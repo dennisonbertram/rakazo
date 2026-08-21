@@ -18,6 +18,8 @@ import {
   isComposioEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  McpConnector,
+  McpOAuthBroker,
   PiAgentRuntime,
   PostgresRealtimeFanout,
   ScriptedAgentRuntime,
@@ -49,10 +51,15 @@ async function main() {
     dataDir,
     prisma,
   });
-  const stack = createConnectorStack(isComposioEnabled(process.env.COMPOSIO_API_KEY));
+  const secrets = new EncryptedSecretStore(resolveEncryptionKey(process.env));
+  const mcpOAuth = new McpOAuthBroker(prisma, secrets);
+  const mcp = new McpConnector(prisma, secrets, {
+    stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
+    allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "").split(",").map((v) => v.trim()).filter(Boolean),
+  }, mcpOAuth);
+  const stack = createConnectorStack(isComposioEnabled(process.env.COMPOSIO_API_KEY), undefined, mcp);
   const connector = stack.destination;
   await connector.start();
-  const secrets = new EncryptedSecretStore(resolveEncryptionKey(process.env));
   const home = new LocalAgentHomeStore(dataDir);
   const artifacts = new LocalArtifactStore(dataDir);
   const inMemoryJobs = process.env.WAKEUP_DRIVER === "memory" ? new InMemoryJobQueue() : undefined;
@@ -106,6 +113,7 @@ async function main() {
     await jobs.close();
     await realtime.close();
     await connector.stop();
+    await mcp.close();
     await prisma.$disconnect().catch(() => undefined);
     await pool.end().catch(() => undefined);
   };

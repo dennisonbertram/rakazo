@@ -100,6 +100,9 @@ const ModelSettingsOverlay = lazy(() =>
 const PluginsOverlay = lazy(() =>
   import("./PluginsOverlay").then((module) => ({ default: module.PluginsOverlay })),
 );
+const McpServersOverlay = lazy(() =>
+  import("./McpServersOverlay").then((module) => ({ default: module.McpServersOverlay })),
+);
 const RoutineSchedule = lazy(() =>
   import("./RoutineSchedule").then((module) => ({ default: module.RoutineSchedule })),
 );
@@ -145,6 +148,7 @@ export function ShellPage() {
   const [teachBusy, setTeachBusy] = useState(false);
   const [computer, setComputer] = useState<ComputerStatus | null>(null);
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
@@ -1710,7 +1714,8 @@ export function ShellPage() {
           />
         ) : null}
 
-        {pluginsOpen ? <PluginsOverlay onClose={() => setPluginsOpen(false)} /> : null}
+        {pluginsOpen ? <PluginsOverlay onClose={() => setPluginsOpen(false)} onOpenMcp={() => { setPluginsOpen(false); setMcpOpen(true); }} /> : null}
+        {mcpOpen ? <McpServersOverlay onClose={() => setMcpOpen(false)} /> : null}
       </Suspense>
 
       <Suspense fallback={null}>

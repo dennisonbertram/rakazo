@@ -18,6 +18,8 @@ import {
   isComposioEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  McpConnector,
+  McpOAuthBroker,
   PiAgentRuntime,
   PiOAuthLogins,
   PostgresRealtimeFanout,
@@ -94,11 +96,16 @@ export async function createApp(
     prisma,
   });
   const secrets = new EncryptedSecretStore(env.encryptionKey);
+  const mcpOAuth = new McpOAuthBroker(prisma, secrets);
   const oauthLogins = new PiOAuthLogins();
   const home = new LocalAgentHomeStore(env.dataDir);
   const artifacts = new LocalArtifactStore(env.dataDir);
   const memory = new MarkdownMemoryStore(prisma);
-  const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride);
+  const mcp = new McpConnector(prisma, secrets, {
+    stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
+    allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "").split(",").map((v) => v.trim()).filter(Boolean),
+  }, mcpOAuth);
+  const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride, mcp);
   const connector = stack.destination;
   await connector.start();
   void stack.composio?.warmDirectory().catch(() => undefined);
@@ -190,6 +197,7 @@ export async function createApp(
     home,
     secrets,
     oauthLogins,
+    mcpOAuth,
     composio: stack.composio,
     artifacts,
     dataDir: env.dataDir,
@@ -263,7 +271,8 @@ export async function createApp(
       await reconciler?.stop();
       await jobs.close();
       await realtime.close();
-      await connector.stop();
+    await connector.stop();
+    await mcp.close();
       await prisma.$disconnect().catch(() => undefined);
       await created.pool?.end().catch(() => undefined);
     },

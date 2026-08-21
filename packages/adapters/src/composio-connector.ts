@@ -12,6 +12,7 @@ import {
   type ToolkitDirectoryEntry,
 } from "./composio-catalog-cache.js";
 import { DestinationEmulator } from "./destination-emulator.js";
+import type { McpConnector } from "./mcp-connector.js";
 
 type ComposioSession = Awaited<ReturnType<Composio["create"]>>;
 
@@ -44,6 +45,7 @@ function mapOneTool(item: unknown): ConnectorTool | undefined {
       name,
       description: String(fn.description ?? name),
       inputSchema: asObject(fn.parameters) ?? { type: "object", properties: {} },
+      route: { kind: "composio" },
     };
   }
   const name = String(raw.slug ?? raw.name ?? "");
@@ -54,6 +56,7 @@ function mapOneTool(item: unknown): ConnectorTool | undefined {
     inputSchema: asObject(raw.inputParameters) ??
       asObject(raw.inputSchema) ??
       asObject(raw.parameters) ?? { type: "object", properties: {} },
+    route: { kind: "composio" },
   };
 }
 
@@ -354,6 +357,7 @@ export class CompositeConnector implements ConnectorProvider {
   constructor(
     readonly destination: DestinationEmulator,
     readonly composio?: ComposioProvider,
+    readonly mcp?: McpConnector,
   ) {}
 
   describe() {
@@ -361,20 +365,40 @@ export class CompositeConnector implements ConnectorProvider {
   }
 
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
-    const dest = await this.destination.discoverTools(context);
-    if (!this.composio) return dest;
+    const dest = (await this.destination.discoverTools(context)).map((tool) => ({
+      ...tool,
+      route: tool.route ?? { kind: "destination" as const },
+    }));
+    const mcp = this.mcp ? await this.mcp.discoverTools(context).catch(() => []) : [];
+    if (!this.composio) return [...dest, ...mcp];
     try {
-      const extra = await this.composio.discoverTools(context);
+      const extra = (await this.composio.discoverTools(context)).map((tool) => ({
+        ...tool,
+        route: tool.route ?? { kind: "composio" as const },
+      }));
       const destNames = new Set(dest.map((tool) => tool.name));
-      return [...dest, ...extra.filter((tool) => !destNames.has(tool.name))];
+      const names = new Set([...destNames, ...extra.map((tool) => tool.name)]);
+      return [...dest, ...extra.filter((tool) => !destNames.has(tool.name)), ...mcp.filter((tool) => !names.has(tool.name))];
     } catch {
-      return dest;
+      return [...dest, ...mcp.filter((tool) => !dest.some((item) => item.name === tool.name))];
     }
   }
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
-    if (call.tool === "destination.write" || !this.composio) {
+    if (call.route?.kind === "mcp") {
+      if (!this.mcp) { yield { type: "error", message: "MCP is not configured" }; return; }
+      yield* this.mcp.execute(call, context); return;
+    }
+    if (
+      call.route?.kind === "destination" ||
+      (!call.route && call.tool === "destination.write") ||
+      !this.composio
+    ) {
       yield* this.destination.execute(call, context);
+      return;
+    }
+    if (call.route?.kind === "builtin") {
+      yield { type: "error", message: `builtin tool ${call.tool} is not a connector tool` };
       return;
     }
     yield* this.composio.execute(call, context);
@@ -384,13 +408,14 @@ export class CompositeConnector implements ConnectorProvider {
 export function createConnectorStack(
   composioEnabled: boolean,
   composioOverride?: ComposioProvider,
+  mcp?: McpConnector,
 ) {
   const destination = new DestinationEmulator();
   const composio = composioOverride ?? (composioEnabled ? new ComposioConnector() : undefined);
   return {
     destination,
     composio,
-    connector: new CompositeConnector(destination, composio),
+    connector: new CompositeConnector(destination, composio, mcp),
   };
 }
 

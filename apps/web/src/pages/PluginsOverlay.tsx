@@ -10,7 +10,7 @@ function markConnected(items: ConnectionCatalogItem[], slug: string, connected: 
   return items.map((entry) => (entry.slug === slug ? { ...entry, connected } : entry));
 }
 
-export function PluginsOverlay({ onClose }: { onClose: () => void }) {
+export function PluginsOverlay({ onClose, onOpenMcp }: { onClose: () => void; onOpenMcp?: () => void }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<CatalogView>("all");
   const [catalog, setCatalog] = useState<ConnectionCatalogItem[]>(cachedCatalog);
@@ -106,6 +106,8 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
             <div className="text-2xl font-medium text-[#F1F1F2]">Plugins</div>
             {loading ? <p className="mt-1 text-[13.5px] text-[#7A7A80]">Loading catalog…</p> : null}
           </div>
+          <div className="flex items-center gap-3">
+          {onOpenMcp ? <button type="button" onClick={onOpenMcp} className="rounded-full border border-[#383844] px-3 py-1.5 text-xs text-[#C9C9CE] hover:bg-[#232327]">MCP servers</button> : null}
           <button
             type="button"
             aria-label="Close plugins"
@@ -114,6 +116,7 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
           >
             ✕
           </button>
+          </div>
         </div>
         <div className="px-8 pt-4">
           <input

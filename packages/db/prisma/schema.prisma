@@ -22,6 +22,7 @@ model User {
   modelCredentials UserModelCredential[]
   voiceCredentials UserVoiceCredential[]
   secrets          Secret[]
+  mcpServers       McpServer[]
   botSections      BotSection[]
 
   @@unique([email])
@@ -105,6 +106,7 @@ model Organization {
   notificationPreferences NotificationPreference[]
   computers   Computer[]
   externalEffects ExternalEffect[]
+  mcpServers   McpServer[]
 
   @@unique([slug])
   @@map("organization")
@@ -225,6 +227,7 @@ model Bot {
   usageRecords   UsageRecord[]
   tasks          Task[]
   runs           Run[]
+  mcpServers     BotMcpServer[]
 
   @@index([workspaceId, userId, archivedAt, pinned, updatedAt])
   @@index([sectionId])
@@ -660,7 +663,54 @@ model Secret {
   kind        String
   ciphertext  String
   createdAt   DateTime @default(now())
+  mcpServers  McpServer[]
 
   @@index([userId, workspaceId])
   @@map("secrets")
+}
+
+model McpServer {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug        String
+  name        String
+  description String   @default("")
+  transport   String
+  endpoint    String?
+  command     String?
+  args        Json     @default("[]")
+  env         Json     @default("{}")
+  headers     Json     @default("{}")
+  secretId    String?
+  secret      Secret?  @relation(fields: [secretId], references: [id], onDelete: SetNull)
+  enabled     Boolean  @default(true)
+  revision    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  assignments BotMcpServer[]
+
+  @@unique([workspaceId, userId, slug])
+  @@index([workspaceId, userId])
+  @@map("mcp_servers")
+}
+
+model BotMcpServer {
+  id          String   @id @default(cuid())
+  workspaceId String
+  botId       String
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  serverId    String
+  server      McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  userId      String
+  allowAllTools Boolean @default(true)
+  allowedTools Json    @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([botId, serverId])
+  @@index([workspaceId, userId, botId])
+  @@map("bot_mcp_servers")
 }

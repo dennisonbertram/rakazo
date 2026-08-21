@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { authClient } from "./lib/auth";
 import { markAfterPaint, markOnce } from "./lib/performance";
 import { ShellPage } from "./pages/Shell";
+import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
 
 const AuthPage = lazy(() =>
   import("./pages/Auth").then((module) => ({ default: module.AuthPage })),
@@ -44,6 +45,10 @@ export function App() {
         <Route
           path="/onboarding"
           element={user ? <OnboardingPage /> : <Navigate to="/sign-in" replace />}
+        />
+        <Route
+          path="/mcp/oauth/callback"
+          element={user ? <McpOAuthCallbackPage /> : <Navigate to="/sign-in" replace />}
         />
         <Route path="/app" element={user ? <ShellPage /> : <Navigate to="/sign-in" replace />} />
         <Route
