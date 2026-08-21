@@ -82,7 +82,8 @@ export class McpConnector implements ConnectorProvider {
       await session.connectStdio({ command: String(server.command ?? ""), args, env, allowedCommands: this.options.allowedCommands ?? [] });
     } else {
       if (!server.endpoint) throw new Error("MCP endpoint is required");
-      const headers = { ...(material.headers ?? {}), ...(typeof server.headers === "object" && server.headers ? server.headers : {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) };
+      const staticToken = material.secret ? (material.secret.startsWith("Bearer ") ? material.secret : `Bearer ${material.secret}`) : undefined;
+      const headers = { ...(material.headers ?? {}), ...(staticToken ? { Authorization: staticToken } : {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) };
       await session.connectRemote({ url: server.endpoint, transport: server.transport === "sse" ? "sse" : "streamable-http", allowLegacySse: server.transport === "sse", headerPolicy: { headers }, fallbackToSse: false });
     }
     this.sessions.set(sessionKey, { session, serverId: server.id });

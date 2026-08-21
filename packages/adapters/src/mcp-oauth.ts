@@ -6,6 +6,8 @@ import { EncryptedSecretStore } from "./secrets.js";
 
 type OAuthMaterial = {
   secret?: string;
+  oauthClientId?: string;
+  oauthClientSecret?: string;
   env?: Record<string, string>;
   headers?: Record<string, string>;
   oauth?: { tokens: OAuthTokens; obtainedAt: number; clientInformation?: OAuthClientInformationMixed; discoveryState?: OAuthDiscoveryState };
@@ -17,8 +19,8 @@ class PendingProvider implements OAuthClientProvider {
   private verifier?: string;
   private discovery?: OAuthDiscoveryState;
   authorizationUrl?: URL;
-  constructor(readonly redirectUrl: string, readonly stateValue: string) {}
-  get clientMetadata(): OAuthClientMetadata { return { redirect_uris: [this.redirectUrl], client_name: "Rakazo", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" }; }
+  constructor(readonly redirectUrl: string, readonly stateValue: string, private readonly registeredClient?: OAuthClientInformationMixed) { this.client = registeredClient; }
+  get clientMetadata(): OAuthClientMetadata { return { redirect_uris: [this.redirectUrl], client_name: "Rakazo", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: this.registeredClient?.client_secret ? "client_secret_post" : "none" }; }
   state(): string { return this.stateValue; }
   clientInformation(): OAuthClientInformationMixed | undefined { return this.client; }
   saveClientInformation(value: OAuthClientInformationMixed): void { this.client = value; }
@@ -63,7 +65,10 @@ export class McpOAuthBroker {
     const server = await this.prisma.mcpServer.findFirst({ where: { id: input.serverId, workspaceId: input.workspaceId, userId: input.userId, enabled: true } });
     if (!server?.endpoint) throw new Error("MCP server endpoint is required for OAuth");
     const sessionId = randomUUID();
-    const provider = new PendingProvider(input.redirectUri, sessionId);
+    const existingSecret = server.secretId ? await this.prisma.secret.findFirst({ where: { id: server.secretId, workspaceId: input.workspaceId, userId: input.userId } }) : null;
+    const existingMaterial = existingSecret ? this.read(existingSecret.ciphertext) : {};
+    const registeredClient = existingMaterial.oauthClientId ? { client_id: existingMaterial.oauthClientId, client_secret: existingMaterial.oauthClientSecret } : undefined;
+    const provider = new PendingProvider(input.redirectUri, sessionId, registeredClient);
     const result = await auth(provider, { serverUrl: server.endpoint });
     if (result !== "REDIRECT" || !provider.authorizationUrl) throw new Error("MCP server did not start OAuth authorization");
     this.pending.set(sessionId, { serverId: server.id, workspaceId: input.workspaceId, userId: input.userId, endpoint: server.endpoint, provider });

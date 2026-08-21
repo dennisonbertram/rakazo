@@ -1457,8 +1457,8 @@ export function createRouter(deps: RouterDeps) {
         }),
         create: authed.mcp.servers.create.handler(async ({ context, input }) => {
           const secretPayload =
-            "secret" in input && input.secret
-              ? JSON.stringify({ secret: input.secret, env: "env" in input ? input.env : {}, headers: "headers" in input ? input.headers : {} })
+            ("secret" in input && input.secret) || ("oauthClientId" in input && input.oauthClientId) || ("oauthClientSecret" in input && input.oauthClientSecret)
+              ? JSON.stringify({ secret: "secret" in input ? input.secret : undefined, env: "env" in input ? input.env : {}, headers: "headers" in input ? input.headers : {}, oauthClientId: "oauthClientId" in input ? input.oauthClientId : undefined, oauthClientSecret: "oauthClientSecret" in input ? input.oauthClientSecret : undefined })
               : null;
           const stored = secretPayload
             ? await deps.secrets.put(secretPayload, computerContext(context.actor, "mcp", "mcp.create"))
