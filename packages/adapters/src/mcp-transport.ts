@@ -172,7 +172,11 @@ export class McpSession {
 
   async callTool(name: string, args: Record<string, unknown> = {}, options?: { signal?: AbortSignal }): Promise<CallToolResult> {
     this.assertConnected();
-    return this.client.callTool({ name, arguments: args }, undefined, { signal: options?.signal });
+    return (await this.client.callTool(
+      { name, arguments: args },
+      undefined,
+      { signal: options?.signal },
+    )) as CallToolResult;
   }
 
   async close(): Promise<void> {

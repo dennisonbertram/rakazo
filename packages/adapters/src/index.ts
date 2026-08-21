@@ -31,6 +31,7 @@ export * from "./host-aware-sandbox.js";
 export * from "./job-reconciler.js";
 export * from "./mcp-emulator.js";
 export * from "./mcp-transport.js";
+export * from "./mcp-connector.js";
 export * from "./openai-voice.js";
 export * from "./pi-models.js";
 export * from "./pi-oauth.js";

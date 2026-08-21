@@ -1460,6 +1460,9 @@ export function createRouter(deps: RouterDeps) {
           const stored = secretPayload
             ? await deps.secrets.put(secretPayload, computerContext(context.actor, "mcp", "mcp.create"))
             : null;
+          if (stored) {
+            await deps.prisma.secret.create({ data: { id: stored.id, userId: context.actor.userId, workspaceId: context.actor.workspaceId, kind: "mcp", ciphertext: stored.ciphertext } });
+          }
           const row = await deps.prisma.mcpServer.create({
             data: {
               workspaceId: context.actor.workspaceId,
@@ -1473,9 +1476,7 @@ export function createRouter(deps: RouterDeps) {
               args: ("args" in input ? input.args : []) as Prisma.InputJsonValue,
               env: ("env" in input ? Object.fromEntries(Object.keys(input.env).map((key) => [key, true])) : {}) as Prisma.InputJsonValue,
               headers: ("headers" in input ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, true])) : {}) as Prisma.InputJsonValue,
-              secret: stored
-                ? { create: { id: stored.id, userId: context.actor.userId, workspaceId: context.actor.workspaceId, kind: "mcp", ciphertext: stored.ciphertext } }
-                : undefined,
+              secretId: stored?.id,
               enabled: input.enabled,
             },
           });

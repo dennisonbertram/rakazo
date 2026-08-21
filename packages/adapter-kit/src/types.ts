@@ -167,7 +167,8 @@ export interface ConnectorTool {
 export type ConnectorRoute =
   | { kind: "builtin" }
   | { kind: "destination" }
-  | { kind: "composio" };
+  | { kind: "composio" }
+  | { kind: "mcp"; serverId: string; remoteName: string };
 
 export interface ConnectorCall {
   tool: string;
