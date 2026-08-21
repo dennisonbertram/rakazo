@@ -25,11 +25,7 @@ export class PendingProvider implements OAuthClientProvider {
   private discovery?: OAuthDiscoveryState;
   authorizationUrl?: URL;
 
-  constructor(
-    readonly redirectUrl: string,
-    readonly stateValue: string,
-    private readonly resourceOriginAliases = new Set<string>(),
-  ) {}
+  constructor(readonly redirectUrl: string, readonly stateValue: string) {}
 
   get clientMetadata(): OAuthClientMetadata {
     const hostname = new URL(this.redirectUrl).hostname;
@@ -54,57 +50,6 @@ export class PendingProvider implements OAuthClientProvider {
   codeVerifier(): string { if (!this.verifier) throw new Error("OAuth PKCE verifier is missing"); return this.verifier; }
   saveDiscoveryState(value: OAuthDiscoveryState): void { this.discovery = value; }
   discoveryState(): OAuthDiscoveryState | undefined { return this.discovery; }
-  async validateResourceURL(serverUrl: string | URL, resource?: string): Promise<URL | undefined> {
-    const server = new URL(serverUrl);
-    if (!resource) return server;
-    const candidate = new URL(resource);
-    if (candidate.href === server.href || candidate.origin === server.origin || this.resourceOriginAliases.has(candidate.origin)) {
-      return candidate;
-    }
-    throw new Error(`Protected resource ${candidate.href} does not match MCP server ${server.href}`);
-  }
-}
-
-function canRetryOAuthRequestAtResourceOrigin(request: Request): boolean {
-  if (request.method === "GET" || request.method === "HEAD") return true;
-  if (request.method !== "POST" || request.headers.has("authorization")) return false;
-  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
-  return contentType.includes("application/json");
-}
-
-function oauthFetchWithResourceOriginFallback(serverUrl: URL): {
-  fetch: typeof fetch;
-  resourceOriginAliases: Set<string>;
-} {
-  const resourceOriginAliases = new Set<string>();
-  const fetchWithFallback: typeof fetch = async (input: string | URL | Request, init?: RequestInit) => {
-    const request = new Request(input, init);
-    const retryRequest = request.clone();
-    try {
-      return await fetch(request);
-    } catch (error) {
-      const requestedUrl = new URL(request.url);
-      if (
-        requestedUrl.origin === serverUrl.origin ||
-        !canRetryOAuthRequestAtResourceOrigin(retryRequest)
-      ) throw error;
-
-      if (retryRequest.method === "POST") {
-        const body = await retryRequest.clone().json().catch(() => undefined) as Record<string, unknown> | undefined;
-        if (!body || !Array.isArray(body.redirect_uris) || typeof body.client_name !== "string" || "grant_type" in body) {
-          throw error;
-        }
-      }
-
-      const fallbackUrl = new URL(`${requestedUrl.pathname}${requestedUrl.search}`, serverUrl.origin);
-      const response = await fetch(new Request(fallbackUrl, retryRequest));
-      if (response.ok && (retryRequest.method === "GET" || retryRequest.method === "HEAD")) {
-        resourceOriginAliases.add(requestedUrl.origin);
-      }
-      return response;
-    }
-  };
-  return { fetch: fetchWithFallback, resourceOriginAliases };
 }
 
 type Pending = {
@@ -146,13 +91,8 @@ export class McpOAuthBroker {
     const server = await this.prisma.mcpServer.findFirst({ where: { id: input.serverId, workspaceId: input.workspaceId, userId: input.userId, enabled: true } });
     if (!server?.endpoint) throw new Error("MCP server endpoint is required for OAuth");
     const sessionId = randomUUID();
-    const serverUrl = new URL(server.endpoint);
-    const oauthFetch = oauthFetchWithResourceOriginFallback(serverUrl);
-    const provider = new PendingProvider(input.redirectUri, sessionId, oauthFetch.resourceOriginAliases);
-    const transport = new StreamableHTTPClientTransport(serverUrl, {
-      authProvider: provider,
-      fetch: oauthFetch.fetch,
-    });
+    const provider = new PendingProvider(input.redirectUri, sessionId);
+    const transport = new StreamableHTTPClientTransport(new URL(server.endpoint), { authProvider: provider });
     const client = new Client({ name: "rakazo-oauth", version: "0.1.0" });
     try {
       await client.connect(transport);
@@ -171,12 +111,7 @@ export class McpOAuthBroker {
     if (!pending || pending.workspaceId !== input.workspaceId || pending.userId !== input.userId || input.state !== input.sessionId) {
       throw new Error("MCP OAuth session is invalid or expired");
     }
-    const serverUrl = new URL(pending.endpoint);
-    const oauthFetch = oauthFetchWithResourceOriginFallback(serverUrl);
-    const transport = new StreamableHTTPClientTransport(serverUrl, {
-      authProvider: pending.provider,
-      fetch: oauthFetch.fetch,
-    });
+    const transport = new StreamableHTTPClientTransport(new URL(pending.endpoint), { authProvider: pending.provider });
     await transport.finishAuth(input.code);
     const tokens = pending.provider.tokens();
     if (!tokens) throw new Error("MCP OAuth authorization failed");
