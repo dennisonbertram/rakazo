@@ -298,6 +298,15 @@ export const appContract = {
         )
         .output(z.array(BotMcpServerSchema)),
     },
+    oauth: {
+      begin: oc
+        .input(z.object({ serverId: Id, redirectUri: z.string().url() }))
+        .output(z.object({ sessionId: Id, authorizationUrl: z.string().url() })),
+      complete: oc
+        .input(z.object({ sessionId: Id, code: z.string().min(1), state: z.string().min(1) }))
+        .output(z.object({ ok: z.literal(true) })),
+      disconnect: oc.input(z.object({ serverId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
   },
   connections: {
     catalog: oc

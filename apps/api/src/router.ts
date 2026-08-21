@@ -26,6 +26,7 @@ import {
   destroyBot,
   displayBotWorkspacePath,
   type EncryptedSecretStore,
+  McpOAuthBroker,
   expireComputerControl,
   hasActiveComputerControl,
   isSupermemoryEnabled,
@@ -164,6 +165,7 @@ export interface RouterDeps {
   secrets: EncryptedSecretStore;
   oauthLogins: PiOAuthLogins;
   composio?: ComposioProvider;
+  mcpOAuth?: McpOAuthBroker;
   artifacts: ArtifactStore;
   dataDir: string;
   env: {
@@ -179,6 +181,7 @@ export interface RouterDeps {
 export function createRouter(deps: RouterDeps) {
   const os = implement(appContract).$context<{ actor: Actor | null; signal?: AbortSignal }>();
   const repos = createRepos(deps.prisma);
+  const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets);
   const taughtSkills = createTaughtSkillsService({
     prisma: deps.prisma,
     events: deps.events,
@@ -1525,7 +1528,7 @@ export function createRouter(deps: RouterDeps) {
           return { ok: true as const };
         }),
       },
-      assignments: {
+    assignments: {
         list: authed.mcp.assignments.list.handler(async ({ context, input }) => {
           const bot = await deps.prisma.bot.findFirst({ where: { id: input.botId, workspaceId: context.actor.workspaceId, userId: context.actor.userId }, select: { id: true } });
           if (!bot) throw new IsolationError();
@@ -1544,8 +1547,20 @@ export function createRouter(deps: RouterDeps) {
           });
           return result.map((row) => ({ id: row.id, botId: row.botId, serverId: row.serverId, allowAllTools: row.allowAllTools, allowedTools: Array.isArray(row.allowedTools) ? row.allowedTools.filter((item): item is string => typeof item === "string") : [], createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() }));
         }),
-      },
     },
+    oauth: {
+      begin: authed.mcp.oauth.begin.handler(async ({ context, input }) =>
+        mcpOAuth.begin({ ...input, workspaceId: context.actor.workspaceId, userId: context.actor.userId })),
+      complete: authed.mcp.oauth.complete.handler(async ({ context, input }) => {
+        await mcpOAuth.complete({ ...input, workspaceId: context.actor.workspaceId, userId: context.actor.userId });
+        return { ok: true as const };
+      }),
+      disconnect: authed.mcp.oauth.disconnect.handler(async ({ context, input }) => {
+        await mcpOAuth.disconnect({ ...input, workspaceId: context.actor.workspaceId, userId: context.actor.userId });
+        return { ok: true as const };
+      }),
+    },
+  },
     connections: {
       catalog: authed.connections.catalog.handler(async ({ context, input }) => {
         if (!deps.composio) return [];

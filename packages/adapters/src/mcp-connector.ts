@@ -2,6 +2,7 @@ import type { AdapterContext, ConnectorCall, ConnectorEvent, ConnectorProvider, 
 import type { PrismaClient } from "@rakazo/db";
 import { McpSession } from "./mcp-transport.js";
 import { EncryptedSecretStore } from "./secrets.js";
+import type { McpOAuthBroker } from "./mcp-oauth.js";
 
 type SessionEntry = { session: McpSession; serverId: string };
 
@@ -12,10 +13,11 @@ export class McpConnector implements ConnectorProvider {
     private readonly prisma: PrismaClient,
     private readonly secrets: EncryptedSecretStore,
     private readonly options: { stdioEnabled?: boolean; allowedCommands?: string[] } = {},
+    private readonly oauth?: McpOAuthBroker,
   ) {}
 
   describe() {
-    return { id: "mcp", contractVersion: "1", adapterVersion: "0.1.0", capabilities: { discover: true, oauth: false, secretsBrokered: true } };
+    return { id: "mcp", contractVersion: "1", adapterVersion: "0.1.0", capabilities: { discover: true, oauth: true, secretsBrokered: true } };
   }
 
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
@@ -66,7 +68,9 @@ export class McpConnector implements ConnectorProvider {
   async close(): Promise<void> { await Promise.all([...this.sessions.values()].map(({ session }) => session.close())); this.sessions.clear(); }
 
   private async sessionFor(server: any, context: AdapterContext): Promise<McpSession> {
-    const existing = this.sessions.get(server.id);
+    const accessToken = this.oauth ? await this.oauth.accessToken(server, context) : undefined;
+    const sessionKey = `${server.id}:${accessToken ?? "static"}`;
+    const existing = this.sessions.get(sessionKey);
     if (existing) return existing.session;
     const session = new McpSession({ name: `rakazo-${server.slug}` });
     const secret = server.secretId ? await this.prisma.secret.findFirst({ where: { id: server.secretId, workspaceId: context.workspaceId, userId: context.userId } }) : null;
@@ -78,10 +82,10 @@ export class McpConnector implements ConnectorProvider {
       await session.connectStdio({ command: String(server.command ?? ""), args, env, allowedCommands: this.options.allowedCommands ?? [] });
     } else {
       if (!server.endpoint) throw new Error("MCP endpoint is required");
-      const headers = { ...(material.headers ?? {}), ...(typeof server.headers === "object" && server.headers ? server.headers : {}) };
+      const headers = { ...(material.headers ?? {}), ...(typeof server.headers === "object" && server.headers ? server.headers : {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) };
       await session.connectRemote({ url: server.endpoint, transport: server.transport === "sse" ? "sse" : "streamable-http", allowLegacySse: server.transport === "sse", headerPolicy: { headers }, fallbackToSse: false });
     }
-    this.sessions.set(server.id, { session, serverId: server.id });
+    this.sessions.set(sessionKey, { session, serverId: server.id });
     return session;
   }
 }

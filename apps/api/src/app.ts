@@ -19,6 +19,7 @@ import {
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
+  McpOAuthBroker,
   PiAgentRuntime,
   PiOAuthLogins,
   PostgresRealtimeFanout,
@@ -95,6 +96,7 @@ export async function createApp(
     prisma,
   });
   const secrets = new EncryptedSecretStore(env.encryptionKey);
+  const mcpOAuth = new McpOAuthBroker(prisma, secrets);
   const oauthLogins = new PiOAuthLogins();
   const home = new LocalAgentHomeStore(env.dataDir);
   const artifacts = new LocalArtifactStore(env.dataDir);
@@ -102,7 +104,7 @@ export async function createApp(
   const mcp = new McpConnector(prisma, secrets, {
     stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
     allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "").split(",").map((v) => v.trim()).filter(Boolean),
-  });
+  }, mcpOAuth);
   const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride, mcp);
   const connector = stack.destination;
   await connector.start();
@@ -195,6 +197,7 @@ export async function createApp(
     home,
     secrets,
     oauthLogins,
+    mcpOAuth,
     composio: stack.composio,
     artifacts,
     dataDir: env.dataDir,

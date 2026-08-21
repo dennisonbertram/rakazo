@@ -50,6 +50,20 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
     finally { setSaving(false); }
   }
 
+  async function connectOAuth(server: McpServer) {
+    setError(null);
+    try {
+      const started = await rpc.mcp.oauth.begin({ serverId: server.id, redirectUri: `${window.location.origin}/mcp/oauth/callback` });
+      window.location.assign(started.authorizationUrl);
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not start OAuth"); }
+  }
+
+  async function disconnectOAuth(server: McpServer) {
+    setError(null);
+    try { await rpc.mcp.oauth.disconnect({ serverId: server.id }); await refresh(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not disconnect OAuth"); }
+  }
+
   return <div className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(4,4,5,.62)] p-6">
     <section className="flex max-h-full w-[1080px] max-w-full flex-col overflow-hidden rounded-[26px] border border-[#2A2A31] bg-[#141416] shadow-[0_40px_90px_rgba(0,0,0,.55)]" aria-label="MCP servers">
       <header className="flex items-start justify-between border-b border-[#27272C] px-8 py-6">
@@ -73,7 +87,7 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-5">
           <div><h2 className="text-[15px] font-medium text-[#ECECEE]">Agent access</h2><p className="mt-1 text-xs text-[#77777F]">Select agents before adding the server.</p><div className="mt-3 space-y-2">{bots.map((bot) => <label key={bot.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#292930] bg-[#101012] px-3 py-3"><input type="checkbox" checked={selectedBotIds.includes(bot.id)} onChange={() => toggleBot(bot.id)} className="accent-[#7785FF]" /><span className="grid h-8 w-8 place-items-center rounded-lg bg-[#30356A] text-xs text-[#E2E4FF]">{bot.name.slice(0, 1).toUpperCase()}</span><span><span className="block text-sm text-[#E4E4E7]">{bot.name}</span><span className="block text-xs text-[#77777F]">{bot.title}</span></span></label>)}</div></div>
-          <div><h2 className="text-[15px] font-medium text-[#ECECEE]">Configured servers</h2><div className="mt-3 space-y-2">{servers.length === 0 ? <p className="rounded-xl border border-dashed border-[#34343B] p-5 text-sm text-[#77777F]">No MCP servers yet.</p> : servers.map((server) => <div key={server.id} className="rounded-xl border border-[#292930] bg-[#101012] p-4"><div className="flex items-center justify-between"><span className="font-medium text-[#ECECEE]">{server.name}</span><span className="rounded-full bg-[#202536] px-2 py-1 text-[10px] uppercase text-[#AEB7FF]">{server.transport.replace("_", " ")}</span></div><p className="mt-1 text-xs text-[#77777F]">{server.endpoint ?? server.command ?? server.slug}</p><p className="mt-2 text-[11px] text-[#6E778A]">{server.hasSecret ? "Encrypted credential saved" : "No credential saved"}</p></div>)}</div></div>
+          <div><h2 className="text-[15px] font-medium text-[#ECECEE]">Configured servers</h2><div className="mt-3 space-y-2">{servers.length === 0 ? <p className="rounded-xl border border-dashed border-[#34343B] p-5 text-sm text-[#77777F]">No MCP servers yet.</p> : servers.map((server) => <div key={server.id} className="rounded-xl border border-[#292930] bg-[#101012] p-4"><div className="flex items-center justify-between"><span className="font-medium text-[#ECECEE]">{server.name}</span><span className="rounded-full bg-[#202536] px-2 py-1 text-[10px] uppercase text-[#AEB7FF]">{server.transport.replace("_", " ")}</span></div><p className="mt-1 text-xs text-[#77777F]">{server.endpoint ?? server.command ?? server.slug}</p><p className="mt-2 text-[11px] text-[#6E778A]">{server.hasSecret ? "Encrypted credential saved" : "No credential saved"}</p>{server.transport !== "stdio" ? <div className="mt-3 flex gap-2"><button type="button" onClick={() => void connectOAuth(server)} className="rounded-lg bg-[#7785FF] px-3 py-2 text-xs font-semibold text-[#090A12]">Connect OAuth</button>{server.hasSecret ? <button type="button" onClick={() => void disconnectOAuth(server)} className="rounded-lg border border-[#34343B] px-3 py-2 text-xs text-[#B9B9C0]">Disconnect</button> : null}</div> : null}</div>)}</div></div>
         </div>
       </div>
     </section>
