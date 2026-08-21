@@ -44,6 +44,7 @@ function mapOneTool(item: unknown): ConnectorTool | undefined {
       name,
       description: String(fn.description ?? name),
       inputSchema: asObject(fn.parameters) ?? { type: "object", properties: {} },
+      route: { kind: "composio" },
     };
   }
   const name = String(raw.slug ?? raw.name ?? "");
@@ -54,6 +55,7 @@ function mapOneTool(item: unknown): ConnectorTool | undefined {
     inputSchema: asObject(raw.inputParameters) ??
       asObject(raw.inputSchema) ??
       asObject(raw.parameters) ?? { type: "object", properties: {} },
+    route: { kind: "composio" },
   };
 }
 
@@ -361,10 +363,16 @@ export class CompositeConnector implements ConnectorProvider {
   }
 
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
-    const dest = await this.destination.discoverTools(context);
+    const dest = (await this.destination.discoverTools(context)).map((tool) => ({
+      ...tool,
+      route: tool.route ?? { kind: "destination" as const },
+    }));
     if (!this.composio) return dest;
     try {
-      const extra = await this.composio.discoverTools(context);
+      const extra = (await this.composio.discoverTools(context)).map((tool) => ({
+        ...tool,
+        route: tool.route ?? { kind: "composio" as const },
+      }));
       const destNames = new Set(dest.map((tool) => tool.name));
       return [...dest, ...extra.filter((tool) => !destNames.has(tool.name))];
     } catch {
@@ -373,8 +381,16 @@ export class CompositeConnector implements ConnectorProvider {
   }
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
-    if (call.tool === "destination.write" || !this.composio) {
+    if (
+      call.route?.kind === "destination" ||
+      (!call.route && call.tool === "destination.write") ||
+      !this.composio
+    ) {
       yield* this.destination.execute(call, context);
+      return;
+    }
+    if (call.route?.kind === "builtin") {
+      yield { type: "error", message: `builtin tool ${call.tool} is not a connector tool` };
       return;
     }
     yield* this.composio.execute(call, context);

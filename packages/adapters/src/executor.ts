@@ -6,6 +6,7 @@ import type {
   ArtifactStore,
   ComputerRef,
   ConnectorProvider,
+  ConnectorRoute,
   JobPublisher,
   MemoryStore,
   NotificationMessage,
@@ -502,6 +503,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           name: string,
           args: Record<string, unknown>,
           executionId: string,
+          route?: ConnectorRoute,
         ) => {
           const applied = READ_ONLY_AGENT_TOOLS.has(name)
             ? undefined
@@ -819,7 +821,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (deps.connector) {
             let result: unknown = { error: `unknown tool ${name}` };
             for await (const event of deps.connector.execute(
-              { tool: name, args, executionId },
+              { tool: name, args, executionId, route },
               context,
             )) {
               if (event.type === "result") {

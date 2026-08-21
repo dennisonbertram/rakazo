@@ -159,13 +159,22 @@ export interface ConnectorTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /** Captured by discovery and carried opaquely through model/tool execution. */
+  route?: ConnectorRoute;
 }
+
+/** The connector selected during discovery. Never infer authorization from a tool name. */
+export type ConnectorRoute =
+  | { kind: "builtin" }
+  | { kind: "destination" }
+  | { kind: "composio" };
 
 export interface ConnectorCall {
   tool: string;
   args: Record<string, unknown>;
   connectionId?: string;
   executionId: string;
+  route?: ConnectorRoute;
 }
 
 export type ConnectorEvent =
@@ -263,6 +272,7 @@ export interface AgentRunRequest {
     name: string,
     args: Record<string, unknown>,
     executionId: string,
+    route?: ConnectorRoute,
   ) => Promise<unknown>;
 }
 

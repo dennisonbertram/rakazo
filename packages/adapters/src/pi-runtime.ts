@@ -7,6 +7,7 @@ import type {
   AgentRuntime,
   AgentRuntimeEvent,
   AgentToolExecutionResult,
+  ConnectorRoute,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
 import { builtinAgentTools, DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
@@ -269,6 +270,7 @@ function toHistory(history: AgentRunRequest["history"], prompt: string) {
 }
 
 function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): AgentTool {
+  const route: ConnectorRoute = tool.route ?? { kind: "builtin" };
   return {
     name: exposedName,
     label: tool.name,
@@ -361,7 +363,9 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         };
       }
       if (host.request.executeTool) {
-        const result = await host.request.executeTool(tool.name, args, executionId);
+        const result = tool.route
+          ? await host.request.executeTool(tool.name, args, executionId, route)
+          : await host.request.executeTool(tool.name, args, executionId);
         if (isAgentToolExecutionResult(result)) return result;
         return {
           content: [{ type: "text", text: summarizeToolResult(result) }],

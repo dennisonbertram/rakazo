@@ -205,4 +205,4 @@ export const builtinAgentTools: ConnectorTool[] = [
       required: ["confirm_name"],
     },
   },
-];
+].map((tool) => ({ ...tool, route: { kind: "builtin" as const } }));
