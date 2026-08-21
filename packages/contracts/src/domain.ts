@@ -188,6 +188,69 @@ export const CapabilityInstallSchema = z.object({
 });
 export type CapabilityInstall = z.infer<typeof CapabilityInstallSchema>;
 
+export const McpTransportSchema = z.enum(["streamable_http", "sse", "stdio"]);
+export type McpTransport = z.infer<typeof McpTransportSchema>;
+
+const McpServerBaseInput = z.object({
+  slug: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().max(2000).default(""),
+  enabled: z.boolean().default(true),
+});
+export const McpServerConfigInput = z.discriminatedUnion("transport", [
+  McpServerBaseInput.extend({
+    transport: z.literal("streamable_http"),
+    endpoint: z.string().url(),
+    headers: z.record(z.string().regex(/^[A-Za-z0-9-]+$/), z.string().max(4096)).default({}),
+    secret: z.string().max(16384).optional(),
+  }),
+  McpServerBaseInput.extend({
+    transport: z.literal("sse"),
+    endpoint: z.string().url(),
+    headers: z.record(z.string().regex(/^[A-Za-z0-9-]+$/), z.string().max(4096)).default({}),
+    secret: z.string().max(16384).optional(),
+  }),
+  McpServerBaseInput.extend({
+    transport: z.literal("stdio"),
+    command: z.string().min(1).max(512),
+    args: z.array(z.string().max(2048)).max(64).default([]),
+    env: z.record(z.string().regex(/^[A-Z_][A-Z0-9_]*$/), z.string().max(4096)).max(32).default({}),
+    secret: z.string().max(16384).optional(),
+  }),
+]);
+export type McpServerConfigInput = z.infer<typeof McpServerConfigInput>;
+
+export const McpServerSchema = z.object({
+  id: Id,
+  workspaceId: Id,
+  slug: z.string(),
+  name: z.string(),
+  description: z.string(),
+  transport: McpTransportSchema,
+  endpoint: z.string().url().nullable(),
+  command: z.string().nullable(),
+  args: z.array(z.string()),
+  envKeys: z.array(z.string()),
+  headerKeys: z.array(z.string()),
+  hasSecret: z.boolean(),
+  enabled: z.boolean(),
+  revision: z.number().int().positive(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type McpServer = z.infer<typeof McpServerSchema>;
+
+export const BotMcpServerSchema = z.object({
+  id: Id,
+  botId: Id,
+  serverId: Id,
+  allowAllTools: z.boolean(),
+  allowedTools: z.array(z.string().min(1).max(200)),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type BotMcpServer = z.infer<typeof BotMcpServerSchema>;
+
 export const ArtifactSchema = z.object({
   id: Id,
   botId: Id,
