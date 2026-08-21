@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { auth, discoverAuthorizationServerMetadata, extractWWWAuthenticateParams, refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth, extractWWWAuthenticateParams, refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { PrismaClient } from "@rakazo/db";
 import { EncryptedSecretStore } from "./secrets.js";
@@ -81,25 +81,8 @@ export class McpOAuthBroker {
     const existingSecret = server.secretId ? await this.prisma.secret.findFirst({ where: { id: server.secretId, workspaceId: input.workspaceId, userId: input.userId } }) : null;
     const existingMaterial = existingSecret ? this.read(existingSecret.ciphertext) : {};
     const registeredClient = existingMaterial.oauthClientId ? { client_id: existingMaterial.oauthClientId, client_secret: existingMaterial.oauthClientSecret } : undefined;
-    if (this.isBrexServer(server.endpoint) && !registeredClient) {
-      throw new Error("Brex does not offer self-service OAuth registration. Rakazo needs a Brex-issued partner client before Connect OAuth can open Brex sign-in. You can use a Brex API key instead, or ask us to configure the Rakazo Brex integration.");
-    }
     const provider = new PendingProvider(input.redirectUri, sessionId, registeredClient);
     const challenge = await this.oauthChallenge(server.endpoint);
-    if (this.isBrexServer(server.endpoint)) {
-      // Brex advertises its authorization endpoint in the MCP challenge, but its
-      // protected-resource metadata host is not publicly reachable. Seed the
-      // standards-based SDK flow with the documented issuer so it can construct
-      // the authorization request without attempting dynamic registration.
-      const authorizationServerUrl = "https://accounts-api.brex.com/oauth2/default";
-      const authorizationServerMetadata = await discoverAuthorizationServerMetadata(authorizationServerUrl);
-      if (!authorizationServerMetadata) throw new Error("Could not load Brex OAuth metadata");
-      provider.saveDiscoveryState({
-        authorizationServerUrl,
-        authorizationServerMetadata,
-        resourceMetadata: { resource: server.endpoint, authorization_servers: [authorizationServerUrl] },
-      });
-    }
     const result = await auth(provider, { serverUrl: server.endpoint, resourceMetadataUrl: challenge.resourceMetadataUrl, scope: challenge.scope });
     if (result !== "REDIRECT" || !provider.authorizationUrl) throw new Error("MCP server did not start OAuth authorization");
     this.pending.set(sessionId, { serverId: server.id, workspaceId: input.workspaceId, userId: input.userId, endpoint: server.endpoint, provider });
@@ -158,6 +141,12 @@ export class McpOAuthBroker {
   }
 
   private async oauthChallenge(endpoint: string): Promise<{ resourceMetadataUrl?: URL; scope?: string }> {
+    if (this.isBrexServer(endpoint)) {
+      // Brex's MCP documentation names the path-scoped PRM endpoint. Its 401
+      // challenge currently points at an internal mirror, so prefer the public
+      // canonical endpoint before handing discovery to the MCP SDK.
+      return { resourceMetadataUrl: new URL("https://api.brex.com/.well-known/oauth-protected-resource/mcp") };
+    }
     try {
       const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
       return response.status === 401 ? extractWWWAuthenticateParams(response) : {};
