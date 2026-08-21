@@ -1490,8 +1490,8 @@ export function createRouter(deps: RouterDeps) {
           if (!existing) throw new IsolationError();
           const config = input.config;
           const secretPayload =
-            "secret" in config && config.secret
-              ? JSON.stringify({ secret: config.secret, env: "env" in config ? config.env : {}, headers: "headers" in config ? config.headers : {} })
+            (("secret" in config && config.secret) || ("oauthClientId" in config && config.oauthClientId) || ("oauthClientSecret" in config && config.oauthClientSecret))
+              ? JSON.stringify({ secret: "secret" in config ? config.secret : undefined, env: "env" in config ? config.env : {}, headers: "headers" in config ? config.headers : {}, oauthClientId: "oauthClientId" in config ? config.oauthClientId : undefined, oauthClientSecret: "oauthClientSecret" in config ? config.oauthClientSecret : undefined })
               : null;
           const stored = secretPayload
             ? await deps.secrets.put(secretPayload, computerContext(context.actor, "mcp", "mcp.update"))
