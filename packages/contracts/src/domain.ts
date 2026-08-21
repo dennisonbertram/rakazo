@@ -203,16 +203,12 @@ export const McpServerConfigInput = z.discriminatedUnion("transport", [
     endpoint: z.string().url(),
     headers: z.record(z.string().regex(/^[A-Za-z0-9-]+$/), z.string().max(4096)).default({}),
     secret: z.string().max(16384).optional(),
-    oauthClientId: z.string().max(512).optional(),
-    oauthClientSecret: z.string().max(16384).optional(),
   }),
   McpServerBaseInput.extend({
     transport: z.literal("sse"),
     endpoint: z.string().url(),
     headers: z.record(z.string().regex(/^[A-Za-z0-9-]+$/), z.string().max(4096)).default({}),
     secret: z.string().max(16384).optional(),
-    oauthClientId: z.string().max(512).optional(),
-    oauthClientSecret: z.string().max(16384).optional(),
   }),
   McpServerBaseInput.extend({
     transport: z.literal("stdio"),

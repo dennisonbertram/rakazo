@@ -12,8 +12,6 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [endpoint, setEndpoint] = useState("");
   const [secret, setSecret] = useState("");
-  const [oauthClientId, setOauthClientId] = useState("");
-  const [oauthClientSecret, setOauthClientSecret] = useState("");
   const [headerName, setHeaderName] = useState("Authorization");
   const [headerValue, setHeaderValue] = useState("");
   const [command, setCommand] = useState("");
@@ -45,10 +43,10 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
       const headers = headerValue.trim() ? { [headerName.trim() || "Authorization"]: headerValue.trim() } : {};
       const created = transport === "stdio"
         ? await rpc.mcp.servers.create({ slug, name: name.trim(), transport, command: command.trim(), args: args.split(/\s+/).filter(Boolean), env: {}, secret: secret || undefined, enabled: true })
-        : await rpc.mcp.servers.create({ slug, name: name.trim(), transport, endpoint: endpoint.trim(), headers, secret: secret || undefined, oauthClientId: oauthClientId || undefined, oauthClientSecret: oauthClientSecret || undefined, enabled: true });
+        : await rpc.mcp.servers.create({ slug, name: name.trim(), transport, endpoint: endpoint.trim(), headers, secret: secret || undefined, enabled: true });
       await Promise.all(selectedBotIds.map((botId) => rpc.mcp.assignments.replace({ botId, assignments: [{ serverId: created.id, allowAllTools: true, allowedTools: [] }] })));
       setServers((current) => [...current, created]);
-      setName(""); setEndpoint(""); setSecret(""); setOauthClientId(""); setOauthClientSecret(""); setHeaderValue(""); setCommand(""); setArgs(""); setSelectedBotIds([]);
+      setName(""); setEndpoint(""); setSecret(""); setHeaderValue(""); setCommand(""); setArgs(""); setSelectedBotIds([]);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not add MCP server"); }
     finally { setSaving(false); }
   }
@@ -85,7 +83,6 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
             {([['streamable_http', 'HTTP'], ['sse', 'SSE'], ['stdio', 'STDIO']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setTransport(value)} className={`rounded-lg px-2 py-2 text-xs ${transport === value ? "bg-[#30356A] text-[#E2E4FF]" : "text-[#85858B]"}`}>{label}</button>)}
           </div>
           {transport === "stdio" ? <><label className="mb-1.5 block text-xs text-[#B9B9C0]" htmlFor="mcp-command">Command</label><input id="mcp-command" value={command} onChange={(e) => setCommand(e.target.value)} placeholder="/opt/mcp-server" className="mb-4 w-full rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-sm text-white outline-none" /><label className="mb-1.5 block text-xs text-[#B9B9C0]" htmlFor="mcp-args">Arguments</label><input id="mcp-args" value={args} onChange={(e) => setArgs(e.target.value)} placeholder="--stdio" className="mb-4 w-full rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-sm text-white outline-none" /></> : <><label className="mb-1.5 block text-xs text-[#B9B9C0]" htmlFor="mcp-endpoint">Server URL</label><input id="mcp-endpoint" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://api.mobbin.com/mcp" className="mb-4 w-full rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-sm text-white outline-none" /></>}
-          {transport !== "stdio" ? <><label className="mb-1.5 block text-xs text-[#B9B9C0]" htmlFor="mcp-client-id">OAuth client ID (optional)</label><input id="mcp-client-id" value={oauthClientId} onChange={(e) => setOauthClientId(e.target.value)} placeholder="For pre-registered OAuth clients" className="mb-3 w-full rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-sm text-white outline-none" /><label className="mb-1.5 block text-xs text-[#B9B9C0]" htmlFor="mcp-client-secret">OAuth client secret (optional)</label><input id="mcp-client-secret" type="password" value={oauthClientSecret} onChange={(e) => setOauthClientSecret(e.target.value)} placeholder="Stored encrypted" className="mb-3 w-full rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-sm text-white outline-none" /></> : null}
           <label className="mb-1.5 block text-xs text-[#B9B9C0]" htmlFor="mcp-secret">Access token (optional)</label><input id="mcp-secret" type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Stored encrypted" className="mb-3 w-full rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-sm text-white outline-none" />
           {transport !== "stdio" ? <div className="grid grid-cols-[.7fr_1fr] gap-2"><input aria-label="Header name" value={headerName} onChange={(e) => setHeaderName(e.target.value)} className="rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-xs text-white outline-none" /><input aria-label="Header value" type="password" value={headerValue} onChange={(e) => setHeaderValue(e.target.value)} placeholder="Optional header value" className="rounded-xl border border-[#303038] bg-[#0B0B0D] px-3 py-2.5 text-xs text-white outline-none" /></div> : null}
           {error ? <p className="mt-4 text-xs text-[#F07178]">{error}</p> : null}

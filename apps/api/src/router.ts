@@ -1456,10 +1456,9 @@ export function createRouter(deps: RouterDeps) {
           return rows.map(mcpServerDto);
         }),
         create: authed.mcp.servers.create.handler(async ({ context, input }) => {
-          const secretPayload =
-            ("secret" in input && input.secret) || ("oauthClientId" in input && input.oauthClientId) || ("oauthClientSecret" in input && input.oauthClientSecret)
-              ? JSON.stringify({ secret: "secret" in input ? input.secret : undefined, env: "env" in input ? input.env : {}, headers: "headers" in input ? input.headers : {}, oauthClientId: "oauthClientId" in input ? input.oauthClientId : undefined, oauthClientSecret: "oauthClientSecret" in input ? input.oauthClientSecret : undefined })
-              : null;
+          const secretPayload = "secret" in input && input.secret
+            ? JSON.stringify({ secret: input.secret, env: "env" in input ? input.env : {}, headers: "headers" in input ? input.headers : {} })
+            : null;
           const stored = secretPayload
             ? await deps.secrets.put(secretPayload, computerContext(context.actor, "mcp", "mcp.create"))
             : null;
@@ -1499,17 +1498,14 @@ export function createRouter(deps: RouterDeps) {
               if (value && typeof value === "object" && !Array.isArray(value)) existingMaterial = value as Record<string, unknown>;
             } catch { /* Existing malformed secrets are replaced only when new credentials are supplied. */ }
           }
-          const secretPayload =
-            (existingSecret || ("secret" in config && config.secret) || ("oauthClientId" in config && config.oauthClientId) || ("oauthClientSecret" in config && config.oauthClientSecret))
-              ? JSON.stringify({
-                  ...existingMaterial,
-                  ...("secret" in config && config.secret ? { secret: config.secret } : {}),
-                  ...("env" in config ? { env: config.env } : {}),
-                  ...("headers" in config ? { headers: config.headers } : {}),
-                  ...("oauthClientId" in config && config.oauthClientId ? { oauthClientId: config.oauthClientId } : {}),
-                  ...("oauthClientSecret" in config && config.oauthClientSecret ? { oauthClientSecret: config.oauthClientSecret } : {}),
-                })
-              : null;
+          const secretPayload = existingSecret || ("secret" in config && config.secret)
+            ? JSON.stringify({
+                ...existingMaterial,
+                ...("secret" in config && config.secret ? { secret: config.secret } : {}),
+                ...("env" in config ? { env: config.env } : {}),
+                ...("headers" in config ? { headers: config.headers } : {}),
+              })
+            : null;
           const stored = secretPayload
             ? await deps.secrets.put(secretPayload, computerContext(context.actor, "mcp", "mcp.update"))
             : null;

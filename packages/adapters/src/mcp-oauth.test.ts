@@ -1,69 +1,98 @@
-import { auth, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
-import { describe, expect, it } from "vitest";
-import { PendingProvider } from "./mcp-oauth.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { McpOAuthBroker, PendingProvider } from "./mcp-oauth.js";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("MCP OAuth", () => {
-  it("dynamically registers then redirects when no client credentials were supplied", async () => {
-    const endpoint = "https://mcp.example.test/mcp";
-    const provider = new PendingProvider("http://localhost:5173/mcp/oauth/callback", "state-456");
-    provider.saveDiscoveryState({
-      authorizationServerUrl: "https://auth.example.test",
-      resourceMetadata: { resource: endpoint, authorization_servers: ["https://auth.example.test"] },
-      authorizationServerMetadata: {
-        authorization_endpoint: "https://auth.example.test/authorize",
-        token_endpoint: "https://auth.example.test/token",
-        registration_endpoint: "https://auth.example.test/register",
-        response_types_supported: ["code"],
-        grant_types_supported: ["authorization_code", "refresh_token"],
-        code_challenge_methods_supported: ["S256"],
-      },
-    } as OAuthDiscoveryState);
-    let registrationBody: Record<string, unknown> | undefined;
+  it("describes a public client for SDK-managed dynamic registration", () => {
+    const local = new PendingProvider("http://127.0.0.1:5173/mcp/oauth/callback", "state-local");
+    const remote = new PendingProvider("https://app.example.test/mcp/oauth/callback", "state-remote");
 
-    await expect(auth(provider, {
-      serverUrl: endpoint,
-      fetchFn: async (_url, init) => {
-        registrationBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-        return new Response(JSON.stringify({
-          client_id: "registered-client-id",
-          redirect_uris: ["http://localhost:5173/mcp/oauth/callback"],
-          token_endpoint_auth_method: "none",
-          grant_types: ["authorization_code", "refresh_token"],
-          response_types: ["code"],
-        }), { status: 201, headers: { "Content-Type": "application/json" } });
-      },
-    })).resolves.toBe("REDIRECT");
-
-    expect(registrationBody).toMatchObject({ client_name: "Rakazo", application_type: "native" });
-    expect(provider.authorizationUrl?.searchParams.get("client_id")).toBe("registered-client-id");
+    expect(local.clientMetadata).toMatchObject({
+      client_name: "Rakazo",
+      application_type: "native",
+      token_endpoint_auth_method: "none",
+    });
+    expect(remote.clientMetadata).toMatchObject({ application_type: "web" });
   });
 
-  it("redirects a pre-registered OAuth client without dynamic registration", async () => {
-    const endpoint = "https://api.brex.com/mcp";
-    const provider = new PendingProvider(
-      "http://localhost:5173/mcp/oauth/callback",
-      "state-123",
-      { client_id: "brex-client-id", client_secret: "brex-client-secret" },
-    );
-    expect((provider.clientMetadata as Record<string, unknown>).application_type).toBe("native");
-    provider.saveDiscoveryState({
-      authorizationServerUrl: "https://accounts-api.brex.com/oauth2/default",
-      resourceMetadata: { resource: endpoint, authorization_servers: ["https://accounts-api.brex.com/oauth2/default"] },
-      authorizationServerMetadata: {
-        authorization_endpoint: "https://accounts-api.brex.com/oauth2/default/v1/authorize",
-        token_endpoint: "https://accounts-api.brex.com/oauth2/default/v1/token",
-        response_types_supported: ["code"],
-        grant_types_supported: ["authorization_code", "refresh_token"],
-        code_challenge_methods_supported: ["S256"],
-      },
-    } as OAuthDiscoveryState);
+  it("lets the official Streamable HTTP transport drive discovery, registration, PKCE, and redirect", async () => {
+    const requests: string[] = [];
+    let registration: Record<string, unknown> | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
+      const method = init?.method ?? "GET";
+      requests.push(`${method} ${url.toString()}`);
 
-    await expect(auth(provider, { serverUrl: endpoint })).resolves.toBe("REDIRECT");
-    expect(provider.authorizationUrl?.origin).toBe("https://accounts-api.brex.com");
-    expect(provider.authorizationUrl?.pathname).toBe("/oauth2/default/v1/authorize");
-    expect(provider.authorizationUrl?.searchParams.get("client_id")).toBe("brex-client-id");
-    expect(provider.authorizationUrl?.searchParams.get("redirect_uri")).toBe("http://localhost:5173/mcp/oauth/callback");
-    expect(provider.authorizationUrl?.searchParams.get("state")).toBe("state-123");
-    expect(provider.authorizationUrl?.searchParams.get("code_challenge_method")).toBe("S256");
+      if (url.href === "https://mcp.example.test/mcp" && method === "GET") return new Response(null, { status: 405 });
+      if (url.href === "https://mcp.example.test/mcp" && method === "POST") {
+        return new Response(null, {
+          status: 401,
+          headers: { "WWW-Authenticate": 'Bearer resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"' },
+        });
+      }
+      if (url.href === "https://mcp.example.test/.well-known/oauth-protected-resource/mcp") {
+        return Response.json({ resource: "https://mcp.example.test/mcp", authorization_servers: ["https://auth.example.test"] });
+      }
+      if (url.href === "https://auth.example.test/.well-known/oauth-authorization-server") {
+        return Response.json({
+          issuer: "https://auth.example.test",
+          authorization_endpoint: "https://auth.example.test/authorize",
+          token_endpoint: "https://auth.example.test/token",
+          registration_endpoint: "https://auth.example.test/register",
+          response_types_supported: ["code"],
+          grant_types_supported: ["authorization_code", "refresh_token"],
+          code_challenge_methods_supported: ["S256"],
+        });
+      }
+      if (url.href === "https://auth.example.test/register" && method === "POST") {
+        registration = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return Response.json({
+          client_id: "registered-client-id",
+          redirect_uris: ["http://127.0.0.1:5173/mcp/oauth/callback"],
+          token_endpoint_auth_method: "none",
+        }, { status: 201 });
+      }
+      if (url.href === "https://auth.example.test/token" && method === "POST") {
+        return Response.json({ access_token: "access-token", refresh_token: "refresh-token", token_type: "bearer", expires_in: 3600 });
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`);
+    }));
+    const put = vi.fn().mockResolvedValue({ id: "secret-1", ciphertext: "encrypted" });
+    const prisma = {
+      mcpServer: {
+        findFirst: vi.fn().mockResolvedValue({ id: "server-1", endpoint: "https://mcp.example.test/mcp" }),
+        findUnique: vi.fn().mockResolvedValue({ id: "server-1", secretId: null }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      secret: { findUnique: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+      $transaction: vi.fn().mockResolvedValue([]),
+    };
+    const broker = new McpOAuthBroker(prisma as never, { put } as never);
+
+    const started = await broker.begin({
+      serverId: "server-1",
+      workspaceId: "workspace-1",
+      userId: "user-1",
+      redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+    });
+    const authorizationUrl = new URL(started.authorizationUrl);
+
+    expect(requests).toContain("POST https://mcp.example.test/mcp");
+    expect(registration).toMatchObject({ client_name: "Rakazo", application_type: "native" });
+    expect(authorizationUrl.origin).toBe("https://auth.example.test");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe("registered-client-id");
+    expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(authorizationUrl.searchParams.get("state")).toBe(started.sessionId);
+
+    await broker.complete({
+      sessionId: started.sessionId,
+      code: "authorization-code",
+      state: started.sessionId,
+      workspaceId: "workspace-1",
+      userId: "user-1",
+    });
+    expect(requests).toContain("POST https://auth.example.test/token");
+    expect(JSON.parse(String(put.mock.calls[0]?.[0])).oauth.tokens).toMatchObject({ access_token: "access-token", refresh_token: "refresh-token" });
   });
 });

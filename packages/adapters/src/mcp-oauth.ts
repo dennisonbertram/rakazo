@@ -1,16 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { auth, extractWWWAuthenticateParams, refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
+import { refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { PrismaClient } from "@rakazo/db";
 import { EncryptedSecretStore } from "./secrets.js";
 
 type OAuthMaterial = {
   secret?: string;
-  oauthClientId?: string;
-  oauthClientSecret?: string;
   env?: Record<string, string>;
   headers?: Record<string, string>;
-  oauth?: { tokens: OAuthTokens; obtainedAt: number; clientInformation?: OAuthClientInformationMixed; discoveryState?: OAuthDiscoveryState };
+  oauth?: {
+    tokens: OAuthTokens;
+    obtainedAt: number;
+    clientInformation?: OAuthClientInformationMixed;
+    discoveryState?: OAuthDiscoveryState;
+  };
 };
 
 export class PendingProvider implements OAuthClientProvider {
@@ -19,21 +24,22 @@ export class PendingProvider implements OAuthClientProvider {
   private verifier?: string;
   private discovery?: OAuthDiscoveryState;
   authorizationUrl?: URL;
-  constructor(readonly redirectUrl: string, readonly stateValue: string, private readonly registeredClient?: OAuthClientInformationMixed) { this.client = registeredClient; }
+
+  constructor(readonly redirectUrl: string, readonly stateValue: string) {}
+
   get clientMetadata(): OAuthClientMetadata {
-    const localCallback = new URL(this.redirectUrl).hostname === "localhost" || new URL(this.redirectUrl).hostname === "127.0.0.1";
-    // application_type is an OpenID Connect DCR extension. The MCP SDK accepts
-    // RFC 7591 metadata, but preserves additional registration fields on the
-    // wire; this lets OIDC providers apply the correct redirect-URI policy.
+    const hostname = new URL(this.redirectUrl).hostname;
+    const applicationType = hostname === "localhost" || hostname === "127.0.0.1" ? "native" : "web";
     return {
       redirect_uris: [this.redirectUrl],
       client_name: "Rakazo",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
-      token_endpoint_auth_method: this.registeredClient?.client_secret ? "client_secret_post" : "none",
-      application_type: localCallback ? "native" : "web",
+      token_endpoint_auth_method: "none",
+      application_type: applicationType,
     } as OAuthClientMetadata;
   }
+
   state(): string { return this.stateValue; }
   clientInformation(): OAuthClientInformationMixed | undefined { return this.client; }
   saveClientInformation(value: OAuthClientInformationMixed): void { this.client = value; }
@@ -46,10 +52,17 @@ export class PendingProvider implements OAuthClientProvider {
   discoveryState(): OAuthDiscoveryState | undefined { return this.discovery; }
 }
 
-type Pending = { serverId: string; workspaceId: string; userId: string; endpoint: string; provider: PendingProvider };
+type Pending = {
+  serverId: string;
+  workspaceId: string;
+  userId: string;
+  endpoint: string;
+  provider: PendingProvider;
+};
 
 export class McpOAuthBroker {
   private readonly pending = new Map<string, Pending>();
+
   constructor(private readonly prisma: PrismaClient, private readonly secrets: EncryptedSecretStore) {}
 
   async accessToken(server: { id: string; endpoint: string | null; secretId: string | null }, context: { workspaceId: string; userId: string }): Promise<string | undefined> {
@@ -78,31 +91,31 @@ export class McpOAuthBroker {
     const server = await this.prisma.mcpServer.findFirst({ where: { id: input.serverId, workspaceId: input.workspaceId, userId: input.userId, enabled: true } });
     if (!server?.endpoint) throw new Error("MCP server endpoint is required for OAuth");
     const sessionId = randomUUID();
-    const existingSecret = server.secretId ? await this.prisma.secret.findFirst({ where: { id: server.secretId, workspaceId: input.workspaceId, userId: input.userId } }) : null;
-    const existingMaterial = existingSecret ? this.read(existingSecret.ciphertext) : {};
-    const registeredClient = existingMaterial.oauthClientId ? { client_id: existingMaterial.oauthClientId, client_secret: existingMaterial.oauthClientSecret } : undefined;
-    const provider = new PendingProvider(input.redirectUri, sessionId, registeredClient);
-    const challenge = await this.oauthChallenge(server.endpoint);
-    const result = await auth(provider, {
-      serverUrl: server.endpoint,
-      resourceMetadataUrl: challenge.resourceMetadataUrl,
-      scope: challenge.scope,
-      // A remote discovery service must never leave the product in a perpetual
-      // "Connecting" state. The UI receives the resulting error and re-enables
-      // the button, while successful providers normally complete in one round.
-      fetchFn: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(12_000) }),
-    });
-    if (result !== "REDIRECT" || !provider.authorizationUrl) throw new Error("MCP server did not start OAuth authorization");
+    const provider = new PendingProvider(input.redirectUri, sessionId);
+    const transport = new StreamableHTTPClientTransport(new URL(server.endpoint), { authProvider: provider });
+    const client = new Client({ name: "rakazo-oauth", version: "0.1.0" });
+    try {
+      await client.connect(transport);
+    } catch (error) {
+      if (!provider.authorizationUrl) throw error;
+    } finally {
+      await client.close().catch(() => undefined);
+    }
+    if (!provider.authorizationUrl) throw new Error("MCP server did not request OAuth authorization");
     this.pending.set(sessionId, { serverId: server.id, workspaceId: input.workspaceId, userId: input.userId, endpoint: server.endpoint, provider });
     return { sessionId, authorizationUrl: provider.authorizationUrl.toString() };
   }
 
   async complete(input: { sessionId: string; code: string; state: string; workspaceId: string; userId: string }): Promise<void> {
     const pending = this.pending.get(input.sessionId);
-    if (!pending || pending.workspaceId !== input.workspaceId || pending.userId !== input.userId || input.state !== input.sessionId) throw new Error("MCP OAuth session is invalid or expired");
-    const result = await auth(pending.provider, { serverUrl: pending.endpoint, authorizationCode: input.code });
-    if (result !== "AUTHORIZED" || !pending.provider.tokens()) throw new Error("MCP OAuth authorization failed");
-    await this.saveOAuth(pending, pending.provider.tokens()!);
+    if (!pending || pending.workspaceId !== input.workspaceId || pending.userId !== input.userId || input.state !== input.sessionId) {
+      throw new Error("MCP OAuth session is invalid or expired");
+    }
+    const transport = new StreamableHTTPClientTransport(new URL(pending.endpoint), { authProvider: pending.provider });
+    await transport.finishAuth(input.code);
+    const tokens = pending.provider.tokens();
+    if (!tokens) throw new Error("MCP OAuth authorization failed");
+    await this.saveOAuth(pending, tokens);
     this.pending.delete(input.sessionId);
   }
 
@@ -121,7 +134,10 @@ export class McpOAuthBroker {
         this.prisma.secret.delete({ where: { id: row.id } }),
       ]);
     } else {
-      await this.prisma.$transaction([this.prisma.mcpServer.update({ where: { id: server.id }, data: { secretId: null, revision: { increment: 1 } } }), this.prisma.secret.delete({ where: { id: row.id } })]);
+      await this.prisma.$transaction([
+        this.prisma.mcpServer.update({ where: { id: server.id }, data: { secretId: null, revision: { increment: 1 } } }),
+        this.prisma.secret.delete({ where: { id: row.id } }),
+      ]);
     }
   }
 
@@ -129,7 +145,12 @@ export class McpOAuthBroker {
     const server = await this.prisma.mcpServer.findUnique({ where: { id: pending.serverId } });
     const existing = server?.secretId ? await this.prisma.secret.findUnique({ where: { id: server.secretId } }) : null;
     const material = existing ? this.read(existing.ciphertext) : {};
-    material.oauth = { tokens, obtainedAt: Date.now(), clientInformation: pending.provider.clientInformation(), discoveryState: pending.provider.discoveryState() };
+    material.oauth = {
+      tokens,
+      obtainedAt: Date.now(),
+      clientInformation: pending.provider.clientInformation(),
+      discoveryState: pending.provider.discoveryState(),
+    };
     await this.persistMaterial(pending.serverId, existing?.id, material, pending);
   }
 
@@ -142,14 +163,11 @@ export class McpOAuthBroker {
     ]);
   }
 
-  private read(ciphertext: string): OAuthMaterial { try { const value = JSON.parse(this.secrets.load(ciphertext)); return value && typeof value === "object" ? value as OAuthMaterial : {}; } catch { return {}; } }
-
-  private async oauthChallenge(endpoint: string): Promise<{ resourceMetadataUrl?: URL; scope?: string }> {
+  private read(ciphertext: string): OAuthMaterial {
     try {
-      const response = await fetch(endpoint, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
-      return response.status === 401 ? extractWWWAuthenticateParams(response) : {};
+      const value = JSON.parse(this.secrets.load(ciphertext));
+      return value && typeof value === "object" ? value as OAuthMaterial : {};
     } catch {
-      // auth() will attempt the standard well-known discovery fallbacks.
       return {};
     }
   }
