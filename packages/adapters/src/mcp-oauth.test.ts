@@ -10,6 +10,7 @@ describe("MCP OAuth", () => {
       "state-123",
       { client_id: "brex-client-id", client_secret: "brex-client-secret" },
     );
+    expect((provider.clientMetadata as Record<string, unknown>).application_type).toBe("native");
     provider.saveDiscoveryState({
       authorizationServerUrl: "https://accounts-api.brex.com/oauth2/default",
       resourceMetadata: { resource: endpoint, authorization_servers: ["https://accounts-api.brex.com/oauth2/default"] },

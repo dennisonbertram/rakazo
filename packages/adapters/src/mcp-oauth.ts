@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { auth, discoverAuthorizationServerMetadata, refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth, discoverAuthorizationServerMetadata, extractWWWAuthenticateParams, refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { PrismaClient } from "@rakazo/db";
 import { EncryptedSecretStore } from "./secrets.js";
@@ -20,7 +20,20 @@ export class PendingProvider implements OAuthClientProvider {
   private discovery?: OAuthDiscoveryState;
   authorizationUrl?: URL;
   constructor(readonly redirectUrl: string, readonly stateValue: string, private readonly registeredClient?: OAuthClientInformationMixed) { this.client = registeredClient; }
-  get clientMetadata(): OAuthClientMetadata { return { redirect_uris: [this.redirectUrl], client_name: "Rakazo", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: this.registeredClient?.client_secret ? "client_secret_post" : "none" }; }
+  get clientMetadata(): OAuthClientMetadata {
+    const localCallback = new URL(this.redirectUrl).hostname === "localhost" || new URL(this.redirectUrl).hostname === "127.0.0.1";
+    // application_type is an OpenID Connect DCR extension. The MCP SDK accepts
+    // RFC 7591 metadata, but preserves additional registration fields on the
+    // wire; this lets OIDC providers apply the correct redirect-URI policy.
+    return {
+      redirect_uris: [this.redirectUrl],
+      client_name: "Rakazo",
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: this.registeredClient?.client_secret ? "client_secret_post" : "none",
+      application_type: localCallback ? "native" : "web",
+    } as OAuthClientMetadata;
+  }
   state(): string { return this.stateValue; }
   clientInformation(): OAuthClientInformationMixed | undefined { return this.client; }
   saveClientInformation(value: OAuthClientInformationMixed): void { this.client = value; }
@@ -69,9 +82,10 @@ export class McpOAuthBroker {
     const existingMaterial = existingSecret ? this.read(existingSecret.ciphertext) : {};
     const registeredClient = existingMaterial.oauthClientId ? { client_id: existingMaterial.oauthClientId, client_secret: existingMaterial.oauthClientSecret } : undefined;
     if (this.isBrexServer(server.endpoint) && !registeredClient) {
-      throw new Error("Brex requires a pre-registered OAuth client ID. Open OAuth setup on this server and save the client ID and secret issued by Brex.");
+      throw new Error("Brex does not offer self-service OAuth registration. Rakazo needs a Brex-issued partner client before Connect OAuth can open Brex sign-in. You can use a Brex API key instead, or ask us to configure the Rakazo Brex integration.");
     }
     const provider = new PendingProvider(input.redirectUri, sessionId, registeredClient);
+    const challenge = await this.oauthChallenge(server.endpoint);
     if (this.isBrexServer(server.endpoint)) {
       // Brex advertises its authorization endpoint in the MCP challenge, but its
       // protected-resource metadata host is not publicly reachable. Seed the
@@ -86,7 +100,7 @@ export class McpOAuthBroker {
         resourceMetadata: { resource: server.endpoint, authorization_servers: [authorizationServerUrl] },
       });
     }
-    const result = await auth(provider, { serverUrl: server.endpoint });
+    const result = await auth(provider, { serverUrl: server.endpoint, resourceMetadataUrl: challenge.resourceMetadataUrl, scope: challenge.scope });
     if (result !== "REDIRECT" || !provider.authorizationUrl) throw new Error("MCP server did not start OAuth authorization");
     this.pending.set(sessionId, { serverId: server.id, workspaceId: input.workspaceId, userId: input.userId, endpoint: server.endpoint, provider });
     return { sessionId, authorizationUrl: provider.authorizationUrl.toString() };
@@ -141,5 +155,15 @@ export class McpOAuthBroker {
 
   private isBrexServer(endpoint: string): boolean {
     try { return new URL(endpoint).hostname === "api.brex.com"; } catch { return false; }
+  }
+
+  private async oauthChallenge(endpoint: string): Promise<{ resourceMetadataUrl?: URL; scope?: string }> {
+    try {
+      const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+      return response.status === 401 ? extractWWWAuthenticateParams(response) : {};
+    } catch {
+      // auth() will attempt the standard well-known discovery fallbacks.
+      return {};
+    }
   }
 }

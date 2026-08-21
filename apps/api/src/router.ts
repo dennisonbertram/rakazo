@@ -1566,8 +1566,13 @@ export function createRouter(deps: RouterDeps) {
         }),
     },
     oauth: {
-      begin: authed.mcp.oauth.begin.handler(async ({ context, input }) =>
-        mcpOAuth.begin({ ...input, workspaceId: context.actor.workspaceId, userId: context.actor.userId })),
+      begin: authed.mcp.oauth.begin.handler(async ({ context, input }) => {
+        try {
+          return await mcpOAuth.begin({ ...input, workspaceId: context.actor.workspaceId, userId: context.actor.userId });
+        } catch (error) {
+          throw new ORPCError("BAD_REQUEST", { message: error instanceof Error ? error.message : "Could not start MCP OAuth" });
+        }
+      }),
       complete: authed.mcp.oauth.complete.handler(async ({ context, input }) => {
         await mcpOAuth.complete({ ...input, workspaceId: context.actor.workspaceId, userId: context.actor.userId });
         return { ok: true as const };
