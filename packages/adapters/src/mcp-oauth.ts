@@ -83,7 +83,15 @@ export class McpOAuthBroker {
     const registeredClient = existingMaterial.oauthClientId ? { client_id: existingMaterial.oauthClientId, client_secret: existingMaterial.oauthClientSecret } : undefined;
     const provider = new PendingProvider(input.redirectUri, sessionId, registeredClient);
     const challenge = await this.oauthChallenge(server.endpoint);
-    const result = await auth(provider, { serverUrl: server.endpoint, resourceMetadataUrl: challenge.resourceMetadataUrl, scope: challenge.scope });
+    const result = await auth(provider, {
+      serverUrl: server.endpoint,
+      resourceMetadataUrl: challenge.resourceMetadataUrl,
+      scope: challenge.scope,
+      // A remote discovery service must never leave the product in a perpetual
+      // "Connecting" state. The UI receives the resulting error and re-enables
+      // the button, while successful providers normally complete in one round.
+      fetchFn: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(12_000) }),
+    });
     if (result !== "REDIRECT" || !provider.authorizationUrl) throw new Error("MCP server did not start OAuth authorization");
     this.pending.set(sessionId, { serverId: server.id, workspaceId: input.workspaceId, userId: input.userId, endpoint: server.endpoint, provider });
     return { sessionId, authorizationUrl: provider.authorizationUrl.toString() };
@@ -136,19 +144,9 @@ export class McpOAuthBroker {
 
   private read(ciphertext: string): OAuthMaterial { try { const value = JSON.parse(this.secrets.load(ciphertext)); return value && typeof value === "object" ? value as OAuthMaterial : {}; } catch { return {}; } }
 
-  private isBrexServer(endpoint: string): boolean {
-    try { return new URL(endpoint).hostname === "api.brex.com"; } catch { return false; }
-  }
-
   private async oauthChallenge(endpoint: string): Promise<{ resourceMetadataUrl?: URL; scope?: string }> {
-    if (this.isBrexServer(endpoint)) {
-      // Brex's MCP documentation names the path-scoped PRM endpoint. Its 401
-      // challenge currently points at an internal mirror, so prefer the public
-      // canonical endpoint before handing discovery to the MCP SDK.
-      return { resourceMetadataUrl: new URL("https://api.brex.com/.well-known/oauth-protected-resource/mcp") };
-    }
     try {
-      const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+      const response = await fetch(endpoint, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
       return response.status === 401 ? extractWWWAuthenticateParams(response) : {};
     } catch {
       // auth() will attempt the standard well-known discovery fallbacks.

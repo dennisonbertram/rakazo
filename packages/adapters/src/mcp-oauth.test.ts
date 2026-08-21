@@ -38,7 +38,7 @@ describe("MCP OAuth", () => {
     expect(provider.authorizationUrl?.searchParams.get("client_id")).toBe("registered-client-id");
   });
 
-  it("redirects a pre-registered Brex client to the Brex authorization endpoint without dynamic registration", async () => {
+  it("redirects a pre-registered OAuth client without dynamic registration", async () => {
     const endpoint = "https://api.brex.com/mcp";
     const provider = new PendingProvider(
       "http://localhost:5173/mcp/oauth/callback",
