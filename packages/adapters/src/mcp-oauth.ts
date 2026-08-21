@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { auth, refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth, discoverAuthorizationServerMetadata, refreshAuthorization, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { PrismaClient } from "@rakazo/db";
 import { EncryptedSecretStore } from "./secrets.js";
@@ -13,7 +13,7 @@ type OAuthMaterial = {
   oauth?: { tokens: OAuthTokens; obtainedAt: number; clientInformation?: OAuthClientInformationMixed; discoveryState?: OAuthDiscoveryState };
 };
 
-class PendingProvider implements OAuthClientProvider {
+export class PendingProvider implements OAuthClientProvider {
   private client?: OAuthClientInformationMixed;
   private tokenSet?: OAuthTokens;
   private verifier?: string;
@@ -68,7 +68,24 @@ export class McpOAuthBroker {
     const existingSecret = server.secretId ? await this.prisma.secret.findFirst({ where: { id: server.secretId, workspaceId: input.workspaceId, userId: input.userId } }) : null;
     const existingMaterial = existingSecret ? this.read(existingSecret.ciphertext) : {};
     const registeredClient = existingMaterial.oauthClientId ? { client_id: existingMaterial.oauthClientId, client_secret: existingMaterial.oauthClientSecret } : undefined;
+    if (this.isBrexServer(server.endpoint) && !registeredClient) {
+      throw new Error("Brex requires a pre-registered OAuth client ID. Open OAuth setup on this server and save the client ID and secret issued by Brex.");
+    }
     const provider = new PendingProvider(input.redirectUri, sessionId, registeredClient);
+    if (this.isBrexServer(server.endpoint)) {
+      // Brex advertises its authorization endpoint in the MCP challenge, but its
+      // protected-resource metadata host is not publicly reachable. Seed the
+      // standards-based SDK flow with the documented issuer so it can construct
+      // the authorization request without attempting dynamic registration.
+      const authorizationServerUrl = "https://accounts-api.brex.com/oauth2/default";
+      const authorizationServerMetadata = await discoverAuthorizationServerMetadata(authorizationServerUrl);
+      if (!authorizationServerMetadata) throw new Error("Could not load Brex OAuth metadata");
+      provider.saveDiscoveryState({
+        authorizationServerUrl,
+        authorizationServerMetadata,
+        resourceMetadata: { resource: server.endpoint, authorization_servers: [authorizationServerUrl] },
+      });
+    }
     const result = await auth(provider, { serverUrl: server.endpoint });
     if (result !== "REDIRECT" || !provider.authorizationUrl) throw new Error("MCP server did not start OAuth authorization");
     this.pending.set(sessionId, { serverId: server.id, workspaceId: input.workspaceId, userId: input.userId, endpoint: server.endpoint, provider });
@@ -121,4 +138,8 @@ export class McpOAuthBroker {
   }
 
   private read(ciphertext: string): OAuthMaterial { try { const value = JSON.parse(this.secrets.load(ciphertext)); return value && typeof value === "object" ? value as OAuthMaterial : {}; } catch { return {}; } }
+
+  private isBrexServer(endpoint: string): boolean {
+    try { return new URL(endpoint).hostname === "api.brex.com"; } catch { return false; }
+  }
 }

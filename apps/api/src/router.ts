@@ -1489,9 +1489,26 @@ export function createRouter(deps: RouterDeps) {
           const existing = await deps.prisma.mcpServer.findFirst({ where: { id: input.id, workspaceId: context.actor.workspaceId, userId: context.actor.userId } });
           if (!existing) throw new IsolationError();
           const config = input.config;
+          const existingSecret = existing.secretId
+            ? await deps.prisma.secret.findFirst({ where: { id: existing.secretId, workspaceId: context.actor.workspaceId, userId: context.actor.userId } })
+            : null;
+          let existingMaterial: Record<string, unknown> = {};
+          if (existingSecret) {
+            try {
+              const value = JSON.parse(deps.secrets.load(existingSecret.ciphertext));
+              if (value && typeof value === "object" && !Array.isArray(value)) existingMaterial = value as Record<string, unknown>;
+            } catch { /* Existing malformed secrets are replaced only when new credentials are supplied. */ }
+          }
           const secretPayload =
-            (("secret" in config && config.secret) || ("oauthClientId" in config && config.oauthClientId) || ("oauthClientSecret" in config && config.oauthClientSecret))
-              ? JSON.stringify({ secret: "secret" in config ? config.secret : undefined, env: "env" in config ? config.env : {}, headers: "headers" in config ? config.headers : {}, oauthClientId: "oauthClientId" in config ? config.oauthClientId : undefined, oauthClientSecret: "oauthClientSecret" in config ? config.oauthClientSecret : undefined })
+            (existingSecret || ("secret" in config && config.secret) || ("oauthClientId" in config && config.oauthClientId) || ("oauthClientSecret" in config && config.oauthClientSecret))
+              ? JSON.stringify({
+                  ...existingMaterial,
+                  ...("secret" in config && config.secret ? { secret: config.secret } : {}),
+                  ...("env" in config ? { env: config.env } : {}),
+                  ...("headers" in config ? { headers: config.headers } : {}),
+                  ...("oauthClientId" in config && config.oauthClientId ? { oauthClientId: config.oauthClientId } : {}),
+                  ...("oauthClientSecret" in config && config.oauthClientSecret ? { oauthClientSecret: config.oauthClientSecret } : {}),
+                })
               : null;
           const stored = secretPayload
             ? await deps.secrets.put(secretPayload, computerContext(context.actor, "mcp", "mcp.update"))
