@@ -83,7 +83,11 @@ function secureFetch(resourceUrl: URL, urlPolicy: McpUrlPolicy, headerPolicy: Mc
     for (const [name, value] of new Headers(init?.headers)) {
       if (allowed.has(name.toLowerCase())) headers.set(name, value);
     }
-    const response = await fetch(new Request(url, source), { headers, redirect: "manual" });
+    // Buffer the body: a re-wrapped Request body is a stream without a replayable
+    // source, and undici fails the whole request when a server answers 401 early
+    // (the OAuth challenge) instead of draining it.
+    const body = source.method === "GET" || source.method === "HEAD" ? undefined : await source.arrayBuffer();
+    const response = await fetch(url, { method: source.method, headers, body, redirect: "manual", signal: source.signal });
     if (response.status >= 300 && response.status < 400) {
       throw new Error("MCP redirects are not permitted; configure the final HTTPS URL explicitly");
     }

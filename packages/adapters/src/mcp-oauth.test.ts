@@ -22,7 +22,23 @@ describe("MCP OAuth", () => {
     expect(provider.clientInformation()).toEqual({ client_id: "client-1" });
     expect(provider.discoveryState()).toMatchObject({ authorizationServerUrl: "https://auth.example.test" });
     expect(persisted).toHaveLength(2);
-    expect(() => provider.redirectToAuthorization(new URL("https://auth.example.test/authorize"))).toThrow(McpReauthorizationRequiredError);
+    await expect(provider.redirectToAuthorization(new URL("https://auth.example.test/authorize"))).rejects.toThrow(McpReauthorizationRequiredError);
+  });
+
+  it("clears stale tokens when runtime re-authorization is required so status flips to reconnect", async () => {
+    const persisted: { oauth?: { tokens?: unknown } }[] = [];
+    const provider = new StoredMcpOAuthProvider("server-1", {
+      oauth: {
+        redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+        tokens: { access_token: "revoked-server-side", token_type: "bearer" },
+        clientInformation: { client_id: "client-1" },
+      },
+    }, async (material) => { persisted.push(structuredClone(material)); });
+
+    await expect(provider.redirectToAuthorization(new URL("https://auth.example.test/authorize"))).rejects.toThrow(McpReauthorizationRequiredError);
+
+    expect(provider.tokens()).toBeUndefined();
+    expect(persisted.at(-1)?.oauth?.tokens).toBeUndefined();
   });
 
   it("lets the official Streamable HTTP transport drive discovery, registration, PKCE, redirect, and token exchange", async () => {
@@ -107,5 +123,6 @@ describe("MCP OAuth", () => {
 
     expect(requests).toContain("POST https://auth.example.test/token");
     expect(storedPayloads.map((value) => JSON.parse(value)).some((value) => value.oauth?.tokens?.access_token === "access-token")).toBe(true);
+    expect(prisma.mcpServer.update).toHaveBeenCalledWith({ where: { id: "server-1" }, data: { revision: { increment: 1 } } });
   });
 });

@@ -1,4 +1,6 @@
 import { strict as assert } from "node:assert";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoredMcpOAuthProvider } from "./mcp-oauth.js";
 import { McpSession, validateUrl } from "./mcp-transport.js";
@@ -119,5 +121,46 @@ describe("MCP transport seam", () => {
 
     expect(provider.tokens()).toBeUndefined();
     expect(persisted.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // Real HTTP on purpose: undici drops the whole request ("fetch failed",
+  // cause "expected non-null body source") when a stream-bodied POST meets a
+  // server that answers 401 without draining the body — the exact shape of an
+  // OAuth challenge. A stubbed fetch can never catch this.
+  it("receives the OAuth 401 challenge from a server that rejects before reading the request body", async () => {
+    const server = createServer((req, res) => {
+      if (req.method !== "POST" || !req.url?.startsWith("/mcp")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      res.statusCode = 401;
+      res.setHeader("WWW-Authenticate", "Bearer");
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    const provider = new StoredMcpOAuthProvider("server-1", {
+      oauth: {
+        redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+        clientInformation: { client_id: "client-1" },
+        discoveryState: {
+          authorizationServerUrl: `http://127.0.0.1:${port}`,
+          authorizationServerMetadata: {
+            issuer: `http://127.0.0.1:${port}`,
+            authorization_endpoint: `http://127.0.0.1:${port}/authorize`,
+            token_endpoint: `http://127.0.0.1:${port}/token`,
+            response_types_supported: ["code"],
+          },
+        },
+      },
+    }, async () => {});
+    const session = new McpSession();
+    try {
+      await expect(session.connectRemote({ url: `http://127.0.0.1:${port}/mcp`, authProvider: provider, fallbackToSse: false })).rejects.toThrow("Reconnect this server");
+    } finally {
+      await session.close();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

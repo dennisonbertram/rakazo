@@ -88,12 +88,14 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     oauth.obtainedAt = Date.now();
     await this.persist();
   }
-  redirectToAuthorization(url: URL): void {
+  async redirectToAuthorization(url: URL): Promise<void> {
     this.authorizationUrl = url;
     if (this.options.onAuthorization) {
       this.options.onAuthorization(url);
       return;
     }
+    // Runtime re-auth needs the user; drop the dead tokens so status reads "reconnect".
+    await this.invalidateCredentials("tokens");
     throw new McpReauthorizationRequiredError(this.serverId);
   }
   async saveCodeVerifier(value: string): Promise<void> {
@@ -198,6 +200,8 @@ export class McpOAuthBroker {
     const transport = new StreamableHTTPClientTransport(new URL(pending.endpoint), { authProvider: pending.provider });
     await transport.finishAuth(input.code);
     if (!pending.provider.tokens()) throw new Error("MCP OAuth authorization failed");
+    // Bump the revision so cached runtime sessions rebuild with the fresh tokens.
+    await this.prisma.mcpServer.update({ where: { id: pending.serverId }, data: { revision: { increment: 1 } } });
     this.pending.delete(input.sessionId);
   }
 

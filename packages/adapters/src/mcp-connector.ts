@@ -42,6 +42,7 @@ export class McpConnector implements ConnectorProvider {
         }
       } catch {
         // A single unavailable server must not hide tools from other connectors.
+        await this.evict(assignment.server.id);
       }
     }
     return tools;
@@ -61,11 +62,20 @@ export class McpConnector implements ConnectorProvider {
       const result = await (await this.sessionFor(assignment.server, context)).callTool(call.route.remoteName, call.args, { signal: context.signal });
       yield { type: "result", data: result };
     } catch (error) {
+      // A thrown call means the transport or auth broke; drop the session so the next call reconnects.
+      await this.evict(assignment.server.id);
       yield { type: "error", message: error instanceof Error ? error.message : String(error) };
     }
   }
 
   async close(): Promise<void> { await Promise.all([...this.sessions.values()].map(({ session }) => session.close())); this.sessions.clear(); }
+
+  private async evict(serverId: string): Promise<void> {
+    const entry = this.sessions.get(String(serverId));
+    if (!entry) return;
+    this.sessions.delete(String(serverId));
+    await entry.session.close();
+  }
 
   private async sessionFor(server: any, context: AdapterContext): Promise<McpSession> {
     const sessionKey = String(server.id);
