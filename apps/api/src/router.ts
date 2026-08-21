@@ -130,7 +130,7 @@ function mcpServerDto(row: {
   revision: number;
   createdAt: Date;
   updatedAt: Date;
-}): McpServer {
+}, oauthStatus: McpServer["oauthStatus"] = "none"): McpServer {
   const args = Array.isArray(row.args) ? row.args.filter((item): item is string => typeof item === "string") : [];
   const envKeys = row.env && typeof row.env === "object" && !Array.isArray(row.env) ? Object.keys(row.env) : [];
   const headerKeys = row.headers && typeof row.headers === "object" && !Array.isArray(row.headers) ? Object.keys(row.headers) : [];
@@ -147,6 +147,7 @@ function mcpServerDto(row: {
     envKeys,
     headerKeys,
     hasSecret: row.secretId !== null,
+    oauthStatus,
     enabled: row.enabled,
     revision: row.revision,
     createdAt: row.createdAt.toISOString(),
@@ -1453,7 +1454,7 @@ export function createRouter(deps: RouterDeps) {
             where: { workspaceId: context.actor.workspaceId, userId: context.actor.userId },
             orderBy: [{ name: "asc" }, { createdAt: "asc" }],
           });
-          return rows.map(mcpServerDto);
+          return Promise.all(rows.map(async (row) => mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor))));
         }),
         create: authed.mcp.servers.create.handler(async ({ context, input }) => {
           const secretPayload = "secret" in input && input.secret
@@ -1482,7 +1483,7 @@ export function createRouter(deps: RouterDeps) {
               enabled: input.enabled,
             },
           });
-          return mcpServerDto(row);
+          return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
         update: authed.mcp.servers.update.handler(async ({ context, input }) => {
           const existing = await deps.prisma.mcpServer.findFirst({ where: { id: input.id, workspaceId: context.actor.workspaceId, userId: context.actor.userId } });
@@ -1533,7 +1534,7 @@ export function createRouter(deps: RouterDeps) {
             }
             return updated;
           });
-          return mcpServerDto(row);
+          return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
         remove: authed.mcp.servers.remove.handler(async ({ context, input }) => {
           const result = await deps.prisma.mcpServer.deleteMany({ where: { id: input.id, workspaceId: context.actor.workspaceId, userId: context.actor.userId } });

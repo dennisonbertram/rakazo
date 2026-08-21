@@ -1,31 +1,39 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { McpOAuthBroker, PendingProvider } from "./mcp-oauth.js";
+import { McpOAuthBroker, McpReauthorizationRequiredError, StoredMcpOAuthProvider } from "./mcp-oauth.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MCP OAuth", () => {
-  it("describes a public client for SDK-managed dynamic registration", () => {
-    const local = new PendingProvider("http://127.0.0.1:5173/mcp/oauth/callback", "state-local");
-    const remote = new PendingProvider("https://app.example.test/mcp/oauth/callback", "state-remote");
+  it("persists SDK credentials and invalidates only the requested scope", async () => {
+    const persisted: unknown[] = [];
+    const provider = new StoredMcpOAuthProvider("server-1", {
+      oauth: {
+        redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+        tokens: { access_token: "old", refresh_token: "refresh", token_type: "bearer" },
+        clientInformation: { client_id: "client-1" },
+        discoveryState: { authorizationServerUrl: "https://auth.example.test" },
+      },
+    }, async (material) => { persisted.push(structuredClone(material)); });
 
-    expect(local.clientMetadata).toMatchObject({
-      client_name: "Rakazo",
-      application_type: "native",
-      token_endpoint_auth_method: "none",
-    });
-    expect(remote.clientMetadata).toMatchObject({ application_type: "web" });
+    await provider.saveTokens({ access_token: "new", refresh_token: "rotated", token_type: "bearer" });
+    await provider.invalidateCredentials("tokens");
+
+    expect(provider.tokens()).toBeUndefined();
+    expect(provider.clientInformation()).toEqual({ client_id: "client-1" });
+    expect(provider.discoveryState()).toMatchObject({ authorizationServerUrl: "https://auth.example.test" });
+    expect(persisted).toHaveLength(2);
+    expect(() => provider.redirectToAuthorization(new URL("https://auth.example.test/authorize"))).toThrow(McpReauthorizationRequiredError);
   });
 
-  it("lets the official Streamable HTTP transport drive discovery, registration, PKCE, and redirect", async () => {
+  it("lets the official Streamable HTTP transport drive discovery, registration, PKCE, redirect, and token exchange", async () => {
     const requests: string[] = [];
     let registration: Record<string, unknown> | undefined;
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
-      const method = init?.method ?? "GET";
-      requests.push(`${method} ${url.toString()}`);
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      requests.push(`${request.method} ${url.toString()}`);
 
-      if (url.href === "https://mcp.example.test/mcp" && method === "GET") return new Response(null, { status: 405 });
-      if (url.href === "https://mcp.example.test/mcp" && method === "POST") {
+      if (url.href === "https://mcp.example.test/mcp" && request.method === "POST") {
         return new Response(null, {
           status: 401,
           headers: { "WWW-Authenticate": 'Bearer resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"' },
@@ -45,27 +53,32 @@ describe("MCP OAuth", () => {
           code_challenge_methods_supported: ["S256"],
         });
       }
-      if (url.href === "https://auth.example.test/register" && method === "POST") {
-        registration = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      if (url.href === "https://auth.example.test/register" && request.method === "POST") {
+        registration = await request.json() as Record<string, unknown>;
         return Response.json({
           client_id: "registered-client-id",
           redirect_uris: ["http://127.0.0.1:5173/mcp/oauth/callback"],
           token_endpoint_auth_method: "none",
         }, { status: 201 });
       }
-      if (url.href === "https://auth.example.test/token" && method === "POST") {
+      if (url.href === "https://auth.example.test/token" && request.method === "POST") {
         return Response.json({ access_token: "access-token", refresh_token: "refresh-token", token_type: "bearer", expires_in: 3600 });
       }
-      throw new Error(`Unexpected request: ${method} ${url}`);
+      throw new Error(`Unexpected request: ${request.method} ${url}`);
     }));
-    const put = vi.fn().mockResolvedValue({ id: "secret-1", ciphertext: "encrypted" });
+    let secretCounter = 0;
+    const storedPayloads: string[] = [];
+    const put = vi.fn(async (plaintext: string) => {
+      storedPayloads.push(plaintext);
+      secretCounter += 1;
+      return { id: `secret-${secretCounter}`, ciphertext: `encrypted-${secretCounter}` };
+    });
     const prisma = {
       mcpServer: {
-        findFirst: vi.fn().mockResolvedValue({ id: "server-1", endpoint: "https://mcp.example.test/mcp" }),
-        findUnique: vi.fn().mockResolvedValue({ id: "server-1", secretId: null }),
+        findFirst: vi.fn().mockResolvedValue({ id: "server-1", endpoint: "https://mcp.example.test/mcp", secretId: null }),
         update: vi.fn().mockResolvedValue({}),
       },
-      secret: { findUnique: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+      secret: { findFirst: vi.fn(), create: vi.fn().mockResolvedValue({}), delete: vi.fn().mockResolvedValue({}) },
       $transaction: vi.fn().mockResolvedValue([]),
     };
     const broker = new McpOAuthBroker(prisma as never, { put } as never);
@@ -78,7 +91,6 @@ describe("MCP OAuth", () => {
     });
     const authorizationUrl = new URL(started.authorizationUrl);
 
-    expect(requests).toContain("POST https://mcp.example.test/mcp");
     expect(registration).toMatchObject({ client_name: "Rakazo", application_type: "native" });
     expect(authorizationUrl.origin).toBe("https://auth.example.test");
     expect(authorizationUrl.searchParams.get("client_id")).toBe("registered-client-id");
@@ -92,7 +104,8 @@ describe("MCP OAuth", () => {
       workspaceId: "workspace-1",
       userId: "user-1",
     });
+
     expect(requests).toContain("POST https://auth.example.test/token");
-    expect(JSON.parse(String(put.mock.calls[0]?.[0])).oauth.tokens).toMatchObject({ access_token: "access-token", refresh_token: "refresh-token" });
+    expect(storedPayloads.map((value) => JSON.parse(value)).some((value) => value.oauth?.tokens?.access_token === "access-token")).toBe(true);
   });
 });

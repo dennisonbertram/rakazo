@@ -1,4 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -31,6 +32,8 @@ export interface McpRemoteOptions {
   allowLegacySse?: boolean;
   /** Fall back to SSE only after a fresh Streamable HTTP client fails. */
   fallbackToSse?: boolean;
+  /** Let the official SDK own token refresh, re-authentication, and request retry. */
+  authProvider?: OAuthClientProvider;
 }
 
 export interface McpStdioOptions {
@@ -67,17 +70,20 @@ function validateUrl(raw: string | URL, policy: McpUrlPolicy = {}): URL {
   return url;
 }
 
-function secureFetch(urlPolicy: McpUrlPolicy, headerPolicy: McpHeaderPolicy = {}) {
+function secureFetch(resourceUrl: URL, urlPolicy: McpUrlPolicy, headerPolicy: McpHeaderPolicy = {}) {
   const allowed = new Set((headerPolicy.allowedHeaders ?? DEFAULT_HEADERS).map((h) => h.toLowerCase()));
   const configured = Object.entries(headerPolicy.headers ?? {}).filter(([name]) => allowed.has(name.toLowerCase()));
   return async (input: Request | URL | string, init?: RequestInit): Promise<Response> => {
-    const url = validateUrl(typeof input === "string" || input instanceof URL ? input : input.url, urlPolicy);
-    const headers = new Headers(input instanceof Request ? input.headers : undefined);
-    for (const [name, value] of configured) headers.set(name, value);
+    const source = input instanceof Request ? input : new Request(input, init);
+    const url = validateUrl(source.url, urlPolicy);
+    const headers = new Headers(source.headers);
+    if (url.origin === resourceUrl.origin) {
+      for (const [name, value] of configured) headers.set(name, value);
+    }
     for (const [name, value] of new Headers(init?.headers)) {
       if (allowed.has(name.toLowerCase())) headers.set(name, value);
     }
-    const response = await fetch(url, { ...init, headers, redirect: "manual" });
+    const response = await fetch(new Request(url, source), { headers, redirect: "manual" });
     if (response.status >= 300 && response.status < 400) {
       throw new Error("MCP redirects are not permitted; configure the final HTTPS URL explicitly");
     }
@@ -120,15 +126,16 @@ export class McpSession {
   async connectRemote(options: McpRemoteOptions): Promise<{ transport: McpRemoteTransport; usedFallback: boolean }> {
     if (this.connected || this.connecting) throw new Error("MCP session is already connected or connecting");
     const url = validateUrl(options.url, options.urlPolicy);
-    const fetch = secureFetch(options.urlPolicy ?? {}, options.headerPolicy);
+    const fetch = secureFetch(url, options.urlPolicy ?? {}, options.headerPolicy);
     let usedFallback = false;
     const connect = async (kind: McpRemoteTransport): Promise<void> => {
       const requestInit: RequestInit = { headers: options.headerPolicy?.headers };
       const transport = kind === "streamable-http"
-        ? new StreamableHTTPClientTransport(url, { fetch, requestInit })
+        ? new StreamableHTTPClientTransport(url, { fetch, requestInit, authProvider: options.authProvider })
         : new SSEClientTransport(url, {
             fetch,
             requestInit,
+            authProvider: options.authProvider,
             eventSourceInit: { fetch: fetch as never },
           });
       this.transport = transport;

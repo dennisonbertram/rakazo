@@ -4,7 +4,7 @@ import { McpSession } from "./mcp-transport.js";
 import { EncryptedSecretStore } from "./secrets.js";
 import type { McpOAuthBroker } from "./mcp-oauth.js";
 
-type SessionEntry = { session: McpSession; serverId: string };
+type SessionEntry = { session: McpSession; serverId: string; revision: number };
 
 /** Runtime MCP connector. Authorization is re-checked against the bot assignment on every call. */
 export class McpConnector implements ConnectorProvider {
@@ -68,10 +68,13 @@ export class McpConnector implements ConnectorProvider {
   async close(): Promise<void> { await Promise.all([...this.sessions.values()].map(({ session }) => session.close())); this.sessions.clear(); }
 
   private async sessionFor(server: any, context: AdapterContext): Promise<McpSession> {
-    const accessToken = this.oauth ? await this.oauth.accessToken(server, context) : undefined;
-    const sessionKey = `${server.id}:${accessToken ?? "static"}`;
+    const sessionKey = String(server.id);
     const existing = this.sessions.get(sessionKey);
-    if (existing) return existing.session;
+    if (existing && existing.revision === server.revision) return existing.session;
+    if (existing) {
+      await existing.session.close();
+      this.sessions.delete(sessionKey);
+    }
     const session = new McpSession({ name: `rakazo-${server.slug}` });
     const secret = server.secretId ? await this.prisma.secret.findFirst({ where: { id: server.secretId, workspaceId: context.workspaceId, userId: context.userId } }) : null;
     const material = secret ? JSON.parse(this.secrets.load(secret.ciphertext)) as { secret?: string; env?: Record<string, string>; headers?: Record<string, string> } : {};
@@ -82,11 +85,12 @@ export class McpConnector implements ConnectorProvider {
       await session.connectStdio({ command: String(server.command ?? ""), args, env, allowedCommands: this.options.allowedCommands ?? [] });
     } else {
       if (!server.endpoint) throw new Error("MCP endpoint is required");
+      const authProvider = this.oauth ? await this.oauth.providerFor(server, context) : undefined;
       const staticToken = material.secret ? (material.secret.startsWith("Bearer ") ? material.secret : `Bearer ${material.secret}`) : undefined;
-      const headers = { ...(material.headers ?? {}), ...(staticToken ? { Authorization: staticToken } : {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) };
-      await session.connectRemote({ url: server.endpoint, transport: server.transport === "sse" ? "sse" : "streamable-http", allowLegacySse: server.transport === "sse", headerPolicy: { headers }, fallbackToSse: false });
+      const headers = { ...(material.headers ?? {}), ...(staticToken ? { Authorization: staticToken } : {}) };
+      await session.connectRemote({ url: server.endpoint, transport: server.transport === "sse" ? "sse" : "streamable-http", allowLegacySse: server.transport === "sse", headerPolicy: { headers }, fallbackToSse: false, authProvider });
     }
-    this.sessions.set(sessionKey, { session, serverId: server.id });
+    this.sessions.set(sessionKey, { session, serverId: server.id, revision: server.revision });
     return session;
   }
 }
