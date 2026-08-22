@@ -71,6 +71,7 @@ import { TeachRecordingChrome, TeachStopButton } from "../components/teach/Teach
 import { decodeArtifactBase64, openArtifact } from "../lib/artifact-open";
 import { authClient } from "../lib/auth";
 import { takeInitialBootstrap } from "../lib/bootstrap";
+import { chartViewport } from "../lib/chart-viewport";
 import { dictation } from "../lib/dictation";
 import { revokePendingAttachmentPreviews } from "../lib/pending-attachments";
 import { markAfterPaint, markOnce } from "../lib/performance";
@@ -3182,13 +3183,22 @@ function ChartBlockView({
   data: unknown[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   useEffect(() => {
     if (!expanded) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setExpanded(false);
     };
+    const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
   }, [expanded]);
   return (
     <>
@@ -3230,8 +3240,8 @@ function ChartBlockView({
             <ChartCanvas
               spec={spec}
               data={data}
-              width={Math.min(1240, Math.floor(window.innerWidth * 0.88))}
-              height={Math.floor(window.innerHeight * 0.66)}
+              width={chartViewport(viewport.width, viewport.height).width}
+              height={chartViewport(viewport.width, viewport.height).height}
             />
           </div>
         </div>

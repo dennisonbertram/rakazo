@@ -5,7 +5,7 @@ import type {
   ConnectorProvider,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { McpServer, PrismaClient } from "@rakazo/db";
 import type { McpOAuthBroker } from "./mcp-oauth.js";
 import { McpSession } from "./mcp-transport.js";
 import type { EncryptedSecretStore } from "./secrets.js";
@@ -128,7 +128,7 @@ export class McpConnector implements ConnectorProvider {
     await entry.session.close();
   }
 
-  private async sessionFor(server: any, context: AdapterContext): Promise<McpSession> {
+  private async sessionFor(server: McpServer, context: AdapterContext): Promise<McpSession> {
     const sessionKey = String(server.id);
     const existing = this.sessions.get(sessionKey);
     if (existing && existing.revision === server.revision) return existing.session;

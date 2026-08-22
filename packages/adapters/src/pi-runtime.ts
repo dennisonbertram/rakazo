@@ -21,7 +21,7 @@ const MAX_PARALLEL_SUBAGENTS = 4;
 const AGENT_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MAX_AGENT_TOOL_NAME_LENGTH = 64;
 const FALLBACK_AGENT_TOOL_NAME = "connector_tool";
-// ponytail: flat per-turn cap; smarter same-error loop detection if this bites real work.
+// Flat per-turn cap; smarter same-error loop detection if this bites real work.
 const MAX_TOOL_CALLS_PER_TURN = 80;
 
 export class PiAgentRuntime implements AgentRuntime {
