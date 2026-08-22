@@ -1714,7 +1714,15 @@ export function ShellPage() {
           />
         ) : null}
 
-        {pluginsOpen ? <PluginsOverlay onClose={() => setPluginsOpen(false)} onOpenMcp={() => { setPluginsOpen(false); setMcpOpen(true); }} /> : null}
+        {pluginsOpen ? (
+          <PluginsOverlay
+            onClose={() => setPluginsOpen(false)}
+            onOpenMcp={() => {
+              setPluginsOpen(false);
+              setMcpOpen(true);
+            }}
+          />
+        ) : null}
         {mcpOpen ? <McpServersOverlay onClose={() => setMcpOpen(false)} /> : null}
       </Suspense>
 
@@ -3100,7 +3108,10 @@ function ChartCanvas({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [meta, setMeta] = useState<{ title?: string; swatches: { label: string; color: string }[] }>({ swatches: [] });
+  const [meta, setMeta] = useState<{
+    title?: string;
+    swatches: { label: string; color: string }[];
+  }>({ swatches: [] });
   useEffect(() => {
     let cancelled = false;
     // Plot loads lazily so threads without charts never pay for the library.
@@ -3133,15 +3144,24 @@ function ChartCanvas({
       cancelled = true;
     };
   }, [spec, data, width, height]);
-  if (error) return <div className="text-[13px] text-[#F3A2AA]">Chart failed to render: {error}</div>;
+  if (error)
+    return <div className="text-[13px] text-[#F3A2AA]">Chart failed to render: {error}</div>;
   return (
     <div className="text-[#C9C9CE]">
-      {meta.title ? <div className="mb-1 text-[14.5px] font-semibold text-[#ECECEE]">{meta.title}</div> : null}
+      {meta.title ? (
+        <div className="mb-1 text-[14.5px] font-semibold text-[#ECECEE]">{meta.title}</div>
+      ) : null}
       {meta.swatches.length > 0 ? (
         <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1">
           {meta.swatches.map((swatch) => (
-            <span key={swatch.label} className="flex items-center gap-1.5 text-[12px] text-[#A6A6AD]">
-              <span className="h-[10px] w-[10px] rounded-[3px]" style={{ background: swatch.color }} />
+            <span
+              key={swatch.label}
+              className="flex items-center gap-1.5 text-[12px] text-[#A6A6AD]"
+            >
+              <span
+                className="h-[10px] w-[10px] rounded-[3px]"
+                style={{ background: swatch.color }}
+              />
               {swatch.label}
             </span>
           ))}
@@ -3152,7 +3172,15 @@ function ChartCanvas({
   );
 }
 
-function ChartBlockView({ name, spec, data }: { name: string; spec: Record<string, unknown>; data: unknown[] }) {
+function ChartBlockView({
+  name,
+  spec,
+  data,
+}: {
+  name: string;
+  spec: Record<string, unknown>;
+  data: unknown[];
+}) {
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     if (!expanded) return;
@@ -3177,12 +3205,17 @@ function ChartBlockView({ name, spec, data }: { name: string; spec: Record<strin
       {expanded ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,4,5,.78)] p-8"
-          onClick={() => setExpanded(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={name}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setExpanded(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setExpanded(false);
+          }}
         >
-          <div
-            className="max-h-[92vh] w-[min(1320px,94vw)] overflow-auto rounded-[24px] border border-[#2A2A31] bg-[#141416] p-8 shadow-[0_40px_90px_rgba(0,0,0,.6)]"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="max-h-[92vh] w-[min(1320px,94vw)] overflow-auto rounded-[24px] border border-[#2A2A31] bg-[#141416] p-8 shadow-[0_40px_90px_rgba(0,0,0,.6)]">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-[13px] text-[#85858A]">{name}</span>
               <button
