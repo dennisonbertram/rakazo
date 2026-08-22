@@ -1012,6 +1012,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 pendingProgress = "";
               }
             } else if (event.type === "progress") {
+              // Flush batched text deltas first so an activity line cannot land
+              // ahead of text the model streamed before the tool call.
+              if (pendingProgress) {
+                await deps.events.append({
+                  workspaceId: run.workspaceId,
+                  threadId: thread.id,
+                  botId: bot.id,
+                  type: "thread.progress",
+                  runId,
+                  payload: { delta: pendingProgress, streaming: true },
+                });
+                pendingProgress = "";
+                lastProgressAt = Date.now();
+              }
               await deps.events.append({
                 workspaceId: run.workspaceId,
                 threadId: thread.id,

@@ -105,13 +105,25 @@ export class PiAgentRuntime implements AgentRuntime {
         signal.addEventListener("abort", onAbort);
 
         let streamed = "";
+        let toolActivityShowing = false;
         agent.subscribe((event) => {
+          if (event.type === "tool_execution_start") {
+            // Live activity feedback: without this the thread shows a bare
+            // "working…" for the whole tool call with nothing actionable.
+            toolActivityShowing = true;
+            queue.push({ type: "progress", text: describeToolActivity(event.toolName, event.args) });
+          }
           if (
             event.type === "message_update" &&
             event.assistantMessageEvent.type === "text_delta"
           ) {
             const delta = event.assistantMessageEvent.delta;
             if (delta) {
+              if (toolActivityShowing) {
+                // Real text replaces the activity line instead of appending to it.
+                toolActivityShowing = false;
+                queue.push({ type: "progress", text: "" });
+              }
               streamed += delta;
               queue.push({ type: "text", text: delta });
             }
@@ -213,6 +225,31 @@ export function normalizeAgentToolName(name: string): string {
  * Existing valid names are reserved first so sanitizing a connector cannot
  * rename or shadow a builtin tool with the same valid name.
  */
+const ACTIVITY_DETAIL_LIMIT = 90;
+
+/** One human-readable line describing a tool call, shown live in the thread. */
+export function describeToolActivity(toolName: string, args: unknown): string {
+  const record = args && typeof args === "object" ? (args as Record<string, unknown>) : {};
+  const detail = (value: unknown): string => {
+    const text = String(value ?? "").replaceAll(/\s+/g, " ").trim();
+    return text.length > ACTIVITY_DETAIL_LIMIT ? `${text.slice(0, ACTIVITY_DETAIL_LIMIT)}…` : text;
+  };
+  if (toolName === "shell") return `Running: ${detail(record.command)}`;
+  if (toolName === "read_file") return `Reading ${detail(record.path)}`;
+  if (toolName === "write_file") return `Writing ${detail(record.path)}`;
+  if (toolName === "list_files") return `Listing ${detail(record.path ?? ".")}`;
+  if (toolName === "attach_file") return `Attaching ${detail(record.path)}`;
+  if (toolName === "open_path") return `Opening ${detail(record.path)}`;
+  if (toolName === "render_plot") return "Rendering a chart";
+  if (toolName === "computer_observe") return "Looking at the screen";
+  if (toolName === "computer_act") return "Operating the computer";
+  if (toolName === "run_subagent") return `Delegating to helper: ${detail(record.name)}`;
+  if (toolName === "remember") return "Saving a note to memory";
+  const mcp = toolName.match(/^mcp__(.+?)__(.+)$/);
+  if (mcp) return `Using ${mcp[1]}: ${mcp[2]}`;
+  return `Using ${toolName}`;
+}
+
 export function normalizeAgentToolNames(tools: readonly ConnectorTool[]): string[] {
   const reservedValidNames = new Set(
     tools.filter((tool) => isProviderSafeAgentToolName(tool.name)).map((tool) => tool.name),

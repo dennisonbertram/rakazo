@@ -1916,7 +1916,13 @@ const Transcript = memo(function Transcript({
           />
         </div>
       ))}
-      {running ? (
+      {running &&
+      !messages.some(
+        (message) =>
+          message.id.startsWith("progress:") &&
+          message.blocks[0]?.kind === "progress" &&
+          message.blocks[0].text,
+      ) ? (
         <div className="flex justify-start">
           <div
             className="rounded-[20px] bg-[#1A1A1D] px-[18px] py-[13px] text-[14.5px] text-[#85858A]"
