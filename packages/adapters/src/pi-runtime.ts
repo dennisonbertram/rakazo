@@ -134,7 +134,8 @@ export class PiAgentRuntime implements AgentRuntime {
           }
         });
 
-        queue.push({ type: "progress", text: "working…" });
+        // No "working…" progress push here: the shell already renders its own
+        // placeholder while a run is active, and emitting one here shows two.
         const images = request.currentTurnImages?.map((image) => ({
           type: "image" as const,
           data: Buffer.from(image.data).toString("base64"),
