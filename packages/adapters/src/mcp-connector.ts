@@ -40,8 +40,9 @@ export class McpConnector implements ConnectorProvider {
             route: { kind: "mcp", serverId: assignment.serverId, remoteName: tool.name },
           });
         }
-      } catch {
+      } catch (error) {
         // A single unavailable server must not hide tools from other connectors.
+        console.error(`mcp discovery failed for server ${assignment.server.slug}:`, error instanceof Error ? error.message : error);
         await this.evict(assignment.server.id);
       }
     }
