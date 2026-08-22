@@ -1,5 +1,6 @@
 import type { Bot, McpServer } from "@rakazo/contracts";
 import { useEffect, useState } from "react";
+import { connectMcpOauth, isNoOauthNeededError, MCP_OAUTH_CHANNEL } from "../lib/mcp-connect";
 import { rpc } from "../lib/rpc";
 
 type Transport = "streamable_http" | "sse" | "stdio";
@@ -55,7 +56,7 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
     // BroadcastChannel instead of window.opener messaging: provider login
     // pages with COOP sever the opener link, but the channel is origin-scoped
     // and unaffected.
-    const channel = new BroadcastChannel("rakazo-mcp-oauth");
+    const channel = new BroadcastChannel(MCP_OAUTH_CHANNEL);
     channel.onmessage = (event: MessageEvent) => {
       if ((event.data as { type?: string } | null)?.type !== "mcp-oauth-complete") return;
       setOauthPending(null);
@@ -151,29 +152,17 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
     setError(null);
     setOauthPending(server.id);
     try {
-      const started = await rpc.mcp.oauth.begin({
-        serverId: server.id,
-        redirectUri: `${window.location.origin}/mcp/oauth/callback`,
-      });
-      // A popup keeps the app open while the provider authorizes; the callback
-      // page posts "mcp-oauth-complete" back and closes itself.
-      const popup = window.open(
-        started.authorizationUrl,
-        "rakazo-mcp-oauth",
-        "popup,width=560,height=720",
-      );
-      if (!popup) {
-        window.location.assign(started.authorizationUrl);
-        return;
-      }
-      const timer = window.setInterval(() => {
-        if (!popup.closed) return;
-        window.clearInterval(timer);
-        setOauthPending((current) => (current === server.id ? null : current));
-        void refresh().catch(() => undefined);
-      }, 500);
+      const result = await connectMcpOauth(server.id);
+      if (result === "connected") setOauthPending(null);
+      await refresh();
+      if (result === "connected") return;
+      setOauthPending((current) => (current === server.id ? null : current));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start OAuth");
+      if (isNoOauthNeededError(err)) {
+        setError("No browser authorization is needed for this server — it is ready to use.");
+      } else {
+        setError(err instanceof Error ? err.message : "Could not start OAuth");
+      }
       setOauthPending(null);
     }
   }

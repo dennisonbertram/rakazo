@@ -34,6 +34,8 @@ import {
 import {
   createThreadMessage,
   findDefaultModelCredential,
+  type McpServer,
+  type Prisma,
   type PrismaClient,
   parseComputerMode,
   type ThreadEvents,
@@ -75,6 +77,11 @@ import {
   LEGACY_HISTORY_WINDOW_SIZE,
   shouldEnqueueCompaction,
 } from "./history-compaction.js";
+import {
+  buildMcpCredentialBlob,
+  needsOAuthProbe,
+  parseMcpServerToolArgs,
+} from "./mcp-server-tool.js";
 import { loadAgentMemoryContext } from "./memory-context.js";
 import { toOAuthCredential } from "./pi-credentials.js";
 import {
@@ -825,6 +832,113 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
             return finish({ ok: true });
           }
+          if (name === "add_mcp_server") {
+            const parsed = parseMcpServerToolArgs(args);
+            if (!parsed) {
+              return finish({
+                error:
+                  "Invalid MCP server details. Required: name, transport (streamable_http|sse|stdio); endpoint for remote transports; command for stdio.",
+              });
+            }
+            if (!deps.secretStore) {
+              return finish({ error: "Secret storage is not available in this deployment." });
+            }
+            const credentialBlob = buildMcpCredentialBlob(parsed);
+            let secretId: string | null = null;
+            if (credentialBlob) {
+              const stored = await deps.secretStore.put(credentialBlob, {
+                operationId: executionId,
+                traceId: executionId,
+                workspaceId: run.workspaceId,
+                userId: run.userId,
+                botId: bot.id,
+                signal: new AbortController().signal,
+              });
+              await deps.prisma.secret.create({
+                data: {
+                  id: stored.id,
+                  userId: run.userId,
+                  workspaceId: run.workspaceId,
+                  kind: "mcp",
+                  ciphertext: stored.ciphertext,
+                },
+              });
+              secretId = stored.id;
+            }
+            let serverRow: McpServer;
+            try {
+              serverRow = await deps.prisma.mcpServer.create({
+                data: {
+                  workspaceId: run.workspaceId,
+                  userId: run.userId,
+                  slug: parsed.slug,
+                  name: parsed.name,
+                  description: parsed.description,
+                  transport: parsed.transport,
+                  endpoint: parsed.endpoint ?? null,
+                  command: parsed.command ?? null,
+                  args: parsed.args as unknown as Prisma.InputJsonValue,
+                  env: Object.fromEntries(Object.keys(parsed.env).map((key) => [key, true])),
+                  headers: Object.fromEntries(
+                    Object.keys(parsed.headers).map((key) => [key, true]),
+                  ),
+                  secretId,
+                  enabled: true,
+                },
+              });
+            } catch (error) {
+              // Unique constraint on (workspace, user, slug): the user likely
+              // already has a server by this name.
+              if (
+                typeof error === "object" &&
+                error !== null &&
+                "code" in error &&
+                (error as { code?: string }).code === "P2002"
+              ) {
+                // Roll back the credential blob we just stored.
+                if (secretId) {
+                  await deps.prisma.secret.deleteMany({
+                    where: { id: secretId, workspaceId: run.workspaceId },
+                  });
+                }
+                return finish({
+                  error: `An MCP server named "${parsed.name}" already exists. Ask the user to remove it first or pick another name.`,
+                });
+              }
+              throw error;
+            }
+            if (parsed.assignToSelf) {
+              await deps.prisma.botMcpServer.create({
+                data: {
+                  workspaceId: run.workspaceId,
+                  userId: run.userId,
+                  botId: bot.id,
+                  serverId: serverRow.id,
+                  allowAllTools: true,
+                  allowedTools: [],
+                },
+              });
+            }
+            const oauthLikely = needsOAuthProbe(parsed);
+            await publishMessage(deps, run, "bot", [
+              {
+                kind: "mcp_approval",
+                name: serverRow.name,
+                serverId: serverRow.id,
+                transport: parsed.transport as "streamable_http" | "sse" | "stdio",
+                endpoint: parsed.endpoint ?? null,
+                needsOAuth: oauthLikely,
+              },
+            ]);
+            return finish({
+              ok: true,
+              server_id: serverRow.id,
+              assigned_to_self: parsed.assignToSelf,
+              next_step: oauthLikely
+                ? "An approval card was posted to the chat. Tell the user to click Authorize on it to complete browser OAuth; its tools become available on their next message."
+                : "The server is connected and assigned to you; its tools are usable from the next message.",
+            });
+          }
           if (name === "request_takeover") return { ok: true };
           if (name === "run_subagent") {
             return {
@@ -987,6 +1101,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 pluginLine,
                 taughtSkillsLine,
                 'For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {"help": true} before your first chart to read the full guide.',
+                "When the user asks you to add or connect an MCP server (and gives you its details), use add_mcp_server. If it uses browser sign-in, an approval card appears in the chat — tell the user to click Authorize on it.",
                 "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
               ]
                 .filter((instruction): instruction is string => Boolean(instruction))

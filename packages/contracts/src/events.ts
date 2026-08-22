@@ -117,6 +117,17 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     data: z.array(z.any()).max(5000),
   }),
   z.object({
+    /** Approval card for an agent-created MCP server. The user completes the
+        OAuth popup (or confirms no authorization is needed) in the UI. */
+    kind: z.literal("mcp_approval"),
+    name: z.string(),
+    serverId: Id,
+    // Mirrors McpTransportSchema; inlined to avoid a circular import with domain.ts.
+    transport: z.enum(["streamable_http", "sse", "stdio"]),
+    endpoint: z.string().nullable(),
+    needsOAuth: z.boolean(),
+  }),
+  z.object({
     kind: z.literal("image"),
     artifactId: Id,
     mimeType: z.string(),

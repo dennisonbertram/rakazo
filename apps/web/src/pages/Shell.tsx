@@ -73,6 +73,7 @@ import { authClient } from "../lib/auth";
 import { takeInitialBootstrap } from "../lib/bootstrap";
 import { chartViewport } from "../lib/chart-viewport";
 import { dictation } from "../lib/dictation";
+import { connectMcpOauth, isNoOauthNeededError } from "../lib/mcp-connect";
 import { revokePendingAttachmentPreviews } from "../lib/pending-attachments";
 import { markAfterPaint, markOnce } from "../lib/performance";
 import { rpc } from "../lib/rpc";
@@ -2266,6 +2267,19 @@ const MessageView = memo(function MessageView({
             </div>
           );
         }
+        if (block.kind === "mcp_approval") {
+          return (
+            <div key={i} className="flex justify-start">
+              <McpApprovalCard
+                name={block.name}
+                serverId={block.serverId}
+                transport={block.transport}
+                endpoint={block.endpoint}
+                needsOAuth={block.needsOAuth}
+              />
+            </div>
+          );
+        }
         if (block.kind === "image") {
           return (
             <div
@@ -3169,6 +3183,99 @@ function ChartCanvas({
         </div>
       ) : null}
       <div ref={ref} className="[&_svg]:max-w-full" />
+    </div>
+  );
+}
+
+type McpApprovalState = "pending" | "connecting" | "connected" | "no-auth" | "dismissed";
+
+/** Approval card for an agent-created MCP server: the user completes browser
+ * OAuth (or confirms no authorization is needed) without leaving the chat. */
+function McpApprovalCard({
+  name,
+  serverId,
+  transport,
+  endpoint,
+  needsOAuth,
+}: {
+  name: string;
+  serverId: string;
+  transport: string;
+  endpoint: string | null;
+  needsOAuth: boolean;
+}) {
+  const [state, setState] = useState<McpApprovalState>(needsOAuth ? "pending" : "no-auth");
+  const [error, setError] = useState<string | null>(null);
+
+  async function authorize() {
+    setState("connecting");
+    setError(null);
+    try {
+      const result = await connectMcpOauth(serverId);
+      setState(result === "connected" ? "connected" : needsOAuth ? "pending" : "no-auth");
+    } catch (err) {
+      if (isNoOauthNeededError(err)) {
+        setState("no-auth");
+      } else {
+        setError(err instanceof Error ? err.message : "Could not start authorization");
+        setState("pending");
+      }
+    }
+  }
+
+  const summary = endpoint ?? `stdio · ${transport}`;
+  return (
+    <div className="max-w-[74%] rounded-[20px] border border-[#2A2A31] bg-[#17171A] p-4">
+      <div className="flex items-center gap-2">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#30356A] text-xs text-[#E2E4FF]">
+          M
+        </span>
+        <span className="text-[14.5px] font-medium text-[#ECECEE]">
+          Connect MCP server “{name}”
+        </span>
+      </div>
+      <p className="mt-1.5 truncate text-[12px] text-[#85858B]">{summary}</p>
+      {state === "pending" || state === "connecting" ? (
+        <>
+          <p className="mt-2 text-[13px] leading-[1.5] text-[#B9B9C0]">
+            This server uses browser sign-in. Authorize it to let your agents use its tools — a
+            popup will open.
+          </p>
+          {error ? <p className="mt-2 text-xs text-[#F07178]">{error}</p> : null}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={state === "connecting"}
+              onClick={() => void authorize()}
+              className="rounded-xl bg-[#7785FF] px-4 py-2 text-sm font-semibold text-[#090A12] disabled:opacity-50"
+            >
+              {state === "connecting" ? "Waiting for authorization…" : "Authorize"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setState("dismissed")}
+              className="rounded-xl border border-[#34343B] px-4 py-2 text-sm text-[#B9B9C0]"
+            >
+              Not now
+            </button>
+          </div>
+        </>
+      ) : null}
+      {state === "no-auth" ? (
+        <p className="mt-2 text-[13px] text-[#9BD49B]">
+          ✓ No browser authorization needed — the server is ready to use.
+        </p>
+      ) : null}
+      {state === "connected" ? (
+        <p className="mt-2 text-[13px] text-[#9BD49B]">
+          ✓ Connected — its tools are available from your next message.
+        </p>
+      ) : null}
+      {state === "dismissed" ? (
+        <p className="mt-2 text-[13px] text-[#85858A]">
+          Dismissed — reconnect anytime from MCP settings.
+        </p>
+      ) : null}
     </div>
   );
 }

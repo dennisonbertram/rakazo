@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { MCP_OAUTH_CHANNEL } from "../lib/mcp-connect";
 import { rpc } from "../lib/rpc";
 
-// The window.open name set by McpServersOverlay. Providers whose login pages
-// send COOP sever window.opener mid-flow, but the window name survives, so it
-// is the reliable "we are the popup" marker.
-const POPUP_NAME = "rakazo-mcp-oauth";
+// The window.open name set by the OAuth popup flow. Providers whose login
+// pages send COOP sever window.opener mid-flow, but the window name survives,
+// so it is the reliable "we are the popup" marker.
+const POPUP_NAME = MCP_OAUTH_CHANNEL;
 
 export function McpOAuthCallbackPage() {
   const navigate = useNavigate();
