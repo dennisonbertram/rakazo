@@ -82,6 +82,7 @@ import {
   getOwnedArtifact,
   resolveSendAttachments,
 } from "./artifacts.js";
+import { buildMcpUpdateMaterial } from "./mcp-material.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { queryWorkspaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
@@ -1557,21 +1558,15 @@ export function createRouter(deps: RouterDeps) {
               /* Existing malformed secrets are replaced only when new credentials are supplied. */
             }
           }
-          const secretPayload =
-            existingSecret || ("secret" in config && config.secret)
-              ? JSON.stringify({
-                  ...existingMaterial,
-                  ...("secret" in config && config.secret ? { secret: config.secret } : {}),
-                  ...("env" in config ? { env: config.env } : {}),
-                  ...("headers" in config ? { headers: config.headers } : {}),
-                })
+          const update = buildMcpUpdateMaterial(existingMaterial, config);
+          const stored =
+            update.action === "store" && Object.keys(update.material).length > 0
+              ? await deps.secrets.put(
+                  JSON.stringify(update.material),
+                  computerContext(context.actor, "mcp", "mcp.update"),
+                )
               : null;
-          const stored = secretPayload
-            ? await deps.secrets.put(
-                secretPayload,
-                computerContext(context.actor, "mcp", "mcp.update"),
-              )
-            : null;
+          const clearing = update.action === "store" && Object.keys(update.material).length === 0;
           const row = await deps.prisma.$transaction(async (tx) => {
             const updated = await tx.mcpServer.update({
               where: { id: existing.id },
@@ -1591,7 +1586,7 @@ export function createRouter(deps: RouterDeps) {
                   : {}) as Prisma.InputJsonValue,
                 enabled: config.enabled,
                 revision: { increment: 1 },
-                ...(stored ? { secretId: stored.id } : {}),
+                ...(stored ? { secretId: stored.id } : clearing ? { secretId: null } : {}),
               },
             });
             if (stored) {
@@ -1608,6 +1603,10 @@ export function createRouter(deps: RouterDeps) {
                 await tx.secret.deleteMany({
                   where: { id: existing.secretId, workspaceId: context.actor.workspaceId },
                 });
+            } else if (clearing && existing.secretId) {
+              await tx.secret.deleteMany({
+                where: { id: existing.secretId, workspaceId: context.actor.workspaceId },
+              });
             }
             return updated;
           });

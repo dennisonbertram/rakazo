@@ -196,6 +196,9 @@ const McpServerBaseInput = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(2000).default(""),
   enabled: z.boolean().default(true),
+  /** Update-only: drop the stored static credential (secret/env/headers).
+   * OAuth state survives so a connected server stays connected. */
+  clearCredential: z.boolean().optional(),
 });
 export const McpServerConfigInput = z.discriminatedUnion("transport", [
   McpServerBaseInput.extend({
