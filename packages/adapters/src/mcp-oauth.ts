@@ -111,7 +111,7 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
   // The resource metadata is served by the endpoint the user configured, so
   // accept its self-declared canonical resource identity even when the host
   // differs (Brex advertises an internal alias for its public API origin).
-  validateResourceURL(_serverUrl: string | URL, resource?: string): URL | undefined {
+  async validateResourceURL(_serverUrl: string | URL, resource?: string): Promise<URL | undefined> {
     return resource ? new URL(resource) : undefined;
   }
   async saveDiscoveryState(value: OAuthDiscoveryState): Promise<void> {

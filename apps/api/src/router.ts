@@ -1537,8 +1537,13 @@ export function createRouter(deps: RouterDeps) {
           return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
         remove: authed.mcp.servers.remove.handler(async ({ context, input }) => {
-          const result = await deps.prisma.mcpServer.deleteMany({ where: { id: input.id, workspaceId: context.actor.workspaceId, userId: context.actor.userId } });
-          if (result.count !== 1) throw new IsolationError();
+          const server = await deps.prisma.mcpServer.findFirst({ where: { id: input.id, workspaceId: context.actor.workspaceId, userId: context.actor.userId }, select: { id: true, secretId: true } });
+          if (!server) throw new IsolationError();
+          // Assignments cascade; the encrypted credential must go with the server.
+          await deps.prisma.$transaction([
+            deps.prisma.mcpServer.delete({ where: { id: server.id } }),
+            ...(server.secretId ? [deps.prisma.secret.delete({ where: { id: server.secretId } })] : []),
+          ]);
           return { ok: true as const };
         }),
       },
