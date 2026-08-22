@@ -11,7 +11,7 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { PrismaClient } from "@rakazo/db";
-import { withEndpointOriginFallback } from "./mcp-transport.js";
+import { secureFetch, validateUrl, withEndpointOriginFallback } from "./mcp-transport.js";
 import type { EncryptedSecretStore } from "./secrets.js";
 
 type OAuthState = {
@@ -121,11 +121,19 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     if (!verifier) throw new Error("OAuth PKCE verifier is missing");
     return verifier;
   }
-  // The resource metadata is served by the endpoint the user configured, so
-  // accept its self-declared canonical resource identity even when the host
-  // differs (Brex advertises an internal alias for its public API origin).
+  // RFC 8707 resource binding: only accept a self-declared canonical resource
+  // that is itself a well-formed HTTPS (or localhost) URL. Providers like Brex
+  // advertise an internal alias for their public origin, so cross-host
+  // resources are allowed, but malformed or cleartext resources are rejected
+  // and the SDK falls back to deriving the resource from the server URL.
   async validateResourceURL(_serverUrl: string | URL, resource?: string): Promise<URL | undefined> {
-    return resource ? new URL(resource) : undefined;
+    if (!resource) return undefined;
+    try {
+      validateUrl(resource);
+      return new URL(resource);
+    } catch {
+      return undefined;
+    }
   }
   async saveDiscoveryState(value: OAuthDiscoveryState): Promise<void> {
     this.oauth().discoveryState = value;
@@ -171,7 +179,18 @@ type Pending = {
   userId: string;
   endpoint: string;
   provider: StoredMcpOAuthProvider;
+  createdAt: number;
 };
+
+const PENDING_TTL_MS = 10 * 60_000;
+
+/** OAuth traffic runs through the same URL policy as runtime MCP requests
+ * (HTTPS enforced, redirects rejected), with the endpoint-origin fallback
+ * layered on top for providers like Brex. */
+function oauthFetch(endpoint: string): typeof fetch {
+  const url = new URL(endpoint);
+  return withEndpointOriginFallback(url.origin, secureFetch(url, { allowHttpLocalhost: true }));
+}
 
 export class McpOAuthBroker {
   private readonly pending = new Map<string, Pending>();
@@ -214,6 +233,7 @@ export class McpOAuthBroker {
       },
     });
     if (!server?.endpoint) throw new Error("MCP server endpoint is required for OAuth");
+    this.sweepExpiredPending();
     const sessionId = randomUUID();
     const context = { workspaceId: input.workspaceId, userId: input.userId };
     const loaded = await this.loadMaterial(server, context);
@@ -225,11 +245,13 @@ export class McpOAuthBroker {
         authorizationUrl = url;
       },
     });
-    if (provider.tokens()) await provider.invalidateCredentials("tokens");
+    // Never destroy working tokens here: if this attempt fails (network error,
+    // cancelled popup), the server keeps its valid connection. The SDK itself
+    // invalidates dead tokens when a refresh is rejected with invalid_grant.
     const endpoint = new URL(server.endpoint);
     const transport = new StreamableHTTPClientTransport(endpoint, {
       authProvider: provider,
-      fetch: withEndpointOriginFallback(endpoint.origin),
+      fetch: oauthFetch(server.endpoint),
     });
     const client = new Client({ name: "rakazo-oauth", version: "0.1.0" });
     try {
@@ -239,13 +261,21 @@ export class McpOAuthBroker {
     } finally {
       await client.close().catch(() => undefined);
     }
-    if (!authorizationUrl) throw new Error("MCP server did not request OAuth authorization");
+    if (!authorizationUrl) {
+      if (provider.tokens()) {
+        throw new Error(
+          "MCP server accepted the existing connection; disconnect this server first to force re-authorization.",
+        );
+      }
+      throw new Error("MCP server did not request OAuth authorization");
+    }
     this.pending.set(sessionId, {
       serverId: server.id,
       workspaceId: input.workspaceId,
       userId: input.userId,
       endpoint: server.endpoint,
       provider,
+      createdAt: Date.now(),
     });
     return { sessionId, authorizationUrl: authorizationUrl.toString() };
   }
@@ -257,6 +287,7 @@ export class McpOAuthBroker {
     workspaceId: string;
     userId: string;
   }): Promise<void> {
+    this.sweepExpiredPending();
     const pending = this.pending.get(input.sessionId);
     if (
       !pending ||
@@ -266,10 +297,13 @@ export class McpOAuthBroker {
     ) {
       throw new Error("MCP OAuth session is invalid or expired");
     }
+    // Consume the session up front so a failed token exchange cannot be
+    // retried with a replayed code; the user starts a fresh flow instead.
+    this.pending.delete(input.sessionId);
     const endpoint = new URL(pending.endpoint);
     const transport = new StreamableHTTPClientTransport(endpoint, {
       authProvider: pending.provider,
-      fetch: withEndpointOriginFallback(endpoint.origin),
+      fetch: oauthFetch(pending.endpoint),
     });
     await transport.finishAuth(input.code);
     if (!pending.provider.tokens()) throw new Error("MCP OAuth authorization failed");
@@ -278,7 +312,13 @@ export class McpOAuthBroker {
       where: { id: pending.serverId },
       data: { revision: { increment: 1 } },
     });
-    this.pending.delete(input.sessionId);
+  }
+
+  private sweepExpiredPending(): void {
+    const cutoff = Date.now() - PENDING_TTL_MS;
+    for (const [sessionId, pending] of this.pending) {
+      if (pending.createdAt < cutoff) this.pending.delete(sessionId);
+    }
   }
 
   async disconnect(input: {

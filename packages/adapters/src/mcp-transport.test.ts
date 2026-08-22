@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoredMcpOAuthProvider } from "./mcp-oauth.js";
-import { McpSession, validateUrl } from "./mcp-transport.js";
+import { McpSession, validateUrl, withEndpointOriginFallback } from "./mcp-transport.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -230,5 +230,45 @@ describe("MCP transport seam", () => {
       await session.close();
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+
+  it("strips sensitive headers when falling back to the endpoint origin", async () => {
+    const seen: Record<string, string>[] = [];
+    const inner = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.url === "https://private.example.test/data") throw new TypeError("fetch failed");
+      seen.push(Object.fromEntries(new Headers(init?.headers).entries()));
+      return Response.json({ ok: true });
+    });
+    const fallback = withEndpointOriginFallback(
+      "https://endpoint.example.test",
+      inner as typeof fetch,
+    );
+
+    const response = await fallback("https://private.example.test/data", {
+      headers: { authorization: "Bearer secret", "x-custom": "keep-me" },
+    });
+
+    expect(response.ok).toBe(true);
+    const retry = seen[0] ?? {};
+    expect(retry.authorization).toBeUndefined();
+    expect(retry.cookie).toBeUndefined();
+    expect(retry["x-custom"]).toBe("keep-me");
+  });
+
+  it("keeps sensitive headers on same-origin and first-attempt requests", async () => {
+    const inner = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      return Response.json({ authorization: request.headers.get("authorization") });
+    });
+    const fallback = withEndpointOriginFallback(
+      "https://endpoint.example.test",
+      inner as typeof fetch,
+    );
+
+    const direct = await fallback("https://endpoint.example.test/api", {
+      headers: { authorization: "Bearer secret" },
+    });
+    await expect(direct.json()).resolves.toEqual({ authorization: "Bearer secret" });
   });
 });

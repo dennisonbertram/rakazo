@@ -78,7 +78,7 @@ function validateUrl(raw: string | URL, policy: McpUrlPolicy = {}): URL {
   return url;
 }
 
-function secureFetch(
+export function secureFetch(
   resourceUrl: URL,
   urlPolicy: McpUrlPolicy,
   headerPolicy: McpHeaderPolicy = {},
@@ -128,6 +128,17 @@ export function withEndpointOriginFallback(
   endpointOrigin: string,
   fetchImpl: typeof fetch = fetch,
 ): typeof fetch {
+  // Credentials must not be replayed to a different origin than the one the
+  // SDK addressed, so the retry drops auth/session headers.
+  const SENSITIVE_RETRY_HEADERS = new Set(["authorization", "cookie", "proxy-authorization"]);
+  const sanitizedInit = (init?: RequestInit): RequestInit | undefined => {
+    if (!init?.headers) return init;
+    const headers = new Headers(init.headers);
+    for (const name of [...headers.keys()]) {
+      if (SENSITIVE_RETRY_HEADERS.has(name.toLowerCase())) headers.delete(name);
+    }
+    return { ...init, headers };
+  };
   return async (input: Request | URL | string, init?: RequestInit): Promise<Response> => {
     if (input instanceof Request) return fetchImpl(input, init);
     const url = new URL(String(input));
@@ -140,7 +151,7 @@ export function withEndpointOriginFallback(
         init?.signal ? init : { ...init, signal: AbortSignal.timeout(4_000) },
       );
     } catch {
-      return fetchImpl(new URL(url.pathname + url.search, endpointOrigin), init);
+      return fetchImpl(new URL(url.pathname + url.search, endpointOrigin), sanitizedInit(init));
     }
   };
 }

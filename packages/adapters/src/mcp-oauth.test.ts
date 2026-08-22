@@ -184,6 +184,102 @@ describe("MCP OAuth", () => {
     });
   });
 
+  it("applies the transport URL policy to OAuth traffic: no plain-HTTP endpoints, no redirects", async () => {
+    const fetchCalls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        fetchCalls.push(`${request.method} ${request.url}`);
+        if (request.url === "http://insecure.example.test/mcp") {
+          return new Response(null, {
+            status: 401,
+            headers: {
+              "WWW-Authenticate":
+                'Bearer resource_metadata="http://insecure.example.test/.well-known/oauth-protected-resource/mcp"',
+            },
+          });
+        }
+        throw new Error(`Unexpected request: ${request.method} ${request.url}`);
+      }),
+    );
+    const prisma = {
+      mcpServer: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "server-1",
+          endpoint: "http://insecure.example.test/mcp",
+          secretId: null,
+        }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      secret: { findFirst: vi.fn(), create: vi.fn(), delete: vi.fn() },
+      $transaction: vi.fn().mockResolvedValue([]),
+    };
+    const broker = new McpOAuthBroker(prisma as never, { put: vi.fn() } as never);
+
+    await expect(
+      broker.begin({
+        serverId: "server-1",
+        workspaceId: "workspace-1",
+        userId: "user-1",
+        redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+      }),
+    ).rejects.toThrow(/HTTPS/i);
+    expect(fetchCalls).toEqual([]);
+  });
+
+  it("rejects redirects during OAuth discovery instead of following them", async () => {
+    const requestedUrls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        requestedUrls.push(request.url);
+        if (request.url === "https://mcp.example.test/mcp") {
+          return new Response(null, {
+            status: 401,
+            headers: {
+              "WWW-Authenticate":
+                'Bearer resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"',
+            },
+          });
+        }
+        if (request.url.startsWith("https://mcp.example.test/.well-known/")) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: "https://attacker.example.test/.well-known/oauth-protected-resource/mcp",
+            },
+          });
+        }
+        throw new Error(`Unexpected request: ${request.method} ${request.url}`);
+      }),
+    );
+    const prisma = {
+      mcpServer: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "server-1",
+          endpoint: "https://mcp.example.test/mcp",
+          secretId: null,
+        }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      secret: { findFirst: vi.fn(), create: vi.fn(), delete: vi.fn() },
+      $transaction: vi.fn().mockResolvedValue([]),
+    };
+    const broker = new McpOAuthBroker(prisma as never, { put: vi.fn() } as never);
+
+    await expect(
+      broker.begin({
+        serverId: "server-1",
+        workspaceId: "workspace-1",
+        userId: "user-1",
+        redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+      }),
+    ).rejects.toThrow(/redirect/i);
+    expect(requestedUrls.every((url) => !url.includes("attacker.example.test"))).toBe(true);
+  });
+
   it("retries unreachable OAuth discovery and DCR hosts on the MCP endpoint origin", async () => {
     const requests: string[] = [];
     vi.stubGlobal(
