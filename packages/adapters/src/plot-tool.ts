@@ -19,6 +19,8 @@ export type PlotMarkSpec = {
 
 export type PlotSpec = {
   title?: string;
+  /** Rows may also arrive nested in the spec; treated like top-level data. */
+  data?: unknown[];
   width?: number;
   height?: number;
   marginLeft?: number;
@@ -140,6 +142,60 @@ export function supportedPlotNames(): { marks: string[]; transforms: string[] } 
   };
 }
 
+// Channels where a string must name a column; a typo otherwise renders an
+// empty chart with no error, which strands the calling model.
+const COLUMN_CHANNELS = ["x", "y", "x1", "x2", "y1", "y2", "fx", "fy"] as const;
+
+function assertChannelsMatchColumns(mark: PlotMarkSpec, data: unknown[]): void {
+  const first = data[0];
+  if (!first || typeof first !== "object" || Array.isArray(first)) return;
+  const keys = Object.keys(first);
+  const available = new Set(keys);
+  let namedChannels = 0;
+  for (const channel of COLUMN_CHANNELS) {
+    const value = mark.options?.[channel];
+    if (value !== undefined) namedChannels += 1;
+    if (typeof value === "string" && !available.has(value)) {
+      throw new Error(
+        `Mark "${mark.type}": ${channel} refers to "${value}" but the data columns are: ${keys.join(", ")}. Channel names must match data keys exactly.`,
+      );
+    }
+  }
+  if (namedChannels === 0 && !mark.transform) {
+    throw new Error(
+      `Mark "${mark.type}" has object rows but no position channels; set options like {"x": "<column>", "y": "<column>"} using these columns: ${keys.join(", ")}.`,
+    );
+  }
+}
+
+/** Models also hand over data as CSV text lines; parse those into rows. */
+function normalizeRows(rows: unknown[]): unknown[] {
+  if (
+    rows.length > 1 &&
+    rows.every((row) => typeof row === "string") &&
+    (rows[0] as string).includes(",")
+  ) {
+    return csvParse(rows.join("\n"), autoType);
+  }
+  return coerceNumericStrings(rows);
+}
+
+/** Models often send numbers as JSON strings; ordinal-typed values then stack
+    into one giant bar instead of measuring. Coerce numeric-looking strings. */
+function coerceNumericStrings(rows: unknown[]): unknown[] {
+  return rows.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      out[key] =
+        typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))
+          ? Number(value)
+          : value;
+    }
+    return out;
+  });
+}
+
 function buildMark(mark: PlotMarkSpec, sharedData: unknown[] | undefined): Plot.Markish {
   const options = { ...(mark.options ?? {}) };
   const dataless = DATALESS_MARKS[mark.type];
@@ -150,8 +206,13 @@ function buildMark(mark: PlotMarkSpec, sharedData: unknown[] | undefined): Plot.
       `Unsupported mark type "${mark.type}". Supported marks: ${supportedPlotNames().marks.join(", ")}`,
     );
   }
-  const data = mark.data ?? sharedData;
-  if (!data) throw new Error(`Mark "${mark.type}" has no data and the spec has no shared data.`);
+  const rawData = mark.data ?? sharedData;
+  if (!rawData) throw new Error(`Mark "${mark.type}" has no data and the spec has no shared data.`);
+  if (Array.isArray(rawData) && rawData.length === 0) {
+    throw new Error(`Mark "${mark.type}" received an empty data array; pass the rows in "data".`);
+  }
+  const data = normalizeRows(rawData);
+  assertChannelsMatchColumns(mark, data);
   let finalOptions: Record<string, unknown> = options;
   if (mark.transform) {
     const transform = TRANSFORMS[mark.transform.name];
@@ -184,7 +245,8 @@ export function renderPlotSpecToSvg(
   if (!Array.isArray(spec.marks) || spec.marks.length === 0) {
     throw new Error("The spec needs a non-empty marks array.");
   }
-  const { title, marks, ...plotOptions } = spec;
+  const { title, marks, data: nestedData, ...plotOptions } = spec;
+  const sharedData = data ?? (Array.isArray(nestedData) ? nestedData : undefined);
   for (const scale of ["color", "x", "y", "fx", "fy", "r", "opacity", "symbol"] as const) {
     const options = plotOptions[scale];
     // Plot renders legends/titles as HTML <figure> wrappers, which cannot
@@ -194,7 +256,7 @@ export function renderPlotSpecToSvg(
   const plotted = Plot.plot({
     document,
     ...(plotOptions as Plot.PlotOptions),
-    marks: marks.map((mark) => buildMark(mark, data)),
+    marks: marks.map((mark) => buildMark(mark, sharedData)),
   });
   const svg = plotted.tagName === "svg" ? plotted : plotted.querySelector("svg");
   if (!svg) throw new Error("Plot did not produce an SVG element");

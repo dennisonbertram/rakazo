@@ -86,6 +86,65 @@ describe("render_plot", () => {
     expect(supportedPlotNames().transforms).toContain("binX");
   });
 
+  it("rejects empty data and channel names that match no column", () => {
+    expect(() =>
+      renderPlotSpecToSvg({ marks: [{ type: "barY", options: { x: "q", y: "v" } }] }, [], dom()),
+    ).toThrow(/empty data array/);
+    expect(() =>
+      renderPlotSpecToSvg(
+        { marks: [{ type: "barY", options: { x: "Quarter", y: "Sales" } }] },
+        [{ quarter: "Q1", sales: 120 }],
+        dom(),
+      ),
+    ).toThrow(/x refers to "Quarter" but the data columns are: quarter, sales/);
+    expect(() =>
+      renderPlotSpecToSvg(
+        { marks: [{ type: "barY" }] },
+        [{ quarter: "Q1", sales: 120 }],
+        dom(),
+      ),
+    ).toThrow(/no position channels/);
+  });
+
+  it("coerces numeric strings so bar heights measure instead of stacking ordinally", () => {
+    const svg = renderPlotSpecToSvg(
+      { marks: [{ type: "barY", options: { x: "quarter", y: "sales" } }] },
+      [
+        { quarter: "Q1", sales: "120" },
+        { quarter: "Q2", sales: "185" },
+        { quarter: "Q3", sales: "143" },
+        { quarter: "Q4", sales: "210" },
+      ],
+      dom(),
+    );
+    // A quantitative y axis includes a 200 tick; the ordinal failure mode has none.
+    expect(svg).toContain("200");
+    expect(svg).toContain("Q3");
+  });
+
+  it("parses data given as CSV text lines", () => {
+    const svg = renderPlotSpecToSvg(
+      { marks: [{ type: "barY", options: { x: "quarter", y: "sales" } }] },
+      ["quarter,sales", "Q1,120", "Q2,185", "Q3,143", "Q4,210"],
+      dom(),
+    );
+    expect(svg).toContain("200");
+    expect(svg).toContain("Q3");
+  });
+
+  it("accepts rows nested inside the spec as data", () => {
+    const svg = renderPlotSpecToSvg(
+      {
+        data: [{ quarter: "Q1", sales: 120 }, { quarter: "Q2", sales: 185 }],
+        marks: [{ type: "barY", options: { x: "quarter", y: "sales" } }],
+      },
+      undefined,
+      dom(),
+    );
+    expect(svg).toContain("rect");
+    expect(svg).toContain("Q2");
+  });
+
   it("parses csv with automatic typing and json row arrays", () => {
     const rows = parsePlotData("data.csv", "a,b\n1,2024-01-05\n2,2024-02-05\n") as {
       a: number;

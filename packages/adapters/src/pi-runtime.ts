@@ -21,6 +21,8 @@ const MAX_PARALLEL_SUBAGENTS = 4;
 const AGENT_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MAX_AGENT_TOOL_NAME_LENGTH = 64;
 const FALLBACK_AGENT_TOOL_NAME = "connector_tool";
+// ponytail: flat per-turn cap; smarter same-error loop detection if this bites real work.
+const MAX_TOOL_CALLS_PER_TURN = 80;
 
 export class PiAgentRuntime implements AgentRuntime {
   describe() {
@@ -106,8 +108,20 @@ export class PiAgentRuntime implements AgentRuntime {
 
         let streamed = "";
         let toolActivityShowing = false;
+        let toolCallCount = 0;
         agent.subscribe((event) => {
           if (event.type === "tool_execution_start") {
+            // Backstop for runaway retry loops: a confused model can otherwise
+            // hammer a failing tool indefinitely, billing every iteration.
+            toolCallCount += 1;
+            if (toolCallCount > MAX_TOOL_CALLS_PER_TURN) {
+              queue.push({
+                type: "progress",
+                text: `Stopped: more than ${MAX_TOOL_CALLS_PER_TURN} tool calls in one turn.`,
+              });
+              agent.abort();
+              return;
+            }
             // Live activity feedback: without this the thread shows a bare
             // "working…" for the whole tool call with nothing actionable.
             toolActivityShowing = true;
