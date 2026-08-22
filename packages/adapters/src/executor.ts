@@ -39,6 +39,7 @@ import {
   type ThreadEvents,
 } from "@rakazo/db";
 import { builtinAgentTools } from "./builtin-tools.js";
+import { parsePlotData, PLOT_TOOL_GUIDE, type PlotSpec, renderPlotSpecToSvg } from "./plot-tool.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import {
   collectLogIds,
@@ -614,6 +615,67 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
             return finish({ ok: true, path: filePath });
           }
+          if (name === "render_plot") {
+            if (args.help === true || !args.spec || typeof args.spec !== "object") {
+              return { guide: PLOT_TOOL_GUIDE };
+            }
+            try {
+              let rows = Array.isArray(args.data) ? (args.data as unknown[]) : undefined;
+              const dataPath =
+                typeof args.data_path === "string" && args.data_path ? args.data_path : undefined;
+              if (!rows && dataPath) {
+                const bytes = await deps.sandbox.readFile(
+                  computer,
+                  resolveBotWorkspacePath(computerMode, bot.id, dataPath),
+                  context,
+                  { maxBytes: ATTACHMENT_MAX_BYTES },
+                );
+                rows = parsePlotData(dataPath, new TextDecoder().decode(bytes));
+              }
+              // jsdom and sharp load lazily so chart-free runs never pay for them.
+              const [{ JSDOM }, sharp] = await Promise.all([import("jsdom"), import("sharp")]);
+              const svg = renderPlotSpecToSvg(
+                args.spec as PlotSpec,
+                rows,
+                new JSDOM("").window.document,
+              );
+              const png = await sharp.default(Buffer.from(svg), { density: 144 })
+                .png()
+                .toBuffer();
+              const outPath =
+                typeof args.path === "string" && args.path
+                  ? args.path
+                  : `charts/plot-${Date.now()}.png`;
+              await deps.sandbox.writeFile(
+                computer,
+                { path: resolveBotWorkspacePath(computerMode, bot.id, outPath), content: png },
+                context,
+              );
+              let attached = false;
+              if (args.attach !== false && deps.artifacts) {
+                const result = await attachWorkspaceFileToThread(
+                  { prisma: deps.prisma, artifacts: deps.artifacts },
+                  {
+                    workspaceId: run.workspaceId,
+                    userId: run.userId,
+                    botId: bot.id,
+                    runId: run.id,
+                    filePath: outPath,
+                    bytes: png,
+                    operationId: executionId,
+                  },
+                );
+                await publishMessage(deps, run, "bot", [result.block]);
+                attached = true;
+              }
+              return finish({ ok: true, path: outPath, attached });
+            } catch (error) {
+              return finish({
+                error: error instanceof Error ? error.message : String(error),
+                hint: "Call render_plot with {\"help\": true} for the spec format and chart catalog.",
+              });
+            }
+          }
           if (name === "attach_file") {
             const filePath = String(args.path ?? "");
             if (!deps.artifacts) {
@@ -892,6 +954,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 "archive_bot safely archives a bot this bot created, and only that bot. Use it when the user asks to remove that bot or when it is finished and unused. The user can restore it or permanently delete it later. confirm_name must exactly match its name.",
                 pluginLine,
                 taughtSkillsLine,
+                "For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {\"help\": true} before your first chart to read the full guide.",
                 "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
               ]
                 .filter((instruction): instruction is string => Boolean(instruction))
