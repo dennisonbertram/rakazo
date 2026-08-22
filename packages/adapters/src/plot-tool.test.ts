@@ -1,6 +1,13 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import { parsePlotData, PLOT_TOOL_GUIDE, renderPlotSpecToSvg, supportedPlotNames } from "./plot-tool.js";
+import {
+  CHART_CATALOG,
+  parsePlotData,
+  PLOT_TOOL_GUIDE,
+  renderPlotSpecToSvg,
+  searchChartCatalog,
+  supportedPlotNames,
+} from "./plot-tool.js";
 
 const dom = () => new JSDOM("").window.document;
 
@@ -154,6 +161,22 @@ describe("render_plot", () => {
     expect(rows[0]?.b instanceof Date).toBe(true);
     expect(parsePlotData("rows.json", '[{"x":1}]')).toEqual([{ x: 1 }]);
     expect(() => parsePlotData("rows.json", '{"x":1}')).toThrow(/top-level array/);
+  });
+
+  it("renders every chart catalog example spec verbatim", () => {
+    for (const entry of CHART_CATALOG) {
+      const svg = renderPlotSpecToSvg(entry.spec, undefined, dom());
+      expect(svg.startsWith("<svg"), `catalog entry "${entry.name}" must render`).toBe(true);
+    }
+    expect(CHART_CATALOG.length).toBeGreaterThanOrEqual(18);
+  });
+
+  it("searches the chart catalog by keyword and falls back to the full list", () => {
+    const hist = searchChartCatalog("distribution");
+    expect(hist.map((entry) => entry.name)).toContain("histogram");
+    expect(hist.length).toBeLessThan(CHART_CATALOG.length);
+    expect(searchChartCatalog("qzx-no-match")).toHaveLength(CHART_CATALOG.length);
+    expect(searchChartCatalog(undefined)).toHaveLength(CHART_CATALOG.length);
   });
 
   it("ships a guide that teaches the agent how to call the tool", () => {

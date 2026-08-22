@@ -39,7 +39,7 @@ import {
   type ThreadEvents,
 } from "@rakazo/db";
 import { builtinAgentTools } from "./builtin-tools.js";
-import { parsePlotData, PLOT_TOOL_GUIDE, type PlotSpec, renderPlotSpecToSvg } from "./plot-tool.js";
+import { parsePlotData, PLOT_TOOL_GUIDE, type PlotSpec, renderPlotSpecToSvg, searchChartCatalog } from "./plot-tool.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import {
   collectLogIds,
@@ -616,6 +616,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish({ ok: true, path: filePath });
           }
           if (name === "render_plot") {
+            if (args.charts !== undefined) {
+              const query = typeof args.charts === "string" ? args.charts : undefined;
+              return {
+                charts: searchChartCatalog(query),
+                note: "Each spec is a complete runnable example: substitute your rows and column names, then call render_plot with it.",
+              };
+            }
             if (args.help === true || !args.spec || typeof args.spec !== "object") {
               return { guide: PLOT_TOOL_GUIDE };
             }
@@ -670,9 +677,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               }
               return finish({ ok: true, path: outPath, attached });
             } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              console.error(`render_plot failed for bot ${bot.id}: ${message}`);
               return finish({
-                error: error instanceof Error ? error.message : String(error),
-                hint: "Call render_plot with {\"help\": true} for the spec format and chart catalog.",
+                error: message,
+                hint: "Call render_plot with {\"charts\": true} for runnable example specs, or {\"help\": true} for the full guide.",
               });
             }
           }
