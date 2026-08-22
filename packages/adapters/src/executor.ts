@@ -39,7 +39,6 @@ import {
   type ThreadEvents,
 } from "@rakazo/db";
 import { builtinAgentTools } from "./builtin-tools.js";
-import { parsePlotData, PLOT_TOOL_GUIDE, plotSvgToPng, type PlotSpec, renderPlotSpecToSvg, searchChartCatalog } from "./plot-tool.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import {
   collectLogIds,
@@ -84,6 +83,14 @@ import {
   secretValuesToRedact,
   serializeModelSecret,
 } from "./pi-oauth.js";
+import {
+  PLOT_TOOL_GUIDE,
+  type PlotSpec,
+  parsePlotData,
+  plotSvgToPng,
+  renderPlotSpecToSvg,
+  searchChartCatalog,
+} from "./plot-tool.js";
 import { inferScript } from "./scripted-runtime.js";
 import type { EncryptedSecretStore } from "./secrets.js";
 import {
@@ -697,7 +704,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               console.error(`render_plot failed for bot ${bot.id}: ${message}`);
               return finish({
                 error: message,
-                hint: "Call render_plot with {\"charts\": true} for runnable example specs, or {\"help\": true} for the full guide.",
+                hint: 'Call render_plot with {"charts": true} for runnable example specs, or {"help": true} for the full guide.',
               });
             }
           }
@@ -979,7 +986,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 "archive_bot safely archives a bot this bot created, and only that bot. Use it when the user asks to remove that bot or when it is finished and unused. The user can restore it or permanently delete it later. confirm_name must exactly match its name.",
                 pluginLine,
                 taughtSkillsLine,
-                "For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {\"help\": true} before your first chart to read the full guide.",
+                'For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {"help": true} before your first chart to read the full guide.',
                 "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
               ]
                 .filter((instruction): instruction is string => Boolean(instruction))

@@ -67,7 +67,12 @@ function createWindow() {
         titleBarStyle: "default",
         autoHideMenuBar: true,
         backgroundColor: "#050506",
-        webPreferences: { preload: "", nodeIntegration: false, contextIsolation: true, sandbox: true },
+        webPreferences: {
+          preload: "",
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+        },
       },
     };
   });

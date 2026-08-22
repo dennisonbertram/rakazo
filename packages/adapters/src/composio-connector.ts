@@ -378,7 +378,11 @@ export class CompositeConnector implements ConnectorProvider {
       }));
       const destNames = new Set(dest.map((tool) => tool.name));
       const names = new Set([...destNames, ...extra.map((tool) => tool.name)]);
-      return [...dest, ...extra.filter((tool) => !destNames.has(tool.name)), ...mcp.filter((tool) => !names.has(tool.name))];
+      return [
+        ...dest,
+        ...extra.filter((tool) => !destNames.has(tool.name)),
+        ...mcp.filter((tool) => !names.has(tool.name)),
+      ];
     } catch {
       return [...dest, ...mcp.filter((tool) => !dest.some((item) => item.name === tool.name))];
     }
@@ -386,8 +390,12 @@ export class CompositeConnector implements ConnectorProvider {
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
     if (call.route?.kind === "mcp") {
-      if (!this.mcp) { yield { type: "error", message: "MCP is not configured" }; return; }
-      yield* this.mcp.execute(call, context); return;
+      if (!this.mcp) {
+        yield { type: "error", message: "MCP is not configured" };
+        return;
+      }
+      yield* this.mcp.execute(call, context);
+      return;
     }
     if (
       call.route?.kind === "destination" ||

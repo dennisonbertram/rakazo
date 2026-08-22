@@ -125,7 +125,10 @@ export class PiAgentRuntime implements AgentRuntime {
             // Live activity feedback: without this the thread shows a bare
             // "working…" for the whole tool call with nothing actionable.
             toolActivityShowing = true;
-            queue.push({ type: "progress", text: describeToolActivity(event.toolName, event.args) });
+            queue.push({
+              type: "progress",
+              text: describeToolActivity(event.toolName, event.args),
+            });
           }
           if (
             event.type === "message_update" &&
@@ -245,7 +248,9 @@ const ACTIVITY_DETAIL_LIMIT = 90;
 export function describeToolActivity(toolName: string, args: unknown): string {
   const record = args && typeof args === "object" ? (args as Record<string, unknown>) : {};
   const detail = (value: unknown): string => {
-    const text = String(value ?? "").replaceAll(/\s+/g, " ").trim();
+    const text = String(value ?? "")
+      .replaceAll(/\s+/g, " ")
+      .trim();
     return text.length > ACTIVITY_DETAIL_LIMIT ? `${text.slice(0, ACTIVITY_DETAIL_LIMIT)}…` : text;
   };
   if (toolName === "shell") return `Running: ${detail(record.command)}`;

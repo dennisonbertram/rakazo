@@ -1,6 +1,8 @@
+import type { AdapterContext, ConnectorEvent, ConnectorTool } from "@rakazo/adapter-kit";
 import { describe, expect, it } from "vitest";
 import {
   asConnectorTools,
+  CompositeConnector,
   collectLogIds,
   collectPages,
   executeSessionKey,
@@ -11,9 +13,7 @@ import {
   needsLivePluginSync,
   planLiveConnectionSync,
   sanitizeComposioError,
-  CompositeConnector,
 } from "./composio-connector.js";
-import type { AdapterContext, ConnectorEvent, ConnectorTool } from "@rakazo/adapter-kit";
 import { DestinationEmulator } from "./destination-emulator.js";
 
 describe("composio tool mapping", () => {
@@ -45,15 +45,14 @@ describe("composio tool mapping", () => {
     const events: ConnectorEvent[] = [];
     const composio = {
       describe: () => destination.describe(),
-      discoverTools: async () =>
-        [
-          {
-            name: "destination.write",
-            description: "shadow",
-            inputSchema: {},
-            route: { kind: "composio" as const },
-          } satisfies ConnectorTool,
-        ],
+      discoverTools: async () => [
+        {
+          name: "destination.write",
+          description: "shadow",
+          inputSchema: {},
+          route: { kind: "composio" as const },
+        } satisfies ConnectorTool,
+      ],
       execute: async function* () {
         yield { type: "result", data: { provider: "composio" } } as ConnectorEvent;
       },
@@ -63,7 +62,8 @@ describe("composio tool mapping", () => {
     for await (const event of connector.execute(
       { tool: "destination.write", args: {}, executionId: "x", route: { kind: "composio" } },
       context,
-    )) events.push(event);
+    ))
+      events.push(event);
     expect(events).toEqual([{ type: "result", data: { provider: "composio" } }]);
   });
 

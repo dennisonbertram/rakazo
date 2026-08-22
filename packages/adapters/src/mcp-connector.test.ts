@@ -13,12 +13,21 @@ const SERVER = {
   revision: 1,
 };
 
-const ASSIGNMENT = { botId: "bot-1", serverId: "server-1", workspaceId: "w1", userId: "u1", allowAllTools: true, allowedTools: [], server: SERVER };
+const ASSIGNMENT = {
+  botId: "bot-1",
+  serverId: "server-1",
+  workspaceId: "w1",
+  userId: "u1",
+  allowAllTools: true,
+  allowedTools: [],
+  server: SERVER,
+};
 
 function mcpFetch(state: { failNext: boolean; initializations: number }) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
-    if (new URL(request.url).href !== "https://mcp.example.test/mcp") throw new Error(`Unexpected request: ${request.url}`);
+    if (new URL(request.url).href !== "https://mcp.example.test/mcp")
+      throw new Error(`Unexpected request: ${request.url}`);
     if (request.method !== "POST") return new Response(null, { status: 405 });
     if (state.failNext) return new Response("boom", { status: 500 });
     const message = JSON.parse(await request.text()) as { id?: number; method?: string };
@@ -27,14 +36,26 @@ function mcpFetch(state: { failNext: boolean; initializations: number }) {
       return Response.json({
         jsonrpc: "2.0",
         id: message.id,
-        result: { protocolVersion: "2025-11-25", capabilities: { tools: {} }, serverInfo: { name: "test", version: "1" } },
+        result: {
+          protocolVersion: "2025-11-25",
+          capabilities: { tools: {} },
+          serverInfo: { name: "test", version: "1" },
+        },
       });
     }
     if (message.method === "tools/list") {
-      return Response.json({ jsonrpc: "2.0", id: message.id, result: { tools: [{ name: "echo", inputSchema: { type: "object" } }] } });
+      return Response.json({
+        jsonrpc: "2.0",
+        id: message.id,
+        result: { tools: [{ name: "echo", inputSchema: { type: "object" } }] },
+      });
     }
     if (message.method === "tools/call") {
-      return Response.json({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text: "ok" }] } });
+      return Response.json({
+        jsonrpc: "2.0",
+        id: message.id,
+        result: { content: [{ type: "text", text: "ok" }] },
+      });
     }
     return new Response(null, { status: 202 });
   });
@@ -51,8 +72,17 @@ describe("MCP connector session cache", () => {
       },
     };
     const connector = new McpConnector(prisma as never, {} as never);
-    const context = { workspaceId: "w1", userId: "u1", botId: "bot-1", signal: new AbortController().signal } as never;
-    const call = { tool: "mcp__demo__echo", args: {}, route: { kind: "mcp", serverId: "server-1", remoteName: "echo" } } as never;
+    const context = {
+      workspaceId: "w1",
+      userId: "u1",
+      botId: "bot-1",
+      signal: new AbortController().signal,
+    } as never;
+    const call = {
+      tool: "mcp__demo__echo",
+      args: {},
+      route: { kind: "mcp", serverId: "server-1", remoteName: "echo" },
+    } as never;
 
     const tools = await connector.discoverTools(context);
     expect(tools.map((tool) => tool.name)).toEqual(["mcp__demo__echo"]);

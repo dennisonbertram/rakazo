@@ -5,6 +5,7 @@ import {
   AppBootstrapSchema,
   ArtifactSchema,
   ArtifactWithContentSchema,
+  BotMcpServerSchema,
   BotSchema,
   BotSectionSchema,
   CapabilityInstallSchema,
@@ -16,10 +17,9 @@ import {
   CreateRoutineInput,
   DeploymentSettingsSchema,
   ExportManifestSchema,
-  MemoryDocumentSchema,
   McpServerConfigInput,
   McpServerSchema,
-  BotMcpServerSchema,
+  MemoryDocumentSchema,
   MeSchema,
   ModelCatalogEntrySchema,
   ModelCredentialSchema,
@@ -276,9 +276,7 @@ export const appContract = {
     servers: {
       list: oc.output(z.array(McpServerSchema)),
       create: oc.input(McpServerConfigInput).output(McpServerSchema),
-      update: oc
-        .input(z.object({ id: Id, config: McpServerConfigInput }))
-        .output(McpServerSchema),
+      update: oc.input(z.object({ id: Id, config: McpServerConfigInput })).output(McpServerSchema),
       remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
     },
     assignments: {

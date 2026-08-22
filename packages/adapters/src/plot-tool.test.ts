@@ -2,8 +2,8 @@ import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import {
   CHART_CATALOG,
-  parsePlotData,
   PLOT_TOOL_GUIDE,
+  parsePlotData,
   renderPlotSpecToSvg,
   searchChartCatalog,
   supportedPlotNames,
@@ -79,9 +79,9 @@ describe("render_plot", () => {
   });
 
   it("rejects unknown marks and transforms with the supported lists", () => {
-    expect(() =>
-      renderPlotSpecToSvg({ marks: [{ type: "evilMark" }] }, penguinish, dom()),
-    ).toThrow(/Unsupported mark type "evilMark"/);
+    expect(() => renderPlotSpecToSvg({ marks: [{ type: "evilMark" }] }, penguinish, dom())).toThrow(
+      /Unsupported mark type "evilMark"/,
+    );
     expect(() =>
       renderPlotSpecToSvg(
         { marks: [{ type: "dot", transform: { name: "eval" }, options: {} }] },
@@ -105,11 +105,7 @@ describe("render_plot", () => {
       ),
     ).toThrow(/x refers to "Quarter" but the data columns are: quarter, sales/);
     expect(() =>
-      renderPlotSpecToSvg(
-        { marks: [{ type: "barY" }] },
-        [{ quarter: "Q1", sales: 120 }],
-        dom(),
-      ),
+      renderPlotSpecToSvg({ marks: [{ type: "barY" }] }, [{ quarter: "Q1", sales: 120 }], dom()),
     ).toThrow(/no position channels/);
   });
 
@@ -142,7 +138,10 @@ describe("render_plot", () => {
   it("accepts rows nested inside the spec as data", () => {
     const svg = renderPlotSpecToSvg(
       {
-        data: [{ quarter: "Q1", sales: 120 }, { quarter: "Q2", sales: 185 }],
+        data: [
+          { quarter: "Q1", sales: 120 },
+          { quarter: "Q2", sales: 185 },
+        ],
         marks: [{ type: "barY", options: { x: "quarter", y: "sales" } }],
       },
       undefined,

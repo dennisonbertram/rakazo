@@ -2,8 +2,8 @@ import { lazy, Suspense, useLayoutEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { authClient } from "./lib/auth";
 import { markAfterPaint, markOnce } from "./lib/performance";
-import { ShellPage } from "./pages/Shell";
 import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
+import { ShellPage } from "./pages/Shell";
 
 const AuthPage = lazy(() =>
   import("./pages/Auth").then((module) => ({ default: module.AuthPage })),

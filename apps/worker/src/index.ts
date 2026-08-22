@@ -53,11 +53,23 @@ async function main() {
   });
   const secrets = new EncryptedSecretStore(resolveEncryptionKey(process.env));
   const mcpOAuth = new McpOAuthBroker(prisma, secrets);
-  const mcp = new McpConnector(prisma, secrets, {
-    stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
-    allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "").split(",").map((v) => v.trim()).filter(Boolean),
-  }, mcpOAuth);
-  const stack = createConnectorStack(isComposioEnabled(process.env.COMPOSIO_API_KEY), undefined, mcp);
+  const mcp = new McpConnector(
+    prisma,
+    secrets,
+    {
+      stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
+      allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean),
+    },
+    mcpOAuth,
+  );
+  const stack = createConnectorStack(
+    isComposioEnabled(process.env.COMPOSIO_API_KEY),
+    undefined,
+    mcp,
+  );
   const connector = stack.destination;
   await connector.start();
   const home = new LocalAgentHomeStore(dataDir);
