@@ -29,14 +29,16 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => { void refresh().catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not load MCP servers")); }, []);
 
   useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
+    // BroadcastChannel instead of window.opener messaging: provider login
+    // pages with COOP sever the opener link, but the channel is origin-scoped
+    // and unaffected.
+    const channel = new BroadcastChannel("rakazo-mcp-oauth");
+    channel.onmessage = (event: MessageEvent) => {
       if ((event.data as { type?: string } | null)?.type !== "mcp-oauth-complete") return;
       setOauthPending(null);
       void refresh().catch(() => undefined);
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    };
+    return () => channel.close();
   }, []);
 
   function toggleBot(id: string) {
