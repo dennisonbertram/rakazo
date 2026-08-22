@@ -109,6 +109,14 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     status: z.enum(["draft", "saved"]),
   }),
   z.object({
+    kind: z.literal("chart"),
+    name: z.string(),
+    /** Declarative Observable Plot spec, validated by render_plot before publish.
+        z.any keeps the inferred type JSON-assignable for persistence. */
+    spec: z.record(z.string(), z.any()),
+    data: z.array(z.any()).max(5000),
+  }),
+  z.object({
     kind: z.literal("image"),
     artifactId: Id,
     mimeType: z.string(),

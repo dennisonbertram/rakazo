@@ -657,7 +657,25 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 context,
               );
               let attached = false;
-              if (args.attach !== false && deps.artifacts) {
+              const chartName = outPath.split("/").pop() ?? "chart";
+              const chartRows = rows ?? (args.spec as { data?: unknown[] }).data ?? [];
+              const chartFits =
+                Array.isArray(chartRows) &&
+                chartRows.length <= 5000 &&
+                JSON.stringify(chartRows).length <= 200_000;
+              if (args.attach !== false && chartFits) {
+                // Live inline chart: the client re-renders the validated spec
+                // and the PNG stays on disk as the exportable copy.
+                await publishMessage(deps, run, "bot", [
+                  {
+                    kind: "chart",
+                    name: chartName,
+                    spec: args.spec as Record<string, unknown>,
+                    data: chartRows,
+                  },
+                ]);
+                attached = true;
+              } else if (args.attach !== false && deps.artifacts) {
                 const result = await attachWorkspaceFileToThread(
                   { prisma: deps.prisma, artifacts: deps.artifacts },
                   {
