@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { PrismaClient } from "@rakazo/db";
+import { withEndpointOriginFallback } from "./mcp-transport.js";
 import { EncryptedSecretStore } from "./secrets.js";
 
 type OAuthState = {
@@ -107,6 +108,12 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     if (!verifier) throw new Error("OAuth PKCE verifier is missing");
     return verifier;
   }
+  // The resource metadata is served by the endpoint the user configured, so
+  // accept its self-declared canonical resource identity even when the host
+  // differs (Brex advertises an internal alias for its public API origin).
+  validateResourceURL(_serverUrl: string | URL, resource?: string): URL | undefined {
+    return resource ? new URL(resource) : undefined;
+  }
   async saveDiscoveryState(value: OAuthDiscoveryState): Promise<void> {
     this.oauth().discoveryState = value;
     await this.persist();
@@ -178,7 +185,8 @@ export class McpOAuthBroker {
       onAuthorization: (url) => { authorizationUrl = url; },
     });
     if (provider.tokens()) await provider.invalidateCredentials("tokens");
-    const transport = new StreamableHTTPClientTransport(new URL(server.endpoint), { authProvider: provider });
+    const endpoint = new URL(server.endpoint);
+    const transport = new StreamableHTTPClientTransport(endpoint, { authProvider: provider, fetch: withEndpointOriginFallback(endpoint.origin) });
     const client = new Client({ name: "rakazo-oauth", version: "0.1.0" });
     try {
       await client.connect(transport);
@@ -197,7 +205,8 @@ export class McpOAuthBroker {
     if (!pending || pending.workspaceId !== input.workspaceId || pending.userId !== input.userId || input.state !== input.sessionId) {
       throw new Error("MCP OAuth session is invalid or expired");
     }
-    const transport = new StreamableHTTPClientTransport(new URL(pending.endpoint), { authProvider: pending.provider });
+    const endpoint = new URL(pending.endpoint);
+    const transport = new StreamableHTTPClientTransport(endpoint, { authProvider: pending.provider, fetch: withEndpointOriginFallback(endpoint.origin) });
     await transport.finishAuth(input.code);
     if (!pending.provider.tokens()) throw new Error("MCP OAuth authorization failed");
     // Bump the revision so cached runtime sessions rebuild with the fresh tokens.

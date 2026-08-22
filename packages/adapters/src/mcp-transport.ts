@@ -95,6 +95,27 @@ function secureFetch(resourceUrl: URL, urlPolicy: McpUrlPolicy, headerPolicy: Mc
   };
 }
 
+/**
+ * Some providers (Brex) advertise OAuth discovery and registration hosts that
+ * are not publicly routable, while mirroring the same well-known documents on
+ * the MCP endpoint's own origin. When a request to another origin cannot
+ * connect, retry the same path on the endpoint origin before giving up.
+ */
+export function withEndpointOriginFallback(endpointOrigin: string, fetchImpl: typeof fetch = fetch): typeof fetch {
+  return async (input: Request | URL | string, init?: RequestInit): Promise<Response> => {
+    if (input instanceof Request) return fetchImpl(input, init);
+    const url = new URL(String(input));
+    if (url.origin === endpointOrigin) return fetchImpl(input, init);
+    try {
+      // Cap the first attempt: an unroutable host otherwise burns the full
+      // connect timeout before the fallback gets a chance.
+      return await fetchImpl(input, init?.signal ? init : { ...init, signal: AbortSignal.timeout(4_000) });
+    } catch {
+      return fetchImpl(new URL(url.pathname + url.search, endpointOrigin), init);
+    }
+  };
+}
+
 function stdioParams(options: McpStdioOptions): StdioServerParameters {
   const command = options.command.trim();
   if (!command || !options.allowedCommands.includes(command)) {
@@ -130,7 +151,7 @@ export class McpSession {
   async connectRemote(options: McpRemoteOptions): Promise<{ transport: McpRemoteTransport; usedFallback: boolean }> {
     if (this.connected || this.connecting) throw new Error("MCP session is already connected or connecting");
     const url = validateUrl(options.url, options.urlPolicy);
-    const fetch = secureFetch(url, options.urlPolicy ?? {}, options.headerPolicy);
+    const fetch = withEndpointOriginFallback(url.origin, secureFetch(url, options.urlPolicy ?? {}, options.headerPolicy));
     let usedFallback = false;
     const connect = async (kind: McpRemoteTransport): Promise<void> => {
       const requestInit: RequestInit = { headers: options.headerPolicy?.headers };

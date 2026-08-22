@@ -125,4 +125,71 @@ describe("MCP OAuth", () => {
     expect(storedPayloads.map((value) => JSON.parse(value)).some((value) => value.oauth?.tokens?.access_token === "access-token")).toBe(true);
     expect(prisma.mcpServer.update).toHaveBeenCalledWith({ where: { id: "server-1" }, data: { revision: { increment: 1 } } });
   });
+
+  it("retries unreachable OAuth discovery and DCR hosts on the MCP endpoint origin", async () => {
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      requests.push(`${request.method} ${url.toString()}`);
+
+      if (url.href === "https://mcp.example.test/mcp" && request.method === "POST") {
+        return new Response(null, {
+          status: 401,
+          headers: { "WWW-Authenticate": 'Bearer resource_metadata="https://private-auth.example.test/.well-known/oauth-protected-resource/mcp"' },
+        });
+      }
+      if (url.origin === "https://private-auth.example.test") throw new TypeError("fetch failed");
+      if (url.href === "https://mcp.example.test/.well-known/oauth-protected-resource/mcp") {
+        // Like Brex: the advertised canonical resource is the private alias.
+        return Response.json({ resource: "https://private-auth.example.test", authorization_servers: ["https://private-auth.example.test"] });
+      }
+      if (url.href === "https://mcp.example.test/.well-known/oauth-authorization-server") {
+        return Response.json({
+          issuer: "https://private-auth.example.test",
+          authorization_endpoint: "https://login.example.test/authorize",
+          token_endpoint: "https://login.example.test/token",
+          registration_endpoint: "https://private-auth.example.test/register",
+          response_types_supported: ["code"],
+          grant_types_supported: ["authorization_code", "refresh_token"],
+          code_challenge_methods_supported: ["S256"],
+        });
+      }
+      if (url.href === "https://mcp.example.test/register" && request.method === "POST") {
+        return Response.json({
+          client_id: "fallback-client",
+          redirect_uris: ["http://127.0.0.1:5173/mcp/oauth/callback"],
+          token_endpoint_auth_method: "none",
+        }, { status: 201 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url}`);
+    }));
+    let secretCounter = 0;
+    const put = vi.fn(async () => {
+      secretCounter += 1;
+      return { id: `secret-${secretCounter}`, ciphertext: `encrypted-${secretCounter}` };
+    });
+    const prisma = {
+      mcpServer: {
+        findFirst: vi.fn().mockResolvedValue({ id: "server-1", endpoint: "https://mcp.example.test/mcp", secretId: null }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      secret: { findFirst: vi.fn(), create: vi.fn().mockResolvedValue({}), delete: vi.fn().mockResolvedValue({}) },
+      $transaction: vi.fn().mockResolvedValue([]),
+    };
+    const broker = new McpOAuthBroker(prisma as never, { put } as never);
+
+    const started = await broker.begin({
+      serverId: "server-1",
+      workspaceId: "workspace-1",
+      userId: "user-1",
+      redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+    });
+
+    expect(requests).toContain("GET https://mcp.example.test/.well-known/oauth-protected-resource/mcp");
+    expect(requests).toContain("POST https://mcp.example.test/register");
+    expect(new URL(started.authorizationUrl).origin).toBe("https://login.example.test");
+    expect(new URL(started.authorizationUrl).searchParams.get("client_id")).toBe("fallback-client");
+    expect(new URL(started.authorizationUrl).searchParams.get("resource")).toBe("https://private-auth.example.test/");
+  });
 });

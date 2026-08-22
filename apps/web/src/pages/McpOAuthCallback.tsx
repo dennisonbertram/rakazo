@@ -10,7 +10,14 @@ export function McpOAuthCallbackPage() {
     const code = params.get("code");
     const state = params.get("state");
     if (!code || !state) { setError(params.get("error_description") ?? "OAuth authorization was cancelled."); return; }
-    void rpc.mcp.oauth.complete({ sessionId: state, code, state }).then(() => navigate("/app?mcp_oauth=connected", { replace: true })).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not complete OAuth"));
+    void rpc.mcp.oauth.complete({ sessionId: state, code, state }).then(() => {
+      if (window.opener) {
+        (window.opener as Window).postMessage({ type: "mcp-oauth-complete" }, window.location.origin);
+        window.close();
+        return;
+      }
+      navigate("/app?mcp_oauth=connected", { replace: true });
+    }).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not complete OAuth"));
   }, [navigate, params]);
   return <div className="grid min-h-screen place-items-center bg-[#050506] p-6 text-center"><div><div className="text-lg text-[#F1F1F2]">{error ? "OAuth connection failed" : "Finishing MCP connection…"}</div>{error ? <><p className="mt-2 max-w-md text-sm text-[#85858B]">{error}</p><button type="button" onClick={() => navigate("/app")} className="mt-5 rounded-xl bg-[#7785FF] px-4 py-2 text-sm font-semibold text-[#090A12]">Return to Rakazo</button></> : <p className="mt-2 text-sm text-[#85858B]">You can close this tab if it does not redirect automatically.</p>}</div></div>;
 }

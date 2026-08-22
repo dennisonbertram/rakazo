@@ -28,6 +28,17 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
 
   useEffect(() => { void refresh().catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not load MCP servers")); }, []);
 
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if ((event.data as { type?: string } | null)?.type !== "mcp-oauth-complete") return;
+      setOauthPending(null);
+      void refresh().catch(() => undefined);
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   function toggleBot(id: string) {
     setSelectedBotIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
@@ -56,7 +67,16 @@ export function McpServersOverlay({ onClose }: { onClose: () => void }) {
     setOauthPending(server.id);
     try {
       const started = await rpc.mcp.oauth.begin({ serverId: server.id, redirectUri: `${window.location.origin}/mcp/oauth/callback` });
-      window.location.assign(started.authorizationUrl);
+      // A popup keeps the app open while the provider authorizes; the callback
+      // page posts "mcp-oauth-complete" back and closes itself.
+      const popup = window.open(started.authorizationUrl, "rakazo-mcp-oauth", "popup,width=560,height=720");
+      if (!popup) { window.location.assign(started.authorizationUrl); return; }
+      const timer = window.setInterval(() => {
+        if (!popup.closed) return;
+        window.clearInterval(timer);
+        setOauthPending((current) => current === server.id ? null : current);
+        void refresh().catch(() => undefined);
+      }, 500);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not start OAuth"); setOauthPending(null); }
   }
 
