@@ -39,7 +39,7 @@ import {
   type ThreadEvents,
 } from "@rakazo/db";
 import { builtinAgentTools } from "./builtin-tools.js";
-import { parsePlotData, PLOT_TOOL_GUIDE, type PlotSpec, renderPlotSpecToSvg, searchChartCatalog } from "./plot-tool.js";
+import { parsePlotData, PLOT_TOOL_GUIDE, plotSvgToPng, type PlotSpec, renderPlotSpecToSvg, searchChartCatalog } from "./plot-tool.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import {
   collectLogIds,
@@ -640,15 +640,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 rows = parsePlotData(dataPath, new TextDecoder().decode(bytes));
               }
               // jsdom and sharp load lazily so chart-free runs never pay for them.
-              const [{ JSDOM }, sharp] = await Promise.all([import("jsdom"), import("sharp")]);
+              const { JSDOM } = await import("jsdom");
               const svg = renderPlotSpecToSvg(
                 args.spec as PlotSpec,
                 rows,
                 new JSDOM("").window.document,
               );
-              const png = await sharp.default(Buffer.from(svg), { density: 144 })
-                .png()
-                .toBuffer();
+              const png = await plotSvgToPng(svg);
               const outPath =
                 typeof args.path === "string" && args.path
                   ? args.path

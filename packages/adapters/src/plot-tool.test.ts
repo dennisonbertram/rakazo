@@ -179,6 +179,21 @@ describe("render_plot", () => {
     expect(searchChartCatalog(undefined)).toHaveLength(CHART_CATALOG.length);
   });
 
+  it("rasterizes to a fully opaque PNG (no transparent background)", async () => {
+    const { plotSvgToPng } = await import("./plot-tool.js");
+    const svg = renderPlotSpecToSvg(
+      { marks: [{ type: "barY", options: { x: "species", y: "length" } }] },
+      penguinish,
+      dom(),
+    );
+    const png = await plotSvgToPng(svg);
+    const sharp = (await import("sharp")).default;
+    const stats = await sharp(png).stats();
+    const meta = await sharp(png).metadata();
+    const alpha = stats.channels[3];
+    expect(meta.channels === 3 || (alpha && alpha.min === 255)).toBe(true);
+  });
+
   it("ships a guide that teaches the agent how to call the tool", () => {
     expect(PLOT_TOOL_GUIDE).toContain("How to use the tool");
     expect(PLOT_TOOL_GUIDE).toContain("data_path");

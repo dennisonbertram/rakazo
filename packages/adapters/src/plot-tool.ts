@@ -295,6 +295,17 @@ export function renderPlotSpecToSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}" font-family="system-ui, sans-serif" style="background:#ffffff;color:#1a1a1a">${header.join("")}${svg.outerHTML}</svg>`;
 }
 
+/** Rasterize a rendered plot SVG to an opaque PNG. The SVG's CSS background is
+    not honored by all rasterizers, and a transparent chart is unreadable on
+    dark chat themes, so the alpha channel is flattened onto white. */
+export async function plotSvgToPng(svg: string): Promise<Buffer> {
+  const { default: sharp } = await import("sharp");
+  return sharp(Buffer.from(svg), { density: 144 })
+    .flatten({ background: "#ffffff" })
+    .png()
+    .toBuffer();
+}
+
 function categoricalSwatches(scale: Plot.Scale | undefined): { label: string; color: string }[] {
   if (!scale || typeof scale.apply !== "function") return [];
   const domain = Array.isArray(scale.domain) ? scale.domain : [];

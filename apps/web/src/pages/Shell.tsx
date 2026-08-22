@@ -1924,8 +1924,10 @@ const Transcript = memo(function Transcript({
           message.blocks[0].text,
       ) ? (
         <div className="flex justify-start">
+          {/* Box metrics match the progress bubble exactly so swapping between
+              them never changes height or text position. */}
           <div
-            className="rounded-[20px] bg-[#1A1A1D] px-[18px] py-[13px] text-[14.5px] text-[#85858A]"
+            className="max-w-[74%] rounded-[20px] bg-[#1A1A1D] px-[18px] py-3 text-[15.5px] leading-[1.5] text-[#85858A]"
             style={{ animation: "rkPulse 1.2s ease-in-out infinite" }}
           >
             working…
