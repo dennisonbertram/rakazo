@@ -155,6 +155,9 @@ describePiApp("live OpenRouter product journey", () => {
       dataDir,
       sandboxProvider: "fake",
       agentRuntime: "pi",
+      // The canary owns only an API process, not the separate production worker.
+      // Use the in-process queue so the submitted run is actually dispatched.
+      wakeupDriver: "memory",
     });
     stop = handles.stop;
     const stamp = Date.now();
