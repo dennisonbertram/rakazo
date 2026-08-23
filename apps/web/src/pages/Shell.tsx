@@ -145,6 +145,23 @@ export function ShellPage() {
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [panel, setPanel] = useState<Panel>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("rk-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((current) => {
+      try {
+        localStorage.setItem("rk-sidebar-collapsed", current ? "0" : "1");
+      } catch {
+        // Preference persistence is best-effort.
+      }
+      return !current;
+    });
+  }, []);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [routinesBotId, setRoutinesBotId] = useState<string | null>(null);
   const [taughtSkills, setTaughtSkills] = useState<TaughtSkill[]>([]);
@@ -996,17 +1013,43 @@ export function ShellPage() {
       {bootstrapMe !== undefined ? (
         <HostComputerPrompt initialMe={bootstrapMe ?? undefined} />
       ) : null}
-      <aside className="flex w-[316px] shrink-0 flex-col border-r border-[#171719] bg-[#0B0B0C]">
+      {sidebarCollapsed ? (
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+          className="absolute left-2 top-12 z-20 grid h-[30px] w-[30px] place-items-center rounded-[9px] border border-[#232326] bg-[#141416] text-[#9A9AA0] hover:bg-[#1B1B1E] hover:text-[#C9C9CE]"
+        >
+          »
+        </button>
+      ) : null}
+      <aside
+        className={`flex shrink-0 flex-col overflow-hidden bg-[#0B0B0C] transition-[width] duration-200 ${
+          sidebarCollapsed ? "w-0" : "w-[316px] border-r border-[#171719]"
+        }`}
+      >
         <div className="app-drag flex items-center justify-between px-[18px] pb-3 pt-4">
           <WindowChrome />
-          <button
-            type="button"
-            onClick={() => setPanel("create")}
-            className="app-no-drag text-[21px] text-[#7A7A80] hover:text-[#C9C9CE]"
-            title="New bot"
-          >
-            +
-          </button>
+          <span className="app-no-drag flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPanel("create")}
+              className="text-[21px] text-[#7A7A80] hover:text-[#C9C9CE]"
+              title="New bot"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+              className="grid h-[26px] w-[26px] place-items-center rounded-[8px] text-[16px] text-[#7A7A80] hover:bg-[#1B1B1E] hover:text-[#C9C9CE]"
+            >
+              «
+            </button>
+          </span>
         </div>
         <div className="mx-3.5 mb-3 flex items-center gap-2.5 rounded-xl border border-[#202023] bg-[#141416] px-3 py-2 text-[14px] text-[#6C6C70]">
           <span>⌕</span>
