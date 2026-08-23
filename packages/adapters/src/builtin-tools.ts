@@ -17,7 +17,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "computer_act",
     description:
-      "Perform up to 24 ordered desktop actions on this bot's computer and return the resulting screen. Batch only predictable actions; stop before an outcome you need to inspect. Action kinds: click, move, down, up, type, key, scroll, wait.",
+      "Perform up to 24 ordered desktop actions on this bot's computer. The default returns a fresh screen. For a predictable input-only sequence (for example typing text then pressing Enter), batch actions and set observe:false; call computer_observe before the next coordinate-based action, after navigation, or whenever an outcome is uncertain. Action kinds: click, move, down, up, type, key, scroll, wait.",
     inputSchema: {
       type: "object",
       properties: {
@@ -44,7 +44,11 @@ export const builtinAgentTools: ConnectorTool[] = [
             required: ["kind"],
           },
         },
-        observe: { type: "boolean" },
+        observe: {
+          type: "boolean",
+          description:
+            "Defaults to true. Set false only for a predictable input-only batch, then explicitly observe before relying on visual state.",
+        },
         settle_ms: { type: "number" },
       },
       required: ["actions"],

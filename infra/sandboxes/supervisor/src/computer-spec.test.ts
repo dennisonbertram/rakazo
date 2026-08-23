@@ -66,6 +66,8 @@ describe("graphical computer spec", () => {
     const browser = readFileSync(path.join(root, "rakazo-browser"), "utf8");
     expect(dockerfile).toMatch(/chromium/);
     expect(dockerfile).toMatch(/control.py/);
+    expect(dockerfile).toMatch(/xcapture\.c/);
+    expect(dockerfile).toMatch(/librakazo-xcapture\.so/);
     expect(start).toMatch(/rakazo-computer-control/);
     expect(start).toMatch(/rakazo-browser/);
     expect(start).toMatch(/x11vnc .* -viewonly /);
