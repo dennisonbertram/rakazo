@@ -65,7 +65,7 @@ import {
   useState,
 } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { BuiButton, BuiCard, LoadingState, SuccessPop } from "../components/beautiful-ui/primitives";
+import { BuiButton, BuiCard, Shimmer, SuccessPop } from "../components/beautiful-ui/primitives";
 import { SkillDraftCard } from "../components/teach/SkillDraftCard";
 import { TeachCaptureOverlay } from "../components/teach/TeachCaptureOverlay";
 import { TeachComputerSection } from "../components/teach/TeachComputerSection";
@@ -1288,6 +1288,8 @@ export function ShellPage() {
         <Transcript
           scrollRef={messageScroll}
           botId={active?.id ?? ""}
+          botName={active?.name ?? "Bot"}
+          botColor={active?.color ?? "#5B4B8A"}
           messages={snapshot?.messages ?? []}
           olderCursor={snapshot?.olderCursor ?? null}
           loadingOlder={loadingOlder}
@@ -1909,6 +1911,8 @@ export function ShellPage() {
 const Transcript = memo(function Transcript({
   scrollRef,
   botId,
+  botName,
+  botColor,
   messages,
   olderCursor,
   loadingOlder,
@@ -1925,6 +1929,8 @@ const Transcript = memo(function Transcript({
 }: {
   scrollRef: RefObject<HTMLDivElement | null>;
   botId: string;
+  botName: string;
+  botColor: string;
   messages: ThreadMessage[];
   olderCursor: number | null;
   loadingOlder: boolean;
@@ -1978,12 +1984,18 @@ const Transcript = memo(function Transcript({
           message.blocks[0]?.kind === "progress" &&
           message.blocks[0].text,
       ) ? (
-        <div className="flex justify-start">
-          {/* Box metrics match the progress bubble exactly so swapping between
-              them never changes height or text position. */}
-          <div className="flex max-w-[74%] items-center rounded-[20px] bg-[#1A1A1D] px-[18px] py-3 text-[15.5px] leading-[1.5]">
-            <LoadingState label="working" />
-          </div>
+        <div
+          className="group flex items-center gap-2.5 self-start py-1"
+          title={`${botName} is working`}
+        >
+          <span style={{ animation: "rkPulse 1.6s ease-in-out infinite" }}>
+            <BotAvatar color={botColor} size={30} />
+          </span>
+          <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 group-hover:max-w-[340px] group-hover:opacity-100">
+            <span className="text-[15px] font-medium">
+              <Shimmer>{`${botName} is working`}</Shimmer>
+            </span>
+          </span>
         </div>
       ) : null}
     </div>
