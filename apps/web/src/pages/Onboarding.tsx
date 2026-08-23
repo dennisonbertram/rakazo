@@ -177,16 +177,16 @@ export function OnboardingPage() {
   }
 
   async function createBot() {
-    const instructions = answers.length
-      ? `User setup:\n${answers.map((a) => `- ${a}`).join("\n")}`
-      : description;
     const bot = await rpc.bots.create({
       name: name.trim(),
       title,
       description,
-      instructions,
+      instructions: description,
       notifyOnFinish: true,
     });
+    // Onboarding continues conversationally in the thread: greeting, focus
+    // choice, and Composio authorize cards.
+    await rpc.onboarding.start({ botId: bot.id }).catch(() => undefined);
     navigate(`/app/${bot.id}`);
   }
 
@@ -356,7 +356,7 @@ export function OnboardingPage() {
             <button
               type="button"
               disabled={!name.trim()}
-              onClick={() => setStep("questions")}
+              onClick={() => void createBot()}
               className="mt-6 rounded-[11px] bg-[#F1F1EF] px-5 py-2.5 text-[#17171A] disabled:opacity-40"
             >
               Continue

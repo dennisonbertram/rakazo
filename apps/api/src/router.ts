@@ -83,6 +83,7 @@ import {
   resolveSendAttachments,
 } from "./artifacts.js";
 import { buildMcpUpdateMaterial } from "./mcp-material.js";
+import { chooseFocus, markAppConnected, startOnboarding } from "./onboarding.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { queryWorkspaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
@@ -1754,6 +1755,34 @@ export function createRouter(deps: RouterDeps) {
           return { ok: true as const };
         }),
       },
+    },
+    onboarding: {
+      start: authed.onboarding.start.handler(async ({ context, input }) => {
+        await startOnboarding(
+          { prisma: deps.prisma, events: deps.events, composio: deps.composio },
+          context.actor,
+          input.botId,
+        );
+        return { ok: true as const };
+      }),
+      choose: authed.onboarding.choose.handler(async ({ context, input }) => {
+        await chooseFocus(
+          { prisma: deps.prisma, events: deps.events, composio: deps.composio },
+          context.actor,
+          input.botId,
+          input.optionId,
+        );
+        return { ok: true as const };
+      }),
+      appConnected: authed.onboarding.appConnected.handler(async ({ context, input }) => {
+        await markAppConnected(
+          { prisma: deps.prisma, events: deps.events, composio: deps.composio },
+          context.actor,
+          input.botId,
+          input.provider,
+        );
+        return { ok: true as const };
+      }),
     },
     connections: {
       catalog: authed.connections.catalog.handler(async ({ context, input }) => {

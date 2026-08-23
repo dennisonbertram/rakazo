@@ -306,6 +306,18 @@ export const appContract = {
       disconnect: oc.input(z.object({ serverId: Id })).output(z.object({ ok: z.literal(true) })),
     },
   },
+  onboarding: {
+    /** Seed the first-run conversational onboarding into the bot's thread. */
+    start: oc.input(z.object({ botId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Answer the focus choice; renames the bot and posts the app cards. */
+    choose: oc
+      .input(z.object({ botId: Id, optionId: z.string() }))
+      .output(z.object({ ok: z.literal(true) })),
+    /** Flip an app_connect card to connected after authorization completes. */
+    appConnected: oc
+      .input(z.object({ botId: Id, provider: z.string() }))
+      .output(z.object({ ok: z.literal(true) })),
+  },
   connections: {
     catalog: oc
       .input(z.object({ query: z.string().optional() }))

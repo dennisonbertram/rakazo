@@ -61,6 +61,18 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     question: z.string(),
     subtitle: z.string().optional(),
     options: z.array(z.object({ id: z.string(), letter: z.string(), label: z.string() })),
+    /** Set once the user picks an option; renders the picker as answered. */
+    answerId: z.string().optional(),
+  }),
+  z.object({
+    /** Inline app authorization card (Composio-backed): logo, name, one-line
+        description, and an Authorize button that flips to connected. */
+    kind: z.literal("app_connect"),
+    provider: z.string(),
+    name: z.string(),
+    description: z.string(),
+    logo: z.string().nullable(),
+    status: z.enum(["pending", "connected"]),
   }),
   z.object({
     kind: z.literal("connect"),

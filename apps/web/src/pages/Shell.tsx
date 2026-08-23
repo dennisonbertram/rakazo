@@ -5,6 +5,7 @@ import type {
   ComputerMode,
   ComputerStatus,
   Me,
+  MessageBlock,
   ProductEvent,
   Routine,
   SearchHit,
@@ -2260,6 +2261,46 @@ const MessageView = memo(function MessageView({
             </button>
           );
         }
+        if (block.kind === "choice") {
+          return (
+            <div key={i} className="flex justify-start">
+              <div className="w-[min(420px,80%)] rounded-[20px] bg-[#1A1A1D] px-[18px] py-[14px]">
+                <div className="text-[15.5px] text-[#DFDFE2]">{block.question}</div>
+                {block.subtitle ? (
+                  <div className="mt-0.5 text-[13px] text-[#85858A]">{block.subtitle}</div>
+                ) : null}
+                <div className="mt-3 space-y-1.5">
+                  {block.options
+                    .filter((option) => !block.answerId || option.id === block.answerId)
+                    .map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        disabled={Boolean(block.answerId)}
+                        onClick={() => void rpc.onboarding.choose({ botId, optionId: option.id }).catch(() => undefined)}
+                        className={`flex w-full items-center gap-3 rounded-[12px] border border-[#2A2A2F] px-3.5 py-3 text-left ${block.answerId ? "bg-[#1F1F23]" : "bg-[#161619] hover:bg-[#222226]"}`}
+                      >
+                        <span className="grid h-[24px] w-[24px] place-items-center rounded-[7px] bg-[#232327] text-[12.5px] text-[#9A9AA0]">
+                          {option.letter}
+                        </span>
+                        <span className={`flex-1 text-[15px] ${block.answerId ? "text-[#85858A]" : "text-[#ECECEE]"}`}>
+                          {option.label}
+                        </span>
+                        {block.answerId === option.id ? <span className="text-[#B9B9C0]">✓</span> : null}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (block.kind === "app_connect") {
+          return (
+            <div key={i} className="flex justify-start">
+              <AppConnectCard botId={botId} block={block} />
+            </div>
+          );
+        }
         if (block.kind === "chart") {
           return (
             <div key={i} className="flex justify-start">
@@ -3108,6 +3149,69 @@ function computerPlaceholder(
 
 function computerLabel(mode: ComputerStatus["mode"] | undefined, botName: string) {
   return mode === "dedicated" ? `${botName}’s computer` : "Team Computer";
+}
+
+function AppConnectCard({
+  botId,
+  block,
+}: {
+  botId: string;
+  block: Extract<MessageBlock, { kind: "app_connect" }>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [localStatus, setLocalStatus] = useState<"pending" | "connected">(block.status);
+  const status = block.status === "connected" ? "connected" : localStatus;
+  async function authorize() {
+    setBusy(true);
+    try {
+      const started = await rpc.connections.begin({ provider: block.provider, displayName: block.name });
+      if (started.authorizationUrl) {
+        window.open(started.authorizationUrl, "rakazo-app-connect", "popup,width=560,height=720");
+      }
+      for (let i = 0; i < 60; i += 1) {
+        const row = await rpc.connections
+          .complete({ connectionId: started.connectionId })
+          .catch(() => undefined);
+        if (row?.status === "connected") {
+          setLocalStatus("connected");
+          await rpc.onboarding.appConnected({ botId, provider: block.provider }).catch(() => undefined);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex w-[min(420px,80%)] items-center gap-3.5 rounded-[20px] bg-[#1A1A1D] px-4 py-3.5">
+      {block.logo ? (
+        <img src={block.logo} alt="" className="h-10 w-10 rounded-[10px] bg-white object-contain p-1" />
+      ) : (
+        <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-[#30356A] text-[15px] text-[#E2E4FF]">
+          {block.name.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-medium text-[#ECECEE]">{block.name}</span>
+        <span className="block truncate text-[13px] text-[#85858A]">{block.description}</span>
+      </span>
+      {status === "connected" ? (
+        <span className="rounded-full border border-[#2E5A3C] bg-[#14241A] px-3.5 py-1.5 text-[13.5px] text-[#7FCF9A]">
+          Connected
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void authorize()}
+          className="rounded-full border border-[#3A3A42] bg-[#232327] px-4 py-2 text-[14px] text-[#ECECEE] hover:bg-[#2B2B30] disabled:opacity-60"
+        >
+          {busy ? "Waiting…" : "Authorize"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function ChartCanvas({
