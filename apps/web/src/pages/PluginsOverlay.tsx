@@ -23,7 +23,11 @@ export function PluginsOverlay({
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(cachedCatalog.length === 0);
-  const [google, setGoogle] = useState<{ configured: boolean; connected: boolean } | null>(null);
+  const [google, setGoogle] = useState<{
+    configured: boolean;
+    connected: boolean;
+    state: "none" | "connected" | "reconnect";
+  } | null>(null);
 
   useEffect(() => {
     void rpc.google.status().then(setGoogle).catch(() => setGoogle(null));
@@ -201,12 +205,22 @@ export function PluginsOverlay({
                 G
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-medium text-[#ECECEE]">Gmail (built-in)</span>
+                <span className="block text-[15px] font-medium text-[#ECECEE]">Google (built-in)</span>
                 <span className="block truncate text-[13px] text-[#85858A]">
-                  Native Google connection — powers gmail_search, gmail_get, and high-recall email dumps.
+                  {google.state === "reconnect"
+                    ? "New permissions added (Drive, Calendar, Meet) — reconnect to grant them."
+                    : "Gmail, Drive, Calendar, and Meet transcripts — native Google connection."}
                 </span>
               </span>
-              {google.connected ? (
+              {google.state === "reconnect" ? (
+                <button
+                  type="button"
+                  onClick={() => void connectGoogle()}
+                  className="rounded-full border border-[#6B5A2C] bg-[#2A2415] px-4 py-2 text-[14px] text-[#F0CF8A] hover:bg-[#332B18]"
+                >
+                  Reconnect
+                </button>
+              ) : google.connected ? (
                 <>
                   <span className="rounded-full border border-[#2E5A3C] bg-[#14241A] px-3.5 py-1.5 text-[13.5px] text-[#7FCF9A]">
                     Connected

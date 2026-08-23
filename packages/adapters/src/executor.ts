@@ -83,6 +83,7 @@ import {
   parseMcpServerToolArgs,
 } from "./mcp-server-tool.js";
 import { collectNativeMailDump, GmailNative, gmailSummaryLine } from "./google-gmail.js";
+import type { CalendarNative, DriveNative, MeetNative } from "./google-workspace.js";
 import {
   buildMailDumpFile,
   collectMailDump,
@@ -154,6 +155,7 @@ export interface ExecutorDeps {
   jobs: JobPublisher;
   listConnectedPluginSlugs?: (userId: string) => Promise<string[]>;
   gmailNative?: GmailNative;
+  googleWorkspace?: { drive: DriveNative; calendar: CalendarNative; meet: MeetNative };
 }
 
 export async function deferFutureRoutine(
@@ -669,6 +671,56 @@ export function createRunExecutor(deps: ExecutorDeps) {
               if (!id) return finish({ error: "Pass the Gmail message id." });
               const message = await deps.gmailNative.full(actor, id);
               return finish(message);
+            } catch (error) {
+              return finish({ error: error instanceof Error ? error.message : String(error) });
+            }
+          }
+          if (
+            name === "drive_search" ||
+            name === "drive_read" ||
+            name === "calendar_events" ||
+            name === "meet_transcripts" ||
+            name === "meet_transcript_get"
+          ) {
+            if (!deps.googleWorkspace) return finish({ error: "built-in Google unavailable" });
+            const actor = { workspaceId: run.workspaceId, userId: run.userId };
+            try {
+              if (name === "drive_search") {
+                const query = String(args.query ?? "").trim();
+                if (!query) return finish({ error: "Pass a Drive query." });
+                const files = await deps.googleWorkspace.drive.search(actor, {
+                  query,
+                  maxResults: Number(args.max_results) || undefined,
+                });
+                return finish({ files });
+              }
+              if (name === "drive_read") {
+                const id = String(args.id ?? "").trim();
+                if (!id) return finish({ error: "Pass the Drive file id." });
+                return finish(await deps.googleWorkspace.drive.read(actor, id));
+              }
+              if (name === "calendar_events") {
+                const events = await deps.googleWorkspace.calendar.events(actor, {
+                  timeMin: typeof args.time_min === "string" ? args.time_min : undefined,
+                  timeMax: typeof args.time_max === "string" ? args.time_max : undefined,
+                  query: typeof args.query === "string" ? args.query : undefined,
+                  maxResults: Number(args.max_results) || undefined,
+                });
+                return finish({ events });
+              }
+              if (name === "meet_transcripts") {
+                const records = await deps.googleWorkspace.meet.recentTranscripts(
+                  actor,
+                  Math.min(25, Math.max(1, Number(args.max_records) || 10)),
+                );
+                return finish({ records });
+              }
+              const transcript = String(args.transcript ?? "").trim();
+              if (!transcript.startsWith("conferenceRecords/")) {
+                return finish({ error: "Pass a transcript resource name from meet_transcripts." });
+              }
+              const text = await deps.googleWorkspace.meet.transcriptText(actor, transcript);
+              return finish({ transcript, text });
             } catch (error) {
               return finish({ error: error instanceof Error ? error.message : String(error) });
             }
@@ -1199,6 +1251,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 taughtSkillsLine,
                 'For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {"help": true} before your first chart to read the full guide.',
                 "For email questions about 'all', 'everything', 'did I handle', 'status of', or anything where missing one email would be wrong: do NOT answer from a few search hits. Use email_dump_search with several WIDE queries; it writes every match to a file in your home, then grep that file and answer from what the grep shows, reporting the coverage honestly.",
+                "Built-in Google tools (need Google connected from Plugins): gmail_search and gmail_get for email lookups, drive_search and drive_read for Drive files and Docs, calendar_events for the user's calendar, and meet_transcripts plus meet_transcript_get for Google Meet transcripts.",
                 "When the user asks you to add or connect an MCP server (and gives you its details), use add_mcp_server. If it uses browser sign-in, an approval card appears in the chat — tell the user to click Authorize on it.",
                 "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
               ]

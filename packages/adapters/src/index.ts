@@ -30,6 +30,7 @@ export * from "./home.js";
 export * from "./host-aware-sandbox.js";
 export * from "./job-reconciler.js";
 export * from "./google-gmail.js";
+export * from "./google-workspace.js";
 export * from "./mail-dump.js";
 export * from "./mcp-connector.js";
 export * from "./mcp-emulator.js";

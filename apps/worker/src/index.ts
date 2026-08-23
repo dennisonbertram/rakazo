@@ -18,7 +18,10 @@ import {
   isComposioEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  CalendarNative,
+  DriveNative,
   GmailNative,
+  MeetNative,
   GoogleAuthBroker,
   McpConnector,
   McpOAuthBroker,
@@ -62,6 +65,11 @@ async function main() {
     process.env.GOOGLE_CLIENT_SECRET || undefined,
   );
   const gmailNative = new GmailNative(googleAuth);
+  const googleWorkspace = {
+    drive: new DriveNative(googleAuth),
+    calendar: new CalendarNative(googleAuth),
+    meet: new MeetNative(googleAuth),
+  };
   const mcp = new McpConnector(
     prisma,
     secrets,
@@ -95,6 +103,7 @@ async function main() {
     artifacts,
     connector: stack.connector,
     gmailNative,
+    googleWorkspace,
     listConnectedPluginSlugs: stack.composio?.listConnectedSlugs.bind(stack.composio),
     secrets: [process.env.OPENROUTER_API_KEY ?? "", process.env.COMPOSIO_API_KEY ?? ""].filter(
       Boolean,

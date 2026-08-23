@@ -162,6 +162,62 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "drive_search",
+    description:
+      "Search Google Drive (built-in Google integration). Pass plain text for a full-text search, or a raw Drive query like \"name contains 'Q3' and mimeType = 'application/pdf'\". Returns file ids, names, types, and modified times, newest first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        max_results: { type: "integer", description: "1-25, default 15." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "drive_read",
+    description:
+      "Read one Google Drive file as text by id (from drive_search). Google Docs/Slides export as plain text, Sheets as CSV, text files download directly; binaries return metadata only.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "calendar_events",
+    description:
+      "List Google Calendar events (built-in Google integration) from the primary calendar, recurrences expanded, ordered by start time. Give an ISO time window and optionally a text query.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        time_min: { type: "string", description: "ISO datetime lower bound, e.g. 2026-08-24T00:00:00Z." },
+        time_max: { type: "string", description: "ISO datetime upper bound." },
+        query: { type: "string", description: "Optional free-text filter." },
+        max_results: { type: "integer", description: "1-50, default 25." },
+      },
+    },
+  },
+  {
+    name: "meet_transcripts",
+    description:
+      "List recent Google Meet conference records with their transcript resource names (built-in Google integration). Use meet_transcript_get with a transcript name to read the actual transcript.",
+    inputSchema: {
+      type: "object",
+      properties: { max_records: { type: "integer", description: "1-25, default 10." } },
+    },
+  },
+  {
+    name: "meet_transcript_get",
+    description:
+      "Read a Google Meet transcript in full as speaker-labelled lines, by the transcript resource name from meet_transcripts (conferenceRecords/…/transcripts/…).",
+    inputSchema: {
+      type: "object",
+      properties: { transcript: { type: "string" } },
+      required: ["transcript"],
+    },
+  },
+  {
     name: "email_dump_search",
     description:
       "High-recall email search. Runs several WIDE Gmail queries, downloads every matching message's metadata into a grep-friendly file in your home (the results do NOT enter this conversation), and returns the file path plus per-query coverage. Then grep/read the file to answer. Use this whenever the user asks about 'all', 'everything', 'did I handle', 'status of', or any question where stopping at the first few search hits could miss the email that matters. Requires the Gmail plugin to be connected.",

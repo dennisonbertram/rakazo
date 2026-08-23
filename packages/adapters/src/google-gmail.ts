@@ -11,8 +11,15 @@ import type { EncryptedSecretStore } from "./secrets.js";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
-export const GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+/** Everything the built-in Google integration asks for, read-only. */
+export const GOOGLE_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/meetings.space.readonly",
+];
 const SECRET_KIND = "google-oauth";
 
 type Actor = { workspaceId: string; userId: string };
@@ -21,6 +28,8 @@ type StoredTokens = {
   access_token: string;
   refresh_token?: string;
   expires_in?: number;
+  /** Space-separated scopes Google actually granted, from the token response. */
+  scope?: string;
   obtainedAt: number;
 };
 
@@ -32,6 +41,7 @@ function base64url(buffer: Buffer): string {
 
 export class GoogleAuthBroker {
   private readonly pending = new Map<string, Pending>();
+  private readonly refreshing = new Map<string, Promise<string | undefined>>();
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -44,9 +54,21 @@ export class GoogleAuthBroker {
     return Boolean(this.clientId);
   }
 
-  async status(actor: Actor): Promise<"none" | "connected"> {
+  async status(actor: Actor): Promise<"none" | "connected" | "reconnect"> {
     const row = await this.secretRow(actor);
-    return row ? "connected" : "none";
+    if (!row) return "none";
+    try {
+      const tokens = JSON.parse(this.secrets.load(row.ciphertext)) as StoredTokens;
+      // Tokens saved before scope tracking carry no scope field; treat those as
+      // fully granted rather than forcing everyone to reconnect.
+      if (typeof tokens.scope === "string" && tokens.scope.length > 0) {
+        const granted = new Set(tokens.scope.split(/\s+/));
+        if (GOOGLE_SCOPES.some((scope) => !granted.has(scope))) return "reconnect";
+      }
+      return "connected";
+    } catch {
+      return "reconnect";
+    }
   }
 
   begin(actor: Actor, redirectUri: string): { authorizationUrl: string; state: string } {
@@ -58,7 +80,7 @@ export class GoogleAuthBroker {
       client_id: this.clientId,
       redirect_uri: redirectUri,
       response_type: "code",
-      scope: GMAIL_SCOPES.join(" "),
+      scope: GOOGLE_SCOPES.join(" "),
       state,
       code_challenge: base64url(createHash("sha256").update(verifier).digest()),
       code_challenge_method: "S256",
@@ -96,11 +118,35 @@ export class GoogleAuthBroker {
 
   async disconnect(actor: Actor): Promise<void> {
     const row = await this.secretRow(actor);
-    if (row) await this.prisma.secret.delete({ where: { id: row.id } });
+    if (!row) return;
+    try {
+      const tokens = JSON.parse(this.secrets.load(row.ciphertext)) as StoredTokens;
+      const token = tokens.refresh_token ?? tokens.access_token;
+      if (token) {
+        await fetch(GOOGLE_REVOKE_URL, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ token }),
+        }).catch(() => undefined);
+      }
+    } catch {
+      // Revocation is best-effort; the stored secret is removed regardless.
+    }
+    await this.prisma.secret.delete({ where: { id: row.id } });
   }
 
-  /** Valid access token, refreshing (and persisting the rotation) when stale. */
+  /** Valid access token, refreshing (and persisting the rotation) when stale.
+      Concurrent callers share one refresh request. */
   async accessToken(actor: Actor): Promise<string | undefined> {
+    const key = `${actor.workspaceId}:${actor.userId}`;
+    const inFlight = this.refreshing.get(key);
+    if (inFlight) return inFlight;
+    const task = this.accessTokenInner(actor).finally(() => this.refreshing.delete(key));
+    this.refreshing.set(key, task);
+    return task;
+  }
+
+  private async accessTokenInner(actor: Actor): Promise<string | undefined> {
     const row = await this.secretRow(actor);
     if (!row) return undefined;
     let tokens: StoredTokens;
@@ -131,10 +177,38 @@ export class GoogleAuthBroker {
       ...tokens,
       ...refreshed,
       refresh_token: refreshed.refresh_token ?? tokens.refresh_token,
+      scope: refreshed.scope ?? tokens.scope,
       obtainedAt: Date.now(),
     };
     await this.saveTokens(actor, next, row.id);
     return next.access_token;
+  }
+
+  /** Authorized GET against any Google API, shared by all service clients. */
+  async apiGet(actor: Actor, url: string): Promise<Record<string, unknown>> {
+    const token = await this.accessToken(actor);
+    if (!token) throw new Error("Google is not connected. Connect Google (built-in) from Plugins.");
+    const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    if (!response.ok) {
+      throw new Error(`Google API ${response.status}: ${(await response.text()).slice(0, 200)}`);
+    }
+    const text = await response.text();
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return { __raw: text };
+    }
+  }
+
+  /** Authorized GET returning the raw body (Drive exports / downloads). */
+  async apiGetText(actor: Actor, url: string): Promise<string> {
+    const token = await this.accessToken(actor);
+    if (!token) throw new Error("Google is not connected. Connect Google (built-in) from Plugins.");
+    const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    if (!response.ok) {
+      throw new Error(`Google API ${response.status}: ${(await response.text()).slice(0, 200)}`);
+    }
+    return response.text();
   }
 
   private async secretRow(actor: Actor) {

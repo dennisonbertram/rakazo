@@ -308,7 +308,14 @@ export const appContract = {
   },
   google: {
     /** Built-in Google/Gmail OAuth (native, not Composio). */
-    status: oc.output(z.object({ configured: z.boolean(), connected: z.boolean() })),
+    status: oc.output(
+      z.object({
+        configured: z.boolean(),
+        connected: z.boolean(),
+        /** "reconnect" means scopes were added since the user authorized. */
+        state: z.enum(["none", "connected", "reconnect"]),
+      }),
+    ),
     begin: oc
       .input(z.object({ redirectUri: z.string() }))
       .output(z.object({ authorizationUrl: z.string(), state: z.string() })),

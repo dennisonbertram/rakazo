@@ -1759,12 +1759,14 @@ export function createRouter(deps: RouterDeps) {
       },
     },
     google: {
-      status: authed.google.status.handler(async ({ context }) => ({
-        configured: Boolean(deps.googleAuth?.configured),
-        connected: deps.googleAuth
-          ? (await deps.googleAuth.status(context.actor)) === "connected"
-          : false,
-      })),
+      status: authed.google.status.handler(async ({ context }) => {
+        const state = deps.googleAuth ? await deps.googleAuth.status(context.actor) : "none";
+        return {
+          configured: Boolean(deps.googleAuth?.configured),
+          connected: state === "connected",
+          state,
+        };
+      }),
       begin: authed.google.begin.handler(async ({ context, input }) => {
         if (!deps.googleAuth) throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
         return deps.googleAuth.begin(context.actor, input.redirectUri);
