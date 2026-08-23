@@ -67,6 +67,108 @@ describe("MCP OAuth", () => {
     expect(persisted.at(-1)?.oauth?.tokens).toBeUndefined();
   });
 
+
+  it("completes authorization after a broker restart via persisted pending state", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      if (url.href === "https://mcp.example.test/mcp" && request.method === "POST") {
+        return new Response(null, {
+          status: 401,
+          headers: { "WWW-Authenticate": 'Bearer resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"' },
+        });
+      }
+      if (url.href === "https://mcp.example.test/.well-known/oauth-protected-resource/mcp") {
+        return Response.json({ resource: "https://mcp.example.test/mcp", authorization_servers: ["https://auth.example.test"] });
+      }
+      if (url.href === "https://auth.example.test/.well-known/oauth-authorization-server") {
+        return Response.json({
+          issuer: "https://auth.example.test",
+          authorization_endpoint: "https://auth.example.test/authorize",
+          token_endpoint: "https://auth.example.test/token",
+          registration_endpoint: "https://auth.example.test/register",
+          response_types_supported: ["code"],
+          grant_types_supported: ["authorization_code", "refresh_token"],
+          code_challenge_methods_supported: ["S256"],
+        });
+      }
+      if (url.href === "https://auth.example.test/register" && request.method === "POST") {
+        return Response.json({
+          client_id: "registered-client-id",
+          redirect_uris: ["http://127.0.0.1:5173/mcp/oauth/callback"],
+          token_endpoint_auth_method: "none",
+        }, { status: 201 });
+      }
+      if (url.href === "https://auth.example.test/token" && request.method === "POST") {
+        return Response.json({ access_token: "restart-access", refresh_token: "restart-refresh", token_type: "bearer", expires_in: 3600 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url}`);
+    }));
+
+    // Stateful fakes shared by both broker instances, like the real DB.
+    const secretRows = new Map<string, { id: string; workspaceId: string; userId: string; ciphertext: string }>();
+    let serverSecretId: string | null = null;
+    let counter = 0;
+    const secrets = {
+      put: async (plaintext: string) => {
+        counter += 1;
+        const id = `secret-${counter}`;
+        return { id, ciphertext: plaintext };
+      },
+      load: (ciphertext: string) => ciphertext,
+    };
+    const serverRow = () => ({ id: "server-1", endpoint: "https://mcp.example.test/mcp", secretId: serverSecretId, enabled: true, workspaceId: "workspace-1", userId: "user-1" });
+    const prisma = {
+      mcpServer: {
+        findFirst: vi.fn(async () => serverRow()),
+        findMany: vi.fn(async () => (serverSecretId ? [serverRow()] : [])),
+        update: vi.fn(async () => ({})),
+      },
+      secret: {
+        findFirst: vi.fn(async ({ where }: { where: { id: string } }) => secretRows.get(where.id) ?? null),
+        create: vi.fn(async ({ data }: { data: { id: string; workspaceId: string; userId: string; ciphertext: string } }) => {
+          secretRows.set(data.id, data);
+          return data;
+        }),
+        delete: vi.fn(async ({ where }: { where: { id: string } }) => {
+          secretRows.delete(where.id);
+          return {};
+        }),
+      },
+      $transaction: vi.fn(async (ops: unknown[] | ((tx: unknown) => Promise<unknown>)) => {
+        if (Array.isArray(ops)) return Promise.all(ops);
+        return [];
+      }),
+    };
+    // Mirror the real broker persistence: secret create + server link happen in
+    // replaceMaterial, which we intercept via mcpServer.update on secretId.
+    prisma.mcpServer.update = vi.fn(async ({ data }: { data: { secretId?: string } }) => {
+      if (typeof data.secretId === "string") serverSecretId = data.secretId;
+      return {};
+    }) as never;
+
+    const brokerA = new McpOAuthBroker(prisma as never, secrets as never);
+    const started = await brokerA.begin({
+      serverId: "server-1",
+      workspaceId: "workspace-1",
+      userId: "user-1",
+      redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+    });
+
+    // Fresh instance: simulates the API restarting before the callback lands.
+    const brokerB = new McpOAuthBroker(prisma as never, secrets as never);
+    await brokerB.complete({
+      sessionId: started.sessionId,
+      code: "authorization-code",
+      state: started.sessionId,
+      workspaceId: "workspace-1",
+      userId: "user-1",
+    });
+    const stored = [...secretRows.values()].map((row) => JSON.parse(row.ciphertext));
+    expect(stored.some((value) => value.oauth?.tokens?.access_token === "restart-access")).toBe(true);
+    expect(stored.at(-1)?.oauth?.pendingState).toBeUndefined();
+  });
+
   it("lets the official Streamable HTTP transport drive discovery, registration, PKCE, redirect, and token exchange", async () => {
     const requests: string[] = [];
     let registration: Record<string, unknown> | undefined;

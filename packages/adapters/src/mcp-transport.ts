@@ -93,11 +93,21 @@ export function secureFetch(
     const source = input instanceof Request ? input : new Request(input, init);
     const url = validateUrl(source.url, urlPolicy);
     const headers = new Headers(source.headers);
-    if (url.origin === resourceUrl.origin) {
+    const sameOrigin = url.origin === resourceUrl.origin;
+    if (sameOrigin) {
       for (const [name, value] of configured) headers.set(name, value);
+    } else {
+      // Operator-configured credentials belong to the MCP endpoint only; never
+      // forward them to third-party OAuth/discovery origins, whichever path
+      // they arrived through (requestInit merges included).
+      for (const [name] of configured) headers.delete(name);
     }
     for (const [name, value] of new Headers(init?.headers)) {
-      if (allowed.has(name.toLowerCase())) headers.set(name, value);
+      if (!allowed.has(name.toLowerCase())) continue;
+      if (!sameOrigin && configured.some(([configuredName]) => configuredName.toLowerCase() === name.toLowerCase())) {
+        continue;
+      }
+      headers.set(name, value);
     }
     // Buffer the body: a re-wrapped Request body is a stream without a replayable
     // source, and undici fails the whole request when a server answers 401 early
@@ -207,17 +217,14 @@ export class McpSession {
     );
     let usedFallback = false;
     const connect = async (kind: McpRemoteTransport): Promise<void> => {
-      const requestInit: RequestInit = { headers: options.headerPolicy?.headers };
+      // Credential headers are injected per-origin inside secureFetch; putting
+      // them in requestInit would merge them into every SDK request, including
+      // OAuth discovery and token calls to other origins.
       const transport =
         kind === "streamable-http"
-          ? new StreamableHTTPClientTransport(url, {
-              fetch,
-              requestInit,
-              authProvider: options.authProvider,
-            })
+          ? new StreamableHTTPClientTransport(url, { fetch, authProvider: options.authProvider })
           : new SSEClientTransport(url, {
               fetch,
-              requestInit,
               authProvider: options.authProvider,
               eventSourceInit: { fetch: fetch as never },
             });

@@ -33,6 +33,73 @@ describe("MCP transport seam", () => {
     await expect(session.callTool("echo")).rejects.toThrow("not connected");
   });
 
+
+  it("never forwards configured credential headers to other origins (OAuth discovery/token)", async () => {
+    const headersByUrl = new Map<string, Record<string, string | null>>();
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      headersByUrl.set(url.href, {
+        authorization: request.headers.get("authorization"),
+        "x-api-key": request.headers.get("x-api-key"),
+      });
+      if (url.href === "https://auth.example.test/token") {
+        return Response.json({ access_token: "fresh-access", refresh_token: "rotated", token_type: "bearer", expires_in: 3600 });
+      }
+      if (url.href === "https://mcp.example.test/mcp") {
+        const authorization = request.headers.get("authorization") ?? "";
+        if (!authorization.includes("fresh-access")) {
+          return new Response(null, { status: 401, headers: { "WWW-Authenticate": "Bearer" } });
+        }
+        const message = JSON.parse(await request.text()) as { id?: number; method?: string };
+        if (message.method === "initialize") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "test", version: "1" } },
+          });
+        }
+        return new Response(null, { status: 202 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url}`);
+    }));
+    const provider = new StoredMcpOAuthProvider("server-1", {
+      oauth: {
+        redirectUri: "http://127.0.0.1:5173/mcp/oauth/callback",
+        tokens: { access_token: "stale-access", refresh_token: "refresh", token_type: "bearer" },
+        clientInformation: { client_id: "client-1" },
+        discoveryState: {
+          authorizationServerUrl: "https://auth.example.test",
+          resourceMetadata: { resource: "https://mcp.example.test/mcp", authorization_servers: ["https://auth.example.test"] },
+          authorizationServerMetadata: {
+            issuer: "https://auth.example.test",
+            authorization_endpoint: "https://auth.example.test/authorize",
+            token_endpoint: "https://auth.example.test/token",
+            response_types_supported: ["code"],
+            grant_types_supported: ["authorization_code", "refresh_token"],
+          },
+        },
+      },
+    }, async () => {});
+    const session = new McpSession();
+    await session.connectRemote({
+      url: "https://mcp.example.test/mcp",
+      authProvider: provider,
+      fallbackToSse: false,
+      headerPolicy: {
+        headers: { Authorization: "Bearer operator-static-secret", "x-api-key": "operator-key" },
+        allowedHeaders: ["accept", "content-type", "authorization", "x-api-key"],
+      },
+    });
+    await session.close();
+    const tokenHeaders = headersByUrl.get("https://auth.example.test/token");
+    expect(tokenHeaders).toBeDefined();
+    expect(tokenHeaders?.authorization ?? null).toBeNull();
+    expect(tokenHeaders?.["x-api-key"] ?? null).toBeNull();
+    const resourceHeaders = headersByUrl.get("https://mcp.example.test/mcp");
+    expect(resourceHeaders?.["x-api-key"]).toBe("operator-key");
+  });
+
   it("lets the SDK refresh a rejected token, persist rotation, and retry the MCP request", async () => {
     const resourceHeaders: string[] = [];
     const persisted: unknown[] = [];
