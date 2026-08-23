@@ -101,6 +101,7 @@ import {
   serializeModelSecret,
 } from "./pi-oauth.js";
 import {
+  assertPlotDataWithinLimits,
   PLOT_TOOL_GUIDE,
   type PlotSpec,
   parsePlotData,
@@ -810,6 +811,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 );
                 rows = parsePlotData(dataPath, new TextDecoder().decode(bytes));
               }
+              assertPlotDataWithinLimits(args.spec as PlotSpec, rows);
               // jsdom and sharp load lazily so chart-free runs never pay for them.
               const { JSDOM } = await import("jsdom");
               const svg = renderPlotSpecToSvg(
@@ -830,10 +832,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               let attached = false;
               const chartName = outPath.split("/").pop() ?? "chart";
               const chartRows = rows ?? (args.spec as { data?: unknown[] }).data ?? [];
+              const chartSpec = { ...(args.spec as Record<string, unknown>) };
+              delete chartSpec.data;
               const chartFits =
                 Array.isArray(chartRows) &&
-                chartRows.length <= 5000 &&
-                JSON.stringify(chartRows).length <= 200_000;
+                JSON.stringify({ spec: chartSpec, data: chartRows }).length <= 200_000;
               if (args.attach !== false && chartFits) {
                 // Live inline chart: the client re-renders the validated spec
                 // and the PNG stays on disk as the exportable copy.
@@ -841,7 +844,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   {
                     kind: "chart",
                     name: chartName,
-                    spec: args.spec as Record<string, unknown>,
+                    spec: chartSpec,
                     data: chartRows,
                   },
                 ]);

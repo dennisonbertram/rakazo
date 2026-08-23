@@ -32,6 +32,19 @@ describe("describeToolActivity", () => {
     expect(line).toMatch(/^Running: a x/);
   });
 
+  it("redacts credentials from activity details", () => {
+    const line = describeToolActivity("shell", {
+      command:
+        "curl -H 'Authorization: Bearer fake-token' https://example.test?api_key=fake-key password=fake-password",
+    });
+
+    expect(line).toContain("Bearer [redacted]");
+    expect(line).toContain("api_key=[redacted]");
+    expect(line).not.toContain("fake-token");
+    expect(line).not.toContain("fake-key");
+    expect(line).not.toContain("fake-password");
+  });
+
   it("falls back to the tool name", () => {
     expect(describeToolActivity("destination_write", undefined)).toBe("Using destination_write");
   });

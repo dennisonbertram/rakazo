@@ -356,14 +356,17 @@ export function applyMobileThreadEvent(
     const activeRunChanged = prev.activeRuns?.some(
       (candidate) => candidate.id === event.runId && candidate.status !== "waiting_input",
     );
-    if (!runChanged && !activeRunChanged) return prev;
+    const cursor = event.seq ?? prev.cursor;
+    if (!runChanged && !activeRunChanged) {
+      return cursor === prev.cursor ? prev : { ...prev, cursor };
+    }
     const run = runChanged && prev.run ? { ...prev.run, status: "waiting_input" } : prev.run;
     const activeRuns = activeRunChanged
       ? prev.activeRuns?.map((candidate) =>
           candidate.id === event.runId ? { ...candidate, status: "waiting_input" } : candidate,
         )
       : prev.activeRuns;
-    return { ...prev, run, activeRuns };
+    return { ...prev, cursor, run, activeRuns };
   }
   if (isRunTerminalEvent(event)) {
     const activeRuns = prev.activeRuns?.filter((candidate) => candidate.id !== event.runId);
@@ -453,6 +456,7 @@ export function applyMobileThreadEvent(
     };
     return {
       ...prev,
+      cursor: event.seq ?? prev.cursor,
       messages: [
         ...remaining.filter(
           (message) =>

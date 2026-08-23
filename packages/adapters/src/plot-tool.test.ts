@@ -177,6 +177,21 @@ describe("render_plot", () => {
     expect(svg).toContain("Q2");
   });
 
+  it("rejects oversized data across top-level, spec, and per-mark arrays", () => {
+    const rows = Array.from({ length: 2_501 }, (_, x) => ({ x }));
+
+    expect(() =>
+      renderPlotSpecToSvg(
+        {
+          data: rows,
+          marks: [{ type: "dot", data: rows, options: { x: "x" } }],
+        },
+        undefined,
+        dom(),
+      ),
+    ).toThrow(/5,000-row limit/);
+  });
+
   it("parses csv with automatic typing and json row arrays", () => {
     const rows = parsePlotData("data.csv", "a,b\n1,2024-01-05\n2,2024-02-05\n") as {
       a: number;

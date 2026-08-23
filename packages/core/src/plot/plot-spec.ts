@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import * as Plot from "@observablehq/plot";
+import { MAX_CHART_DATA_ROWS } from "@rakazo/contracts";
 import { autoType, csvParse, tsvParse } from "d3-dsv";
 
 /**
@@ -143,6 +144,20 @@ export function supportedPlotNames(): { marks: string[]; transforms: string[] } 
   };
 }
 
+/** Bound all row arrays carried by a plot, including per-mark overrides. */
+export function assertPlotDataWithinLimits(spec: PlotSpec, data: unknown[] | undefined): void {
+  const marks = Array.isArray(spec.marks) ? spec.marks : [];
+  const sources = [data, spec.data, ...marks.map((mark) => mark.data)].filter(
+    (rows): rows is unknown[] => Array.isArray(rows),
+  );
+  const rowCount = sources.reduce((total, rows) => total + rows.length, 0);
+  if (rowCount > MAX_CHART_DATA_ROWS) {
+    throw new Error(
+      `Plot data exceeds the ${MAX_CHART_DATA_ROWS.toLocaleString("en-US")}-row limit across top-level, spec, and mark data.`,
+    );
+  }
+}
+
 // Channels where a string must name a column; a typo otherwise renders an
 // empty chart with no error, which strands the calling model.
 const COLUMN_CHANNELS = ["x", "y", "x1", "x2", "y1", "y2", "fx", "fy"] as const;
@@ -275,6 +290,7 @@ export function buildPlotParts(
   if (!Array.isArray(spec.marks) || spec.marks.length === 0) {
     throw new Error("The spec needs a non-empty marks array.");
   }
+  assertPlotDataWithinLimits(spec, data);
   const { title, marks, data: nestedData, ...plotOptions } = spec;
   const sharedData = data ?? (Array.isArray(nestedData) ? nestedData : undefined);
   const normalizedData = new WeakMap<unknown[], unknown[]>();
