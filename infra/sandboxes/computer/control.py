@@ -20,7 +20,11 @@ def capture(display):
     cursor = output(["xdotool", "getmouselocation", "--shell"])
     window = output(["xdotool", "getactivewindow"])
     title = output(["xdotool", "getwindowname", window]) if window else ""
-    image = subprocess.run(["import", "-window", "root", "png:-"], env=env, capture_output=True)
+    image = subprocess.run(
+        ["import", "-define", "png:compression-level=3", "-window", "root", "png:-"],
+        env=env,
+        capture_output=True,
+    )
     if image.returncode:
         raise RuntimeError(image.stderr.decode("utf-8", "replace") or "screen capture failed")
     fields = dict(line.split("=", 1) for line in cursor.splitlines() if "=" in line)
