@@ -58,7 +58,6 @@ const destinationTool: ConnectorTool = {
       body: { type: "string" },
     },
   },
-  route: { kind: "destination" },
 };
 
 describe("Pi connector tool dispatch", () => {
@@ -98,7 +97,6 @@ describe("Pi connector tool dispatch", () => {
       "destination.write",
       { collection: "notes", title: "Result", body: "Done" },
       "call-1",
-      { kind: "destination" },
     );
   });
 });

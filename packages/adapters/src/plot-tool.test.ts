@@ -2,8 +2,9 @@ import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import {
   CHART_CATALOG,
-  parsePlotData,
   PLOT_TOOL_GUIDE,
+  type PlotSpec,
+  parsePlotData,
   renderPlotSpecToSvg,
   searchChartCatalog,
   supportedPlotNames,
@@ -33,6 +34,17 @@ describe("render_plot", () => {
     expect(svg).toContain("Culmen shape by species");
     for (const species of ["Adelie", "Chinstrap", "Gentoo"]) expect(svg).toContain(species);
     expect(svg).toContain("circle");
+  });
+
+  it("does not mutate caller-owned scale options", () => {
+    const color = Object.freeze({ legend: true });
+    const spec: PlotSpec = {
+      color,
+      marks: [{ type: "dot", options: { x: "length", y: "depth", stroke: "species" } }],
+    };
+
+    expect(() => renderPlotSpecToSvg(spec, penguinish, dom())).not.toThrow();
+    expect(color.legend).toBe(true);
   });
 
   it("supports transforms: binned histogram and grouped stacked bars", () => {
@@ -79,9 +91,9 @@ describe("render_plot", () => {
   });
 
   it("rejects unknown marks and transforms with the supported lists", () => {
-    expect(() =>
-      renderPlotSpecToSvg({ marks: [{ type: "evilMark" }] }, penguinish, dom()),
-    ).toThrow(/Unsupported mark type "evilMark"/);
+    expect(() => renderPlotSpecToSvg({ marks: [{ type: "evilMark" }] }, penguinish, dom())).toThrow(
+      /Unsupported mark type "evilMark"/,
+    );
     expect(() =>
       renderPlotSpecToSvg(
         { marks: [{ type: "dot", transform: { name: "eval" }, options: {} }] },
@@ -105,11 +117,7 @@ describe("render_plot", () => {
       ),
     ).toThrow(/x refers to "Quarter" but the data columns are: quarter, sales/);
     expect(() =>
-      renderPlotSpecToSvg(
-        { marks: [{ type: "barY" }] },
-        [{ quarter: "Q1", sales: 120 }],
-        dom(),
-      ),
+      renderPlotSpecToSvg({ marks: [{ type: "barY" }] }, [{ quarter: "Q1", sales: 120 }], dom()),
     ).toThrow(/no position channels/);
   });
 
@@ -142,7 +150,10 @@ describe("render_plot", () => {
   it("accepts rows nested inside the spec as data", () => {
     const svg = renderPlotSpecToSvg(
       {
-        data: [{ quarter: "Q1", sales: 120 }, { quarter: "Q2", sales: 185 }],
+        data: [
+          { quarter: "Q1", sales: 120 },
+          { quarter: "Q2", sales: 185 },
+        ],
         marks: [{ type: "barY", options: { x: "quarter", y: "sales" } }],
       },
       undefined,

@@ -19,9 +19,7 @@ describe("describeToolActivity", () => {
   });
 
   it("names MCP server and remote tool", () => {
-    expect(describeToolActivity("mcp__brex__list_expenses", {})).toBe(
-      "Using brex: list_expenses",
-    );
+    expect(describeToolActivity("mcp__brex__list_expenses", {})).toBe("Using brex: list_expenses");
     expect(describeToolActivity("mcp__demo-oauth__greet", {})).toBe("Using demo-oauth: greet");
   });
 

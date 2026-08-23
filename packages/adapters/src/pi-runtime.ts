@@ -7,21 +7,28 @@ import type {
   AgentRuntime,
   AgentRuntimeEvent,
   AgentToolExecutionResult,
-  ConnectorRoute,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
 import { builtinAgentTools, DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
 import { PiRuntimeCredentialStore, toOAuthCredential } from "./pi-credentials.js";
+import { registerLocalProvider } from "./pi-local-provider.js";
 
 const running = new Map<string, AbortController>();
-const catalogModels = builtinModels();
+// Built on first use, not at module load: entry points call loadRootEnv() after
+// their imports, and ESM hoists those imports, so module-level env reads here
+// would run before .env is loaded and miss the local provider entirely.
+let catalogModelsCache: Models | undefined;
+function catalogModels(): Models {
+  catalogModelsCache ??= registerLocalProvider(builtinModels());
+  return catalogModelsCache;
+}
 const MAX_PARALLEL_SUBAGENTS = 4;
 // Pi forwards these names to OpenAI Responses, whose function-name contract is
 // ^[a-zA-Z0-9_-]+$ with a maximum length of 64 characters.
 const AGENT_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MAX_AGENT_TOOL_NAME_LENGTH = 64;
 const FALLBACK_AGENT_TOOL_NAME = "connector_tool";
-// ponytail: flat per-turn cap; smarter same-error loop detection if this bites real work.
+// Bound runaway agent loops before they can issue unbounded billable tool calls.
 const MAX_TOOL_CALLS_PER_TURN = 80;
 
 export class PiAgentRuntime implements AgentRuntime {
@@ -125,7 +132,10 @@ export class PiAgentRuntime implements AgentRuntime {
             // Live activity feedback: without this the thread shows a bare
             // "working…" for the whole tool call with nothing actionable.
             toolActivityShowing = true;
-            queue.push({ type: "progress", text: describeToolActivity(event.toolName, event.args) });
+            queue.push({
+              type: "progress",
+              text: describeToolActivity(event.toolName, event.args),
+            });
           }
           if (
             event.type === "message_update" &&
@@ -203,16 +213,18 @@ export class PiAgentRuntime implements AgentRuntime {
 
 function modelsForRequest(request: AgentRunRequest, provider: string): Models {
   const oauth = request.model.oauth;
-  if (!oauth) return catalogModels;
+  if (!oauth) return catalogModels();
 
   const persist = oauth.persist;
-  return builtinModels({
-    credentials: new PiRuntimeCredentialStore(
-      provider,
-      toOAuthCredential(oauth.credential),
-      persist ? (next) => persist(next) : undefined,
-    ),
-  });
+  return registerLocalProvider(
+    builtinModels({
+      credentials: new PiRuntimeCredentialStore(
+        provider,
+        toOAuthCredential(oauth.credential),
+        persist ? (next) => persist(next) : undefined,
+      ),
+    }),
+  );
 }
 
 function toAgentTools(toolDefs: readonly ConnectorTool[], host: ToolHost): AgentTool[] {
@@ -245,7 +257,9 @@ const ACTIVITY_DETAIL_LIMIT = 90;
 export function describeToolActivity(toolName: string, args: unknown): string {
   const record = args && typeof args === "object" ? (args as Record<string, unknown>) : {};
   const detail = (value: unknown): string => {
-    const text = String(value ?? "").replaceAll(/\s+/g, " ").trim();
+    const text = String(value ?? "")
+      .replaceAll(/\s+/g, " ")
+      .trim();
     return text.length > ACTIVITY_DETAIL_LIMIT ? `${text.slice(0, ACTIVITY_DETAIL_LIMIT)}…` : text;
   };
   if (toolName === "shell") return `Running: ${detail(record.command)}`;
@@ -322,7 +336,6 @@ function toHistory(history: AgentRunRequest["history"], prompt: string) {
 }
 
 function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): AgentTool {
-  const route: ConnectorRoute = tool.route ?? { kind: "builtin" };
   return {
     name: exposedName,
     label: tool.name,
@@ -415,9 +428,7 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         };
       }
       if (host.request.executeTool) {
-        const result = tool.route
-          ? await host.request.executeTool(tool.name, args, executionId, route)
-          : await host.request.executeTool(tool.name, args, executionId);
+        const result = await host.request.executeTool(tool.name, args, executionId);
         if (isAgentToolExecutionResult(result)) return result;
         return {
           content: [{ type: "text", text: summarizeToolResult(result) }],
