@@ -455,7 +455,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           connectedProviders: connectedPlugins.map((row) => row.provider),
         };
 
-        const runStarted = deps.events.append({
+        await deps.events.append({
           workspaceId: run.workspaceId,
           threadId: thread.id,
           botId: bot.id,
@@ -489,9 +489,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           })),
         );
         const supermemoryEnabled = isSupermemoryEnabled(process.env.SUPERMEMORY_API_KEY);
-        // These prepare the first model request but do not depend on one
-        // another. Launch them together to avoid a startup waterfall; the
-        // required run-start event is still awaited before runtime execution.
+        // The durable lifecycle event is a boundary: do not provision a
+        // computer or call a connector until it is persisted. After it is
+        // durable, these startup operations are independent and can overlap.
         const currentTurnImages = loadCurrentTurnImages(deps, turnBlocks, context);
         const memoryContext = loadAgentMemoryContext(deps.memory, bot.id, context);
         const recalled =
@@ -512,10 +512,44 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const storedComputer = bot.computer;
         const computerMode = parseComputerMode(storedComputer.scope);
         const provisionedComputer = provisionComputer(deps, storedComputer.id, context, "bot");
+        const [discoveryResult, imagesResult, memoryResult, recallResult, keyResult, computerResult] =
+          await Promise.allSettled([
+            Promise.resolve(discoveredTools),
+            currentTurnImages,
+            memoryContext,
+            Promise.resolve(recalled),
+            resolvedKey,
+            provisionedComputer,
+          ]);
+        // If another startup task failed after a computer was provisioned,
+        // establish its cleanup ownership before propagating the failure. The
+        // enclosing finally will release the screen/lease; allSettled ensures
+        // no sibling rejection goes unobserved.
+        if (computerResult.status === "fulfilled") {
+          screenRelease = { computer: computerResult.value, context };
+          scheduleComputerSleep(deps.jobs, storedComputer.id);
+        }
+        const startupFailure = [
+          discoveryResult,
+          imagesResult,
+          memoryResult,
+          recallResult,
+          keyResult,
+          computerResult,
+        ].find((result) => result.status === "rejected");
+        if (startupFailure?.status === "rejected") throw startupFailure.reason;
+
+        const discovered = settledValue(discoveryResult);
+        const images = settledValue(imagesResult);
+        const loadedMemory = settledValue(memoryResult);
+        const recalledResult = settledValue(recallResult);
+        const resolved = settledValue(keyResult);
+        const computer = settledValue(computerResult);
+
         let recalledMemory = "";
         let recallSucceeded = false;
-        if (recalled) {
-          const result = await recalled;
+        if (recalledResult) {
+          const result = recalledResult;
           if (result.ok && result.results.length > 0) {
             recallSucceeded = true;
             recalledMemory = formatRecalledMemory(result.results);
@@ -532,17 +566,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }),
           );
         }
-        const [discovered, images, loadedMemory, resolved, computer] = await Promise.all([
-          Promise.resolve(discoveredTools),
-          currentTurnImages,
-          memoryContext,
-          resolvedKey,
-          provisionedComputer,
-        ]);
-        await runStarted;
         runSecrets.push(...resolved.redact);
-        screenRelease = { computer, context };
-        scheduleComputerSleep(deps.jobs, storedComputer.id);
         const currentTurnFiles = deps.artifacts
           ? await materializeCurrentTurnFiles(
               { prisma: deps.prisma, artifacts: deps.artifacts, sandbox: deps.sandbox },
@@ -1997,6 +2021,11 @@ async function withModelCredentialLock<T>(key: string, fn: () => Promise<T>): Pr
     release();
     if (modelCredentialLocks.get(key) === current) modelCredentialLocks.delete(key);
   }
+}
+
+function settledValue<T>(result: PromiseSettledResult<T>): T {
+  if (result.status === "rejected") throw result.reason;
+  return result.value;
 }
 
 async function loadCurrentTurnImages(
