@@ -102,7 +102,15 @@ describe("render_plot", () => {
       ),
     ).toThrow(/Unsupported transform "eval"/);
     expect(supportedPlotNames().marks).toContain("dot");
+    expect(supportedPlotNames().marks).not.toContain("image");
     expect(supportedPlotNames().transforms).toContain("binX");
+    expect(() =>
+      renderPlotSpecToSvg(
+        { marks: [{ type: "image", options: { src: "https://example.test/pixel.png" } }] },
+        [{ x: 1, y: 1 }],
+        dom(),
+      ),
+    ).toThrow(/Unsupported mark type "image"/);
   });
 
   it("rejects empty data and channel names that match no column", () => {

@@ -71,7 +71,6 @@ const DATA_MARKS = {
   dotX: Plot.dotX,
   dotY: Plot.dotY,
   hull: Plot.hull,
-  image: Plot.image,
   line: Plot.line,
   lineX: Plot.lineX,
   lineY: Plot.lineY,
