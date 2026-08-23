@@ -10,7 +10,7 @@ const RAW = {
   messageId: "abc123",
   threadId: "t1",
   messageTimestamp: "2026-08-20T10:00:00Z",
-  sender: "Alice <alice@acme.com>",
+  sender: "Alice <alice@example.com>",
   to: "me@example.com",
   subject: "Invoice  #42\n  overdue",
   preview: { body: "Please pay the   attached invoice soon." },
@@ -43,7 +43,7 @@ describe("email dump search", () => {
     const record = toMailDumpRecord(RAW);
     expect(record).toMatchObject({ id: "abc123", subject: "Invoice #42 overdue" });
     const line = mailDumpLine(record!);
-    expect(line).toContain("Alice <alice@acme.com>");
+    expect(line).toContain("Alice <alice@example.com>");
     expect(line).toContain("Please pay the attached invoice soon.");
     expect(line).toContain("id=abc123");
     expect(line).not.toContain("\n");
@@ -58,11 +58,11 @@ describe("email dump search", () => {
     const result = await collectMailDump({
       connector: connector as never,
       context: CONTEXT,
-      queries: ["from:acme.com", "subject:invoice"],
+      queries: ["from:example.com", "subject:invoice"],
       maxMessages: 100,
     });
     expect(result.records.map((r) => r.id).sort()).toEqual(["abc123", "def456", "ghi789"]);
-    expect(result.summaries[0]).toMatchObject({ query: "from:acme.com", found: 3, pages: 2 });
+    expect(result.summaries[0]).toMatchObject({ query: "from:example.com", found: 3, pages: 2 });
     expect(result.summaries[1]).toMatchObject({ found: 1 });
     expect(result.cappedTotal).toBe(false);
   });
@@ -98,11 +98,11 @@ describe("email dump search", () => {
     const contents = buildMailDumpFile({
       intent: "acme invoices",
       records: [older, toMailDumpRecord(RAW)!],
-      summaries: [{ query: "from:acme.com", found: 2, pages: 1, capped: false }],
+      summaries: [{ query: "from:example.com", found: 2, pages: 1, capped: false }],
       cappedTotal: false,
     });
     expect(contents).toContain("# Email dump — acme invoices");
-    expect(contents).toContain("query `from:acme.com`: 2 messages");
+    expect(contents).toContain("query `from:example.com`: 2 messages");
     expect(contents).toContain("Collection completed within limits.");
     expect(contents.indexOf("id=abc123")).toBeLessThan(contents.indexOf("id=old"));
   });
