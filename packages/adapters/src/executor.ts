@@ -144,6 +144,15 @@ const GRAPHICAL_AGENT_TOOLS = new Set([
   "open_path",
   "launch_app",
 ]);
+const GOOGLE_AGENT_TOOLS = new Set([
+  "gmail_search",
+  "gmail_get",
+  "drive_search",
+  "drive_read",
+  "calendar_events",
+  "meet_transcripts",
+  "meet_transcript_get",
+]);
 
 export interface ExecutorDeps {
   prisma: PrismaClient;
@@ -577,9 +586,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const attachedFilesPrompt = currentTurnFilesInstruction(currentTurnFiles);
         const graphical =
           computer.kind !== "desktop" && deps.sandbox.describe().capabilities.graphical;
-        const builtins = graphical
+        const hasGoogleConnection = connectedPlugins.some((plugin) =>
+          /(^gmail$|google)/i.test(plugin.provider),
+        );
+        const graphicalBuiltins = graphical
           ? builtinAgentTools
           : builtinAgentTools.filter((tool) => !GRAPHICAL_AGENT_TOOLS.has(tool.name));
+        // Unconnected Google tools only return an unavailable error. Omitting
+        // them until their backing connection exists shortens every model
+        // request without hiding any executable capability.
+        const builtins = hasGoogleConnection
+          ? graphicalBuiltins
+          : graphicalBuiltins.filter((tool) => !GOOGLE_AGENT_TOOLS.has(tool.name));
         const tools = [
           ...builtins,
           ...discovered.filter(
@@ -1361,7 +1379,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 taughtSkillsLine,
                 'For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {"help": true} before your first chart to read the full guide.',
                 "For email questions about 'all', 'everything', 'did I handle', 'status of', or anything where missing one email would be wrong: do NOT answer from a few search hits. Use email_dump_search with several WIDE queries; it writes every match to a file in your home, then grep that file and answer from what the grep shows, reporting the coverage honestly.",
-                "Built-in Google tools (need Google connected from Plugins): gmail_search and gmail_get for email lookups, drive_search and drive_read for Drive files and Docs, calendar_events for the user's calendar, and meet_transcripts plus meet_transcript_get for Google Meet transcripts.",
+                hasGoogleConnection
+                  ? "Built-in Google tools: gmail_search and gmail_get for email lookups, drive_search and drive_read for Drive files and Docs, calendar_events for the user's calendar, and meet_transcripts plus meet_transcript_get for Google Meet transcripts."
+                  : undefined,
                 "When the user asks you to add or connect an MCP server (and gives you its details), use add_mcp_server. If it uses browser sign-in, an approval card appears in the chat — tell the user to click Authorize on it.",
                 "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
               ]
