@@ -3788,9 +3788,10 @@ function ChartCanvas({
   useEffect(() => {
     let cancelled = false;
     // Plot loads lazily so threads without charts never pay for the library.
-    void import("@rakazo/core/plot").then(({ buildPlotParts }) => {
-      if (cancelled || !ref.current) return;
+    void (async () => {
       try {
+        const { buildPlotParts } = await import("@rakazo/core/plot");
+        if (cancelled || !ref.current) return;
         // Hover inspection by default: give the first mark a tooltip unless
         // the spec already asks for one somewhere.
         const marks = Array.isArray((spec as { marks?: unknown[] }).marks)
@@ -3810,9 +3811,11 @@ function ChartCanvas({
         setError(null);
         ref.current.replaceChildren(parts.plotted);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not render chart");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not render chart");
+        }
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };

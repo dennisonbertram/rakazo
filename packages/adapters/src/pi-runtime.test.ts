@@ -29,6 +29,7 @@ describe("describeToolActivity", () => {
     expect(line.length).toBeLessThanOrEqual("Running: ".length + 91);
     expect(line).toContain("…");
     expect(line).not.toContain("\n");
+    expect(line).toMatch(/^Running: a x/);
   });
 
   it("falls back to the tool name", () => {

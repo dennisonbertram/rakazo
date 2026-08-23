@@ -80,6 +80,8 @@ export class PiAgentRuntime implements AgentRuntime {
           apiKey,
           nestedAgents,
           subagentGate: createGate(MAX_PARALLEL_SUBAGENTS),
+          toolCallBudget: { count: 0, exceeded: false },
+          abortTurn: () => undefined,
           signal,
           depth: 0,
         };
@@ -103,32 +105,22 @@ export class PiAgentRuntime implements AgentRuntime {
           },
         });
 
-        if (signal.aborted) {
-          queue.push({ type: "done", text: "stopped" });
-          return;
-        }
         const onAbort = () => {
           agent.abort();
           for (const nested of nestedAgents) nested.abort();
         };
+        host.abortTurn = onAbort;
+        if (signal.aborted) {
+          queue.push({ type: "done", text: "stopped" });
+          return;
+        }
         signal.addEventListener("abort", onAbort);
 
         let streamed = "";
         let toolActivityShowing = false;
-        let toolCallCount = 0;
         agent.subscribe((event) => {
           if (event.type === "tool_execution_start") {
-            // Backstop for runaway retry loops: a confused model can otherwise
-            // hammer a failing tool indefinitely, billing every iteration.
-            toolCallCount += 1;
-            if (toolCallCount > MAX_TOOL_CALLS_PER_TURN) {
-              queue.push({
-                type: "progress",
-                text: `Stopped: more than ${MAX_TOOL_CALLS_PER_TURN} tool calls in one turn.`,
-              });
-              agent.abort();
-              return;
-            }
+            if (!consumeToolCall(host)) return;
             // Live activity feedback: without this the thread shows a bare
             // "working…" for the whole tool call with nothing actionable.
             toolActivityShowing = true;
@@ -491,6 +483,7 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
   let lastPush = 0;
   nested.subscribe((event) => {
     if (event.type === "tool_execution_start") {
+      if (!consumeToolCall(host)) return;
       const toolName = "toolName" in event && event.toolName ? String(event.toolName) : "a tool";
       host.queue.push({
         type: "subagent",
@@ -758,8 +751,24 @@ interface ToolHost {
   apiKey: string | undefined;
   nestedAgents: Set<Agent>;
   subagentGate: { acquire(): Promise<void>; release(): void };
+  toolCallBudget: { count: number; exceeded: boolean };
+  abortTurn(): void;
   signal: AbortSignal;
   depth: number;
+}
+
+function consumeToolCall(host: ToolHost): boolean {
+  host.toolCallBudget.count += 1;
+  if (host.toolCallBudget.count <= MAX_TOOL_CALLS_PER_TURN) return true;
+  if (!host.toolCallBudget.exceeded) {
+    host.toolCallBudget.exceeded = true;
+    host.queue.push({
+      type: "progress",
+      text: `Stopped: more than ${MAX_TOOL_CALLS_PER_TURN} tool calls in one turn.`,
+    });
+  }
+  host.abortTurn();
+  return false;
 }
 
 function createGate(max: number) {

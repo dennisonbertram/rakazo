@@ -188,13 +188,16 @@ function coerceNumericStrings(rows: unknown[]): unknown[] {
     if (!row || typeof row !== "object" || Array.isArray(row)) return row;
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(row)) {
-      out[key] =
-        typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))
-          ? Number(value)
-          : value;
+      out[key] = typeof value === "string" && isPlainNumber(value) ? Number(value) : value;
     }
     return out;
   });
+}
+
+function isPlainNumber(value: string): boolean {
+  const trimmed = value.trim();
+  const parsed = Number(trimmed);
+  return trimmed !== "" && Number.isFinite(parsed) && String(parsed) === trimmed;
 }
 
 function buildMark(

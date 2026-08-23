@@ -137,6 +137,20 @@ describe("render_plot", () => {
     expect(svg).toContain("Q3");
   });
 
+  it("preserves numeric-looking category labels", () => {
+    const svg = renderPlotSpecToSvg(
+      { marks: [{ type: "barY", options: { x: "code", y: "sales" } }] },
+      [
+        { code: "007", sales: "120" },
+        { code: "1e5", sales: "185" },
+      ],
+      dom(),
+    );
+
+    expect(svg).toContain("007");
+    expect(svg).toContain("1e5");
+  });
+
   it("parses data given as CSV text lines", () => {
     const svg = renderPlotSpecToSvg(
       { marks: [{ type: "barY", options: { x: "quarter", y: "sales" } }] },
