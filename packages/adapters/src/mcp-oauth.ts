@@ -14,6 +14,9 @@ type OAuthState = {
   discoveryState?: OAuthDiscoveryState;
   redirectUri?: string;
   codeVerifier?: string;
+  /** Session id of an authorization in flight; persisted so the callback can
+      complete even if the API restarted between begin and the redirect. */
+  pendingState?: string;
 };
 
 type OAuthMaterial = {
@@ -55,10 +58,22 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     if (options.redirectUri) {
       this.material.oauth = { ...(this.material.oauth ?? {}), redirectUri: options.redirectUri };
     }
+    // An interactive session carries its state so the persisted material lets
+    // a different process complete the callback after a restart.
+    if (options.state) {
+      this.material.oauth = { ...(this.material.oauth ?? {}), pendingState: options.state };
+    }
   }
 
   get redirectUrl(): string | undefined {
     return this.options.redirectUri ?? this.material.oauth?.redirectUri;
+  }
+
+  /** Drop the persisted in-flight session marker once authorization completes. */
+  async clearPendingState(): Promise<void> {
+    if (!this.material.oauth?.pendingState) return;
+    delete this.material.oauth.pendingState;
+    await this.persist();
   }
 
   get clientMetadata(): OAuthClientMetadata {
@@ -201,17 +216,42 @@ export class McpOAuthBroker {
   }
 
   async complete(input: { sessionId: string; code: string; state: string; workspaceId: string; userId: string }): Promise<void> {
-    const pending = this.pending.get(input.sessionId);
-    if (!pending || pending.workspaceId !== input.workspaceId || pending.userId !== input.userId || input.state !== input.sessionId) {
+    if (input.state !== input.sessionId) throw new Error("MCP OAuth session is invalid or expired");
+    let pending = this.pending.get(input.sessionId);
+    if (pending && (pending.workspaceId !== input.workspaceId || pending.userId !== input.userId)) {
       throw new Error("MCP OAuth session is invalid or expired");
     }
+    // The in-memory entry dies with the process; the provider persisted the
+    // PKCE verifier, client registration, and pendingState during begin, so a
+    // restarted API (or another replica) can rebuild it from the store.
+    pending ??= await this.recoverPending(input);
+    if (!pending) throw new Error("MCP OAuth session is invalid or expired");
     const endpoint = new URL(pending.endpoint);
     const transport = new StreamableHTTPClientTransport(endpoint, { authProvider: pending.provider, fetch: withEndpointOriginFallback(endpoint.origin) });
     await transport.finishAuth(input.code);
     if (!pending.provider.tokens()) throw new Error("MCP OAuth authorization failed");
+    await pending.provider.clearPendingState();
     // Bump the revision so cached runtime sessions rebuild with the fresh tokens.
     await this.prisma.mcpServer.update({ where: { id: pending.serverId }, data: { revision: { increment: 1 } } });
     this.pending.delete(input.sessionId);
+  }
+
+  private async recoverPending(input: { sessionId: string; workspaceId: string; userId: string }): Promise<Pending | undefined> {
+    const servers = await this.prisma.mcpServer.findMany({
+      where: { workspaceId: input.workspaceId, userId: input.userId, enabled: true, secretId: { not: null } },
+    });
+    for (const server of servers) {
+      if (!server.endpoint) continue;
+      const context = { workspaceId: input.workspaceId, userId: input.userId };
+      const loaded = await this.loadMaterial(server, context);
+      if (loaded.material.oauth?.pendingState !== input.sessionId) continue;
+      const provider = this.createProvider(server, context, loaded, {
+        redirectUri: loaded.material.oauth.redirectUri,
+        state: input.sessionId,
+      });
+      return { serverId: server.id, workspaceId: input.workspaceId, userId: input.userId, endpoint: server.endpoint, provider };
+    }
+    return undefined;
   }
 
   async disconnect(input: { serverId: string; workspaceId: string; userId: string }): Promise<void> {
