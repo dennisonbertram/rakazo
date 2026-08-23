@@ -324,6 +324,10 @@ export const appContract = {
       )
       .output(CapabilityInstallSchema),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    oauthBegin: oc.input(z.object({ id: Id })).output(z.object({ authorizationUrl: z.string() })),
+    oauthComplete: oc
+      .input(z.object({ code: z.string().min(1).max(2048), state: z.string().min(1).max(256) }))
+      .output(z.object({ ok: z.literal(true) })),
   },
   connections: {
     catalog: oc

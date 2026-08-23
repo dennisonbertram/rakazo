@@ -22,6 +22,20 @@ function markConnected(
   );
 }
 
+function isOAuthMcp(source: CapabilityInstall) {
+  if (source.kind !== "mcp") return false;
+  const auth = source.config.auth as { type?: string } | undefined;
+  return auth?.type === "oauth";
+}
+
+/** Opened synchronously inside the click gesture so popup blockers allow it;
+    the authorization URL is assigned once the server returns it. */
+function openAuthWindow(): Window | null {
+  const popup = window.open("", "_blank");
+  if (popup) popup.opener = null;
+  return popup;
+}
+
 export function PluginsOverlay({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<CatalogView>("all");
@@ -31,12 +45,13 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
   const [sourceName, setSourceName] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [credential, setCredential] = useState("");
-  const [authType, setAuthType] = useState<"none" | "bearer" | "header">("bearer");
+  const [authType, setAuthType] = useState<"none" | "bearer" | "header" | "oauth">("bearer");
   const [authName, setAuthName] = useState("x-api-key");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const connectionAttempt = useRef<AbortController | null>(null);
+  const oauthAttempt = useRef<AbortController | null>(null);
 
   async function refresh() {
     const [items, installs] = await Promise.all([
@@ -54,7 +69,10 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
         setError(err instanceof Error ? err.message : "Could not load integrations"),
       )
       .finally(() => setLoading(false));
-    return () => connectionAttempt.current?.abort();
+    return () => {
+      connectionAttempt.current?.abort();
+      oauthAttempt.current?.abort();
+    };
   }, []);
 
   const visible = useMemo(() => {
@@ -152,8 +170,58 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
     setAuthName("x-api-key");
   }
 
+  async function beginOAuth(id: string, name: string, authWindow: Window | null) {
+    oauthAttempt.current?.abort();
+    const controller = new AbortController();
+    oauthAttempt.current = controller;
+    setError(null);
+    setPending(`oauth:${id}`);
+    try {
+      const { authorizationUrl } = await rpc.capabilities.oauthBegin({ id });
+      if (authWindow && !authWindow.closed) {
+        authWindow.location.href = authorizationUrl;
+      } else {
+        // A blank same-flavor open reports blocking reliably; `noopener` makes
+        // window.open return null even for a window that did open.
+        const fallback = openAuthWindow();
+        if (!fallback) {
+          setError(
+            `Your browser blocked the authorization window for ${name}. Allow pop-ups and try again.`,
+          );
+          return;
+        }
+        fallback.location.href = authorizationUrl;
+      }
+      for (let i = 0; i < 45; i += 1) {
+        if (controller.signal.aborted) return;
+        const installs = await rpc.capabilities.list().catch(() => undefined);
+        const row = installs?.find((entry) => entry.id === id);
+        if (row?.oauthStatus === "connected") {
+          if (controller.signal.aborted) return;
+          await refresh();
+          return;
+        }
+        await abortableDelay(2_000, controller.signal);
+      }
+      if (controller.signal.aborted) return;
+      setError(`Authorization for ${name} is still pending. You can close this and check again.`);
+    } catch (err) {
+      if (authWindow && !authWindow.closed) authWindow.close();
+      if (controller.signal.aborted) return;
+      setError(err instanceof Error ? err.message : "Could not authorize connector");
+    } finally {
+      if (oauthAttempt.current === controller) {
+        oauthAttempt.current = null;
+        setPending(null);
+      }
+    }
+  }
+
   async function installSource() {
     if (!sourceKind) return;
+    const kind = sourceKind;
+    const oauth = kind === "mcp" && authType === "oauth";
+    const authWindow = oauth ? openAuthWindow() : null;
     setError(null);
     setPending("install-source");
     try {
@@ -161,22 +229,26 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
         type: authType,
         ...(authType === "header" ? { name: authName.trim() } : {}),
       };
-      await rpc.capabilities.install({
-        kind: sourceKind === "api" ? "api" : "mcp",
-        name: sourceName.trim() || (sourceKind === "treg" ? "Treg" : "Custom connector"),
+      const install = await rpc.capabilities.install({
+        kind: kind === "api" ? "api" : "mcp",
+        name: sourceName.trim() || (kind === "treg" ? "Treg" : "Custom connector"),
         source: sourceUrl.trim(),
-        credential: credential.trim() || undefined,
+        credential: oauth ? undefined : credential.trim() || undefined,
         config:
-          sourceKind === "treg"
+          kind === "treg"
             ? { preset: "treg", auth: { type: "bearer" } }
-            : sourceKind === "api"
+            : kind === "api"
               ? { openApi: true, auth }
               : { preset: "custom", auth },
       });
       setCredential("");
       setSourceKind(null);
       await refresh();
+      if (oauth) {
+        await beginOAuth(install.id, install.name, authWindow);
+      }
     } catch (err) {
+      if (authWindow && !authWindow.closed) authWindow.close();
       setError(err instanceof Error ? err.message : "Could not install connector");
     } finally {
       setPending(null);
@@ -308,6 +380,7 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
                       <option value="none">No authentication</option>
                       <option value="bearer">Bearer token</option>
                       <option value="header">API key header</option>
+                      {sourceKind === "mcp" ? <option value="oauth">OAuth</option> : null}
                     </select>
                   ) : null}
                   {authType === "header" && sourceKind !== "treg" ? (
@@ -318,7 +391,7 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
                       className="w-full rounded-xl border border-[#2C2C30] bg-[#171719] px-3 py-2.5 text-sm text-[#ECECEE] outline-none"
                     />
                   ) : null}
-                  {sourceKind === "treg" || authType !== "none" ? (
+                  {sourceKind === "treg" || (authType !== "none" && authType !== "oauth") ? (
                     <input
                       type="password"
                       autoComplete="new-password"
@@ -357,29 +430,57 @@ export function PluginsOverlay({ onClose }: { onClose: () => void }) {
               {sources.length === 0 && !sourceKind ? (
                 <p className="text-[#6C6C70]">No MCP or API tool sources installed yet.</p>
               ) : null}
-              {sources.map((source) => (
-                <div key={source.id} className="flex items-center gap-4 rounded-[13px] px-3 py-2.5">
-                  <div className="grid h-[42px] w-[42px] place-items-center rounded-xl bg-[#2C2C30] font-semibold uppercase text-[#ECECEE]">
-                    {source.kind === "mcp" ? "M" : "A"}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[15.5px] font-medium text-[#ECECEE]">{source.name}</div>
-                    <div className="truncate text-[13.5px] text-[#7A7A80]">
-                      {source.kind.toUpperCase()} · {source.source} ·{" "}
-                      {source.secretConfigured ? "credential saved" : "no auth"}
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="pill"
-                    size="sm"
-                    disabled={pending === source.id}
-                    onClick={() => void removeSource(source)}
+              {sources.map((source) => {
+                const oauthMcp = isOAuthMcp(source);
+                const oauthStatus = source.oauthStatus ?? "none";
+                return (
+                  <div
+                    key={source.id}
+                    className="flex items-center gap-4 rounded-[13px] px-3 py-2.5"
                   >
-                    {pending === source.id ? "Removing…" : "Remove"}
-                  </Button>
-                </div>
-              ))}
+                    <div className="grid h-[42px] w-[42px] place-items-center rounded-xl bg-[#2C2C30] font-semibold uppercase text-[#ECECEE]">
+                      {source.kind === "mcp" ? "M" : "A"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[15.5px] font-medium text-[#ECECEE]">{source.name}</div>
+                      <div className="truncate text-[13.5px] text-[#7A7A80]">
+                        {source.kind.toUpperCase()} · {source.source} ·{" "}
+                        {oauthMcp
+                          ? oauthStatus === "connected"
+                            ? "Connected"
+                            : "Authorize needed"
+                          : source.secretConfigured
+                            ? "credential saved"
+                            : "no auth"}
+                      </div>
+                    </div>
+                    {oauthMcp ? (
+                      <Button
+                        type="button"
+                        variant="pill"
+                        size="sm"
+                        disabled={pending === `oauth:${source.id}`}
+                        onClick={() => void beginOAuth(source.id, source.name, openAuthWindow())}
+                      >
+                        {pending === `oauth:${source.id}`
+                          ? "Authorizing…"
+                          : oauthStatus === "reconnect"
+                            ? "Reconnect"
+                            : "Authorize"}
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="pill"
+                      size="sm"
+                      disabled={pending === source.id}
+                      onClick={() => void removeSource(source)}
+                    >
+                      {pending === source.id ? "Removing…" : "Remove"}
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <>

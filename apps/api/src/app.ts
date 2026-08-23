@@ -26,6 +26,7 @@ import {
   isPipedreamEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  McpOAuthBroker,
   PiAgentRuntime,
   PiOAuthLogins,
   PipedreamConnector,
@@ -120,7 +121,8 @@ export async function createApp(
   const pipedream =
     pipedreamOverride ??
     (isPipedreamEnabled(pipedreamConfig) ? new PipedreamConnector(pipedreamConfig) : undefined);
-  const installed = new InstalledConnectorProvider(prisma, secrets, remoteConnectors);
+  const mcpOAuth = new McpOAuthBroker(prisma, secrets, remoteConnectors);
+  const installed = new InstalledConnectorProvider(prisma, secrets, remoteConnectors, mcpOAuth);
   const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride, [
     installed,
     ...(pipedream ? [pipedream] : []),
@@ -223,6 +225,7 @@ export async function createApp(
     oauthLogins,
     connectors: stack.connector,
     remoteConnectors,
+    mcpOAuth,
     artifacts,
     dataDir: env.dataDir,
     env: {

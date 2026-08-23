@@ -20,6 +20,7 @@ import {
   isPipedreamEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  McpOAuthBroker,
   PiAgentRuntime,
   PipedreamConnector,
   PostgresRealtimeFanout,
@@ -66,7 +67,7 @@ async function main() {
     ? new PipedreamConnector(pipedreamConfig)
     : undefined;
   const stack = createConnectorStack(isComposioEnabled(process.env.COMPOSIO_API_KEY), undefined, [
-    new InstalledConnectorProvider(prisma, secrets),
+    new InstalledConnectorProvider(prisma, secrets, {}, new McpOAuthBroker(prisma, secrets)),
     ...(pipedream ? [pipedream] : []),
   ]);
   const connector = stack.destination;

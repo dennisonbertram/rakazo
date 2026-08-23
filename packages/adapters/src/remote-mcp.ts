@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP, type LookupFunction } from "node:net";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ConnectorTool } from "@rakazo/adapter-kit";
@@ -23,6 +24,8 @@ export interface RemoteMcpOptions extends RemoteTransportDependencies {
   endpoint: string;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** Let the official SDK own OAuth token attach, refresh, and 401 retry. */
+  authProvider?: OAuthClientProvider;
 }
 
 export interface SafeRemoteFetch {
@@ -97,6 +100,7 @@ async function withRemoteMcpClient<T>(
       signal,
     },
     fetch: safeFetch,
+    authProvider: options.authProvider,
   });
   const client = new Client({ name: "rakazo", version: "0.1.0" }, { capabilities: {} });
   try {

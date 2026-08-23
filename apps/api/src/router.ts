@@ -29,6 +29,7 @@ import {
   expireComputerControl,
   hasActiveComputerControl,
   listPiCatalog,
+  McpOAuthBroker,
   type MemoryProviderResolver,
   type PiOAuthLogins,
   planLiveConnectionSync,
@@ -193,6 +194,7 @@ export interface RouterDeps {
   oauthLogins: PiOAuthLogins;
   connectors: ConnectorRegistry;
   remoteConnectors?: RemoteConnectorDependencies;
+  mcpOAuth?: McpOAuthBroker;
   artifacts: ArtifactStore;
   dataDir: string;
   env: {
@@ -205,8 +207,16 @@ export interface RouterDeps {
   };
 }
 
+function isOAuthMcpInstall(row: { kind: string; config: unknown }): boolean {
+  if (row.kind !== "mcp") return false;
+  const auth = (row.config as { auth?: { type?: string } } | null)?.auth;
+  return auth?.type === "oauth";
+}
+
 export function createRouter(deps: RouterDeps) {
   const os = implement(appContract).$context<{ actor: Actor | null; signal?: AbortSignal }>();
+  const mcpOAuth =
+    deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets, deps.remoteConnectors);
   const repos = createRepos(deps.prisma);
   const groupRepos = createGroupRepos(deps.prisma);
   const taughtSkills = createTaughtSkillsService({
@@ -1502,20 +1512,22 @@ export function createRouter(deps: RouterDeps) {
     },
     capabilities: {
       list: authed.capabilities.list.handler(async ({ context }) => {
-        const rows = await deps.prisma.capabilityInstall.findMany({
-          where: { workspaceId: context.actor.workspaceId, userId: context.actor.userId },
-        });
-        return rows.map((row) => ({
-          id: row.id,
-          kind: row.kind as "skill" | "plugin" | "mcp" | "api" | "connection",
-          name: row.name,
-          source: row.source,
-          version: row.version,
-          digest: row.digest,
-          secretConfigured: Boolean(row.secretId),
-          config: row.config as Record<string, unknown>,
-          createdAt: row.createdAt.toISOString(),
-        }));
+        const actor = { workspaceId: context.actor.workspaceId, userId: context.actor.userId };
+        const rows = await deps.prisma.capabilityInstall.findMany({ where: actor });
+        return Promise.all(
+          rows.map(async (row) => ({
+            id: row.id,
+            kind: row.kind as "skill" | "plugin" | "mcp" | "api" | "connection",
+            name: row.name,
+            source: row.source,
+            version: row.version,
+            digest: row.digest,
+            secretConfigured: Boolean(row.secretId),
+            config: row.config as Record<string, unknown>,
+            oauthStatus: isOAuthMcpInstall(row) ? await mcpOAuth.statusFor(row, actor) : undefined,
+            createdAt: row.createdAt.toISOString(),
+          })),
+        );
       }),
       install: authed.capabilities.install.handler(async ({ context, input }) => {
         let source = input.source.trim();
@@ -1619,6 +1631,41 @@ export function createRouter(deps: RouterDeps) {
           config: row.config as Record<string, unknown>,
           createdAt: row.createdAt.toISOString(),
         };
+      }),
+      oauthBegin: authed.capabilities.oauthBegin.handler(async ({ context, input }) => {
+        // The redirect target is server-controlled: clients cannot steer the
+        // OAuth redirect (or the DCR registration) to another origin. A base
+        // path in the configured web origin is preserved.
+        const redirect = new URL(deps.env.webOrigin);
+        redirect.pathname = `${redirect.pathname.replace(/\/$/, "")}/mcp/oauth/callback`;
+        redirect.search = "";
+        redirect.hash = "";
+        const redirectUri = redirect.toString();
+        try {
+          return await mcpOAuth.begin({
+            installId: input.id,
+            workspaceId: context.actor.workspaceId,
+            userId: context.actor.userId,
+            redirectUri,
+            signal: context.signal,
+          });
+        } catch (error) {
+          throw new ORPCError("BAD_REQUEST", { message: sanitizeComposioError(error) });
+        }
+      }),
+      oauthComplete: authed.capabilities.oauthComplete.handler(async ({ context, input }) => {
+        try {
+          await mcpOAuth.complete({
+            code: input.code,
+            state: input.state,
+            workspaceId: context.actor.workspaceId,
+            userId: context.actor.userId,
+            signal: context.signal,
+          });
+        } catch (error) {
+          throw new ORPCError("BAD_REQUEST", { message: sanitizeComposioError(error) });
+        }
+        return { ok: true as const };
       }),
       remove: authed.capabilities.remove.handler(async ({ context, input }) => {
         await deps.prisma.$transaction(async (tx) => {

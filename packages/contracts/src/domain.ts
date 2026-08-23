@@ -239,6 +239,8 @@ export const CapabilityInstallSchema = z.object({
   digest: z.string().nullable(),
   secretConfigured: z.boolean(),
   config: z.record(z.string(), z.unknown()),
+  /** Present only for MCP installs whose auth type is "oauth". */
+  oauthStatus: z.enum(["none", "pending", "connected", "reconnect"]).optional(),
   createdAt: z.string(),
 });
 export type CapabilityInstall = z.infer<typeof CapabilityInstallSchema>;
