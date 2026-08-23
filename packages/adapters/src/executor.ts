@@ -82,6 +82,12 @@ import {
   needsOAuthProbe,
   parseMcpServerToolArgs,
 } from "./mcp-server-tool.js";
+import {
+  buildMailDumpFile,
+  collectMailDump,
+  MAIL_DUMP_DEFAULT_MAX,
+  MAIL_DUMP_HARD_MAX,
+} from "./mail-dump.js";
 import { loadAgentMemoryContext } from "./memory-context.js";
 import { toOAuthCredential } from "./pi-credentials.js";
 import {
@@ -629,6 +635,54 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
             return finish({ ok: true, path: filePath });
           }
+          if (name === "email_dump_search") {
+            if (!deps.connector) return finish({ error: "connectors unavailable" });
+            if (!context.connectedProviders?.includes("gmail")) {
+              return finish({
+                error: "Gmail is not connected. Ask the user to connect Gmail from Plugins first.",
+              });
+            }
+            const queries = Array.isArray(args.queries) ? args.queries.map(String) : [];
+            if (queries.length === 0) return finish({ error: "Pass 1-10 wide Gmail queries." });
+            const intent = String(args.intent ?? "email search");
+            const maxMessages = Math.min(
+              MAIL_DUMP_HARD_MAX,
+              Math.max(1, Number(args.max_messages) || MAIL_DUMP_DEFAULT_MAX),
+            );
+            try {
+              const collected = await collectMailDump({
+                connector: deps.connector,
+                context,
+                queries,
+                maxMessages,
+              });
+              const contents = buildMailDumpFile({ intent, ...collected });
+              const outPath =
+                typeof args.path === "string" && args.path
+                  ? args.path
+                  : `mail/dump-${Date.now()}.md`;
+              await deps.sandbox.writeFile(
+                computer,
+                {
+                  path: resolveBotWorkspacePath(computerMode, bot.id, outPath),
+                  content: new TextEncoder().encode(contents),
+                },
+                context,
+              );
+              return finish({
+                ok: true,
+                path: outPath,
+                messages: collected.records.length,
+                coverage: collected.summaries,
+                capped: collected.cappedTotal,
+                next: `Now grep ${outPath} (shell: grep -i "<term>" ${outPath}) before answering; the dump is not in this conversation.`,
+              });
+            } catch (error) {
+              return finish({
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          }
           if (name === "render_plot") {
             if (args.charts !== undefined) {
               const query = typeof args.charts === "string" ? args.charts : undefined;
@@ -1101,6 +1155,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 pluginLine,
                 taughtSkillsLine,
                 'For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {"help": true} before your first chart to read the full guide.',
+                "For email questions about 'all', 'everything', 'did I handle', 'status of', or anything where missing one email would be wrong: do NOT answer from a few search hits. Use email_dump_search with several WIDE queries; it writes every match to a file in your home, then grep that file and answer from what the grep shows, reporting the coverage honestly.",
                 "When the user asks you to add or connect an MCP server (and gives you its details), use add_mcp_server. If it uses browser sign-in, an approval card appears in the chat — tell the user to click Authorize on it.",
                 "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
               ]

@@ -139,6 +139,25 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "email_dump_search",
+    description:
+      "High-recall email search. Runs several WIDE Gmail queries, downloads every matching message's metadata into a grep-friendly file in your home (the results do NOT enter this conversation), and returns the file path plus per-query coverage. Then grep/read the file to answer. Use this whenever the user asks about 'all', 'everything', 'did I handle', 'status of', or any question where stopping at the first few search hits could miss the email that matters. Requires the Gmail plugin to be connected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        intent: { type: "string", description: "One line describing what you are looking for; written into the dump header." },
+        queries: {
+          type: "array",
+          items: { type: "string" },
+          description: "1-10 broad Gmail queries, cast WIDE (e.g. ['from:acme.com', 'subject:invoice', 'acme invoice']). Broader beats narrower; the grep step narrows.",
+        },
+        max_messages: { type: "integer", description: "Total message cap across all queries. Default 500, hard max 2000." },
+        path: { type: "string", description: "Output file path in your home. Default mail/dump-<time>.md." },
+      },
+      required: ["intent", "queries"],
+    },
+  },
+  {
     name: "render_plot",
     description:
       'Render a chart from tabular data as a PNG and attach it to the chat. Backed by Observable Plot: bar, line, area, scatter, histogram, heatmap, box plot, facets, and more via a declarative JSON spec. Call with {"charts": true} FIRST to list every chart type with a complete runnable example spec ({"charts": "<keyword>"} searches), then copy the closest example and substitute your rows and columns. {"help": true} returns the full guide. Pass rows inline as data, or data_path for a .csv/.tsv/.json file in your home.',
