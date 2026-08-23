@@ -68,7 +68,11 @@ import {
   resolveBotWorkspacePath,
   teamBotWorkspaceDirectory,
 } from "./computer-support.js";
-import { observationToolResult, parseComputerActions } from "./computer-tools.js";
+import {
+  DEFAULT_COMPUTER_ACTION_SETTLE_MS,
+  observationToolResult,
+  parseComputerActions,
+} from "./computer-tools.js";
 import { checkpointAndRecordComputerWorkspace } from "./computer-workspace.js";
 import {
   COMPACTION_BATCH_SIZE,
@@ -544,7 +548,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ),
         ];
         const computerInstruction = graphical
-          ? "You have a persistent computer. Use computer_observe and computer_act for its visible desktop, including browsers and installed applications. Use open_path and launch_app to open graphical files, URLs, and applications. Use the file tools and shell for precise filesystem and terminal work. On a Team Computer you have your own screen; other Team bots may run at the same time on theirs. Another user may interact with your screen while you run, so re-observe when it may have changed."
+          ? "You have a persistent computer. Use computer_observe and computer_act for its visible desktop, including browsers and installed applications. For a predictable action sequence, batch actions and set observe:false; observe before coordinate-based actions, after navigation, or whenever the outcome is uncertain. Use an explicit wait action or settle_ms only when an app genuinely needs more time. Use open_path and launch_app to open graphical files, URLs, and applications. Use the file tools and shell for precise filesystem and terminal work. On a Team Computer you have your own screen; other Team bots may run at the same time on theirs. Another user may interact with your screen while you run, so re-observe when it may have changed."
           : "You have a persistent sandbox filesystem and shell. This backend does not provide model-visible graphical control, so use the file tools and shell.";
         const workspaceInstruction =
           computerMode === "team"
@@ -609,7 +613,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 {
                   actions: parseComputerActions(args.actions),
                   observe: args.observe !== false,
-                  settleMs: Number(args.settle_ms ?? 350),
+                  settleMs: Number(args.settle_ms ?? DEFAULT_COMPUTER_ACTION_SETTLE_MS),
                 },
                 context,
               );

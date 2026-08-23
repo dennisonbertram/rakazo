@@ -11,6 +11,7 @@ import type {
   ConnectorTool,
 } from "@rakazo/adapter-kit";
 import { builtinAgentTools, DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
+import { DEFAULT_COMPUTER_ACTION_SETTLE_MS } from "./computer-tools.js";
 import { PiRuntimeCredentialStore, toOAuthCredential } from "./pi-credentials.js";
 import { registerLocalProvider } from "./pi-local-provider.js";
 
@@ -366,7 +367,7 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         return {
           actions: Array.isArray(raw.actions) ? raw.actions : [],
           observe: raw.observe === undefined ? true : Boolean(raw.observe),
-          settle_ms: Number(raw.settle_ms ?? 350),
+          settle_ms: Number(raw.settle_ms ?? DEFAULT_COMPUTER_ACTION_SETTLE_MS),
         };
       }
       if (tool.name === "list_files") return { path: String(raw.path ?? "") };

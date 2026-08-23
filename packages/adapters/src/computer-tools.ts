@@ -4,6 +4,13 @@ import type {
   ComputerObservation,
 } from "@rakazo/adapter-kit";
 
+// Desktop input has already completed when the supervisor receives the action
+// batch. A short settle lets the compositor paint ordinary clicks and typing
+// without adding a third of a second to every agent tool iteration. Agents can
+// still request a longer settle (or a precise wait action) for navigation and
+// slow applications.
+export const DEFAULT_COMPUTER_ACTION_SETTLE_MS = 75;
+
 export function parseComputerActions(value: unknown): ComputerAction[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error("computer_act requires at least one action");

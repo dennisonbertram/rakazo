@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { computerObservation } from "./computer-support.js";
-import { observationToolResult, parseComputerActions } from "./computer-tools.js";
+import {
+  DEFAULT_COMPUTER_ACTION_SETTLE_MS,
+  observationToolResult,
+  parseComputerActions,
+} from "./computer-tools.js";
 
 describe("computer tool bridge", () => {
+  it("uses a short default settle while allowing tools to request longer waits", () => {
+    expect(DEFAULT_COMPUTER_ACTION_SETTLE_MS).toBe(75);
+  });
+
   it("normalizes a bounded batch into provider-neutral actions", () => {
     expect(
       parseComputerActions([
