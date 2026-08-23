@@ -10,6 +10,7 @@ import Docker from "dockerode";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  COMPUTER_CONTROL_PORT,
   COMPUTER_IMAGE,
   containerCreateOptions,
   containerNameFor,
@@ -120,6 +121,7 @@ app.post("/computers", async (c) => {
         workspaceId: body.workspaceId,
         homePath,
         networkMode,
+        controlToken: randomUUID(),
       }),
     );
     await container.start();
@@ -196,13 +198,19 @@ app.post("/computers/:id/exec", async (c) => {
 
 app.post("/computers/:id/observe", async (c) => {
   try {
-    const { container, layout } = await managedScreen(
+    const { container, info, layout } = await managedScreen(
       c.req.param("id"),
       c.req.header("x-rakazo-bot-id"),
       c.req.header("x-rakazo-workspace-id"),
       c.req.header("x-rakazo-screen-id"),
       c.req.header("x-rakazo-screen-lease-id"),
     );
+    const control = computerControlEndpoint(info);
+    if (control) {
+      const result = await controlDesktop(control, [], layout.display, true, 0);
+      if (result.observation) return c.json(result.observation);
+      throw new Error("computer control returned no observation");
+    }
     return c.json(await observeContainer(container, layout.display));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -219,20 +227,42 @@ app.post("/computers/:id/actions", async (c) => {
     })
     .parse(await c.req.json());
   try {
-    const { container, layout } = await managedScreen(
+    const { container, info, layout } = await managedScreen(
       c.req.param("id"),
       c.req.header("x-rakazo-bot-id"),
       c.req.header("x-rakazo-workspace-id"),
       c.req.header("x-rakazo-screen-id"),
       c.req.header("x-rakazo-screen-lease-id"),
     );
-    if (body.actions.length) await applyContainerActions(container, body.actions, layout.display);
-    if (body.settleMs) await new Promise((resolve) => setTimeout(resolve, body.settleMs));
+    const control = computerControlEndpoint(info);
+    const controlResult = control
+      ? await controlDesktop(
+          control,
+          body.actions,
+          layout.display,
+          body.observe !== false,
+          body.settleMs ?? 0,
+        )
+      : undefined;
+    const observation =
+      controlResult?.observation ??
+      (body.observe === false
+        ? undefined
+        : body.actions.length
+          ? await actAndObserveContainer(
+              container,
+              body.actions,
+              layout.display,
+              body.settleMs ?? 0,
+            )
+          : await observeContainer(container, layout.display));
+    if (body.observe === false && !controlResult) {
+      if (body.actions.length) await applyContainerActions(container, body.actions, layout.display);
+      if (body.settleMs) await new Promise((resolve) => setTimeout(resolve, body.settleMs));
+    }
     return c.json({
-      completed: body.actions.length,
-      ...(body.observe === false
-        ? {}
-        : { observation: await observeContainer(container, layout.display) }),
+      completed: controlResult?.completed ?? body.actions.length,
+      ...(observation ? { observation } : {}),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -522,6 +552,7 @@ async function ensureComputerImage() {
           src: [
             "Dockerfile",
             "start.sh",
+            "control.py",
             "rakazo-browser",
             "embed.html",
             "fluxbox.init",
@@ -612,6 +643,47 @@ function hostHomePath(serviceHomePath: string, info: Docker.ContainerInspectInfo
   const dataMount = info?.Mounts.find((mount) => mount.Destination === dataDir);
   if (!dataMount?.Source) return serviceHomePath;
   return path.join(dataMount.Source, path.relative(dataDir, serviceHomePath));
+}
+
+function computerControlEndpoint(info: Docker.ContainerInspectInfo) {
+  const token = info.Config.Env?.find((value) =>
+    value.startsWith("RAKAZO_COMPUTER_CONTROL_TOKEN="),
+  )?.slice("RAKAZO_COMPUTER_CONTROL_TOKEN=".length);
+  const hostPort = info.NetworkSettings.Ports?.[`${COMPUTER_CONTROL_PORT}/tcp`]?.[0]?.HostPort;
+  if (!token || !hostPort) return undefined;
+  return { url: `http://127.0.0.1:${hostPort}/v1/desktop`, token };
+}
+
+async function controlDesktop(
+  endpoint: { url: string; token: string },
+  actions: Array<z.infer<typeof computerActionSchema>>,
+  display: string,
+  observe: boolean,
+  settleMs: number,
+) {
+  const response = await fetch(endpoint.url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${endpoint.token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      steps: actions.map((action) => containerActionStep(action, display)),
+      display,
+      observe,
+      settleMs,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const payload = (await response.json()) as {
+    completed?: unknown;
+    observation?: unknown;
+    error?: unknown;
+  };
+  if (!response.ok) throw new Error(String(payload.error ?? "computer control failed"));
+  if (typeof payload.completed !== "number")
+    throw new Error("computer control returned no completion count");
+  return {
+    completed: payload.completed,
+    ...(payload.observation ? { observation: payload.observation } : {}),
+  };
 }
 
 function loadRootEnv() {
@@ -763,7 +835,51 @@ async function applyContainerActions(
 }
 
 async function observeContainer(container: Docker.Container, display = ":1") {
-  const command = [
+  const result = await runContainerCommand(container, ["bash", "-lc", observationCommand(display)]);
+  if (result.code !== 0) throw new Error(result.stderr || "screen capture failed");
+  return parseObservation(result.stdout);
+}
+
+/**
+ * Input and capture used to be two Docker execs. Keeping both operations in
+ * one in-container process removes a complete daemon round-trip while the
+ * captured pixels and action ordering remain identical to the separate path.
+ */
+async function actAndObserveContainer(
+  container: Docker.Container,
+  actions: Array<z.infer<typeof computerActionSchema>>,
+  display: string,
+  settleMs: number,
+) {
+  const script = [
+    "import json, subprocess, sys, time",
+    "for step in json.loads(sys.argv[1]):",
+    "  if 'waitMs' in step: time.sleep(step['waitMs'] / 1000)",
+    "  else:",
+    "    result = subprocess.run(step['argv'])",
+    "    if result.returncode: sys.exit(result.returncode)",
+    "settle_ms = int(sys.argv[2])",
+    "if settle_ms: time.sleep(settle_ms / 1000)",
+    "result = subprocess.run(['bash', '-lc', sys.argv[3]], capture_output=True)",
+    "sys.stdout.buffer.write(result.stdout)",
+    "sys.stderr.buffer.write(result.stderr)",
+    "sys.exit(result.returncode)",
+  ].join("\n");
+  const result = await runContainerCommand(container, [
+    "python3",
+    "-c",
+    script,
+    JSON.stringify(actions.map((action) => containerActionStep(action, display))),
+    String(settleMs),
+    observationCommand(display),
+  ]);
+  if (result.code !== 0)
+    throw new Error(result.stderr || "computer action or screen capture failed");
+  return parseObservation(result.stdout);
+}
+
+function observationCommand(display: string) {
+  return [
     "set -e",
     `export DISPLAY=${display}`,
     'printf "GEOM %s\\n" "$(xdotool getdisplaygeometry 2>/dev/null || echo 1280 800)"',
@@ -775,9 +891,6 @@ async function observeContainer(container: Docker.Container, display = ":1") {
     "import -window root png:- 2>/dev/null | base64 -w0",
     'printf "\\n"',
   ].join("; ");
-  const result = await runContainerCommand(container, ["bash", "-lc", command]);
-  if (result.code !== 0) throw new Error(result.stderr || "screen capture failed");
-  return parseObservation(result.stdout);
 }
 
 async function writeContainerFile(

@@ -1,5 +1,6 @@
 export const COMPUTER_IMAGE = process.env.RAKAZO_COMPUTER_IMAGE ?? "rakazo/computer:local";
 export const TEAM_SCREEN_LIMIT = 8;
+export const COMPUTER_CONTROL_PORT = 7070;
 const SCREEN_HOST = process.env.SANDBOX_SCREEN_HOST ?? "127.0.0.1";
 
 export function screenPorts(index: number) {
@@ -28,6 +29,8 @@ export function computerPortBindings() {
     PortBindings[`${ports.viewPort}/tcp`] = [{ HostIp: "127.0.0.1", HostPort: "0" }];
     PortBindings[`${ports.controlPort}/tcp`] = [{ HostIp: "127.0.0.1", HostPort: "0" }];
   }
+  ExposedPorts[`${COMPUTER_CONTROL_PORT}/tcp`] = {};
+  PortBindings[`${COMPUTER_CONTROL_PORT}/tcp`] = [{ HostIp: "127.0.0.1", HostPort: "0" }];
   return { ExposedPorts, PortBindings };
 }
 
@@ -37,6 +40,7 @@ export interface ComputerCreateInput {
   botId: string;
   workspaceId: string;
   homePath: string;
+  controlToken?: string;
   networkMode?: string;
 }
 
@@ -65,6 +69,7 @@ export function containerCreateOptions(input: ComputerCreateInput) {
       "PATH=/home/rakazo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
       "NPM_CONFIG_PREFIX=/home/rakazo/.local",
       "PIP_USER=1",
+      ...(input.controlToken ? [`RAKAZO_COMPUTER_CONTROL_TOKEN=${input.controlToken}`] : []),
     ],
     Labels: {
       "rakazo.managed": "true",

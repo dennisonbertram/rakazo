@@ -29,7 +29,8 @@ describe("graphical computer spec", () => {
       "PATH=/home/rakazo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     );
     expect(options.Env).toContain("NPM_CONFIG_PREFIX=/home/rakazo/.local");
-    expect(options.ExposedPorts).toEqual({
+    expect(options.ExposedPorts).toMatchObject({
+      "7070/tcp": {},
       "6080/tcp": {},
       "6081/tcp": {},
       "6082/tcp": {},
@@ -47,6 +48,7 @@ describe("graphical computer spec", () => {
       "6094/tcp": {},
       "6095/tcp": {},
     });
+    expect(options.HostConfig.PortBindings["7070/tcp"]?.[0]?.HostIp).toBe("127.0.0.1");
     expect(options.HostConfig.PortBindings["6080/tcp"]?.[0]?.HostIp).toBe("127.0.0.1");
     expect(options.HostConfig.PortBindings["6081/tcp"]?.[0]?.HostIp).toBe("127.0.0.1");
     expect(options.HostConfig.PortBindings["6082/tcp"]?.[0]?.HostIp).toBe("127.0.0.1");
@@ -63,6 +65,8 @@ describe("graphical computer spec", () => {
     const start = readFileSync(path.join(root, "start.sh"), "utf8");
     const browser = readFileSync(path.join(root, "rakazo-browser"), "utf8");
     expect(dockerfile).toMatch(/chromium/);
+    expect(dockerfile).toMatch(/control.py/);
+    expect(start).toMatch(/rakazo-computer-control/);
     expect(start).toMatch(/rakazo-browser/);
     expect(start).toMatch(/x11vnc .* -viewonly /);
     expect(browser).toMatch(/\.browser-profiles\/chromium/);
