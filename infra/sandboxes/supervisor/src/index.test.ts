@@ -14,7 +14,9 @@ import {
   normalizeWorkspaceRelative,
   parseObservation,
   releaseAssignedScreen,
+  SCREEN_READINESS_TTL_MS,
   type ScreenAssignment,
+  ScreenReadinessCache,
   sandboxCommandTimedOut,
   sandboxTimeoutCommand,
   stopExtraScreenCommand,
@@ -196,6 +198,20 @@ describe("sandbox supervisor input containment", () => {
     for (let index = 0; index < 8; index += 1) {
       expect(nextScreenIndex(fresh, `bot-fresh-${index}`)).toBe(index);
     }
+  });
+
+  it("caches only recent readiness probes and invalidates them by screen or container", () => {
+    const cache = new ScreenReadinessCache();
+    cache.markReady("container-1", 0, 100);
+    cache.markReady("container-1", 1, 100);
+    cache.markReady("container-2", 0, 100);
+
+    expect(cache.isReady("container-1", 0, 100 + SCREEN_READINESS_TTL_MS - 1)).toBe(true);
+    expect(cache.isReady("container-1", 0, 100 + SCREEN_READINESS_TTL_MS)).toBe(false);
+    cache.invalidateScreen("container-1", 1);
+    expect(cache.isReady("container-1", 1, 101)).toBe(false);
+    cache.invalidateContainer("container-2");
+    expect(cache.isReady("container-2", 0, 101)).toBe(false);
   });
 
   it("does not release a screen reclaimed by a newer execution fence", () => {

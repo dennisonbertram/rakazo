@@ -2,13 +2,29 @@ import { describe, expect, it } from "vitest";
 import { computerObservation } from "./computer-support.js";
 import {
   DEFAULT_COMPUTER_ACTION_SETTLE_MS,
+  defaultComputerActionSettleMs,
   observationToolResult,
   parseComputerActions,
 } from "./computer-tools.js";
 
 describe("computer tool bridge", () => {
-  it("uses a short default settle while allowing tools to request longer waits", () => {
+  it("uses a short default settle for click-like actions", () => {
     expect(DEFAULT_COMPUTER_ACTION_SETTLE_MS).toBe(75);
+    expect(
+      defaultComputerActionSettleMs([
+        { kind: "pointer", x: 1, y: 1, type: "click", button: "left" },
+      ]),
+    ).toBe(75);
+  });
+
+  it("does not add a fixed wait to synchronous keyboard and typing batches", () => {
+    expect(
+      defaultComputerActionSettleMs([
+        { kind: "key", key: "a" },
+        { kind: "clipboard", text: "hello" },
+        { kind: "scroll", direction: "down" },
+      ]),
+    ).toBe(0);
   });
 
   it("normalizes a bounded batch into provider-neutral actions", () => {

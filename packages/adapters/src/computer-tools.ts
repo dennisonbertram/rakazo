@@ -11,6 +11,20 @@ import type {
 // slow applications.
 export const DEFAULT_COMPUTER_ACTION_SETTLE_MS = 75;
 
+/**
+ * Key, text, scroll, and pointer-move batches are synchronous at the input
+ * boundary. Do not add an artificial paint delay unless the model asks for
+ * one; by the next model turn they have had much longer than a compositor
+ * frame to settle. Click-like actions retain the conservative short default.
+ */
+export function defaultComputerActionSettleMs(actions: readonly ComputerAction[]): number {
+  return actions.some(
+    (action) => action.kind === "pointer" && (action.type === "click" || action.type === "up"),
+  )
+    ? DEFAULT_COMPUTER_ACTION_SETTLE_MS
+    : 0;
+}
+
 export function parseComputerActions(value: unknown): ComputerAction[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error("computer_act requires at least one action");

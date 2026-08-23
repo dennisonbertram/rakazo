@@ -31,6 +31,7 @@ import {
   parseObservation,
   releaseAssignedScreen,
   type ScreenAssignment,
+  ScreenReadinessCache,
   sandboxCommandTimedOut,
   sandboxTimeoutCommand,
   stopExtraScreenCommand,
@@ -50,6 +51,7 @@ let imageReady: Promise<void> | undefined;
 let supervisorInfo: Docker.ContainerInspectInfo | undefined;
 const supervisorToken = resolveSupervisorToken(process.env);
 const computerScreens = new Map<string, Map<string, ScreenAssignment>>();
+const screenReadiness = new ScreenReadinessCache();
 
 const app = new Hono();
 
@@ -99,8 +101,12 @@ app.post("/computers", async (c) => {
         (networkMode && info.HostConfig.NetworkMode !== networkMode)
       ) {
         await existing.remove({ force: true }).catch(() => undefined);
+        screenReadiness.invalidateContainer(existing.id);
       } else {
-        if (!info.State.Running) await existing.start();
+        if (!info.State.Running) {
+          await existing.start();
+          screenReadiness.invalidateContainer(existing.id);
+        }
         const screenUrl = await publishedScreenUrl(existing, info.State.Running ? info : undefined);
         return c.json({ id: existing.id, image: COMPUTER_IMAGE, screenUrl, resumed: true });
       }
@@ -439,6 +445,7 @@ app.delete("/computers/:id/screen", async (c) => {
       }
     } finally {
       if (assigned && index !== undefined) completeReleasedScreen(assigned, screenId, index);
+      if (index !== undefined) screenReadiness.invalidateScreen(c.req.param("id"), index);
       if (assigned?.size === 0) computerScreens.delete(c.req.param("id"));
     }
     return c.json({ ok: true });
@@ -458,6 +465,7 @@ app.post("/computers/:id/stop", async (c) => {
     );
     await container.stop().catch(() => undefined);
     clearComputerScreenRegistry(computerScreens, id);
+    screenReadiness.invalidateContainer(id);
     return c.json({ ok: true });
   } catch {
     return c.json({ error: "computer not found" }, 404);
@@ -474,6 +482,7 @@ app.delete("/computers/:id", async (c) => {
     );
     await container.remove({ force: true }).catch(() => undefined);
     clearComputerScreenRegistry(computerScreens, id);
+    screenReadiness.invalidateContainer(id);
     return c.json({ ok: true });
   } catch {
     return c.json({ error: "computer not found" }, 404);
@@ -560,6 +569,7 @@ async function managedScreen(
   screenLeaseId: string | undefined,
 ) {
   const { container, info } = await managedContainer(id, botId, workspaceId);
+  if (!info.State.Running) screenReadiness.invalidateContainer(id);
   let assigned = computerScreens.get(id);
   if (!assigned) {
     assigned = new Map();
@@ -567,10 +577,18 @@ async function managedScreen(
   }
   const index = nextScreenIndex(assigned, screenId || botId || id, screenLeaseId);
   const layout = screenPorts(index);
-  const ensured = await runContainerCommand(container, ["bash", "-lc", ensureScreenCommand(index)]);
-  if (ensured.code !== 0) {
-    assigned.delete(screenId || botId || id);
-    throw new Error(ensured.stderr || `computer screen ${layout.display} failed to start`);
+  if (!screenReadiness.isReady(id, index)) {
+    const ensured = await runContainerCommand(container, [
+      "bash",
+      "-lc",
+      ensureScreenCommand(index),
+    ]);
+    if (ensured.code !== 0) {
+      assigned.delete(screenId || botId || id);
+      screenReadiness.invalidateScreen(id, index);
+      throw new Error(ensured.stderr || `computer screen ${layout.display} failed to start`);
+    }
+    screenReadiness.markReady(id, index);
   }
   return { container, info, layout };
 }

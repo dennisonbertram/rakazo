@@ -69,7 +69,7 @@ import {
   teamBotWorkspaceDirectory,
 } from "./computer-support.js";
 import {
-  DEFAULT_COMPUTER_ACTION_SETTLE_MS,
+  defaultComputerActionSettleMs,
   observationToolResult,
   parseComputerActions,
 } from "./computer-tools.js";
@@ -608,12 +608,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return { error: "Teaching is in progress. Stop teaching before using the computer." };
             }
             return computerScreenToolResult(async () => {
+              const actions = parseComputerActions(args.actions);
               const result = await deps.sandbox.act(
                 computer,
                 {
-                  actions: parseComputerActions(args.actions),
+                  actions,
                   observe: args.observe !== false,
-                  settleMs: Number(args.settle_ms ?? DEFAULT_COMPUTER_ACTION_SETTLE_MS),
+                  settleMs:
+                    args.settle_ms === undefined
+                      ? defaultComputerActionSettleMs(actions)
+                      : Number(args.settle_ms),
                 },
                 context,
               );

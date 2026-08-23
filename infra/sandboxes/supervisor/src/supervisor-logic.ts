@@ -130,6 +130,44 @@ export interface ScreenAssignment {
   releasing?: boolean;
 }
 
+// The display stays alive for the lifetime of the managed container. Re-running
+// ensureScreenCommand is a Docker exec on every visual tool call, so cache a
+// successful readiness probe briefly. Container identity is still inspected on
+// every request; this only skips the redundant in-container display probe.
+export const SCREEN_READINESS_TTL_MS = 10_000;
+
+export class ScreenReadinessCache {
+  private readonly readyAt = new Map<string, number>();
+
+  isReady(containerId: string, index: number, now = Date.now()): boolean {
+    const key = this.key(containerId, index);
+    const readyAt = this.readyAt.get(key);
+    if (readyAt === undefined) return false;
+    if (now - readyAt < SCREEN_READINESS_TTL_MS) return true;
+    this.readyAt.delete(key);
+    return false;
+  }
+
+  markReady(containerId: string, index: number, now = Date.now()): void {
+    this.readyAt.set(this.key(containerId, index), now);
+  }
+
+  invalidateScreen(containerId: string, index: number): void {
+    this.readyAt.delete(this.key(containerId, index));
+  }
+
+  invalidateContainer(containerId: string): void {
+    const prefix = `${containerId}\0`;
+    for (const key of this.readyAt.keys()) {
+      if (key.startsWith(prefix)) this.readyAt.delete(key);
+    }
+  }
+
+  private key(containerId: string, index: number): string {
+    return `${containerId}\0${index}`;
+  }
+}
+
 export function clearComputerScreenRegistry(
   registry: Map<string, Map<string, ScreenAssignment>>,
   containerId: string,
