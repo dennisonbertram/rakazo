@@ -2,6 +2,7 @@ import { lazy, Suspense, useLayoutEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { authClient } from "./lib/auth";
 import { markAfterPaint, markOnce } from "./lib/performance";
+import { GoogleOAuthCallbackPage } from "./pages/GoogleOAuthCallback";
 import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
 import { ShellPage } from "./pages/Shell";
 
@@ -45,6 +46,10 @@ export function App() {
         <Route
           path="/onboarding"
           element={user ? <OnboardingPage /> : <Navigate to="/sign-in" replace />}
+        />
+        <Route
+          path="/google/oauth/callback"
+          element={user ? <GoogleOAuthCallbackPage /> : <Navigate to="/sign-in" replace />}
         />
         <Route
           path="/mcp/oauth/callback"

@@ -29,6 +29,8 @@ export * from "./fake-sandbox.js";
 export * from "./home.js";
 export * from "./host-aware-sandbox.js";
 export * from "./job-reconciler.js";
+export * from "./google-gmail.js";
+export * from "./mail-dump.js";
 export * from "./mcp-connector.js";
 export * from "./mcp-emulator.js";
 export * from "./mcp-oauth.js";

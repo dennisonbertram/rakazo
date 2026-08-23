@@ -18,6 +18,8 @@ import {
   isComposioEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  GmailNative,
+  GoogleAuthBroker,
   McpConnector,
   McpOAuthBroker,
   PiAgentRuntime,
@@ -53,6 +55,13 @@ async function main() {
   });
   const secrets = new EncryptedSecretStore(resolveEncryptionKey(process.env));
   const mcpOAuth = new McpOAuthBroker(prisma, secrets);
+  const googleAuth = new GoogleAuthBroker(
+    prisma,
+    secrets,
+    process.env.GOOGLE_CLIENT_ID ?? "",
+    process.env.GOOGLE_CLIENT_SECRET || undefined,
+  );
+  const gmailNative = new GmailNative(googleAuth);
   const mcp = new McpConnector(
     prisma,
     secrets,
@@ -85,6 +94,7 @@ async function main() {
     home,
     artifacts,
     connector: stack.connector,
+    gmailNative,
     listConnectedPluginSlugs: stack.composio?.listConnectedSlugs.bind(stack.composio),
     secrets: [process.env.OPENROUTER_API_KEY ?? "", process.env.COMPOSIO_API_KEY ?? ""].filter(
       Boolean,

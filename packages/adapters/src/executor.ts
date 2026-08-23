@@ -82,11 +82,14 @@ import {
   needsOAuthProbe,
   parseMcpServerToolArgs,
 } from "./mcp-server-tool.js";
+import { collectNativeMailDump, GmailNative, gmailSummaryLine } from "./google-gmail.js";
 import {
   buildMailDumpFile,
   collectMailDump,
   MAIL_DUMP_DEFAULT_MAX,
   MAIL_DUMP_HARD_MAX,
+  type MailDumpQuerySummary,
+  type MailDumpRecord,
 } from "./mail-dump.js";
 import { loadAgentMemoryContext } from "./memory-context.js";
 import { toOAuthCredential } from "./pi-credentials.js";
@@ -150,6 +153,7 @@ export interface ExecutorDeps {
   notifications?: NotificationProvider;
   jobs: JobPublisher;
   listConnectedPluginSlugs?: (userId: string) => Promise<string[]>;
+  gmailNative?: GmailNative;
 }
 
 export async function deferFutureRoutine(
@@ -635,11 +639,48 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
             return finish({ ok: true, path: filePath });
           }
-          if (name === "email_dump_search") {
-            if (!deps.connector) return finish({ error: "connectors unavailable" });
-            if (!context.connectedProviders?.includes("gmail")) {
+          if (name === "gmail_search") {
+            if (!deps.gmailNative) return finish({ error: "built-in Gmail unavailable" });
+            try {
+              const actor = { workspaceId: run.workspaceId, userId: run.userId };
+              if (!(await deps.gmailNative.connected(actor))) {
+                return finish({ error: "Google is not connected. Connect Gmail (built-in) from Plugins." });
+              }
+              const query = String(args.query ?? "").trim();
+              if (!query) return finish({ error: "Pass a Gmail query." });
+              const max = Math.min(25, Math.max(1, Number(args.max_results) || 10));
+              const page = await deps.gmailNative.list(actor, { q: query, maxResults: max });
+              const summaries = await deps.gmailNative.metadataMany(actor, page.ids.map((m) => m.id));
               return finish({
-                error: "Gmail is not connected. Ask the user to connect Gmail from Plugins first.",
+                query,
+                results: summaries.map(gmailSummaryLine),
+                more: Boolean(page.nextPageToken),
+                note: "For exhaustive questions use email_dump_search instead of paging here.",
+              });
+            } catch (error) {
+              return finish({ error: error instanceof Error ? error.message : String(error) });
+            }
+          }
+          if (name === "gmail_get") {
+            if (!deps.gmailNative) return finish({ error: "built-in Gmail unavailable" });
+            try {
+              const actor = { workspaceId: run.workspaceId, userId: run.userId };
+              const id = String(args.id ?? "").trim();
+              if (!id) return finish({ error: "Pass the Gmail message id." });
+              const message = await deps.gmailNative.full(actor, id);
+              return finish(message);
+            } catch (error) {
+              return finish({ error: error instanceof Error ? error.message : String(error) });
+            }
+          }
+          if (name === "email_dump_search") {
+            const actor = { workspaceId: run.workspaceId, userId: run.userId };
+            const nativeReady = deps.gmailNative ? await deps.gmailNative.connected(actor) : false;
+            if (!nativeReady && !deps.connector) return finish({ error: "connectors unavailable" });
+            if (!nativeReady && !context.connectedProviders?.includes("gmail")) {
+              return finish({
+                error:
+                  "Gmail is not connected. Ask the user to connect Gmail (built-in Google or the Gmail plugin) from Plugins first.",
               });
             }
             const queries = Array.isArray(args.queries) ? args.queries.map(String) : [];
@@ -650,12 +691,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               Math.max(1, Number(args.max_messages) || MAIL_DUMP_DEFAULT_MAX),
             );
             try {
-              const collected = await collectMailDump({
-                connector: deps.connector,
-                context,
-                queries,
-                maxMessages,
-              });
+              const collected = nativeReady
+                ? await collectNativeMailDump(deps.gmailNative!, actor, queries, maxMessages)
+                : await collectMailDump({
+                    connector: deps.connector!,
+                    context,
+                    queries,
+                    maxMessages,
+                  });
               const contents = buildMailDumpFile({ intent, ...collected });
               const outPath =
                 typeof args.path === "string" && args.path

@@ -30,6 +30,7 @@ import {
   hasActiveComputerControl,
   isSupermemoryEnabled,
   listPiCatalog,
+  GoogleAuthBroker,
   McpOAuthBroker,
   type PiOAuthLogins,
   provisionComputer,
@@ -178,6 +179,7 @@ export interface RouterDeps {
   oauthLogins: PiOAuthLogins;
   composio?: ComposioProvider;
   mcpOAuth?: McpOAuthBroker;
+  googleAuth?: GoogleAuthBroker;
   artifacts: ArtifactStore;
   dataDir: string;
   env: {
@@ -1755,6 +1757,27 @@ export function createRouter(deps: RouterDeps) {
           return { ok: true as const };
         }),
       },
+    },
+    google: {
+      status: authed.google.status.handler(async ({ context }) => ({
+        configured: Boolean(deps.googleAuth?.configured),
+        connected: deps.googleAuth
+          ? (await deps.googleAuth.status(context.actor)) === "connected"
+          : false,
+      })),
+      begin: authed.google.begin.handler(async ({ context, input }) => {
+        if (!deps.googleAuth) throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
+        return deps.googleAuth.begin(context.actor, input.redirectUri);
+      }),
+      complete: authed.google.complete.handler(async ({ context, input }) => {
+        if (!deps.googleAuth) throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
+        await deps.googleAuth.complete(context.actor, input.state, input.code);
+        return { ok: true as const };
+      }),
+      disconnect: authed.google.disconnect.handler(async ({ context }) => {
+        await deps.googleAuth?.disconnect(context.actor);
+        return { ok: true as const };
+      }),
     },
     onboarding: {
       start: authed.onboarding.start.handler(async ({ context, input }) => {

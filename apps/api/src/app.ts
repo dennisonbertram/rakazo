@@ -19,6 +19,7 @@ import {
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
+  GoogleAuthBroker,
   McpOAuthBroker,
   PiAgentRuntime,
   PiOAuthLogins,
@@ -97,6 +98,12 @@ export async function createApp(
   });
   const secrets = new EncryptedSecretStore(env.encryptionKey);
   const mcpOAuth = new McpOAuthBroker(prisma, secrets);
+  const googleAuth = new GoogleAuthBroker(
+    prisma,
+    secrets,
+    process.env.GOOGLE_CLIENT_ID ?? "",
+    process.env.GOOGLE_CLIENT_SECRET || undefined,
+  );
   const oauthLogins = new PiOAuthLogins();
   const home = new LocalAgentHomeStore(env.dataDir);
   const artifacts = new LocalArtifactStore(env.dataDir);
@@ -206,6 +213,7 @@ export async function createApp(
     secrets,
     oauthLogins,
     mcpOAuth,
+    googleAuth,
     composio: stack.composio,
     artifacts,
     dataDir: env.dataDir,

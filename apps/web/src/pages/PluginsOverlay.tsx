@@ -23,6 +23,36 @@ export function PluginsOverlay({
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(cachedCatalog.length === 0);
+  const [google, setGoogle] = useState<{ configured: boolean; connected: boolean } | null>(null);
+
+  useEffect(() => {
+    void rpc.google.status().then(setGoogle).catch(() => setGoogle(null));
+    const channel = new BroadcastChannel("rakazo-google-oauth");
+    channel.onmessage = () => void rpc.google.status().then(setGoogle).catch(() => undefined);
+    return () => channel.close();
+  }, []);
+
+  async function connectGoogle() {
+    setError(null);
+    try {
+      const started = await rpc.google.begin({
+        redirectUri: `${window.location.origin}/google/oauth/callback`,
+      });
+      window.open(started.authorizationUrl, "rakazo-google-oauth", "popup,width=560,height=760");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start Google sign-in");
+    }
+  }
+
+  async function disconnectGoogle() {
+    setError(null);
+    try {
+      await rpc.google.disconnect();
+      setGoogle((current) => (current ? { ...current, connected: false } : current));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not disconnect Google");
+    }
+  }
 
   async function refresh() {
     const items = await rpc.connections.catalog({});
@@ -165,6 +195,41 @@ export function PluginsOverlay({
           className="rk-scroll flex-1 overflow-y-auto px-8 py-6"
         >
           {error ? <p className="mb-4 text-sm text-[#C94244]">{error}</p> : null}
+          {google?.configured && (view === "all" || google.connected) ? (
+            <div className="mb-4 flex items-center gap-3.5 rounded-[16px] border border-[#2A2A31] bg-[#17171A] px-4 py-3.5">
+              <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-white text-[15px] font-semibold text-[#4285F4]">
+                G
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium text-[#ECECEE]">Gmail (built-in)</span>
+                <span className="block truncate text-[13px] text-[#85858A]">
+                  Native Google connection — powers gmail_search, gmail_get, and high-recall email dumps.
+                </span>
+              </span>
+              {google.connected ? (
+                <>
+                  <span className="rounded-full border border-[#2E5A3C] bg-[#14241A] px-3.5 py-1.5 text-[13.5px] text-[#7FCF9A]">
+                    Connected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void disconnectGoogle()}
+                    className="rounded-full border border-[#34343B] px-3.5 py-1.5 text-[13px] text-[#B9B9C0]"
+                  >
+                    Disconnect
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void connectGoogle()}
+                  className="rounded-full border border-[#3A3A42] bg-[#232327] px-4 py-2 text-[14px] text-[#ECECEE] hover:bg-[#2B2B30]"
+                >
+                  Connect
+                </button>
+              )}
+            </div>
+          ) : null}
           {!loading && catalog.length === 0 ? (
             <p className="text-[#6C6C70]">Composio is not configured on this deployment.</p>
           ) : null}

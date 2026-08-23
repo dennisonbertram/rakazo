@@ -139,6 +139,29 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "gmail_search",
+    description:
+      "Search Gmail directly (built-in Google integration) for a NARROW lookup: a specific sender, subject, or date. Returns up to 25 message summaries. For anything exhaustive ('all', 'everything', 'did I handle…') use email_dump_search instead — stopping at a page of hits misses mail.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Gmail search query (from:, to:, subject:, after:YYYY/MM/DD, is:unread, …)." },
+        max_results: { type: "integer", description: "1-25, default 10." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "gmail_get",
+    description:
+      "Read one Gmail message in full (headers plus body text) by its id, as returned by gmail_search or an email dump file.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Gmail message id." } },
+      required: ["id"],
+    },
+  },
+  {
     name: "email_dump_search",
     description:
       "High-recall email search. Runs several WIDE Gmail queries, downloads every matching message's metadata into a grep-friendly file in your home (the results do NOT enter this conversation), and returns the file path plus per-query coverage. Then grep/read the file to answer. Use this whenever the user asks about 'all', 'everything', 'did I handle', 'status of', or any question where stopping at the first few search hits could miss the email that matters. Requires the Gmail plugin to be connected.",
