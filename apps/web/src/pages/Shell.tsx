@@ -65,6 +65,7 @@ import {
   useState,
 } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { BuiButton, BuiCard, LoadingState, SuccessPop } from "../components/beautiful-ui/primitives";
 import { SkillDraftCard } from "../components/teach/SkillDraftCard";
 import { TeachCaptureOverlay } from "../components/teach/TeachCaptureOverlay";
 import { TeachComputerSection } from "../components/teach/TeachComputerSection";
@@ -1937,11 +1938,8 @@ const Transcript = memo(function Transcript({
         <div className="flex justify-start">
           {/* Box metrics match the progress bubble exactly so swapping between
               them never changes height or text position. */}
-          <div
-            className="max-w-[74%] rounded-[20px] bg-[#1A1A1D] px-[18px] py-3 text-[15.5px] leading-[1.5] text-[#85858A]"
-            style={{ animation: "rkPulse 1.2s ease-in-out infinite" }}
-          >
-            working…
+          <div className="flex max-w-[74%] items-center rounded-[20px] bg-[#1A1A1D] px-[18px] py-3 text-[15.5px] leading-[1.5]">
+            <LoadingState label="working" />
           </div>
         </div>
       ) : null}
@@ -3184,7 +3182,7 @@ function AppConnectCard({
     }
   }
   return (
-    <div className="flex w-[min(420px,80%)] items-center gap-3.5 rounded-[20px] bg-[#1A1A1D] px-4 py-3.5">
+    <BuiCard className="flex w-[min(420px,80%)] items-center gap-3.5 px-4 py-3.5">
       {block.logo ? (
         <img src={block.logo} alt="" className="h-10 w-10 rounded-[10px] bg-white object-contain p-1" />
       ) : (
@@ -3193,24 +3191,21 @@ function AppConnectCard({
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-medium text-[#ECECEE]">{block.name}</span>
-        <span className="block truncate text-[13px] text-[#85858A]">{block.description}</span>
+        <span className="block text-[15px] font-medium" style={{ color: "var(--bui-ink)" }}>
+          {block.name}
+        </span>
+        <span className="block truncate text-[13px]" style={{ color: "var(--bui-ink-3)" }}>
+          {block.description}
+        </span>
       </span>
       {status === "connected" ? (
-        <span className="rounded-full border border-[#2E5A3C] bg-[#14241A] px-3.5 py-1.5 text-[13.5px] text-[#7FCF9A]">
-          Connected
-        </span>
+        <SuccessPop label="Connected" />
       ) : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void authorize()}
-          className="rounded-full border border-[#3A3A42] bg-[#232327] px-4 py-2 text-[14px] text-[#ECECEE] hover:bg-[#2B2B30] disabled:opacity-60"
-        >
+        <BuiButton disabled={busy} onClick={() => void authorize()}>
           {busy ? "Waiting…" : "Authorize"}
-        </button>
+        </BuiButton>
       )}
-    </div>
+    </BuiCard>
   );
 }
 
@@ -3329,58 +3324,47 @@ function McpApprovalCard({
 
   const summary = endpoint ?? `stdio · ${transport}`;
   return (
-    <div className="max-w-[74%] rounded-[20px] border border-[#2A2A31] bg-[#17171A] p-4">
+    <BuiCard className="max-w-[74%] p-4">
       <div className="flex items-center gap-2">
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#30356A] text-xs text-[#E2E4FF]">
           M
         </span>
-        <span className="text-[14.5px] font-medium text-[#ECECEE]">
+        <span className="text-[14.5px] font-medium" style={{ color: "var(--bui-ink)" }}>
           Connect MCP server “{name}”
         </span>
       </div>
-      <p className="mt-1.5 truncate text-[12px] text-[#85858B]">{summary}</p>
+      <p className="mt-1.5 truncate text-[12px]" style={{ color: "var(--bui-ink-3)" }}>{summary}</p>
       {state === "pending" || state === "connecting" ? (
         <>
-          <p className="mt-2 text-[13px] leading-[1.5] text-[#B9B9C0]">
+          <p className="mt-2 text-[13px] leading-[1.5]" style={{ color: "var(--bui-ink-2)" }}>
             This server uses browser sign-in. Authorize it to let your agents use its tools — a
             popup will open.
           </p>
           {error ? <p className="mt-2 text-xs text-[#F07178]">{error}</p> : null}
           <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              disabled={state === "connecting"}
-              onClick={() => void authorize()}
-              className="rounded-xl bg-[#7785FF] px-4 py-2 text-sm font-semibold text-[#090A12] disabled:opacity-50"
-            >
+            <BuiButton tone="accent" disabled={state === "connecting"} onClick={() => void authorize()}>
               {state === "connecting" ? "Waiting for authorization…" : "Authorize"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setState("dismissed")}
-              className="rounded-xl border border-[#34343B] px-4 py-2 text-sm text-[#B9B9C0]"
-            >
-              Not now
-            </button>
+            </BuiButton>
+            <BuiButton onClick={() => setState("dismissed")}>Not now</BuiButton>
           </div>
         </>
       ) : null}
       {state === "no-auth" ? (
-        <p className="mt-2 text-[13px] text-[#9BD49B]">
-          ✓ No browser authorization needed — the server is ready to use.
-        </p>
+        <div className="mt-3">
+          <SuccessPop label="No browser authorization needed — the server is ready to use." />
+        </div>
       ) : null}
       {state === "connected" ? (
-        <p className="mt-2 text-[13px] text-[#9BD49B]">
-          ✓ Connected — its tools are available from your next message.
-        </p>
+        <div className="mt-3">
+          <SuccessPop label="Connected — its tools are available from your next message." />
+        </div>
       ) : null}
       {state === "dismissed" ? (
         <p className="mt-2 text-[13px] text-[#85858A]">
           Dismissed — reconnect anytime from MCP settings.
         </p>
       ) : null}
-    </div>
+    </BuiCard>
   );
 }
 
