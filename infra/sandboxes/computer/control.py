@@ -36,6 +36,8 @@ class NativeCapture:
             ctypes.POINTER(ctypes.c_int),
         ]
         library.rakazo_xcapture_damage.restype = ctypes.c_int
+        library.rakazo_xinput_argv.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
+        library.rakazo_xinput_argv.restype = ctypes.c_int
         context = library.rakazo_xcapture_open(display.encode("utf-8"))
         if not context:
             raise RuntimeError("MIT-SHM capture is unavailable")
@@ -61,6 +63,10 @@ class NativeCapture:
             ({"x": damage[0].value, "y": damage[1].value, "width": damage[2].value, "height": damage[3].value}
              if changed else None),
         )
+
+    def act(self, argv):
+        encoded = (ctypes.c_char_p * len(argv))(*(value.encode("utf-8") for value in argv))
+        return self.library.rakazo_xinput_argv(self.context, len(argv), encoded)
 
 
 NATIVE_CAPTURES = {}
@@ -130,9 +136,12 @@ class Handler(BaseHTTPRequestHandler):
                 if "waitMs" in step:
                     time.sleep(max(0, min(int(step["waitMs"]), 5000)) / 1000)
                     continue
-                result = subprocess.run(step["argv"], env={**os.environ, "DISPLAY": display})
-                if result.returncode:
-                    raise RuntimeError("computer action failed")
+                source = native_capture(display)
+                handled = source.act(step["argv"]) if source else 0
+                if not handled:
+                    result = subprocess.run(step["argv"], env={**os.environ, "DISPLAY": display})
+                    if result.returncode:
+                        raise RuntimeError("computer action failed")
             settle_ms = max(0, min(int(body.get("settleMs", 0)), 5000))
             if settle_ms:
                 time.sleep(settle_ms / 1000)

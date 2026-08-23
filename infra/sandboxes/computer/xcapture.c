@@ -4,6 +4,7 @@
 #include <X11/extensions/XShm.h>
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xfixes.h>
+#include <X11/extensions/XTest.h>
 #include <png.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -205,4 +206,55 @@ void rakazo_xcapture_close(void *context) {
   free(capture->png);
   if (capture->display) XCloseDisplay(capture->display);
   free(capture);
+}
+
+static KeySym key_symbol(const char *name) {
+  if (!strcmp(name, "ctrl")) return XStringToKeysym("Control_L");
+  if (!strcmp(name, "alt")) return XStringToKeysym("Alt_L");
+  if (!strcmp(name, "shift")) return XStringToKeysym("Shift_L");
+  if (!strcmp(name, "super")) return XStringToKeysym("Super_L");
+  return XStringToKeysym(name);
+}
+
+int rakazo_xinput_argv(void *context, int argc, const char *const *argv) {
+  XCapture *capture = context;
+  if (!capture || argc < 4 || strcmp(argv[0], "env") || strncmp(argv[1], "DISPLAY=", 8) || strcmp(argv[2], "xdotool")) return 0;
+  if (!XTestQueryExtension(capture->display, &(int){0}, &(int){0}, &(int){0}, &(int){0})) return -1;
+  if (!strcmp(argv[3], "key") && argc == 6 && !strcmp(argv[4], "--clearmodifiers")) {
+    char combo[128];
+    if (strlen(argv[5]) >= sizeof(combo)) return 0;
+    strcpy(combo, argv[5]);
+    KeyCode keys[8]; int count = 0;
+    for (char *part = strtok(combo, "+"); part; part = strtok(NULL, "+")) {
+      KeyCode key = XKeysymToKeycode(capture->display, key_symbol(part));
+      if (!key || count == 8) return 0;
+      keys[count++] = key;
+    }
+    for (int i = 0; i < count; i++) XTestFakeKeyEvent(capture->display, keys[i], True, CurrentTime);
+    for (int i = count - 1; i >= 0; i--) XTestFakeKeyEvent(capture->display, keys[i], False, CurrentTime);
+    XFlush(capture->display);
+    return 1;
+  }
+  if (!strcmp(argv[3], "mousemove") && argc >= 7 && !strcmp(argv[4], "--")) {
+    int x = atoi(argv[5]), y = atoi(argv[6]);
+    XTestFakeMotionEvent(capture->display, DefaultScreen(capture->display), x, y, CurrentTime);
+    if (argc == 7) { XFlush(capture->display); return 1; }
+    if (argc == 9 && (!strcmp(argv[7], "click") || !strcmp(argv[7], "mousedown"))) {
+      const unsigned int button = (unsigned int)atoi(argv[8]);
+      XTestFakeButtonEvent(capture->display, button, True, CurrentTime);
+      if (!strcmp(argv[7], "click")) XTestFakeButtonEvent(capture->display, button, False, CurrentTime);
+      XFlush(capture->display); return 1;
+    }
+  }
+  if (!strcmp(argv[3], "mouseup") && argc == 5) {
+    XTestFakeButtonEvent(capture->display, (unsigned int)atoi(argv[4]), False, CurrentTime);
+    XFlush(capture->display); return 1;
+  }
+  if (!strcmp(argv[3], "click") && argc == 6) {
+    const int count = atoi(argv[4]); const unsigned int button = (unsigned int)atoi(argv[5]);
+    if (count < 1 || count > 20) return 0;
+    for (int i = 0; i < count; i++) { XTestFakeButtonEvent(capture->display, button, True, CurrentTime); XTestFakeButtonEvent(capture->display, button, False, CurrentTime); }
+    XFlush(capture->display); return 1;
+  }
+  return 0;
 }

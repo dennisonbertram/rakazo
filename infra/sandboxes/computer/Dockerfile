@@ -5,12 +5,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxdamage-dev \
     libxext-dev \
     libxfixes-dev \
+    libxtst-dev \
     libpng-dev \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY xcapture.c .
 RUN cc -O3 -fPIC -shared -Wall -Wextra -Werror -o librakazo-xcapture.so xcapture.c \
-    -lX11 -lXext -lXdamage -lXfixes -lpng
+    -lX11 -lXext -lXdamage -lXfixes -lXtst -lpng
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
