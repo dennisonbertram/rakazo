@@ -311,7 +311,7 @@ async function writeProofEvidence(databaseUrl: string) {
           jobStore: jobEvidence.available ? "graphile" : "in-memory",
           jobs: jobEvidence.jobs,
         },
-        null,
+        (_, value) => (typeof value === "bigint" ? value.toString() : value),
         2,
       )}\n`,
     );
