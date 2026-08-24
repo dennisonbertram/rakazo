@@ -8,7 +8,7 @@ Use the smallest proof that can answer the question. Every command writes a reda
 | `pnpm prove:api` | Migrations, API contracts, persistence, and job enqueueing | Browser, Electron, real model credentials |
 | `pnpm prove:worker` | Scripted model execution, tools, retries, and run state transitions | Browser, Electron, real model credentials |
 | `pnpm prove:web` | Browser bot CRUD against an isolated API and database | Electron, real model credentials |
-| `pnpm prove:desktop` | Electron launch, renderer isolation, and preload bridge | API, database, model credentials |
+| `pnpm prove:desktop` | Electron loads the real app, signs up, onboards, and opens/creates a bot through the title-bar Create control | Real model credentials |
 | `pnpm prove:local` | All deterministic proofs in dependency order | Existing local data or credentials |
 
 The harness creates isolated Postgres containers and uses the scripted runtime or test doubles.
@@ -16,5 +16,8 @@ It never reads developer credentials from the local database. Provider and compu
 explicit opt-in commands (`pnpm test:canary`, `pnpm test:computer`) because they can consume quota
 or access external systems.
 
-When `summary.json` reports a failure, start with its `phases` entry and `proof.log`. The affected
-layer, command, timestamps, exit code, and the precise test output are retained together.
+Every phase also writes an `evidence-<layer>.json` snapshot. It correlates run IDs, attempt IDs,
+event types, and queued job keys without recording prompts, credential values, or event payloads.
+When `summary.json` reports a failure, start with its `phases` entry, its evidence file, and
+`proof.log`. The affected layer, command, timestamps, exit code, and precise test output are
+retained together.

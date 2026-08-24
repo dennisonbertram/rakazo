@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+import { createDb } from "@rakazo/db";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { runProcess } from "./process.js";
 
@@ -99,13 +100,17 @@ async function main() {
       } as const;
       const selectedSuites =
         integrationSuite === "all" ? [...suites.api, ...suites.worker] : suites[integrationSuite];
-      execSync(
-        ["pnpm exec vitest run --no-file-parallelism", ...selectedSuites].join(" "),
-        {
-          stdio: "inherit",
-          env: process.env,
-        },
-      );
+      try {
+        execSync(
+          ["pnpm exec vitest run --no-file-parallelism", ...selectedSuites].join(" "),
+          {
+            stdio: "inherit",
+            env: process.env,
+          },
+        );
+      } finally {
+        await writeProofEvidence(databaseUrl);
+      }
       await writeSummary(reportDir, {
         ok: true,
         mode,
@@ -184,6 +189,8 @@ async function main() {
         });
         if (failedRuns.length) console.error("Failed agent runs:", failedRuns);
         throw error;
+      } finally {
+        await writeProofEvidence(databaseUrl);
       }
       await writeSummary(reportDir, {
         ok: true,
@@ -257,6 +264,60 @@ async function writeSummary(reportDir: string, summary: Record<string, unknown>)
     path.join(reportDir, "summary.json"),
     JSON.stringify({ ...summary, at: new Date().toISOString() }, null, 2),
   );
+}
+
+async function writeProofEvidence(databaseUrl: string) {
+  const destination = process.env.RAKAZO_PROOF_EVIDENCE_PATH;
+  if (!destination) return;
+  const { prisma, pool } = createDb(databaseUrl);
+  try {
+    const [runs, attempts, events, jobs] = await Promise.all([
+      prisma.run.findMany({
+        select: {
+          id: true,
+          botId: true,
+          threadId: true,
+          status: true,
+          trigger: true,
+          modelProvider: true,
+          modelId: true,
+          error: true,
+          createdAt: true,
+          startedAt: true,
+          completedAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.attempt.findMany({
+        select: { id: true, runId: true, fence: true, status: true, error: true, startedAt: true, finishedAt: true },
+        orderBy: { startedAt: "asc" },
+      }),
+      prisma.event.findMany({
+        select: { runId: true, threadId: true, seq: true, type: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.$queryRaw<
+        Array<{
+          id: number;
+          task_identifier: string;
+          key: string | null;
+          attempts: number;
+          max_attempts: number;
+          run_at: Date;
+          updated_at: Date;
+        }>
+      >`SELECT id, task_identifier, key, attempts, max_attempts, run_at, updated_at FROM graphile_worker.jobs ORDER BY id`,
+    ]);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(
+      destination,
+      `${JSON.stringify({ capturedAt: new Date().toISOString(), runs, attempts, events, jobs }, null, 2)}\n`,
+    );
+  } finally {
+    await prisma.$disconnect();
+    await pool.end();
+  }
 }
 
 async function waitForHealth(url: string, ms: number) {

@@ -6,7 +6,7 @@ describe("proof harness", () => {
     expect(commandForLayer("api").args).toContain("--suite=api");
     expect(commandForLayer("worker").args).toContain("--suite=worker");
     expect(commandForLayer("web").args.join(" ")).toContain("bot-crud.spec.ts");
-    expect(commandForLayer("desktop").args).toContain("test:e2e");
+    expect(commandForLayer("desktop").args.join(" ")).toContain("desktop-product.ts");
   });
 
   it("redacts credential-shaped values from proof logs", () => {

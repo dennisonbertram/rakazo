@@ -31,8 +31,8 @@ export function commandForLayer(layer: Exclude<ProofLayer, "local">): ProofComma
     case "desktop":
       return {
         command: "pnpm",
-        args: ["--filter", "@rakazo/desktop", "test:e2e"],
-        proves: "Electron launch, renderer isolation, and the narrow desktop bridge",
+        args: ["tsx", "packages/testkit/src/cli/desktop-product.ts"],
+        proves: "the Electron shell loads the real web app and can create a bot through the title-bar control",
       };
   }
 }
@@ -51,13 +51,13 @@ function parseLayer(argv: string[]): ProofLayer {
   return value as ProofLayer;
 }
 
-async function run(command: ProofCommand, logPath: string) {
+async function run(command: ProofCommand, logPath: string, evidencePath: string) {
   const stream = createWriteStream(logPath, { flags: "a" });
   const startedAt = new Date().toISOString();
   try {
     const exitCode = await new Promise<number>((resolve, reject) => {
       const child = spawn(command.command, command.args, {
-        env: process.env,
+        env: { ...process.env, RAKAZO_PROOF_EVIDENCE_PATH: evidencePath },
         shell: false,
       });
       child.stdout.on("data", (chunk) => stream.write(redact(String(chunk))));
@@ -83,8 +83,9 @@ async function main() {
 
   for (const proofLayer of layers) {
     const command = commandForLayer(proofLayer);
-    const result = await run(command, logPath);
-    phases.push({ layer: proofLayer, ...command, ...result });
+    const evidence = `evidence-${proofLayer}.json`;
+    const result = await run(command, logPath, path.join(reportDir, evidence));
+    phases.push({ layer: proofLayer, ...command, ...result, evidence });
     if (result.exitCode !== 0) break;
   }
 
@@ -95,7 +96,7 @@ async function main() {
     ok,
     startedAt: phases[0]?.startedAt ?? new Date().toISOString(),
     finishedAt: new Date().toISOString(),
-    artifacts: { log: "proof.log" },
+    artifacts: { log: "proof.log", evidence: phases.map((phase) => phase.evidence) },
     phases,
   };
   await writeFile(path.join(reportDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
