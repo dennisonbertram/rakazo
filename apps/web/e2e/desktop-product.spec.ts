@@ -1,6 +1,6 @@
 import path from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
-import { completeOnboarding, signup } from "./helpers";
+import { completeOnboarding } from "./helpers";
 
 test("Electron loads the real app and opens the new-bot flow", async ({ baseURL }) => {
   const app = await electron.launch({
@@ -16,7 +16,11 @@ test("Electron loads the real app and opens the new-bot flow", async ({ baseURL 
   try {
     const page = await app.firstWindow();
     const stamp = Date.now();
-    await signup(page, `desktop-proof-${stamp}@rakazo.test`, "password12", "Desktop Proof");
+    await page.goto(new URL("/sign-up", baseURL).toString());
+    await page.getByPlaceholder("Your name").fill("Desktop Proof");
+    await page.getByPlaceholder("Your email address").fill(`desktop-proof-${stamp}@rakazo.test`);
+    await page.getByPlaceholder("Password").fill("password12");
+    await page.getByRole("button", { name: "Create account" }).click();
     await completeOnboarding(page, ["A bit of everything", "Clear and tight"]);
 
     await page.getByTitle("Create").click();

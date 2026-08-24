@@ -271,7 +271,7 @@ async function writeProofEvidence(databaseUrl: string) {
   if (!destination) return;
   const { prisma, pool } = createDb(databaseUrl);
   try {
-    const [runs, attempts, events, jobs] = await Promise.all([
+    const [runs, attempts, events, jobEvidence] = await Promise.all([
       prisma.run.findMany({
         select: {
           id: true,
@@ -297,26 +297,46 @@ async function writeProofEvidence(databaseUrl: string) {
         select: { runId: true, threadId: true, seq: true, type: true, createdAt: true },
         orderBy: { createdAt: "asc" },
       }),
-      prisma.$queryRaw<
-        Array<{
-          id: number;
-          task_identifier: string;
-          key: string | null;
-          attempts: number;
-          max_attempts: number;
-          run_at: Date;
-          updated_at: Date;
-        }>
-      >`SELECT id, task_identifier, key, attempts, max_attempts, run_at, updated_at FROM graphile_worker.jobs ORDER BY id`,
+      queuedJobs(prisma),
     ]);
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(
       destination,
-      `${JSON.stringify({ capturedAt: new Date().toISOString(), runs, attempts, events, jobs }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          capturedAt: new Date().toISOString(),
+          runs,
+          attempts,
+          events,
+          jobStore: jobEvidence.available ? "graphile" : "in-memory",
+          jobs: jobEvidence.jobs,
+        },
+        null,
+        2,
+      )}\n`,
     );
   } finally {
     await prisma.$disconnect();
     await pool.end();
+  }
+}
+
+async function queuedJobs(prisma: ReturnType<typeof createDb>["prisma"]) {
+  try {
+    const jobs = await prisma.$queryRaw<
+      Array<{
+        id: number;
+        task_identifier: string;
+        key: string | null;
+        attempts: number;
+        max_attempts: number;
+        run_at: Date;
+        updated_at: Date;
+      }>
+    >`SELECT id, task_identifier, key, attempts, max_attempts, run_at, updated_at FROM graphile_worker.jobs ORDER BY id`;
+    return { available: true, jobs };
+  } catch {
+    return { available: false, jobs: [] };
   }
 }
 
