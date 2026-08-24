@@ -21,7 +21,7 @@ test("Electron loads the real app and opens the new-bot flow", async ({ baseURL 
     await page.getByPlaceholder("Your email address").fill(`desktop-proof-${stamp}@rakazo.test`);
     await page.getByPlaceholder("Password").fill("password12");
     await page.getByRole("button", { name: "Create account" }).click();
-    await completeOnboarding(page, ["A bit of everything", "Clear and tight"]);
+    await completeOnboarding(page);
 
     await page.getByTitle("Create").click();
     await expect(page.getByRole("button", { name: "New bot", exact: true })).toBeVisible();

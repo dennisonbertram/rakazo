@@ -70,19 +70,6 @@ async function main() {
     },
     mcpOAuth,
   );
-  const mcpOAuth = new McpOAuthBroker(prisma, secrets);
-  const mcp = new McpConnector(
-    prisma,
-    secrets,
-    {
-      stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
-      allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "")
-        .split(",")
-        .map((v) => v.trim())
-        .filter(Boolean),
-    },
-    mcpOAuth,
-  );
   const pipedreamConfig = pipedreamConfigFromEnv({
     pipedreamClientId: process.env.PIPEDREAM_CLIENT_ID,
     pipedreamClientSecret: process.env.PIPEDREAM_CLIENT_SECRET,
