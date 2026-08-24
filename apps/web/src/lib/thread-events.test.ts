@@ -205,7 +205,41 @@ describe("thread event reduction", () => {
     expect(
       isThreadSnapshotEvent(event({ type: "thread.cleared", seq: 12, runId: undefined })),
     ).toBe(true);
+    expect(isThreadSnapshotEvent(event({ type: "run.started" }))).toBe(true);
     expect(isThreadSnapshotEvent(event({ type: "run.completed" }))).toBe(true);
+  });
+
+  it("keeps group member status in sync with run lifecycle events", () => {
+    const run = threadRun("run-1", "bot-member");
+    const initial: ThreadSnapshot = {
+      ...snapshot([]),
+      botId: undefined,
+      groupId: "group-1",
+      members: [{ botId: "bot-member", name: "Member", color: "#8B5CF6", status: "idle" }],
+    };
+
+    const started = reduceThreadSnapshot(
+      initial,
+      event({ type: "run.started", botId: "bot-member", runId: run.id }),
+    );
+    expect(started?.members?.[0]?.status).toBe("running");
+
+    const waiting = reduceThreadSnapshot(
+      { ...started!, run, activeRuns: [run] },
+      event({
+        type: "run.waiting_input",
+        seq: 5,
+        botId: "bot-member",
+        runId: run.id,
+      }),
+    );
+    expect(waiting?.members?.[0]?.status).toBe("waiting_input");
+
+    const completed = reduceThreadSnapshot(
+      waiting,
+      event({ type: "run.completed", seq: 6, botId: "bot-member", runId: run.id }),
+    );
+    expect(completed?.members?.[0]?.status).toBe("idle");
   });
 
   it("clears only the terminal run's live progress", () => {
@@ -735,15 +769,19 @@ describe("computer event reduction", () => {
   it("grants user control without overwriting the lifecycle state", () => {
     const granted = reduceComputerStatus(
       computer({ state: "suspended", controlHolder: "bot" }),
-      event({ type: "computer.takeover.granted", payload: {} }),
+      event({ type: "computer.takeover.granted", payload: { takeoverRequested: true } }),
     );
     expect(granted).toMatchObject({
       state: "suspended",
       controlHolder: "user",
       controlBotId: "bot-1",
+      takeoverRequested: true,
     });
     expect(
-      reduceComputerStatus(granted, event({ type: "computer.takeover.granted", payload: {} })),
+      reduceComputerStatus(
+        granted,
+        event({ type: "computer.takeover.granted", payload: { takeoverRequested: true } }),
+      ),
     ).toBe(granted);
   });
 
@@ -752,6 +790,7 @@ describe("computer event reduction", () => {
       state: "running",
       controlHolder: "user",
       controlBotId: "bot-1",
+      takeoverRequested: true,
     });
     const expired = reduceComputerStatus(
       initial,
@@ -771,11 +810,13 @@ describe("computer event reduction", () => {
       state: "running",
       controlHolder: "none",
       controlBotId: null,
+      takeoverRequested: false,
     });
     expect(released).toMatchObject({
       state: "running",
       controlHolder: "bot",
       controlBotId: null,
+      takeoverRequested: false,
     });
   });
 
@@ -840,6 +881,7 @@ function computer(overrides: Partial<ComputerStatus> = {}): ComputerStatus {
     state: "booting",
     controlHolder: "none",
     controlBotId: null,
+    takeoverRequested: false,
     screenAvailable: false,
     screenWidth: 1280,
     screenHeight: 800,

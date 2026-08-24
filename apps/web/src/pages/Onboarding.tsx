@@ -1,3 +1,10 @@
+import {
+  OPENAI_COMPATIBLE_BASE_URL_HINT,
+  OPENAI_COMPATIBLE_PROVIDER_ID,
+  openAiCompatibleConnectReady,
+  openAiCompatibleProbeSuccessMessage,
+} from "@rakazo/contracts";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,49 +17,30 @@ import {
 } from "../lib/model-auth";
 import { rpc } from "../lib/rpc";
 
-const QUESTIONS = [
-  {
-    q: "What do you mainly want help with?",
-    sub: "Pick whatever’s closest, or type your own.",
-    opts: [
-      "Inbox & email",
-      "Slack & messages",
-      "Coding & repos",
-      "Research & writing",
-      "A bit of everything",
-    ],
-  },
-  {
-    q: "How do you want me to write?",
-    sub: "I’ll match this unless you say otherwise.",
-    opts: [
-      "Clear and tight",
-      "Warm and conversational",
-      "Polished / formal",
-      "Match whatever I draft",
-    ],
-  },
-];
-
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"loading" | "model" | "bot" | "questions">("loading");
+  const [step, setStep] = useState<"loading" | "model" | "bot">("loading");
   const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
   const [query, setQuery] = useState("");
   const [provider, setProvider] = useState("openrouter");
   const [modelId, setModelId] = useState("deepseek/deepseek-v4-flash-0731");
   const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [probeModels, setProbeModels] = useState<string[]>([]);
+  const [probedBaseUrl, setProbedBaseUrl] = useState<string | null>(null);
+  const [probing, setProbing] = useState(false);
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [answers, setAnswers] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [oauth, setOauth] = useState<ModelOAuthBegin | null>(null);
   const [pasteCode, setPasteCode] = useState("");
   const [oauthPending, setOauthPending] = useState(false);
   const oauthAbortRef = useRef<AbortController | null>(null);
   const oauthLoginIdRef = useRef<string | null>(null);
   const oauthCodeSubmittingRef = useRef(false);
+  const probeRequestIdRef = useRef(0);
 
   function cancelOAuthAttempt(resetState = true) {
     const loginId = oauthLoginIdRef.current;
@@ -78,12 +66,15 @@ export function OnboardingPage() {
           models[0];
         if (preferred) {
           setProvider(preferred.provider);
-          setModelId(preferred.id);
+          setModelId(preferred.provider === OPENAI_COMPATIBLE_PROVIDER_ID ? "" : preferred.id);
         }
         setStep("model");
       })
       .catch(() => setStep("bot"));
-    return () => cancelOAuthAttempt(false);
+    return () => {
+      probeRequestIdRef.current += 1;
+      cancelOAuthAttempt(false);
+    };
   }, []);
 
   const providers = useMemo(() => {
@@ -115,14 +106,73 @@ export function OnboardingPage() {
   );
 
   const selected = modelsForProvider.find((entry) => entry.id === modelId) ?? modelsForProvider[0];
+  const isOpenAiCompatible = provider === OPENAI_COMPATIBLE_PROVIDER_ID;
   const subscriptionSignIn = selected?.signIn !== undefined;
   const acceptsKey = selected?.auth !== "oauth";
   const signInLabel = selected?.oauthLabel ?? "Sign in";
+  const openAiCompatibleReady = openAiCompatibleConnectReady({
+    baseUrl,
+    modelId,
+    probedBaseUrl,
+  });
+
+  function resetOpenAiCompatibleProbe() {
+    probeRequestIdRef.current += 1;
+    setProbeModels([]);
+    setProbedBaseUrl(null);
+    setProbing(false);
+  }
+
+  function updateBaseUrl(nextBaseUrl: string) {
+    setBaseUrl(nextBaseUrl);
+    resetOpenAiCompatibleProbe();
+    setError(null);
+    setNotice(null);
+  }
+
+  function updateApiKey(nextApiKey: string) {
+    setApiKey(nextApiKey);
+    resetOpenAiCompatibleProbe();
+  }
+
+  async function probeServerModels() {
+    const trimmedBaseUrl = baseUrl.trim();
+    if (!trimmedBaseUrl) return;
+    resetOpenAiCompatibleProbe();
+    const requestId = probeRequestIdRef.current;
+    setProbing(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await rpc.models.probeOpenAiCompatible({
+        baseUrl: trimmedBaseUrl,
+        apiKey: apiKey.trim() || undefined,
+      });
+      if (requestId !== probeRequestIdRef.current) return;
+      setProbeModels(result.models);
+      setProbedBaseUrl(trimmedBaseUrl);
+      setModelId((current) => current.trim() || result.models[0] || "");
+      setNotice(openAiCompatibleProbeSuccessMessage(result.models.length));
+    } catch (err) {
+      if (requestId !== probeRequestIdRef.current) return;
+      setError(err instanceof Error ? err.message : "Could not reach this model server");
+    } finally {
+      if (requestId === probeRequestIdRef.current) setProbing(false);
+    }
+  }
 
   async function saveModel() {
     setError(null);
     try {
-      if (apiKey) {
+      if (isOpenAiCompatible) {
+        await rpc.models.connect({
+          provider,
+          baseUrl: baseUrl.trim(),
+          modelId: modelId.trim(),
+          apiKey: apiKey.trim() || undefined,
+          label: selected?.providerName ?? provider,
+        });
+      } else if (apiKey) {
         await rpc.models.connect({
           provider,
           apiKey,
@@ -219,20 +269,23 @@ export function OnboardingPage() {
   }
 
   async function createBot() {
-    const instructions = answers.length
-      ? `User setup:\n${answers.map((a) => `- ${a}`).join("\n")}`
-      : description;
-    const bot = await rpc.bots.create({
-      name: name.trim(),
-      title,
-      description,
-      instructions,
-      notifyOnFinish: true,
-    });
-    navigate(`/app/${bot.id}`);
+    setError(null);
+    try {
+      const bot = await rpc.bots.create({
+        name: name.trim(),
+        title,
+        description,
+        instructions: description,
+        notifyOnFinish: true,
+      });
+      // Onboarding continues conversationally in the thread: greeting, focus
+      // choice, and Composio authorize cards.
+      await rpc.onboarding.start({ botId: bot.id }).catch(() => undefined);
+      navigate(`/app/${bot.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create your bot");
+    }
   }
-
-  const question = QUESTIONS[answers.length];
 
   return (
     <div className="flex min-h-full items-center justify-center bg-[#0D0D0E] px-6">
@@ -241,10 +294,7 @@ export function OnboardingPage() {
         {step === "model" ? (
           <div>
             <h1 className="text-[32px] font-medium text-[#F1F1F2]">Connect a model</h1>
-            <p className="mt-2 text-[#85858A]">
-              Rakazo does not pay for model usage. Paste an API key, sign in with ChatGPT, Copilot,
-              or SuperGrok, or skip if this deployment already has a key.
-            </p>
+            <p className="mt-2 text-[#85858A]">Choose a model to get started.</p>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -259,9 +309,15 @@ export function OnboardingPage() {
                   onClick={() => {
                     cancelOAuthAttempt();
                     setProvider(entry.provider);
-                    const first = catalog.find((item) => item.provider === entry.provider);
-                    if (first) setModelId(first.id);
+                    setModelId(
+                      entry.provider === OPENAI_COMPATIBLE_PROVIDER_ID
+                        ? ""
+                        : (catalog.find((item) => item.provider === entry.provider)?.id ?? ""),
+                    );
+                    setBaseUrl("");
+                    resetOpenAiCompatibleProbe();
                     setError(null);
+                    setNotice(null);
                   }}
                   className={`flex w-full items-center justify-between border-b border-[#202023] px-3.5 py-2.5 text-left last:border-0 ${
                     entry.provider === provider ? "bg-[#1A1A1D]" : "hover:bg-[#161618]"
@@ -274,24 +330,102 @@ export function OnboardingPage() {
                 </button>
               ))}
             </div>
-            <label className="mt-4 block text-sm text-[#85858A]">
-              Model
-              <select
-                value={selected?.id ?? modelId}
-                onChange={(e) => {
-                  cancelOAuthAttempt();
-                  setModelId(e.target.value);
-                }}
-                className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
-              >
-                {modelsForProvider.map((entry) => (
-                  <option key={`${entry.provider}:${entry.id}`} value={entry.id}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="mt-2 text-[13px] text-[#85858A]">{selected?.billing}</p>
+            <div className="mt-4 block text-sm text-[#85858A]">
+              {isOpenAiCompatible ? (
+                <>
+                  <label className="block">
+                    Server URL
+                    <input
+                      value={baseUrl}
+                      onChange={(e) => updateBaseUrl(e.target.value)}
+                      aria-label="OpenAI-compatible server URL"
+                      placeholder="http://127.0.0.1:8000/v1"
+                      autoComplete="off"
+                      className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
+                    />
+                  </label>
+                  <details className="mt-2 text-[13px] leading-[1.5] text-[#85858A]">
+                    <summary className="w-fit cursor-pointer select-none">Setup help</summary>
+                    <p className="mt-1">{OPENAI_COMPATIBLE_BASE_URL_HINT}</p>
+                  </details>
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      disabled={probing || !baseUrl.trim()}
+                      onClick={() => void probeServerModels()}
+                      className="rounded-[11px] border border-[#26262A] px-4 py-2 text-sm text-[#ECECEE] disabled:opacity-40"
+                    >
+                      {probing ? "Finding…" : "Find models"}
+                    </button>
+                  </div>
+                  <div className="mt-4 block">
+                    <span>Model</span>
+                    {probeModels.length && probeModels.includes(modelId) ? (
+                      <div className="relative mt-2">
+                        <select
+                          value={modelId}
+                          onChange={(e) => setModelId(e.target.value)}
+                          aria-label="Models from server"
+                          className="w-full appearance-none rounded-[11px] border border-[#26262A] bg-transparent py-3 pl-3.5 pr-11 text-[#ECECEE]"
+                        >
+                          {probeModels.map((id) => (
+                            <option key={id} value={id}>
+                              {id}
+                            </option>
+                          ))}
+                          <option value="">Other model…</option>
+                        </select>
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#85858A]"
+                        >
+                          <ChevronDown size={16} strokeWidth={1.8} />
+                        </span>
+                      </div>
+                    ) : (
+                      <input
+                        value={modelId}
+                        onChange={(e) => setModelId(e.target.value)}
+                        aria-label="Model id"
+                        placeholder="exact-model-id"
+                        className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
+                      />
+                    )}
+                    {probeModels.length && !probeModels.includes(modelId) ? (
+                      <button
+                        type="button"
+                        className="mt-2 text-[13px] text-[#85858A] underline"
+                        onClick={() => setModelId(probeModels[0] ?? "")}
+                      >
+                        Use a found model
+                      </button>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span>Model</span>
+                  <select
+                    value={selected?.id ?? modelId}
+                    onChange={(e) => {
+                      cancelOAuthAttempt();
+                      setModelId(e.target.value);
+                    }}
+                    aria-label="Model"
+                    className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
+                  >
+                    {modelsForProvider.map((entry) => (
+                      <option key={`${entry.provider}:${entry.id}`} value={entry.id}>
+                        {entry.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+            {!isOpenAiCompatible ? (
+              <p className="mt-2 text-[13px] text-[#85858A]">{selected?.billing}</p>
+            ) : null}
             {subscriptionSignIn ? (
               <div className="mt-4">
                 {oauth ? (
@@ -364,28 +498,44 @@ export function OnboardingPage() {
               </div>
             ) : null}
             {acceptsKey ? (
-              <label className="mt-4 block text-sm text-[#85858A]">
-                {subscriptionSignIn ? "Or paste an API key" : "API key"}
-                <input
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="sk-…"
-                  type="password"
-                  autoComplete="new-password"
-                  className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
-                />
-              </label>
+              isOpenAiCompatible ? (
+                <details className="mt-4 text-sm text-[#85858A]">
+                  <summary className="w-fit cursor-pointer select-none">API key</summary>
+                  <input
+                    aria-label="API key"
+                    value={apiKey}
+                    onChange={(e) => updateApiKey(e.target.value)}
+                    placeholder="Optional"
+                    type="password"
+                    autoComplete="new-password"
+                    className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
+                  />
+                </details>
+              ) : (
+                <label className="mt-4 block text-sm text-[#85858A]">
+                  {subscriptionSignIn ? "Or paste an API key" : "API key"}
+                  <input
+                    value={apiKey}
+                    onChange={(e) => updateApiKey(e.target.value)}
+                    placeholder="sk-…"
+                    type="password"
+                    autoComplete="new-password"
+                    className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
+                  />
+                </label>
+              )
             ) : subscriptionSignIn ? null : (
               <p className="mt-4 text-sm text-[#85858A]">
                 This provider cannot paste a key here. Skip if this deployment already has
                 credentials.
               </p>
             )}
+            {notice ? <p className="mt-3 text-sm text-[#4ECB71]">{notice}</p> : null}
             {error ? <p className="mt-3 text-sm text-[#E65707]">{error}</p> : null}
             <div className="mt-6 flex gap-3">
               <button
                 type="button"
-                disabled={oauthPending}
+                disabled={oauthPending || (isOpenAiCompatible && !openAiCompatibleReady)}
                 onClick={() => void saveModel()}
                 className="rounded-[11px] bg-[#F1F1EF] px-5 py-2.5 text-[#17171A] disabled:opacity-40"
               >
@@ -435,47 +585,14 @@ export function OnboardingPage() {
                 className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-transparent px-3.5 py-3 text-[#ECECEE]"
               />
             </label>
+            {error ? <p className="mt-3 text-sm text-[#E65707]">{error}</p> : null}
             <button
               type="button"
               disabled={!name.trim()}
-              onClick={() => setStep("questions")}
+              onClick={() => void createBot()}
               className="mt-6 rounded-[11px] bg-[#F1F1EF] px-5 py-2.5 text-[#17171A] disabled:opacity-40"
             >
               Continue
-            </button>
-          </div>
-        ) : null}
-        {step === "questions" && question ? (
-          <div className="rounded-[20px] bg-[#1A1A1D] p-5">
-            <div className="text-[17px] font-medium text-[#F1F1F2]">{question.q}</div>
-            <div className="mt-1 text-[15px] text-[#85858A]">{question.sub}</div>
-            <div className="mt-3.5 overflow-hidden rounded-[13px] border border-[#232326]">
-              {question.opts.map((opt, i) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setAnswers((a) => [...a, opt])}
-                  className="flex w-full items-center gap-3.5 border-b border-[#202023] px-4 py-3.5 text-left last:border-0 hover:bg-[#222226]"
-                >
-                  <span className="grid h-[22px] w-[22px] place-items-center rounded-[6px] bg-[#232327] text-[12.5px] text-[#9A9AA0]">
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  <span className="text-[15.5px] text-[#ECECEE]">{opt}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {step === "questions" && !question ? (
-          <div>
-            <h1 className="text-[32px] font-medium text-[#F1F1F2]">You’re set.</h1>
-            <p className="mt-2 text-[#85858A]">I’ll pick up work the moment you send it.</p>
-            <button
-              type="button"
-              onClick={() => void createBot()}
-              className="mt-6 rounded-[11px] bg-[#F1F1EF] px-5 py-2.5 text-[#17171A]"
-            >
-              Open Rakazo
             </button>
           </div>
         ) : null}

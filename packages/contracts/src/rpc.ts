@@ -2,13 +2,16 @@ import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
 import { ATTACHMENT_MAX_BASE64_LENGTH, ATTACHMENT_MAX_COUNT } from "./attachments.js";
 import {
+  ActionApprovalRuleSchema,
   AppBootstrapSchema,
   ArtifactSchema,
   ArtifactWithContentSchema,
+  BotMcpServerSchema,
   BotSchema,
   BotSectionSchema,
   CapabilityInstallSchema,
   ComputerModeSchema,
+  ComputerReleaseReasonSchema,
   ComputerStatusSchema,
   ConnectionCatalogItemSchema,
   ConnectionSchema,
@@ -20,10 +23,13 @@ import {
   GROUP_MEMBER_MAX,
   GroupDetailSchema,
   GroupSchema,
+  McpServerConfigInput,
+  McpServerSchema,
   MemoryDocumentSchema,
   MemoryScopeSchema,
   MeSchema,
   ModelCatalogEntrySchema,
+  ModelConnectInputSchema,
   ModelCredentialSchema,
   ModelOAuthBeginSchema,
   RoutineSchema,
@@ -104,16 +110,15 @@ export const appContract = {
   models: {
     list: oc.output(z.array(ModelCatalogEntrySchema)),
     credentials: oc.output(z.array(ModelCredentialSchema)),
-    connect: oc
+    connect: oc.input(ModelConnectInputSchema).output(ModelCredentialSchema),
+    probeOpenAiCompatible: oc
       .input(
         z.object({
-          provider: z.string(),
-          apiKey: z.string().min(8),
-          label: z.string().optional(),
-          modelId: z.string().optional(),
+          baseUrl: z.string(),
+          apiKey: z.string().optional(),
         }),
       )
-      .output(ModelCredentialSchema),
+      .output(z.object({ models: z.array(z.string()) })),
     beginOAuth: oc
       .input(
         z.object({
@@ -218,7 +223,14 @@ export const appContract = {
     boot: oc.input(botId).output(ComputerStatusSchema),
     stop: oc.input(botId).output(ComputerStatusSchema),
     takeover: oc.input(botId).output(z.object({ leaseId: Id, expiresAt: z.string() })),
-    release: oc.input(botId).output(z.object({ ok: z.literal(true) })),
+    release: oc
+      .input(
+        z.object({
+          botId: Id,
+          reason: ComputerReleaseReasonSchema.optional(),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
     input: oc
       .input(
         z.object({
@@ -324,9 +336,62 @@ export const appContract = {
       )
       .output(CapabilityInstallSchema),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
-    oauthBegin: oc.input(z.object({ id: Id })).output(z.object({ authorizationUrl: z.string() })),
-    oauthComplete: oc
-      .input(z.object({ code: z.string().min(1).max(2048), state: z.string().min(1).max(256) }))
+  },
+  mcp: {
+    servers: {
+      list: oc.output(z.array(McpServerSchema)),
+      create: oc.input(McpServerConfigInput).output(McpServerSchema),
+      update: oc.input(z.object({ id: Id, config: McpServerConfigInput })).output(McpServerSchema),
+      remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+    assignments: {
+      list: oc.input(botId).output(z.array(BotMcpServerSchema)),
+      all: oc.output(z.array(BotMcpServerSchema)),
+      approve: oc.input(z.object({ botId: Id, serverId: Id })).output(BotMcpServerSchema),
+      replace: oc
+        .input(
+          z.object({
+            botId: Id,
+            assignments: z.array(
+              z.object({
+                serverId: Id,
+                allowAllTools: z.boolean().default(true),
+                allowedTools: z.array(z.string().min(1).max(200)).max(500).default([]),
+              }),
+            ),
+          }),
+        )
+        .output(z.array(BotMcpServerSchema)),
+    },
+    oauth: {
+      begin: oc.input(z.object({ serverId: Id, redirectUri: z.string().url() })).output(
+        z.discriminatedUnion("status", [
+          z.object({
+            status: z.literal("authorization_required"),
+            sessionId: Id,
+            authorizationUrl: z.string().url(),
+          }),
+          z.object({
+            status: z.enum(["already_connected", "authorization_not_requested"]),
+          }),
+        ]),
+      ),
+      complete: oc
+        .input(z.object({ sessionId: Id, code: z.string().min(1), state: z.string().min(1) }))
+        .output(z.object({ ok: z.literal(true) })),
+      disconnect: oc.input(z.object({ serverId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+  },
+  onboarding: {
+    /** Seed the first-run conversational onboarding into the bot's thread. */
+    start: oc.input(z.object({ botId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Answer the focus choice; renames the bot and posts the app cards. */
+    choose: oc
+      .input(z.object({ botId: Id, optionId: z.string() }))
+      .output(z.object({ ok: z.literal(true) })),
+    /** Flip an app_connect card to connected after authorization completes. */
+    appConnected: oc
+      .input(z.object({ botId: Id, provider: z.string() }))
       .output(z.object({ ok: z.literal(true) })),
   },
   connections: {
@@ -347,6 +412,19 @@ export const appContract = {
       .input(z.object({ connectionId: Id, code: z.string().optional() }))
       .output(ConnectionSchema),
     revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  approvalRules: {
+    list: oc.output(z.array(ActionApprovalRuleSchema)),
+    set: oc
+      .input(
+        z.object({
+          effect: z.enum(["always_allow", "require_approval"]),
+          matchKind: z.enum(["tool", "connector", "category"]),
+          matchValue: z.string().min(1),
+        }),
+      )
+      .output(ActionApprovalRuleSchema),
+    remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
   },
   artifacts: {
     list: oc.input(botId).output(z.array(ArtifactSchema)),

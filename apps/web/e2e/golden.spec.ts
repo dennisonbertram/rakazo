@@ -18,13 +18,13 @@ test("two users are isolated and a bot completes durable work", async ({ browser
 
   const stamp = Date.now();
   await signup(pageA, `ada-${stamp}@rakazo.test`, "password12", "Ada", testInfo);
-  await completeOnboarding(pageA, ["A bit of everything", "Clear and tight"], testInfo);
+  await completeOnboarding(pageA, testInfo);
   await expect(pageA.getByText("Chief").first()).toBeVisible();
 
   await signup(pageB, `bob-${stamp}@rakazo.test`, "password12", "Bob");
-  await completeOnboarding(pageB, ["Coding & repos", "Clear and tight"]);
+  await completeOnboarding(pageB);
   await expect(pageB.getByText("Chief").first()).toBeVisible();
-  await expect(pageB.getByText("Ada")).toHaveCount(0);
+  await expect(pageB.getByText("Ada", { exact: true })).toHaveCount(0);
 
   const composer = pageA.getByPlaceholder(/Message/);
   await composer.fill("write a file in your home called notes/result.txt that says isolation-ok");
@@ -46,14 +46,14 @@ test("two users are isolated and a bot completes durable work", async ({ browser
 test("takeover, routine, plugins, and export are reachable", async ({ page }, testInfo) => {
   const stamp = Date.now();
   await signup(page, `flow-${stamp}@rakazo.test`, "password12", "Flow");
-  await completeOnboarding(page, ["A bit of everything", "Clear and tight"]);
+  await completeOnboarding(page);
 
   const composer = page.getByPlaceholder(/Message/);
   await composer.fill("install the gsc cli and sign in");
   await page.keyboard.press("Enter");
-  await expect(page.getByText(/sign in to continue|protected input/i).first()).toBeVisible({
-    timeout: realSandboxTimeout(90_000, 30_000),
-  });
+  await expect(
+    page.getByText(/handing you the computer|sign in to continue|protected input/i).first(),
+  ).toBeVisible({ timeout: realSandboxTimeout(90_000, 30_000) });
   await expect
     .poll(() => threadRunStatus(page), {
       timeout: realSandboxTimeout(90_000, 30_000),
@@ -73,13 +73,32 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   expect((mainBox?.x ?? 0) + (mainBox?.width ?? 0)).toBeLessThanOrEqual(panelBox?.x ?? 0);
   await page.getByRole("button", { name: "Take control" }).click();
   await expect(page.getByRole("button", { name: "Close computer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Skip", exact: true }).last()).toBeVisible();
+  await expect(page.getByRole("button", { name: "I’m done", exact: true }).last()).toBeVisible();
   if (process.env.SANDBOX_PROVIDER === "box") await waitForBoxFramebuffer(page);
-  await captureScreenshot(page, testInfo, "09-computer-takeover");
-  await page.getByRole("button", { name: "Release" }).last().click();
+  await captureScreenshot(page, testInfo, "09-computer-takeover-outcomes");
+  await page.getByRole("button", { name: "I’m done", exact: true }).last().click();
   await expect(page.getByRole("button", { name: "Close computer" })).toBeHidden();
   await expect(page.getByText(/signed in|session stays/i).first()).toBeVisible({
     timeout: realSandboxTimeout(90_000, 30_000),
   });
+
+  await composer.fill("sign in again so I can skip this time");
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() => threadRunStatus(page), {
+      timeout: realSandboxTimeout(90_000, 30_000),
+      message: "the second protected-input run must be ready for takeover",
+    })
+    .toBe("waiting_takeover");
+  await page.getByRole("button", { name: "Take control" }).click();
+  await expect(page.getByRole("button", { name: "Close computer" })).toBeVisible();
+  await page.getByRole("button", { name: "Skip", exact: true }).last().click();
+  await expect(page.getByRole("button", { name: "Close computer" })).toBeHidden();
+  await expect(page.getByText(/login was skipped/i).last()).toBeVisible({
+    timeout: realSandboxTimeout(90_000, 30_000),
+  });
+  await captureScreenshot(page, testInfo, "09a-computer-takeover-skipped");
 
   await page.getByText("+ New routine").click();
   await page.locator("label:has-text('Name') input").fill("Monday briefing");
@@ -150,7 +169,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await page.getByRole("button", { name: "Close integrations" }).click();
 
   await page.getByText("Chief").first().click();
-  const gear = page.getByRole("button", { name: "Bot settings" });
+  const gear = page.getByRole("button", { name: "Show settings" });
   if (!(await gear.isVisible().catch(() => false))) {
     await page.getByTitle("Agent computer").click();
   }
@@ -180,7 +199,7 @@ test("sign-in, spawn, and stop work in the shell", async ({ page }, testInfo) =>
   const stamp = Date.now();
   const email = `shell-${stamp}@rakazo.test`;
   await signup(page, email, "password12", "Shell");
-  await completeOnboarding(page, ["A bit of everything", "Clear and tight"]);
+  await completeOnboarding(page);
 
   const composer = page.getByPlaceholder(/Message/);
   await composer.fill("spawn a bot named Scout to research venues");
@@ -221,7 +240,7 @@ test("bot context menu pins, duplicates, edits, and confirms deletion", async ({
 }, testInfo) => {
   const stamp = Date.now();
   await signup(page, `menu-${stamp}@rakazo.test`, "password12", "Menu");
-  await completeOnboarding(page, ["A bit of everything", "Clear and tight"]);
+  await completeOnboarding(page);
 
   const chief = page.getByRole("button", { name: /Chief/ }).first();
   await chief.click({ button: "right" });

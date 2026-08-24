@@ -12,6 +12,11 @@ import type {
 import { builtinAgentTools, DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
 import { PiRuntimeCredentialStore, toOAuthCredential } from "./pi-credentials.js";
 import { registerLocalProvider } from "./pi-local-provider.js";
+import {
+  OPENAI_COMPATIBLE_PROVIDER_ID,
+  registerOpenAiCompatibleCatalog,
+  registerOpenAiCompatibleRuntime,
+} from "./pi-openai-compatible-provider.js";
 
 const running = new Map<string, AbortController>();
 // Built on first use, not at module load: entry points call loadRootEnv() after
@@ -19,10 +24,14 @@ const running = new Map<string, AbortController>();
 // would run before .env is loaded and miss the local provider entirely.
 let catalogModelsCache: Models | undefined;
 function catalogModels(): Models {
-  catalogModelsCache ??= registerLocalProvider(builtinModels());
+  catalogModelsCache ??= registerOpenAiCompatibleCatalog(registerLocalProvider(builtinModels()));
   return catalogModelsCache;
 }
 const MAX_PARALLEL_SUBAGENTS = 4;
+// Reasoning-capable models must not start at "off": for OpenRouter, pi-ai maps
+// that to reasoning.effort "none", which 400s on endpoints that mandate
+// reasoning (e.g. google/gemini-3.7-flash). Keep a real level when model.reasoning
+// is set; plain models stay off.
 const REASONING_MODEL_THINKING_LEVEL = "medium";
 function thinkingLevelFor(model: { reasoning?: boolean }) {
   return model.reasoning ? REASONING_MODEL_THINKING_LEVEL : "off";
@@ -59,12 +68,25 @@ export class PiAgentRuntime implements AgentRuntime {
       try {
         const provider =
           request.model.provider === "scripted" ? "openrouter" : request.model.provider;
+        const envDefaultModel = process.env.PI_DEFAULT_MODEL?.trim();
+        const envDefaultProvider = process.env.PI_DEFAULT_PROVIDER?.trim() || "openrouter";
         const modelId =
           request.model.id === "scripted"
-            ? (process.env.PI_DEFAULT_MODEL ?? "deepseek/deepseek-v4-flash-0731")
-            : request.model.id;
+            ? envDefaultModel || "deepseek/deepseek-v4-flash-0731"
+            : request.model.id.trim();
         const models = modelsForRequest(request, provider);
-        const model = models.getModel(provider, modelId) ?? models.getModel("openrouter", modelId);
+        let model = models.getModel(provider, modelId);
+        if (!model && provider !== "openrouter" && provider !== OPENAI_COMPATIBLE_PROVIDER_ID) {
+          model = models.getModel("openrouter", modelId);
+        }
+        if (
+          !model &&
+          provider === "openrouter" &&
+          envDefaultProvider === "openrouter" &&
+          modelId === envDefaultModel
+        ) {
+          model = configuredOpenRouterModel(modelId);
+        }
         if (!model) {
           queue.push({ type: "text", text: `Unknown model ${provider}/${modelId}` });
           queue.push({ type: "done" });
@@ -73,7 +95,9 @@ export class PiAgentRuntime implements AgentRuntime {
 
         const apiKey = request.model.oauth
           ? undefined
-          : (request.model.apiKey ?? process.env.OPENROUTER_API_KEY);
+          : request.model.provider === OPENAI_COMPATIBLE_PROVIDER_ID
+            ? request.model.apiKey || "local"
+            : (request.model.apiKey ?? process.env.OPENROUTER_API_KEY);
         const toolDefs = request.tools.length ? request.tools : builtinAgentTools;
         const nestedAgents = new Set<Agent>();
         const host: ToolHost = {
@@ -173,9 +197,12 @@ export class PiAgentRuntime implements AgentRuntime {
           data: Buffer.from(image.data).toString("base64"),
           mimeType: image.mimeType,
         }));
-        await agent.prompt(request.prompt, images?.length ? images : undefined);
-        await agent.waitForIdle();
-        signal.removeEventListener("abort", onAbort);
+        try {
+          await agent.prompt(request.prompt, images?.length ? images : undefined);
+          await agent.waitForIdle();
+        } finally {
+          signal.removeEventListener("abort", onAbort);
+        }
 
         const error = agent.state.errorMessage;
         if (error) {
@@ -207,20 +234,56 @@ export class PiAgentRuntime implements AgentRuntime {
   }
 }
 
-function modelsForRequest(request: AgentRunRequest, provider: string): Models {
-  const oauth = request.model.oauth;
-  if (!oauth) return catalogModels();
+function configuredOpenRouterModel(id: string): Model<"openai-completions"> {
+  // A configured model can intentionally be newer than Pi's static catalog. Keep
+  // pricing conservative, but enable reasoning: unknown OpenRouter endpoints
+  // (e.g. gemini-3.7-flash before the snapshot catches up) often mandate it, and
+  // thinkingLevel "off" becomes effort "none" which those endpoints reject.
+  return {
+    id,
+    name: id,
+    api: "openai-completions",
+    provider: "openrouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 16_384,
+    maxTokens: 4_096,
+  };
+}
 
-  const persist = oauth.persist;
-  return registerLocalProvider(
-    builtinModels({
-      credentials: new PiRuntimeCredentialStore(
-        provider,
-        toOAuthCredential(oauth.credential),
-        persist ? (next) => persist(next) : undefined,
+export function modelsForRequest(
+  request: Pick<AgentRunRequest, "model">,
+  provider: string,
+): Models {
+  const oauth = request.model.oauth;
+  if (oauth) {
+    const persist = oauth.persist;
+    return registerOpenAiCompatibleCatalog(
+      registerLocalProvider(
+        builtinModels({
+          credentials: new PiRuntimeCredentialStore(
+            provider,
+            toOAuthCredential(oauth.credential),
+            persist ? (next) => persist(next) : undefined,
+          ),
+        }),
       ),
-    }),
-  );
+    );
+  }
+  if (
+    provider === OPENAI_COMPATIBLE_PROVIDER_ID &&
+    request.model.baseUrl &&
+    request.model.id.trim()
+  ) {
+    const models = registerOpenAiCompatibleCatalog(registerLocalProvider(builtinModels()));
+    return registerOpenAiCompatibleRuntime(models, {
+      modelId: request.model.id,
+      baseUrl: request.model.baseUrl,
+    });
+  }
+  return catalogModels();
 }
 
 function toAgentTools(toolDefs: readonly ConnectorTool[], host: ToolHost): AgentTool[] {
@@ -265,6 +328,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "attach_file") return `Attaching ${detail(record.path)}`;
   if (toolName === "open_path") return `Opening ${detail(record.path)}`;
   if (toolName === "render_plot") return "Rendering a chart";
+  if (toolName === "add_mcp_server") return `Connecting MCP server: ${detail(record.name)}`;
   if (toolName === "computer_observe") return "Looking at the screen";
   if (toolName === "computer_act") return "Operating the computer";
   if (toolName === "run_subagent") return `Delegating to helper: ${detail(record.name)}`;
@@ -424,7 +488,9 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         };
       }
       if (host.request.executeTool) {
-        const result = await host.request.executeTool(tool.name, args, executionId);
+        const result = tool.route
+          ? await host.request.executeTool(tool.name, args, executionId, tool.route)
+          : await host.request.executeTool(tool.name, args, executionId);
         if (isAgentToolExecutionResult(result)) return result;
         return {
           content: [{ type: "text", text: summarizeToolResult(result) }],

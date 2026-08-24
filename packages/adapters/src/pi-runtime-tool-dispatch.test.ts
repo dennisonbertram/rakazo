@@ -78,6 +78,16 @@ vi.mock("@earendil-works/pi-ai/providers/all", () => ({
   }),
 }));
 
+vi.mock("./pi-local-provider.js", () => ({
+  registerLocalProvider: (models: unknown) => models,
+}));
+
+vi.mock("./pi-openai-compatible-provider.js", () => ({
+  OPENAI_COMPATIBLE_PROVIDER_ID: "openai-compatible",
+  registerOpenAiCompatibleCatalog: (models: unknown) => models,
+  registerOpenAiCompatibleRuntime: (models: unknown) => models,
+}));
+
 import { PiAgentRuntime } from "./pi-runtime.js";
 
 const destinationTool: ConnectorTool = {
@@ -91,6 +101,7 @@ const destinationTool: ConnectorTool = {
       body: { type: "string" },
     },
   },
+  route: { connectorId: "destination", toolName: "destination.write" },
 };
 
 describe("Pi connector tool dispatch", () => {
@@ -132,6 +143,7 @@ describe("Pi connector tool dispatch", () => {
       "destination.write",
       { collection: "notes", title: "Result", body: "Done" },
       "call-1",
+      { connectorId: "destination", toolName: "destination.write" },
     );
   });
 

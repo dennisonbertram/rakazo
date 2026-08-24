@@ -314,6 +314,7 @@ export interface AgentRunRequest {
     provider: string;
     id: string;
     apiKey?: string;
+    baseUrl?: string;
     /** In-process OAuth credential from the encrypted store for this run. */
     oauth?: {
       credential: AgentModelOAuthCredential;
@@ -326,6 +327,7 @@ export interface AgentRunRequest {
     name: string,
     args: Record<string, unknown>,
     executionId: string,
+    route?: ConnectorRoute,
   ) => Promise<unknown>;
 }
 
