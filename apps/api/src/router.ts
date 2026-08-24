@@ -1916,13 +1916,18 @@ export function createRouter(deps: RouterDeps) {
               });
               if (existing.secretId)
                 await tx.secret.deleteMany({
-                  where: { id: existing.secretId, workspaceId: context.actor.workspaceId },
+                  where: {
+                    id: existing.secretId,
+                    workspaceId: context.actor.workspaceId,
+                    userId: context.actor.userId,
+                  },
                 });
             } else if (clearing && existing.secretId) {
               await tx.secret.deleteMany({
                 where: {
                   id: existing.secretId,
                   workspaceId: context.actor.workspaceId,
+                  userId: context.actor.userId,
                 },
               });
             }
