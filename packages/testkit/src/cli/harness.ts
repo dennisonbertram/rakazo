@@ -12,9 +12,11 @@ const e2e = process.argv.includes("--e2e");
 const sandboxArg = process.argv.find((arg) => arg.startsWith("--sandbox="));
 const specArg = process.argv.find((arg) => arg.startsWith("--spec="));
 const grepArg = process.argv.find((arg) => arg.startsWith("--grep="));
+const suiteArg = process.argv.find((arg) => arg.startsWith("--suite="));
 const sandboxProvider = sandboxArg?.slice("--sandbox=".length) ?? "fake";
 const e2eSpec = specArg?.slice("--spec=".length);
 const e2eGrep = grepArg?.slice("--grep=".length);
+const integrationSuite = suiteArg?.slice("--suite=".length) ?? "all";
 
 if (Number(integration) + Number(e2e) !== 1) {
   throw new Error("Pass exactly one of --integration or --e2e");
@@ -24,6 +26,12 @@ if (!["fake", "e2b", "daytona", "box"].includes(sandboxProvider)) {
 }
 if (integration && sandboxProvider !== "fake") {
   throw new Error("Integration tests only support the fake sandbox");
+}
+if (!integration && suiteArg) {
+  throw new Error("--suite is only supported with --integration");
+}
+if (!['all', 'api', 'worker'].includes(integrationSuite)) {
+  throw new Error('Integration suite must be "all", "api", or "worker"');
 }
 if (sandboxProvider === "e2b" && !process.env.E2B_API_KEY) {
   throw new Error("E2B_API_KEY is required when --sandbox=e2b");
@@ -73,20 +81,26 @@ async function main() {
     });
 
     if (integration) {
-      execSync(
-        [
-          "pnpm exec vitest run --no-file-parallelism",
-          "packages/testkit/src/journeys.test.ts",
+      const suites = {
+        api: [
           "packages/testkit/src/authorization.test.ts",
           "packages/testkit/src/attachments.test.ts",
           "packages/testkit/src/voice.test.ts",
           "packages/testkit/src/search.test.ts",
-          "packages/testkit/src/executor-lifecycle.test.ts",
           "packages/testkit/src/connections.test.ts",
+        ],
+        worker: [
+          "packages/testkit/src/journeys.test.ts",
+          "packages/testkit/src/executor-lifecycle.test.ts",
           "packages/adapters/src/wakeup.postgres.test.ts",
           "packages/adapters/src/realtime.postgres.test.ts",
           "packages/adapters/src/job-reconciler.postgres.test.ts",
-        ].join(" "),
+        ],
+      } as const;
+      const selectedSuites =
+        integrationSuite === "all" ? [...suites.api, ...suites.worker] : suites[integrationSuite];
+      execSync(
+        ["pnpm exec vitest run --no-file-parallelism", ...selectedSuites].join(" "),
         {
           stdio: "inherit",
           env: process.env,
