@@ -1944,7 +1944,15 @@ export function createRouter(deps: RouterDeps) {
           await deps.prisma.$transaction([
             deps.prisma.mcpServer.delete({ where: { id: server.id } }),
             ...(server.secretId
-              ? [deps.prisma.secret.delete({ where: { id: server.secretId } })]
+              ? [
+                  deps.prisma.secret.deleteMany({
+                    where: {
+                      id: server.secretId,
+                      workspaceId: context.actor.workspaceId,
+                      userId: context.actor.userId,
+                    },
+                  }),
+                ]
               : []),
           ]);
           return { ok: true as const };
