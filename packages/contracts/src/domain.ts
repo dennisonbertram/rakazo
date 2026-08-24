@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { ThreadMessageSchema } from "./events.js";
 import { Id, MemoryScope, RunStatus, SandboxKind } from "./ids.js";
+import { McpHeadersSchema, McpRemoteEndpointSchema, McpTransportSchema } from "./mcp.js";
 
 export const ComputerModeSchema = z.enum(["team", "dedicated"]);
 export type ComputerMode = z.infer<typeof ComputerModeSchema>;
@@ -90,23 +91,40 @@ export const BotSectionSchema = z.object({
 });
 export type BotSection = z.infer<typeof BotSectionSchema>;
 
+export const BOT_NAME_MAX_LENGTH = 80;
+export const BOT_TITLE_MAX_LENGTH = 500;
+export const BOT_DESCRIPTION_MAX_LENGTH = 4000;
+export const BOT_INSTRUCTIONS_MAX_LENGTH = 20000;
+
 export const CreateBotInput = z.object({
-  name: z.string().min(1).max(80),
-  title: z.string().max(160).default(""),
-  description: z.string().max(4000).default(""),
-  instructions: z.string().max(20000).default(""),
+  name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH),
+  title: z.string().max(BOT_TITLE_MAX_LENGTH).default(""),
+  description: z.string().max(BOT_DESCRIPTION_MAX_LENGTH).default(""),
+  instructions: z.string().max(BOT_INSTRUCTIONS_MAX_LENGTH).default(""),
   notifyOnFinish: z.boolean().default(true),
   color: z.string().optional(),
   computerMode: ComputerModeSchema.default("team"),
 });
 export type CreateBotInput = z.infer<typeof CreateBotInput>;
 
+export function normalizeCreateBotProfile(
+  input: Pick<CreateBotInput, "name" | "title" | "description">,
+) {
+  const description = input.description.trim();
+  return {
+    name: input.name.trim().slice(0, BOT_NAME_MAX_LENGTH),
+    title: input.title.trim().slice(0, BOT_TITLE_MAX_LENGTH),
+    description: description.slice(0, BOT_DESCRIPTION_MAX_LENGTH),
+    instructions: description.slice(0, BOT_INSTRUCTIONS_MAX_LENGTH),
+  };
+}
+
 export const UpdateBotInput = z.object({
   botId: Id,
-  name: z.string().min(1).max(80).optional(),
-  title: z.string().max(160).optional(),
-  description: z.string().max(4000).optional(),
-  instructions: z.string().max(20000).optional(),
+  name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH).optional(),
+  title: z.string().max(BOT_TITLE_MAX_LENGTH).optional(),
+  description: z.string().max(BOT_DESCRIPTION_MAX_LENGTH).optional(),
+  instructions: z.string().max(BOT_INSTRUCTIONS_MAX_LENGTH).optional(),
   notifyOnFinish: z.boolean().optional(),
   color: z.string().optional(),
   pinned: z.boolean().optional(),
@@ -230,6 +248,15 @@ export const ConnectionCatalogItemSchema = z.object({
 });
 export type ConnectionCatalogItem = z.infer<typeof ConnectionCatalogItemSchema>;
 
+export const ActionApprovalRuleSchema = z.object({
+  id: Id,
+  effect: z.enum(["always_allow", "require_approval"]),
+  matchKind: z.enum(["tool", "connector", "category"]),
+  matchValue: z.string(),
+  createdAt: z.string(),
+});
+export type ActionApprovalRule = z.infer<typeof ActionApprovalRuleSchema>;
+
 export const CapabilityInstallSchema = z.object({
   id: Id,
   kind: z.enum(["skill", "plugin", "mcp", "api", "connection"]),
@@ -239,11 +266,82 @@ export const CapabilityInstallSchema = z.object({
   digest: z.string().nullable(),
   secretConfigured: z.boolean(),
   config: z.record(z.string(), z.unknown()),
-  /** Present only for MCP installs whose auth type is "oauth". */
-  oauthStatus: z.enum(["none", "pending", "connected", "reconnect"]).optional(),
   createdAt: z.string(),
 });
 export type CapabilityInstall = z.infer<typeof CapabilityInstallSchema>;
+
+export type { McpTransport } from "./mcp.js";
+
+const McpServerBaseInput = z.object({
+  slug: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().max(2000).default(""),
+  enabled: z.boolean().default(true),
+  /** Update-only: drop the stored static credential (secret/env/headers).
+   * OAuth state survives so a connected server stays connected. */
+  clearCredential: z.boolean().optional(),
+});
+export const McpServerConfigInput = z.discriminatedUnion("transport", [
+  McpServerBaseInput.extend({
+    transport: z.literal("streamable_http"),
+    endpoint: McpRemoteEndpointSchema,
+    headers: McpHeadersSchema.default({}),
+    secret: z.string().max(16384).optional(),
+  }),
+  McpServerBaseInput.extend({
+    transport: z.literal("sse"),
+    endpoint: McpRemoteEndpointSchema,
+    headers: McpHeadersSchema.default({}),
+    secret: z.string().max(16384).optional(),
+  }),
+  McpServerBaseInput.extend({
+    transport: z.literal("stdio"),
+    command: z.string().min(1).max(512),
+    args: z.array(z.string().max(2048)).max(64).default([]),
+    env: z
+      .record(z.string().regex(/^[A-Z_][A-Z0-9_]*$/), z.string().max(4096))
+      .superRefine((value, ctx) => {
+        if (Object.keys(value).length > 32) {
+          ctx.addIssue({ code: "custom", message: "At most 32 environment variables are allowed" });
+        }
+      })
+      .default({}),
+    secret: z.string().max(16384).optional(),
+  }),
+]);
+export type McpServerConfigInput = z.infer<typeof McpServerConfigInput>;
+
+export const McpServerSchema = z.object({
+  id: Id,
+  workspaceId: Id,
+  slug: z.string(),
+  name: z.string(),
+  description: z.string(),
+  transport: McpTransportSchema,
+  endpoint: z.string().url().nullable(),
+  command: z.string().nullable(),
+  args: z.array(z.string()),
+  envKeys: z.array(z.string()),
+  headerKeys: z.array(z.string()),
+  hasSecret: z.boolean(),
+  oauthStatus: z.enum(["none", "connected", "reconnect"]),
+  enabled: z.boolean(),
+  revision: z.number().int().positive(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type McpServer = z.infer<typeof McpServerSchema>;
+
+export const BotMcpServerSchema = z.object({
+  id: Id,
+  botId: Id,
+  serverId: Id,
+  allowAllTools: z.boolean(),
+  allowedTools: z.array(z.string().min(1).max(200)),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type BotMcpServer = z.infer<typeof BotMcpServerSchema>;
 
 export const ArtifactSchema = z.object({
   id: Id,
@@ -279,6 +377,7 @@ export const ComputerStatusSchema = z.object({
   state: z.enum(["stopped", "booting", "running", "suspended", "error"]),
   controlHolder: z.enum(["bot", "user", "none"]),
   controlBotId: Id.nullable(),
+  takeoverRequested: z.boolean(),
   screenAvailable: z.boolean(),
   screenWidth: z.number().int().positive(),
   screenHeight: z.number().int().positive(),
@@ -286,6 +385,9 @@ export const ComputerStatusSchema = z.object({
   busyBotName: z.string().nullable(),
 });
 export type ComputerStatus = z.infer<typeof ComputerStatusSchema>;
+
+export const ComputerReleaseReasonSchema = z.enum(["done", "skipped"]);
+export type ComputerReleaseReason = z.infer<typeof ComputerReleaseReasonSchema>;
 
 export const RunSchema = z.object({
   id: Id,

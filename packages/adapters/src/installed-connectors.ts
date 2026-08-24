@@ -12,7 +12,6 @@ import {
   redactConnectorPayload,
   sanitizeConnectorError,
 } from "./connector-safety.js";
-import type { McpOAuthBroker } from "./mcp-oauth.js";
 import {
   assertSafeRemoteUrl,
   callRemoteMcpTool,
@@ -42,7 +41,7 @@ const AuthSchema = z
 
 const McpAuthSchema = z
   .object({
-    type: z.enum(["none", "bearer", "header", "oauth"]).default("none"),
+    type: z.enum(["none", "bearer", "header"]).default("none"),
     name: HeaderName.optional(),
   })
   .default({ type: "none" });
@@ -109,7 +108,6 @@ export class InstalledConnectorProvider implements ConnectorProvider {
     private readonly prisma: PrismaClient,
     private readonly secrets: EncryptedSecretStore,
     private readonly remote: RemoteConnectorDependencies = {},
-    private readonly oauth?: McpOAuthBroker,
   ) {}
 
   describe() {
@@ -117,7 +115,7 @@ export class InstalledConnectorProvider implements ConnectorProvider {
       id: "installed",
       contractVersion: "1",
       adapterVersion: "0.1.0",
-      capabilities: { discover: true, oauth: Boolean(this.oauth), secretsBrokered: true },
+      capabilities: { discover: true, oauth: false, secretsBrokered: true },
     };
   }
 
@@ -147,15 +145,10 @@ export class InstalledConnectorProvider implements ConnectorProvider {
     try {
       if (install.kind === "mcp") {
         const config = McpConfigSchema.parse(install.config);
-        const isOAuth = config.auth.type === "oauth";
-        const authProvider = isOAuth ? await this.oauth?.providerFor(install, context) : undefined;
-        // An OAuth connector the user never authorized has no tools to offer yet.
-        if (isOAuth && !authProvider) return [];
-        const credential = isOAuth ? undefined : await this.loadCredential(install, context);
+        const credential = await this.loadCredential(install, context);
         const remote = await listRemoteMcpTools({
           endpoint: install.source,
           headers: connectorHeaders(config, credential),
-          authProvider,
           signal: context.signal,
           fetch: this.remote.fetch,
           resolveHostname: this.remote.resolveHostname,
@@ -209,23 +202,13 @@ export class InstalledConnectorProvider implements ConnectorProvider {
     }
     let credential: string | undefined;
     try {
+      credential = await this.loadCredential(install, context);
       if (install.kind === "mcp") {
         const config = McpConfigSchema.parse(install.config);
-        const isOAuth = config.auth.type === "oauth";
-        const authProvider = isOAuth ? await this.oauth?.providerFor(install, context) : undefined;
-        if (isOAuth && !authProvider) {
-          yield {
-            type: "error",
-            message: "This MCP connector is not authorized yet. Authorize it in Plugins.",
-          };
-          return;
-        }
-        credential = isOAuth ? undefined : await this.loadCredential(install, context);
         const result = await callRemoteMcpTool(
           {
             endpoint: install.source,
             headers: connectorHeaders(config, credential),
-            authProvider,
             signal: context.signal,
             fetch: this.remote.fetch,
             resolveHostname: this.remote.resolveHostname,
@@ -239,7 +222,6 @@ export class InstalledConnectorProvider implements ConnectorProvider {
         };
         return;
       }
-      credential = await this.loadCredential(install, context);
       const config = ApiConfigSchema.parse(install.config);
       const operation = config.operations.find(
         (candidate) => candidate.id === (call.route?.toolName ?? call.tool),
@@ -291,13 +273,6 @@ export async function verifyMcpInstall(input: {
 }): Promise<{ config: Record<string, unknown>; toolCount: number }> {
   assertNoSensitiveQuery(input.source);
   const config = McpConfigSchema.parse(input.config);
-  if (config.auth.type === "oauth") {
-    if (input.credential) throw new Error("OAuth connectors do not accept a static credential");
-    // Tools cannot be listed until the user authorizes; the OAuth completion
-    // step enforces the "server has tools" check instead.
-    await assertSafeRemoteUrl(input.source, input.remote?.resolveHostname);
-    return { config, toolCount: 0 };
-  }
   requireCredential(config.auth, input.credential);
   const tools = await listRemoteMcpTools({
     endpoint: input.source,
@@ -555,7 +530,7 @@ function joinApiUrl(baseUrl: string, path: string): URL {
   return base;
 }
 
-function requireCredential(auth: { type: string }, credential?: string): void {
+function requireCredential(auth: z.infer<typeof AuthSchema>, credential?: string): void {
   if (auth.type !== "none" && !credential) throw new Error("This connector requires a credential");
 }
 

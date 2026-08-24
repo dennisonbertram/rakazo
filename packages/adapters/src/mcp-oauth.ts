@@ -11,44 +11,33 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { PrismaClient } from "@rakazo/db";
-import { combineSignals } from "./connector-safety.js";
-import {
-  assertSafeRemoteUrl,
-  createSafeRemoteFetch,
-  listRemoteMcpTools,
-  type RemoteTransportDependencies,
-} from "./remote-mcp.js";
+import { secureFetch, validateUrl, withEndpointOriginFallback } from "./mcp-transport.js";
+import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import type { EncryptedSecretStore } from "./secrets.js";
 
-const OAUTH_TIMEOUT_MS = 30_000;
-
-/** Bound every OAuth discovery/registration/token request by the same deadline. */
-function withDeadline(fetchImpl: typeof fetch, signal: AbortSignal): typeof fetch {
-  return (input, init) => fetchImpl(input, init?.signal ? init : { ...init, signal });
-}
-
-/** OAuth material for one MCP install, JSON-serialized into its encrypted Secret row. */
-type OAuthMaterial = {
+type OAuthState = {
   tokens?: OAuthTokens;
   obtainedAt?: number;
   clientInformation?: OAuthClientInformationMixed;
   discoveryState?: OAuthDiscoveryState;
   redirectUri?: string;
   codeVerifier?: string;
-  /** State of an authorization in flight; persisted so the callback can
-      complete even if the API restarted between begin and the redirect. */
-  pendingState?: string;
 };
 
-type InstallRef = { id: string; source: string; secretId: string | null };
-type ActorRef = { workspaceId: string; userId: string };
+export type OAuthMaterial = {
+  secret?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  oauth?: OAuthState;
+};
 
-export type McpOAuthStatus = "none" | "pending" | "connected" | "reconnect";
+type ServerRef = { id: string; endpoint: string | null; secretId: string | null };
+type ActorRef = { workspaceId: string; userId: string };
 
 export class McpReauthorizationRequiredError extends Error {
   readonly code = "MCP_REAUTHORIZATION_REQUIRED";
-  constructor(readonly installId: string) {
-    super("MCP authorization expired. Reconnect this connector in Plugins.");
+  constructor(readonly serverId: string) {
+    super("MCP authorization expired. Reconnect this server in MCP settings.");
     this.name = "McpReauthorizationRequiredError";
   }
 }
@@ -66,31 +55,23 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
   private persistQueue = Promise.resolve();
 
   constructor(
-    readonly installId: string,
+    readonly serverId: string,
     private readonly material: OAuthMaterial,
     private readonly persistMaterial: (material: OAuthMaterial) => Promise<void>,
     private readonly options: ProviderOptions = {},
   ) {
-    if (options.redirectUri) this.material.redirectUri = options.redirectUri;
-    // An interactive session carries its state so the persisted material lets
-    // a different process complete the callback after a restart.
-    if (options.state) this.material.pendingState = options.state;
+    if (options.redirectUri) {
+      this.material.oauth = { ...(this.material.oauth ?? {}), redirectUri: options.redirectUri };
+    }
   }
 
   get redirectUrl(): string | undefined {
-    return this.options.redirectUri ?? this.material.redirectUri;
-  }
-
-  /** Drop the persisted in-flight session marker once authorization completes. */
-  async clearPendingState(): Promise<void> {
-    if (!this.material.pendingState) return;
-    delete this.material.pendingState;
-    await this.persist();
+    return this.options.redirectUri ?? this.material.oauth?.redirectUri;
   }
 
   get clientMetadata(): OAuthClientMetadata {
     const redirectUri = this.redirectUrl;
-    if (!redirectUri) throw new McpReauthorizationRequiredError(this.installId);
+    if (!redirectUri) throw new McpReauthorizationRequiredError(this.serverId);
     const hostname = new URL(redirectUri).hostname;
     const applicationType = hostname === "localhost" || hostname === "127.0.0.1" ? "native" : "web";
     return {
@@ -107,18 +88,19 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     return this.options.state ?? this.runtimeState;
   }
   clientInformation(): OAuthClientInformationMixed | undefined {
-    return this.material.clientInformation;
+    return this.material.oauth?.clientInformation;
   }
   async saveClientInformation(value: OAuthClientInformationMixed): Promise<void> {
-    this.material.clientInformation = value;
+    this.oauth().clientInformation = value;
     await this.persist();
   }
   tokens(): OAuthTokens | undefined {
-    return this.material.tokens;
+    return this.material.oauth?.tokens;
   }
   async saveTokens(value: OAuthTokens): Promise<void> {
-    this.material.tokens = value;
-    this.material.obtainedAt = Date.now();
+    const oauth = this.oauth();
+    oauth.tokens = value;
+    oauth.obtainedAt = Date.now();
     await this.persist();
   }
   async redirectToAuthorization(url: URL): Promise<void> {
@@ -129,43 +111,58 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     }
     // Runtime re-auth needs the user; drop the dead tokens so status reads "reconnect".
     await this.invalidateCredentials("tokens");
-    throw new McpReauthorizationRequiredError(this.installId);
+    throw new McpReauthorizationRequiredError(this.serverId);
   }
   async saveCodeVerifier(value: string): Promise<void> {
-    this.material.codeVerifier = value;
+    this.oauth().codeVerifier = value;
     await this.persist();
   }
   codeVerifier(): string {
-    const verifier = this.material.codeVerifier;
+    const verifier = this.material.oauth?.codeVerifier;
     if (!verifier) throw new Error("OAuth PKCE verifier is missing");
     return verifier;
   }
+  // RFC 8707 resource binding: only accept a self-declared canonical resource
+  // that is itself a well-formed HTTPS (or localhost) URL. Providers like Brex
+  // advertise an internal alias for their public origin, so cross-host
+  // resources are allowed, but malformed or cleartext resources are rejected
+  // and the SDK falls back to deriving the resource from the server URL.
+  async validateResourceURL(_serverUrl: string | URL, resource?: string): Promise<URL | undefined> {
+    if (!resource) return undefined;
+    try {
+      return validateUrl(resource);
+    } catch {
+      return undefined;
+    }
+  }
   async saveDiscoveryState(value: OAuthDiscoveryState): Promise<void> {
-    this.material.discoveryState = value;
+    this.oauth().discoveryState = value;
     await this.persist();
   }
   discoveryState(): OAuthDiscoveryState | undefined {
-    return this.material.discoveryState;
+    return this.material.oauth?.discoveryState;
   }
   async invalidateCredentials(
     scope: "all" | "client" | "tokens" | "verifier" | "discovery",
   ): Promise<void> {
     if (scope === "all") {
       const redirectUri = this.redirectUrl;
-      for (const key of Object.keys(this.material)) {
-        delete this.material[key as keyof OAuthMaterial];
-      }
-      if (redirectUri) this.material.redirectUri = redirectUri;
-    } else {
-      if (scope === "client") delete this.material.clientInformation;
+      this.material.oauth = redirectUri ? { redirectUri } : undefined;
+    } else if (this.material.oauth) {
+      if (scope === "client") delete this.material.oauth.clientInformation;
       if (scope === "tokens") {
-        delete this.material.tokens;
-        delete this.material.obtainedAt;
+        delete this.material.oauth.tokens;
+        delete this.material.oauth.obtainedAt;
       }
-      if (scope === "verifier") delete this.material.codeVerifier;
-      if (scope === "discovery") delete this.material.discoveryState;
+      if (scope === "verifier") delete this.material.oauth.codeVerifier;
+      if (scope === "discovery") delete this.material.oauth.discoveryState;
     }
     await this.persist();
+  }
+
+  private oauth(): OAuthState {
+    if (!this.material.oauth) this.material.oauth = {};
+    return this.material.oauth;
   }
 
   private async persist(): Promise<void> {
@@ -176,260 +173,409 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
   }
 }
 
-/**
- * OAuth lifecycle for installed MCP connectors (CapabilityInstall rows whose
- * config.auth.type is "oauth"). All state, including in-flight authorizations,
- * lives in the install's encrypted Secret row, so any process can complete a
- * callback regardless of which one began it.
- */
+type Pending = {
+  serverId: string;
+  workspaceId: string;
+  userId: string;
+  endpoint: string;
+  provider: StoredMcpOAuthProvider;
+  createdAt: number;
+  expiry?: ReturnType<typeof setTimeout>;
+};
+
+const PENDING_TTL_MS = 10 * 60_000;
+const MAX_PENDING_SESSIONS = 100;
+
+/** OAuth traffic runs through the same URL policy as runtime MCP requests
+ * (HTTPS enforced, redirects rejected), with the endpoint-origin fallback
+ * layered on top for providers like Brex. */
+function oauthFetch(
+  endpoint: string,
+  network: RemoteTransportDependencies,
+): { fetch: typeof fetch; close: () => Promise<void> } {
+  const url = new URL(endpoint);
+  const safeFetch = secureFetch(url, {}, {}, network);
+  return {
+    fetch: withEndpointOriginFallback(url.origin, safeFetch),
+    close: () => safeFetch.close(),
+  };
+}
+
 export class McpOAuthBroker {
+  private readonly pending = new Map<string, Pending>();
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly secrets: EncryptedSecretStore,
-    private readonly remote: RemoteTransportDependencies = {},
+    private readonly network: RemoteTransportDependencies = {},
   ) {}
 
-  async statusFor(install: InstallRef, context: ActorRef): Promise<McpOAuthStatus> {
-    const loaded = await this.loadMaterial(install, context);
-    if (!loaded.material) return "none";
-    if (loaded.material.tokens) return "connected";
-    if (loaded.material.pendingState) return "pending";
-    return "reconnect";
+  async statusFor(
+    server: ServerRef,
+    context: ActorRef,
+  ): Promise<"none" | "connected" | "reconnect"> {
+    const { material } = await this.loadMaterial(server, context);
+    if (material.oauth?.tokens) return "connected";
+    return material.oauth ? "reconnect" : "none";
   }
 
-  /** Runtime provider for tool discovery/calls; undefined until the user authorized once. */
+  statusForCiphertext(ciphertext: string | undefined): "none" | "connected" | "reconnect" {
+    const material = ciphertext ? this.read(ciphertext) : {};
+    if (material.oauth?.tokens) return "connected";
+    return material.oauth ? "reconnect" : "none";
+  }
+
   async providerFor(
-    install: InstallRef,
+    server: ServerRef,
     context: ActorRef,
+    loaded?: { material: OAuthMaterial; secretId?: string },
   ): Promise<OAuthClientProvider | undefined> {
-    const loaded = await this.loadMaterial(install, context);
-    if (!loaded.material) return undefined;
-    return this.createProvider(install, context, loaded.material);
+    const material = loaded ?? (await this.loadMaterial(server, context));
+    if (!material.material.oauth) return undefined;
+    return this.createProvider(server, context, material);
   }
 
   async begin(input: {
-    installId: string;
+    serverId: string;
     workspaceId: string;
     userId: string;
     redirectUri: string;
-    signal?: AbortSignal;
-  }): Promise<{ authorizationUrl: string }> {
+  }): Promise<
+    | { status: "authorization_required"; sessionId: string; authorizationUrl: string }
+    | { status: "already_connected" | "authorization_not_requested" }
+  > {
+    const server = await this.prisma.mcpServer.findFirst({
+      where: {
+        id: input.serverId,
+        workspaceId: input.workspaceId,
+        userId: input.userId,
+        enabled: true,
+      },
+    });
+    if (!server?.endpoint) throw new Error("MCP server endpoint is required for OAuth");
+    await this.sweepExpiredPending();
+    let actorPending = 0;
+    for (const pending of this.pending.values()) {
+      if (pending.workspaceId === input.workspaceId && pending.userId === input.userId) {
+        actorPending += 1;
+      }
+    }
+    if (actorPending >= MAX_PENDING_SESSIONS) {
+      throw new Error("Too many pending MCP authorization attempts; wait and try again");
+    }
+    const activeCount = await this.prisma.mcpOAuthSession.count({
+      where: { workspaceId: input.workspaceId, userId: input.userId },
+    });
+    if (activeCount >= MAX_PENDING_SESSIONS) {
+      throw new Error("Too many pending MCP authorization attempts; wait and try again");
+    }
+    const sessionId = randomUUID();
     const context = { workspaceId: input.workspaceId, userId: input.userId };
-    const install = await this.findInstall(input.installId, context);
-    if (!install) throw new Error("MCP connector is unavailable");
-    const auth = (install.config as { auth?: { type?: string } } | null)?.auth;
-    if (auth?.type !== "oauth") throw new Error("This MCP connector does not use OAuth");
-    const state = randomUUID();
-    const loaded = await this.loadMaterial(install, context);
+    const loaded = await this.loadMaterial(server, context);
     let authorizationUrl: URL | undefined;
-    const provider = this.createProvider(install, context, loaded.material ?? {}, {
+    const provider = this.createProvider(server, context, loaded, {
       redirectUri: input.redirectUri,
-      state,
+      state: sessionId,
       onAuthorization: (url) => {
         authorizationUrl = url;
       },
     });
-    if (provider.tokens()) await provider.invalidateCredentials("tokens");
-    const endpoint = await assertSafeRemoteUrl(install.source, this.remote.resolveHostname);
-    const signal = combineSignals(input.signal, AbortSignal.timeout(OAUTH_TIMEOUT_MS));
-    const safeFetch = createSafeRemoteFetch(this.remote.fetch, this.remote.resolveHostname);
+    // Never destroy working tokens here: if this attempt fails (network error,
+    // cancelled popup), the server keeps its valid connection. The SDK itself
+    // invalidates dead tokens when a refresh is rejected with invalid_grant.
+    const endpoint = new URL(server.endpoint);
+    const networkFetch = oauthFetch(server.endpoint, this.network);
     const transport = new StreamableHTTPClientTransport(endpoint, {
       authProvider: provider,
-      fetch: withDeadline(safeFetch, signal),
+      fetch: networkFetch.fetch,
     });
     const client = new Client({ name: "rakazo-oauth", version: "0.1.0" });
+    const signal = AbortSignal.timeout(15_000);
     try {
-      await client.connect(transport, { signal, timeout: OAUTH_TIMEOUT_MS });
+      await client.connect(transport, { signal, timeout: 15_000 });
     } catch (error) {
       if (!authorizationUrl) throw error;
     } finally {
       await client.close().catch(() => undefined);
-      await safeFetch.close().catch(() => undefined);
+      await networkFetch.close().catch(() => undefined);
     }
-    if (!authorizationUrl) throw new Error("MCP server did not request OAuth authorization");
-    return { authorizationUrl: authorizationUrl.toString() };
+    if (!authorizationUrl) {
+      if (provider.tokens()) {
+        return { status: "already_connected" };
+      }
+      return { status: "authorization_not_requested" };
+    }
+    const sessionMaterial = await this.secrets.put(JSON.stringify(loaded.material), {
+      operationId: "mcp.oauth.session",
+      traceId: "mcp.oauth.session",
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      botId: "mcp",
+      signal: new AbortController().signal,
+    });
+    await this.prisma.mcpOAuthSession.create({
+      data: {
+        id: sessionId,
+        serverId: server.id,
+        workspaceId: input.workspaceId,
+        userId: input.userId,
+        endpoint: server.endpoint,
+        redirectUri: input.redirectUri,
+        oauthCiphertext: sessionMaterial.ciphertext,
+      },
+    });
+    const expiry = setTimeout(() => {
+      this.pending.delete(sessionId);
+      void this.prisma.mcpOAuthSession
+        .deleteMany({ where: { id: sessionId } })
+        .catch(() => undefined);
+    }, PENDING_TTL_MS);
+    expiry.unref?.();
+    this.pending.set(sessionId, {
+      serverId: server.id,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      endpoint: server.endpoint,
+      provider,
+      createdAt: Date.now(),
+      expiry,
+    });
+    return {
+      status: "authorization_required",
+      sessionId,
+      authorizationUrl: authorizationUrl.toString(),
+    };
   }
 
   async complete(input: {
+    sessionId: string;
     code: string;
     state: string;
     workspaceId: string;
     userId: string;
-    signal?: AbortSignal;
-  }): Promise<{ installId: string }> {
-    const context = { workspaceId: input.workspaceId, userId: input.userId };
-    const found = await this.findPending(input.state, context);
-    if (!found) throw new Error("MCP OAuth session is invalid or expired");
-    const { install, material } = found;
-    const provider = this.createProvider(install, context, material, {
-      redirectUri: material.redirectUri,
-      state: input.state,
-    });
-    const endpoint = await assertSafeRemoteUrl(install.source, this.remote.resolveHostname);
-    const signal = combineSignals(input.signal, AbortSignal.timeout(OAUTH_TIMEOUT_MS));
-    const safeFetch = createSafeRemoteFetch(this.remote.fetch, this.remote.resolveHostname);
-    try {
-      const transport = new StreamableHTTPClientTransport(endpoint, {
-        authProvider: provider,
-        fetch: withDeadline(safeFetch, signal),
+  }): Promise<void> {
+    await this.sweepExpiredPending();
+    if (input.state !== input.sessionId) {
+      throw new Error("MCP OAuth session is invalid or expired");
+    }
+    let pending = this.pending.get(input.sessionId);
+    if (pending && (pending.workspaceId !== input.workspaceId || pending.userId !== input.userId)) {
+      pending = undefined;
+    }
+    if (!pending) {
+      const session = await this.prisma.mcpOAuthSession.findFirst({
+        where: {
+          id: input.sessionId,
+          workspaceId: input.workspaceId,
+          userId: input.userId,
+          createdAt: { gte: new Date(Date.now() - PENDING_TTL_MS) },
+        },
       });
+      if (!session) throw new Error("MCP OAuth session is invalid or expired");
+      const server = await this.prisma.mcpServer.findFirst({
+        where: {
+          id: session.serverId,
+          workspaceId: input.workspaceId,
+          userId: input.userId,
+          enabled: true,
+        },
+      });
+      if (!server?.endpoint) throw new Error("MCP OAuth session is invalid or expired");
+      const context = { workspaceId: input.workspaceId, userId: input.userId };
+      const loaded = {
+        material: this.read(session.oauthCiphertext),
+        ...(server.secretId ? { secretId: server.secretId } : {}),
+      };
+      pending = {
+        serverId: server.id,
+        workspaceId: input.workspaceId,
+        userId: input.userId,
+        endpoint: session.endpoint,
+        provider: this.createProvider(server, context, loaded, {
+          redirectUri: session.redirectUri,
+          state: session.id,
+        }),
+        createdAt: session.createdAt.getTime(),
+        expiry: undefined,
+      };
+    }
+    // Consume the session up front so a failed token exchange cannot be
+    // retried with a replayed code; the user starts a fresh flow instead.
+    this.pending.delete(input.sessionId);
+    if (pending.expiry) clearTimeout(pending.expiry);
+    const consumed = await this.prisma.mcpOAuthSession.deleteMany({
+      where: {
+        id: input.sessionId,
+        workspaceId: input.workspaceId,
+        userId: input.userId,
+      },
+    });
+    if (consumed.count !== 1) throw new Error("MCP OAuth session is invalid or expired");
+    const endpoint = new URL(pending.endpoint);
+    const networkFetch = oauthFetch(pending.endpoint, this.network);
+    const transport = new StreamableHTTPClientTransport(endpoint, {
+      authProvider: pending.provider,
+      fetch: networkFetch.fetch,
+    });
+    try {
       await transport.finishAuth(input.code);
-      if (!provider.tokens()) throw new Error("MCP OAuth authorization failed");
-      await provider.clearPendingState();
-      // The install-time "server has tools" check was deferred for OAuth
-      // connectors; enforce it now that the tokens exist.
-      try {
-        const tools = await listRemoteMcpTools({
-          endpoint: install.source,
-          authProvider: provider,
-          signal: input.signal,
-          fetch: this.remote.fetch,
-          resolveHostname: this.remote.resolveHostname,
-        });
-        if (tools.length === 0) throw new Error("MCP server returned no tools");
-      } catch (error) {
-        // Keep the stored state consistent with the reported failure; with the
-        // tokens left in place the connector would read "connected".
-        await provider.invalidateCredentials("tokens");
-        throw error;
-      }
     } finally {
-      await safeFetch.close().catch(() => undefined);
+      await transport.close().catch(() => undefined);
+      await networkFetch.close().catch(() => undefined);
     }
-    return { installId: install.id };
-  }
-
-  private async findInstall(
-    installId: string,
-    context: ActorRef,
-  ): Promise<(InstallRef & { config: unknown }) | null> {
-    return this.prisma.capabilityInstall.findFirst({
-      where: {
-        id: installId,
-        workspaceId: context.workspaceId,
-        userId: context.userId,
-        kind: "mcp",
-      },
-      select: { id: true, source: true, secretId: true, config: true },
+    if (!pending.provider.tokens()) throw new Error("MCP OAuth authorization failed");
+    // Bump the revision so cached runtime sessions rebuild with the fresh tokens.
+    await this.prisma.mcpServer.update({
+      where: { id: pending.serverId },
+      data: { revision: { increment: 1 } },
     });
   }
 
-  private async findPending(
-    state: string,
-    context: ActorRef,
-  ): Promise<{ install: InstallRef; material: OAuthMaterial } | undefined> {
-    const installs = await this.prisma.capabilityInstall.findMany({
-      where: {
-        workspaceId: context.workspaceId,
-        userId: context.userId,
-        kind: "mcp",
-        secretId: { not: null },
-      },
-      select: { id: true, source: true, secretId: true, config: true },
-    });
-    for (const install of installs) {
-      const auth = (install.config as { auth?: { type?: string } } | null)?.auth;
-      if (auth?.type !== "oauth") continue;
-      const loaded = await this.loadMaterial(install, context);
-      if (loaded.material?.pendingState === state) return { install, material: loaded.material };
+  private async sweepExpiredPending(): Promise<void> {
+    const cutoff = Date.now() - PENDING_TTL_MS;
+    for (const [sessionId, pending] of this.pending) {
+      if (pending.createdAt < cutoff) {
+        this.discardPending(sessionId, pending);
+      }
     }
-    return undefined;
+    await this.prisma.mcpOAuthSession.deleteMany({
+      where: { createdAt: { lt: new Date(cutoff) } },
+    });
+  }
+
+  private discardPending(sessionId: string, pending: Pending): void {
+    if (pending.expiry) clearTimeout(pending.expiry);
+    this.pending.delete(sessionId);
+  }
+
+  async disconnect(input: {
+    serverId: string;
+    workspaceId: string;
+    userId: string;
+  }): Promise<void> {
+    const server = await this.prisma.mcpServer.findFirst({
+      where: { id: input.serverId, workspaceId: input.workspaceId, userId: input.userId },
+    });
+    if (!server?.secretId) return;
+    const row = await this.prisma.secret.findFirst({
+      where: { id: server.secretId, workspaceId: input.workspaceId, userId: input.userId },
+    });
+    if (!row) return;
+    const material = this.read(row.ciphertext);
+    delete material.oauth;
+    await this.replaceMaterial(server.id, material, input, true);
   }
 
   private async loadMaterial(
-    install: InstallRef,
+    server: ServerRef,
     context: ActorRef,
-  ): Promise<{ material?: OAuthMaterial }> {
-    if (!install.secretId) return {};
+  ): Promise<{ material: OAuthMaterial; secretId?: string }> {
+    if (!server.secretId) return { material: {} };
     const row = await this.prisma.secret.findFirst({
-      where: { id: install.secretId, workspaceId: context.workspaceId, userId: context.userId },
+      where: { id: server.secretId, workspaceId: context.workspaceId, userId: context.userId },
     });
-    if (!row) return {};
-    try {
-      const value = JSON.parse(this.secrets.load(row.ciphertext));
-      return value && typeof value === "object" && !Array.isArray(value)
-        ? { material: value as OAuthMaterial }
-        : {};
-    } catch {
-      return {};
-    }
+    return row ? { material: this.read(row.ciphertext), secretId: row.id } : { material: {} };
   }
 
   private createProvider(
-    install: InstallRef,
+    server: ServerRef,
     context: ActorRef,
-    material: OAuthMaterial,
+    loaded: { material: OAuthMaterial; secretId?: string },
     options: ProviderOptions = {},
   ): StoredMcpOAuthProvider {
-    let currentSecretId = install.secretId ?? undefined;
     return new StoredMcpOAuthProvider(
-      install.id,
-      material,
-      async (snapshot) => {
-        currentSecretId = await this.saveMaterial(install.id, currentSecretId, snapshot, context);
+      server.id,
+      loaded.material,
+      async (material) => {
+        await this.replaceMaterial(server.id, material, context, false, server.endpoint);
       },
       options,
     );
   }
 
-  private async saveMaterial(
-    installId: string,
-    secretId: string | undefined,
+  private async replaceMaterial(
+    serverId: string,
     material: OAuthMaterial,
     context: ActorRef,
+    incrementRevision: boolean,
+    expectedEndpoint?: string | null,
   ): Promise<string | undefined> {
-    if (Object.keys(material).length === 0) {
-      await this.prisma.$transaction([
-        this.prisma.capabilityInstall.update({
-          where: { id: installId },
-          data: { secretId: null },
-        }),
-        ...(secretId
-          ? [
-              this.prisma.secret.deleteMany({
-                where: {
-                  id: secretId,
-                  workspaceId: context.workspaceId,
-                  userId: context.userId,
-                },
-              }),
-            ]
-          : []),
-      ]);
-      return undefined;
-    }
-    const stored = await this.secrets.put(JSON.stringify(material), {
-      operationId: "capabilities.oauth",
-      traceId: "capabilities.oauth",
-      workspaceId: context.workspaceId,
-      userId: context.userId,
-      signal: new AbortController().signal,
-    });
-    if (secretId) {
-      const updated = await this.prisma.secret.updateMany({
-        where: { id: secretId, workspaceId: context.workspaceId, userId: context.userId },
-        data: { ciphertext: stored.ciphertext },
-      });
-      // A zero-row update means the install was removed mid-flight; failing
-      // loudly beats reporting success for a connector that no longer exists.
-      if (updated.count === 0) throw new Error("MCP connector is unavailable");
-      return secretId;
-    }
-    await this.prisma.$transaction([
-      this.prisma.secret.create({
-        data: {
-          id: stored.id,
+    return this.prisma.$transaction(async (tx) => {
+      // Serialize every credential rotation across API instances. OAuth
+      // providers hold a session snapshot, so merge only their OAuth state
+      // into the latest static material after acquiring the lock.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('mcp-oauth-material'), hashtext(${serverId}))`;
+      const server = await tx.mcpServer.findFirst({
+        where: {
+          id: serverId,
           workspaceId: context.workspaceId,
           userId: context.userId,
-          kind: "connector",
-          ciphertext: stored.ciphertext,
         },
-      }),
-      this.prisma.capabilityInstall.update({
-        where: { id: installId },
-        data: { secretId: stored.id },
-      }),
-    ]);
-    return stored.id;
+        select: { endpoint: true, secretId: true },
+      });
+      if (!server) throw new Error("MCP server is unavailable");
+      if (expectedEndpoint !== undefined && server.endpoint !== expectedEndpoint) {
+        throw new Error("MCP server endpoint changed during authorization; reconnect this server");
+      }
+      const currentSecret = server.secretId
+        ? await tx.secret.findFirst({
+            where: {
+              id: server.secretId,
+              workspaceId: context.workspaceId,
+              userId: context.userId,
+            },
+          })
+        : null;
+      const nextMaterial = currentSecret ? this.read(currentSecret.ciphertext) : {};
+      if (material.oauth) nextMaterial.oauth = structuredClone(material.oauth);
+      else delete nextMaterial.oauth;
+      const hasMaterial = Boolean(
+        nextMaterial.secret ||
+          Object.keys(nextMaterial.env ?? {}).length ||
+          Object.keys(nextMaterial.headers ?? {}).length ||
+          nextMaterial.oauth,
+      );
+      const stored = hasMaterial
+        ? await this.secrets.put(JSON.stringify(nextMaterial), {
+            operationId: "mcp.oauth.persist",
+            traceId: "mcp.oauth.persist",
+            workspaceId: context.workspaceId,
+            userId: context.userId,
+            botId: "mcp",
+            signal: new AbortController().signal,
+          })
+        : undefined;
+      if (stored) {
+        await tx.secret.create({
+          data: {
+            id: stored.id,
+            workspaceId: context.workspaceId,
+            userId: context.userId,
+            kind: "mcp",
+            ciphertext: stored.ciphertext,
+          },
+        });
+      }
+      await tx.mcpServer.update({
+        where: { id: serverId },
+        data: {
+          secretId: stored?.id ?? null,
+          ...(incrementRevision ? { revision: { increment: 1 } } : {}),
+        },
+      });
+      if (server.secretId && server.secretId !== stored?.id) {
+        await tx.secret.deleteMany({ where: { id: server.secretId } });
+      }
+      return stored?.id;
+    });
+  }
+
+  private read(ciphertext: string): OAuthMaterial {
+    try {
+      const value = JSON.parse(this.secrets.load(ciphertext));
+      return value && typeof value === "object" ? (value as OAuthMaterial) : {};
+    } catch {
+      return {};
+    }
   }
 }

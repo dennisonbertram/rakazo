@@ -2,6 +2,7 @@ import { lazy, Suspense, useLayoutEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { authClient } from "./lib/auth";
 import { markAfterPaint, markOnce } from "./lib/performance";
+import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
 import { ShellPage } from "./pages/Shell";
 
 const AuthPage = lazy(() =>
@@ -12,9 +13,6 @@ const OnboardingPage = lazy(() =>
 );
 const WelcomePage = lazy(() =>
   import("./pages/Welcome").then((module) => ({ default: module.WelcomePage })),
-);
-const McpOAuthCallbackPage = lazy(() =>
-  import("./pages/McpOAuthCallback").then((module) => ({ default: module.McpOAuthCallbackPage })),
 );
 
 export function App() {
@@ -48,11 +46,11 @@ export function App() {
           path="/onboarding"
           element={user ? <OnboardingPage /> : <Navigate to="/sign-in" replace />}
         />
-        <Route path="/app" element={user ? <ShellPage /> : <Navigate to="/sign-in" replace />} />
         <Route
           path="/mcp/oauth/callback"
           element={user ? <McpOAuthCallbackPage /> : <Navigate to="/sign-in" replace />}
         />
+        <Route path="/app" element={user ? <ShellPage /> : <Navigate to="/sign-in" replace />} />
         <Route
           path="/app/g/:groupId"
           element={user ? <ShellPage /> : <Navigate to="/sign-in" replace />}

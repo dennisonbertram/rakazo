@@ -26,6 +26,7 @@ import {
   isPipedreamEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  McpConnector,
   McpOAuthBroker,
   PiAgentRuntime,
   PiOAuthLogins,
@@ -112,20 +113,31 @@ export async function createApp(
     prisma,
   });
   const secrets = new EncryptedSecretStore(env.encryptionKey);
+  const mcpOAuth = new McpOAuthBroker(prisma, secrets, remoteConnectors);
   const memoryProviders = new WorkspaceMemoryProviderResolver(prisma, secrets);
   const oauthLogins = new PiOAuthLogins();
   const home = new LocalAgentHomeStore(env.dataDir);
   const artifacts = new LocalArtifactStore(env.dataDir);
   const memory = new MarkdownMemoryStore(prisma);
+  const mcp = new McpConnector(
+    prisma,
+    secrets,
+    {
+      stdioEnabled: env.mcpStdioEnabled,
+      allowedCommands: env.mcpStdioAllowedCommands,
+      network: remoteConnectors,
+    },
+    mcpOAuth,
+  );
   const pipedreamConfig = pipedreamConfigFromEnv(env);
   const pipedream =
     pipedreamOverride ??
     (isPipedreamEnabled(pipedreamConfig) ? new PipedreamConnector(pipedreamConfig) : undefined);
-  const mcpOAuth = new McpOAuthBroker(prisma, secrets, remoteConnectors);
-  const installed = new InstalledConnectorProvider(prisma, secrets, remoteConnectors, mcpOAuth);
+  const installed = new InstalledConnectorProvider(prisma, secrets, remoteConnectors);
   const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride, [
     installed,
     ...(pipedream ? [pipedream] : []),
+    mcp,
   ]);
   const connector = stack.destination;
   await connector.start();
@@ -223,9 +235,10 @@ export async function createApp(
     home,
     secrets,
     oauthLogins,
+    mcpOAuth,
+    composio: stack.composio,
     connectors: stack.connector,
     remoteConnectors,
-    mcpOAuth,
     artifacts,
     dataDir: env.dataDir,
     env: {
@@ -301,6 +314,7 @@ export async function createApp(
       await jobs.close();
       await realtime.close();
       await connector.stop();
+      await mcp.close();
       await prisma.$disconnect().catch(() => undefined);
       await created.pool?.end().catch(() => undefined);
     },
