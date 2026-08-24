@@ -1249,44 +1249,44 @@ export function ShellPage() {
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-[18px] pb-3 pt-4">
+        <div className="flex px-[18px] pt-4">
           <div className="app-drag flex-1">
             <WindowChrome />
           </div>
-          <div className="app-no-drag relative">
-            <button
-              type="button"
-              onClick={() => setCreateMenuOpen((open) => !open)}
-              className="text-[21px] text-[#7A7A80] hover:text-[#C9C9CE]"
-              title="Create"
-            >
-              +
-            </button>
-            {createMenuOpen ? (
-              <div className="absolute right-0 top-full z-20 mt-2 min-w-[160px] rounded-xl border border-[#26262A] bg-[#141416] py-1 shadow-lg">
-                <button
-                  type="button"
-                  className="block w-full px-3.5 py-2 text-left text-[14px] text-[#ECECEE] hover:bg-[#1A1A1D]"
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    setPanel("create");
-                  }}
-                >
-                  New bot
-                </button>
-                <button
-                  type="button"
-                  className="block w-full px-3.5 py-2 text-left text-[14px] text-[#ECECEE] hover:bg-[#1A1A1D]"
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    setPanel("create-group");
-                  }}
-                >
-                  New group
-                </button>
-              </div>
-            ) : null}
-          </div>
+        </div>
+        <div className="app-no-drag relative mt-5 flex justify-end px-[18px] pb-3">
+          <button
+            type="button"
+            onClick={() => setCreateMenuOpen((open) => !open)}
+            className="text-[21px] text-[#7A7A80] hover:text-[#C9C9CE]"
+            title="Create"
+          >
+            +
+          </button>
+          {createMenuOpen ? (
+            <div className="absolute right-[18px] top-full z-20 mt-2 min-w-[160px] rounded-xl border border-[#26262A] bg-[#141416] py-1 shadow-lg">
+              <button
+                type="button"
+                className="block w-full px-3.5 py-2 text-left text-[14px] text-[#ECECEE] hover:bg-[#1A1A1D]"
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  setPanel("create");
+                }}
+              >
+                New bot
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3.5 py-2 text-left text-[14px] text-[#ECECEE] hover:bg-[#1A1A1D]"
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  setPanel("create-group");
+                }}
+              >
+                New group
+              </button>
+            </div>
+          ) : null}
         </div>
         <div className="mx-3.5 mb-3 flex items-center gap-2.5 rounded-xl border border-[#202023] bg-[#141416] px-3 py-2 text-[14px] text-[#6C6C70]">
           <span>⌕</span>
