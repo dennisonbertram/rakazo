@@ -2,7 +2,7 @@ import path from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 import { completeOnboarding } from "./helpers";
 
-test("Electron loads the real app and opens the new-bot flow", async ({ baseURL }) => {
+test("Electron loads the real app and opens the new-bot flow", async ({ baseURL }, testInfo) => {
   const app = await electron.launch({
     args: ["."],
     cwd: path.resolve(import.meta.dirname, "../../desktop"),
@@ -27,6 +27,7 @@ test("Electron loads the real app and opens the new-bot flow", async ({ baseURL 
     await expect(page.getByRole("button", { name: "New bot", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "New bot", exact: true }).click();
     await expect(page.getByText("New bot", { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("desktop-new-bot-form.png") });
 
     await page.locator("label:has-text('Name') input").fill("Desktop researcher");
     await page.locator("label:has-text('Title') input").fill("Desktop proof bot");
