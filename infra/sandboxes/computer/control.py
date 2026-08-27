@@ -29,7 +29,17 @@ KNOWN_LAUNCH = frozenset(
     }
 )
 NATIVE_CAPTURES = {}
-NATIVE_LOCK = threading.Lock()
+DISPLAY_LOCKS = {}
+DISPLAY_LOCKS_GUARD = threading.Lock()
+
+
+def display_lock(display):
+    with DISPLAY_LOCKS_GUARD:
+        lock = DISPLAY_LOCKS.get(display)
+        if lock is None:
+            lock = threading.Lock()
+            DISPLAY_LOCKS[display] = lock
+        return lock
 
 
 class NativeCapture:
@@ -171,22 +181,21 @@ def capture(display):
     cursor = output(["xdotool", "getmouselocation", "--shell"])
     window = output(["xdotool", "getactivewindow"])
     title = output(["xdotool", "getwindowname", window]) if window else ""
-    with NATIVE_LOCK:
-        source = native_capture(display)
-        if source:
-            try:
-                encoded, width, height, damage = source.copy()
-                image = subprocess.CompletedProcess([], 0, encoded, b"")
-            except RuntimeError:
-                drop_native_capture(display)
-                source = None
-        if not source:
-            image = subprocess.run(
-                ["import", "-define", "png:compression-level=3", "-window", "root", "png:-"],
-                env=env,
-                capture_output=True,
-            )
-            width, height, damage = (int(geometry[0]), int(geometry[1]), None)
+    source = native_capture(display)
+    if source:
+        try:
+            encoded, width, height, damage = source.copy()
+            image = subprocess.CompletedProcess([], 0, encoded, b"")
+        except RuntimeError:
+            drop_native_capture(display)
+            source = None
+    if not source:
+        image = subprocess.run(
+            ["import", "-define", "png:compression-level=3", "-window", "root", "png:-"],
+            env=env,
+            capture_output=True,
+        )
+        width, height, damage = (int(geometry[0]), int(geometry[1]), None)
     if image.returncode:
         raise RuntimeError(image.stderr.decode("utf-8", "replace") or "screen capture failed")
     fields = dict(line.split("=", 1) for line in cursor.splitlines() if "=" in line)
@@ -219,29 +228,29 @@ class Handler(BaseHTTPRequestHandler):
             display = body.get("display", ":1")
             if not isinstance(display, str) or not re.fullmatch(r":[0-9]+", display):
                 raise RuntimeError("invalid display")
-            for step in body.get("steps", []):
-                if "waitMs" in step:
-                    time.sleep(max(0, min(int(step["waitMs"]), 5000)) / 1000)
-                    continue
-                argv = step.get("argv")
-                if not allowed_control_argv(argv):
-                    raise RuntimeError("unsupported computer action")
-                with NATIVE_LOCK:
+            with display_lock(display):
+                for step in body.get("steps", []):
+                    if "waitMs" in step:
+                        time.sleep(max(0, min(int(step["waitMs"]), 5000)) / 1000)
+                        continue
+                    argv = step.get("argv")
+                    if not allowed_control_argv(argv):
+                        raise RuntimeError("unsupported computer action")
                     source = native_capture(display)
                     handled = source.act(argv) if source else 0
                     if handled < 0:
                         drop_native_capture(display)
                         handled = 0
-                if not handled:
-                    result = subprocess.run(argv, env={**os.environ, "DISPLAY": display})
-                    if result.returncode:
-                        raise RuntimeError("computer action failed")
-            settle_ms = max(0, min(int(body.get("settleMs", 0)), 5000))
-            if settle_ms:
-                time.sleep(settle_ms / 1000)
-            response = {"completed": len(body.get("steps", []))}
-            if body.get("observe", True):
-                response["observation"] = capture(display)
+                    if not handled:
+                        result = subprocess.run(argv, env={**os.environ, "DISPLAY": display})
+                        if result.returncode:
+                            raise RuntimeError("computer action failed")
+                settle_ms = max(0, min(int(body.get("settleMs", 0)), 5000))
+                if settle_ms:
+                    time.sleep(settle_ms / 1000)
+                response = {"completed": len(body.get("steps", []))}
+                if body.get("observe", True):
+                    response["observation"] = capture(display)
             encoded = json.dumps(response, separators=(",", ":")).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

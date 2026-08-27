@@ -241,7 +241,21 @@ describe("sandbox supervisor input containment", () => {
         throw timeout;
       }),
     ).resolves.toMatchObject({ status: "failed" });
-    expect(isComputerControlUnavailable(new TypeError("fetch failed"))).toBe(true);
+    expect(isComputerControlUnavailable(new TypeError("fetch failed"))).toBe(false);
+    expect(
+      isComputerControlUnavailable(
+        Object.assign(new TypeError("fetch failed"), {
+          cause: new Error("connect ECONNREFUSED 127.0.0.1:7070"),
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isComputerControlUnavailable(
+        Object.assign(new TypeError("fetch failed"), {
+          cause: new Error("read ECONNRESET"),
+        }),
+      ),
+    ).toBe(false);
     expect(isComputerControlUnavailable(timeout)).toBe(false);
     await expect(attemptComputerControl(async () => ({ completed: 2 }))).resolves.toEqual({
       status: "ok",

@@ -78,14 +78,13 @@ export function isComputerControlUnavailable(error: unknown) {
   if (!(error instanceof Error)) return false;
   if (error.name === "TimeoutError" || error.name === "AbortError") return false;
   const text = errorText(error);
+  // Only pre-connect failures prove no actions ran. Mid-flight resets/hang-ups can
+  // happen after the service already applied steps.
   return (
-    text.includes("fetch failed") ||
     text.includes("econnrefused") ||
-    text.includes("econnreset") ||
     text.includes("enotfound") ||
     text.includes("ehostunreach") ||
-    text.includes("socket hang up") ||
-    text.includes("network")
+    text.includes("eai_again")
   );
 }
 
