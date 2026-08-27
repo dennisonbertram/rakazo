@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -7,6 +8,7 @@ import {
   computerNetworkNamesForCleanup,
   containerCreateOptions,
   containerNameFor,
+  resolveComputerControlEndpoint,
   resolveScreenPublishTarget,
   screenPorts,
   screenUrlFor,
@@ -152,6 +154,67 @@ describe("graphical computer spec", () => {
         containerPort: "6080",
       }),
     ).toEqual({ host: "172.18.0.4", port: "6080" });
+  });
+
+  it("resolves computer control through the same publish-target rules as the screen", () => {
+    const networkMode = "rakazo_default";
+    expect(
+      resolveComputerControlEndpoint({
+        token: "secret",
+        screenNetwork: undefined,
+        networkMode,
+        networks: { [networkMode]: { IPAddress: "172.18.0.4" } },
+        hostPort: "49170",
+      }),
+    ).toEqual({ url: "http://127.0.0.1:49170/v1/desktop", token: "secret" });
+    expect(
+      resolveComputerControlEndpoint({
+        token: "secret",
+        screenNetwork: "internal",
+        networkMode,
+        networks: { [networkMode]: { IPAddress: "172.18.0.4" } },
+        hostPort: "49170",
+      }),
+    ).toEqual({ url: "http://172.18.0.4:7070/v1/desktop", token: "secret" });
+    expect(
+      resolveComputerControlEndpoint({
+        token: undefined,
+        screenNetwork: undefined,
+        networkMode,
+        networks: {},
+        hostPort: "49170",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("restricts computer control argv to supervisor shapes", () => {
+    const controlPath = path.resolve(import.meta.dirname, "../../computer/control.py");
+    const result = spawnSync(
+      "python3",
+      [
+        "-c",
+        [
+          "import importlib.util",
+          `spec = importlib.util.spec_from_file_location('control', ${JSON.stringify(controlPath)})`,
+          "module = importlib.util.module_from_spec(spec)",
+          "spec.loader.exec_module(module)",
+          "allow = module.allowed_control_argv",
+          "assert allow(['env', 'DISPLAY=:1', 'xdotool', 'key', '--clearmodifiers', 'a'])",
+          "assert allow(['env', 'DISPLAY=:2', 'xdg-open', 'https://example.com'])",
+          "assert allow(['env', 'DISPLAY=:1', 'chromium', 'https://example.com'])",
+          "assert allow(['env', 'DISPLAY=:1', 'rakazo-browser'])",
+          "assert not allow(['bash', '-c', 'id'])",
+          "assert not allow(['env', 'DISPLAY=:1', 'bash', '-c', 'id'])",
+          "assert not allow(['env', 'DISPLAY=:1', '/bin/sh', '-c', 'id'])",
+          "assert not allow(['env', 'DISPLAY=wayland-0', 'xdotool', 'key', 'a'])",
+          "assert not allow(['env', 'DISPLAY=:1', 'xdg-open', 'a', 'b'])",
+          "print('ok')",
+        ].join("\n"),
+      ],
+      { encoding: "utf8" },
+    );
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout.trim()).toBe("ok");
   });
 
   it("turns takeover input into xdotool", () => {

@@ -17,6 +17,7 @@ import {
   computerNetworkNamesForCleanup,
   containerCreateOptions,
   containerNameFor,
+  resolveComputerControlEndpoint,
   resolveScreenPublishTarget,
   SCREEN_HOST,
   screenPorts,
@@ -35,12 +36,14 @@ import {
   nextScreenIndex,
   normalizeWorkspaceRelative,
   parseObservation,
+  preferComputerControl,
   releaseAssignedScreen,
   type ScreenAssignment,
   sandboxCommandTimedOut,
   sandboxTimeoutCommand,
   stopExtraScreenCommand,
   toSandboxInput,
+  tryComputerControl,
   workspaceTarget,
 } from "./supervisor-logic.js";
 
@@ -221,12 +224,17 @@ app.post("/computers/:id/observe", async (c) => {
       c.req.header("x-rakazo-screen-lease-id"),
     );
     const control = computerControlEndpoint(info);
-    if (control) {
-      const result = await controlDesktop(control, [], layout.display, true, 0);
-      if (result.observation) return c.json(result.observation);
-      throw new Error("computer control returned no observation");
-    }
-    return c.json(await observeContainer(container, layout.display));
+    const observation = await preferComputerControl(
+      control
+        ? async () => {
+            const result = await controlDesktop(control, [], layout.display, true, 0);
+            if (!result.observation) throw new Error("computer control returned no observation");
+            return result.observation;
+          }
+        : undefined,
+      () => observeContainer(container, layout.display),
+    );
+    return c.json(observation);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return c.json({ error: message }, 500);
@@ -250,15 +258,18 @@ app.post("/computers/:id/actions", async (c) => {
       c.req.header("x-rakazo-screen-lease-id"),
     );
     const control = computerControlEndpoint(info);
-    const controlResult = control
-      ? await controlDesktop(
-          control,
-          body.actions,
-          layout.display,
-          body.observe !== false,
-          body.settleMs ?? 0,
-        )
-      : undefined;
+    const controlResult = await tryComputerControl(
+      control
+        ? () =>
+            controlDesktop(
+              control,
+              body.actions,
+              layout.display,
+              body.observe !== false,
+              body.settleMs ?? 0,
+            )
+        : undefined,
+    );
     if (!controlResult && body.actions.length)
       await applyContainerActions(container, body.actions, layout.display);
     if (!controlResult && body.settleMs)
@@ -653,9 +664,14 @@ function computerControlEndpoint(info: Docker.ContainerInspectInfo) {
   const token = info.Config.Env?.find((value) =>
     value.startsWith("RAKAZO_COMPUTER_CONTROL_TOKEN="),
   )?.slice("RAKAZO_COMPUTER_CONTROL_TOKEN=".length);
-  const hostPort = info.NetworkSettings.Ports?.[`${COMPUTER_CONTROL_PORT}/tcp`]?.[0]?.HostPort;
-  if (!token || !hostPort) return undefined;
-  return { url: `http://127.0.0.1:${hostPort}/v1/desktop`, token };
+  return resolveComputerControlEndpoint({
+    token,
+    screenNetwork: process.env.SANDBOX_SCREEN_NETWORK,
+    networkMode: info.HostConfig.NetworkMode,
+    networks: info.NetworkSettings?.Networks,
+    hostPort: info.NetworkSettings.Ports?.[`${COMPUTER_CONTROL_PORT}/tcp`]?.[0]?.HostPort,
+    screenHost: SCREEN_HOST,
+  });
 }
 
 async function controlDesktop(

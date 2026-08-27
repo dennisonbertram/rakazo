@@ -148,6 +148,28 @@ export function resolveScreenPublishTarget(input: {
   return undefined;
 }
 
+/** Same publish-target rules as the screen URL, for the in-container control port. */
+export function resolveComputerControlEndpoint(input: {
+  token: string | undefined;
+  screenNetwork: string | undefined;
+  networkMode: string | null | undefined;
+  networks: Record<string, { IPAddress?: string } | undefined> | null | undefined;
+  hostPort: string | undefined;
+  screenHost?: string;
+}): { url: string; token: string } | undefined {
+  if (!input.token) return undefined;
+  const target = resolveScreenPublishTarget({
+    screenNetwork: input.screenNetwork,
+    networkMode: input.networkMode,
+    networks: input.networks,
+    hostPort: input.hostPort,
+    containerPort: String(COMPUTER_CONTROL_PORT),
+    screenHost: input.screenHost,
+  });
+  if (!target) return undefined;
+  return { url: `http://${target.host}:${target.port}/v1/desktop`, token: input.token };
+}
+
 export function xdotoolCommand(input: SandboxInput): string[] {
   if (input.kind === "key") {
     const key = mapKey(input.key);

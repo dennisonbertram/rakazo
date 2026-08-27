@@ -1,16 +1,35 @@
 #!/usr/bin/env python3
-"""Loopback-only low-latency desktop control for the Rakazo supervisor."""
+"""Token-auth desktop control for the Rakazo supervisor."""
 
 import base64
 import ctypes
 import hmac
 import json
 import os
+import re
 import subprocess
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = os.environ.get("RAKAZO_COMPUTER_CONTROL_TOKEN", "")
+MAX_BODY_BYTES = 256 * 1024
+MAX_ARGV = 32
+MAX_ARG_LEN = 16_384
+DISPLAY_ENV_RE = re.compile(r"^DISPLAY=:[0-9]+$")
+KNOWN_LAUNCH = frozenset(
+    {
+        "chromium",
+        "chromium-browser",
+        "firefox",
+        "google-chrome",
+        "google-chrome-stable",
+        "rakazo-browser",
+        "xterm",
+    }
+)
+NATIVE_CAPTURES = {}
+NATIVE_LOCK = threading.Lock()
 
 
 class NativeCapture:
@@ -69,41 +88,66 @@ class NativeCapture:
         return self.library.rakazo_xinput_argv(self.context, len(argv), encoded)
 
 
-NATIVE_CAPTURES = {}
-
-
 def native_capture(display):
-    if display not in NATIVE_CAPTURES:
-        try:
-            NATIVE_CAPTURES[display] = NativeCapture(display)
-        except (OSError, RuntimeError):
-            NATIVE_CAPTURES[display] = None
-    return NATIVE_CAPTURES[display]
+    existing = NATIVE_CAPTURES.get(display)
+    if existing is not None:
+        return existing
+    try:
+        capture = NativeCapture(display)
+    except (OSError, RuntimeError):
+        return None
+    NATIVE_CAPTURES[display] = capture
+    return capture
+
+
+def drop_native_capture(display):
+    NATIVE_CAPTURES.pop(display, None)
+
+
+def allowed_control_argv(argv):
+    """Only supervisor-shaped argv: env DISPLAY=... plus xdotool / xdg-open / known launch."""
+    if not isinstance(argv, list) or not (3 <= len(argv) <= MAX_ARGV):
+        return False
+    if any(not isinstance(value, str) or len(value) > MAX_ARG_LEN or "\0" in value for value in argv):
+        return False
+    if argv[0] != "env" or not DISPLAY_ENV_RE.fullmatch(argv[1]):
+        return False
+    command = argv[2]
+    if command == "xdotool":
+        return len(argv) >= 4
+    if command == "xdg-open":
+        return len(argv) == 4
+    if "/" in command or command not in KNOWN_LAUNCH:
+        return False
+    return len(argv) in (3, 4)
 
 
 def capture(display):
     env = {**os.environ, "DISPLAY": display}
+
     def output(argv, fallback=""):
         return subprocess.run(argv, env=env, capture_output=True, text=True).stdout.strip() or fallback
+
     geometry = output(["xdotool", "getdisplaygeometry"], "1280 800").split()
     cursor = output(["xdotool", "getmouselocation", "--shell"])
     window = output(["xdotool", "getactivewindow"])
     title = output(["xdotool", "getwindowname", window]) if window else ""
-    source = native_capture(display)
-    if source:
-        try:
-            encoded, width, height, damage = source.copy()
-            image = subprocess.CompletedProcess([], 0, encoded, b"")
-        except RuntimeError:
-            NATIVE_CAPTURES[display] = None
-            source = None
-    if not source:
-        image = subprocess.run(
-            ["import", "-define", "png:compression-level=3", "-window", "root", "png:-"],
-            env=env,
-            capture_output=True,
-        )
-        width, height, damage = (int(geometry[0]), int(geometry[1]), None)
+    with NATIVE_LOCK:
+        source = native_capture(display)
+        if source:
+            try:
+                encoded, width, height, damage = source.copy()
+                image = subprocess.CompletedProcess([], 0, encoded, b"")
+            except RuntimeError:
+                drop_native_capture(display)
+                source = None
+        if not source:
+            image = subprocess.run(
+                ["import", "-define", "png:compression-level=3", "-window", "root", "png:-"],
+                env=env,
+                capture_output=True,
+            )
+            width, height, damage = (int(geometry[0]), int(geometry[1]), None)
     if image.returncode:
         raise RuntimeError(image.stderr.decode("utf-8", "replace") or "screen capture failed")
     fields = dict(line.split("=", 1) for line in cursor.splitlines() if "=" in line)
@@ -130,16 +174,27 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or length > MAX_BODY_BYTES:
+                raise RuntimeError("request body too large")
             body = json.loads(self.rfile.read(length))
             display = body.get("display", ":1")
+            if not isinstance(display, str) or not re.fullmatch(r":[0-9]+", display):
+                raise RuntimeError("invalid display")
             for step in body.get("steps", []):
                 if "waitMs" in step:
                     time.sleep(max(0, min(int(step["waitMs"]), 5000)) / 1000)
                     continue
-                source = native_capture(display)
-                handled = source.act(step["argv"]) if source else 0
+                argv = step.get("argv")
+                if not allowed_control_argv(argv):
+                    raise RuntimeError("unsupported computer action")
+                with NATIVE_LOCK:
+                    source = native_capture(display)
+                    handled = source.act(argv) if source else 0
+                    if handled < 0:
+                        drop_native_capture(display)
+                        handled = 0
                 if not handled:
-                    result = subprocess.run(step["argv"], env={**os.environ, "DISPLAY": display})
+                    result = subprocess.run(argv, env={**os.environ, "DISPLAY": display})
                     if result.returncode:
                         raise RuntimeError("computer action failed")
             settle_ms = max(0, min(int(body.get("settleMs", 0)), 5000))
@@ -163,4 +218,5 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(encoded)
 
 
-ThreadingHTTPServer(("0.0.0.0", 7070), Handler).serve_forever()
+if __name__ == "__main__":
+    ThreadingHTTPServer(("0.0.0.0", 7070), Handler).serve_forever()

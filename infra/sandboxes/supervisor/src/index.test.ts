@@ -15,11 +15,13 @@ import {
   nextScreenIndex,
   normalizeWorkspaceRelative,
   parseObservation,
+  preferComputerControl,
   releaseAssignedScreen,
   type ScreenAssignment,
   sandboxCommandTimedOut,
   sandboxTimeoutCommand,
   stopExtraScreenCommand,
+  tryComputerControl,
 } from "./supervisor-logic.js";
 
 const token = resolveSupervisorToken(process.env);
@@ -193,6 +195,34 @@ describe("sandbox supervisor input containment", () => {
     expect(containerActionStep({ kind: "wait", ms: -1 })).toEqual({ waitMs: 0 });
     expect(containerActionStep({ kind: "scroll", direction: "up", amount: 99 })).toEqual({
       argv: ["env", "DISPLAY=:1", "xdotool", "click", "--repeat", "20", "4"],
+    });
+  });
+
+  it("falls back to docker-exec when computer control fails", async () => {
+    await expect(
+      preferComputerControl(
+        async () => {
+          throw new Error("connection refused");
+        },
+        async () => "docker-exec",
+      ),
+    ).resolves.toBe("docker-exec");
+    await expect(preferComputerControl(undefined, async () => "docker-exec")).resolves.toBe(
+      "docker-exec",
+    );
+    await expect(
+      preferComputerControl(
+        async () => "fast-path",
+        async () => "docker-exec",
+      ),
+    ).resolves.toBe("fast-path");
+    await expect(
+      tryComputerControl(async () => {
+        throw new Error("timeout");
+      }),
+    ).resolves.toBeUndefined();
+    await expect(tryComputerControl(async () => ({ completed: 2 }))).resolves.toEqual({
+      completed: 2,
     });
   });
 

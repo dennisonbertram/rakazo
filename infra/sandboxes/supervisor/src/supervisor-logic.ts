@@ -46,6 +46,31 @@ export function hasValidBearerToken(authorization: string | undefined, expectedT
   return actual.length === candidate.length && timingSafeEqual(actual, candidate);
 }
 
+/** Prefer the HTTP control fast path; on failure use the docker-exec fallback. */
+export async function preferComputerControl<T>(
+  run: (() => Promise<T>) | undefined,
+  fallback: () => Promise<T>,
+): Promise<T> {
+  if (!run) return fallback();
+  try {
+    return await run();
+  } catch {
+    return fallback();
+  }
+}
+
+/** Try the HTTP control fast path; return undefined so callers can fall back. */
+export async function tryComputerControl<T>(
+  run: (() => Promise<T>) | undefined,
+): Promise<T | undefined> {
+  if (!run) return undefined;
+  try {
+    return await run();
+  } catch {
+    return undefined;
+  }
+}
+
 export function toSandboxInput(input: {
   kind: "key" | "pointer" | "clipboard";
   key?: string;
