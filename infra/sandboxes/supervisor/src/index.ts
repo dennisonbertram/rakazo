@@ -267,7 +267,10 @@ app.post("/computers/:id/actions", async (c) => {
       completed: controlResult?.completed ?? body.actions.length,
       ...(body.observe === false
         ? {}
-        : { observation: controlResult?.observation ?? (await observeContainer(container, layout.display)) }),
+        : {
+            observation:
+              controlResult?.observation ?? (await observeContainer(container, layout.display)),
+          }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
