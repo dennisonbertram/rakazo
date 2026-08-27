@@ -24,6 +24,7 @@ import {
   type ScreenAssignment,
   sandboxCommandTimedOut,
   sandboxTimeoutCommand,
+  shouldReplayComputerActions,
   stopExtraScreenCommand,
 } from "./supervisor-logic.js";
 
@@ -268,6 +269,38 @@ describe("sandbox supervisor input containment", () => {
       status: "ok",
       value: { completed: 2 },
     });
+  });
+
+  it("falls back on connection refused but does not replay after a request-sent failure", async () => {
+    const refused = await attemptComputerControl(async () => {
+      throw Object.assign(new TypeError("fetch failed"), {
+        cause: new Error("connect ECONNREFUSED 172.18.0.4:7070"),
+      });
+    });
+    expect(refused).toEqual({ status: "unavailable" });
+    expect(shouldReplayComputerActions(refused)).toBe(true);
+
+    const afterWrite = await attemptComputerControl(async () => {
+      throw new Error("computer control failed");
+    });
+    expect(afterWrite).toMatchObject({ status: "failed" });
+    expect(shouldReplayComputerActions(afterWrite)).toBe(false);
+
+    const timedOut = await attemptComputerControl(async () => {
+      throw Object.assign(new Error("The operation was aborted due to timeout"), {
+        name: "TimeoutError",
+      });
+    });
+    expect(timedOut).toMatchObject({ status: "failed" });
+    expect(shouldReplayComputerActions(timedOut)).toBe(false);
+
+    const reset = await attemptComputerControl(async () => {
+      throw Object.assign(new TypeError("fetch failed"), {
+        cause: new Error("read ECONNRESET"),
+      });
+    });
+    expect(reset).toMatchObject({ status: "failed" });
+    expect(shouldReplayComputerActions(reset)).toBe(false);
   });
 
   it("extends the computer control deadline for mapped waits", () => {

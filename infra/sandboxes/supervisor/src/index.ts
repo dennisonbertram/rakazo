@@ -11,7 +11,6 @@ import Docker from "dockerode";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
-  COMPUTER_CONTROL_PORT,
   COMPUTER_IMAGE,
   computerNetworkNameFor,
   computerNetworkNamesForCleanup,
@@ -45,6 +44,7 @@ import {
   type ScreenAssignment,
   sandboxCommandTimedOut,
   sandboxTimeoutCommand,
+  shouldReplayComputerActions,
   stopExtraScreenCommand,
   toSandboxInput,
   workspaceTarget,
@@ -275,9 +275,9 @@ app.post("/computers/:id/actions", async (c) => {
     );
     if (attempt.status === "failed") throw attempt.error;
     const controlResult = attempt.status === "ok" ? attempt.value : undefined;
-    if (!controlResult && body.actions.length)
+    if (shouldReplayComputerActions(attempt) && body.actions.length)
       await applyContainerActions(container, body.actions, layout.display);
-    if (!controlResult && body.settleMs)
+    if (shouldReplayComputerActions(attempt) && body.settleMs)
       await new Promise((resolve) => setTimeout(resolve, body.settleMs));
     return c.json({
       completed: controlResult?.completed ?? body.actions.length,
@@ -671,11 +671,8 @@ function computerControlEndpoint(info: Docker.ContainerInspectInfo) {
   )?.slice("RAKAZO_COMPUTER_CONTROL_TOKEN=".length);
   return resolveComputerControlEndpoint({
     token,
-    screenNetwork: process.env.SANDBOX_SCREEN_NETWORK,
     networkMode: info.HostConfig.NetworkMode,
     networks: info.NetworkSettings?.Networks,
-    hostPort: info.NetworkSettings.Ports?.[`${COMPUTER_CONTROL_PORT}/tcp`]?.[0]?.HostPort,
-    screenHost: SCREEN_HOST,
   });
 }
 

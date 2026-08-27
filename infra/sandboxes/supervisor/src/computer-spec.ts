@@ -31,8 +31,8 @@ export function computerPortBindings() {
     PortBindings[`${ports.viewPort}/tcp`] = [{ HostIp: "127.0.0.1", HostPort: "0" }];
     PortBindings[`${ports.controlPort}/tcp`] = [{ HostIp: "127.0.0.1", HostPort: "0" }];
   }
-  ExposedPorts[`${COMPUTER_CONTROL_PORT}/tcp`] = {};
-  PortBindings[`${COMPUTER_CONTROL_PORT}/tcp`] = [{ HostIp: "127.0.0.1", HostPort: "0" }];
+  // Control stays on the container network only (0.0.0.0 inside the container).
+  // Do not publish 7070 to the host.
   return { ExposedPorts, PortBindings };
 }
 
@@ -148,26 +148,22 @@ export function resolveScreenPublishTarget(input: {
   return undefined;
 }
 
-/** Same publish-target rules as the screen URL, for the in-container control port. */
+/**
+ * Resolve the in-container control service via its Docker network IP.
+ * Control is never host-published; the supervisor reaches 7070 on the
+ * container network while the process binds 0.0.0.0 inside the sandbox.
+ */
 export function resolveComputerControlEndpoint(input: {
   token: string | undefined;
-  screenNetwork: string | undefined;
   networkMode: string | null | undefined;
   networks: Record<string, { IPAddress?: string } | undefined> | null | undefined;
-  hostPort: string | undefined;
-  screenHost?: string;
 }): { url: string; token: string } | undefined {
   if (!input.token) return undefined;
-  const target = resolveScreenPublishTarget({
-    screenNetwork: input.screenNetwork,
-    networkMode: input.networkMode,
-    networks: input.networks,
-    hostPort: input.hostPort,
-    containerPort: String(COMPUTER_CONTROL_PORT),
-    screenHost: input.screenHost,
-  });
-  if (!target) return undefined;
-  return { url: `http://${target.host}:${target.port}/v1/desktop`, token: input.token };
+  const address =
+    (input.networkMode ? input.networks?.[input.networkMode]?.IPAddress : undefined) ||
+    Object.values(input.networks ?? {}).find((network) => network?.IPAddress)?.IPAddress;
+  if (!address) return undefined;
+  return { url: `http://${address}:${COMPUTER_CONTROL_PORT}/v1/desktop`, token: input.token };
 }
 
 export function xdotoolCommand(input: SandboxInput): string[] {

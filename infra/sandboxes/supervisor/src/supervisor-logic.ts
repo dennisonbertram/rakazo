@@ -114,6 +114,11 @@ export async function attemptComputerControl<T>(
   }
 }
 
+/** Replay actions via docker-exec only when control was never reached. */
+export function shouldReplayComputerActions(attempt: ComputerControlAttempt<unknown>) {
+  return attempt.status === "unavailable";
+}
+
 const CONTROL_BASE_TIMEOUT_MS = 15_000;
 const CONTROL_MAX_TIMEOUT_MS = 60_000;
 
