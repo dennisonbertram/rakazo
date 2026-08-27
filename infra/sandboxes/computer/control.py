@@ -16,7 +16,6 @@ TOKEN = os.environ.get("RAKAZO_COMPUTER_CONTROL_TOKEN", "")
 MAX_BODY_BYTES = 256 * 1024
 MAX_ARGV = 32
 MAX_ARG_LEN = 16_384
-DISPLAY_ENV_RE = re.compile(r"^DISPLAY=:[0-9]+$")
 KNOWN_LAUNCH = frozenset(
     {
         "chromium",
@@ -29,6 +28,7 @@ KNOWN_LAUNCH = frozenset(
     }
 )
 NATIVE_CAPTURES = {}
+NATIVE_LOCK = threading.Lock()
 DISPLAY_LOCKS = {}
 DISPLAY_LOCKS_GUARD = threading.Lock()
 
@@ -153,13 +153,13 @@ def allowed_xdotool_argv(argv):
     return False
 
 
-def allowed_control_argv(argv):
-    """Only supervisor-shaped argv: env DISPLAY=... plus xdotool / xdg-open / known launch."""
+def allowed_control_argv(argv, display):
+    """Only supervisor-shaped argv for the locked display."""
     if not isinstance(argv, list) or not (3 <= len(argv) <= MAX_ARGV):
         return False
     if any(not isinstance(value, str) or len(value) > MAX_ARG_LEN or "\0" in value for value in argv):
         return False
-    if argv[0] != "env" or not DISPLAY_ENV_RE.fullmatch(argv[1]):
+    if argv[0] != "env" or argv[1] != f"DISPLAY={display}":
         return False
     command = argv[2]
     if command == "xdotool":
@@ -181,15 +181,17 @@ def capture(display):
     cursor = output(["xdotool", "getmouselocation", "--shell"])
     window = output(["xdotool", "getactivewindow"])
     title = output(["xdotool", "getwindowname", window]) if window else ""
-    source = native_capture(display)
-    if source:
-        try:
-            encoded, width, height, damage = source.copy()
-            image = subprocess.CompletedProcess([], 0, encoded, b"")
-        except RuntimeError:
-            drop_native_capture(display)
-            source = None
-    if not source:
+    image = None
+    width = height = damage = None
+    with NATIVE_LOCK:
+        source = native_capture(display)
+        if source:
+            try:
+                encoded, width, height, damage = source.copy()
+                image = subprocess.CompletedProcess([], 0, encoded, b"")
+            except RuntimeError:
+                drop_native_capture(display)
+    if image is None:
         image = subprocess.run(
             ["import", "-define", "png:compression-level=3", "-window", "root", "png:-"],
             env=env,
@@ -234,13 +236,14 @@ class Handler(BaseHTTPRequestHandler):
                         time.sleep(max(0, min(int(step["waitMs"]), 5000)) / 1000)
                         continue
                     argv = step.get("argv")
-                    if not allowed_control_argv(argv):
+                    if not allowed_control_argv(argv, display):
                         raise RuntimeError("unsupported computer action")
-                    source = native_capture(display)
-                    handled = source.act(argv) if source else 0
-                    if handled < 0:
-                        drop_native_capture(display)
-                        handled = 0
+                    with NATIVE_LOCK:
+                        source = native_capture(display)
+                        handled = source.act(argv) if source else 0
+                        if handled < 0:
+                            drop_native_capture(display)
+                            handled = 0
                     if not handled:
                         result = subprocess.run(argv, env={**os.environ, "DISPLAY": display})
                         if result.returncode:

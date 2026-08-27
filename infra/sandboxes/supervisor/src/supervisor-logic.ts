@@ -84,6 +84,7 @@ export function isComputerControlUnavailable(error: unknown) {
     text.includes("econnrefused") ||
     text.includes("enotfound") ||
     text.includes("ehostunreach") ||
+    text.includes("enetunreach") ||
     text.includes("eai_again")
   );
 }

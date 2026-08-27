@@ -252,6 +252,13 @@ describe("sandbox supervisor input containment", () => {
     expect(
       isComputerControlUnavailable(
         Object.assign(new TypeError("fetch failed"), {
+          cause: new Error("connect ENETUNREACH 172.18.0.4:7070"),
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isComputerControlUnavailable(
+        Object.assign(new TypeError("fetch failed"), {
           cause: new Error("read ECONNRESET"),
         }),
       ),
