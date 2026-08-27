@@ -4,7 +4,7 @@ import {
   MessageBlock as MessageBlockSchema,
   type ProductEvent,
 } from "@rakazo/contracts";
-import { isApprovalAskBlock } from "@rakazo/core";
+import { isApprovalAskBlock, isSecretAskBlock } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "./client.js";
 import {
   assertRunCanWriteHistory,
@@ -35,6 +35,7 @@ export interface ThreadEvents {
   finalizeRun(input: FinalizeRunInput): Promise<boolean>;
   notify(threadId: string, seq: number): Promise<void>;
   pauseRunForInput(input: PauseRunForInput): Promise<boolean>;
+  pauseRunForTakeover(input: PauseRunForTakeover): Promise<boolean>;
   sendUserMessage(input: SendUserMessageInput): Promise<SendUserMessageResult>;
   follow(threadId: string, cursor: number, signal?: AbortSignal): AsyncGenerator<ProductEvent>;
 }
@@ -90,6 +91,17 @@ export interface PauseRunForInput {
   blocks: MessageBlock[];
 }
 
+export interface PauseRunForTakeover {
+  workspaceId: string;
+  threadId: string;
+  botId: string;
+  runId: string;
+  attemptId: string;
+  leaseOwner: string;
+  leaseFence: number;
+  reason: string;
+}
+
 export interface AnswerRunInput {
   workspaceId: string;
   threadId: string;
@@ -120,13 +132,23 @@ export interface SendUserMessageResult {
   runId: string | null;
 }
 
+export interface RunSecretWriter {
+  store(input: {
+    runId: string;
+    userId: string;
+    workspaceId: string;
+    plaintext: string;
+    tx: Prisma.TransactionClient;
+  }): Promise<void>;
+}
+
 export function createThreadEvents(
   prisma: PrismaClient,
   realtime?: RealtimeFanout,
-  options: { catchUpMs?: number } = {},
+  options: { catchUpMs?: number; runSecretWriter?: RunSecretWriter } = {},
 ): ThreadEvents {
   return {
-    answerRunInput: (input) => answerRunInput(prisma, input, realtime),
+    answerRunInput: (input) => answerRunInput(prisma, input, realtime, options.runSecretWriter),
     append: (input) => appendEvent(prisma, input, realtime),
     clearThread: (input) => clearThread(prisma, input, realtime),
     finalizeComputerControlRelease: (input) =>
@@ -134,6 +156,7 @@ export function createThreadEvents(
     finalizeRun: (input) => finalizeRun(prisma, input, realtime),
     notify: (threadId, seq) => notifyRealtime(realtime, threadId, seq),
     pauseRunForInput: (input) => pauseRunForInput(prisma, input, realtime),
+    pauseRunForTakeover: (input) => pauseRunForTakeover(prisma, input, realtime),
     sendUserMessage: (input) => sendUserMessage(prisma, input, realtime),
     follow: (threadId, cursor, signal) =>
       followThreadEvents(prisma, threadId, cursor, realtime, signal, options.catchUpMs),
@@ -350,6 +373,7 @@ export async function answerRunInput(
   prisma: PrismaClient,
   input: AnswerRunInput,
   realtime?: RealtimeFanout,
+  runSecretWriter?: RunSecretWriter,
 ): Promise<boolean> {
   const committed = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // Thread row first, then run rows — the same order as clearThread and finalizeRun, so a
@@ -380,6 +404,8 @@ export async function answerRunInput(
     );
     if (pendingAsk?.kind !== "ask") return null;
     const approvalAsk = isApprovalAskBlock(pendingAsk);
+    const secretAsk = isSecretAskBlock(pendingAsk);
+    if (secretAsk && !runSecretWriter) return null;
     let approvalEffect: { id: string; kind: string } | null = null;
     let approvalUserId: string | null = null;
 
@@ -438,6 +464,23 @@ export async function answerRunInput(
           update: {},
         });
       }
+    } else if (secretAsk) {
+      await runSecretWriter!.store({
+        runId: input.runId,
+        userId: run.userId,
+        workspaceId: input.workspaceId,
+        plaintext: input.answer,
+        tx,
+      });
+      await tx.externalEffect.updateMany({
+        where: {
+          runId: input.runId,
+          workspaceId: input.workspaceId,
+          kind: "request_secret",
+          status: "intended",
+        },
+        data: { status: "approved" },
+      });
     } else {
       const task = await tx.task.updateMany({
         where: { runs: { some: { id: input.runId } } },
@@ -448,7 +491,11 @@ export async function answerRunInput(
 
     const blocks = parsed.data.map((block) =>
       block === pendingAsk
-        ? { ...block, status: "answered" as const, answer: input.answer }
+        ? {
+            ...block,
+            status: "answered" as const,
+            answer: secretAsk ? "" : input.answer,
+          }
         : block,
     );
     await tx.message.update({ where: { id: message.id }, data: { blocks } });
@@ -506,6 +553,7 @@ export async function pauseRunForInput(
       threadId: input.threadId,
       role: "bot",
       blocks: input.blocks,
+      botId: input.botId,
       runId: input.runId,
     });
     await appendEventInTransaction(tx, {
@@ -523,6 +571,60 @@ export async function pauseRunForInput(
       type: "run.waiting_input",
       runId: input.runId,
       payload: {},
+    });
+    await tx.event.deleteMany({ where: { runId: input.runId, type: "thread.progress" } });
+    return { threadId: waitingEvent.threadId, seq: waitingEvent.seq };
+  });
+
+  if (!committed) return false;
+  await notifyRealtime(realtime, committed.threadId, committed.seq);
+  return true;
+}
+
+export async function pauseRunForTakeover(
+  prisma: PrismaClient,
+  input: PauseRunForTakeover,
+  realtime?: RealtimeFanout,
+): Promise<boolean> {
+  const committed = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
+    const paused = await tx.run.updateMany({
+      where: {
+        id: input.runId,
+        workspaceId: input.workspaceId,
+        threadId: input.threadId,
+        botId: input.botId,
+        status: "running",
+        leaseOwner: input.leaseOwner,
+        leaseFence: input.leaseFence,
+      },
+      data: {
+        status: "waiting_takeover",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        checkpoint: null,
+      },
+    });
+    if (paused.count !== 1) return null;
+
+    const attempt = await tx.attempt.updateMany({
+      where: {
+        id: input.attemptId,
+        runId: input.runId,
+        fence: input.leaseFence,
+        status: "running",
+      },
+      data: { status: "waiting_takeover", finishedAt: new Date() },
+    });
+    if (attempt.count !== 1) throw new Error("Active run attempt was not available to pause");
+
+    const waitingEvent = await appendEventInTransaction(tx, {
+      workspaceId: input.workspaceId,
+      threadId: input.threadId,
+      botId: input.botId,
+      type: "computer.takeover.requested",
+      runId: input.runId,
+      payload: { reason: input.reason },
     });
     await tx.event.deleteMany({ where: { runId: input.runId, type: "thread.progress" } });
     return { threadId: waitingEvent.threadId, seq: waitingEvent.seq };

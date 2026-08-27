@@ -89,6 +89,7 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     text: z.string(),
     approvalEffectId: Id.optional(),
     detail: z.string().optional(),
+    input: z.enum(["text", "secret"]).optional(),
     status: z.enum(["pending", "answered"]).optional(),
     answer: z.string().optional(),
     actions: z.array(z.object({ id: z.string(), label: z.string() })).optional(),
@@ -194,6 +195,22 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     fromBotId: Id,
     toBotId: Id,
     text: z.string(),
+  }),
+  z.object({
+    /** Shown in the sending bot's own chat, so the user can see what it sent. */
+    kind: z.literal("bot_message_sent"),
+    toBotId: Id,
+    toBotName: z.string(),
+    text: z.string(),
+  }),
+  z.object({
+    /** Delivered into the receiving bot's own chat as the prompt that woke it. */
+    kind: z.literal("bot_message_received"),
+    fromBotId: Id,
+    fromBotName: z.string(),
+    text: z.string(),
+    /** Links in a bot-started chain; absent when a person started it. */
+    hop: z.number().int().nonnegative().optional(),
   }),
 ]);
 export type MessageBlock = z.infer<typeof MessageBlock>;

@@ -2,6 +2,27 @@ import { Cron } from "croner";
 
 const WEEKDAYS = "1-5";
 
+export const ONCE_ROUTINE_CRON = "@once";
+
+export function isOneShotRoutineCron(cron: string): boolean {
+  return cron.trim() === ONCE_ROUTINE_CRON;
+}
+
+// A routine is one-shot only when it has exactly one schedule and that
+// schedule is @once — a mix of @once plus recurring schedules doesn't make
+// sense (the one-shot slot would never get a "next run" to compute).
+export function isOneShotRoutineCrons(crons: string[]): boolean {
+  return crons.length === 1 && isOneShotRoutineCron(crons[0] ?? "");
+}
+
+// True when @once is combined with any other schedule — never valid, since
+// the one-shot slot has no "next run" to compute and would sit inert
+// forever. Callers that persist crons must reject this rather than let
+// isOneShotRoutineCrons quietly classify the array as recurring.
+export function hasMixedOneShotSchedule(crons: string[]): boolean {
+  return crons.length > 1 && crons.some(isOneShotRoutineCron);
+}
+
 export const CRON_FREQS = [
   "Every hour",
   "Every day",
@@ -36,7 +57,11 @@ export function defaultCronPreset(): CronPreset {
 }
 
 export function cronFromPreset(input: CronPresetInput): string {
-  if (input.freq === "Advanced") return input.cron?.trim() || "*/3 * * * *";
+  const advancedCron = input.cron?.trim();
+  if (input.freq === "Advanced") {
+    if (advancedCron && isOneShotRoutineCron(advancedCron)) return ONCE_ROUTINE_CRON;
+    return advancedCron || "*/3 * * * *";
+  }
   if (input.freq === "Every hour") return "0 * * * *";
   if (input.freq === "Interval") {
     const n = Number.isFinite(input.n) && (input.n ?? 0) > 0 ? (input.n as number) : 5;
@@ -54,6 +79,9 @@ export function cronFromPreset(input: CronPresetInput): string {
 export function presetFromCron(cron: string): CronPreset {
   const base = defaultCronPreset();
   const trimmed = cron.trim();
+  if (isOneShotRoutineCron(trimmed)) {
+    return { ...base, freq: "Advanced", cron: ONCE_ROUTINE_CRON };
+  }
   const parts = trimmed.split(/\s+/);
   if (parts.length < 5) {
     return { ...base, freq: "Advanced", cron: trimmed };
@@ -131,10 +159,24 @@ export function formatSchedule(preset: CronPreset): string {
 }
 
 export function formatCron(cron: string): string {
+  if (isOneShotRoutineCron(cron)) return "One-time";
   return formatSchedule(presetFromCron(cron));
 }
 
+export function resolveRoutineNextRunAt(
+  cron: string,
+  from: Date,
+  timezone: string,
+  existing: Date | null | undefined,
+): Date | null {
+  if (isOneShotRoutineCron(cron)) return existing ?? null;
+  return nextCronDate(cron, from, timezone);
+}
+
 export function nextCronDate(cron: string, from: Date, timezone = "UTC"): Date {
+  if (isOneShotRoutineCron(cron)) {
+    throw new Error("nextCronDate does not apply to one-shot routines");
+  }
   if (cron.trim().split(/\s+/).length !== 5) {
     throw new RangeError("Cron expressions must contain five fields");
   }
@@ -145,6 +187,46 @@ export function nextCronDate(cron: string, from: Date, timezone = "UTC"): Date {
   const next = schedule.nextRun(from);
   if (!next) throw new RangeError(`Cron expression has no future run: ${cron}`);
   return next;
+}
+
+// Nearest next run across every recurring schedule on a routine. Ignores
+// @once slots (they don't recur) and any schedule that fails to parse. Only
+// the wakeup path (packages/adapters/src/executor.ts) should use this —
+// legacy or hand-edited records may carry a stale cron, and skipping it
+// there is safer than crashing the wakeup job. Anything that persists a
+// routine's crons must reject malformed input instead — see
+// nextCronDateAcrossStrict.
+export function nextCronDateAcross(crons: string[], from: Date, timezone = "UTC"): Date | null {
+  let earliest: Date | null = null;
+  for (const cron of crons) {
+    if (isOneShotRoutineCron(cron)) continue;
+    let next: Date;
+    try {
+      next = nextCronDate(cron, from, timezone);
+    } catch {
+      continue;
+    }
+    if (!earliest || next < earliest) earliest = next;
+  }
+  return earliest;
+}
+
+// Same as nextCronDateAcross, but throws on the first malformed recurring
+// cron instead of silently skipping it. Use this before persisting a
+// routine's crons — a partially-invalid array should be rejected outright,
+// not saved with the bad entry quietly never firing.
+export function nextCronDateAcrossStrict(
+  crons: string[],
+  from: Date,
+  timezone = "UTC",
+): Date | null {
+  let earliest: Date | null = null;
+  for (const cron of crons) {
+    if (isOneShotRoutineCron(cron)) continue;
+    const next = nextCronDate(cron, from, timezone);
+    if (!earliest || next < earliest) earliest = next;
+  }
+  return earliest;
 }
 
 function validTimezoneOrUtc(timezone: string): string {

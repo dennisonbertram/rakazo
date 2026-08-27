@@ -2,6 +2,44 @@ import type { AgentToolExecutionResult } from "@rakazo/adapter-kit";
 
 export type ApprovalPausedToolResult = AgentToolExecutionResult & { terminate: true };
 
+export interface ApprovedEffectReplay {
+  kind: string;
+  request: unknown;
+}
+
+export interface ApprovedEffectReplayQueue {
+  nextToolName(): string | undefined;
+  take(toolName: string): Record<string, unknown> | undefined;
+  assertDrained(): void;
+}
+
+export function createApprovedEffectReplayQueue(
+  effects: readonly ApprovedEffectReplay[],
+): ApprovedEffectReplayQueue {
+  const pending = [...effects];
+
+  return {
+    nextToolName() {
+      return pending[0]?.kind;
+    },
+    take(toolName) {
+      const next = pending[0];
+      if (!next || next.kind !== toolName) return undefined;
+      pending.shift();
+      const request = next.request;
+      if (!request || typeof request !== "object" || Array.isArray(request)) {
+        throw new TypeError(`Approved ${toolName} request is not a JSON object`);
+      }
+      return request as Record<string, unknown>;
+    },
+    assertDrained() {
+      if (pending.length > 0) {
+        throw new Error("Approved tool requests were not fully replayed");
+      }
+    },
+  };
+}
+
 export function approvalPausedToolResult(): ApprovalPausedToolResult {
   return {
     kind: "agent_tool_result",
@@ -11,16 +49,18 @@ export function approvalPausedToolResult(): ApprovalPausedToolResult {
   };
 }
 
-export function isApprovalPausedResult(result: unknown): result is ApprovalPausedToolResult {
+export function isToolPauseResult(result: unknown): result is ApprovalPausedToolResult {
   if (!result || typeof result !== "object") return false;
   const record = result as ApprovalPausedToolResult;
   if (record.kind !== "agent_tool_result") return false;
   const details = record.details;
-  return (
-    Boolean(details) &&
-    typeof details === "object" &&
-    (details as { approval?: unknown }).approval === "paused"
-  );
+  if (!details || typeof details !== "object") return false;
+  const pause = details as { approval?: unknown; secret?: unknown };
+  return pause.approval === "paused" || pause.secret === "paused";
+}
+
+export function isApprovalPausedResult(result: unknown): result is ApprovalPausedToolResult {
+  return isToolPauseResult(result);
 }
 
 export type DuplicateEffectGate =
@@ -140,4 +180,23 @@ export async function completeExternalEffect(
     data: { status: "completed", result: result as never },
   });
   return completed.count === 1;
+}
+
+export async function replaceCompletedExternalEffectResult(
+  store: {
+    externalEffect: {
+      updateMany: (args: {
+        where: { id: string; status: string };
+        data: { result: never };
+      }) => Promise<{ count: number }>;
+    };
+  },
+  effectId: string,
+  result: unknown,
+): Promise<boolean> {
+  const replaced = await store.externalEffect.updateMany({
+    where: { id: effectId, status: "completed" },
+    data: { result: result as never },
+  });
+  return replaced.count === 1;
 }

@@ -5,10 +5,51 @@ import {
   claimApprovedEffect,
   claimIntendedEffect,
   completeExternalEffect,
+  createApprovedEffectReplayQueue,
   isApprovalPausedResult,
+  isToolPauseResult,
+  replaceCompletedExternalEffectResult,
   resolveDuplicateEffectGate,
   settleUncertainEffect,
 } from "./approval-effect.js";
+
+describe("approved effect replay", () => {
+  it("replays persisted arguments instead of a changed model reconstruction", () => {
+    const approved = { title: "Approved title", body: "Approved body" };
+    const queue = createApprovedEffectReplayQueue([
+      { kind: "destination.write", request: approved },
+    ]);
+
+    expect(queue.take("destination.write")).toEqual(approved);
+    expect(queue.take("destination.write")).toBeUndefined();
+  });
+
+  it("keeps independently approved calls in creation order", () => {
+    const queue = createApprovedEffectReplayQueue([
+      { kind: "destination.write", request: { sequence: 1 } },
+      { kind: "destination.write", request: { sequence: 2 } },
+    ]);
+
+    expect(queue.assertDrained).toThrow();
+    expect(queue.take("destination.write")).toEqual({ sequence: 1 });
+    expect(queue.assertDrained).toThrow();
+    expect(queue.take("destination.write")).toEqual({ sequence: 2 });
+    expect(queue.assertDrained).not.toThrow();
+  });
+
+  it("does not consume a later tool before the next approved request", () => {
+    const queue = createApprovedEffectReplayQueue([
+      { kind: "first.write", request: { sequence: 1 } },
+      { kind: "second.write", request: { sequence: 2 } },
+    ]);
+
+    expect(queue.nextToolName()).toBe("first.write");
+    expect(queue.take("second.write")).toBeUndefined();
+    expect(queue.nextToolName()).toBe("first.write");
+    expect(queue.take("first.write")).toEqual({ sequence: 1 });
+    expect(queue.nextToolName()).toBe("second.write");
+  });
+});
 
 describe("approvalEffectKey", () => {
   it("is stable across arg key order", () => {
@@ -100,6 +141,25 @@ describe("claimIntendedEffect", () => {
     expect(store.externalEffect.updateMany).toHaveBeenCalledWith({
       where: { id: "effect-1", status: "intended" },
       data: { status: "executing" },
+    });
+  });
+});
+
+describe("replaceCompletedExternalEffectResult", () => {
+  it("updates the stored result for a completed effect", async () => {
+    const store = {
+      externalEffect: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const result = { ok: true, submitted: true, connected: true };
+
+    await expect(replaceCompletedExternalEffectResult(store, "effect-1", result)).resolves.toBe(
+      true,
+    );
+    expect(store.externalEffect.updateMany).toHaveBeenCalledWith({
+      where: { id: "effect-1", status: "completed" },
+      data: { result },
     });
   });
 });
@@ -218,6 +278,20 @@ describe("approved effect resume", () => {
 
     expect(second).toEqual({ executed: false, result: { ok: true, written: true } });
     expect(harness.getDestinationWrites()).toBe(1);
+  });
+});
+
+describe("isToolPauseResult", () => {
+  it("detects approval and secret pauses", () => {
+    expect(isToolPauseResult(approvalPausedToolResult())).toBe(true);
+    expect(
+      isToolPauseResult({
+        kind: "agent_tool_result",
+        terminate: true,
+        details: { secret: "paused" },
+      }),
+    ).toBe(true);
+    expect(isToolPauseResult({ ok: true })).toBe(false);
   });
 });
 

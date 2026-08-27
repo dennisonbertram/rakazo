@@ -1,5 +1,13 @@
 import { Agent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core";
-import { type Api, type Model, type Models, Type } from "@earendil-works/pi-ai";
+import {
+  type Api,
+  clampThinkingLevel,
+  type Model,
+  type Models,
+  type ModelThinkingLevel,
+  type SimpleStreamOptions,
+  Type,
+} from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type {
   AdapterContext,
@@ -9,6 +17,7 @@ import type {
   AgentToolExecutionResult,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
+import { isToolPauseResult } from "./approval-effect.js";
 import { builtinAgentTools, DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
 import { PiRuntimeCredentialStore, toOAuthCredential } from "./pi-credentials.js";
 import { registerLocalProvider } from "./pi-local-provider.js";
@@ -17,6 +26,7 @@ import {
   registerOpenAiCompatibleCatalog,
   registerOpenAiCompatibleRuntime,
 } from "./pi-openai-compatible-provider.js";
+import { textContentArg } from "./tool-text.js";
 
 const running = new Map<string, AbortController>();
 // Built on first use, not at module load: entry points call loadRootEnv() after
@@ -32,17 +42,29 @@ const MAX_PARALLEL_SUBAGENTS = 4;
 // that to reasoning.effort "none", which 400s on endpoints that mandate
 // reasoning (e.g. google/gemini-3.7-flash). Keep a real level when model.reasoning
 // is set; plain models stay off.
-const REASONING_MODEL_THINKING_LEVEL = "medium";
-function thinkingLevelFor(model: { reasoning?: boolean }) {
-  return model.reasoning ? REASONING_MODEL_THINKING_LEVEL : "off";
+const REASONING_MODEL_THINKING_LEVEL: ModelThinkingLevel = "medium";
+function thinkingLevelFor(
+  model: Model<Api>,
+  preferred?: ModelThinkingLevel | null,
+): ModelThinkingLevel {
+  if (!model.reasoning) return "off";
+  if (preferred) return clampThinkingLevel(model, preferred);
+  return clampThinkingLevel(model, REASONING_MODEL_THINKING_LEVEL);
 }
 // Pi forwards these names to OpenAI Responses, whose function-name contract is
 // ^[a-zA-Z0-9_-]+$ with a maximum length of 64 characters.
 const AGENT_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MAX_AGENT_TOOL_NAME_LENGTH = 64;
 const FALLBACK_AGENT_TOOL_NAME = "connector_tool";
-// Bound runaway agent loops before they can issue unbounded billable tool calls.
-const MAX_TOOL_CALLS_PER_TURN = 80;
+
+/** Optional self-host fuse. Unset, empty, or 0 means unlimited (default). */
+export function maxToolCallsPerTurn(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.MAX_TOOL_CALLS_PER_TURN?.trim();
+  if (!raw) return 0;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.floor(parsed);
+}
 
 export class PiAgentRuntime implements AgentRuntime {
   describe() {
@@ -58,10 +80,13 @@ export class PiAgentRuntime implements AgentRuntime {
     running.get(runId)?.abort();
   }
 
-  async *run(request: AgentRunRequest, context: AdapterContext): AsyncIterable<AgentRuntimeEvent> {
+  async *run(
+    request: AgentRunRequest,
+    context?: Partial<AdapterContext>,
+  ): AsyncIterable<AgentRuntimeEvent> {
     const controller = new AbortController();
     running.set(request.runId, controller);
-    const signal = context.signal ?? controller.signal;
+    const signal = context?.signal ?? controller.signal;
     const queue = createQueue();
 
     const work = (async () => {
@@ -97,7 +122,10 @@ export class PiAgentRuntime implements AgentRuntime {
           ? undefined
           : request.model.provider === OPENAI_COMPATIBLE_PROVIDER_ID
             ? request.model.apiKey || "local"
-            : (request.model.apiKey ?? process.env.OPENROUTER_API_KEY);
+            : // Only OpenRouter may fall back to the OpenRouter env key. Handing it to
+              // another provider would ship our key to a vendor it was not issued for.
+              (request.model.apiKey ??
+              (provider === "openrouter" ? process.env.OPENROUTER_API_KEY : undefined));
         const toolDefs = request.tools.length ? request.tools : builtinAgentTools;
         const nestedAgents = new Set<Agent>();
         const host: ToolHost = {
@@ -108,16 +136,18 @@ export class PiAgentRuntime implements AgentRuntime {
           apiKey,
           nestedAgents,
           subagentGate: createGate(MAX_PARALLEL_SUBAGENTS),
-          toolCallBudget: { count: 0, exceeded: false },
+          toolCallBudget: { count: 0, exceeded: false, limit: maxToolCallsPerTurn() },
           abortTurn: () => undefined,
           signal,
           depth: 0,
+          pausePending: false,
         };
         const tools = toAgentTools(toolDefs, host);
         const history = toHistory(request.history, request.prompt);
 
         const agent = new Agent({
-          streamFn: (m, ctx, options) => models.streamSimple(m, ctx, options),
+          streamFn: (m, ctx, options) =>
+            models.streamSimple(m, ctx, reliableStreamOptions(m, options)),
           getApiKey: async () => apiKey,
           transformContext: async (messages) => pruneComputerScreenshotContext(messages),
           initialState: {
@@ -127,7 +157,7 @@ export class PiAgentRuntime implements AgentRuntime {
                 ? "You are a Rakazo bot with a real computer. Use computer_observe and computer_act to operate its visible desktop, including browsers and installed applications. Use shell and the file tools for precise terminal and filesystem work. The user may interact with the same desktop while you run, so re-observe when the screen may have changed. Be concise."
                 : "You are a Rakazo bot with a persistent sandbox filesystem and shell. Be concise."),
             model,
-            thinkingLevel: thinkingLevelFor(model),
+            thinkingLevel: thinkingLevelFor(model, request.model.thinkingLevel),
             tools,
             messages: history,
           },
@@ -145,10 +175,12 @@ export class PiAgentRuntime implements AgentRuntime {
         signal.addEventListener("abort", onAbort);
 
         let streamed = "";
+        let toolCalls = 0;
         let toolActivityShowing = false;
         agent.subscribe((event) => {
           if (event.type === "tool_execution_start") {
             if (!consumeToolCall(host)) return;
+            toolCalls += 1;
             // Live activity feedback: without this the thread shows a bare
             // "working…" for the whole tool call with nothing actionable.
             toolActivityShowing = true;
@@ -204,22 +236,40 @@ export class PiAgentRuntime implements AgentRuntime {
           signal.removeEventListener("abort", onAbort);
         }
 
+        // Budget abort stops the agent underneath the model, which leaves
+        // errorMessage set. Treat that as a soft stop so the turn still ends
+        // with a durable assistant message instead of a failed run.
+        const budgetExceeded = host.toolCallBudget.exceeded;
         const error = agent.state.errorMessage;
-        if (error) {
-          queue.push({ type: "text", text: `I hit a problem: ${sanitizeError(error)}` });
-          queue.push({ type: "done", text: sanitizeError(error) });
-          return;
+        if (error && !budgetExceeded) {
+          throw new Error(sanitizeError(error));
         }
-        if (!streamed) {
-          const fallback = assistantText(agent.state.messages.at(-1)) || "I finished the work.";
-          queue.push({ type: "text", text: fallback });
-          streamed = fallback;
+        if (budgetExceeded) {
+          const budgetMessage = toolCallBudgetExceededMessage(host.toolCallBudget.limit);
+          if (streamed.trim()) {
+            const suffix = `\n\n${budgetMessage}`;
+            queue.push({ type: "text", text: suffix });
+            streamed += suffix;
+          } else {
+            queue.push({ type: "text", text: budgetMessage });
+            streamed = budgetMessage;
+          }
+        } else if (!streamed.trim() && !host.pausePending) {
+          streamed = "";
+          const lastMessage = agent.state.messages.at(-1);
+          const fallback = lastMessage?.role === "assistant" ? assistantText(lastMessage) : "";
+          if (fallback.trim()) {
+            queue.push({ type: "text", text: fallback });
+            streamed = fallback;
+          } else if (toolCalls === 0 && !request.allowSilentEmpty) {
+            streamed = "No response. Try again.";
+            queue.push({ type: "text", text: streamed });
+          }
         }
-        queue.push({ type: "done", text: streamed });
+        queue.push(streamed.trim() ? { type: "done", text: streamed } : { type: "done" });
       } catch (error) {
         const message = sanitizeError(error instanceof Error ? error.message : String(error));
-        queue.push({ type: "text", text: `I hit a problem: ${message}` });
-        queue.push({ type: "done", text: message });
+        queue.fail(new Error(message));
       } finally {
         queue.close();
       }
@@ -333,6 +383,12 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "computer_act") return "Operating the computer";
   if (toolName === "run_subagent") return `Delegating to helper: ${detail(record.name)}`;
   if (toolName === "remember") return "Saving a note to memory";
+  if (toolName === "skill_read") return `Reading skill: ${detail(record.name)}`;
+  if (toolName === "skill_create") return `Creating skill: ${detail(record.name ?? "skill")}`;
+  if (toolName === "skill_update")
+    return `Updating skill: ${detail(record.name ?? record.skillId)}`;
+  if (toolName === "skill_delete")
+    return `Deleting skill: ${detail(record.name ?? record.skillId)}`;
   const mcp = toolName.match(/^mcp__(.+?)__(.+)$/);
   if (mcp) return `Using ${mcp[1]}: ${mcp[2]}`;
   return `Using ${toolName}`;
@@ -416,8 +472,18 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
       if (tool.name === "request_takeover") {
         return { reason: String(raw.reason ?? "I need you on the screen.") };
       }
+      if (tool.name === "request_secret") {
+        return {
+          label: String(raw.label ?? "Code"),
+          purpose: String(raw.purpose ?? "otp"),
+          ...(raw.connectionId ? { connectionId: String(raw.connectionId) } : {}),
+        };
+      }
       if (tool.name === "write_file") {
-        return { path: String(raw.path ?? "notes/result.txt"), content: String(raw.content ?? "") };
+        return {
+          path: String(raw.path ?? "notes/result.txt"),
+          content: textContentArg(raw.content, ""),
+        };
       }
       if (tool.name === "computer_act") {
         return {
@@ -480,6 +546,25 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
           terminate: true,
         };
       }
+      if (tool.name === "request_secret") {
+        if (host.request.executeTool) {
+          const result = await host.request.executeTool(tool.name, args, executionId);
+          if (isAgentToolExecutionResult(result)) {
+            if (isToolPauseResult(result)) host.pausePending = true;
+            return result;
+          }
+          return {
+            content: [{ type: "text", text: summarizeToolResult(result) }],
+            details: result,
+          };
+        }
+        host.pausePending = true;
+        return {
+          content: [{ type: "text", text: "Protected input requested." }],
+          details: args,
+          terminate: true,
+        };
+      }
       if (tool.name === "run_subagent") {
         const result = await executeSubagent(host, executionId, args);
         return {
@@ -491,7 +576,10 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         const result = tool.route
           ? await host.request.executeTool(tool.name, args, executionId, tool.route)
           : await host.request.executeTool(tool.name, args, executionId);
-        if (isAgentToolExecutionResult(result)) return result;
+        if (isAgentToolExecutionResult(result)) {
+          if (isToolPauseResult(result)) host.pausePending = true;
+          return result;
+        }
         return {
           content: [{ type: "text", text: summarizeToolResult(result) }],
           details: result,
@@ -529,7 +617,8 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
   );
   const nestedHost: ToolHost = { ...host, depth: 1 };
   const nested = new Agent({
-    streamFn: (m, ctx, options) => host.models.streamSimple(m, ctx, options),
+    streamFn: (m, ctx, options) =>
+      host.models.streamSimple(m, ctx, reliableStreamOptions(m, options)),
     getApiKey: async () => host.apiKey,
     transformContext: async (messages) => pruneComputerScreenshotContext(messages),
     initialState: {
@@ -542,7 +631,7 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
         .filter(Boolean)
         .join(" "),
       model: host.model,
-      thinkingLevel: thinkingLevelFor(host.model),
+      thinkingLevel: thinkingLevelFor(host.model, host.request.model.thinkingLevel),
       tools: toAgentTools(childDefs, nestedHost),
       messages: [],
     },
@@ -614,13 +703,22 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
     await nested.prompt(task || "Complete the delegated task.");
     await nested.waitForIdle();
     host.signal.removeEventListener("abort", onAbort);
+    // Shared-budget abort leaves errorMessage on the nested agent; surface it as a
+    // completed stop rather than a failed subagent chip.
+    const budgetExceeded = host.toolCallBudget.exceeded;
     const error = nested.state.errorMessage;
-    if (error) {
+    if (error && !budgetExceeded) {
       const message = sanitizeError(error);
       host.queue.push({ type: "subagent", agentId, name, task, status: "failed", result: message });
       return `Subagent failed: ${message}`;
     }
-    const result = streamed || assistantText(nested.state.messages.at(-1)) || "done.";
+    const budgetMessage = budgetExceeded
+      ? toolCallBudgetExceededMessage(host.toolCallBudget.limit)
+      : undefined;
+    const result =
+      budgetMessage && streamed.trim()
+        ? `${streamed.trim()}\n\n${budgetMessage}`
+        : budgetMessage || streamed || assistantText(nested.state.messages.at(-1)) || "done.";
     const clipped = result.length > 12_000 ? `${result.slice(0, 12_000)}…` : result;
     host.queue.push({
       type: "subagent",
@@ -654,6 +752,13 @@ function parametersFor(tool: ConnectorTool) {
   }
   if (tool.name === "request_takeover") {
     return Type.Object({ reason: Type.String() });
+  }
+  if (tool.name === "request_secret") {
+    return Type.Object({
+      label: Type.String(),
+      purpose: Type.Union([Type.Literal("otp"), Type.Literal("password"), Type.Literal("api_key")]),
+      connectionId: Type.Optional(Type.String()),
+    });
   }
   if (tool.name === "remember") {
     return Type.Object({ content: Type.String(), path: Type.String() });
@@ -818,6 +923,7 @@ function sanitizeError(message: string) {
 
 interface EventQueue {
   push(event: AgentRuntimeEvent): void;
+  fail(error: Error): void;
   close(): void;
   iterate(): AsyncIterable<AgentRuntimeEvent>;
 }
@@ -830,20 +936,27 @@ interface ToolHost {
   apiKey: string | undefined;
   nestedAgents: Set<Agent>;
   subagentGate: { acquire(): Promise<void>; release(): void };
-  toolCallBudget: { count: number; exceeded: boolean };
+  toolCallBudget: { count: number; exceeded: boolean; limit: number };
   abortTurn(): void;
   signal: AbortSignal;
   depth: number;
+  pausePending: boolean;
+}
+
+function toolCallBudgetExceededMessage(limit: number) {
+  return `I stopped after reaching the limit of ${limit} tool calls in this turn. Send another message to continue.`;
 }
 
 function consumeToolCall(host: ToolHost): boolean {
   host.toolCallBudget.count += 1;
-  if (host.toolCallBudget.count <= MAX_TOOL_CALLS_PER_TURN) return true;
+  const limit = host.toolCallBudget.limit;
+  // limit <= 0 means unlimited — do not abort.
+  if (limit <= 0 || host.toolCallBudget.count <= limit) return true;
   if (!host.toolCallBudget.exceeded) {
     host.toolCallBudget.exceeded = true;
     host.queue.push({
       type: "progress",
-      text: `Stopped: more than ${MAX_TOOL_CALLS_PER_TURN} tool calls in one turn.`,
+      text: `Stopped: more than ${limit} tool calls in one turn.`,
     });
   }
   host.abortTurn();
@@ -873,9 +986,15 @@ function createQueue(): EventQueue {
   const items: AgentRuntimeEvent[] = [];
   let wake: (() => void) | undefined;
   let closed = false;
+  let failure: Error | undefined;
   return {
     push(event) {
       items.push(event);
+      wake?.();
+    },
+    fail(error) {
+      failure = error;
+      closed = true;
       wake?.();
     },
     close() {
@@ -883,15 +1002,30 @@ function createQueue(): EventQueue {
       wake?.();
     },
     async *iterate() {
-      while (!closed || items.length) {
+      while (true) {
         if (items.length) {
           yield items.shift()!;
           continue;
         }
+        if (failure) throw failure;
+        if (closed) return;
         await new Promise<void>((resolve) => {
           wake = resolve;
         });
       }
     },
   };
+}
+
+export function reliableStreamOptions(
+  model: Pick<Model<Api>, "api" | "provider">,
+  options?: SimpleStreamOptions,
+): SimpleStreamOptions | undefined {
+  if (model.provider !== "openai-codex" && model.api !== "openai-codex-responses") {
+    return options;
+  }
+  // Pi cannot fall back after a WebSocket has emitted its start event. Long tool
+  // runs then surface abnormal close 1006 as a terminal model error. SSE has
+  // bounded network retries and no long-lived connection between tool turns.
+  return { ...options, transport: "sse" };
 }

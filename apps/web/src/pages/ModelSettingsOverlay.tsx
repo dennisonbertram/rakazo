@@ -1,6 +1,6 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import type { Me } from "@rakazo/contracts";
 import {
-  OPENAI_COMPATIBLE_BASE_URL_HINT,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   openAiCompatibleConnectReady,
   openAiCompatibleProbeSuccessMessage,
@@ -9,24 +9,20 @@ import { Button } from "@rakazo/ui-web";
 import { ChevronDown } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
 } from "react";
-import {
-  cancelModelOAuthAttempt,
-  finishModelOAuthAttempt,
-  type ModelCatalogEntry,
-  type ModelCredential,
-  type ModelOAuthBegin,
-  providerHint,
-  waitForModelOAuth,
-} from "../lib/model-auth";
+import { localizedProviderHint } from "../lib/localized-provider-hint";
+import type { ModelCatalogEntry, ModelCredential } from "../lib/model-auth";
 import { rpc } from "../lib/rpc";
+import { useModelOAuthSignIn } from "../lib/use-model-oauth-signin";
 
 export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
+  const { t } = useLingui();
   const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
   const [credentials, setCredentials] = useState<ModelCredential[]>([]);
   const [me, setMe] = useState<Me | null>(null);
@@ -38,32 +34,33 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
   const [probeModels, setProbeModels] = useState<string[]>([]);
   const [probedBaseUrl, setProbedBaseUrl] = useState<string | null>(null);
   const [probing, setProbing] = useState(false);
-  const [oauth, setOauth] = useState<ModelOAuthBegin | null>(null);
-  const [pasteCode, setPasteCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<"connect" | "default" | null>(null);
-  const [oauthPending, setOauthPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const detailScrollRef = useRef<HTMLDivElement>(null);
-  const oauthAbortRef = useRef<AbortController | null>(null);
-  const oauthLoginIdRef = useRef<string | null>(null);
-  const oauthCodeSubmittingRef = useRef(false);
   const refreshRevisionRef = useRef(0);
   const selectionRevisionRef = useRef(0);
   const probeRequestIdRef = useRef(0);
+  const selectedLabelRef = useRef<string | undefined>(undefined);
 
-  function cancelOAuthAttempt(resetState = true) {
-    const loginId = oauthLoginIdRef.current;
-    oauthLoginIdRef.current = null;
-    cancelModelOAuthAttempt(oauthAbortRef, () => {
-      if (resetState) {
-        setOauth(null);
-        setOauthPending(false);
-      }
-    });
-    if (loginId) void rpc.models.cancelOAuth({ loginId }).catch(() => undefined);
-  }
+  const {
+    oauth,
+    pasteCode,
+    setPasteCode,
+    oauthPending,
+    cancelOAuthAttempt,
+    startSubscriptionSignIn,
+    submitOAuthCode,
+  } = useModelOAuthSignIn({
+    onClearError: () => setError(null),
+    onError: setError,
+    onFinished: async (controller) => {
+      await refresh();
+      if (controller.signal.aborted) return;
+      setNotice(t`Connected and using ${selectedLabelRef.current ?? "this model"}.`);
+    },
+  });
 
   async function refresh() {
     const refreshRevision = ++refreshRevisionRef.current;
@@ -107,13 +104,12 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void refresh()
       .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Could not load model settings"),
+        setError(err instanceof Error ? err.message : t`Could not load model settings`),
       )
       .finally(() => setLoading(false));
     return () => {
       refreshRevisionRef.current += 1;
       probeRequestIdRef.current += 1;
-      cancelOAuthAttempt(false);
     };
   }, []);
 
@@ -142,6 +138,7 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
   }, [groups, providerQuery]);
   const modelsForProvider = catalog.filter((entry) => entry.provider === provider);
   const selected = modelsForProvider.find((entry) => entry.id === modelId) ?? modelsForProvider[0];
+  selectedLabelRef.current = selected?.label;
   const isOpenAiCompatible = provider === OPENAI_COMPATIBLE_PROVIDER_ID;
   const credential = credentials.find((entry) => entry.provider === provider);
   const currentEntry = catalog.find(
@@ -221,7 +218,7 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
       setNotice(openAiCompatibleProbeSuccessMessage(result.models.length));
     } catch (err) {
       if (requestId !== probeRequestIdRef.current) return;
-      setError(err instanceof Error ? err.message : "Could not reach this model server");
+      setError(err instanceof Error ? err.message : t`Could not reach this model server`);
     } finally {
       if (requestId === probeRequestIdRef.current) setProbing(false);
     }
@@ -237,9 +234,9 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
     try {
       await rpc.models.setDefault({ provider: selected.provider, modelId: activeModelId });
       await refresh();
-      setNotice(isOpenAiCompatible ? "Model updated." : `Now using ${selected.label}.`);
+      setNotice(isOpenAiCompatible ? t`Model updated.` : t`Now using ${selected.label}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change the default model");
+      setError(err instanceof Error ? err.message : t`Could not change the default model`);
     } finally {
       setPending(null);
     }
@@ -275,97 +272,11 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
       setApiKey("");
       await refresh();
       detailScrollRef.current?.scrollTo({ top: 0 });
-      setNotice(isOpenAiCompatible ? "Saved." : `Connected and using ${selected.label}.`);
+      setNotice(isOpenAiCompatible ? t`Saved.` : t`Connected and using ${selected.label}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not connect this provider");
+      setError(err instanceof Error ? err.message : t`Could not connect this provider`);
     } finally {
       setPending(null);
-    }
-  }
-
-  async function finishSubscriptionSignIn(loginId: string, controller: AbortController) {
-    await waitForModelOAuth(loginId, controller.signal);
-    if (controller.signal.aborted) return;
-    await rpc.models.finishOAuth({ loginId }, { signal: controller.signal });
-    if (controller.signal.aborted) return;
-    oauthLoginIdRef.current = null;
-    setOauth(null);
-    await refresh();
-    if (controller.signal.aborted) return;
-    setNotice(`Connected and using ${selected?.label ?? "this model"}.`);
-  }
-
-  async function startSubscriptionSignIn() {
-    if (!selected) return;
-    setError(null);
-    setNotice(null);
-    setOauthPending(true);
-    const controller = new AbortController();
-    oauthAbortRef.current = controller;
-    let waitingForCode = false;
-    try {
-      const started = await rpc.models.beginOAuth(
-        {
-          provider: selected.provider,
-          modelId: selected.id,
-          label: selected.providerName ?? selected.provider,
-        },
-        { signal: controller.signal },
-      );
-      if (controller.signal.aborted) return;
-      oauthLoginIdRef.current = started.loginId;
-      setPasteCode("");
-      setOauth(started);
-      window.open(started.verificationUri, "_blank", "noopener,noreferrer");
-      waitingForCode = started.mode === "auth-url";
-      if (!waitingForCode) await finishSubscriptionSignIn(started.loginId, controller);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      const loginId = oauthLoginIdRef.current;
-      oauthLoginIdRef.current = null;
-      if (loginId) void rpc.models.cancelOAuth({ loginId }).catch(() => undefined);
-      setError(err instanceof Error ? err.message : "Could not start sign-in");
-      setOauth(null);
-    } finally {
-      if (!waitingForCode) {
-        finishModelOAuthAttempt(oauthAbortRef, controller, () => setOauthPending(false));
-      }
-    }
-  }
-
-  async function submitOAuthCode() {
-    if (oauth?.mode !== "auth-url" || oauthCodeSubmittingRef.current) return;
-    const controller = oauthAbortRef.current;
-    const code = pasteCode.trim();
-    if (!controller || !code) return;
-    oauthCodeSubmittingRef.current = true;
-    setPasteCode("");
-    setError(null);
-    let submitted = false;
-    let retryable = false;
-    try {
-      await rpc.models.submitOAuthCode(
-        { loginId: oauth.loginId, code },
-        { signal: controller.signal },
-      );
-      submitted = true;
-      await finishSubscriptionSignIn(oauth.loginId, controller);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      if (submitted) {
-        oauthLoginIdRef.current = null;
-        setOauth(null);
-        void rpc.models.cancelOAuth({ loginId: oauth.loginId }).catch(() => undefined);
-      } else {
-        retryable = true;
-        setPasteCode(code);
-      }
-      setError(err instanceof Error ? err.message : "Could not finish sign-in");
-    } finally {
-      oauthCodeSubmittingRef.current = false;
-      if (!retryable) {
-        finishModelOAuthAttempt(oauthAbortRef, controller, () => setOauthPending(false));
-      }
     }
   }
 
@@ -374,19 +285,35 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
     onClose();
   }
 
+  function beginSelectedSubscriptionSignIn() {
+    if (!selected) return;
+    setNotice(null);
+    void startSubscriptionSignIn({
+      provider: selected.provider,
+      modelId: selected.id,
+      label: selected.providerName ?? selected.provider,
+    });
+  }
+
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(4,4,5,.62)] p-4 sm:p-10">
       <div className="flex h-[min(760px,100%)] w-[1080px] max-w-full flex-col overflow-hidden rounded-[26px] border border-[#232326] bg-[#141416] shadow-[0_40px_90px_rgba(0,0,0,.55)]">
         <div className="flex items-start justify-between px-6 pt-6 sm:px-8 sm:pt-7">
           <div>
-            <div className="text-2xl font-medium text-[#F1F1F2]">Models</div>
+            <div className="text-2xl font-medium text-[#F1F1F2]">
+              <Trans>Models</Trans>
+            </div>
             <p className="mt-1 text-[13.5px] text-[#7A7A80]">
-              {loading ? "Loading model catalog…" : "Choose which connected model Rakazo uses."}
+              {loading ? (
+                <Trans>Loading model catalog…</Trans>
+              ) : (
+                <Trans>Choose which connected model Rakazo uses.</Trans>
+              )}
             </p>
           </div>
           <button
             type="button"
-            aria-label="Close model settings"
+            aria-label={t`Close model settings`}
             onClick={handleClose}
             className="text-[#85858A]"
           >
@@ -396,27 +323,31 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
 
         <div className="mx-6 mt-5 rounded-[14px] border border-[#26262A] bg-[#101012] px-4 py-3 sm:mx-8">
           <div className="text-[12.5px] uppercase tracking-[0.08em] text-[#6C6C70]">
-            Active model
+            <Trans>Active model</Trans>
           </div>
           <div className="mt-1 text-[16px] text-[#F1F1F2]">
-            {currentEntry?.label ?? me?.defaultModel ?? "Deployment default"}
+            {currentEntry?.label ?? me?.defaultModel ?? t`Deployment default`}
           </div>
           <div className="mt-1 text-[13px] text-[#85858A]">
-            {currentEntry?.providerName ?? me?.defaultProvider ?? "Configured by deployment"}
+            {currentEntry?.providerName ?? me?.defaultProvider ?? (
+              <Trans>Configured by deployment</Trans>
+            )}
           </div>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden px-6 py-6 sm:px-8 md:flex-row">
           <div className="flex min-h-0 shrink-0 flex-col md:w-[310px]">
-            <div className="mb-3 text-[13.5px] text-[#85858A]">Providers</div>
+            <div className="mb-3 text-[13.5px] text-[#85858A]">
+              <Trans>Providers</Trans>
+            </div>
             <label className="sr-only" htmlFor="model-provider-search">
-              Search providers
+              <Trans>Search providers</Trans>
             </label>
             <input
               id="model-provider-search"
               value={providerQuery}
               onChange={(event) => setProviderQuery(event.target.value)}
-              placeholder="Search providers"
+              placeholder={t`Search providers`}
               className="w-full rounded-[11px] border border-[#26262A] bg-[#101012] px-3.5 py-2.5 text-[14px] text-[#ECECEE] outline-none placeholder:text-[#6C6C70] focus:border-[#4A4A50]"
             />
             <div className="rk-scroll mt-3 max-h-[240px] overflow-y-auto rounded-[13px] border border-[#26262A] md:min-h-0 md:max-h-none md:flex-1">
@@ -428,7 +359,7 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                       key={group.id}
                       type="button"
                       onClick={() => chooseProvider(group.id)}
-                      className={`flex w-full items-center gap-3 border-b border-[#202023] px-3.5 py-3 text-left last:border-0 ${
+                      className={`flex w-full items-center gap-3 border-b border-[#202023] px-3.5 py-3 text-start last:border-0 ${
                         group.id === provider ? "bg-[#1A1A1D]" : "hover:bg-[#161618]"
                       }`}
                     >
@@ -437,18 +368,23 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                           {group.name}
                         </span>
                         <span className="mt-0.5 block text-[12px] text-[#6C6C70]">
-                          {group.entries.length} model{group.entries.length === 1 ? "" : "s"} ·{" "}
-                          {providerHint(group.entries[0]!)}
+                          <Plural value={group.entries.length} one="# model" other="# models" />
+                          {" · "}
+                          {localizedProviderHint(group.entries[0]!)}
                         </span>
                       </span>
                       {connected ? (
-                        <span className="text-[12px] text-[#4ECB71]">Connected</span>
+                        <span className="text-[12px] text-[#4ECB71]">
+                          <Trans>Connected</Trans>
+                        </span>
                       ) : null}
                     </button>
                   );
                 })
               ) : (
-                <p className="px-3.5 py-4 text-[13px] text-[#85858A]">No providers found.</p>
+                <p className="px-3.5 py-4 text-[13px] text-[#85858A]">
+                  <Trans>No providers found.</Trans>
+                </p>
               )}
             </div>
           </div>
@@ -462,19 +398,23 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                   {isOpenAiCompatible ? (
                     <>
                       <label className="block">
-                        Server URL
+                        <Trans>Server URL</Trans>
                         <input
                           value={baseUrl}
                           onChange={(event) => updateBaseUrl(event.target.value)}
-                          aria-label="OpenAI-compatible server URL"
+                          aria-label={t`OpenAI-compatible server URL`}
                           placeholder="http://127.0.0.1:8000/v1"
                           autoComplete="off"
                           className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-[#101012] px-3.5 py-3 text-[#ECECEE] outline-none"
                         />
                       </label>
                       <details className="mt-2 text-[13px] leading-[1.5] text-[#85858A]">
-                        <summary className="w-fit cursor-pointer select-none">Setup help</summary>
-                        <p className="mt-1">{OPENAI_COMPATIBLE_BASE_URL_HINT}</p>
+                        <summary className="w-fit cursor-pointer select-none">
+                          <Trans>Setup help</Trans>
+                        </summary>
+                        <p className="mt-1">
+                          {t`Paste the OpenAI-compatible address from your server. Rakazo adds /v1 if needed.`}
+                        </p>
                       </details>
                       <div className="mt-3 flex items-center gap-2">
                         <Button
@@ -484,11 +424,13 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                           disabled={busy || probing || !effectiveBaseUrl}
                           onClick={() => void probeServerModels()}
                         >
-                          {probing ? "Finding…" : "Find models"}
+                          {probing ? <Trans>Finding…</Trans> : <Trans>Find models</Trans>}
                         </Button>
                       </div>
                       <div className="mt-4 block">
-                        <span>Model</span>
+                        <span>
+                          <Trans>Model</Trans>
+                        </span>
                         {probeModels.length && probeModels.includes(modelId) ? (
                           <div className="relative mt-2">
                             <select
@@ -500,7 +442,7 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                                 setError(null);
                                 setNotice(null);
                               }}
-                              aria-label="Models from server"
+                              aria-label={t`Models from server`}
                               className="w-full appearance-none rounded-[11px] border border-[#26262A] bg-[#101012] py-3 pl-3.5 pr-11 text-sm text-[#ECECEE]"
                             >
                               {probeModels.map((id) => (
@@ -508,7 +450,9 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                                   {id}
                                 </option>
                               ))}
-                              <option value="">Other model…</option>
+                              <option value="">
+                                <Trans>Other model…</Trans>
+                              </option>
                             </select>
                             <span
                               aria-hidden="true"
@@ -527,7 +471,7 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                               setError(null);
                               setNotice(null);
                             }}
-                            aria-label="Model id"
+                            aria-label={t`Model id`}
                             placeholder="exact-model-id"
                             className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-[#101012] px-3.5 py-3 text-[#ECECEE] outline-none"
                           />
@@ -538,14 +482,16 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                             className="mt-2 text-[13px] text-[#85858A] underline"
                             onClick={() => setModelId(probeModels[0] ?? "")}
                           >
-                            Use a found model
+                            <Trans>Use a found model</Trans>
                           </button>
                         ) : null}
                       </div>
                     </>
                   ) : (
                     <>
-                      <span>Model</span>
+                      <span>
+                        <Trans>Model</Trans>
+                      </span>
                       <ModelPicker
                         options={modelsForProvider}
                         value={selected.id}
@@ -569,15 +515,23 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                 {!isOpenAiCompatible ? (
                   <div className="mt-5 rounded-[13px] border border-[#26262A] px-4 py-3">
                     <div className="text-[12.5px] uppercase tracking-[0.08em] text-[#6C6C70]">
-                      Personal credential
+                      <Trans>Personal credential</Trans>
                     </div>
                     <div className="mt-1 text-[15px] text-[#ECECEE]">
-                      {credential ? `Connected · ${credential.label}` : "Not connected"}
+                      {credential ? (
+                        <Trans>Connected · {credential.label}</Trans>
+                      ) : (
+                        <Trans>Not connected</Trans>
+                      )}
                     </div>
                     <div className="mt-1 text-[13px] text-[#85858A]">
-                      {credential
-                        ? "Your key or subscription token is stored securely and is never shown here."
-                        : "Connect this provider to use it as your personal model."}
+                      {credential ? (
+                        <Trans>
+                          Your key or subscription token is stored securely and is never shown here.
+                        </Trans>
+                      ) : (
+                        <Trans>Connect this provider to use it as your personal model.</Trans>
+                      )}
                     </div>
                   </div>
                 ) : null}
@@ -589,22 +543,24 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                         {oauth.mode === "auth-url" ? (
                           <>
                             <p className="text-sm leading-[1.5] text-[#85858A]">
-                              Finish signing in at{" "}
-                              <a
-                                href={oauth.verificationUri}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[#ECECEE] underline"
-                              >
-                                {new URL(oauth.verificationUri).hostname}
-                              </a>
-                              . The final page may not load; paste its URL or code here.
+                              <Trans>
+                                Finish signing in at{" "}
+                                <a
+                                  href={oauth.verificationUri}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[#ECECEE] underline"
+                                >
+                                  {new URL(oauth.verificationUri).hostname}
+                                </a>
+                                . The final page may not load; paste its URL or code here.
+                              </Trans>
                             </p>
                             <div className="mt-3 flex items-center gap-2">
                               <input
                                 value={pasteCode}
                                 onChange={(e) => setPasteCode(e.target.value)}
-                                aria-label="Authorization code or callback URL"
+                                aria-label={t`Authorization code or callback URL`}
                                 autoComplete="off"
                                 spellCheck={false}
                                 placeholder="http://localhost:53692/callback?code=…"
@@ -617,28 +573,34 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                                 disabled={!pasteCode.trim()}
                                 onClick={() => void submitOAuthCode()}
                               >
-                                Submit
+                                <Trans>Submit</Trans>
                               </Button>
                             </div>
-                            <p className="mt-2 text-sm text-[#85858A]">Waiting for sign-in…</p>
+                            <p className="mt-2 text-sm text-[#85858A]">
+                              <Trans>Waiting for sign-in…</Trans>
+                            </p>
                           </>
                         ) : (
                           <>
                             <p className="text-sm leading-[1.5] text-[#85858A]">
-                              Enter this code at{" "}
-                              <a
-                                href={oauth.verificationUri}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[#ECECEE] underline"
-                              >
-                                {oauth.verificationUri.replace(/^https:\/\//, "")}
-                              </a>
+                              <Trans>
+                                Enter this code at{" "}
+                                <a
+                                  href={oauth.verificationUri}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[#ECECEE] underline"
+                                >
+                                  {oauth.verificationUri.replace(/^https:\/\//, "")}
+                                </a>
+                              </Trans>
                             </p>
                             <p className="mt-2 font-mono text-[22px] tracking-[0.2em] text-[#F1F1F2]">
                               {oauth.userCode}
                             </p>
-                            <p className="mt-2 text-sm text-[#85858A]">Waiting for sign-in…</p>
+                            <p className="mt-2 text-sm text-[#85858A]">
+                              <Trans>Waiting for sign-in…</Trans>
+                            </p>
                           </>
                         )}
                       </div>
@@ -648,9 +610,13 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                         variant="outline"
                         size="sm"
                         disabled={busy}
-                        onClick={() => void startSubscriptionSignIn()}
+                        onClick={() => beginSelectedSubscriptionSignIn()}
                       >
-                        {oauthPending ? "Starting…" : (selected.oauthLabel ?? "Sign in")}
+                        {oauthPending ? (
+                          <Trans>Starting…</Trans>
+                        ) : (
+                          (selected.oauthLabel ?? t`Sign in`)
+                        )}
                       </Button>
                     )}
                   </div>
@@ -660,12 +626,14 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                   <div className="mt-5">
                     {isOpenAiCompatible ? (
                       <details className="text-[13.5px] text-[#85858A]">
-                        <summary className="w-fit cursor-pointer select-none">API key</summary>
+                        <summary className="w-fit cursor-pointer select-none">
+                          <Trans>API key</Trans>
+                        </summary>
                         <input
-                          aria-label="API key"
+                          aria-label={t`API key`}
                           value={apiKey}
                           onChange={(event) => updateApiKey(event.target.value)}
-                          placeholder="Optional"
+                          placeholder={t`Optional`}
                           type="password"
                           autoComplete="new-password"
                           className="mt-2 w-full rounded-[11px] border border-[#26262A] bg-[#101012] px-3.5 py-3 text-[#ECECEE] outline-none"
@@ -673,11 +641,13 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                       </details>
                     ) : (
                       <label className="block text-[13.5px] text-[#85858A]">
-                        {credential
-                          ? "Replace API key"
-                          : subscriptionSignIn
-                            ? "Or connect an API key"
-                            : "API key"}
+                        {credential ? (
+                          <Trans>Replace API key</Trans>
+                        ) : subscriptionSignIn ? (
+                          <Trans>Or connect an API key</Trans>
+                        ) : (
+                          <Trans>API key</Trans>
+                        )}
                         <input
                           value={apiKey}
                           onChange={(event) => updateApiKey(event.target.value)}
@@ -699,21 +669,25 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                       onClick={() => void connectKey()}
                       className="mt-3"
                     >
-                      {pending === "connect"
-                        ? "Saving…"
-                        : isOpenAiCompatible
-                          ? "Save"
-                          : credential
-                            ? "Replace API key"
-                            : "Connect API key"}
+                      {pending === "connect" ? (
+                        <Trans>Saving…</Trans>
+                      ) : isOpenAiCompatible ? (
+                        <Trans>Save</Trans>
+                      ) : credential ? (
+                        <Trans>Replace API key</Trans>
+                      ) : (
+                        <Trans>Connect API key</Trans>
+                      )}
                     </Button>
                   </div>
                 ) : null}
 
                 {selected.auth === "oauth" && !subscriptionSignIn ? (
                   <p className="mt-5 text-sm leading-[1.5] text-[#85858A]">
-                    This subscription sign-in is not available in Rakazo yet. Use a deployment
-                    credential or choose another provider.
+                    <Trans>
+                      This subscription sign-in is not available in Rakazo yet. Use a deployment
+                      credential or choose another provider.
+                    </Trans>
                   </p>
                 ) : null}
 
@@ -726,15 +700,23 @@ export function ModelSettingsOverlay({ onClose }: { onClose: () => void }) {
                       disabled={busy || (isOpenAiCompatible && !modelId.trim())}
                       onClick={() => void setModelDefault()}
                     >
-                      {pending === "default" ? "Switching…" : "Use this model"}
+                      {pending === "default" ? (
+                        <Trans>Switching…</Trans>
+                      ) : (
+                        <Trans>Use this model</Trans>
+                      )}
                     </Button>
                   </div>
                 ) : null}
               </>
             ) : loading ? (
-              <p className="text-[#85858A]">Loading model catalog…</p>
+              <p className="text-[#85858A]">
+                <Trans>Loading model catalog…</Trans>
+              </p>
             ) : (
-              <p className="text-[#85858A]">No model catalog is available.</p>
+              <p className="text-[#85858A]">
+                <Trans>No model catalog is available.</Trans>
+              </p>
             )}
           </div>
         </div>
@@ -752,8 +734,10 @@ function ModelPicker({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useLingui();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const listboxId = useId();
   const selectedIndex = Math.max(
@@ -761,7 +745,39 @@ function ModelPicker({
     options.findIndex((option) => option.id === value),
   );
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(selectedIndex);
+  const trimmedQuery = query.trim().toLowerCase();
+  const filteredOptions = useMemo(
+    () =>
+      trimmedQuery
+        ? options.filter(
+            (option) =>
+              option.label.toLowerCase().includes(trimmedQuery) ||
+              option.id.toLowerCase().includes(trimmedQuery) ||
+              (option.providerName ?? option.provider).toLowerCase().includes(trimmedQuery),
+          )
+        : options,
+    [options, trimmedQuery],
+  );
+  const groups = useMemo(() => {
+    const grouped = new Map<string, ModelCatalogEntry[]>();
+    for (const option of filteredOptions) {
+      const key = option.providerName ?? option.provider;
+      const list = grouped.get(key);
+      if (list) list.push(option);
+      else grouped.set(key, [option]);
+    }
+    return [...grouped].map(([name, entries]) => ({ name, entries }));
+  }, [filteredOptions]);
+  const groupRanges = useMemo(() => {
+    let index = 0;
+    return groups.map((group) => {
+      const start = index;
+      index += group.entries.length;
+      return { name: group.name, start, entries: group.entries };
+    });
+  }, [groups]);
 
   useEffect(() => {
     setHighlightedIndex(selectedIndex);
@@ -769,9 +785,12 @@ function ModelPicker({
   }, [selectedIndex, value]);
 
   useEffect(() => {
-    if (!open) return;
-    optionRefs.current[highlightedIndex]?.focus();
-  }, [highlightedIndex, open]);
+    if (!open) {
+      setQuery("");
+      return;
+    }
+    searchRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -783,7 +802,7 @@ function ModelPicker({
   }, [open]);
 
   function choose(index: number) {
-    const option = options[index];
+    const option = filteredOptions[index];
     if (!option) return;
     onChange(option.id);
     setOpen(false);
@@ -791,7 +810,58 @@ function ModelPicker({
   }
 
   function moveHighlight(index: number) {
-    setHighlightedIndex((index + options.length) % options.length);
+    const count = filteredOptions.length;
+    if (count === 0) return;
+    const next = ((index % count) + count) % count;
+    setHighlightedIndex(next);
+    const option = optionRefs.current[next];
+    option?.scrollIntoView({ block: "nearest" });
+    // Keep typing focus on the search field; only follow highlight when an option
+    // already has focus (e.g. after Tab / prior option key nav).
+    if (document.activeElement !== searchRef.current) {
+      option?.focus();
+    }
+  }
+
+  function activeOptionIndex() {
+    return highlightedIndex >= 0 && highlightedIndex < filteredOptions.length
+      ? highlightedIndex
+      : 0;
+  }
+
+  function optionDomId(index: number) {
+    return `${listboxId}-option-${index}`;
+  }
+
+  const activeDescendantId =
+    filteredOptions.length > 0 ? optionDomId(activeOptionIndex()) : undefined;
+
+  function onSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (filteredOptions.length === 0) return;
+      moveHighlight(activeOptionIndex() + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (filteredOptions.length === 0) return;
+      moveHighlight(activeOptionIndex() - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      if (filteredOptions.length === 0) return;
+      moveHighlight(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      if (filteredOptions.length === 0) return;
+      moveHighlight(filteredOptions.length - 1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (filteredOptions.length === 0) return;
+      choose(activeOptionIndex());
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
   }
 
   function onTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
@@ -808,7 +878,7 @@ function ModelPicker({
     if (event.key === "ArrowUp") {
       event.preventDefault();
       setOpen(true);
-      setHighlightedIndex(options.length - 1);
+      setHighlightedIndex(Math.max(0, filteredOptions.length - 1));
     }
   }
 
@@ -821,10 +891,10 @@ function ModelPicker({
       moveHighlight(index - 1);
     } else if (event.key === "Home") {
       event.preventDefault();
-      setHighlightedIndex(0);
+      moveHighlight(0);
     } else if (event.key === "End") {
       event.preventDefault();
-      setHighlightedIndex(options.length - 1);
+      moveHighlight(filteredOptions.length - 1);
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       choose(index);
@@ -841,11 +911,11 @@ function ModelPicker({
         ref={triggerRef}
         type="button"
         role="combobox"
-        aria-label="Model"
+        aria-label={t`Model`}
         aria-controls={listboxId}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="flex w-full items-center justify-between rounded-[11px] border border-[#26262A] bg-[#101012] px-3.5 py-3 text-left text-[#ECECEE] outline-none focus-visible:border-[#4A4A50]"
+        className="flex w-full items-center justify-between rounded-[11px] border border-[#26262A] bg-[#101012] px-3.5 py-3 text-start text-[#ECECEE] outline-none focus-visible:border-[#4A4A50]"
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onTriggerKeyDown}
       >
@@ -855,33 +925,106 @@ function ModelPicker({
         </span>
       </button>
       {open ? (
-        <div
-          id={listboxId}
-          role="listbox"
-          aria-label="Model options"
-          className="rk-scroll absolute left-0 right-0 top-full z-20 mt-2 max-h-60 overflow-y-auto rounded-[11px] border border-[#26262A] bg-[#101012] p-1 shadow-[0_20px_45px_rgba(0,0,0,.55)]"
-        >
-          {options.map((option, index) => (
-            <button
-              key={`${option.provider}:${option.id}`}
-              ref={(element) => {
-                optionRefs.current[index] = element;
-              }}
-              type="button"
-              role="option"
-              aria-selected={option.id === value}
-              tabIndex={index === highlightedIndex ? 0 : -1}
-              className={`w-full rounded-[8px] px-3 py-2 text-left text-[13.5px] text-[#ECECEE] outline-none hover:bg-[#1A1A1D] focus-visible:bg-[#1A1A1D] ${
-                option.id === value ? "bg-[#1A1A1D]" : ""
-              }`}
-              onClick={() => choose(index)}
-              onKeyDown={(event) => onOptionKeyDown(event, index)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-[11px] border border-[#26262A] bg-[#101012] shadow-[0_20px_45px_rgba(0,0,0,.55)]">
+          <input
+            ref={searchRef}
+            type="text"
+            value={query}
+            role="combobox"
+            aria-label={t`Search models`}
+            aria-controls={listboxId}
+            aria-expanded={open}
+            aria-autocomplete="list"
+            aria-activedescendant={activeDescendantId}
+            placeholder={t`Search`}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setHighlightedIndex(0);
+            }}
+            onKeyDown={onSearchKeyDown}
+            className="w-full border-b border-[#26262A] bg-transparent px-3 py-2.5 text-[13.5px] text-[#ECECEE] outline-none placeholder:text-[#6C6C70]"
+          />
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-label={t`Model options`}
+            className="rk-scroll max-h-64 overflow-y-auto py-1"
+          >
+            {groupRanges.map((group) => (
+              <div key={group.name}>
+                <p className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[#6C6C70]">
+                  {group.name}
+                </p>
+                {group.entries.map((option, groupIndex) => {
+                  const index = group.start + groupIndex;
+                  return (
+                    <ModelOption
+                      key={`${option.provider}:${option.id}`}
+                      option={option}
+                      optionDomId={optionDomId(index)}
+                      index={index}
+                      value={value}
+                      highlighted={highlightedIndex === index}
+                      optionRefs={optionRefs}
+                      choose={choose}
+                      onOptionKeyDown={onOptionKeyDown}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+            {filteredOptions.length === 0 ? (
+              <p className="px-3 py-2 text-[13px] text-[#85858A]">
+                <Trans>No matching models</Trans>
+              </p>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ModelOption({
+  option,
+  optionDomId,
+  index,
+  value,
+  highlighted,
+  optionRefs,
+  choose,
+  onOptionKeyDown,
+}: {
+  option: ModelCatalogEntry;
+  optionDomId: string;
+  index: number;
+  value: string;
+  highlighted: boolean;
+  optionRefs: RefObject<Array<HTMLButtonElement | null>>;
+  choose: (index: number) => void;
+  onOptionKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => void;
+}) {
+  const { t } = useLingui();
+  return (
+    <button
+      id={optionDomId}
+      ref={(element) => {
+        optionRefs.current[index] = element;
+      }}
+      type="button"
+      role="option"
+      aria-selected={option.id === value}
+      tabIndex={highlighted ? 0 : -1}
+      className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-start text-[13.5px] text-[#ECECEE] outline-none hover:bg-[#1A1A1D] focus-visible:bg-[#1A1A1D] ${
+        highlighted || option.id === value ? "bg-[#1A1A1D]" : ""
+      }`}
+      onClick={() => choose(index)}
+      onKeyDown={(event) => onOptionKeyDown(event, index)}
+    >
+      <span className="min-w-0 truncate">{option.label}</span>
+      {option.billing.toLowerCase().includes("free") ? (
+        <span className="shrink-0 text-[12px] text-[#85858A]">{t`Free`}</span>
+      ) : null}
+    </button>
   );
 }

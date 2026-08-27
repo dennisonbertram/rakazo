@@ -25,6 +25,7 @@ import {
   type ComputerExecutionLease,
   type ConnectorRegistry,
   checkpointAndRecordComputerWorkspace,
+  computerSupportsUpdate,
   createVoiceProvider,
   destroyBot,
   displayBotWorkspacePath,
@@ -32,9 +33,12 @@ import {
   enqueueTakeoverContinuation,
   expireComputerControl,
   hasActiveComputerControl,
+  isScratchpadStatus,
   listPiCatalog,
+  listScratchpadItems,
   McpOAuthBroker,
   type MemoryProviderResolver,
+  mapScratchpadItem,
   modelCredentialDto,
   type PiOAuthLogins,
   planLiveConnectionSync,
@@ -44,6 +48,7 @@ import {
   provisionComputer,
   type RemoteConnectorDependencies,
   releaseComputerExecutionLease,
+  replaceComputer,
   resolveBotWorkspacePath,
   sanitizeComposioError,
   savePushToken,
@@ -71,7 +76,10 @@ import {
   ACTIVE_RUN_STATUSES,
   AttachmentValidationError,
   containsSecret,
-  nextCronDate,
+  expandSkillReferencesInPrompt,
+  hasMixedOneShotSchedule,
+  isOneShotRoutineCrons,
+  nextCronDateAcrossStrict,
 } from "@rakazo/core";
 import {
   appendEventInTransaction,
@@ -91,10 +99,16 @@ import {
   type ThreadEvents,
   touchGroupUpdatedAt,
 } from "@rakazo/db";
+import { createAgentSkillsService } from "./agent-skills.js";
 import { createOwnedArtifact, getOwnedArtifact, getWorkspaceArtifact } from "./artifacts.js";
-import { toComputerStatus } from "./computer-status.js";
+import {
+  executionBlocksUserTakeover,
+  resolveBusyBotName,
+  toComputerStatus,
+} from "./computer-status.js";
 import { buildMcpUpdateMaterial } from "./mcp-material.js";
 import { chooseFocus, markAppConnected, startOnboarding } from "./onboarding.js";
+import { listWorkspaceRuns } from "./runs.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { queryWorkspaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
@@ -289,7 +303,7 @@ export interface RouterDeps {
   env: {
     defaultProvider: string;
     defaultModel: string;
-    openRouterKey?: string;
+    deploymentModelKey?: string;
     webOrigin: string;
     screenProxySecret: string;
     sandboxProvider: string;
@@ -309,6 +323,7 @@ export function createRouter(deps: RouterDeps) {
     home: deps.home,
     dataDir: deps.dataDir,
   });
+  const agentSkills = createAgentSkillsService(deps.prisma);
 
   const authed = os.use(async ({ context, next }) => {
     if (!context.actor) throw new ORPCError("UNAUTHORIZED");
@@ -318,6 +333,15 @@ export function createRouter(deps: RouterDeps) {
   return os.router({
     health: os.health.handler(async () => ({ ok: true as const, version: "0.1.0" })),
     me: authed.me.handler(async ({ context }): Promise<Me> => meDto(deps, context.actor)),
+    preferences: {
+      update: authed.preferences.update.handler(async ({ context, input }): Promise<Me> => {
+        await deps.prisma.user.update({
+          where: { id: context.actor.userId },
+          data: { avatarStyle: input.avatarStyle },
+        });
+        return meDto(deps, context.actor);
+      }),
+    },
     bootstrap: authed.bootstrap.handler(async ({ context, input }) => {
       const actor = context.actor;
       const [me, bots, botSections, archivedBots] = await Promise.all([
@@ -531,6 +555,9 @@ export function createRouter(deps: RouterDeps) {
           notifyOnFinish: source.notifyOnFinish,
           color: source.color,
           computerMode: source.computer?.scope === "dedicated" ? "dedicated" : "team",
+          modelProvider: source.modelProvider,
+          modelId: source.modelId,
+          thinkingLevel: source.thinkingLevel,
         });
         const assignments = await deps.prisma.botMcpServer.findMany({
           where: {
@@ -554,7 +581,7 @@ export function createRouter(deps: RouterDeps) {
         return duplicate;
       }),
       update: authed.bots.update.handler(async ({ context, input }) => {
-        await repos.getBot(context.actor, input.botId);
+        const existing = await repos.getBot(context.actor, input.botId);
         if (input.sectionId) {
           const section = await deps.prisma.botSection.findFirst({
             where: {
@@ -565,6 +592,46 @@ export function createRouter(deps: RouterDeps) {
             select: { id: true },
           });
           if (!section) throw new IsolationError();
+        }
+        if (input.modelProvider && input.modelId) {
+          const credential = await deps.prisma.userModelCredential.findFirst({
+            where: {
+              userId: context.actor.userId,
+              workspaceId: context.actor.workspaceId,
+              provider: input.modelProvider,
+            },
+            orderBy: newestModelCredentialOrder,
+          });
+          if (!credential) {
+            throw new ORPCError("BAD_REQUEST", { message: "Connect that model provider first" });
+          }
+          const knownModels = [...listPiCatalog(), scriptedCatalogEntry];
+          const inCatalog = knownModels.some(
+            (item) => item.provider === input.modelProvider && item.id === input.modelId,
+          );
+          if (!inCatalog && credential.defaultModel !== input.modelId) {
+            throw new ORPCError("BAD_REQUEST", { message: "Unknown model for that provider" });
+          }
+        }
+        const thinkingLevel = input.thinkingLevel;
+        if (input.thinkingLevel) {
+          const provider =
+            input.modelProvider !== undefined ? input.modelProvider : existing.modelProvider;
+          const modelId = input.modelId !== undefined ? input.modelId : existing.modelId;
+          const me = await meDto(deps, context.actor);
+          const effectiveProvider = provider ?? me.defaultProvider;
+          const effectiveModelId = modelId ?? me.defaultModel;
+          if (effectiveProvider && effectiveModelId) {
+            const entry = listPiCatalog().find(
+              (item) => item.provider === effectiveProvider && item.id === effectiveModelId,
+            );
+            const allowed = entry?.thinkingLevels;
+            if (allowed && !allowed.includes(input.thinkingLevel)) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: `Thinking level must be one of: ${allowed.join(", ")}`,
+              });
+            }
+          }
         }
         await deps.prisma.bot.update({
           where: { id: input.botId },
@@ -580,6 +647,10 @@ export function createRouter(deps: RouterDeps) {
             sectionId: input.sectionId,
             voiceId: input.voiceId,
             autoSpeak: input.autoSpeak,
+            ...(input.modelProvider !== undefined
+              ? { modelProvider: input.modelProvider, modelId: input.modelId ?? null }
+              : {}),
+            ...(input.thinkingLevel !== undefined ? { thinkingLevel } : {}),
           },
         });
         const bots = await repos.listBots(context.actor);
@@ -1054,6 +1125,15 @@ export function createRouter(deps: RouterDeps) {
         );
         return computerStatus(deps, context.actor, input.botId);
       }),
+      recover: authed.computer.recover.handler(async ({ context, input }) =>
+        runComputerReplace(deps, context, input.botId, "recover", "recover"),
+      ),
+      reset: authed.computer.reset.handler(async ({ context, input }) =>
+        runComputerReplace(deps, context, input.botId, "reset", "reset"),
+      ),
+      update: authed.computer.update.handler(async ({ context, input }) =>
+        runComputerReplace(deps, context, input.botId, "update", "update"),
+      ),
       takeover: authed.computer.takeover.handler(async ({ context, input }) => {
         let bot = await repos.getBot(context.actor, input.botId);
         if (!bot.computer?.providerRef || bot.computer.state !== "running") {
@@ -1101,23 +1181,29 @@ export function createRouter(deps: RouterDeps) {
         const executionLease = await deps.prisma.computerExecutionLease.findUnique({
           where: { computerId_botId: { computerId: bot.computer.id, botId: bot.id } },
         });
-        const executionLeaseActive = Boolean(
-          executionLease && executionLease.expiresAt.getTime() > Date.now(),
-        );
         const executionRun = executionLease
           ? await deps.prisma.run.findUnique({
               where: { id: executionLease.runId },
               select: { botId: true, status: true },
             })
           : null;
+        const waitingForTakeover =
+          executionRun?.botId === bot.id && executionRun.status === "waiting_takeover";
+        if (
+          executionBlocksUserTakeover({
+            hasLease: Boolean(executionLease),
+            leaseExpiresAt: executionLease?.expiresAt,
+            runStatus: executionRun?.status,
+          })
+        ) {
+          throw new ORPCError("CONFLICT", { message: "Stop the bot first" });
+        }
+        const executionLeaseActive = Boolean(
+          executionLease && executionLease.expiresAt.getTime() > Date.now(),
+        );
         const executionRunActive = Boolean(
           executionRun && ACTIVE_RUN_STATUSES.some((status) => status === executionRun.status),
         );
-        const waitingForTakeover =
-          executionRun?.botId === bot.id && executionRun.status === "waiting_takeover";
-        if (executionLease && !waitingForTakeover && (executionLeaseActive || executionRunActive)) {
-          throw new ORPCError("CONFLICT", { message: "Stop the bot first" });
-        }
         if (executionLease && !executionLeaseActive && !executionRunActive) {
           await deps.prisma.computerExecutionLease.deleteMany({
             where: { id: executionLease.id },
@@ -1129,6 +1215,7 @@ export function createRouter(deps: RouterDeps) {
         const granted = await deps.prisma.computer.updateMany({
           where: {
             id: bot.computer.id,
+            state: "running",
             controlHolder: { not: "user" },
             controlLeaseId: null,
           },
@@ -1492,8 +1579,23 @@ export function createRouter(deps: RouterDeps) {
         return listRoutinesDto(deps, context.actor, input.botId);
       }),
       create: authed.routines.create.handler(async ({ context, input }) => {
+        if (hasMixedOneShotSchedule(input.crons)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "A one-time schedule can't be combined with other schedules.",
+          });
+        }
+        if (input.active && isOneShotRoutineCrons(input.crons)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "One-shot schedules must be created from chat.",
+          });
+        }
         const bot = await repos.getBot(context.actor, input.botId);
-        const nextRunAt = nextRoutineDate(input.cron, input.timezone);
+        // Validate every recurring cron even when inactive; @once has no next date.
+        let nextRunAt: Date | null = null;
+        if (!isOneShotRoutineCrons(input.crons)) {
+          const computedNextRunAt = nextRoutineDate(input.crons, input.timezone);
+          nextRunAt = input.active ? computedNextRunAt : null;
+        }
         const row = await deps.prisma.routine.create({
           data: {
             workspaceId: context.actor.workspaceId,
@@ -1501,11 +1603,11 @@ export function createRouter(deps: RouterDeps) {
             userId: context.actor.userId,
             name: input.name,
             prompt: input.prompt,
-            cron: input.cron,
+            crons: input.crons,
             timezone: input.timezone,
             notify: input.notify,
             active: input.active,
-            nextRunAt: input.active ? nextRunAt : null,
+            nextRunAt,
           },
         });
         if (bot.thread) {
@@ -1532,23 +1634,45 @@ export function createRouter(deps: RouterDeps) {
         });
         if (!existing) throw new IsolationError();
         const active = input.active ?? existing.active;
-        const cron = input.cron ?? existing.cron;
+        const crons = input.crons ?? existing.crons;
         const timezone = input.timezone ?? existing.timezone;
+        if (hasMixedOneShotSchedule(crons)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "A one-time schedule can't be combined with other schedules.",
+          });
+        }
+        if (active && isOneShotRoutineCrons(crons)) {
+          if (!isOneShotRoutineCrons(existing.crons)) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "One-shot schedules must be created from chat.",
+            });
+          }
+          if (!existing.nextRunAt) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "One-shot schedules cannot be reactivated after they fire.",
+            });
+          }
+        }
         const scheduleChanged =
           (!existing.active && active) ||
-          (input.cron !== undefined && input.cron !== existing.cron) ||
+          (input.crons !== undefined &&
+            JSON.stringify(input.crons) !== JSON.stringify(existing.crons)) ||
           (input.timezone !== undefined && input.timezone !== existing.timezone);
         const recalculatedNextRunAt =
-          scheduleChanged || (active && !existing.nextRunAt)
-            ? nextRoutineDate(cron, timezone)
+          !isOneShotRoutineCrons(crons) && (scheduleChanged || (active && !existing.nextRunAt))
+            ? nextRoutineDate(crons, timezone)
             : null;
-        const nextRunAt = !active ? null : (recalculatedNextRunAt ?? existing.nextRunAt);
+        const nextRunAt = !active
+          ? null
+          : isOneShotRoutineCrons(crons)
+            ? existing.nextRunAt
+            : (recalculatedNextRunAt ?? existing.nextRunAt);
         const row = await deps.prisma.routine.update({
           where: { id: existing.id },
           data: {
             name: input.name,
             prompt: input.prompt,
-            cron: input.cron,
+            crons: input.crons,
             timezone: input.timezone,
             active: input.active,
             notify: input.notify,
@@ -1589,34 +1713,140 @@ export function createRouter(deps: RouterDeps) {
       }),
       testRun: authed.routines.testRun.handler(async ({ context, input }) => {
         const routine = await deps.prisma.routine.findFirst({
-          where: { id: input.routineId, workspaceId: context.actor.workspaceId },
+          where: {
+            id: input.routineId,
+            workspaceId: context.actor.workspaceId,
+            userId: context.actor.userId,
+          },
         });
         if (!routine) throw new IsolationError();
         const bot = await repos.getBot(context.actor, routine.botId);
         if (!bot.thread) throw new IsolationError();
-        const task = await deps.prisma.task.create({
-          data: {
-            workspaceId: context.actor.workspaceId,
-            botId: bot.id,
-            threadId: bot.thread.id,
-            userId: context.actor.userId,
-            prompt: routine.prompt,
-            status: "queued",
-          },
+        const threadId = bot.thread.id;
+        const nonce = input.clientNonce ? `routine-test:${input.clientNonce}` : undefined;
+        if (nonce) {
+          const existing = await deps.prisma.run.findFirst({
+            where: { threadId, clientNonce: nonce },
+            select: { id: true },
+          });
+          if (existing) return { runId: existing.id };
+        }
+        const skillRecords = await agentSkills.listWithContent(context.actor);
+        const prompt = expandSkillReferencesInPrompt(routine.prompt, skillRecords);
+        let run: { id: string };
+        try {
+          // Task + run must commit together so a nonce collision cannot leave an orphan queued Task.
+          run = await deps.prisma.$transaction(async (tx) => {
+            if (nonce) {
+              const existing = await tx.run.findFirst({
+                where: { threadId, clientNonce: nonce },
+                select: { id: true },
+              });
+              if (existing) return existing;
+            }
+            const task = await tx.task.create({
+              data: {
+                workspaceId: context.actor.workspaceId,
+                botId: bot.id,
+                threadId,
+                userId: context.actor.userId,
+                prompt,
+                status: "queued",
+              },
+            });
+            return tx.run.create({
+              data: {
+                workspaceId: context.actor.workspaceId,
+                botId: bot.id,
+                threadId,
+                taskId: task.id,
+                userId: context.actor.userId,
+                status: "queued",
+                trigger: "routine",
+                routineId: routine.id,
+                clientNonce: nonce,
+              },
+              select: { id: true },
+            });
+          });
+        } catch (error) {
+          if (nonce) {
+            const existing = await deps.prisma.run.findFirst({
+              where: { threadId, clientNonce: nonce },
+              select: { id: true },
+            });
+            if (existing) return { runId: existing.id };
+          }
+          throw error;
+        }
+        // Keep enqueue outside the nonce-collision catch. The queued run is durable;
+        // log enqueue failures and still return success — the reconciler repairs a missed wake.
+        await deps.jobs.enqueue(runContinueJob(run.id)).catch((error) => {
+          console.error("routine testRun enqueue", error);
         });
-        const run = await deps.prisma.run.create({
-          data: {
-            workspaceId: context.actor.workspaceId,
-            botId: bot.id,
-            threadId: bot.thread.id,
-            taskId: task.id,
-            userId: context.actor.userId,
-            status: "queued",
-            trigger: "routine",
-          },
-        });
-        await deps.jobs.enqueue(runContinueJob(run.id));
         return { runId: run.id };
+      }),
+    },
+    scratchpad: {
+      list: authed.scratchpad.list.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        return listScratchpadItems(
+          { prisma: deps.prisma },
+          {
+            workspaceId: context.actor.workspaceId,
+            botId: input.botId,
+            status: input.status,
+            includeDone: input.includeDone ?? false,
+          },
+        );
+      }),
+      create: authed.scratchpad.create.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        const row = await deps.prisma.scratchpadItem.create({
+          data: {
+            workspaceId: context.actor.workspaceId,
+            botId: input.botId,
+            userId: context.actor.userId,
+            title: input.title.trim(),
+            status: input.status,
+            notes: input.notes.trim(),
+          },
+        });
+        return mapScratchpadItem(row);
+      }),
+      update: authed.scratchpad.update.handler(async ({ context, input }) => {
+        const existing = await deps.prisma.scratchpadItem.findFirst({
+          where: {
+            id: input.itemId,
+            workspaceId: context.actor.workspaceId,
+            userId: context.actor.userId,
+          },
+        });
+        if (!existing) throw new IsolationError();
+        if (input.status !== undefined && !isScratchpadStatus(input.status)) {
+          throw new ORPCError("BAD_REQUEST", { message: "Invalid scratchpad status." });
+        }
+        const row = await deps.prisma.scratchpadItem.update({
+          where: { id: existing.id },
+          data: {
+            ...(input.title !== undefined ? { title: input.title.trim() } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+            ...(input.notes !== undefined ? { notes: input.notes.trim() } : {}),
+          },
+        });
+        return mapScratchpadItem(row);
+      }),
+      remove: authed.scratchpad.remove.handler(async ({ context, input }) => {
+        const existing = await deps.prisma.scratchpadItem.findFirst({
+          where: {
+            id: input.itemId,
+            workspaceId: context.actor.workspaceId,
+            userId: context.actor.userId,
+          },
+        });
+        if (!existing) throw new IsolationError();
+        await deps.prisma.scratchpadItem.delete({ where: { id: existing.id } });
+        return { ok: true as const };
       }),
     },
     skills: {
@@ -1654,6 +1884,21 @@ export function createRouter(deps: RouterDeps) {
       ),
       remove: authed.skills.remove.handler(async ({ context, input }) =>
         taughtSkills.remove(context.actor, input.skillId),
+      ),
+    },
+    agentSkills: {
+      list: authed.agentSkills.list.handler(async ({ context }) => agentSkills.list(context.actor)),
+      get: authed.agentSkills.get.handler(async ({ context, input }) =>
+        agentSkills.get(context.actor, input),
+      ),
+      create: authed.agentSkills.create.handler(async ({ context, input }) =>
+        agentSkills.create(context.actor, input),
+      ),
+      update: authed.agentSkills.update.handler(async ({ context, input }) =>
+        agentSkills.update(context.actor, input),
+      ),
+      remove: authed.agentSkills.remove.handler(async ({ context, input }) =>
+        agentSkills.remove(context.actor, input.skillId),
       ),
     },
     capabilities: {
@@ -2300,6 +2545,17 @@ export function createRouter(deps: RouterDeps) {
         }
         let row = existing;
         if (existing.status !== "connected") {
+          if (input.code) {
+            const state = existing.providerRef ?? existing.provider;
+            try {
+              await connector.complete(
+                { state, code: input.code },
+                connectionContext(context.actor, "connections.complete", context.signal),
+              );
+            } catch (error) {
+              throw new ORPCError("BAD_REQUEST", { message: sanitizeComposioError(error) });
+            }
+          }
           const ready = await connector.connectionReady(
             connectionContext(context.actor, "connections.complete", context.signal),
             existing.provider,
@@ -2546,7 +2802,7 @@ export function createRouter(deps: RouterDeps) {
           routines: routines.map((r) => ({
             name: r.name,
             prompt: r.prompt,
-            cron: r.cron,
+            crons: r.crons,
             timezone: r.timezone,
           })),
           files,
@@ -2563,6 +2819,11 @@ export function createRouter(deps: RouterDeps) {
     search: {
       query: authed.search.query.handler(async ({ context, input }) => ({
         hits: await queryWorkspaceSearch(deps.prisma, context.actor, input.q),
+      })),
+    },
+    runs: {
+      list: authed.runs.list.handler(async ({ context, input }) => ({
+        runs: await listWorkspaceRuns(deps.prisma, context.actor, input.filter),
       })),
     },
     voice: {
@@ -2658,7 +2919,7 @@ async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
     deps.prisma.deploymentSettings.findUnique({ where: { id: "default" } }),
   ]);
   const hasDeployment = Boolean(
-    settings?.deploymentModelCredentialCipher || deps.env.openRouterKey,
+    settings?.deploymentModelCredentialCipher || deps.env.deploymentModelKey,
   );
   return {
     userId: actor.userId,
@@ -2671,6 +2932,7 @@ async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
     defaultModel: cred?.defaultModel ?? settings?.defaultModelId ?? deps.env.defaultModel,
     computerHost: computerHostFor(settings?.computerHost, deps.env.sandboxProvider),
     canChooseHostComputer: actor.isDeploymentOwner && deps.env.sandboxProvider === "docker",
+    avatarStyle: user.avatarStyle === "organic" ? "organic" : "robot",
   };
 }
 
@@ -2684,7 +2946,58 @@ async function computerStatus(
   if (await expireStaleComputerControl(deps, bot.computer)) {
     bot = await repos.getBot(actor, botId);
   }
-  return toComputerStatus(botId, bot.computer);
+  const busyBotName = await resolveBusyBotName(deps.prisma, {
+    computerId: bot.computer?.id,
+    botId,
+    botName: bot.name,
+  });
+  return toComputerStatus(botId, bot.computer, busyBotName);
+}
+
+async function runComputerReplace(
+  deps: RouterDeps,
+  context: { actor: Actor },
+  botId: string,
+  mode: "recover" | "reset" | "update",
+  operationId: string,
+): Promise<ComputerStatus> {
+  const repos = createRepos(deps.prisma);
+  const bot = await repos.getBot(context.actor, botId);
+  if (!bot.computer) throw new IsolationError();
+  if (mode === "update" && !computerSupportsUpdate(bot.computer.kind)) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Computer update is not available on this device",
+    });
+  }
+  const manualRunId = `${mode}:${randomUUID()}`;
+  let lease: ComputerExecutionLease | null;
+  try {
+    lease = await acquireComputerExecutionLease(deps.prisma, {
+      computerId: bot.computer.id,
+      runId: manualRunId,
+      botId: bot.id,
+    });
+  } catch (error) {
+    if (error instanceof ComputerBusyError) {
+      throw new ORPCError("CONFLICT", { message: "Computer is busy" });
+    }
+    throw error;
+  }
+  try {
+    await replaceComputer(deps, bot.computer.id, mode, {
+      ...computerContext(context.actor, bot.id, operationId),
+      screenLeaseId: screenLeaseIdForRun(lease, manualRunId),
+    });
+    scheduleComputerSleep(deps.jobs, bot.computer.id);
+  } catch (error) {
+    if (error instanceof ComputerBusyError) {
+      throw new ORPCError("CONFLICT", { message: "Computer is busy" });
+    }
+    throw error;
+  } finally {
+    await releaseComputerExecutionLease(deps.prisma, lease);
+  }
+  return computerStatus(deps, context.actor, botId);
 }
 
 async function expireStaleComputerControl(
@@ -2941,12 +3254,15 @@ function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) throw signal.reason ?? new Error("Request cancelled");
 }
 
-function nextRoutineDate(cron: string, timezone: string): Date {
+function nextRoutineDate(crons: string[], timezone: string): Date {
+  let next: Date | null;
   try {
-    return nextCronDate(cron, new Date(), timezone);
+    next = nextCronDateAcrossStrict(crons, new Date(), timezone);
   } catch {
     throw new ORPCError("BAD_REQUEST", { message: "Enter a valid cron expression." });
   }
+  if (!next) throw new ORPCError("BAD_REQUEST", { message: "Enter a valid cron expression." });
+  return next;
 }
 
 function mapRoutine(row: {
@@ -2954,7 +3270,7 @@ function mapRoutine(row: {
   botId: string;
   name: string;
   prompt: string;
-  cron: string;
+  crons: string[];
   timezone: string;
   active: boolean;
   notify: boolean;
@@ -2967,7 +3283,7 @@ function mapRoutine(row: {
     botId: row.botId,
     name: row.name,
     prompt: row.prompt,
-    cron: row.cron,
+    crons: row.crons,
     timezone: row.timezone,
     active: row.active,
     notify: row.notify,

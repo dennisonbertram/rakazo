@@ -11,8 +11,12 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   "launch_app",
   "remember",
   "request_takeover",
+  "request_secret",
   "run_subagent",
   "spawn_bot",
+  "schedule_create",
+  "schedule_list",
+  "schedule_cancel",
 ]);
 
 const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set(["destination.write", "delete_bot", "archive_bot"]);
@@ -113,6 +117,14 @@ export function resolveActionApproval(input: {
   )
     ? "ask"
     : "allow";
+}
+
+export function isSecretAskBlock(block: {
+  kind: string;
+  input?: string;
+  approvalEffectId?: string;
+}): boolean {
+  return block.kind === "ask" && block.input === "secret" && !block.approvalEffectId;
 }
 
 export function isApprovalAskBlock(block: {

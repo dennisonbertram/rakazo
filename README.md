@@ -20,7 +20,7 @@ Rakazo is in beta. Learn more at [rakazo.com](https://rakazo.com).
 - Bots that can delegate to peer bots or short-lived subagents
 - Bring-your-own model credentials through Pi
 - App integrations through Composio or Pipedream Connect, plus user-installed Treg, remote MCP, and OpenAPI tool sources
-- Docker, E2B, Daytona, and trusted local-computer support
+- Docker, E2B, Daytona, Box, and trusted local-computer support
 
 ## Demo
 
@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/dccdeddb-2134-4a56-8eed-b2e591736b1c
 - Better Auth
 - Graphile Worker
 - Pi
-- Docker, E2B, and Daytona
+- Docker, E2B, Daytona, and Box
 - Composio, Pipedream Connect, MCP, and OpenAPI integrations
 
 ## Quick start
@@ -87,7 +87,23 @@ With the development stack running, launch Electron with:
 pnpm --filter @rakazo/desktop dev
 ```
 
+On first run the desktop app asks whether to use the Rakazo stack on this computer
+(`http://127.0.0.1:5173`) or connect to an existing server. Public servers must use HTTPS; HTTP is
+accepted only for loopback and private LAN addresses (not link-local). The app verifies Rakazo's
+health endpoint before saving, and later launches go straight to that instance.
+
+Use **Change Rakazo Server…** in the application menu to reconnect. Closing that window without
+saving returns to the previous instance. For development automation, set `RAKAZO_WEB_URL` to point
+the shell somewhere else without changing the saved instance, or `RAKAZO_FORCE_SETUP=1` to run
+setup again.
+
 Mobile build and release instructions live in [docs/mobile-release.md](./docs/mobile-release.md).
+
+## Web UI language
+
+The web (and Electron-hosted) UI supports English, Deutsch, and 한국어. Change it under
+**Settings → Language**. The marketing homepage (`apps/www`) is available in en/de/ko via
+footer language links (`/`, `/de/`, `/ko/`); other marketing pages stay English.
 
 ## Development
 

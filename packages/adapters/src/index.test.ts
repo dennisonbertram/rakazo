@@ -147,9 +147,14 @@ describe("builtin tools", () => {
         "shell",
         "remember",
         "request_takeover",
+        "request_secret",
         "run_subagent",
         "spawn_bot",
         "archive_bot",
+        "skill_read",
+        "skill_create",
+        "skill_update",
+        "skill_delete",
       ]),
     );
   });

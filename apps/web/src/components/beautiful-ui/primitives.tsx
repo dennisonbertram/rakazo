@@ -31,22 +31,30 @@ const CHEVRON_DELAYS = Array.from({ length: 9 }, (_, i) => {
   return (column + Math.abs(row - 1)) * 90;
 });
 
-function useElapsed(): string {
-  const [deciseconds, setDeciseconds] = useState(0);
+/** Format wall-clock seconds since `startedAtMs` as `0.0s` / `1m 2.3s`. */
+export function formatElapsed(startedAtMs: number, nowMs: number): string {
+  const totalTenths = Math.round(Math.max(0, nowMs - startedAtMs) / 100);
+  const minutes = Math.floor(totalTenths / 600);
+  const seconds = (totalTenths % 600) / 10;
+  if (minutes === 0) return `${seconds.toFixed(1)}s`;
+  return `${minutes}m ${seconds.toFixed(1)}s`;
+}
+
+function useElapsed(startedAtMs?: number): string {
+  const [mountedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setDeciseconds((value) => value + 1), 100);
+    const timer = setInterval(() => setNow(Date.now()), 100);
     return () => clearInterval(timer);
   }, []);
-  const total = deciseconds / 10;
-  if (total < 60) return `${total.toFixed(1)}s`;
-  return `${Math.floor(total / 60)}m ${(total % 60).toFixed(1)}s`;
+  return formatElapsed(startedAtMs ?? mountedAt, now);
 }
 
 /** Pixel-grid loader with shimmering label and live elapsed timer. */
-export function LoadingState({ label = "working" }: { label?: string }) {
-  const elapsed = useElapsed();
+function DefaultLoadingState({ label, startedAt }: { label: string; startedAt?: number }) {
+  const elapsed = useElapsed(startedAt);
   return (
-    <span className="flex w-fit items-center gap-2.5">
+    <>
       <span aria-hidden className="grid grid-cols-[repeat(3,4px)] gap-[1.5px]">
         {CHEVRON_DELAYS.map((delay, i) => (
           <span
@@ -66,6 +74,31 @@ export function LoadingState({ label = "working" }: { label?: string }) {
       <span className="font-mono text-[12px] tabular-nums" style={{ color: "var(--bui-ink-3)" }}>
         {elapsed}
       </span>
+    </>
+  );
+}
+
+export function LoadingState({
+  indicator,
+  label = "working",
+  startedAt,
+}: {
+  indicator?: React.ReactNode;
+  label?: string;
+  /** Epoch ms when the run started. Falls back to mount time when omitted. */
+  startedAt?: number;
+}) {
+  if (indicator) {
+    return (
+      <span role="status" className="flex w-fit items-center gap-2.5">
+        <span className="sr-only">{label}</span>
+        {indicator}
+      </span>
+    );
+  }
+  return (
+    <span className="flex w-fit items-center gap-2.5">
+      <DefaultLoadingState label={label} startedAt={startedAt} />
     </span>
   );
 }
