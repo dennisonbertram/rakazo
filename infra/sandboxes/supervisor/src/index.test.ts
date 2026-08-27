@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import { resolveDockerSocketPath, supervisorApp, waitForScreenReady } from "./index.js";
 import {
   assertRequestIdentity,
+  attemptComputerControl,
+  ComputerControlUnavailableError,
   clearComputerScreenRegistry,
   completeReleasedScreen,
   computerControlTimeoutMs,
@@ -13,6 +15,7 @@ import {
   ensureScreenCommand,
   hasValidBearerToken,
   interactiveScreenCommand,
+  isComputerControlUnavailable,
   nextScreenIndex,
   normalizeWorkspaceRelative,
   parseObservation,
@@ -22,7 +25,6 @@ import {
   sandboxCommandTimedOut,
   sandboxTimeoutCommand,
   stopExtraScreenCommand,
-  tryComputerControl,
 } from "./supervisor-logic.js";
 
 const token = resolveSupervisorToken(process.env);
@@ -217,13 +219,33 @@ describe("sandbox supervisor input containment", () => {
         async () => "docker-exec",
       ),
     ).resolves.toBe("fast-path");
+  });
+
+  it("replays actions only when control was never reached", async () => {
+    await expect(attemptComputerControl(undefined)).resolves.toEqual({ status: "unavailable" });
     await expect(
-      tryComputerControl(async () => {
-        throw new Error("timeout");
+      attemptComputerControl(async () => {
+        throw new ComputerControlUnavailableError("fetch failed");
       }),
-    ).resolves.toBeUndefined();
-    await expect(tryComputerControl(async () => ({ completed: 2 }))).resolves.toEqual({
-      completed: 2,
+    ).resolves.toEqual({ status: "unavailable" });
+    await expect(
+      attemptComputerControl(async () => {
+        throw new Error("computer action failed");
+      }),
+    ).resolves.toMatchObject({ status: "failed" });
+    const timeout = Object.assign(new Error("The operation was aborted due to timeout"), {
+      name: "TimeoutError",
+    });
+    await expect(
+      attemptComputerControl(async () => {
+        throw timeout;
+      }),
+    ).resolves.toMatchObject({ status: "failed" });
+    expect(isComputerControlUnavailable(new TypeError("fetch failed"))).toBe(true);
+    expect(isComputerControlUnavailable(timeout)).toBe(false);
+    await expect(attemptComputerControl(async () => ({ completed: 2 }))).resolves.toEqual({
+      status: "ok",
+      value: { completed: 2 },
     });
   });
 

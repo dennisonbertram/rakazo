@@ -26,6 +26,8 @@ import {
 } from "./computer-spec.js";
 import {
   assertRequestIdentity,
+  attemptComputerControl,
+  ComputerControlUnavailableError,
   clearComputerScreenRegistry,
   completeReleasedScreen,
   computerActionSchema,
@@ -34,6 +36,7 @@ import {
   ensureScreenCommand,
   hasValidBearerToken,
   interactiveScreenCommand,
+  isComputerControlUnavailable,
   nextScreenIndex,
   normalizeWorkspaceRelative,
   parseObservation,
@@ -44,7 +47,6 @@ import {
   sandboxTimeoutCommand,
   stopExtraScreenCommand,
   toSandboxInput,
-  tryComputerControl,
   workspaceTarget,
 } from "./supervisor-logic.js";
 
@@ -259,7 +261,7 @@ app.post("/computers/:id/actions", async (c) => {
       c.req.header("x-rakazo-screen-lease-id"),
     );
     const control = computerControlEndpoint(info);
-    const controlResult = await tryComputerControl(
+    const attempt = await attemptComputerControl(
       control
         ? () =>
             controlDesktop(
@@ -271,6 +273,8 @@ app.post("/computers/:id/actions", async (c) => {
             )
         : undefined,
     );
+    if (attempt.status === "failed") throw attempt.error;
+    const controlResult = attempt.status === "ok" ? attempt.value : undefined;
     if (!controlResult && body.actions.length)
       await applyContainerActions(container, body.actions, layout.display);
     if (!controlResult && body.settleMs)
@@ -682,17 +686,27 @@ async function controlDesktop(
   observe: boolean,
   settleMs: number,
 ) {
-  const response = await fetch(endpoint.url, {
-    method: "POST",
-    headers: { authorization: `Bearer ${endpoint.token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      steps: actions.map((action) => containerActionStep(action, display)),
-      display,
-      observe,
-      settleMs,
-    }),
-    signal: AbortSignal.timeout(computerControlTimeoutMs(actions, settleMs)),
-  });
+  let response: Response;
+  try {
+    response = await fetch(endpoint.url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${endpoint.token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        steps: actions.map((action) => containerActionStep(action, display)),
+        display,
+        observe,
+        settleMs,
+      }),
+      signal: AbortSignal.timeout(computerControlTimeoutMs(actions, settleMs)),
+    });
+  } catch (error) {
+    if (isComputerControlUnavailable(error)) {
+      throw new ComputerControlUnavailableError(
+        error instanceof Error ? error.message : "computer control unavailable",
+      );
+    }
+    throw error;
+  }
   const payload = (await response.json()) as {
     completed?: unknown;
     observation?: unknown;

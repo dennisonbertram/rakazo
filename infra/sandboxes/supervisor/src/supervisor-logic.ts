@@ -59,15 +59,58 @@ export async function preferComputerControl<T>(
   }
 }
 
-/** Try the HTTP control fast path; return undefined so callers can fall back. */
-export async function tryComputerControl<T>(
+export class ComputerControlUnavailableError extends Error {
+  constructor(message = "computer control unavailable") {
+    super(message);
+    this.name = "ComputerControlUnavailableError";
+  }
+}
+
+function errorText(error: unknown) {
+  if (!(error instanceof Error)) return String(error).toLowerCase();
+  const cause = error.cause instanceof Error ? ` ${error.cause.message}` : "";
+  return `${error.message}${cause}`.toLowerCase();
+}
+
+/** True when the control service was never reached, so actions were not applied. */
+export function isComputerControlUnavailable(error: unknown) {
+  if (error instanceof ComputerControlUnavailableError) return true;
+  if (!(error instanceof Error)) return false;
+  if (error.name === "TimeoutError" || error.name === "AbortError") return false;
+  const text = errorText(error);
+  return (
+    text.includes("fetch failed") ||
+    text.includes("econnrefused") ||
+    text.includes("econnreset") ||
+    text.includes("enotfound") ||
+    text.includes("ehostunreach") ||
+    text.includes("socket hang up") ||
+    text.includes("network")
+  );
+}
+
+export type ComputerControlAttempt<T> =
+  | { status: "ok"; value: T }
+  | { status: "unavailable" }
+  | { status: "failed"; error: Error };
+
+/**
+ * Try the HTTP control fast path.
+ * `unavailable` means the service was never reached (safe to fall back for actions).
+ * `failed` means the request may have partially applied actions (do not replay).
+ */
+export async function attemptComputerControl<T>(
   run: (() => Promise<T>) | undefined,
-): Promise<T | undefined> {
-  if (!run) return undefined;
+): Promise<ComputerControlAttempt<T>> {
+  if (!run) return { status: "unavailable" };
   try {
-    return await run();
-  } catch {
-    return undefined;
+    return { status: "ok", value: await run() };
+  } catch (error) {
+    if (isComputerControlUnavailable(error)) return { status: "unavailable" };
+    return {
+      status: "failed",
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
   }
 }
 
