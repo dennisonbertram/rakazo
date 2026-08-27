@@ -8,15 +8,17 @@ test("Electron loads the real app and opens the new-bot flow", async ({ baseURL 
     cwd: path.resolve(import.meta.dirname, "../../desktop"),
     env: {
       ...process.env,
-      RAKAZO_WEB_URL: baseURL,
+      // Start on the product route instead of racing the desktop main process
+      // by navigating the renderer while it is still loading its target URL.
+      RAKAZO_WEB_URL: new URL("/sign-up", baseURL).toString(),
       RAKAZO_DISABLE_WARM_WINDOW: "1",
     },
   });
 
   try {
     const page = await app.firstWindow();
+    await expect(page).toHaveURL(new RegExp(`/sign-up(?:$|[?#])`));
     const stamp = Date.now();
-    await page.goto(new URL("/sign-up", baseURL).toString());
     await page.getByPlaceholder("Your name").fill("Desktop Proof");
     await page.getByPlaceholder("Your email address").fill(`desktop-proof-${stamp}@rakazo.test`);
     await page.getByPlaceholder("Password").fill("password12");
