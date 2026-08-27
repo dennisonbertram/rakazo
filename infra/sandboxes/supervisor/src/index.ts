@@ -29,6 +29,7 @@ import {
   clearComputerScreenRegistry,
   completeReleasedScreen,
   computerActionSchema,
+  computerControlTimeoutMs,
   containerActionStep,
   ensureScreenCommand,
   hasValidBearerToken,
@@ -690,7 +691,7 @@ async function controlDesktop(
       observe,
       settleMs,
     }),
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(computerControlTimeoutMs(actions, settleMs)),
   });
   const payload = (await response.json()) as {
     completed?: unknown;

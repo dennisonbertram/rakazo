@@ -71,6 +71,24 @@ export async function tryComputerControl<T>(
   }
 }
 
+const CONTROL_BASE_TIMEOUT_MS = 15_000;
+const CONTROL_MAX_TIMEOUT_MS = 60_000;
+
+/** Bound the HTTP control deadline by mapped waits and settle time. */
+export function computerControlTimeoutMs(
+  actions: Array<z.infer<typeof computerActionSchema>>,
+  settleMs = 0,
+) {
+  let waits = 0;
+  for (const action of actions) {
+    if (action.kind === "wait") waits += Math.min(Math.max(action.ms, 0), 5_000);
+  }
+  return Math.min(
+    CONTROL_MAX_TIMEOUT_MS,
+    CONTROL_BASE_TIMEOUT_MS + waits + Math.min(Math.max(settleMs, 0), 5_000),
+  );
+}
+
 export function toSandboxInput(input: {
   kind: "key" | "pointer" | "clipboard";
   key?: string;

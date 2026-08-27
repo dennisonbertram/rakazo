@@ -8,6 +8,7 @@ import {
   assertRequestIdentity,
   clearComputerScreenRegistry,
   completeReleasedScreen,
+  computerControlTimeoutMs,
   containerActionStep,
   ensureScreenCommand,
   hasValidBearerToken,
@@ -224,6 +225,28 @@ describe("sandbox supervisor input containment", () => {
     await expect(tryComputerControl(async () => ({ completed: 2 }))).resolves.toEqual({
       completed: 2,
     });
+  });
+
+  it("extends the computer control deadline for mapped waits", () => {
+    expect(computerControlTimeoutMs([])).toBe(15_000);
+    expect(computerControlTimeoutMs([{ kind: "wait", ms: 5_000 }], 5_000)).toBe(25_000);
+    expect(
+      computerControlTimeoutMs(
+        [
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+          { kind: "wait", ms: 5_000 },
+        ],
+        5_000,
+      ),
+    ).toBe(60_000);
   });
 
   it("wraps sandbox commands in a process-tree timeout", () => {
