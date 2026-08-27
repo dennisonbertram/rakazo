@@ -104,6 +104,45 @@ def drop_native_capture(display):
     NATIVE_CAPTURES.pop(display, None)
 
 
+def _is_int_string(value):
+    if not value or value[0] == "-":
+        return value[1:].isdigit() if len(value) > 1 else False
+    return value.isdigit()
+
+
+def allowed_xdotool_argv(argv):
+    """Only xdotool forms emitted by containerActionStep / xdotoolCommand."""
+    if len(argv) < 4 or argv[2] != "xdotool":
+        return False
+    op = argv[3]
+    if op == "key":
+        return len(argv) == 6 and argv[4] == "--clearmodifiers" and argv[5] != ""
+    if op == "mousemove":
+        if len(argv) == 7 and argv[4] == "--" and _is_int_string(argv[5]) and _is_int_string(argv[6]):
+            return True
+        return (
+            len(argv) == 9
+            and argv[4] == "--"
+            and _is_int_string(argv[5])
+            and _is_int_string(argv[6])
+            and argv[7] in ("mousedown", "click")
+            and argv[8] in ("1", "3")
+        )
+    if op == "mouseup":
+        return len(argv) == 5 and argv[4] in ("1", "3")
+    if op == "type":
+        return len(argv) == 7 and argv[4] == "--clearmodifiers" and argv[5] == "--"
+    if op == "click":
+        return (
+            len(argv) == 7
+            and argv[4] == "--repeat"
+            and argv[5].isdigit()
+            and 1 <= int(argv[5]) <= 20
+            and argv[6] in ("4", "5")
+        )
+    return False
+
+
 def allowed_control_argv(argv):
     """Only supervisor-shaped argv: env DISPLAY=... plus xdotool / xdg-open / known launch."""
     if not isinstance(argv, list) or not (3 <= len(argv) <= MAX_ARGV):
@@ -114,7 +153,7 @@ def allowed_control_argv(argv):
         return False
     command = argv[2]
     if command == "xdotool":
-        return len(argv) >= 4
+        return allowed_xdotool_argv(argv)
     if command == "xdg-open":
         return len(argv) == 4
     if "/" in command or command not in KNOWN_LAUNCH:
