@@ -398,9 +398,7 @@ function loadAppUrl(win: BrowserWindow, url: string): Promise<void> {
  * fixtures omit the Rakazo app-state marker.
  */
 async function waitForMountedAppDocument(contents: Electron.WebContents) {
-  // Generous: a cold vite transform on a busy machine can take well over 8s,
-  // and probeDocument already rejected dead or erroring servers before this.
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 8_000;
   while (Date.now() < deadline) {
     if (contents.isCrashed()) throw new Error("Renderer stopped after load.");
     const ready = (await contents.executeJavaScript(`(() => {
@@ -1037,6 +1035,10 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
+  // Mid-open there can be zero windows: the hidden legacy-storage probe window
+  // is created and destroyed before the shell window exists. Quitting here
+  // would kill startup on Linux/Windows whenever that probe runs.
+  if (openAppPromise !== null) return;
   if (process.platform !== "darwin") app.quit();
 });
 
