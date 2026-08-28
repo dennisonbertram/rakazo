@@ -97,7 +97,9 @@ jobs:
           E2B_API_KEY: ${{ inputs.sandbox_provider == 'e2b' && secrets.E2B_API_KEY || '' }}
           DAYTONA_API_KEY: ${{ inputs.sandbox_provider == 'daytona' && secrets.DAYTONA_API_KEY || '' }}
           BOX_API_KEY: ${{ inputs.sandbox_provider == 'box' && secrets.BOX_API_KEY || '' }}
-        run: pnpm test:e2e -- --sandbox="$SANDBOX_TEST_PROVIDER"
+        # xvfb: the suite includes an Electron launch (desktop-product.spec.ts),
+        # which needs a display server on Linux runners.
+        run: xvfb-run --auto-servernum pnpm test:e2e -- --sandbox="$SANDBOX_TEST_PROVIDER"
       - name: Record Playwright result
         if: always() && inputs.upload_artifacts
         env:
