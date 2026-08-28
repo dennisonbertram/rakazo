@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { createWriteStream } from "node:fs";
 import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const proofLayers = ["api", "worker", "web", "desktop", "local"] as const;
@@ -32,7 +32,8 @@ export function commandForLayer(layer: Exclude<ProofLayer, "local">): ProofComma
       return {
         command: "pnpm",
         args: ["tsx", "packages/testkit/src/cli/desktop-product.ts"],
-        proves: "the Electron shell loads the real web app and can create a bot through the title-bar control",
+        proves:
+          "the Electron shell loads the real web app and can create a bot through the title-bar control",
       };
   }
 }

@@ -110,6 +110,8 @@ import {
 import { observationToolResult, parseComputerActions } from "./computer-tools.js";
 import { checkpointAndRecordComputerWorkspace } from "./computer-workspace.js";
 import { resolveDeploymentModel } from "./deployment-model.js";
+import { collectNativeMailDump, type GmailNative, gmailSummaryLine } from "./google-gmail.js";
+import type { CalendarNative, DriveNative, MeetNative } from "./google-workspace.js";
 import { handoffToGroupBot, loadGroupContext } from "./group-handoff.js";
 import {
   COMPACTION_BATCH_SIZE,
@@ -123,20 +125,16 @@ import {
   shouldEnqueueCompaction,
 } from "./history-compaction.js";
 import {
-  buildMcpCredentialBlob,
-  needsOAuthProbe,
-  parseMcpServerToolArgs,
-} from "./mcp-server-tool.js";
-import { collectNativeMailDump, GmailNative, gmailSummaryLine } from "./google-gmail.js";
-import type { CalendarNative, DriveNative, MeetNative } from "./google-workspace.js";
-import {
   buildMailDumpFile,
   collectMailDump,
   MAIL_DUMP_DEFAULT_MAX,
   MAIL_DUMP_HARD_MAX,
-  type MailDumpQuerySummary,
-  type MailDumpRecord,
 } from "./mail-dump.js";
+import {
+  buildMcpCredentialBlob,
+  needsOAuthProbe,
+  parseMcpServerToolArgs,
+} from "./mcp-server-tool.js";
 import { loadAgentMemoryContext } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { selectMemoryTools } from "./memory-tools.js";
@@ -1045,7 +1043,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
           name: string,
           args: Record<string, unknown>,
           executionId: string,
-          route?: ConnectorRoute,
         ) => {
           if (IMAGE_RETURNING_COMPUTER_TOOLS.has(name) && !acceptsImages) {
             return { error: MODEL_CANNOT_SEE_MESSAGE };
@@ -1309,13 +1306,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
             try {
               const actor = { workspaceId: run.workspaceId, userId: run.userId };
               if (!(await deps.gmailNative.connected(actor))) {
-                return finish({ error: "Google is not connected. Connect Gmail (built-in) from Plugins." });
+                return finish({
+                  error: "Google is not connected. Connect Gmail (built-in) from Plugins.",
+                });
               }
               const query = String(args.query ?? "").trim();
               if (!query) return finish({ error: "Pass a Gmail query." });
               const max = Math.min(25, Math.max(1, Number(args.max_results) || 10));
               const page = await deps.gmailNative.list(actor, { q: query, maxResults: max });
-              const summaries = await deps.gmailNative.metadataMany(actor, page.ids.map((m) => m.id));
+              const summaries = await deps.gmailNative.metadataMany(
+                actor,
+                page.ids.map((m) => m.id),
+              );
               return finish({
                 query,
                 results: summaries.map(gmailSummaryLine),

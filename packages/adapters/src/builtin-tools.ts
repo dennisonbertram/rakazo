@@ -161,7 +161,10 @@ export const builtinAgentTools: ConnectorTool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Gmail search query (from:, to:, subject:, after:YYYY/MM/DD, is:unread, …)." },
+        query: {
+          type: "string",
+          description: "Gmail search query (from:, to:, subject:, after:YYYY/MM/DD, is:unread, …).",
+        },
         max_results: { type: "integer", description: "1-25, default 10." },
       },
       required: ["query"],
@@ -207,7 +210,10 @@ export const builtinAgentTools: ConnectorTool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        time_min: { type: "string", description: "ISO datetime lower bound, e.g. 2026-08-24T00:00:00Z." },
+        time_min: {
+          type: "string",
+          description: "ISO datetime lower bound, e.g. 2026-08-24T00:00:00Z.",
+        },
         time_max: { type: "string", description: "ISO datetime upper bound." },
         query: { type: "string", description: "Optional free-text filter." },
         max_results: { type: "integer", description: "1-50, default 25." },
@@ -240,14 +246,25 @@ export const builtinAgentTools: ConnectorTool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        intent: { type: "string", description: "One line describing what you are looking for; written into the dump header." },
+        intent: {
+          type: "string",
+          description:
+            "One line describing what you are looking for; written into the dump header.",
+        },
         queries: {
           type: "array",
           items: { type: "string" },
-          description: "1-10 broad Gmail queries, cast WIDE (e.g. ['from:acme.com', 'subject:invoice', 'acme invoice']). Broader beats narrower; the grep step narrows.",
+          description:
+            "1-10 broad Gmail queries, cast WIDE (e.g. ['from:acme.com', 'subject:invoice', 'acme invoice']). Broader beats narrower; the grep step narrows.",
         },
-        max_messages: { type: "integer", description: "Total message cap across all queries. Default 500, hard max 2000." },
-        path: { type: "string", description: "Output file path in your home. Default mail/dump-<time>.md." },
+        max_messages: {
+          type: "integer",
+          description: "Total message cap across all queries. Default 500, hard max 2000.",
+        },
+        path: {
+          type: "string",
+          description: "Output file path in your home. Default mail/dump-<time>.md.",
+        },
       },
       required: ["intent", "queries"],
     },

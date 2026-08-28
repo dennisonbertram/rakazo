@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildMailDumpFile,
-  collectMailDump,
-  mailDumpLine,
-  toMailDumpRecord,
-} from "./mail-dump.js";
+import { buildMailDumpFile, collectMailDump, mailDumpLine, toMailDumpRecord } from "./mail-dump.js";
 
 const RAW = {
   messageId: "abc123",
@@ -30,13 +25,20 @@ function fakeConnector(pages: FakePage[]) {
       }
       yield {
         type: "result" as const,
-        data: { data: { messages: page.messages, nextPageToken: page.next ? `page-${call}` : undefined } },
+        data: {
+          data: { messages: page.messages, nextPageToken: page.next ? `page-${call}` : undefined },
+        },
       };
     },
   };
 }
 
-const CONTEXT = { workspaceId: "w", userId: "u", botId: "b", signal: new AbortController().signal } as never;
+const CONTEXT = {
+  workspaceId: "w",
+  userId: "u",
+  botId: "b",
+  signal: new AbortController().signal,
+} as never;
 
 describe("email dump search", () => {
   it("normalizes raw messages into single-line grep-friendly records", () => {

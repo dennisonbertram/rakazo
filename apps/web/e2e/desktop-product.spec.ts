@@ -17,7 +17,7 @@ test("Electron loads the real app and opens the new-bot flow", async ({ baseURL 
 
   try {
     const page = await app.firstWindow();
-    await expect(page).toHaveURL(new RegExp(`/sign-up(?:$|[?#])`));
+    await expect(page).toHaveURL(/\/sign-up(?:$|[?#])/);
     const stamp = Date.now();
     await page.getByPlaceholder("Your name").fill("Desktop Proof");
     await page.getByPlaceholder("Your email address").fill(`desktop-proof-${stamp}@rakazo.test`);

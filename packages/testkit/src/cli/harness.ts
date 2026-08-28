@@ -2,7 +2,9 @@ import { execSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { loadRootEnv } from "@rakazo/core/node/load-root-env";
-import { createDb } from "@rakazo/db";
+// Type-only: the runtime import happens lazily after `pnpm --filter @rakazo/db generate`,
+// because a fresh checkout has no generated Prisma client yet.
+import type { createDb } from "@rakazo/db";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { runProcess } from "./process.js";
 
@@ -33,7 +35,7 @@ if (integration && sandboxProvider !== "fake") {
 if (!integration && suiteArg) {
   throw new Error("--suite is only supported with --integration");
 }
-if (!['all', 'api', 'worker'].includes(integrationSuite)) {
+if (!["all", "api", "worker"].includes(integrationSuite)) {
   throw new Error('Integration suite must be "all", "api", or "worker"');
 }
 if (agentRuntime !== "pi" && agentRuntime !== "scripted") {
@@ -109,13 +111,10 @@ async function main() {
       const selectedSuites =
         integrationSuite === "all" ? [...suites.api, ...suites.worker] : suites[integrationSuite];
       try {
-        execSync(
-          ["pnpm exec vitest run --no-file-parallelism", ...selectedSuites].join(" "),
-          {
-            stdio: "inherit",
-            env: process.env,
-          },
-        );
+        execSync(["pnpm exec vitest run --no-file-parallelism", ...selectedSuites].join(" "), {
+          stdio: "inherit",
+          env: process.env,
+        });
       } finally {
         await writeProofEvidence(databaseUrl);
       }
@@ -279,7 +278,7 @@ async function writeSummary(reportDir: string, summary: Record<string, unknown>)
 async function writeProofEvidence(databaseUrl: string) {
   const destination = process.env.RAKAZO_PROOF_EVIDENCE_PATH;
   if (!destination) return;
-  const { prisma, pool } = createDb(databaseUrl);
+  const { prisma, pool } = (await import("@rakazo/db")).createDb(databaseUrl);
   try {
     const [runs, attempts, events, jobEvidence] = await Promise.all([
       prisma.run.findMany({
@@ -300,7 +299,15 @@ async function writeProofEvidence(databaseUrl: string) {
         orderBy: { createdAt: "asc" },
       }),
       prisma.attempt.findMany({
-        select: { id: true, runId: true, fence: true, status: true, error: true, startedAt: true, finishedAt: true },
+        select: {
+          id: true,
+          runId: true,
+          fence: true,
+          status: true,
+          error: true,
+          startedAt: true,
+          finishedAt: true,
+        },
         orderBy: { startedAt: "asc" },
       }),
       prisma.event.findMany({

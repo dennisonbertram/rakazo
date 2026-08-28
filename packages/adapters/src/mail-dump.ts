@@ -38,7 +38,8 @@ type ConnectorLike = {
 function asText(value: unknown): string {
   if (typeof value === "string") return value;
   if (value && typeof value === "object") {
-    const body = (value as { body?: unknown; text?: unknown }).body ?? (value as { text?: unknown }).text;
+    const body =
+      (value as { body?: unknown; text?: unknown }).body ?? (value as { text?: unknown }).text;
     if (typeof body === "string") return body;
   }
   return "";
@@ -61,7 +62,10 @@ export function toMailDumpRecord(raw: unknown): MailDumpRecord | undefined {
     from: oneLine(String(message.sender ?? message.from ?? ""), 80),
     to: oneLine(String(message.to ?? ""), 80),
     subject: oneLine(String(message.subject ?? "(no subject)"), 140),
-    preview: oneLine(asText(message.preview) || asText(message.messageText) || String(message.snippet ?? ""), 200),
+    preview: oneLine(
+      asText(message.preview) || asText(message.messageText) || String(message.snippet ?? ""),
+      200,
+    ),
   };
 }
 
@@ -112,7 +116,11 @@ export async function collectMailDump(input: {
   context: AdapterContext;
   queries: string[];
   maxMessages: number;
-}): Promise<{ records: MailDumpRecord[]; summaries: MailDumpQuerySummary[]; cappedTotal: boolean }> {
+}): Promise<{
+  records: MailDumpRecord[];
+  summaries: MailDumpQuerySummary[];
+  cappedTotal: boolean;
+}> {
   const queries = input.queries
     .map((query) => query.trim())
     .filter(Boolean)
@@ -150,7 +158,10 @@ export async function collectMailDump(input: {
       )) {
         if (event.type === "result") {
           const payload = (event as { data?: { data?: unknown } }).data?.data;
-          data = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : undefined;
+          data =
+            payload && typeof payload === "object"
+              ? (payload as Record<string, unknown>)
+              : undefined;
         } else if (event.type === "error") {
           errorMessage = (event as { message?: string }).message ?? "unknown error";
         }
@@ -174,7 +185,10 @@ export async function collectMailDump(input: {
         }
         summary.found += 1;
       }
-      pageToken = typeof data?.nextPageToken === "string" && data.nextPageToken ? data.nextPageToken : undefined;
+      pageToken =
+        typeof data?.nextPageToken === "string" && data.nextPageToken
+          ? data.nextPageToken
+          : undefined;
       if (!pageToken || summary.capped) break;
     }
   }

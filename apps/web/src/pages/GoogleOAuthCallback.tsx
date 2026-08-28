@@ -16,7 +16,9 @@ export function GoogleOAuthCallbackPage() {
     const code = params.get("code");
     const state = params.get("state");
     if (!code || !state) {
-      setError(params.get("error_description") ?? params.get("error") ?? "Authorization was cancelled.");
+      setError(
+        params.get("error_description") ?? params.get("error") ?? "Authorization was cancelled.",
+      );
       return;
     }
     void rpc.google
@@ -32,7 +34,9 @@ export function GoogleOAuthCallbackPage() {
         }
         navigate("/app", { replace: true });
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not complete sign-in"));
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : "Could not complete sign-in"),
+      );
   }, [navigate, params]);
   const showReturn = Boolean(error) && window.name !== POPUP_NAME;
   return (
@@ -52,7 +56,9 @@ export function GoogleOAuthCallbackPage() {
           </button>
         ) : (
           <p className="mt-2 text-sm text-[#85858B]">
-            {error || done ? "You can close this window." : "You can close this tab if it does not redirect automatically."}
+            {error || done
+              ? "You can close this window."
+              : "You can close this tab if it does not redirect automatically."}
           </p>
         )}
       </div>

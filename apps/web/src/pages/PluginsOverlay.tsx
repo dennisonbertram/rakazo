@@ -58,9 +58,16 @@ export function PluginsOverlay({
   } | null>(null);
 
   useEffect(() => {
-    void rpc.google.status().then(setGoogle).catch(() => setGoogle(null));
+    void rpc.google
+      .status()
+      .then(setGoogle)
+      .catch(() => setGoogle(null));
     const channel = new BroadcastChannel("rakazo-google-oauth");
-    channel.onmessage = () => void rpc.google.status().then(setGoogle).catch(() => undefined);
+    channel.onmessage = () =>
+      void rpc.google
+        .status()
+        .then(setGoogle)
+        .catch(() => undefined);
     return () => channel.close();
   }, []);
 

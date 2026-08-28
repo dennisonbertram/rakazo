@@ -92,7 +92,11 @@ export class GoogleAuthBroker {
 
   async complete(actor: Actor, state: string, code: string): Promise<void> {
     const pending = this.pending.get(state);
-    if (!pending || pending.actor.userId !== actor.userId || pending.actor.workspaceId !== actor.workspaceId) {
+    if (
+      !pending ||
+      pending.actor.userId !== actor.userId ||
+      pending.actor.workspaceId !== actor.workspaceId
+    ) {
       throw new Error("Google OAuth session is invalid or expired");
     }
     const body = new URLSearchParams({
@@ -109,7 +113,9 @@ export class GoogleAuthBroker {
       body,
     });
     if (!response.ok) {
-      throw new Error(`Google token exchange failed (${response.status}): ${(await response.text()).slice(0, 200)}`);
+      throw new Error(
+        `Google token exchange failed (${response.status}): ${(await response.text()).slice(0, 200)}`,
+      );
     }
     const tokens = (await response.json()) as StoredTokens;
     await this.saveTokens(actor, { ...tokens, obtainedAt: Date.now() });
@@ -170,7 +176,9 @@ export class GoogleAuthBroker {
       body,
     });
     if (!response.ok) {
-      throw new Error(`Google token refresh failed (${response.status}); reconnect Google from Plugins`);
+      throw new Error(
+        `Google token refresh failed (${response.status}); reconnect Google from Plugins`,
+      );
     }
     const refreshed = (await response.json()) as StoredTokens;
     const next: StoredTokens = {
@@ -260,7 +268,8 @@ export function decodeBase64Url(data: string): string {
 
 /** Depth-first search for the first text/plain (fallback text/html) body part. */
 export function extractBodyText(payload: unknown): string {
-  const stack: Record<string, unknown>[] = payload && typeof payload === "object" ? [payload as Record<string, unknown>] : [];
+  const stack: Record<string, unknown>[] =
+    payload && typeof payload === "object" ? [payload as Record<string, unknown>] : [];
   let html = "";
   while (stack.length > 0) {
     const part = stack.shift()!;
@@ -271,7 +280,11 @@ export function extractBodyText(payload: unknown): string {
     const parts = part.parts;
     if (Array.isArray(parts)) stack.push(...(parts as Record<string, unknown>[]));
   }
-  return html.replaceAll(/<style[\s\S]*?<\/style>/gi, "").replaceAll(/<[^>]+>/g, " ").replaceAll(/\s+/g, " ").trim();
+  return html
+    .replaceAll(/<style[\s\S]*?<\/style>/gi, "")
+    .replaceAll(/<[^>]+>/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
 }
 
 export class GmailNative {
@@ -302,7 +315,9 @@ export class GmailNative {
     if (input.pageToken) params.set("pageToken", input.pageToken);
     params.set("maxResults", String(Math.min(500, Math.max(1, input.maxResults ?? 100))));
     const data = await this.request(actor, `/messages?${params}`);
-    const messages = Array.isArray(data.messages) ? (data.messages as { id: string; threadId: string }[]) : [];
+    const messages = Array.isArray(data.messages)
+      ? (data.messages as { id: string; threadId: string }[])
+      : [];
     return {
       ids: messages,
       nextPageToken: typeof data.nextPageToken === "string" ? data.nextPageToken : undefined,
@@ -370,14 +385,31 @@ export async function collectNativeMailDump(
   queries: string[],
   maxMessages: number,
 ): Promise<{
-  records: { id: string; threadId: string; timestamp: string; from: string; to: string; subject: string; preview: string }[];
+  records: {
+    id: string;
+    threadId: string;
+    timestamp: string;
+    from: string;
+    to: string;
+    subject: string;
+    preview: string;
+  }[];
   summaries: { query: string; found: number; pages: number; capped: boolean; error?: string }[];
   cappedTotal: boolean;
 }> {
   const ids = new Map<string, string>();
-  const summaries: { query: string; found: number; pages: number; capped: boolean; error?: string }[] = [];
+  const summaries: {
+    query: string;
+    found: number;
+    pages: number;
+    capped: boolean;
+    error?: string;
+  }[] = [];
   let cappedTotal = false;
-  for (const query of queries.map((entry) => entry.trim()).filter(Boolean).slice(0, 10)) {
+  for (const query of queries
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .slice(0, 10)) {
     const summary = { query, found: 0, pages: 0, capped: false } as (typeof summaries)[number];
     summaries.push(summary);
     let pageToken: string | undefined;

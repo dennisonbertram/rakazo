@@ -4,8 +4,8 @@ import {
   decodeBase64Url,
   extractBodyText,
   GmailNative,
-  gmailSummaryLine,
   GoogleAuthBroker,
+  gmailSummaryLine,
 } from "./google-gmail.js";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -32,7 +32,10 @@ function brokerWith(tokens: Record<string, unknown> | null) {
 describe("GoogleAuthBroker", () => {
   it("builds a PKCE offline-consent authorization URL", () => {
     const broker = brokerWith(null);
-    const { authorizationUrl, state } = broker.begin(ACTOR, "http://127.0.0.1:5173/google/oauth/callback");
+    const { authorizationUrl, state } = broker.begin(
+      ACTOR,
+      "http://127.0.0.1:5173/google/oauth/callback",
+    );
     const url = new URL(authorizationUrl);
     expect(url.origin + url.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
@@ -62,7 +65,10 @@ describe("GoogleAuthBroker", () => {
 
 describe("Gmail body extraction", () => {
   it("decodes base64url and finds the text/plain part in nested multiparts", () => {
-    const data = Buffer.from("hello plain").toString("base64").replaceAll("+", "-").replaceAll("/", "_");
+    const data = Buffer.from("hello plain")
+      .toString("base64")
+      .replaceAll("+", "-")
+      .replaceAll("/", "_");
     expect(decodeBase64Url(data)).toBe("hello plain");
     const payload = {
       mimeType: "multipart/alternative",
@@ -88,7 +94,12 @@ describe("native mail dump", () => {
     const broker = brokerWith({ access_token: "live", expires_in: 3600, obtainedAt: Date.now() });
     const gmail = new GmailNative(broker);
     vi.spyOn(gmail, "list")
-      .mockResolvedValueOnce({ ids: [{ id: "a", threadId: "t" }, { id: "b", threadId: "t" }] })
+      .mockResolvedValueOnce({
+        ids: [
+          { id: "a", threadId: "t" },
+          { id: "b", threadId: "t" },
+        ],
+      })
       .mockResolvedValueOnce({ ids: [{ id: "a", threadId: "t" }] });
     vi.spyOn(gmail, "metadata").mockImplementation(async (_actor, id) => ({
       id,
@@ -103,6 +114,16 @@ describe("native mail dump", () => {
     expect(result.records.map((record) => record.id).sort()).toEqual(["a", "b"]);
     expect(result.summaries[0]).toMatchObject({ query: "q1", found: 2 });
     expect(result.cappedTotal).toBe(false);
-    expect(gmailSummaryLine({ id: "a", threadId: "t", date: "d", from: "f", to: "me", subject: "s", snippet: "p" })).toContain("id=a");
+    expect(
+      gmailSummaryLine({
+        id: "a",
+        threadId: "t",
+        date: "d",
+        from: "f",
+        to: "me",
+        subject: "s",
+        snippet: "p",
+      }),
+    ).toContain("id=a");
   });
 });

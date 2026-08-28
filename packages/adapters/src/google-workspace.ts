@@ -37,7 +37,10 @@ export function driveQuery(input: string): string {
 export class DriveNative {
   constructor(private readonly broker: GoogleAuthBroker) {}
 
-  async search(actor: Actor, input: { query: string; maxResults?: number }): Promise<DriveFileSummary[]> {
+  async search(
+    actor: Actor,
+    input: { query: string; maxResults?: number },
+  ): Promise<DriveFileSummary[]> {
     const params = new URLSearchParams({
       q: driveQuery(input.query),
       pageSize: String(Math.min(25, Math.max(1, input.maxResults ?? 15))),
@@ -51,7 +54,9 @@ export class DriveNative {
       name: String(file.name ?? ""),
       mimeType: String(file.mimeType ?? ""),
       modifiedTime: String(file.modifiedTime ?? ""),
-      owner: String((file.owners as { displayName?: string }[] | undefined)?.[0]?.displayName ?? ""),
+      owner: String(
+        (file.owners as { displayName?: string }[] | undefined)?.[0]?.displayName ?? "",
+      ),
     }));
   }
 
@@ -65,7 +70,9 @@ export class DriveNative {
       name: String(meta.name ?? ""),
       mimeType: String(meta.mimeType ?? ""),
       modifiedTime: String(meta.modifiedTime ?? ""),
-      owner: String((meta.owners as { displayName?: string }[] | undefined)?.[0]?.displayName ?? ""),
+      owner: String(
+        (meta.owners as { displayName?: string }[] | undefined)?.[0]?.displayName ?? "",
+      ),
     };
     const exportMime = GOOGLE_DOC_EXPORTS[summary.mimeType];
     if (exportMime) {
@@ -114,15 +121,28 @@ export class CalendarNative {
     if (input.timeMin) params.set("timeMin", input.timeMin);
     if (input.timeMax) params.set("timeMax", input.timeMax);
     if (input.query) params.set("q", input.query);
-    const data = await this.broker.apiGet(actor, `${CALENDAR_API}/calendars/primary/events?${params}`);
+    const data = await this.broker.apiGet(
+      actor,
+      `${CALENDAR_API}/calendars/primary/events?${params}`,
+    );
     const items = Array.isArray(data.items) ? (data.items as Record<string, unknown>[]) : [];
     return items.map((event) => ({
       id: String(event.id ?? ""),
       summary: String(event.summary ?? "(no title)"),
-      start: String((event.start as { dateTime?: string; date?: string } | undefined)?.dateTime ?? (event.start as { date?: string } | undefined)?.date ?? ""),
-      end: String((event.end as { dateTime?: string; date?: string } | undefined)?.dateTime ?? (event.end as { date?: string } | undefined)?.date ?? ""),
+      start: String(
+        (event.start as { dateTime?: string; date?: string } | undefined)?.dateTime ??
+          (event.start as { date?: string } | undefined)?.date ??
+          "",
+      ),
+      end: String(
+        (event.end as { dateTime?: string; date?: string } | undefined)?.dateTime ??
+          (event.end as { date?: string } | undefined)?.date ??
+          "",
+      ),
       attendees: Array.isArray(event.attendees)
-        ? (event.attendees as { email?: string }[]).map((a) => String(a.email ?? "")).filter(Boolean)
+        ? (event.attendees as { email?: string }[])
+            .map((a) => String(a.email ?? ""))
+            .filter(Boolean)
         : [],
       location: String(event.location ?? ""),
       meetLink: String(event.hangoutLink ?? ""),
@@ -154,7 +174,9 @@ export class MeetNative {
       try {
         const list = await this.broker.apiGet(actor, `${MEET_API}/${name}/transcripts`);
         transcripts = Array.isArray(list.transcripts)
-          ? (list.transcripts as { name?: string }[]).map((t) => String(t.name ?? "")).filter(Boolean)
+          ? (list.transcripts as { name?: string }[])
+              .map((t) => String(t.name ?? ""))
+              .filter(Boolean)
           : [];
       } catch {
         // A record without readable transcripts still belongs in the listing.
@@ -193,7 +215,10 @@ export class MeetNative {
           return lines.join("\n");
         }
       }
-      pageToken = typeof data.nextPageToken === "string" && data.nextPageToken ? data.nextPageToken : undefined;
+      pageToken =
+        typeof data.nextPageToken === "string" && data.nextPageToken
+          ? data.nextPageToken
+          : undefined;
       if (!pageToken) break;
     }
     return lines.join("\n");

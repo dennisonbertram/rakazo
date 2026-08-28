@@ -32,11 +32,11 @@ import {
   type EncryptedSecretStore,
   enqueueTakeoverContinuation,
   expireComputerControl,
+  type GoogleAuthBroker,
   hasActiveComputerControl,
   isScratchpadStatus,
   listPiCatalog,
   listScratchpadItems,
-  GoogleAuthBroker,
   McpOAuthBroker,
   type MemoryProviderResolver,
   mapScratchpadItem,
@@ -2620,11 +2620,13 @@ export function createRouter(deps: RouterDeps) {
         };
       }),
       begin: authed.google.begin.handler(async ({ context, input }) => {
-        if (!deps.googleAuth) throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
+        if (!deps.googleAuth)
+          throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
         return deps.googleAuth.begin(context.actor, input.redirectUri);
       }),
       complete: authed.google.complete.handler(async ({ context, input }) => {
-        if (!deps.googleAuth) throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
+        if (!deps.googleAuth)
+          throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
         await deps.googleAuth.complete(context.actor, input.state, input.code);
         return { ok: true as const };
       }),
