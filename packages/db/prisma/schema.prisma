@@ -171,6 +171,7 @@ model DeploymentSettings {
   ownerUserId                    String?
   signupsEnabled                 Boolean  @default(true)
   signupAllowlist                String   @default("")
+  signupPolicyInitialized        Boolean  @default(false)
   defaultModelProvider           String?
   defaultModelId                 String?
   deploymentModelCredentialCipher String?
@@ -245,6 +246,7 @@ model Bot {
   modelProvider  String?
   modelId        String?
   thinkingLevel  String?
+  webhookSecretId String?
   routines       Routine[]
   scratchpadItems ScratchpadItem[]
   taughtSkills   TaughtSkill[]
@@ -277,6 +279,7 @@ model BotSection {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   bots        Bot[]
+  groups      ChatGroup[]
 
   @@unique([workspaceId, userId, name])
   @@index([workspaceId, userId, position, createdAt])
@@ -302,13 +305,18 @@ model ChatGroup {
   workspace   Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId      String
   name        String
+  pinned      Boolean  @default(false)
+  sectionId   String?
+  section     BotSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  archivedAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   members     ChatGroupMember[]
   thread      Thread?
   artifacts   Artifact[]
 
-  @@index([workspaceId, userId, updatedAt])
+  @@index([workspaceId, userId, archivedAt, pinned, updatedAt])
+  @@index([sectionId])
   @@map("chat_groups")
 }
 
@@ -489,23 +497,24 @@ model ExternalEffect {
 }
 
 model Routine {
-  id          String    @id @default(cuid())
-  workspaceId String
-  workspace   Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  botId       String
-  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  userId      String
-  name        String
-  prompt      String
-  crons       String[]
-  timezone    String    @default("UTC")
-  active      Boolean   @default(false)
-  notify      Boolean   @default(true)
-  lastRunAt   DateTime?
-  nextRunAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  runs        Run[]
+  id             String    @id @default(cuid())
+  workspaceId    String
+  workspace      Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  botId          String
+  bot            Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userId         String
+  name           String
+  prompt         String
+  crons          String[]
+  timezone       String    @default("UTC")
+  active         Boolean   @default(false)
+  notify         Boolean   @default(true)
+  webhookEnabled Boolean   @default(false)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  runs           Run[]
 
   @@index([active, nextRunAt])
   @@index([workspaceId, botId])

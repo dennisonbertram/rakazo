@@ -1,5 +1,6 @@
 import { type Sandbox, TimeoutError } from "@e2b/desktop";
 import { describe, expect, it, vi } from "vitest";
+import { ComputerScreenUnavailableError } from "./computer-screens.js";
 import { shouldSkipPortableWorkspaceFile } from "./computer-workspace.js";
 import { E2BSandboxProvider, type E2BSandboxSdk } from "./e2b-sandbox.js";
 
@@ -17,6 +18,99 @@ describe("E2B computer backend", () => {
     expect(shouldSkipPortableWorkspaceFile("project/lock")).toBe(false);
     expect(shouldSkipPortableWorkspaceFile(".browser-profiles/chromium/Cache/data")).toBe(true);
     expect(shouldSkipPortableWorkspaceFile(".browser-profiles/chromium/SingletonLock")).toBe(true);
+  });
+
+  it("boots a fresh sandbox when reconnecting to a dead one fails with fetch failed", async () => {
+    const desktop = { sandboxId: "fresh-e2b-box" } as unknown as Sandbox;
+    const sdk: E2BSandboxSdk = {
+      create: vi.fn(async () => desktop),
+      connect: vi.fn(async () => {
+        throw new Error("fetch failed", {
+          cause: Object.assign(new Error("getaddrinfo ENOTFOUND dead-e2b-box.e2b.app"), {
+            code: "ENOTFOUND",
+          }),
+        });
+      }),
+      pause: vi.fn(async () => undefined),
+    };
+    const provider = new E2BSandboxProvider("test-key", sdk);
+
+    const computer = await provider.provision(
+      { botId: "bot-1", homePath: "/unused", providerRef: "dead-e2b-box", providerKind: "e2b" },
+      context,
+    );
+
+    expect(sdk.create).toHaveBeenCalledTimes(1);
+    expect(computer.providerRef).toBe("fresh-e2b-box");
+    expect(computer.fresh).toBe(true);
+  });
+
+  it("gives screen setup commands a real timeout and surfaces a failed one as unavailable", async () => {
+    const run = vi.fn(async (_command: string, opts?: { timeoutMs?: number }) => {
+      // The SDK throws on a non-zero exit rather than returning the result, and caps the
+      // command at 60s unless a timeout is passed.
+      if ((opts?.timeoutMs ?? 60_000) <= 60_000) {
+        throw Object.assign(new Error("signal: terminated"), {
+          name: "CommandExitError",
+          result: { exitCode: -1, stdout: "", stderr: "", error: "signal: terminated" },
+        });
+      }
+      throw Object.assign(new Error("boom"), {
+        name: "CommandExitError",
+        result: { exitCode: 1, stdout: "", stderr: "boom", error: "boom" },
+      });
+    });
+    const desktop = {
+      sandboxId: "screen-e2b-box",
+      display: ":0",
+      commands: { run },
+    } as unknown as Sandbox;
+    const sdk: E2BSandboxSdk = {
+      create: vi.fn(async () => desktop),
+      connect: vi.fn(async () => desktop),
+      pause: vi.fn(async () => undefined),
+    };
+    const provider = new E2BSandboxProvider("test-key", sdk);
+    const computer = {
+      id: "screen-e2b-box",
+      botId: "bot-1",
+      kind: "e2b" as const,
+      providerRef: "screen-e2b-box",
+      fresh: false,
+    };
+
+    await expect(provider.connectScreen(computer, { view: "stream" }, context)).rejects.toThrow(
+      ComputerScreenUnavailableError,
+    );
+    expect(run.mock.calls[0]?.[1]?.timeoutMs).toBeGreaterThan(60_000);
+  });
+
+  it("surfaces a setup TimeoutError as ComputerScreenUnavailableError", async () => {
+    const run = vi.fn(async () => {
+      throw new TimeoutError("the operation timed out");
+    });
+    const desktop = {
+      sandboxId: "timeout-e2b-box",
+      display: ":0",
+      commands: { run },
+    } as unknown as Sandbox;
+    const sdk: E2BSandboxSdk = {
+      create: vi.fn(async () => desktop),
+      connect: vi.fn(async () => desktop),
+      pause: vi.fn(async () => undefined),
+    };
+    const provider = new E2BSandboxProvider("test-key", sdk);
+    const computer = {
+      id: "timeout-e2b-box",
+      botId: "bot-1",
+      kind: "e2b" as const,
+      providerRef: "timeout-e2b-box",
+      fresh: false,
+    };
+
+    await expect(provider.connectScreen(computer, { view: "stream" }, context)).rejects.toThrow(
+      ComputerScreenUnavailableError,
+    );
   });
 
   it("prepares a reused computer idempotently", async () => {
