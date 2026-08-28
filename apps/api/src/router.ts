@@ -36,6 +36,7 @@ import {
   isScratchpadStatus,
   listPiCatalog,
   listScratchpadItems,
+  GoogleAuthBroker,
   McpOAuthBroker,
   type MemoryProviderResolver,
   mapScratchpadItem,
@@ -305,6 +306,7 @@ export interface RouterDeps {
   mcpOAuth?: McpOAuthBroker;
   connectors: ConnectorRegistry;
   remoteConnectors?: RemoteConnectorDependencies;
+  googleAuth?: GoogleAuthBroker;
   artifacts: ArtifactStore;
   dataDir: string;
   env: {
@@ -2605,6 +2607,29 @@ export function createRouter(deps: RouterDeps) {
           input.botId,
           input.provider,
         );
+        return { ok: true as const };
+      }),
+    },
+    google: {
+      status: authed.google.status.handler(async ({ context }) => {
+        const state = deps.googleAuth ? await deps.googleAuth.status(context.actor) : "none";
+        return {
+          configured: Boolean(deps.googleAuth?.configured),
+          connected: state === "connected",
+          state,
+        };
+      }),
+      begin: authed.google.begin.handler(async ({ context, input }) => {
+        if (!deps.googleAuth) throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
+        return deps.googleAuth.begin(context.actor, input.redirectUri);
+      }),
+      complete: authed.google.complete.handler(async ({ context, input }) => {
+        if (!deps.googleAuth) throw new ORPCError("BAD_REQUEST", { message: "Google OAuth is not configured" });
+        await deps.googleAuth.complete(context.actor, input.state, input.code);
+        return { ok: true as const };
+      }),
+      disconnect: authed.google.disconnect.handler(async ({ context }) => {
+        await deps.googleAuth?.disconnect(context.actor);
         return { ok: true as const };
       }),
     },

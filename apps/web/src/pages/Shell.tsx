@@ -350,6 +350,23 @@ export function ShellPage() {
   const [dictationError, setDictationError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("rk-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((current) => {
+      try {
+        localStorage.setItem("rk-sidebar-collapsed", current ? "0" : "1");
+      } catch {
+        // Preference persistence is best-effort.
+      }
+      return !current;
+    });
+  }, []);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [activityMode, setActivityMode] = useState(readActivityMode);
   const toggleActivityMode = useCallback(() => {
@@ -1873,9 +1890,22 @@ export function ShellPage() {
           className="absolute inset-y-0 end-0 start-[min(calc(100%-48px),316px)] z-30 bg-black/60 md:hidden"
         />
       ) : null}
+      {sidebarCollapsed ? (
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={t`Expand sidebar`}
+          title={t`Expand sidebar`}
+          className="absolute start-2 top-12 z-20 hidden h-[30px] w-[30px] place-items-center rounded-[9px] border border-[#232326] bg-[#141416] text-[#9A9AA0] hover:bg-[#1B1B1E] hover:text-[#C9C9CE] md:grid"
+        >
+          »
+        </button>
+      ) : null}
       <aside
-        className={`absolute inset-y-0 start-0 z-40 flex w-[calc(100%-48px)] max-w-[316px] shrink-0 flex-col border-e border-[#171719] bg-[#0B0B0C] transition-transform md:static md:z-auto md:w-[316px] md:translate-x-0 ${
+        className={`absolute inset-y-0 start-0 z-40 flex w-[calc(100%-48px)] max-w-[316px] shrink-0 flex-col bg-[#0B0B0C] transition-transform md:static md:z-auto md:translate-x-0 md:transition-[width] md:duration-200 ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full"
+        } border-e border-[#171719] ${
+          sidebarCollapsed ? "md:w-0 md:overflow-hidden md:border-e-0" : "md:w-[316px]"
         }`}
       >
         <div className="app-drag flex items-center justify-between px-[18px] pb-3 pt-4">
@@ -1931,6 +1961,15 @@ export function ShellPage() {
                 </button>
               </div>
             ) : null}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={t`Collapse sidebar`}
+              title={t`Collapse sidebar`}
+              className="app-no-drag hidden h-[26px] w-[26px] place-items-center rounded-[8px] text-[16px] text-[#7A7A80] hover:bg-[#1B1B1E] hover:text-[#C9C9CE] md:grid"
+            >
+              «
+            </button>
           </div>
         </div>
         <div className="mx-3.5 mb-3 flex items-center gap-2.5 rounded-xl border border-[#202023] bg-[#141416] px-3 py-2 text-[14px] text-[#6C6C70]">

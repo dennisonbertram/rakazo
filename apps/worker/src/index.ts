@@ -21,6 +21,11 @@ import {
   isPipedreamEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
+  CalendarNative,
+  DriveNative,
+  GmailNative,
+  MeetNative,
+  GoogleAuthBroker,
   McpConnector,
   McpOAuthBroker,
   PiAgentRuntime,
@@ -67,6 +72,18 @@ async function main() {
     prisma,
   });
   const mcpOAuth = new McpOAuthBroker(prisma, secrets);
+  const googleAuth = new GoogleAuthBroker(
+    prisma,
+    secrets,
+    process.env.GOOGLE_CLIENT_ID ?? "",
+    process.env.GOOGLE_CLIENT_SECRET || undefined,
+  );
+  const gmailNative = new GmailNative(googleAuth);
+  const googleWorkspace = {
+    drive: new DriveNative(googleAuth),
+    calendar: new CalendarNative(googleAuth),
+    meet: new MeetNative(googleAuth),
+  };
   const mcp = new McpConnector(
     prisma,
     secrets,
@@ -112,6 +129,8 @@ async function main() {
     artifacts,
     connector: stack.connector,
     connectors: stack.connector,
+    gmailNative,
+    googleWorkspace,
     listConnectedPluginSlugs: stack.composio?.listConnectedSlugs.bind(stack.composio),
     secrets: [deploymentModelKey ?? "", process.env.COMPOSIO_API_KEY ?? ""].filter(Boolean),
     secretStore: secrets,

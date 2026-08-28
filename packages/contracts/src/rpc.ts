@@ -497,6 +497,24 @@ export const appContract = {
       disconnect: oc.input(z.object({ serverId: Id })).output(z.object({ ok: z.literal(true) })),
     },
   },
+  google: {
+    /** Built-in Google/Gmail OAuth (native, not Composio). */
+    status: oc.output(
+      z.object({
+        configured: z.boolean(),
+        connected: z.boolean(),
+        /** "reconnect" means scopes were added since the user authorized. */
+        state: z.enum(["none", "connected", "reconnect"]),
+      }),
+    ),
+    begin: oc
+      .input(z.object({ redirectUri: z.string() }))
+      .output(z.object({ authorizationUrl: z.string(), state: z.string() })),
+    complete: oc
+      .input(z.object({ state: z.string(), code: z.string() }))
+      .output(z.object({ ok: z.literal(true) })),
+    disconnect: oc.output(z.object({ ok: z.literal(true) })),
+  },
   onboarding: {
     /** Seed the first-run conversational onboarding into the bot's thread. */
     start: oc.input(z.object({ botId: Id })).output(z.object({ ok: z.literal(true) })),

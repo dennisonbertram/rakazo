@@ -124,11 +124,18 @@ export function secureFetch(
         if (localCredentialHeaders.has(name.toLowerCase())) headers.delete(name);
       }
     }
-    if (!localHttp && url.origin === resourceUrl.origin) {
+    const sameOrigin = url.origin === resourceUrl.origin;
+    if (!localHttp && sameOrigin) {
       for (const [name, value] of configured) headers.set(name, value);
+    } else if (!sameOrigin) {
+      // Operator-configured credentials belong to the MCP endpoint only; never
+      // forward them to third-party OAuth/discovery origins, whichever path
+      // they arrived through (requestInit merges included).
+      for (const [name] of configured) headers.delete(name);
     }
     for (const [name, value] of new Headers(init?.headers)) {
       if (localHttp && localCredentialHeaders.has(name.toLowerCase())) continue;
+      if (!sameOrigin && configuredNames.has(name.toLowerCase())) continue;
       if (allowed.has(name.toLowerCase())) headers.set(name, value);
     }
     // Buffer the body: a re-wrapped Request body is a stream without a replayable
@@ -253,17 +260,17 @@ export class McpSession {
     const signal = combineSignals(options.signal, AbortSignal.timeout(options.timeoutMs ?? 15_000));
     let usedFallback = false;
     const connect = async (kind: McpRemoteTransport): Promise<void> => {
-      const requestInit: RequestInit = { headers: options.headerPolicy?.headers };
+      // Credential headers are injected per-origin inside secureFetch; putting them in
+      // requestInit would merge them into every SDK request, including OAuth discovery
+      // and token calls to other origins.
       const transport =
         kind === "streamable-http"
           ? new StreamableHTTPClientTransport(url, {
               fetch,
-              requestInit,
               authProvider: options.authProvider,
             })
           : new SSEClientTransport(url, {
               fetch,
-              requestInit,
               authProvider: options.authProvider,
               eventSourceInit: { fetch: fetch as never },
             });

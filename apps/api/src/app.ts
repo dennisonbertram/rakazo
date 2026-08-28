@@ -29,6 +29,11 @@ import {
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
+  CalendarNative,
+  DriveNative,
+  GmailNative,
+  GoogleAuthBroker,
+  MeetNative,
   McpOAuthBroker,
   PiAgentRuntime,
   PiOAuthLogins,
@@ -140,6 +145,18 @@ export async function createApp(
   });
   const mcpOAuth = new McpOAuthBroker(prisma, secrets, remoteConnectors);
   const memoryProviders = new WorkspaceMemoryProviderResolver(prisma, secrets);
+  const googleAuth = new GoogleAuthBroker(
+    prisma,
+    secrets,
+    process.env.GOOGLE_CLIENT_ID ?? "",
+    process.env.GOOGLE_CLIENT_SECRET || undefined,
+  );
+  const gmailNative = new GmailNative(googleAuth);
+  const googleWorkspace = {
+    drive: new DriveNative(googleAuth),
+    calendar: new CalendarNative(googleAuth),
+    meet: new MeetNative(googleAuth),
+  };
   const oauthLogins = new PiOAuthLogins();
   const home = new LocalAgentHomeStore(env.dataDir);
   const artifacts = new LocalArtifactStore(env.dataDir);
@@ -221,6 +238,8 @@ export async function createApp(
     artifacts,
     connector: stack.connector,
     connectors: stack.connector,
+    gmailNative,
+    googleWorkspace,
     listConnectedPluginSlugs: stack.composio?.listConnectedSlugs.bind(stack.composio),
     secrets: [env.deploymentModelKey ?? "", env.composioApiKey ?? ""].filter(Boolean),
     secretStore: secrets,
@@ -262,6 +281,7 @@ export async function createApp(
     secrets,
     oauthLogins,
     mcpOAuth,
+    googleAuth,
     composio: stack.composio,
     connectors: stack.connector,
     remoteConnectors,
