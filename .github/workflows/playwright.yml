@@ -75,6 +75,10 @@ jobs:
         # Skip --with-deps: GitHub ubuntu-latest already has Chromium's OS libraries,
         # and apt-get against azure.archive.ubuntu.com can stall until the job timeout.
         run: pnpm --filter @rakazo/web exec playwright install chromium
+      - name: Build desktop app
+        # desktop-product.spec.ts launches Electron from apps/desktop, whose
+        # entry point is the built dist/main.js.
+        run: pnpm --filter @rakazo/desktop build
       - name: Validate E2B credentials
         if: inputs.sandbox_provider == 'e2b'
         env:
