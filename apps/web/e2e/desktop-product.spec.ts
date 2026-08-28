@@ -1,6 +1,28 @@
 import path from "node:path";
-import { _electron as electron, expect, test } from "@playwright/test";
+import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 import { completeOnboarding } from "./helpers";
+
+/**
+ * The desktop main process may open a hidden 1×1 probe window on the origin
+ * root (legacy-storage detection) before the real shell window, so
+ * `firstWindow()` can resolve to the probe. Wait for the window that carries
+ * the requested route instead.
+ */
+async function windowWithRoute(app: ElectronApplication, route: string, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const hit = app.windows().find((candidate) => {
+      try {
+        return !candidate.isClosed() && candidate.url().includes(route);
+      } catch {
+        return false;
+      }
+    });
+    if (hit) return hit;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`No Electron window reached ${route}`);
+}
 
 test("Electron loads the real app and opens the new-bot flow", async ({ baseURL }, testInfo) => {
   const app = await electron.launch({
@@ -16,7 +38,7 @@ test("Electron loads the real app and opens the new-bot flow", async ({ baseURL 
   });
 
   try {
-    const page = await app.firstWindow();
+    const page = await windowWithRoute(app, "/sign-up");
     await expect(page).toHaveURL(/\/sign-up(?:$|[?#])/);
     const stamp = Date.now();
     await page.getByPlaceholder("Your name").fill("Desktop Proof");
