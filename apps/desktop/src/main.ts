@@ -398,7 +398,9 @@ function loadAppUrl(win: BrowserWindow, url: string): Promise<void> {
  * fixtures omit the Rakazo app-state marker.
  */
 async function waitForMountedAppDocument(contents: Electron.WebContents) {
-  const deadline = Date.now() + 8_000;
+  // Generous: a cold vite transform on a busy machine can take well over 8s,
+  // and probeDocument already rejected dead or erroring servers before this.
+  const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     if (contents.isCrashed()) throw new Error("Renderer stopped after load.");
     const ready = (await contents.executeJavaScript(`(() => {

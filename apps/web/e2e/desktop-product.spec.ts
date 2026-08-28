@@ -21,7 +21,20 @@ async function windowWithRoute(app: ElectronApplication, route: string, timeoutM
     if (hit) return hit;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`No Electron window reached ${route}`);
+  const windows = await Promise.all(
+    app.windows().map(async (candidate) => {
+      try {
+        if (candidate.isClosed()) return { url: "<closed>" };
+        return {
+          url: candidate.url(),
+          text: (await candidate.evaluate(() => document.body?.innerText ?? "")).slice(0, 300),
+        };
+      } catch (error) {
+        return { url: `<unreadable: ${String(error)}>` };
+      }
+    }),
+  );
+  throw new Error(`No Electron window reached ${route}. Windows: ${JSON.stringify(windows)}`);
 }
 
 test("Electron loads the real app and opens the new-bot flow", async ({ baseURL }, testInfo) => {
