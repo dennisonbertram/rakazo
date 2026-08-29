@@ -33,6 +33,7 @@ import type {
   MessagingGroup,
   MessagingGroupRequest,
   MessagingSendResult,
+  MessagingTypingRequest,
   NotificationMessage,
   PortableFile,
   ProcessEvent,
@@ -282,4 +283,10 @@ export interface MessagingProvider {
   ): Promise<MessagingSendResult>;
   sendGroup(request: MessagingGroupRequest, context: AdapterContext): Promise<MessagingSendResult>;
   getGroup(groupId: string, context: AdapterContext): Promise<MessagingGroup>;
+  /**
+   * Best-effort "…" typing bubbles for 1:1 chats. Optional because vendors
+   * may not support it (SendBlue itself cannot deliver it in groups); it is
+   * cosmetic and must never gate message delivery.
+   */
+  sendTypingIndicator?(request: MessagingTypingRequest, context: AdapterContext): Promise<void>;
 }

@@ -7,6 +7,7 @@ import type {
   MessagingGroupRequest,
   MessagingProvider,
   MessagingSendResult,
+  MessagingTypingRequest,
 } from "@rakazo/adapter-kit";
 
 const DEFAULT_BASE_URL = "https://api.sendblue.com";
@@ -134,6 +135,20 @@ export class SendBlueMessagingProvider implements MessagingProvider {
       context,
     );
     return { handle: messageHandle(data) };
+  }
+
+  async sendTypingIndicator(
+    request: MessagingTypingRequest,
+    context: AdapterContext,
+  ): Promise<void> {
+    // Best effort: SendBlue answers SENT even when the bubbles cannot be
+    // delivered (stale chat, non-iMessage recipient), so there is nothing
+    // useful to return.
+    await this.call(
+      "/api/send-typing-indicator",
+      { number: request.to, from_number: this.config.phoneNumber },
+      context,
+    );
   }
 
   async sendGroup(

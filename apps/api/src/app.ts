@@ -380,6 +380,17 @@ export async function createApp(
           signupAllowlist: env.signupAllowlist,
         },
         lineNumber: env.sendbluePhoneNumber ?? "",
+        typing: (toNumber) =>
+          messaging.sendTypingIndicator?.(
+            { to: toNumber },
+            {
+              operationId: `phone.typing:${toNumber}`,
+              traceId: `phone.typing:${toNumber}`,
+              workspaceId: "",
+              userId: "",
+              signal: new AbortController().signal,
+            },
+          ) ?? Promise.resolve(),
       }),
     });
   }

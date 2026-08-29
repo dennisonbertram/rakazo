@@ -19,6 +19,11 @@ export interface PhoneInboundDeps {
   signupPolicy: SignupPolicyEnv;
   /** The deployment's own line, so it is never treated as a participant. */
   lineNumber: string;
+  /**
+   * Best-effort "…" bubbles shown to a 1:1 texter while their run executes.
+   * Cosmetic only — callers must catch failures; groups never get it.
+   */
+  typing?: (toNumber: string) => Promise<void>;
 }
 
 type PhoneIdentityRow = {
@@ -102,6 +107,10 @@ async function handleDirectEvent(
   if (sent.runId) {
     await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
       console.error("phone inbound run enqueue error", error);
+    });
+    // Typing bubbles only make sense once a reply is actually coming.
+    await deps.typing?.(event.fromNumber).catch((error) => {
+      console.error("phone typing indicator error", error);
     });
   }
 }
