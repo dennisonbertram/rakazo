@@ -215,6 +215,15 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** `connect:{requesterBotId}:{targetBotId}` — agent-connection approval DMs. */
+function connectInvitePair(
+  idempotencyKey: string,
+): { requesterBotId: string; targetBotId: string } | null {
+  const match = /^connect:([^:]+):([^:]+)$/.exec(idempotencyKey);
+  if (!match) return null;
+  return { requesterBotId: match[1]!, targetBotId: match[2]! };
+}
+
 async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<void> {
   const now = new Date();
   const pending = await deps.prisma.phoneOutbound.findMany({
@@ -232,6 +241,28 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
       data: { status: "sent", nextAttemptAt: null },
     });
     if (claim.count === 0) continue;
+    // Connect invites are claimed before send (status flips to sent), so a
+    // concurrent revoke's pending-only delete can miss this row. Re-check the
+    // connection before texting YES/NO for a request that is already gone.
+    const invitePair = connectInvitePair(row.idempotencyKey);
+    if (invitePair) {
+      const connection = await deps.prisma.agentConnection.findUnique({
+        where: {
+          requesterBotId_targetBotId: {
+            requesterBotId: invitePair.requesterBotId,
+            targetBotId: invitePair.targetBotId,
+          },
+        },
+        select: { status: true },
+      });
+      if (connection?.status !== "pending") {
+        await deps.prisma.phoneOutbound.update({
+          where: { id: row.id },
+          data: { status: "failed" },
+        });
+        continue;
+      }
+    }
     try {
       if (row.kind === "group" || row.kind === "intro") {
         if (!row.providerGroupId) {

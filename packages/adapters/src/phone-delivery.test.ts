@@ -40,6 +40,7 @@ function createDeps(overrides: {
   outboundRows?: unknown[];
   existingOutbox?: unknown;
   sendError?: Error;
+  connectionStatus?: string | null;
 }) {
   const rows = [...(overrides.outboundRows ?? [])] as Array<Record<string, unknown>>;
   const sendDirect = vi.fn(async () => ({ handle: "handle-out-1" }));
@@ -74,6 +75,15 @@ function createDeps(overrides: {
         overrides.identity === null ? null : (overrides.identity ?? identity),
       ),
       update: vi.fn(async () => identity),
+    },
+    agentConnection: {
+      findUnique: vi.fn(async () =>
+        overrides.connectionStatus === null
+          ? null
+          : overrides.connectionStatus
+            ? { status: overrides.connectionStatus }
+            : { status: "pending" },
+      ),
     },
     phoneOutbound: {
       findUnique: vi.fn(async () => overrides.existingOutbox ?? null),
@@ -304,6 +314,62 @@ describe("deliverPhoneOutbound", () => {
 
     expect(deps.sendDirect).not.toHaveBeenCalled();
     expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "failed" }));
+  });
+
+  it("does not send a connect invite after the connection was revoked", async () => {
+    const deps = createDeps({
+      run: null,
+      connectionStatus: "revoked",
+      outboundRows: [
+        {
+          id: "out-connect",
+          idempotencyKey: "connect:bot-1:bot-9",
+          kind: "dm",
+          toNumber: "+15559999999",
+          body: "wants to connect. Reply YES to allow, NO to decline.",
+          status: "pending",
+          providerHandle: null,
+        },
+      ],
+    });
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.sendDirect).not.toHaveBeenCalled();
+    expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "failed" }));
+    expect(deps.prisma.agentConnection.findUnique).toHaveBeenCalledWith({
+      where: {
+        requesterBotId_targetBotId: { requesterBotId: "bot-1", targetBotId: "bot-9" },
+      },
+      select: { status: true },
+    });
+  });
+
+  it("still sends a connect invite while the connection is pending", async () => {
+    const deps = createDeps({
+      run: null,
+      connectionStatus: "pending",
+      outboundRows: [
+        {
+          id: "out-connect",
+          idempotencyKey: "connect:bot-1:bot-9",
+          kind: "dm",
+          toNumber: "+15559999999",
+          body: "wants to connect. Reply YES to allow, NO to decline.",
+          status: "pending",
+          providerHandle: null,
+        },
+      ],
+    });
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.sendDirect).toHaveBeenCalledWith(
+      {
+        to: "+15559999999",
+        body: "wants to connect. Reply YES to allow, NO to decline.",
+      },
+      context,
+    );
+    expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
   });
 });
 
