@@ -98,60 +98,70 @@ export async function connectAgent(
 
   // Claim + invite in one locked transaction so a concurrent revoke cannot
   // leave a pending invite after the connection is already revoked.
-  const claimed = await deps.prisma.$transaction(async (tx) => {
-    if (existing) {
-      const locked = await tx.$queryRaw<Array<{ status: string }>>`
-        SELECT status FROM agent_connections WHERE id = ${existing.id} FOR UPDATE
-      `;
-      const status = locked[0]?.status;
-      if (status === "approved" || status === "pending") {
-        return { ok: true as const, status };
-      }
-      // Only reopen the status we observed. A concurrent revoke of a declined
-      // row would show up here as revoked and must win.
-      if (status !== existing.status) {
-        return { ok: false as const, error: "connection changed; try again" };
-      }
-      await tx.agentConnection.update({
-        where: { id: existing.id },
-        data: { status: "pending" },
-      });
-    } else {
-      try {
-        await tx.agentConnection.create({
-          data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
-        });
-      } catch (error) {
-        // Two first-time connects can both miss the pre-read; the unique key
-        // serializes them. The loser adopts the winner's status.
-        if (!isUniqueConstraintError(error)) throw error;
-        const current = await tx.agentConnection.findUnique({
-          where: {
-            requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
-          },
-        });
-        if (current?.status === "approved" || current?.status === "pending") {
-          return { ok: true as const, status: current.status };
+  let claimed: Awaited<ReturnType<typeof claimConnection>>;
+  const claimConnection = () =>
+    deps.prisma.$transaction(async (tx) => {
+      if (existing) {
+        const locked = await tx.$queryRaw<Array<{ status: string }>>`
+          SELECT status FROM agent_connections WHERE id = ${existing.id} FOR UPDATE
+        `;
+        const status = locked[0]?.status;
+        if (status === "approved" || status === "pending") {
+          return { ok: true as const, status };
         }
-        return { ok: false as const, error: "connection changed; try again" };
+        // Only reopen the status we observed. A concurrent revoke of a declined
+        // row would show up here as revoked and must win.
+        if (status !== existing.status) {
+          return { ok: false as const, error: "connection changed; try again" };
+        }
+        await tx.agentConnection.update({
+          where: { id: existing.id },
+          data: { status: "pending" },
+        });
+      } else {
+        try {
+          await tx.agentConnection.create({
+            data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
+          });
+        } catch (error) {
+          // Two first-time connects can both miss the pre-read; the unique key
+          // serializes them. PostgreSQL aborts the interactive transaction on
+          // P2002, so recovery must happen outside — rethrow a marker.
+          if (!isUniqueConstraintError(error)) throw error;
+          throw new ConnectCreateRaceError();
+        }
       }
-    }
-    // Fresh approval cycle: clear the old invite row or skipDuplicates would
-    // silently swallow the new request.
-    await tx.phoneOutbound.deleteMany({ where: { idempotencyKey: inviteKey } });
-    await tx.phoneOutbound.createMany({
-      data: [
-        {
-          idempotencyKey: inviteKey,
-          kind: "dm",
-          toNumber: targetIdentity.phoneE164,
-          body: inviteBody,
-        },
-      ],
-      skipDuplicates: true,
+      // Fresh approval cycle: clear the old invite row or skipDuplicates would
+      // silently swallow the new request.
+      await tx.phoneOutbound.deleteMany({ where: { idempotencyKey: inviteKey } });
+      await tx.phoneOutbound.createMany({
+        data: [
+          {
+            idempotencyKey: inviteKey,
+            kind: "dm",
+            toNumber: targetIdentity.phoneE164,
+            body: inviteBody,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      return { ok: true as const, status: "pending" as const };
     });
-    return { ok: true as const, status: "pending" as const };
-  });
+
+  try {
+    claimed = await claimConnection();
+  } catch (error) {
+    if (!(error instanceof ConnectCreateRaceError)) throw error;
+    const current = await deps.prisma.agentConnection.findUnique({
+      where: {
+        requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
+      },
+    });
+    if (current?.status === "approved" || current?.status === "pending") {
+      return { ok: true, status: current.status };
+    }
+    return { ok: false, error: "connection changed; try again" };
+  }
 
   if (!claimed.ok) return claimed;
   if (claimed.status !== "pending") return { ok: true, status: claimed.status };
@@ -390,6 +400,14 @@ export async function messageConnectedAgent(
 
 function isUniqueConstraintError(error: unknown) {
   return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
+}
+
+/** Marker: unique create raced; recover outside the aborted PG transaction. */
+class ConnectCreateRaceError extends Error {
+  constructor() {
+    super("connect create race");
+    this.name = "ConnectCreateRaceError";
+  }
 }
 
 async function approvedConnectionBetween(
