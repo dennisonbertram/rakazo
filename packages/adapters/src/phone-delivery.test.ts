@@ -85,8 +85,17 @@ function createDeps(overrides: {
             : { status: "pending" },
       ),
     },
+    $queryRaw: vi.fn(async () =>
+      overrides.connectionStatus === null
+        ? []
+        : [{ status: overrides.connectionStatus ?? "pending" }],
+    ),
     phoneOutbound: {
-      findUnique: vi.fn(async () => overrides.existingOutbox ?? null),
+      findUnique: vi.fn(async ({ where }: { where?: { id?: string } } = {}) => {
+        if (overrides.existingOutbox) return overrides.existingOutbox;
+        if (where?.id) return rows.find((row) => row.id === where.id) ?? null;
+        return null;
+      }),
       findMany: vi.fn(async ({ where }: { where?: { status?: string; OR?: unknown[] } } = {}) => {
         const now = Date.now();
         return rows.filter((row) => {
@@ -138,6 +147,9 @@ function createDeps(overrides: {
       ),
     },
   };
+  (prisma as { $transaction?: unknown }).$transaction = vi.fn(
+    async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
+  );
   return {
     prisma: prisma as unknown as PrismaClient & typeof prisma,
     messaging,
@@ -336,12 +348,30 @@ describe("deliverPhoneOutbound", () => {
 
     expect(deps.sendDirect).not.toHaveBeenCalled();
     expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "failed" }));
-    expect(deps.prisma.agentConnection.findUnique).toHaveBeenCalledWith({
-      where: {
-        requesterBotId_targetBotId: { requesterBotId: "bot-1", targetBotId: "bot-9" },
-      },
-      select: { status: true },
+    expect(deps.prisma.$queryRaw).toHaveBeenCalled();
+  });
+
+  it("does not send a connect invite when revoke already deleted the claim", async () => {
+    const deps = createDeps({
+      run: null,
+      connectionStatus: "pending",
+      outboundRows: [
+        {
+          id: "out-connect",
+          idempotencyKey: "connect:bot-1:bot-9",
+          kind: "dm",
+          toNumber: "+15559999999",
+          body: "wants to connect. Reply YES to allow, NO to decline.",
+          status: "pending",
+          providerHandle: null,
+        },
+      ],
     });
+    // After claim, revoke deletes the row before the locked gate runs.
+    deps.prisma.phoneOutbound.findUnique = vi.fn(async () => null) as never;
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.sendDirect).not.toHaveBeenCalled();
   });
 
   it("still sends a connect invite while the connection is pending", async () => {

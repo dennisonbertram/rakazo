@@ -2950,10 +2950,15 @@ export function createRouter(deps: RouterDeps) {
               data: { status: "revoked" },
             });
             if (count === 0) throw new ORPCError("NOT_FOUND");
+            // Cancel undelivered invites, including rows the drain already
+            // claimed (status sent, no providerHandle yet). The drain holds
+            // this same connection row FOR UPDATE before sendDirect, so a
+            // revoke either deletes the claim first or the drain sees
+            // revoked and aborts.
             await tx.phoneOutbound.deleteMany({
               where: {
                 idempotencyKey: `connect:${connection.requesterBotId}:${connection.targetBotId}`,
-                status: "pending",
+                OR: [{ status: "pending" }, { status: "sent", providerHandle: null }],
               },
             });
           });

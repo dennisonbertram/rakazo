@@ -152,12 +152,30 @@ function phoneDeps(
       return { count };
     }),
     deleteMany: vi.fn(
-      async ({ where }: { where: { idempotencyKey?: string; status?: string } }) => {
+      async ({
+        where,
+      }: {
+        where: {
+          idempotencyKey?: string;
+          status?: string;
+          OR?: Array<{ status?: string; providerHandle?: null }>;
+        };
+      }) => {
         let count = 0;
         for (let i = outboundRows.length - 1; i >= 0; i -= 1) {
           const row = outboundRows[i]!;
           if (where.idempotencyKey && row.idempotencyKey !== where.idempotencyKey) continue;
           if (where.status && row.status !== where.status) continue;
+          if (where.OR) {
+            const matches = where.OR.some((clause) => {
+              if (clause.status && row.status !== clause.status) return false;
+              if ("providerHandle" in clause && clause.providerHandle === null) {
+                return row.providerHandle == null;
+              }
+              return true;
+            });
+            if (!matches) continue;
+          }
           outboundRows.splice(i, 1);
           count += 1;
         }
@@ -438,12 +456,46 @@ describe("phone.connections", () => {
     });
 
     expect(prisma.phoneOutbound.deleteMany).toHaveBeenCalledWith({
-      where: { idempotencyKey: "connect:bot-1:bot-9", status: "pending" },
+      where: {
+        idempotencyKey: "connect:bot-1:bot-9",
+        OR: [{ status: "pending" }, { status: "sent", providerHandle: null }],
+      },
     });
     expect(outboundRows).toEqual([
       expect.objectContaining({
         idempotencyKey: "connect:bot-1:bot-9-already-sent",
         status: "sent",
+      }),
+    ]);
+    await expect(response.json()).resolves.toEqual({ json: { ok: true } });
+  });
+
+  it("cancels a claimed-but-undelivered connect invite on revoke", async () => {
+    const { handler, actor, outboundRows } = phoneDeps({
+      connection: { id: "ac-claimed", requesterBotId: "bot-1", targetBotId: "bot-9", status: "pending" },
+    });
+    outboundRows.push({
+      idempotencyKey: "connect:bot-1:bot-9",
+      kind: "dm",
+      status: "sent",
+      providerHandle: null,
+      body: "claimed by drain",
+    });
+    outboundRows.push({
+      idempotencyKey: "connect:bot-1:bot-9-delivered",
+      kind: "dm",
+      status: "sent",
+      providerHandle: "h-delivered",
+    });
+
+    const response = await call(handler, actor, "phone/connections/revoke", {
+      connectionId: "ac-claimed",
+    });
+
+    expect(outboundRows).toEqual([
+      expect.objectContaining({
+        idempotencyKey: "connect:bot-1:bot-9-delivered",
+        providerHandle: "h-delivered",
       }),
     ]);
     await expect(response.json()).resolves.toEqual({ json: { ok: true } });
