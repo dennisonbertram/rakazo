@@ -209,6 +209,21 @@ describe("connectAgent", () => {
     const declined = createDeps({
       connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" },
     });
+    const declinedModel = declined.prisma.agentConnection as unknown as Record<string, unknown>;
+    declinedModel.findUnique = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: "ac-1",
+        requesterBotId: "bot-1",
+        targetBotId: "bot-2",
+        status: "declined",
+      })
+      .mockResolvedValue({
+        id: "ac-1",
+        requesterBotId: "bot-1",
+        targetBotId: "bot-2",
+        status: "pending",
+      });
     const reinvite = await connectAgent(declined, run, sender, { phone: "+15552222222" });
     expect(reinvite).toEqual(expect.objectContaining({ ok: true, status: "pending" }));
     expect(declined.prisma.agentConnection.updateMany).toHaveBeenCalledWith({
@@ -248,6 +263,35 @@ describe("connectAgent", () => {
         return { count: 1 };
       },
     );
+
+    const result = await connectAgent(deps, run, sender, { phone: "+15552222222" });
+
+    expect(result).toEqual({ ok: false, error: "connection changed; try again" });
+    expect(state.status).toBe("revoked");
+    expect(deps.outboundRows).toHaveLength(0);
+  });
+
+  it("does not queue an invite when revoke lands after the reconnect claim", async () => {
+    const state = { status: "declined" };
+    const deps = createDeps({
+      connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" },
+    });
+    const model = deps.prisma.agentConnection as unknown as Record<string, unknown>;
+    let reads = 0;
+    model.findUnique = vi.fn(async () => {
+      reads += 1;
+      // First read: declined (pre-claim). After a successful claim, a revoke
+      // flips the row before the post-claim live check.
+      if (reads === 1)
+        return { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" };
+      return { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: state.status };
+    });
+    model.updateMany = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      Object.assign(state, data);
+      // Revoke wins after the claim, before the invite is written.
+      state.status = "revoked";
+      return { count: 1 };
+    });
 
     const result = await connectAgent(deps, run, sender, { phone: "+15552222222" });
 

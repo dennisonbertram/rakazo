@@ -111,6 +111,16 @@ export async function connectAgent(
       }
       return { ok: false, error: "connection changed; try again" };
     }
+    // A concurrent revoke after the claim must not leave a stale invite DM.
+    const live = await deps.prisma.agentConnection.findUnique({
+      where: {
+        requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
+      },
+    });
+    if (live?.status !== "pending") {
+      if (live?.status === "approved") return { ok: true, status: "approved" };
+      return { ok: false, error: "connection changed; try again" };
+    }
   } else {
     await deps.prisma.agentConnection.create({
       data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
