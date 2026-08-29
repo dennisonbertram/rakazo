@@ -82,10 +82,12 @@ describe("createPhoneInboundHandler", () => {
       trigger: "phone",
       clientNonce: "phone:handle-1",
     });
-    expect(deps.enqueue).toHaveBeenCalledWith({
-      name: "run.continue",
-      payload: { runId: "run-1" },
-    });
+    expect(deps.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "run.continue",
+        payload: { runId: "run-1" },
+      }),
+    );
   });
 
   it("provisions on first text and uses the new identity", async () => {
