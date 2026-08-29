@@ -105,12 +105,16 @@ async function handleDirectEvent(
     clientNonce: `phone:${event.handle}`,
   });
   if (sent.runId) {
+    // Typing bubbles only make sense once a reply is actually coming. Fire
+    // before the enqueue so they land ahead of a fast reply, and never await:
+    // a stalled SendBlue call must not hold the webhook open. The bubbles
+    // clear on their own after a short display window or when the reply
+    // arrives, so long runs simply outlive them.
+    void deps.typing?.(event.fromNumber).catch((error) => {
+      console.error("phone typing indicator error", error);
+    });
     await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
       console.error("phone inbound run enqueue error", error);
-    });
-    // Typing bubbles only make sense once a reply is actually coming.
-    await deps.typing?.(event.fromNumber).catch((error) => {
-      console.error("phone typing indicator error", error);
     });
   }
 }
