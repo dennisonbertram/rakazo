@@ -105,8 +105,18 @@ function phoneDeps(
       findUnique: vi.fn(async () => ({ id: "user-9", name: "Bob Owner" })),
     },
   } as unknown as PrismaClient;
+  const outboundRows: Array<Record<string, unknown>> = [];
+  const phoneOutbound = {
+    createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+      outboundRows.push(...data);
+      return { count: data.length };
+    }),
+  };
+  (prisma as { phoneOutbound?: unknown }).phoneOutbound = phoneOutbound;
+  const enqueue = vi.fn(async () => undefined);
   const deps = {
     prisma,
+    jobs: { enqueue },
     env: {
       defaultProvider: "fake",
       defaultModel: "fake-model",
@@ -123,7 +133,7 @@ function phoneDeps(
     email: "user@rakazo.test",
     isDeploymentOwner: false,
   } satisfies Actor;
-  return { prisma, deps, actor, handler: new RPCHandler(createRouter(deps)) };
+  return { prisma, deps, actor, outboundRows, enqueue, handler: new RPCHandler(createRouter(deps)) };
 }
 
 async function call(handler: RPCHandler<never>, actor: Actor, path: string, body: unknown = {}) {
@@ -163,9 +173,22 @@ describe("phone.status", () => {
 });
 
 describe("phone.channels", () => {
-  it("lists the caller's memberships with channel names", async () => {
-    const { handler, actor } = phoneDeps();
+  it("lists the caller's memberships with channel names, counting only active members", async () => {
+    const { handler, actor, prisma } = phoneDeps();
     const response = await call(handler, actor, "phone/channels/list");
+    expect(prisma.phoneChannelMember.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          channel: expect.objectContaining({
+            include: expect.objectContaining({
+              members: expect.objectContaining({
+                where: { status: { in: ["invited", "approved"] } },
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
     await expect(response.json()).resolves.toEqual({
       json: [{ channelId: "ch-1", name: "Family", status: "invited", memberCount: 2 }],
     });
@@ -252,8 +275,20 @@ describe("phone.connections", () => {
     });
   });
 
-  it("approves a pending incoming connection", async () => {
-    const { handler, actor, prisma } = phoneDeps();
+  it("hides peer identity for outgoing connections that are not approved", async () => {
+    const { handler, actor } = phoneDeps({
+      connection: { id: "ac-4", requesterBotId: "bot-1", targetBotId: "bot-9", status: "pending" },
+    });
+    const response = await call(handler, actor, "phone/connections/list");
+    await expect(response.json()).resolves.toEqual({
+      json: [
+        expect.objectContaining({ peerBotName: "agent", peerOwnerLabel: "owner", incoming: false }),
+      ],
+    });
+  });
+
+  it("approves a pending incoming connection and texts the requester", async () => {
+    const { handler, actor, prisma, outboundRows, enqueue } = phoneDeps();
     const response = await call(handler, actor, "phone/connections/respond", {
       connectionId: "ac-1",
       accept: true,
@@ -264,6 +299,14 @@ describe("phone.connections", () => {
     await expect(response.json()).resolves.toEqual({
       json: expect.objectContaining({ status: "approved" }),
     });
+    expect(outboundRows).toEqual([
+      expect.objectContaining({
+        idempotencyKey: "command:connected:ac-1",
+        kind: "dm",
+        toNumber: "+15559999999",
+      }),
+    ]);
+    expect(enqueue).toHaveBeenCalled();
   });
 
   it("rejects respond from the requester side", async () => {
