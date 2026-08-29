@@ -117,9 +117,24 @@ export async function connectAgent(
         data: { status: "pending" },
       });
     } else {
-      await tx.agentConnection.create({
-        data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
-      });
+      try {
+        await tx.agentConnection.create({
+          data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
+        });
+      } catch (error) {
+        // Two first-time connects can both miss the pre-read; the unique key
+        // serializes them. The loser adopts the winner's status.
+        if (!isUniqueConstraintError(error)) throw error;
+        const current = await tx.agentConnection.findUnique({
+          where: {
+            requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
+          },
+        });
+        if (current?.status === "approved" || current?.status === "pending") {
+          return { ok: true as const, status: current.status };
+        }
+        return { ok: false as const, error: "connection changed; try again" };
+      }
     }
     // Fresh approval cycle: clear the old invite row or skipDuplicates would
     // silently swallow the new request.

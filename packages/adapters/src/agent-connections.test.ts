@@ -203,6 +203,25 @@ describe("connectAgent", () => {
     expect(deps.enqueue).toHaveBeenCalled();
   });
 
+  it("treats a concurrent first-time create as pending when the unique key loses", async () => {
+    const deps = createDeps();
+    deps.prisma.agentConnection.create = vi.fn(async () => {
+      throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+    }) as unknown as typeof deps.prisma.agentConnection.create;
+    deps.prisma.agentConnection.findUnique = vi.fn().mockResolvedValueOnce(null).mockResolvedValue({
+      id: "ac-1",
+      requesterBotId: "bot-1",
+      targetBotId: "bot-2",
+      status: "pending",
+    }) as unknown as typeof deps.prisma.agentConnection.findUnique;
+
+    const result = await connectAgent(deps, run, sender, { phone: "+15552222222" });
+
+    expect(result).toEqual({ ok: true, status: "pending" });
+    // Winner owns the invite write; the loser must not double-queue.
+    expect(deps.outboundRows).toHaveLength(0);
+  });
+
   it("rejects unknown numbers, self-connections, and repeat requests", async () => {
     const unknown = createDeps();
     expect(await connectAgent(unknown, run, sender, { phone: "+15559999999" })).toEqual(
