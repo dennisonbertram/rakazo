@@ -29,6 +29,7 @@ export class SendBlueEmulator {
   readonly signingSecret = "test-signing-secret";
   readonly phoneNumber = "+15550009999";
   readonly sent: SentMessage[] = [];
+  readonly typingIndicators: string[] = [];
   private handleCounter = 0;
   private readonly groups = new Map<string, RegisteredGroup>();
 
@@ -48,6 +49,11 @@ export class SendBlueEmulator {
         handle,
       });
       return Response.json({ message_handle: handle });
+    }
+    if (url.pathname === "/api/send-typing-indicator" && method === "POST") {
+      const body = parseBody(init?.body);
+      this.typingIndicators.push(String(body.number ?? ""));
+      return Response.json({ status: "SENT" });
     }
     if (url.pathname === "/api/send-group-message" && method === "POST") {
       const body = parseBody(init?.body);

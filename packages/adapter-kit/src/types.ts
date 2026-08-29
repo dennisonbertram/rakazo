@@ -469,6 +469,10 @@ export interface MessagingGroupRequest {
   body: string;
 }
 
+export interface MessagingTypingRequest {
+  to: string;
+}
+
 export interface MessagingSendResult {
   handle: string;
 }
