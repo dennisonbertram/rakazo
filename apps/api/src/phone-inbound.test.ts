@@ -657,3 +657,102 @@ describe("createPhoneInboundHandler channel routing", () => {
     expect(runJobs).toHaveLength(0);
   });
 });
+
+describe("createPhoneInboundHandler owner-command status races", () => {
+  it("does not let YES overwrite an invite that was concurrently swept to left", async () => {
+    const swept = {
+      id: "pm-9",
+      channelId: "ch-1",
+      phoneE164: "+15551111111",
+      identityId: "pi-1",
+      status: "invited",
+    };
+    const deps = createDeps({ invitedMember: swept, members: [swept] });
+    deps.prisma.phoneChannelMember.findFirst = vi.fn(
+      async ({ where }: { where?: { status?: string } }) => {
+        if (where?.status === "invited" && swept.status === "invited") {
+          const snapshot = { ...swept };
+          // Interleaved: a group-participant sweep marks the member left
+          // between the command's read and its write.
+          swept.status = "left";
+          return snapshot;
+        }
+        return null;
+      },
+    );
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "YES" });
+
+    expect(swept.status).toBe("left");
+    expect(deps.outboundRows).toHaveLength(0);
+    // No longer actionable: the text falls through as a normal message.
+    expect(deps.sendUserMessage).toHaveBeenCalled();
+  });
+
+  it("does not let YES overwrite a concurrently revoked agent connection", async () => {
+    const deps = createDeps();
+    const state = {
+      id: "ac-7",
+      requesterBotId: "bot-9",
+      targetBotId: "bot-1",
+      status: "pending",
+      updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+    };
+    const connectionModel = deps.prisma.agentConnection as unknown as Record<string, unknown>;
+    connectionModel.findFirst = vi.fn(async ({ where }: { where?: { status?: string } }) => {
+      if (where?.status === "pending" && state.status === "pending") {
+        const snapshot = { ...state };
+        // Interleaved: the requester revokes between the read and the write.
+        state.status = "revoked";
+        return snapshot;
+      }
+      return null;
+    });
+    connectionModel.update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      Object.assign(state, data);
+      return state;
+    });
+    connectionModel.updateMany = vi.fn(
+      async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
+        if (where.status && state.status !== where.status) return { count: 0 };
+        Object.assign(state, data);
+        return { count: 1 };
+      },
+    );
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "YES" });
+
+    expect(state.status).toBe("revoked");
+    expect(deps.outboundRows).toHaveLength(0);
+    expect(deps.sendUserMessage).toHaveBeenCalled();
+  });
+
+  it("does not let an in-flight LEAVE overwrite a membership that was re-invited", async () => {
+    const rejoined = {
+      id: "pm-8",
+      channelId: "ch-1",
+      phoneE164: "+15551111111",
+      identityId: "pi-1",
+      status: "approved",
+    };
+    const deps = createDeps({ approvedMember: rejoined, members: [rejoined] });
+    deps.prisma.phoneChannelMember.findFirst = vi.fn(
+      async ({ where }: { where?: { status?: string } }) => {
+        if (where?.status === "approved" && rejoined.status === "approved") {
+          const snapshot = { ...rejoined };
+          // Interleaved: swept out and re-added, so the member is invited
+          // again by the time the stale LEAVE writes.
+          rejoined.status = "invited";
+          return snapshot;
+        }
+        return null;
+      },
+    );
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "LEAVE" });
+
+    expect(rejoined.status).toBe("invited");
+    expect(deps.outboundRows).toHaveLength(0);
+    expect(deps.sendUserMessage).toHaveBeenCalled();
+  });
+});

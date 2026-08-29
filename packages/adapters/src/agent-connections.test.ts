@@ -28,6 +28,8 @@ function createDeps(
     connection?: Record<string, unknown> | null;
     pendingConnection?: Record<string, unknown> | null;
     sourceHop?: number;
+    /** Simulates a revoke landing between the pre-check and the transaction. */
+    connectionRevokedInsideTx?: boolean;
   } = {},
 ) {
   const outboundRows: Array<Record<string, unknown>> = [];
@@ -64,6 +66,18 @@ function createDeps(
     },
     thread: { update: vi.fn(async () => ({ nextMessageSeq: 4, nextEventSeq: 9 })) },
     bot: { findFirst: vi.fn(async () => ({ id: "bot-2" })) },
+    agentConnection: {
+      findFirst: vi.fn(async ({ where }: { where?: { status?: string } }) => {
+        if (overrides.connectionRevokedInsideTx) return null;
+        if (
+          where?.status === "approved" &&
+          (connection as { status?: string } | null)?.status === "approved"
+        ) {
+          return connection;
+        }
+        return null;
+      }),
+    },
   };
   const connection = overrides.connection === undefined ? null : overrides.connection;
   const prisma = {
@@ -299,5 +313,57 @@ describe("messageConnectedAgent", () => {
     expect(result).toEqual(
       expect.objectContaining({ ok: false, error: expect.stringMatching(/limit/i) }),
     );
+  });
+});
+
+describe("agent connection status races", () => {
+  it("does not overwrite a concurrent revoke when the target responds", async () => {
+    const deps = createDeps();
+    const state = {
+      id: "ac-1",
+      requesterBotId: "bot-2",
+      targetBotId: "bot-1",
+      status: "pending",
+    };
+    const connectionModel = deps.prisma.agentConnection as unknown as Record<string, unknown>;
+    connectionModel.findFirst = vi.fn(async ({ where }: { where?: { status?: string } }) => {
+      if (where?.status === "pending" && state.status === "pending") {
+        const snapshot = { ...state };
+        // Interleaved: the owner revokes between the read and the write.
+        state.status = "revoked";
+        return snapshot;
+      }
+      return null;
+    });
+    connectionModel.updateMany = vi.fn(
+      async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
+        if (where.status && state.status !== where.status) return { count: 0 };
+        Object.assign(state, data);
+        return { count: 1 };
+      },
+    );
+    const result = await respondAgentConnection(deps, run, sender, { accept: true });
+
+    expect(result).toEqual(expect.objectContaining({ ok: false }));
+    expect(state.status).toBe("revoked");
+  });
+
+  it("refuses delivery when the connection is revoked before the transaction commits", async () => {
+    const deps = createDeps({
+      connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "approved" },
+      connectionRevokedInsideTx: true,
+    });
+    const result = await messageConnectedAgent(deps, run, sender, {
+      phone: "+15552222222",
+      message: "still there?",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ ok: false, error: expect.stringMatching(/approved/i) }),
+    );
+    expect(deps.txCalls.messageCreate).toHaveLength(0);
+    expect(deps.txCalls.taskCreate).toHaveLength(0);
+    expect(deps.txCalls.runCreate).toHaveLength(0);
+    expect(deps.enqueue).not.toHaveBeenCalled();
   });
 });

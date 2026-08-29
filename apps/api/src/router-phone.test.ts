@@ -340,3 +340,78 @@ describe("phone.connections", () => {
     await expect(response.json()).resolves.toEqual({ json: { ok: true } });
   });
 });
+
+describe("phone status-write races", () => {
+  it("does not overwrite a concurrent revoke when responding to a connection", async () => {
+    const { handler, actor, prisma, outboundRows } = phoneDeps();
+    const state = { status: "pending" };
+    const connectionModel = prisma.agentConnection as unknown as Record<string, unknown>;
+    connectionModel.findFirst = vi.fn(async () => {
+      const snapshot = {
+        id: "ac-1",
+        requesterBotId: "bot-9",
+        targetBotId: "bot-1",
+        status: state.status,
+      };
+      // Interleaved: the requester revokes between the read and the write.
+      state.status = "revoked";
+      return snapshot;
+    });
+    connectionModel.update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      Object.assign(state, data);
+      return state;
+    });
+    connectionModel.updateMany = vi.fn(
+      async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
+        if (where.status && state.status !== where.status) return { count: 0 };
+        Object.assign(state, data);
+        return { count: 1 };
+      },
+    );
+    const response = await call(handler, actor, "phone/connections/respond", {
+      connectionId: "ac-1",
+      accept: true,
+    });
+
+    expect(state.status).toBe("revoked");
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(outboundRows).toHaveLength(0);
+  });
+
+  it("does not overwrite a concurrent leave when responding to a channel invite", async () => {
+    const { handler, actor, prisma } = phoneDeps();
+    const state = { status: "invited" };
+    const memberModel = prisma.phoneChannelMember as unknown as Record<string, unknown>;
+    memberModel.findFirst = vi.fn(async () => {
+      const snapshot = {
+        id: "pm-1",
+        channelId: "ch-1",
+        phoneE164: "+15551111111",
+        identityId: "pi-1",
+        status: state.status,
+        channel: { id: "ch-1", name: "Family", members: [{ id: "pm-1" }] },
+      };
+      // Interleaved: the owner left (or was swept out) after the read.
+      state.status = "left";
+      return snapshot;
+    });
+    memberModel.update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      Object.assign(state, data);
+      return state;
+    });
+    memberModel.updateMany = vi.fn(
+      async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
+        if (where.status && state.status !== where.status) return { count: 0 };
+        Object.assign(state, data);
+        return { count: 1 };
+      },
+    );
+    const response = await call(handler, actor, "phone/channels/respond", {
+      channelId: "ch-1",
+      accept: true,
+    });
+
+    expect(state.status).toBe("left");
+    expect(response.status).toBeGreaterThanOrEqual(400);
+  });
+});
