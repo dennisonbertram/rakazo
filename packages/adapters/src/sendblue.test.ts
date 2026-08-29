@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { isSendBlueEnabled, parseSendBlueInbound, SendBlueMessagingProvider } from "./sendblue.js";
+import {
+  isPhoneSurfaceEnabled,
+  isSendBlueEnabled,
+  parseSendBlueInbound,
+  SendBlueMessagingProvider,
+} from "./sendblue.js";
 
 const config = {
   apiKeyId: "key-id",
@@ -100,6 +105,17 @@ describe("SendBlueMessagingProvider", () => {
       /401/,
     );
   });
+
+  it("URL-encodes group ids and threads the abort signal", async () => {
+    const { provider, fetchMock } = providerReturning(
+      Response.json({ group_id: "g/1", participants: [] }),
+    );
+    await provider.getGroup("g/1", context);
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("https://api.sendblue.com/api/v2/groups/g%2F1");
+    expect(init?.signal).toBe(context.signal);
+  });
 });
 
 describe("isSendBlueEnabled", () => {
@@ -176,10 +192,26 @@ describe("parseSendBlueInbound", () => {
     });
   });
 
+  it("treats a missing is_outbound flag as inbound when from_number is present", () => {
+    const { is_outbound: _dropped, ...withoutFlag } = receivePayload;
+    const parsed = parseSendBlueInbound(withoutFlag);
+    expect(parsed).toMatchObject({ type: "message", fromNumber: "+19998887777" });
+  });
+
   it("ignores non-message events and malformed payloads", () => {
     expect(parseSendBlueInbound({ event_type: "call_log", call_id: "cs_1" })).toBeNull();
     expect(parseSendBlueInbound(null)).toBeNull();
     expect(parseSendBlueInbound("nope")).toBeNull();
     expect(parseSendBlueInbound({ is_outbound: false })).toBeNull();
+  });
+});
+
+describe("isPhoneSurfaceEnabled", () => {
+  it("requires SendBlue config and a deployment model key", () => {
+    vi.stubEnv("VITEST", "");
+    expect(isPhoneSurfaceEnabled(config, "model-key")).toBe(true);
+    expect(isPhoneSurfaceEnabled(config, undefined)).toBe(false);
+    expect(isPhoneSurfaceEnabled({ ...config, apiSecret: "" }, "model-key")).toBe(false);
+    vi.unstubAllEnvs();
   });
 });
