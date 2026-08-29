@@ -128,6 +128,29 @@ describe("createPhoneInboundHandler", () => {
     expect(deps.enqueue).not.toHaveBeenCalled();
   });
 
+  it("never provisions on content-free events like tapbacks", async () => {
+    const deps = createDeps();
+    deps.prisma.phoneIdentity.findUnique = vi.fn(async () => null);
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "", mediaUrl: null });
+
+    expect(deps.provision).not.toHaveBeenCalled();
+    expect(deps.sendUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("still resets the outbound counter on a known sender's content-free reply", async () => {
+    const deps = createDeps();
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "", mediaUrl: null });
+
+    expect(deps.prisma.phoneIdentity.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ outboundSinceInbound: 0 }),
+      }),
+    );
+    expect(deps.sendUserMessage).not.toHaveBeenCalled();
+  });
+
   it("does not enqueue when the message created no run", async () => {
     const deps = createDeps({
       events: { sendUserMessage: vi.fn(async () => ({ messageId: "msg-1", runId: null, seq: 3 })) },
