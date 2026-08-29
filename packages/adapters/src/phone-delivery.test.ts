@@ -230,20 +230,21 @@ describe("deliverPhoneOutbound", () => {
     const deps = createDeps({});
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
 
-    const claim = deps.prisma.phoneOutbound.updateMany.mock.calls.find(
-      ([args]: [{ where?: { status?: string } }]) => args.where?.status === "pending",
+    const calls = deps.prisma.phoneOutbound.updateMany.mock.calls as Array<
+      [{ where?: { status?: string } }]
+    >;
+    const claimIndex = calls.findIndex(([args]) => args.where?.status === "pending");
+    expect(claimIndex).toBeGreaterThanOrEqual(0);
+    expect(deps.prisma.phoneOutbound.updateMany.mock.invocationCallOrder[claimIndex]!).toBeLessThan(
+      deps.sendDirect.mock.invocationCallOrder[0]!,
     );
-    expect(claim).toBeTruthy();
-    expect(
-      deps.prisma.phoneOutbound.updateMany.mock.invocationCallOrder[
-        deps.prisma.phoneOutbound.updateMany.mock.calls.indexOf(claim)
-      ]!,
-    ).toBeLessThan(deps.sendDirect.mock.invocationCallOrder[0]!);
   });
 
   it("skips the send when another drain won the claim", async () => {
     const deps = createDeps({});
-    deps.prisma.phoneOutbound.updateMany = vi.fn(async () => ({ count: 0 }));
+    deps.prisma.phoneOutbound.updateMany = vi.fn(async () => ({
+      count: 0,
+    })) as unknown as typeof deps.prisma.phoneOutbound.updateMany;
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
 
     expect(deps.sendDirect).not.toHaveBeenCalled();
