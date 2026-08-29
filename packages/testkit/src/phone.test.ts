@@ -19,7 +19,10 @@ describePhone("phone surface journeys", () => {
   let prisma: any;
   const emulator = new SendBlueEmulator();
   const dataDir = mkdtempSync(path.join(tmpdir(), "rakazo-phone-"));
-  const sender = "+15557654321";
+  // Unique per run: identities, threads, and outbox rows persist in the dev database.
+  const stamp = Date.now();
+  const sender = `+1555${String(stamp).slice(-7)}`;
+  const dmHandle = `journey-dm-${stamp}`;
 
   beforeAll(async () => {
     const { createApp } = await import("../../../apps/api/src/app.ts");
@@ -50,16 +53,27 @@ describePhone("phone surface journeys", () => {
 
   it("provisions on first text, runs the bot, and mirrors the reply back out", async () => {
     const res = await app.request(
-      emulator.buildInboundRequest({ fromNumber: sender, content: "hello there" }),
+      emulator.buildInboundRequest({
+        fromNumber: sender,
+        content: "hello there",
+        handle: dmHandle,
+      }),
     );
     expect(res.status).toBe(200);
 
     await waitForDatabase(async () =>
       Boolean(await prisma.phoneIdentity.findUnique({ where: { phoneE164: sender } })),
     );
+    // The outbox row flips to sent after the provider call and counter update,
+    // so it is the last durable signal of the whole mirror loop.
     await waitForDatabase(async () =>
-      emulator.sent.some((send) => send.kind === "dm" && send.to === sender),
+      Boolean(
+        await prisma.phoneOutbound.findFirst({
+          where: { toNumber: sender, kind: "dm", status: "sent" },
+        }),
+      ),
     );
+    expect(emulator.sent.some((send) => send.kind === "dm" && send.to === sender)).toBe(true);
 
     const identity = await prisma.phoneIdentity.findUnique({ where: { phoneE164: sender } });
     expect(identity.outboundSinceInbound).toBe(1);
@@ -67,18 +81,24 @@ describePhone("phone surface journeys", () => {
       where: { toNumber: sender, kind: "dm" },
     });
     expect(outbound).toHaveLength(1);
-    expect(outbound[0].status).toBe("sent");
     expect(outbound[0].providerHandle).toBeTruthy();
 
     const userMessage = await prisma.message.findFirst({
-      where: { threadId: (await prisma.thread.findFirst({ where: { botId: identity.botId } })).id, role: "user" },
+      where: {
+        threadId: (await prisma.thread.findFirst({ where: { botId: identity.botId } })).id,
+        role: "user",
+      },
     });
     expect(userMessage.clientNonce).toMatch(/^phone:/);
   });
 
   it("replays the same handle without a duplicate message or send", async () => {
     const replay = await app.request(
-      emulator.buildInboundRequest({ fromNumber: sender, content: "hello there" }),
+      emulator.buildInboundRequest({
+        fromNumber: sender,
+        content: "hello there",
+        handle: dmHandle,
+      }),
     );
     expect(replay.status).toBe(200);
 
@@ -111,7 +131,9 @@ describePhone("phone surface journeys", () => {
       body: await request.text(),
     });
     expect(res.status).toBe(401);
-    expect(await prisma.phoneIdentity.findUnique({ where: { phoneE164: "+15550000001" } })).toBeNull();
+    expect(
+      await prisma.phoneIdentity.findUnique({ where: { phoneE164: "+15550000001" } }),
+    ).toBeNull();
   });
 });
 
