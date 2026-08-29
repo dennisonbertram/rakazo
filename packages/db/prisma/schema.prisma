@@ -879,3 +879,63 @@ model BotMcpServer {
   @@index([workspaceId, userId, botId])
   @@map("bot_mcp_servers")
 }
+
+model PhoneIdentity {
+  id                   String    @id @default(cuid())
+  phoneE164            String    @unique
+  userId               String
+  workspaceId          String
+  botId                String    @unique
+  verifiedAt           DateTime?
+  lastInboundAt        DateTime?
+  outboundSinceInbound Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("phone_identities")
+}
+
+model PhoneChannel {
+  id              String               @id @default(cuid())
+  providerGroupId String               @unique
+  name            String?
+  introPostedAt   DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  members         PhoneChannelMember[]
+
+  @@map("phone_channels")
+}
+
+model PhoneChannelMember {
+  id         String       @id @default(cuid())
+  channelId  String
+  channel    PhoneChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  phoneE164  String
+  identityId String?
+  status     String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([channelId, phoneE164])
+  @@index([identityId])
+  @@map("phone_channel_members")
+}
+
+model PhoneOutbound {
+  id              String    @id @default(cuid())
+  idempotencyKey  String    @unique
+  kind            String
+  toNumber        String?
+  providerGroupId String?
+  body            String
+  status          String    @default("pending")
+  providerHandle  String?
+  sourceMessageId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status])
+  @@map("phone_outbound")
+}

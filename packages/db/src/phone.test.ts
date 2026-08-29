@@ -21,11 +21,10 @@ describe("provisionPhoneIdentity", () => {
       thread: { findFirst: vi.fn(async () => ({ id: "thread-1" })) },
       user: { create: vi.fn() },
     };
-    const result = await provisionPhoneIdentity(
-      prisma as unknown as PrismaClient,
-      "+15551234567",
-      { signupsEnabled: undefined, signupAllowlist: undefined },
-    );
+    const result = await provisionPhoneIdentity(prisma as unknown as PrismaClient, "+15551234567", {
+      signupsEnabled: undefined,
+      signupAllowlist: undefined,
+    });
 
     expect(result).toEqual({
       phoneE164: "+15551234567",

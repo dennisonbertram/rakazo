@@ -1,18 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "./client.js";
 import { bootstrapUserWorkspace } from "./bootstrap-user.js";
+import type { PrismaClient } from "./client.js";
 
 function makePrisma(settings: { id: string; ownerUserId: string | null } | null) {
+  const create = () => vi.fn(async (_input: { data: Record<string, unknown> }) => ({}));
   const prisma = {
-    organization: { create: vi.fn(async () => ({})) },
-    member: { create: vi.fn(async () => ({})) },
+    organization: { create: create() },
+    member: { create: create() },
     deploymentSettings: {
       findUnique: vi.fn(async () => settings),
-      create: vi.fn(async () => ({})),
-      update: vi.fn(async () => ({})),
+      create: create(),
+      update: create(),
     },
-    memoryDocument: { create: vi.fn(async () => ({})) },
-    notificationPreference: { create: vi.fn(async () => ({})) },
+    memoryDocument: { create: create() },
+    notificationPreference: { create: create() },
   };
   return prisma;
 }
