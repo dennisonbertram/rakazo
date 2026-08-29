@@ -83,6 +83,11 @@ describePostgres("provisionPhoneIdentity (PostgreSQL)", () => {
     expect(pref).toBeTruthy();
   });
 
+  it("does not let a texter claim deployment ownership", async () => {
+    const settings = await prisma.deploymentSettings.findUnique({ where: { id: "default" } });
+    expect(settings?.ownerUserId ?? null).not.toBe(provisioned!.userId);
+  });
+
   it("is idempotent for a repeat inbound from the same number", async () => {
     const again = await provisionPhoneIdentity(prisma, phone, {
       signupsEnabled: undefined,
@@ -100,5 +105,68 @@ describePostgres("provisionPhoneIdentity (PostgreSQL)", () => {
     expect(users).toHaveLength(1);
     const identities = await prisma.phoneIdentity.findMany({ where: { phoneE164: phone } });
     expect(identities).toHaveLength(1);
+  });
+
+  it("resumes after a partial first attempt that only created the user row", async () => {
+    const partialPhone = "+15550002222";
+    // Simulates a crash between user.create and bootstrapUserWorkspace.
+    const orphan = await prisma.user.create({
+      data: {
+        id: `partial${Date.now()}`,
+        name: "Phone 2222",
+        email: "phone-15550002222@phone.invalid",
+        emailVerified: false,
+      },
+    });
+    try {
+      const result = await provisionPhoneIdentity(prisma, partialPhone, {
+        signupsEnabled: undefined,
+        signupAllowlist: undefined,
+      });
+
+      expect(result.created).toBe(true);
+      expect(result.userId).toBe(orphan.id);
+      const identity = await prisma.phoneIdentity.findUnique({
+        where: { phoneE164: partialPhone },
+      });
+      expect(identity).toBeTruthy();
+      const bots = await prisma.bot.findMany({
+        where: { workspaceId: result.workspaceId, userId: orphan.id },
+      });
+      expect(bots).toHaveLength(1);
+
+      await prisma.phoneIdentity.deleteMany({ where: { phoneE164: partialPhone } });
+      await prisma.organization.deleteMany({ where: { id: result.workspaceId } });
+    } finally {
+      await prisma.user.deleteMany({ where: { id: orphan.id } });
+    }
+  });
+
+  it("resumes after a partial attempt that reached createBot, reusing the orphaned bot", async () => {
+    const partialPhone = "+15550003333";
+    // First attempt: let it provision fully, then delete only the identity row.
+    const first = await provisionPhoneIdentity(prisma, partialPhone, {
+      signupsEnabled: undefined,
+      signupAllowlist: undefined,
+    });
+    await prisma.phoneIdentity.deleteMany({ where: { phoneE164: partialPhone } });
+    try {
+      const second = await provisionPhoneIdentity(prisma, partialPhone, {
+        signupsEnabled: undefined,
+        signupAllowlist: undefined,
+      });
+
+      expect(second.userId).toBe(first.userId);
+      expect(second.workspaceId).toBe(first.workspaceId);
+      expect(second.botId).toBe(first.botId);
+      const bots = await prisma.bot.findMany({
+        where: { workspaceId: first.workspaceId, userId: first.userId },
+      });
+      expect(bots).toHaveLength(1);
+    } finally {
+      await prisma.phoneIdentity.deleteMany({ where: { phoneE164: partialPhone } });
+      await prisma.organization.deleteMany({ where: { id: first.workspaceId } });
+      await prisma.user.deleteMany({ where: { id: first.userId } });
+    }
   });
 });
