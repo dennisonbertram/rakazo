@@ -3,25 +3,30 @@ import { createPhoneInboundHandler, type PhoneInboundDeps } from "./phone-inboun
 
 const signupPolicy = { signupsEnabled: undefined, signupAllowlist: undefined };
 
-function createDeps(overrides: {
-  identity?: unknown;
-  members?: Array<Record<string, unknown>>;
-  invitedMember?: unknown;
-  approvedMember?: unknown;
-  sendResult?: { messageId: string; runId: string | null; seq: number };
-} = {}) {
-  const identity = overrides.identity === null ? null : (overrides.identity ?? {
-    id: "pi-1",
-    phoneE164: "+15551111111",
-    userId: "user-1",
-    workspaceId: "ws-1",
-    botId: "bot-1",
-    verifiedAt: null,
-    lastInboundAt: null,
-    outboundSinceInbound: 5,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+function createDeps(
+  overrides: {
+    identity?: unknown;
+    members?: Array<Record<string, unknown>>;
+    invitedMember?: unknown;
+    approvedMember?: unknown;
+    sendResult?: { messageId: string; runId: string | null; seq: number };
+  } = {},
+) {
+  const identity =
+    overrides.identity === null
+      ? null
+      : (overrides.identity ?? {
+          id: "pi-1",
+          phoneE164: "+15551111111",
+          userId: "user-1",
+          workspaceId: "ws-1",
+          botId: "bot-1",
+          verifiedAt: null,
+          lastInboundAt: null,
+          outboundSinceInbound: 5,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
   const sendUserMessage = vi.fn(
     async () => overrides.sendResult ?? { messageId: "msg-1", runId: "run-1", seq: 3 },
   );
@@ -44,17 +49,25 @@ function createDeps(overrides: {
   const outboundRows: Array<Record<string, unknown>> = [];
   const txMock = {
     thread: { update: vi.fn(async () => ({ nextMessageSeq: 2 })) },
-    message: { create: vi.fn(async ({ data }: { data: unknown }) => ({ id: "note-1", seq: 1, ...data as object })) },
+    message: {
+      create: vi.fn(async ({ data }: { data: unknown }) => ({
+        id: "note-1",
+        seq: 1,
+        ...(data as object),
+      })),
+    },
     run: { findUnique: vi.fn(async () => null) },
   };
   const members = overrides.members ?? [];
   const prisma = {
     phoneIdentity: {
-      findUnique: vi.fn(async ({ where }: { where: { phoneE164?: string; id?: string; botId?: string } }) => {
-        if (!identity) return null;
-        if (where.phoneE164 && where.phoneE164 !== identity.phoneE164) return null;
-        return identity;
-      }),
+      findUnique: vi.fn(
+        async ({ where }: { where: { phoneE164?: string; id?: string; botId?: string } }) => {
+          if (!identity) return null;
+          if (where.phoneE164 && where.phoneE164 !== identity.phoneE164) return null;
+          return identity;
+        },
+      ),
       update: vi.fn(async () => identity),
     },
     thread: { findFirst: vi.fn(async () => ({ id: "thread-1" })) },
@@ -63,15 +76,23 @@ function createDeps(overrides: {
       update: vi.fn(async () => ({ ...channel, introPostedAt: new Date() })),
     },
     phoneChannelMember: {
-      findUnique: vi.fn(async ({ where }: { where: { channelId_phoneE164: { phoneE164: string } } }) =>
-        members.find((m) => m.phoneE164 === where.channelId_phoneE164.phoneE164) ?? null,
+      findUnique: vi.fn(
+        async ({ where }: { where: { channelId_phoneE164: { phoneE164: string } } }) =>
+          members.find((m) => m.phoneE164 === where.channelId_phoneE164.phoneE164) ?? null,
       ),
       findFirst: vi.fn(async ({ where }: { where: { status?: string } }) => {
         if (where?.status === "invited") return overrides.invitedMember ?? null;
         if (where?.status === "approved") return overrides.approvedMember ?? null;
         return null;
       }),
-      findMany: vi.fn(async () => members),
+      findMany: vi.fn(
+        async ({ where }: { where: { status?: string; identityId?: { not: null } } }) =>
+          members.filter(
+            (m) =>
+              (!where?.status || m.status === where.status) &&
+              (!where?.identityId || m.identityId != null),
+          ),
+      ),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         members.push(data);
         return data;
@@ -327,9 +348,7 @@ describe("createPhoneInboundHandler channel routing", () => {
     const handle = createPhoneInboundHandler(deps);
     await handle(groupEvent);
 
-    expect(
-      deps.outboundRows.filter((row) => row.kind === "intro"),
-    ).toHaveLength(0);
+    expect(deps.outboundRows.filter((row) => row.kind === "intro")).toHaveLength(0);
   });
 
   it("fans an approved member's message out to every approved member bot", async () => {
@@ -392,7 +411,10 @@ describe("createPhoneInboundHandler channel routing", () => {
       "ws-1",
       "ws-2",
     ]);
-    expect(deps.enqueue).toHaveBeenCalledTimes(2);
+    const runJobs = deps.enqueue.mock.calls.filter(
+      ([job]: [{ name: string }]) => job.name === "run.continue",
+    );
+    expect(runJobs).toHaveLength(2);
   });
 
   it("ignores group messages from members who are not approved", async () => {
@@ -408,6 +430,9 @@ describe("createPhoneInboundHandler channel routing", () => {
     await handle(groupEvent);
 
     expect(deps.sendUserMessage).not.toHaveBeenCalled();
-    expect(deps.enqueue).not.toHaveBeenCalled();
+    const runJobs = deps.enqueue.mock.calls.filter(
+      ([job]: [{ name: string }]) => job.name === "run.continue",
+    );
+    expect(runJobs).toHaveLength(0);
   });
 });

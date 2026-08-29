@@ -40,9 +40,12 @@ import {
   humanizeToolName,
   inferAttachmentMimeType,
   isOneShotRoutineCrons,
+  isPhoneChannelRun,
   isTerminal,
   nextCronDateAcross,
   nextFence,
+  phoneChannelPrivacyBlock,
+  phoneDmSurfaceNote,
   planActionGate,
   promptInvokesSkill,
   redactSecrets,
@@ -345,6 +348,8 @@ export interface ExecutorDeps {
   dataDir?: string;
   notifications?: NotificationProvider;
   jobs: JobPublisher;
+  /** Phone surface; absent means zero phone queries and no phone prompts. */
+  phone?: { hasIdentity(botId: string): Promise<boolean> };
   listConnectedPluginSlugs?: (userId: string) => Promise<string[]>;
 }
 
@@ -929,6 +934,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const groupContext = thread.groupId
           ? await loadGroupContext(deps.prisma, thread.groupId)
           : undefined;
+        // Phone runs are rare; the source lookup only happens for them.
+        const phoneSourceBlocks =
+          run.trigger === "phone" && run.sourceMessageId
+            ? ((
+                await deps.prisma.message.findUnique({
+                  where: { id: run.sourceMessageId },
+                  select: { blocks: true },
+                })
+              )?.blocks as MessageBlock[] | undefined)
+            : undefined;
+        const phoneChannelRun = isPhoneChannelRun(run.trigger, phoneSourceBlocks);
+        const phoneContext =
+          deps.phone && (await deps.phone.hasIdentity(bot.id))
+            ? [phoneDmSurfaceNote(), phoneChannelRun ? phoneChannelPrivacyBlock() : null]
+                .filter(Boolean)
+                .join("\n\n")
+            : undefined;
         const graphicalToolsAllowed = graphical && acceptsImages;
         const availableBuiltins = filterBuiltinToolsForThread(
           filterImageReturningComputerTools(builtinAgentTools, graphicalToolsAllowed),
@@ -2329,6 +2351,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               instructions: [
                 bot.instructions || `${bot.name}: ${bot.title}\n${bot.description}`,
                 groupContext,
+                phoneContext,
                 memoryContext ? redactSecrets(memoryContext, runSecrets) : undefined,
                 scratchpadContext ? redactSecrets(scratchpadContext, runSecrets) : undefined,
                 historicalContext.length > 0
@@ -2369,7 +2392,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
               resumeFromCheckpoint: takeoverResume?.checkpoint,
               script,
-              allowSilentEmpty: run.trigger === "bot_message",
+              allowSilentEmpty: run.trigger === "bot_message" || phoneChannelRun,
               executeTool: scripted ? undefined : applyTool,
             },
             context,
@@ -2645,7 +2668,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           flushPendingTools();
           if (!assembled) {
             messageSegments = completionMessageSegments(messageSegments, {
-              allowSilentEmpty: run.trigger === "bot_message",
+              allowSilentEmpty: run.trigger === "bot_message" || phoneChannelRun,
             });
           }
           const blocks = redactBlocks(messageSegments, runSecrets);

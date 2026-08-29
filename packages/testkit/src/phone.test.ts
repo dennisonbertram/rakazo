@@ -41,6 +41,7 @@ describePhone("phone surface journeys", () => {
         { fetch: emulator.fetch },
       ),
       sendblueSigningSecret: emulator.signingSecret,
+      sendbluePhoneNumber: emulator.phoneNumber,
     });
     app = handles.app;
     stop = handles.stop;

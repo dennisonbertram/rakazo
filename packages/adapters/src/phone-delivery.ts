@@ -1,5 +1,9 @@
-import type { AdapterContext, MessagingProvider } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { AdapterContext, JobPublisher, MessagingProvider } from "@rakazo/adapter-kit";
+import { runContinueJob } from "@rakazo/adapter-kit";
+import type { MessageBlock } from "@rakazo/contracts";
+import { botMessageHopExhausted, nextBotMessageHop } from "@rakazo/core";
+import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
 import type { SendBlueOutboundStatus } from "./sendblue.js";
 
 /**
@@ -12,13 +16,18 @@ export const PHONE_DM_OUTBOUND_CAP = 140;
 export interface PhoneDeliveryDeps {
   prisma: PrismaClient;
   messaging: MessagingProvider;
+  events: Pick<ThreadEvents, "sendUserMessage" | "notify">;
+  jobs: Pick<JobPublisher, "enqueue">;
 }
 
 /**
  * Automatic mirror, not a send tool: every text-bearing bot message of a
- * phone DM run is copied into the uniform outbox and sent, so delivery does
- * not depend on prompt compliance. Also drains pending outbox rows (invites
- * and intros are enqueued by the channels slice).
+ * phone run is copied into the uniform outbox and sent, so delivery does
+ * not depend on prompt compliance. DM runs go to the owner's number;
+ * channel runs go to the group with an attribution prefix and are fanned
+ * out internally to peer approved bots (agent-to-agent traffic never
+ * transits SendBlue). Also drains pending outbox rows (invites and intros
+ * are enqueued by the channels slice).
  */
 export async function deliverPhoneOutbound(
   deps: PhoneDeliveryDeps,
@@ -37,8 +46,15 @@ async function mirrorRun(deps: PhoneDeliveryDeps, runId: string): Promise<void> 
     include: { sourceMessage: true },
   });
   if (run?.trigger !== "phone") return;
-  const sourceBlocks = (run.sourceMessage?.blocks ?? []) as Array<{ kind?: string }>;
-  if (sourceBlocks.some((block) => block.kind === "phone_channel_message")) return;
+  const sourceBlocks = (run.sourceMessage?.blocks ?? []) as MessageBlock[];
+  const channelBlock = sourceBlocks.find(
+    (block): block is Extract<MessageBlock, { kind: "phone_channel_message" }> =>
+      block.kind === "phone_channel_message",
+  );
+  if (channelBlock) {
+    await mirrorChannelRun(deps, run, channelBlock);
+    return;
+  }
 
   const identity = await deps.prisma.phoneIdentity.findUnique({
     where: { botId: run.botId },
@@ -62,6 +78,134 @@ async function mirrorRun(deps: PhoneDeliveryDeps, runId: string): Promise<void> 
   // Atomic dedupe: a concurrent phone.deliver for the same run loses on the
   // idempotencyKey unique key instead of throwing P2002.
   await deps.prisma.phoneOutbound.createMany({ data: rows, skipDuplicates: true });
+}
+
+/**
+ * Channel runs post to the group with an attribution prefix, then fan the
+ * post out internally to peer approved bots: context only by default, a
+ * waking run on @-mention, bounded by the shared bot-message hop budget.
+ */
+async function mirrorChannelRun(
+  deps: PhoneDeliveryDeps,
+  run: { id: string; botId: string },
+  channelBlock: Extract<MessageBlock, { kind: "phone_channel_message" }>,
+): Promise<void> {
+  const identity = await deps.prisma.phoneIdentity.findUnique({
+    where: { botId: run.botId },
+  });
+  if (!identity) return;
+  const channel = await deps.prisma.phoneChannel.findUnique({
+    where: { id: channelBlock.channelId },
+  });
+  if (!channel) return;
+  const owner = await deps.prisma.user.findUnique({
+    where: { id: identity.userId },
+    select: { name: true },
+  });
+  const firstName = owner?.name.trim().split(/\s+/)[0] || "Owner";
+  const fromLabel = `${firstName}'s agent`;
+
+  const messages = (
+    await deps.prisma.message.findMany({
+      where: { runId: run.id, role: "bot" },
+      orderBy: { seq: "asc" },
+    })
+  )
+    .map((message) => ({ message, text: extractText(message.blocks) }))
+    .filter((entry) => entry.text);
+  if (messages.length === 0) return;
+
+  await deps.prisma.phoneOutbound.createMany({
+    data: messages.map(({ message, text }) => ({
+      idempotencyKey: `msg:${message.id}`,
+      kind: "group",
+      providerGroupId: channel.providerGroupId,
+      body: `${fromLabel}: ${text}`,
+      sourceMessageId: message.id,
+    })),
+    skipDuplicates: true,
+  });
+
+  const hop = nextBotMessageHop(channelBlock.hop);
+  const peers = await deps.prisma.phoneChannelMember.findMany({
+    where: {
+      channelId: channel.id,
+      status: "approved",
+      identityId: { not: null },
+      NOT: { identityId: identity.id },
+    },
+  });
+  for (const { message, text } of messages) {
+    for (const peer of peers) {
+      const peerIdentity = await deps.prisma.phoneIdentity.findUnique({
+        where: { id: peer.identityId! },
+      });
+      if (!peerIdentity) continue;
+      const peerThread = await deps.prisma.thread.findFirst({
+        where: { botId: peerIdentity.botId },
+      });
+      if (!peerThread) continue;
+      const peerBot = await deps.prisma.bot.findUnique({
+        where: { id: peerIdentity.botId },
+        select: { name: true },
+      });
+      const block: MessageBlock = {
+        kind: "phone_channel_message",
+        channelId: channel.id,
+        fromNumber: identity.phoneE164,
+        fromLabel,
+        text,
+        hop,
+      };
+      const clientNonce = `phone-peer:${message.id}:${peerIdentity.botId}`;
+      const mentioned = peerBot?.name
+        ? new RegExp(`@${escapeRegExp(peerBot.name)}\\b`).test(text)
+        : false;
+      if (mentioned && !botMessageHopExhausted(hop)) {
+        const sent = await deps.events.sendUserMessage({
+          workspaceId: peerIdentity.workspaceId,
+          threadId: peerThread.id,
+          botId: peerIdentity.botId,
+          userId: peerIdentity.userId,
+          blocks: [block],
+          prompt: `[iMessage group "${channel.name ?? "group"}" — ${fromLabel}]: ${text}`,
+          trigger: "phone",
+          clientNonce,
+        });
+        if (sent.runId) {
+          await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
+            console.error("phone peer wake enqueue error", error);
+          });
+        }
+        continue;
+      }
+      // Context only: the peer sees the post in history without a wake.
+      const existing = await deps.prisma.message.findUnique({
+        where: { threadId_clientNonce: { threadId: peerThread.id, clientNonce } },
+      });
+      if (existing) continue;
+      const event = await deps.prisma.$transaction(async (tx) => {
+        const created = await createThreadMessageInTransaction(tx, {
+          threadId: peerThread.id,
+          role: "user",
+          blocks: [block],
+          clientNonce,
+        });
+        return appendEventInTransaction(tx, {
+          workspaceId: peerIdentity.workspaceId,
+          threadId: peerThread.id,
+          botId: peerIdentity.botId,
+          type: "thread.message.created",
+          payload: { messageId: created.id, role: "user", blocks: [block] },
+        });
+      });
+      await deps.events.notify(peerThread.id, event.seq).catch(() => undefined);
+    }
+  }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<void> {
