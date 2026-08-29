@@ -2946,6 +2946,14 @@ export function createRouter(deps: RouterDeps) {
             data: { status: "revoked" },
           });
           if (count === 0) throw new ORPCError("NOT_FOUND");
+          // Drop any undelivered connect invite so a revoke after reconnect
+          // cannot still text YES/NO for a connection that is already gone.
+          await deps.prisma.phoneOutbound.deleteMany({
+            where: {
+              idempotencyKey: `connect:${connection.requesterBotId}:${connection.targetBotId}`,
+              status: "pending",
+            },
+          });
           return { ok: true as const };
         }),
       },

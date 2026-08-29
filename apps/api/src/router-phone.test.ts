@@ -151,16 +151,19 @@ function phoneDeps(
       }
       return { count };
     }),
-    deleteMany: vi.fn(async ({ where }: { where: { idempotencyKey?: string } }) => {
-      let count = 0;
-      for (let i = outboundRows.length - 1; i >= 0; i -= 1) {
-        if (outboundRows[i]!.idempotencyKey === where.idempotencyKey) {
+    deleteMany: vi.fn(
+      async ({ where }: { where: { idempotencyKey?: string; status?: string } }) => {
+        let count = 0;
+        for (let i = outboundRows.length - 1; i >= 0; i -= 1) {
+          const row = outboundRows[i]!;
+          if (where.idempotencyKey && row.idempotencyKey !== where.idempotencyKey) continue;
+          if (where.status && row.status !== where.status) continue;
           outboundRows.splice(i, 1);
           count += 1;
         }
-      }
-      return { count };
-    }),
+        return { count };
+      },
+    ),
   };
   (prisma as { phoneOutbound?: unknown }).phoneOutbound = phoneOutbound;
   // The claim-and-confirm handlers run inside one interactive transaction;
@@ -410,6 +413,39 @@ describe("phone.connections", () => {
         data: { status: "revoked" },
       }),
     );
+    await expect(response.json()).resolves.toEqual({ json: { ok: true } });
+  });
+
+  it("cancels a pending connect invite when revoking a re-requested connection", async () => {
+    const { handler, actor, prisma, outboundRows } = phoneDeps({
+      connection: { id: "ac-4", requesterBotId: "bot-1", targetBotId: "bot-9", status: "pending" },
+    });
+    outboundRows.push({
+      idempotencyKey: "connect:bot-1:bot-9",
+      kind: "dm",
+      toNumber: "+15559999999",
+      body: "wants to connect",
+      status: "pending",
+    });
+    outboundRows.push({
+      idempotencyKey: "connect:bot-1:bot-9-already-sent",
+      kind: "dm",
+      status: "sent",
+    });
+
+    const response = await call(handler, actor, "phone/connections/revoke", {
+      connectionId: "ac-4",
+    });
+
+    expect(prisma.phoneOutbound.deleteMany).toHaveBeenCalledWith({
+      where: { idempotencyKey: "connect:bot-1:bot-9", status: "pending" },
+    });
+    expect(outboundRows).toEqual([
+      expect.objectContaining({
+        idempotencyKey: "connect:bot-1:bot-9-already-sent",
+        status: "sent",
+      }),
+    ]);
     await expect(response.json()).resolves.toEqual({ json: { ok: true } });
   });
 
