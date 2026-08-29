@@ -261,3 +261,22 @@ Kill switch for every slice: unset any SendBlue env var → feature structurally
 - Vestigial column found during research: `DeploymentSettings.deploymentModelCredentialCipher`
   is never written and never read by the executor — worth a separate cleanup issue, not part
   of this feature.
+
+## Follow-up slices (post-v1, noted 2026-08-29)
+
+- **Hosted-browser `browser_task` tool.** Live testing showed the vision-desktop browsing
+  path (E2B computer + `computer_observe`/`computer_act`) works but is heavy: desktop boot
+  dominates cold runs and it needs a vision-capable model. A provider-neutral
+  `BrowserProvider` contract in adapter-kit with a `browser_task` built-in tool would let
+  "go look at this site" tasks run DOM-driven without a desktop. Candidate backends:
+  Browser Use Cloud (simple REST: task in, result out; BYOK), with TS-native self-host
+  options (Stagehand/Browserbase, Steel) preferred over the Python browser-use library,
+  which would mean a sidecar runtime. Does NOT replace the computer — runs still need a
+  workspace; this only covers web navigation.
+- **Image generation + iMessage media.** `gpt-image-2` behind an `ImageProvider` contract
+  as a built-in tool (sibling of `render_plot`), plus outbound media: extend
+  `MessagingDirectRequest` with optional `mediaUrl`, pass to SendBlue `send-message`, and
+  let the phone mirror attach generated images. Inbound media ingestion (photo → real
+  artifact instead of expiring CDN-URL text) pairs with it.
+- Mention-only channel waking and phone-account linking were already flagged above and
+  remain open.
