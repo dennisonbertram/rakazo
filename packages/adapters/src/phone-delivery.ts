@@ -228,11 +228,11 @@ function connectInvitePair(
  * Deliver a connect invite while holding the connection row lock.
  * Revoke's status update blocks behind this lock, so it cannot commit
  * (and delete the claim) between the pending check and sendDirect.
- * Only used for rare approval DMs — not for ordinary mirrored traffic.
+ * Only used for rare approval DMs, not for ordinary mirrored traffic.
  *
  * At-most-once: any failure after the provider call (or an ambiguous
  * transport error) keeps the outer claim as `sent` so drain does not
- * restore pending and duplicate the YES/NO DM. A lost invite is fine —
+ * restore pending and duplicate the YES/NO DM. A lost invite is fine;
  * reconnect starts a fresh cycle.
  */
 async function sendConnectInvite(
@@ -240,7 +240,7 @@ async function sendConnectInvite(
   row: { id: string; toNumber: string; body: string },
   pair: { requesterBotId: string; targetBotId: string },
   context: AdapterContext,
-): Promise<"sent" | "skipped"> {
+): Promise<"delivered" | "skipped" | "held"> {
   try {
     return await deps.prisma.$transaction(
       async (tx) => {
@@ -271,17 +271,18 @@ async function sendConnectInvite(
             where: { id: row.id },
             data: { providerHandle: sent.handle },
           });
+          return "delivered";
         } catch {
           // Provider error or lost response is ambiguous without an
-          // idempotency key — do not ask drain to retry.
+          // idempotency key. Do not ask drain to retry.
+          return "held";
         }
-        return "sent";
       },
       { maxWait: 5_000, timeout: 20_000 },
     );
   } catch {
     // Lock/timeout after a possible accept: keep the outer claim as sent.
-    return "sent";
+    return "held";
   }
 }
 
@@ -341,12 +342,18 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
       }
       const invitePair = connectInvitePair(row.idempotencyKey);
       if (invitePair) {
-        await sendConnectInvite(
+        const result = await sendConnectInvite(
           deps,
           { id: row.id, toNumber: row.toNumber, body: row.body },
           invitePair,
           context,
         );
+        if (result === "delivered" && identity) {
+          await deps.prisma.phoneIdentity.update({
+            where: { id: identity.id },
+            data: { outboundSinceInbound: { increment: 1 } },
+          });
+        }
         continue;
       }
       const sent = await deps.messaging.sendDirect({ to: row.toNumber, body: row.body }, context);

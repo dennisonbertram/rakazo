@@ -400,6 +400,10 @@ describe("deliverPhoneOutbound", () => {
       context,
     );
     expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
+    expect(deps.prisma.phoneIdentity.update).toHaveBeenCalledWith({
+      where: { id: "pi-1" },
+      data: { outboundSinceInbound: { increment: 1 } },
+    });
   });
 
   it("does not re-queue a connect invite when the provider send fails", async () => {
@@ -425,6 +429,7 @@ describe("deliverPhoneOutbound", () => {
     // At-most-once: keep the claim rather than risk a duplicate YES/NO.
     expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
     expect(deps.jobs.enqueue).not.toHaveBeenCalled();
+    expect(deps.prisma.phoneIdentity.update).not.toHaveBeenCalled();
   });
 
   it("does not re-queue a connect invite after a delivery transaction timeout", async () => {

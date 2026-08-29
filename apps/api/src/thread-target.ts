@@ -166,7 +166,7 @@ function sendResult(message: { seq: number }, runs: Array<{ id: string; taskId: 
   };
 }
 
-async function cancelSupersededQueuedRuns(
+export async function cancelSupersededQueuedRuns(
   tx: Prisma.TransactionClient,
   input: { threadId: string; botIds: string[]; keepRunIds: string[] },
 ) {
@@ -175,6 +175,8 @@ async function cancelSupersededQueuedRuns(
       threadId: input.threadId,
       botId: { in: input.botIds },
       status: "queued",
+      trigger: "user",
+      sourceMessage: { role: "user" },
       id: { notIn: input.keepRunIds },
     },
     select: { id: true, taskId: true },
@@ -257,6 +259,15 @@ export async function resolveThreadTarget(
     };
   }
   throw new IsolationError();
+}
+
+export async function threadHead(prisma: PrismaClient, target: ThreadTarget) {
+  const latest = await prisma.event.findFirst({
+    where: { threadId: target.threadId },
+    orderBy: { seq: "desc" },
+    select: { seq: true },
+  });
+  return { threadId: target.threadId, cursor: latest?.seq ?? -1 };
 }
 
 export async function threadSnapshot(
