@@ -94,10 +94,23 @@ export async function connectAgent(
   );
 
   if (existing) {
-    await deps.prisma.agentConnection.update({
-      where: { id: existing.id },
+    // Claim the status we observed. A concurrent revoke of the same declined
+    // or revoked row must win; an unconditional update-by-id would undo it.
+    const { count } = await deps.prisma.agentConnection.updateMany({
+      where: { id: existing.id, status: existing.status },
       data: { status: "pending" },
     });
+    if (count === 0) {
+      const current = await deps.prisma.agentConnection.findUnique({
+        where: {
+          requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
+        },
+      });
+      if (current?.status === "approved" || current?.status === "pending") {
+        return { ok: true, status: current.status };
+      }
+      return { ok: false, error: "connection changed; try again" };
+    }
   } else {
     await deps.prisma.agentConnection.create({
       data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
