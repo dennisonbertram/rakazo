@@ -161,7 +161,7 @@ describe("connectAgent", () => {
     const deps = createDeps();
     const result = await connectAgent(deps, run, sender, { phone: "+15552222222" });
 
-    expect(result).toEqual(expect.objectContaining({ ok: true, status: "pending" }));
+    expect(result).toEqual({ ok: true, status: "pending" });
     expect(deps.prisma.agentConnection.create).toHaveBeenCalledWith({
       data: { requesterBotId: "bot-1", targetBotId: "bot-2", status: "pending" },
     });
@@ -186,11 +186,20 @@ describe("connectAgent", () => {
       expect.objectContaining({ ok: false, error: expect.stringMatching(/itself|self/i) }),
     );
 
+    const declined = createDeps({
+      connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" },
+    });
+    const reinvite = await connectAgent(declined, run, sender, { phone: "+15552222222" });
+    expect(reinvite).toEqual(expect.objectContaining({ ok: true, status: "pending" }));
+    expect(declined.outboundRows).toEqual([
+      expect.objectContaining({ kind: "dm", toNumber: "+15552222222" }),
+    ]);
+
     const approved = createDeps({
       connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "approved" },
     });
     const result = await connectAgent(approved, run, sender, { phone: "+15552222222" });
-    expect(result).toEqual(expect.objectContaining({ ok: true, status: "approved" }));
+    expect(result).toEqual({ ok: true, status: "approved" });
     expect(approved.prisma.agentConnection.create).not.toHaveBeenCalled();
   });
 });
