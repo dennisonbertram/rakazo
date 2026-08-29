@@ -958,3 +958,16 @@ model PhoneOutbound {
   @@index([status])
   @@map("phone_outbound")
 }
+
+model AgentConnection {
+  id             String   @id @default(cuid())
+  requesterBotId String
+  targetBotId    String
+  status         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([requesterBotId, targetBotId])
+  @@index([targetBotId, status])
+  @@map("agent_connections")
+}

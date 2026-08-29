@@ -516,6 +516,15 @@ describe("deliverPhoneOutbound channel runs", () => {
     expect(deps.contextMessages).toHaveLength(0);
   });
 
+  it("wakes an @-mentioned peer even when the casing differs", async () => {
+    const deps = createChannelDeps({ text: "@helper ping" });
+    await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
+
+    expect(deps.sendUserMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ botId: "bot-2", clientNonce: "phone-peer:m-1:bot-2" }),
+    );
+  });
+
   it("does not wake anyone when the hop budget is exhausted", async () => {
     const deps = createChannelDeps({ text: "@Helper again?", sourceHop: 6 });
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
