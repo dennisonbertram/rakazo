@@ -68,18 +68,6 @@ function createDeps(
     },
     thread: { update: vi.fn(async () => ({ nextMessageSeq: 4, nextEventSeq: 9 })) },
     bot: { findFirst: vi.fn(async () => ({ id: "bot-2" })) },
-    agentConnection: {
-      findFirst: vi.fn(async ({ where }: { where?: { status?: string } }) => {
-        if (overrides.connectionRevokedInsideTx) return null;
-        if (
-          where?.status === "approved" &&
-          (connection as { status?: string } | null)?.status === "approved"
-        ) {
-          return connection;
-        }
-        return null;
-      }),
-    },
     // What a `SELECT ... FOR UPDATE` on the connection row would see: the
     // AfterRead variant stays approved for plain reads and only shows the
     // revoke to a locking read.

@@ -142,11 +142,32 @@ function phoneDeps(
   const outboundRows: Array<Record<string, unknown>> = [];
   const phoneOutbound = {
     createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
-      outboundRows.push(...data);
-      return { count: data.length };
+      let count = 0;
+      for (const item of data) {
+        // Honors skipDuplicates against the idempotencyKey unique key.
+        if (outboundRows.some((row) => row.idempotencyKey === item.idempotencyKey)) continue;
+        outboundRows.push(item);
+        count += 1;
+      }
+      return { count };
+    }),
+    deleteMany: vi.fn(async ({ where }: { where: { idempotencyKey?: string } }) => {
+      let count = 0;
+      for (let i = outboundRows.length - 1; i >= 0; i -= 1) {
+        if (outboundRows[i]!.idempotencyKey === where.idempotencyKey) {
+          outboundRows.splice(i, 1);
+          count += 1;
+        }
+      }
+      return { count };
     }),
   };
   (prisma as { phoneOutbound?: unknown }).phoneOutbound = phoneOutbound;
+  // The claim-and-confirm handlers run inside one interactive transaction;
+  // the mock passes the same stateful models as the tx delegate.
+  (prisma as { $transaction?: unknown }).$transaction = vi.fn(
+    async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
+  );
   const enqueue = vi.fn(async () => undefined);
   const deps = {
     prisma,

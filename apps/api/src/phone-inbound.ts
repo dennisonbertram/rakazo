@@ -4,6 +4,7 @@ import type { SendBlueInboundMessage } from "@rakazo/adapters";
 import type { MessageBlock } from "@rakazo/contracts";
 import { parsePhoneCommand, sanitizePhoneLabel } from "@rakazo/core";
 import type {
+  Prisma,
   PrismaClient,
   ProvisionedPhoneIdentity,
   SignupPolicyEnv,
@@ -167,51 +168,89 @@ async function applyPhoneCommand(
   const approved = command === "approve";
 
   if (target.kind === "channel") {
-    const { count } = await deps.prisma.phoneChannelMember.updateMany({
-      where: { id: target.membership.id, status: "invited" },
-      data: { status: approved ? "approved" : "declined" },
+    const key = `command:${command}:${target.membership.id}`;
+    const claimed = await deps.prisma.$transaction(async (tx) => {
+      // The claim holds the membership row lock through commit, so the
+      // participant sweep can never interleave with the confirmation write.
+      const { count } = await tx.phoneChannelMember.updateMany({
+        where: { id: target.membership.id, status: "invited" },
+        data: { status: approved ? "approved" : "declined" },
+      });
+      // Swept out or answered elsewhere since the read: not ours to write.
+      if (count === 0) return false;
+      await writeConfirmation(
+        tx,
+        identity.phoneE164,
+        key,
+        approved
+          ? "You're in — your agent will now see and reply to that group."
+          : "No problem, your agent will stay out of that group.",
+      );
+      return true;
     });
-    // Swept out or answered elsewhere since the read: not ours to write.
-    if (count === 0) return false;
-    await enqueueConfirmation(
-      deps,
-      identity.phoneE164,
-      `command:${command}:${target.membership.id}`,
-      approved
-        ? "You're in — your agent will now see and reply to that group."
-        : "No problem, your agent will stay out of that group.",
-    );
+    if (!claimed) return false;
+    await enqueueDeliverJob(deps);
     return true;
   }
 
-  const { count } = await deps.prisma.agentConnection.updateMany({
-    where: { id: target.connection.id, status: "pending" },
-    data: { status: approved ? "approved" : "declined" },
-  });
-  // Revoked or answered elsewhere since the read: not ours to write.
-  if (count === 0) return false;
-  await enqueueConfirmation(
-    deps,
-    identity.phoneE164,
-    `command:${command}:${target.connection.id}`,
-    approved
-      ? "Connection approved — your agents can now message each other."
-      : "Connection declined.",
-  );
-  if (approved) {
-    const requesterIdentity = await deps.prisma.phoneIdentity.findUnique({
-      where: { botId: target.connection.requesterBotId },
+  const connectedKey = `command:connected:${target.connection.id}`;
+  const requesterIdentity = approved
+    ? await deps.prisma.phoneIdentity.findUnique({
+        where: { botId: target.connection.requesterBotId },
+      })
+    : null;
+  const key = `command:${command}:${target.connection.id}`;
+  const claimed = await deps.prisma.$transaction(async (tx) => {
+    // The claim holds the connection row lock through commit, so a revoke
+    // can never interleave with the confirmation writes.
+    const { count } = await tx.agentConnection.updateMany({
+      where: { id: target.connection.id, status: "pending" },
+      data: { status: approved ? "approved" : "declined" },
     });
+    // Revoked or answered elsewhere since the read: not ours to write.
+    if (count === 0) return false;
+    await writeConfirmation(
+      tx,
+      identity.phoneE164,
+      key,
+      approved
+        ? "Connection approved — your agents can now message each other."
+        : "Connection declined.",
+    );
     if (requesterIdentity) {
-      await enqueueConfirmation(
-        deps,
+      await writeConfirmation(
+        tx,
         requesterIdentity.phoneE164,
-        `command:connected:${target.connection.id}`,
+        connectedKey,
         "Your connection request was accepted — your agents can now message each other.",
       );
     }
-  }
+    return true;
+  });
+  if (!claimed) return false;
+  await enqueueDeliverJob(deps);
   return true;
+}
+
+/** Delete-then-insert inside the caller's claim transaction: the prior
+ * cycle's row must not suppress the new confirmation. */
+async function writeConfirmation(
+  tx: Pick<Prisma.TransactionClient, "phoneOutbound">,
+  toNumber: string,
+  key: string,
+  body: string,
+): Promise<void> {
+  await tx.phoneOutbound.deleteMany({ where: { idempotencyKey: key } });
+  await tx.phoneOutbound.createMany({
+    data: [{ idempotencyKey: key, kind: "dm", toNumber, body }],
+    skipDuplicates: true,
+  });
+}
+
+async function enqueueDeliverJob(deps: PhoneInboundDeps): Promise<void> {
+  await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
+    console.error("phone confirmation enqueue error", error);
+  });
 }
 
 async function enqueueConfirmation(

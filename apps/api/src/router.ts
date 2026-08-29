@@ -2882,38 +2882,48 @@ export function createRouter(deps: RouterDeps) {
               })
             : null;
           if (!identity || !connection) throw new ORPCError("NOT_FOUND");
-          const { count } = await deps.prisma.agentConnection.updateMany({
-            where: { id: connection.id, status: "pending" },
-            data: { status: input.accept ? "approved" : "declined" },
-          });
-          if (count === 0) {
-            // Lost a race with revoke: approval must never overwrite it.
-            throw new ORPCError("NOT_FOUND");
-          }
-          const updated = await deps.prisma.agentConnection.findUniqueOrThrow({
-            where: { id: connection.id },
-          });
-          if (input.accept) {
+          const { updated, notifyRequester } = await deps.prisma.$transaction(async (tx) => {
+            // The claim holds the connection row lock through commit, so a
+            // revoke either beats it or waits — it can never interleave with
+            // the confirmation write below.
+            const { count } = await tx.agentConnection.updateMany({
+              where: { id: connection.id, status: "pending" },
+              data: { status: input.accept ? "approved" : "declined" },
+            });
+            if (count === 0) {
+              // Lost a race with revoke: approval must never overwrite it.
+              throw new ORPCError("NOT_FOUND");
+            }
+            const row = await tx.agentConnection.findUniqueOrThrow({
+              where: { id: connection.id },
+            });
+            if (!input.accept) return { updated: row, notifyRequester: false };
             // Parity with the text-command path: the requester hears about it.
-            const requesterIdentity = await deps.prisma.phoneIdentity.findUnique({
+            const requesterIdentity = await tx.phoneIdentity.findUnique({
               where: { botId: connection.requesterBotId },
             });
-            if (requesterIdentity) {
-              await deps.prisma.phoneOutbound.createMany({
-                data: [
-                  {
-                    idempotencyKey: `command:connected:${connection.id}`,
-                    kind: "dm",
-                    toNumber: requesterIdentity.phoneE164,
-                    body: "Your connection request was accepted — your agents can now message each other.",
-                  },
-                ],
-                skipDuplicates: true,
-              });
-              await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
-                console.error("phone connection confirmation enqueue error", error);
-              });
-            }
+            if (!requesterIdentity) return { updated: row, notifyRequester: false };
+            const key = `command:connected:${connection.id}`;
+            // A re-approved pair starts a fresh cycle; clear the stale row or
+            // skipDuplicates would swallow the new confirmation.
+            await tx.phoneOutbound.deleteMany({ where: { idempotencyKey: key } });
+            await tx.phoneOutbound.createMany({
+              data: [
+                {
+                  idempotencyKey: key,
+                  kind: "dm",
+                  toNumber: requesterIdentity.phoneE164,
+                  body: "Your connection request was accepted — your agents can now message each other.",
+                },
+              ],
+              skipDuplicates: true,
+            });
+            return { updated: row, notifyRequester: true };
+          });
+          if (notifyRequester) {
+            await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
+              console.error("phone connection confirmation enqueue error", error);
+            });
           }
           return phoneConnectionDto(deps.prisma, identity, updated);
         }),

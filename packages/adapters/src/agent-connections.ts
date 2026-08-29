@@ -221,10 +221,13 @@ export async function messageConnectedAgent(
       });
       if (!senderStillRunning)
         return { ok: false as const, error: "source run is no longer active" };
-      // Revalidate inside the transaction: a revoke landing between the
-      // pre-check and commit must not create cross-workspace state.
-      const stillApproved = await approvedConnectionBetween(tx, sender.id, target.id);
-      if (!stillApproved) {
+      // Lock the connection row for the rest of the transaction: a revoke's
+      // update blocks behind this lock, so delivery never commits after a
+      // committed revocation (pattern: teaching-session.ts skill lock).
+      const locked = await tx.$queryRaw<Array<{ status: string }>>`
+        SELECT status FROM agent_connections WHERE id = ${connection.id} FOR UPDATE
+      `;
+      if (locked[0]?.status !== "approved") {
         return { ok: false as const, error: "connection is no longer approved" };
       }
 

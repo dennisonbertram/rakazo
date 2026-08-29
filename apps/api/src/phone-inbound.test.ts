@@ -176,7 +176,17 @@ function createDeps(
     user: {
       findUnique: vi.fn(async () => ({ id: "user-1", name: "Alice Owner" })),
     },
-    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(txMock)),
+    // Claim-and-confirm paths run inside their own transaction; the tx
+    // delegate shares the same stateful models (plus the txMock tables used
+    // by createThreadMessage).
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        ...txMock,
+        agentConnection: prisma.agentConnection,
+        phoneChannelMember: prisma.phoneChannelMember,
+        phoneOutbound: prisma.phoneOutbound,
+      }),
+    ),
   };
   return {
     prisma,
@@ -886,15 +896,14 @@ describe("createPhoneInboundHandler confirmation atomicity", () => {
       deps.outboundRows.push(...data);
       return { count: data.length };
     });
-    deps.prisma.$transaction = vi.fn(
-      async (fn: (tx: unknown) => Promise<unknown>) =>
-        fn({
-          agentConnection: deps.prisma.agentConnection,
-          phoneOutbound: {
-            createMany: txCreateMany,
-            deleteMany: vi.fn(async () => ({ count: 0 })),
-          },
-        }),
+    deps.prisma.$transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        agentConnection: deps.prisma.agentConnection,
+        phoneOutbound: {
+          createMany: txCreateMany,
+          deleteMany: vi.fn(async () => ({ count: 0 })),
+        },
+      }),
     ) as unknown as typeof deps.prisma.$transaction;
     const handle = createPhoneInboundHandler(deps);
     await handle({ ...dmEvent, content: "YES" });
@@ -923,15 +932,14 @@ describe("createPhoneInboundHandler confirmation atomicity", () => {
       deps.outboundRows.push(...data);
       return { count: data.length };
     });
-    deps.prisma.$transaction = vi.fn(
-      async (fn: (tx: unknown) => Promise<unknown>) =>
-        fn({
-          phoneChannelMember: deps.prisma.phoneChannelMember,
-          phoneOutbound: {
-            createMany: txCreateMany,
-            deleteMany: vi.fn(async () => ({ count: 0 })),
-          },
-        }),
+    deps.prisma.$transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        phoneChannelMember: deps.prisma.phoneChannelMember,
+        phoneOutbound: {
+          createMany: txCreateMany,
+          deleteMany: vi.fn(async () => ({ count: 0 })),
+        },
+      }),
     ) as unknown as typeof deps.prisma.$transaction;
     const handle = createPhoneInboundHandler(deps);
     await handle({ ...dmEvent, content: "YES" });
