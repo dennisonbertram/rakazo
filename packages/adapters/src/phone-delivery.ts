@@ -1,5 +1,5 @@
 import type { AdapterContext, JobPublisher, MessagingProvider } from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
+import { phoneDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import { botMessageHopExhausted, nextBotMessageHop } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
@@ -273,12 +273,27 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
         });
       }
     } catch {
+      // Transient provider errors go back to pending with a backed-off
+      // retry; only an exhausted budget is terminal.
+      const attempts = (row.attempts ?? 0) + 1;
+      const exhausted = attempts >= PHONE_OUTBOUND_MAX_ATTEMPTS;
       await deps.prisma.phoneOutbound.update({
         where: { id: row.id },
-        data: { status: "failed" },
+        data: { attempts, status: exhausted ? "failed" : "pending" },
       });
+      if (!exhausted) {
+        const retryAt = new Date(Date.now() + phoneOutboundRetryDelayMs(attempts));
+        await deps.jobs.enqueue(phoneDeliverJob(undefined, retryAt)).catch((error) => {
+          console.error("phone outbound retry enqueue error", error);
+        });
+      }
     }
   }
+}
+
+/** Exponential backoff per attempt, capped at one minute. */
+function phoneOutboundRetryDelayMs(attempts: number): number {
+  return Math.min(2 ** attempts * 1000, 60_000);
 }
 
 /** Outbound status webhooks update outbox rows by provider handle. */

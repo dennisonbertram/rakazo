@@ -45,6 +45,14 @@ export async function connectAgent(
 ): Promise<Result> {
   const phone = input.phone?.trim();
   if (!phone) return { ok: false, error: "phone is required" };
+  const requesterIdentity = await deps.prisma.phoneIdentity.findUnique({
+    where: { botId: sender.id },
+  });
+  // Connection invites are a phone-surface feature; a bot whose owner never
+  // texted the line cannot open them.
+  if (!requesterIdentity) {
+    return { ok: false, error: "only phone-linked agents can use agent connections" };
+  }
   const targetIdentity = await deps.prisma.phoneIdentity.findUnique({
     where: { phoneE164: phone },
   });
@@ -75,9 +83,6 @@ export async function connectAgent(
     return { ok: true, status: "pending" };
   }
 
-  const requesterIdentity = await deps.prisma.phoneIdentity.findUnique({
-    where: { botId: sender.id },
-  });
   const requesterOwner = requesterIdentity
     ? await deps.prisma.user.findUnique({
         where: { id: requesterIdentity.userId },
@@ -156,20 +161,26 @@ export async function messageConnectedAgent(
   const phone = input.phone?.trim();
   if (!phone) return { ok: false, error: "phone is required" };
 
+  const senderIdentity = await deps.prisma.phoneIdentity.findUnique({
+    where: { botId: sender.id },
+  });
+  if (!senderIdentity) {
+    return { ok: false, error: "only phone-linked agents can use agent connections" };
+  }
+
   const targetIdentity = await deps.prisma.phoneIdentity.findUnique({
     where: { phoneE164: phone },
   });
-  if (!targetIdentity) return { ok: false, error: "no agent is registered for that number" };
+  // One generic answer for unknown and unconnected numbers, mirroring
+  // connect_agent: the tool must not enumerate registered numbers.
+  if (!targetIdentity) return { ok: false, error: "no agent can be reached at that number" };
   if (targetIdentity.botId === sender.id) {
     return { ok: false, error: "a bot cannot message itself" };
   }
 
   const connection = await approvedConnectionBetween(deps.prisma, sender.id, targetIdentity.botId);
   if (!connection) {
-    return {
-      ok: false,
-      error: "no approved connection with that agent; use connect_agent first",
-    };
+    return { ok: false, error: "no agent can be reached at that number" };
   }
 
   const hop = nextBotMessageHop(

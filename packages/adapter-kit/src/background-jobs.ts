@@ -113,11 +113,12 @@ export function historyCompactJobKey(threadId: string): string {
   return `history.compact:${threadId}`;
 }
 
-export function phoneDeliverJob(runId?: string): BackgroundJob {
+export function phoneDeliverJob(runId?: string, availableAt?: Date): BackgroundJob {
   return {
     name: "phone.deliver",
     payload: runId ? { runId } : {},
     replaceKey: `phone.deliver:${runId ?? "drain"}`,
+    ...(availableAt ? { availableAt } : {}),
   };
 }
 

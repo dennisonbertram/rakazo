@@ -950,12 +950,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
               )?.blocks as MessageBlock[] | undefined)
             : undefined;
         const phoneChannelRun = isPhoneChannelRun(run.trigger, phoneSourceBlocks);
-        const phoneContext =
-          deps.phone && (await deps.phone.hasIdentity(bot.id))
-            ? [phoneDmSurfaceNote(), phoneChannelRun ? phoneChannelPrivacyBlock() : null]
-                .filter(Boolean)
-                .join("\n\n")
-            : undefined;
+        const hasPhoneIdentity = deps.phone ? await deps.phone.hasIdentity(bot.id) : false;
+        const phoneContext = hasPhoneIdentity
+          ? [phoneDmSurfaceNote(), phoneChannelRun ? phoneChannelPrivacyBlock() : null]
+              .filter(Boolean)
+              .join("\n\n")
+          : undefined;
         const graphicalToolsAllowed = graphical && acceptsImages;
         const availableBuiltins = filterBuiltinToolsForThread(
           filterImageReturningComputerTools(builtinAgentTools, graphicalToolsAllowed),
@@ -963,8 +963,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         const builtins = [
           ...selectMemoryTools(availableBuiltins, semanticMemoryEnabled),
-          // Cross-owner agent connections only exist when the phone surface does.
-          ...(deps.phone ? agentConnectionTools : []),
+          // Cross-owner agent connections only exist for phone-linked bots.
+          ...(hasPhoneIdentity ? agentConnectionTools : []),
         ];
         const exposedConnectorTools = discovered.filter(
           (tool) => !builtinAgentTools.some((builtin) => builtin.name === tool.name),

@@ -220,6 +220,9 @@ async function enqueueConfirmation(
   key: string,
   body: string,
 ): Promise<void> {
+  // Keys are stable per membership/connection across approval cycles; clear
+  // the prior cycle's row or skipDuplicates would swallow the new text.
+  await deps.prisma.phoneOutbound.deleteMany({ where: { idempotencyKey: key } });
   await deps.prisma.phoneOutbound.createMany({
     data: [{ idempotencyKey: key, kind: "dm", toNumber, body }],
     skipDuplicates: true,
@@ -378,6 +381,11 @@ async function inviteMember(
   identity: PhoneIdentityRow,
 ): Promise<void> {
   const name = channel.name ?? "an iMessage group";
+  // A returning member restarts the approval cycle; clear the prior invite
+  // row or skipDuplicates would leave them with no prompt to answer.
+  await deps.prisma.phoneOutbound.deleteMany({
+    where: { idempotencyKey: `invite:${channel.id}:${identity.phoneE164}` },
+  });
   await deps.prisma.phoneOutbound.createMany({
     data: [
       {

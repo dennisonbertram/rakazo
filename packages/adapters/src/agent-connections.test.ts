@@ -295,7 +295,7 @@ describe("messageConnectedAgent", () => {
       message: "hello?",
     });
     expect(result).toEqual(
-      expect.objectContaining({ ok: false, error: expect.stringMatching(/connection/i) }),
+      expect.objectContaining({ ok: false, error: expect.stringMatching(/reached/i) }),
     );
     expect(deps.txCalls.messageCreate).toHaveLength(0);
   });
@@ -391,9 +391,14 @@ describe("agent connection enumeration and sender gating", () => {
 
   it("refuses connection requests from bots without a phone identity", async () => {
     const deps = createDeps();
-    const result = await connectAgent(deps, run, { id: "bot-3", name: "Rogue" }, {
-      phone: "+15552222222",
-    });
+    const result = await connectAgent(
+      deps,
+      run,
+      { id: "bot-3", name: "Rogue" },
+      {
+        phone: "+15552222222",
+      },
+    );
 
     expect(result).toEqual(expect.objectContaining({ ok: false }));
     expect(deps.outboundRows).toHaveLength(0);

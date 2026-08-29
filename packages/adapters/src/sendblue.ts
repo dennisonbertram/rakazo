@@ -110,7 +110,12 @@ export class SendBlueMessagingProvider implements MessagingProvider {
   constructor(
     private readonly config: SendBlueConfig,
     private readonly dependencies: { fetch?: typeof globalThis.fetch } = {},
-  ) {}
+  ) {
+    // The API secret rides every request header; never send it cleartext.
+    if (config.baseUrl && !config.baseUrl.startsWith("https://")) {
+      throw new Error(`SendBlue baseUrl must use HTTPS: ${config.baseUrl}`);
+    }
+  }
 
   describe(): AdapterDescriptor<MessagingCapabilities> {
     return {

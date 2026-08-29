@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -19,9 +20,12 @@ describePhone("phone surface journeys", () => {
   let prisma: any;
   const emulator = new SendBlueEmulator();
   const dataDir = mkdtempSync(path.join(tmpdir(), "rakazo-phone-"));
-  // Unique per run: identities, threads, and outbox rows persist in the dev database.
+  // Unique per run: identities, threads, and outbox rows persist in the dev
+  // database. Random E.164 fixtures — a timestamp suffix repeats within
+  // hours and collides with earlier runs.
   const stamp = Date.now();
-  const sender = `+1555${String(stamp).slice(-7)}`;
+  const uniqueNumber = () => `+1555${String(randomInt(10_000_000)).padStart(7, "0")}`;
+  const sender = uniqueNumber();
   const dmHandle = `journey-dm-${stamp}`;
 
   beforeAll(async () => {
@@ -122,7 +126,7 @@ describePhone("phone surface journeys", () => {
   });
 
   it("runs the channel loop: discovery, invite, intro, YES, fan-out, attributed post", async () => {
-    const stranger = `+1666${String(stamp).slice(-7)}`;
+    const stranger = uniqueNumber();
     const groupId = `grp-${stamp}`;
 
     // 1. Discovery: first group message creates the channel, invites the
@@ -222,8 +226,9 @@ describePhone("phone surface journeys", () => {
   });
 
   it("rejects a bad signing secret", async () => {
+    const intruder = uniqueNumber();
     const request = emulator.buildInboundRequest({
-      fromNumber: "+15550000001",
+      fromNumber: intruder,
       content: "intruder",
     });
     const res = await app.request(request.url, {
@@ -232,9 +237,7 @@ describePhone("phone surface journeys", () => {
       body: await request.text(),
     });
     expect(res.status).toBe(401);
-    expect(
-      await prisma.phoneIdentity.findUnique({ where: { phoneE164: "+15550000001" } }),
-    ).toBeNull();
+    expect(await prisma.phoneIdentity.findUnique({ where: { phoneE164: intruder } })).toBeNull();
   });
 });
 

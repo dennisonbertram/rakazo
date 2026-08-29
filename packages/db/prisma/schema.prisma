@@ -950,6 +950,7 @@ model PhoneOutbound {
   providerGroupId String?
   body            String
   status          String    @default("pending")
+  attempts        Int       @default(0)
   providerHandle  String?
   sourceMessageId String?
   createdAt       DateTime  @default(now())

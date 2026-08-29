@@ -117,12 +117,19 @@ export async function provisionPhoneIdentity(
     // A concurrent first-inbound won the phoneE164 race; report its result.
     const winner = await prisma.phoneIdentity.findUnique({ where: { phoneE164 } });
     if (!winner) throw new Error(`phone identity for ${phoneE164} vanished after create failed`);
+    // The winner's bot can differ from the bot this attempt found or
+    // created; pair the result with the winning bot's own thread.
+    const winnerThread =
+      winner.botId === botId
+        ? thread
+        : await prisma.thread.findFirst({ where: { botId: winner.botId } });
+    if (!winnerThread) throw new Error(`bot ${winner.botId} has no thread`);
     return {
       phoneE164,
       userId: winner.userId,
       workspaceId: winner.workspaceId,
       botId: winner.botId,
-      threadId: thread.id,
+      threadId: winnerThread.id,
       created: false,
     };
   }

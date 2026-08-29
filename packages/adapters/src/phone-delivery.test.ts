@@ -186,12 +186,17 @@ describe("deliverPhoneOutbound", () => {
     expect(deps.rows).toEqual([expect.objectContaining({ kind: "dm", status: "pending" })]);
   });
 
-  it("marks rows failed when the provider send throws", async () => {
+  it("returns a transient send failure to pending and schedules a delayed retry", async () => {
     const deps = createDeps({ sendError: new Error("SendBlue 500") });
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
 
-    expect(deps.rows).toEqual([expect.objectContaining({ kind: "dm", status: "failed" })]);
+    expect(deps.rows).toEqual([
+      expect.objectContaining({ kind: "dm", status: "pending", attempts: 1 }),
+    ]);
     expect(deps.rows[0]!.providerHandle ?? null).toBeNull();
+    expect(deps.jobs.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "phone.deliver", availableAt: expect.any(Date) }),
+    );
   });
 
   it("drains leftover pending rows without a run id", async () => {
@@ -540,18 +545,6 @@ describe("deliverPhoneOutbound channel runs", () => {
 });
 
 describe("deliverPhoneOutbound transient failure retry", () => {
-  it("returns a transient send failure to pending and schedules a delayed retry", async () => {
-    const deps = createDeps({ sendError: new Error("SendBlue 500") });
-    await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
-
-    expect(deps.rows).toEqual([
-      expect.objectContaining({ kind: "dm", status: "pending", attempts: 1 }),
-    ]);
-    expect(deps.jobs.enqueue).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "phone.deliver", availableAt: expect.any(Date) }),
-    );
-  });
-
   it("marks the row failed only once the attempt budget is exhausted", async () => {
     const deps = createDeps({
       run: null,
