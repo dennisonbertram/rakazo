@@ -16,12 +16,18 @@ function newId(): string {
  * workspace + owner membership, deployment-owner claim, user memory, and
  * notification preferences. Shared by the Better Auth `user.create.after`
  * hook and phone-identity provisioning so both paths stay in lockstep.
+ *
+ * `claimDeploymentOwner: false` is for identities that did not sign up
+ * through the app (phone provisioning): a first texter must never become
+ * the deployment owner.
  */
 export async function bootstrapUserWorkspace(
   prisma: PrismaClient,
   user: { id: string },
   env: SignupPolicyEnv,
+  options: { claimDeploymentOwner?: boolean } = {},
 ): Promise<{ workspaceId: string }> {
+  const claimDeploymentOwner = options.claimDeploymentOwner ?? true;
   const orgId = newId();
   await prisma.organization.create({
     data: {
@@ -48,13 +54,13 @@ export async function bootstrapUserWorkspace(
     await prisma.deploymentSettings.create({
       data: {
         id: "default",
-        ownerUserId: user.id,
+        ownerUserId: claimDeploymentOwner ? user.id : null,
         signupsEnabled: policy.enabled,
         signupAllowlist: policy.allowlist.join(","),
         signupPolicyInitialized: true,
       },
     });
-  } else if (!existing.ownerUserId) {
+  } else if (!existing.ownerUserId && claimDeploymentOwner) {
     await prisma.deploymentSettings.update({
       where: { id: "default" },
       data: { ownerUserId: user.id },
