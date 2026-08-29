@@ -51,11 +51,19 @@ import {
 } from "@rakazo/adapters";
 import { blockedAuthPaths, createAuth } from "@rakazo/auth";
 import { signupPolicyFromEnv } from "@rakazo/core";
-import { createDb, createThreadEvents, type PrismaClient, requireMembership } from "@rakazo/db";
+import {
+  createDb,
+  createThreadEvents,
+  type PrismaClient,
+  provisionPhoneIdentity,
+  requireMembership,
+} from "@rakazo/db";
 import { MarkdownMemoryStore } from "@rakazo/memory";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { type AppEnv, loadEnv } from "./env.js";
+import { createPhoneInboundHandler } from "./phone-inbound.js";
+import { mountPhoneWebhookRoutes } from "./phone-webhook.js";
 import { createRouter } from "./router.js";
 import { mountVoiceHttpRoutes } from "./voice.js";
 import { mountWebhookHttpRoutes } from "./webhook.js";
@@ -353,6 +361,22 @@ export async function createApp(
     return requireMembership(prisma, session.user.id).catch(() => null);
   });
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });
+  // The phone webhook only exists when the SendBlue surface is enabled.
+  if (messaging && env.sendblueSigningSecret) {
+    mountPhoneWebhookRoutes(app, {
+      signingSecret: env.sendblueSigningSecret,
+      handle: createPhoneInboundHandler({
+        prisma,
+        events,
+        jobs,
+        provision: (phoneE164, policyEnv) => provisionPhoneIdentity(prisma, phoneE164, policyEnv),
+        signupPolicy: {
+          signupsEnabled: env.signupsEnabled,
+          signupAllowlist: env.signupAllowlist,
+        },
+      }),
+    });
+  }
 
   app.get("/health", (c) =>
     c.json({

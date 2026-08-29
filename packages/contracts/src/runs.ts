@@ -18,6 +18,7 @@ export const RunActivityRowSchema = z.object({
     "skill",
     "bot_message",
     "webhook",
+    "phone",
   ]),
   promptSnippet: z.string(),
   updatedAt: z.string(),
