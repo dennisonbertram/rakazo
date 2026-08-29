@@ -116,7 +116,11 @@ function createDeps(
           return create;
         },
       ),
-      update: vi.fn(async () => ({})),
+      update: vi.fn(async ({ where, data }: { where: { id: string }; data: unknown }) => {
+        const member = members.find((m) => m.id === where.id);
+        if (member) Object.assign(member, data);
+        return member ?? {};
+      }),
       updateMany: vi.fn(async () => ({ count: 0 })),
     },
     phoneOutbound: {
@@ -520,6 +524,40 @@ describe("createPhoneInboundHandler channel routing", () => {
         data: { status: "left" },
       }),
     );
+  });
+
+  it("re-invites a member who is back in the group, and skips the sweep on empty participants", async () => {
+    const returning = {
+      id: "pm-4",
+      channelId: "ch-1",
+      phoneE164: "+15551111111",
+      identityId: "pi-1",
+      status: "left",
+    };
+    const deps = createDeps({ members: [returning] });
+    const handle = createPhoneInboundHandler(deps);
+    await handle(groupEvent);
+
+    expect(returning.status).toBe("invited");
+    expect(
+      deps.outboundRows.some((row) => row.idempotencyKey === "invite:ch-1:+15551111111"),
+    ).toBe(true);
+
+    const sparse = createDeps({
+      members: [
+        {
+          id: "pm-5",
+          channelId: "ch-1",
+          phoneE164: "+15554444444",
+          identityId: null,
+          status: "approved",
+        },
+      ],
+    });
+    const sparseHandle = createPhoneInboundHandler(sparse);
+    // A webhook with no participants array must not mass-mark members left.
+    await sparseHandle({ ...groupEvent, participants: [] });
+    expect(sparse.prisma.phoneChannelMember.updateMany).not.toHaveBeenCalled();
   });
 
   it("sanitizes attacker-controlled group names before storing them", async () => {
