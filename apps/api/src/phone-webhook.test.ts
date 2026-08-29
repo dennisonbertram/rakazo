@@ -116,6 +116,32 @@ describe("phone webhook HTTP route", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("forwards outbound status events to the status handler when provided", async () => {
+    const handleStatus = vi.fn(async () => undefined);
+    const app = new Hono();
+    mountPhoneWebhookRoutes(app, {
+      signingSecret: SIGNING_SECRET,
+      handle: vi.fn(async () => undefined),
+      handleStatus,
+    });
+    const statusPayload = JSON.stringify({
+      ...JSON.parse(receivePayload),
+      is_outbound: true,
+      status: "ERROR",
+    });
+    const res = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post(statusPayload, { "sb-signing-secret": SIGNING_SECRET }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(handleStatus).toHaveBeenCalledWith({
+      type: "status",
+      handle: "handle-1",
+      status: "ERROR",
+    });
+  });
+
   it("acknowledges non-message events and invalid JSON without calling the handler", async () => {
     const { app, handler } = mount();
     const callLog = await app.request(
