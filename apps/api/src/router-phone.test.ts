@@ -449,6 +449,98 @@ describe("phone.connections", () => {
     await expect(response.json()).resolves.toEqual({ json: { ok: true } });
   });
 
+  it("revokes status and cancels invites in one transaction", async () => {
+    const { handler, actor, prisma, outboundRows } = phoneDeps({
+      connection: { id: "ac-5", requesterBotId: "bot-1", targetBotId: "bot-9", status: "pending" },
+    });
+    outboundRows.push({
+      idempotencyKey: "connect:bot-1:bot-9",
+      kind: "dm",
+      status: "pending",
+    });
+    const order: string[] = [];
+    const connectionModel = prisma.agentConnection as unknown as {
+      updateMany: (args: unknown) => Promise<{ count: number }>;
+    };
+    const baseUpdateMany = connectionModel.updateMany.bind(connectionModel);
+    const baseDeleteMany = prisma.phoneOutbound.deleteMany;
+    (prisma as unknown as Record<string, unknown>).$transaction = vi.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) => {
+        order.push("tx-start");
+        const result = await fn({
+          agentConnection: {
+            updateMany: async (args: unknown) => {
+              order.push("update");
+              return baseUpdateMany(args);
+            },
+          },
+          phoneOutbound: {
+            deleteMany: async (args: unknown) => {
+              order.push("delete");
+              return baseDeleteMany(args as never);
+            },
+          },
+        });
+        order.push("tx-end");
+        return result;
+      },
+    );
+
+    const response = await call(handler, actor, "phone/connections/revoke", {
+      connectionId: "ac-5",
+    });
+
+    expect(order).toEqual(["tx-start", "update", "delete", "tx-end"]);
+    expect(outboundRows).toEqual([]);
+    await expect(response.json()).resolves.toEqual({ json: { ok: true } });
+  });
+
+  it("does not delete a reconnect invite created after revoke commits", async () => {
+    const { handler, actor, prisma, outboundRows } = phoneDeps({
+      connection: { id: "ac-6", requesterBotId: "bot-1", targetBotId: "bot-9", status: "pending" },
+    });
+    outboundRows.push({
+      idempotencyKey: "connect:bot-1:bot-9",
+      kind: "dm",
+      status: "pending",
+      body: "old invite",
+    });
+    const connectionModel = prisma.agentConnection as unknown as {
+      updateMany: (args: unknown) => Promise<{ count: number }>;
+    };
+    const baseUpdateMany = connectionModel.updateMany.bind(connectionModel);
+    const baseDeleteMany = prisma.phoneOutbound.deleteMany;
+    (prisma as unknown as Record<string, unknown>).$transaction = vi.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          agentConnection: {
+            updateMany: async (args: unknown) => baseUpdateMany(args),
+          },
+          phoneOutbound: {
+            deleteMany: async (args: unknown) => baseDeleteMany(args as never),
+          },
+        }),
+    );
+
+    await call(handler, actor, "phone/connections/revoke", { connectionId: "ac-6" });
+    expect(outboundRows).toEqual([]);
+
+    // Reconnect after revoke has committed: its fresh invite must survive.
+    outboundRows.push({
+      idempotencyKey: "connect:bot-1:bot-9",
+      kind: "dm",
+      status: "pending",
+      body: "fresh reconnect invite",
+    });
+    expect(prisma.phoneOutbound.deleteMany).toHaveBeenCalledTimes(1);
+    expect(outboundRows).toEqual([
+      expect.objectContaining({
+        idempotencyKey: "connect:bot-1:bot-9",
+        body: "fresh reconnect invite",
+      }),
+    ]);
+  });
+
   it("does not let a stale revoke overwrite a newer pending re-request", async () => {
     const { handler, actor, prisma } = phoneDeps({
       connection: {

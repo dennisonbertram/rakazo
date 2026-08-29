@@ -2938,21 +2938,24 @@ export function createRouter(deps: RouterDeps) {
               })
             : null;
           if (!connection) throw new ORPCError("NOT_FOUND");
-          // Claim the status we observed: a concurrent re-request can move a
-          // declined/revoked row back to pending, and an unconditional write
-          // would drop that newer request.
-          const { count } = await deps.prisma.agentConnection.updateMany({
-            where: { id: connection.id, status: connection.status },
-            data: { status: "revoked" },
-          });
-          if (count === 0) throw new ORPCError("NOT_FOUND");
-          // Drop any undelivered connect invite so a revoke after reconnect
-          // cannot still text YES/NO for a connection that is already gone.
-          await deps.prisma.phoneOutbound.deleteMany({
-            where: {
-              idempotencyKey: `connect:${connection.requesterBotId}:${connection.targetBotId}`,
-              status: "pending",
-            },
+          // Claim + invite cancel in one transaction. The status update holds
+          // the connection row lock through commit, so a concurrent reconnect
+          // (FOR UPDATE) waits until both the revoke and the invite delete
+          // finish — otherwise it could reopen and create a fresh invite that
+          // a post-commit deleteMany would then wipe while leaving the row
+          // pending with no approval prompt.
+          await deps.prisma.$transaction(async (tx) => {
+            const { count } = await tx.agentConnection.updateMany({
+              where: { id: connection.id, status: connection.status },
+              data: { status: "revoked" },
+            });
+            if (count === 0) throw new ORPCError("NOT_FOUND");
+            await tx.phoneOutbound.deleteMany({
+              where: {
+                idempotencyKey: `connect:${connection.requesterBotId}:${connection.targetBotId}`,
+                status: "pending",
+              },
+            });
           });
           return { ok: true as const };
         }),
