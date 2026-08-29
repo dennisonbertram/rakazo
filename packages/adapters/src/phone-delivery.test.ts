@@ -570,3 +570,28 @@ describe("deliverPhoneOutbound transient failure retry", () => {
     expect(deps.jobs.enqueue).not.toHaveBeenCalled();
   });
 });
+
+describe("deliverPhoneOutbound retry enqueue failure", () => {
+  it("propagates the enqueue failure so the job queue retries the drain", async () => {
+    const deps = createDeps({});
+    deps.sendDirect.mockRejectedValueOnce(new Error("SendBlue 500"));
+    deps.jobs.enqueue.mockRejectedValueOnce(new Error("queue down"));
+
+    // A swallowed enqueue failure would strand the row in pending forever:
+    // no job reconciler reclaims phone_outbound rows.
+    await expect(deliverPhoneOutbound(deps, { runId: "run-1" }, context)).rejects.toThrow(
+      "queue down",
+    );
+    expect(deps.rows).toEqual([
+      expect.objectContaining({ kind: "dm", status: "pending", attempts: 1 }),
+    ]);
+
+    // The queue's retry re-enters the drain: the row is pending by design,
+    // the claim flips it before the provider call, and it is sent once.
+    await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
+    expect(deps.sendDirect).toHaveBeenCalledTimes(2);
+    expect(deps.rows).toEqual([
+      expect.objectContaining({ kind: "dm", status: "sent", providerHandle: "handle-out-1" }),
+    ]);
+  });
+});

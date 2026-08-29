@@ -254,3 +254,20 @@ describe("SendBlueMessagingProvider base URL policy", () => {
     expect(() => new SendBlueMessagingProvider(config)).not.toThrow();
   });
 });
+
+describe("SendBlueMessagingProvider redirect policy", () => {
+  it("sends every credential-bearing request with redirect: error", async () => {
+    // Without an explicit redirect mode, fetch follows cross-origin
+    // redirects and forwards the sb-api-* headers to the new origin.
+    const { provider, fetchMock } = providerReturning(Response.json({ message_handle: "h-1" }));
+    await provider.sendDirect({ to: "+15551234567", body: "hi" }, context);
+    await provider.sendGroup({ groupId: "group-9", body: "hi all" }, context);
+    await provider.sendTypingIndicator({ to: "+15551234567" }, context);
+    await provider.getGroup("group-9", context);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init).toEqual(expect.objectContaining({ redirect: "error" }));
+    }
+  });
+});
