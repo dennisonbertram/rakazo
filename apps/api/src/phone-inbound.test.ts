@@ -539,9 +539,9 @@ describe("createPhoneInboundHandler channel routing", () => {
     await handle(groupEvent);
 
     expect(returning.status).toBe("invited");
-    expect(
-      deps.outboundRows.some((row) => row.idempotencyKey === "invite:ch-1:+15551111111"),
-    ).toBe(true);
+    expect(deps.outboundRows.some((row) => row.idempotencyKey === "invite:ch-1:+15551111111")).toBe(
+      true,
+    );
 
     const sparse = createDeps({
       members: [

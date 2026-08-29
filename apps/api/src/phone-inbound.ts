@@ -2,7 +2,7 @@ import type { JobPublisher } from "@rakazo/adapter-kit";
 import { phoneDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { SendBlueInboundMessage } from "@rakazo/adapters";
 import type { MessageBlock } from "@rakazo/contracts";
-import { parsePhoneCommand } from "@rakazo/core";
+import { parsePhoneCommand, sanitizePhoneLabel } from "@rakazo/core";
 import type {
   PrismaClient,
   ProvisionedPhoneIdentity,
@@ -239,6 +239,14 @@ async function handleChannelEvent(
         });
         if (member.status === "invited") await inviteMember(deps, channel, identity);
       }
+      if (member.status === "left") {
+        // Back in the group: restart the approval cycle.
+        await deps.prisma.phoneChannelMember.update({
+          where: { id: member.id },
+          data: { status: "invited" },
+        });
+        if (identity) await inviteMember(deps, channel, identity);
+      }
       if (!identity) hasUnlinked = true;
       continue;
     }
@@ -258,14 +266,18 @@ async function handleChannelEvent(
   }
 
   // Someone removed from the iMessage group must stop receiving its content.
-  await deps.prisma.phoneChannelMember.updateMany({
-    where: {
-      channelId: channel.id,
-      phoneE164: { notIn: participants },
-      status: { in: ["invited", "approved"] },
-    },
-    data: { status: "left" },
-  });
+  // A webhook without a participants array says nothing about membership —
+  // never sweep on partial data.
+  if (event.participants.length > 0) {
+    await deps.prisma.phoneChannelMember.updateMany({
+      where: {
+        channelId: channel.id,
+        phoneE164: { notIn: participants },
+        status: { in: ["invited", "approved"] },
+      },
+      data: { status: "left" },
+    });
+  }
 
   if (hasUnlinked && !channel.introPostedAt) {
     await deps.prisma.phoneOutbound.createMany({
@@ -384,16 +396,4 @@ async function ownerFirstName(
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
   const first = user?.name.trim().split(/\s+/)[0];
   return first ? sanitizePhoneLabel(first) : fallback;
-}
-
-/**
- * Group names and owner names are attacker-controlled text interpolated
- * into prompts and DMs; strip framing characters before they get near one.
- */
-export function sanitizePhoneLabel(value: string): string {
-  return value
-    .replace(/[\r\n"[\]]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 64);
 }
