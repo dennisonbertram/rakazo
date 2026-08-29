@@ -36,6 +36,9 @@ import {
   ModelConnectInputSchema,
   ModelCredentialSchema,
   ModelOAuthBeginSchema,
+  PhoneAgentConnectionSchema,
+  PhoneChannelMembershipSchema,
+  PhoneStatusSchema,
   RoutineSchema,
   ScratchpadItemSchema,
   ScratchpadItemStatusSchema,
@@ -545,6 +548,24 @@ export const appContract = {
       .input(z.object({ connectionId: Id, code: z.string().optional() }))
       .output(ConnectionSchema),
     revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  /** SendBlue phone surface: link state, iMessage channels, agent connections. */
+  phone: {
+    status: oc.output(PhoneStatusSchema),
+    channels: {
+      list: oc.output(z.array(PhoneChannelMembershipSchema)),
+      respond: oc
+        .input(z.object({ channelId: Id, accept: z.boolean() }))
+        .output(PhoneChannelMembershipSchema),
+      leave: oc.input(z.object({ channelId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+    connections: {
+      list: oc.output(z.array(PhoneAgentConnectionSchema)),
+      respond: oc
+        .input(z.object({ connectionId: Id, accept: z.boolean() }))
+        .output(PhoneAgentConnectionSchema),
+      revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
   },
   approvalRules: {
     list: oc.output(z.array(ActionApprovalRuleSchema)),

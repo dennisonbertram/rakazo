@@ -312,6 +312,7 @@ export async function createApp(
     remoteConnectors,
     artifacts,
     dataDir: env.dataDir,
+    phone: { enabled: Boolean(messaging) },
     env: {
       defaultProvider: env.defaultProvider,
       defaultModel: env.defaultModel,
