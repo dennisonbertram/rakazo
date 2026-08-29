@@ -30,6 +30,8 @@ function createDeps(
     sourceHop?: number;
     /** Simulates a revoke landing between the pre-check and the transaction. */
     connectionRevokedInsideTx?: boolean;
+    /** Simulates a revoke landing after the in-transaction approval read. */
+    connectionRevokedAfterReadInsideTx?: boolean;
   } = {},
 ) {
   const outboundRows: Array<Record<string, unknown>> = [];
@@ -78,6 +80,14 @@ function createDeps(
         return null;
       }),
     },
+    // What a `SELECT ... FOR UPDATE` on the connection row would see: the
+    // AfterRead variant stays approved for plain reads and only shows the
+    // revoke to a locking read.
+    $queryRaw: vi.fn(async () =>
+      overrides.connectionRevokedInsideTx || overrides.connectionRevokedAfterReadInsideTx
+        ? [{ status: "revoked" }]
+        : [{ status: "approved" }],
+    ),
   };
   const connection = overrides.connection === undefined ? null : overrides.connection;
   const prisma = {
@@ -418,5 +428,28 @@ describe("agent connection enumeration and sender gating", () => {
 
     expect(result).toEqual(expect.objectContaining({ ok: false }));
     expect(deps.txCalls.messageCreate).toHaveLength(0);
+  });
+});
+
+describe("messageConnectedAgent revocation locking", () => {
+  it("aborts delivery when a revoke lands after the in-transaction approval read", async () => {
+    const deps = createDeps({
+      connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "approved" },
+      connectionRevokedAfterReadInsideTx: true,
+    });
+    const result = await messageConnectedAgent(deps, run, sender, {
+      phone: "+15552222222",
+      message: "still there?",
+    });
+
+    // A plain re-read cannot serialize against the concurrent revoke; only a
+    // row lock (or conditional claim) inside the transaction can.
+    expect(result).toEqual(
+      expect.objectContaining({ ok: false, error: expect.stringMatching(/approved/i) }),
+    );
+    expect(deps.txCalls.messageCreate).toHaveLength(0);
+    expect(deps.txCalls.taskCreate).toHaveLength(0);
+    expect(deps.txCalls.runCreate).toHaveLength(0);
+    expect(deps.enqueue).not.toHaveBeenCalled();
   });
 });

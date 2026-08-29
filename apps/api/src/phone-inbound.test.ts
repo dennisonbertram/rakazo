@@ -867,3 +867,82 @@ describe("createPhoneInboundHandler approval-cycle notifications", () => {
     expect(leaveRows()).toHaveLength(1);
   });
 });
+
+describe("createPhoneInboundHandler confirmation atomicity", () => {
+  it("writes the connection confirmations under the claim's transaction", async () => {
+    const deps = createDeps();
+    deps.prisma.agentConnection = {
+      findFirst: vi.fn(async () => ({
+        id: "ac-1",
+        requesterBotId: "bot-9",
+        targetBotId: "bot-1",
+        status: "pending",
+        updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+      })),
+      update: vi.fn(async () => ({})),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    };
+    const txCreateMany = vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+      deps.outboundRows.push(...data);
+      return { count: data.length };
+    });
+    deps.prisma.$transaction = vi.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          agentConnection: deps.prisma.agentConnection,
+          phoneOutbound: {
+            createMany: txCreateMany,
+            deleteMany: vi.fn(async () => ({ count: 0 })),
+          },
+        }),
+    ) as unknown as typeof deps.prisma.$transaction;
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "YES" });
+
+    // Both confirmations must be written while the claim's row lock is held;
+    // a revoke landing between claim and writes must not interleave.
+    const keys = txCreateMany.mock.calls.flatMap(([input]) =>
+      input.data.map((row) => row.idempotencyKey),
+    );
+    expect(keys).toEqual(
+      expect.arrayContaining(["command:approve:ac-1", "command:connected:ac-1"]),
+    );
+    expect(deps.sendUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("writes the channel confirmation under the claim's transaction", async () => {
+    const invited = {
+      id: "pm-1",
+      channelId: "ch-1",
+      phoneE164: "+15551111111",
+      identityId: "pi-1",
+      status: "invited",
+    };
+    const deps = createDeps({ invitedMember: invited });
+    const txCreateMany = vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+      deps.outboundRows.push(...data);
+      return { count: data.length };
+    });
+    deps.prisma.$transaction = vi.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          phoneChannelMember: deps.prisma.phoneChannelMember,
+          phoneOutbound: {
+            createMany: txCreateMany,
+            deleteMany: vi.fn(async () => ({ count: 0 })),
+          },
+        }),
+    ) as unknown as typeof deps.prisma.$transaction;
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "YES" });
+
+    // The participant sweep updates the same membership row; writing the
+    // "You're in" text under the claim's lock keeps it from interleaving.
+    expect(txCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ idempotencyKey: "command:approve:pm-1" })],
+      }),
+    );
+    expect(deps.sendUserMessage).not.toHaveBeenCalled();
+  });
+});

@@ -464,3 +464,38 @@ describe("phone status-write races", () => {
     expect(response.status).toBeGreaterThanOrEqual(400);
   });
 });
+
+describe("phone.connections.respond confirmation atomicity", () => {
+  it("writes the requester confirmation under the claim's transaction", async () => {
+    const { handler, actor, prisma, outboundRows } = phoneDeps();
+    // Track the transaction-scoped outbox delegate separately: a revoke can
+    // only be excluded from the confirmation window if the claim's row lock
+    // is still held when the confirmation row is written.
+    const txCreateMany = vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+      outboundRows.push(...data);
+      return { count: data.length };
+    });
+    (prisma as unknown as Record<string, unknown>).$transaction = vi.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          agentConnection: prisma.agentConnection,
+          phoneIdentity: prisma.phoneIdentity,
+          phoneOutbound: {
+            createMany: txCreateMany,
+            deleteMany: vi.fn(async () => ({ count: 0 })),
+          },
+        }),
+    );
+    const response = await call(handler, actor, "phone/connections/respond", {
+      connectionId: "ac-1",
+      accept: true,
+    });
+
+    expect(response.status).toBe(200);
+    expect(txCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ idempotencyKey: "command:connected:ac-1" })],
+      }),
+    );
+  });
+});
