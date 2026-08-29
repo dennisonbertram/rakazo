@@ -289,6 +289,55 @@ describe("createPhoneInboundHandler owner commands", () => {
     );
   });
 
+  it("approves a pending agent connection on YES and texts both owners", async () => {
+    const deps = createDeps();
+    deps.prisma.agentConnection = {
+      findFirst: vi.fn(async () => ({
+        id: "ac-1",
+        requesterBotId: "bot-9",
+        targetBotId: "bot-1",
+        status: "pending",
+        updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+      })),
+      update: vi.fn(async () => ({})),
+    };
+    deps.prisma.phoneIdentity.findUnique = vi.fn(
+      async ({ where }: { where: { phoneE164?: string; botId?: string } }) => {
+        if (where.botId === "bot-9") {
+          return {
+            id: "pi-9",
+            phoneE164: "+15559999999",
+            userId: "user-9",
+            workspaceId: "ws-9",
+            botId: "bot-9",
+            outboundSinceInbound: 0,
+          };
+        }
+        return {
+          id: "pi-1",
+          phoneE164: "+15551111111",
+          userId: "user-1",
+          workspaceId: "ws-1",
+          botId: "bot-1",
+          outboundSinceInbound: 0,
+        };
+      },
+    );
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "YES" });
+
+    expect(deps.prisma.agentConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "ac-1" }, data: { status: "approved" } }),
+    );
+    expect(deps.outboundRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "dm", toNumber: "+15551111111" }),
+        expect.objectContaining({ kind: "dm", toNumber: "+15559999999" }),
+      ]),
+    );
+    expect(deps.sendUserMessage).not.toHaveBeenCalled();
+  });
+
   it("treats YES without a pending invite as a normal message", async () => {
     const deps = createDeps();
     const handle = createPhoneInboundHandler(deps);
