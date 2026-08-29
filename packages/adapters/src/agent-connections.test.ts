@@ -125,6 +125,7 @@ function createDeps(
         id: where.id,
         ...(data as object),
       })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     phoneOutbound: {
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
@@ -238,8 +239,8 @@ describe("respondAgentConnection", () => {
     const result = await respondAgentConnection(deps, run, sender, { accept: true });
 
     expect(result).toEqual(expect.objectContaining({ ok: true, status: "approved" }));
-    expect(deps.prisma.agentConnection.update).toHaveBeenCalledWith({
-      where: { id: "ac-1" },
+    expect(deps.prisma.agentConnection.updateMany).toHaveBeenCalledWith({
+      where: { id: "ac-1", status: "pending" },
       data: { status: "approved" },
     });
   });

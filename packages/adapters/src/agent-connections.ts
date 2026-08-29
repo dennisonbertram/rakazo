@@ -132,10 +132,12 @@ export async function respondAgentConnection(
   });
   if (!pending) return { ok: false, error: "no pending connection request" };
   const status = input.accept ? "approved" : "declined";
-  await deps.prisma.agentConnection.update({
-    where: { id: pending.id },
+  const { count } = await deps.prisma.agentConnection.updateMany({
+    where: { id: pending.id, status: "pending" },
     data: { status },
   });
+  // A revoke landing between the read and this write wins; never overwrite it.
+  if (count === 0) return { ok: false, error: "connection request is no longer pending" };
   return { ok: true, status };
 }
 
@@ -208,6 +210,12 @@ export async function messageConnectedAgent(
       });
       if (!senderStillRunning)
         return { ok: false as const, error: "source run is no longer active" };
+      // Revalidate inside the transaction: a revoke landing between the
+      // pre-check and commit must not create cross-workspace state.
+      const stillApproved = await approvedConnectionBetween(tx, sender.id, target.id);
+      if (!stillApproved) {
+        return { ok: false as const, error: "connection is no longer approved" };
+      }
 
       const inboundBlock: MessageBlock = {
         kind: "bot_message_received",
@@ -333,7 +341,7 @@ function isUniqueConstraintError(error: unknown) {
 }
 
 async function approvedConnectionBetween(
-  prisma: PrismaClient,
+  prisma: Pick<PrismaClient, "agentConnection">,
   botA: string,
   botB: string,
 ): Promise<{ id: string } | null> {

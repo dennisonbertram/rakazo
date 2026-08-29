@@ -122,7 +122,30 @@ function createDeps(
         if (member) Object.assign(member, data);
         return member ?? {};
       }),
-      updateMany: vi.fn(async () => ({ count: 0 })),
+      updateMany: vi.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id?: string; status?: string };
+          data: Record<string, unknown>;
+        }) => {
+          // Single-row predicated claims (owner commands) honor the status
+          // predicate; the group sweep path is asserted by call args only.
+          if (where.id) {
+            const row = [overrides.invitedMember, overrides.approvedMember, ...members]
+              .filter(Boolean)
+              .find((m) => (m as Record<string, unknown>).id === where.id) as
+              | Record<string, unknown>
+              | undefined;
+            if (row && (where.status === undefined || row.status === where.status)) {
+              Object.assign(row, data);
+              return { count: 1 };
+            }
+          }
+          return { count: 0 };
+        },
+      ),
     },
     phoneOutbound: {
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
@@ -342,9 +365,9 @@ describe("createPhoneInboundHandler owner commands", () => {
     const handle = createPhoneInboundHandler(deps);
     await handle({ ...dmEvent, content: "YES" });
 
-    expect(deps.prisma.phoneChannelMember.update).toHaveBeenCalledWith(
+    expect(deps.prisma.phoneChannelMember.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "pm-1" },
+        where: { id: "pm-1", status: "invited" },
         data: { status: "approved" },
       }),
     );
@@ -360,8 +383,11 @@ describe("createPhoneInboundHandler owner commands", () => {
     const handle = createPhoneInboundHandler(deps);
     await handle({ ...dmEvent, content: "no" });
 
-    expect(deps.prisma.phoneChannelMember.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "declined" } }),
+    expect(deps.prisma.phoneChannelMember.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pm-1", status: "invited" },
+        data: { status: "declined" },
+      }),
     );
     expect(deps.sendUserMessage).not.toHaveBeenCalled();
   });
@@ -372,8 +398,11 @@ describe("createPhoneInboundHandler owner commands", () => {
     const handle = createPhoneInboundHandler(deps);
     await handle({ ...dmEvent, content: "LEAVE" });
 
-    expect(deps.prisma.phoneChannelMember.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "pm-2" }, data: { status: "left" } }),
+    expect(deps.prisma.phoneChannelMember.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pm-2", status: "approved" },
+        data: { status: "left" },
+      }),
     );
     expect(deps.outboundRows[0]).toEqual(
       expect.objectContaining({ kind: "dm", body: expect.stringMatching(/unchanged|no leave/i) }),
@@ -391,6 +420,7 @@ describe("createPhoneInboundHandler owner commands", () => {
         updatedAt: new Date("2026-08-28T00:00:00.000Z"),
       })),
       update: vi.fn(async () => ({})),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     };
     deps.prisma.phoneIdentity.findUnique = vi.fn(
       async ({ where }: { where: { phoneE164?: string; botId?: string } }) => {
@@ -417,8 +447,11 @@ describe("createPhoneInboundHandler owner commands", () => {
     const handle = createPhoneInboundHandler(deps);
     await handle({ ...dmEvent, content: "YES" });
 
-    expect(deps.prisma.agentConnection.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "ac-1" }, data: { status: "approved" } }),
+    expect(deps.prisma.agentConnection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ac-1", status: "pending" },
+        data: { status: "approved" },
+      }),
     );
     expect(deps.outboundRows).toEqual(
       expect.arrayContaining([
@@ -435,6 +468,7 @@ describe("createPhoneInboundHandler owner commands", () => {
     await handle({ ...dmEvent, content: "YES" });
 
     expect(deps.prisma.phoneChannelMember.update).not.toHaveBeenCalled();
+    expect(deps.prisma.phoneChannelMember.updateMany).not.toHaveBeenCalled();
     expect(deps.sendUserMessage).toHaveBeenCalled();
   });
 });

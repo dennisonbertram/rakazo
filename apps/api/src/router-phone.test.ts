@@ -44,6 +44,8 @@ function phoneDeps(
           status: "pending",
         }
       : overrides.connection;
+  const membershipState = membership ? { ...membership } : null;
+  const connectionState = connection ? { ...connection } : null;
   const prisma = {
     phoneIdentity: {
       findFirst: vi.fn(async () => resolvedIdentity),
@@ -61,6 +63,22 @@ function phoneDeps(
         ...(data as object),
         channel: membership?.channel ?? { id: "ch-1", name: "Family", members: [] },
       })),
+      updateMany: vi.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id?: string; status?: string };
+          data: Record<string, unknown>;
+        }) => {
+          if (!membershipState) return { count: 0 };
+          if (where.id && membershipState.id !== where.id) return { count: 0 };
+          if (where.status && membershipState.status !== where.status) return { count: 0 };
+          Object.assign(membershipState, data);
+          return { count: 1 };
+        },
+      ),
+      findUniqueOrThrow: vi.fn(async () => membershipState),
     },
     agentConnection: {
       findMany: vi.fn(async () => overrides.connections ?? (connection ? [connection] : [])),
@@ -94,6 +112,22 @@ function phoneDeps(
         ...connection,
         ...(data as object),
       })),
+      updateMany: vi.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id?: string; status?: string };
+          data: Record<string, unknown>;
+        }) => {
+          if (!connectionState) return { count: 0 };
+          if (where.id && connectionState.id !== where.id) return { count: 0 };
+          if (where.status && connectionState.status !== where.status) return { count: 0 };
+          Object.assign(connectionState, data);
+          return { count: 1 };
+        },
+      ),
+      findUniqueOrThrow: vi.fn(async () => connectionState),
     },
     bot: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => ({
@@ -201,23 +235,35 @@ describe("phone.channels", () => {
     });
   });
 
-  it("approves an invited membership and declines on accept=false", async () => {
+  it("approves an invited membership", async () => {
     const { handler, actor, prisma } = phoneDeps();
     const approved = await call(handler, actor, "phone/channels/respond", {
       channelId: "ch-1",
       accept: true,
     });
-    expect(prisma.phoneChannelMember.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "approved" } }),
+    expect(prisma.phoneChannelMember.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pm-1", status: "invited" },
+        data: { status: "approved" },
+      }),
     );
     await expect(approved.json()).resolves.toEqual({
       json: expect.objectContaining({ status: "approved" }),
     });
+  });
 
+  it("declines an invited membership on accept=false", async () => {
+    const { handler, actor, prisma } = phoneDeps();
     const declined = await call(handler, actor, "phone/channels/respond", {
       channelId: "ch-1",
       accept: false,
     });
+    expect(prisma.phoneChannelMember.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pm-1", status: "invited" },
+        data: { status: "declined" },
+      }),
+    );
     await expect(declined.json()).resolves.toEqual({
       json: expect.objectContaining({ status: "declined" }),
     });
@@ -300,8 +346,11 @@ describe("phone.connections", () => {
       connectionId: "ac-1",
       accept: true,
     });
-    expect(prisma.agentConnection.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "approved" } }),
+    expect(prisma.agentConnection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ac-1", status: "pending" },
+        data: { status: "approved" },
+      }),
     );
     await expect(response.json()).resolves.toEqual({
       json: expect.objectContaining({ status: "approved" }),

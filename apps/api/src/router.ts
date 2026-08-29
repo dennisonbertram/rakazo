@@ -2830,9 +2830,17 @@ export function createRouter(deps: RouterDeps) {
           if (membership?.status !== "invited") {
             throw new ORPCError("NOT_FOUND");
           }
-          const updated = await deps.prisma.phoneChannelMember.update({
-            where: { id: membership.id },
+          const { count } = await deps.prisma.phoneChannelMember.updateMany({
+            where: { id: membership.id, status: "invited" },
             data: { status: input.accept ? "approved" : "declined" },
+          });
+          if (count === 0) {
+            // Lost a race with leave/sweep: approval must not resurrect a
+            // departed member.
+            throw new ORPCError("NOT_FOUND");
+          }
+          const updated = await deps.prisma.phoneChannelMember.findUniqueOrThrow({
+            where: { id: membership.id },
             include: { channel: { include: { members: ACTIVE_CHANNEL_MEMBERS } } },
           });
           return phoneChannelDto(updated);
@@ -2874,9 +2882,16 @@ export function createRouter(deps: RouterDeps) {
               })
             : null;
           if (!identity || !connection) throw new ORPCError("NOT_FOUND");
-          const updated = await deps.prisma.agentConnection.update({
-            where: { id: connection.id },
+          const { count } = await deps.prisma.agentConnection.updateMany({
+            where: { id: connection.id, status: "pending" },
             data: { status: input.accept ? "approved" : "declined" },
+          });
+          if (count === 0) {
+            // Lost a race with revoke: approval must never overwrite it.
+            throw new ORPCError("NOT_FOUND");
+          }
+          const updated = await deps.prisma.agentConnection.findUniqueOrThrow({
+            where: { id: connection.id },
           });
           if (input.accept) {
             // Parity with the text-command path: the requester hears about it.

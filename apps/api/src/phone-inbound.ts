@@ -131,10 +131,13 @@ async function applyPhoneCommand(
       orderBy: { updatedAt: "desc" },
     });
     if (!membership) return false;
-    await deps.prisma.phoneChannelMember.update({
-      where: { id: membership.id },
+    const { count } = await deps.prisma.phoneChannelMember.updateMany({
+      where: { id: membership.id, status: "approved" },
       data: { status: "left" },
     });
+    // State changed under us (e.g. swept out and re-invited): treat the
+    // text as a normal message rather than overwriting the newer state.
+    if (count === 0) return false;
     await enqueueConfirmation(
       deps,
       identity.phoneE164,
@@ -164,10 +167,12 @@ async function applyPhoneCommand(
   const approved = command === "approve";
 
   if (target.kind === "channel") {
-    await deps.prisma.phoneChannelMember.update({
-      where: { id: target.membership.id },
+    const { count } = await deps.prisma.phoneChannelMember.updateMany({
+      where: { id: target.membership.id, status: "invited" },
       data: { status: approved ? "approved" : "declined" },
     });
+    // Swept out or answered elsewhere since the read: not ours to write.
+    if (count === 0) return false;
     await enqueueConfirmation(
       deps,
       identity.phoneE164,
@@ -179,10 +184,12 @@ async function applyPhoneCommand(
     return true;
   }
 
-  await deps.prisma.agentConnection.update({
-    where: { id: target.connection.id },
+  const { count } = await deps.prisma.agentConnection.updateMany({
+    where: { id: target.connection.id, status: "pending" },
     data: { status: approved ? "approved" : "declined" },
   });
+  // Revoked or answered elsewhere since the read: not ours to write.
+  if (count === 0) return false;
   await enqueueConfirmation(
     deps,
     identity.phoneE164,
