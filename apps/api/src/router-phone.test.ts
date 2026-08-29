@@ -13,14 +13,16 @@ const identity = {
   outboundSinceInbound: 0,
 };
 
-function phoneDeps(overrides: {
-  enabled?: boolean;
-  identity?: unknown;
-  membership?: Record<string, unknown> | null;
-  memberships?: Array<Record<string, unknown>>;
-  connection?: Record<string, unknown> | null;
-  connections?: Array<Record<string, unknown>>;
-} = {}) {
+function phoneDeps(
+  overrides: {
+    enabled?: boolean;
+    identity?: unknown;
+    membership?: Record<string, unknown> | null;
+    memberships?: Array<Record<string, unknown>>;
+    connection?: Record<string, unknown> | null;
+    connections?: Array<Record<string, unknown>>;
+  } = {},
+) {
   const resolvedIdentity = overrides.identity === undefined ? identity : overrides.identity;
   const membership =
     overrides.membership === undefined
@@ -52,9 +54,7 @@ function phoneDeps(overrides: {
       ),
     },
     phoneChannelMember: {
-      findMany: vi.fn(async () =>
-        overrides.memberships ?? (membership ? [membership] : []),
-      ),
+      findMany: vi.fn(async () => overrides.memberships ?? (membership ? [membership] : [])),
       findFirst: vi.fn(async () => membership),
       update: vi.fn(async ({ data }: { data: unknown }) => ({
         ...membership,
@@ -63,10 +63,33 @@ function phoneDeps(overrides: {
       })),
     },
     agentConnection: {
-      findMany: vi.fn(async () =>
-        overrides.connections ?? (connection ? [connection] : []),
+      findMany: vi.fn(async () => overrides.connections ?? (connection ? [connection] : [])),
+      findFirst: vi.fn(
+        async ({
+          where,
+        }: {
+          where?: {
+            id?: string;
+            targetBotId?: string;
+            status?: string;
+            OR?: Array<Record<string, string>>;
+          };
+        }) => {
+          if (!connection) return null;
+          if (where?.id && connection.id !== where.id) return null;
+          if (where?.targetBotId && connection.targetBotId !== where.targetBotId) return null;
+          if (where?.status && connection.status !== where.status) return null;
+          if (where?.OR) {
+            const involved = where.OR.some(
+              (cond) =>
+                connection.requesterBotId === cond.requesterBotId ||
+                connection.targetBotId === cond.targetBotId,
+            );
+            if (!involved) return null;
+          }
+          return connection;
+        },
       ),
-      findFirst: vi.fn(async () => connection),
       update: vi.fn(async ({ data }: { data: unknown }) => ({
         ...connection,
         ...(data as object),
@@ -103,12 +126,7 @@ function phoneDeps(overrides: {
   return { prisma, deps, actor, handler: new RPCHandler(createRouter(deps)) };
 }
 
-async function call(
-  handler: RPCHandler<never>,
-  actor: Actor,
-  path: string,
-  body: unknown = {},
-) {
+async function call(handler: RPCHandler<never>, actor: Actor, path: string, body: unknown = {}) {
   const { response } = await handler.handle(
     new Request(`http://127.0.0.1/rpc/${path}`, {
       method: "POST",
@@ -149,9 +167,7 @@ describe("phone.channels", () => {
     const { handler, actor } = phoneDeps();
     const response = await call(handler, actor, "phone/channels/list");
     await expect(response.json()).resolves.toEqual({
-      json: [
-        { channelId: "ch-1", name: "Family", status: "invited", memberCount: 2 },
-      ],
+      json: [{ channelId: "ch-1", name: "Family", status: "invited", memberCount: 2 }],
     });
   });
 
