@@ -402,7 +402,7 @@ describe("deliverPhoneOutbound", () => {
     expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
   });
 
-  it("retries a connect invite when the provider rejects before accept", async () => {
+  it("does not re-queue a connect invite when the provider send fails", async () => {
     const deps = createDeps({
       run: null,
       connectionStatus: "pending",
@@ -422,9 +422,9 @@ describe("deliverPhoneOutbound", () => {
     });
     await deliverPhoneOutbound(deps, {}, context);
 
-    expect(deps.rows[0]).toEqual(
-      expect.objectContaining({ status: "pending", attempts: 1 }),
-    );
+    // At-most-once: keep the claim rather than risk a duplicate YES/NO.
+    expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
+    expect(deps.jobs.enqueue).not.toHaveBeenCalled();
   });
 
   it("does not re-queue a connect invite after a delivery transaction timeout", async () => {

@@ -230,16 +230,17 @@ function connectInvitePair(
  * (and delete the claim) between the pending check and sendDirect.
  * Only used for rare approval DMs — not for ordinary mirrored traffic.
  *
- * Returns `retry` only when the provider clearly rejected before accept.
- * Transaction timeouts after a possible accept return `sent` so drain does
- * not restore pending and double-text the same YES/NO prompt.
+ * At-most-once: any failure after the provider call (or an ambiguous
+ * transport error) keeps the outer claim as `sent` so drain does not
+ * restore pending and duplicate the YES/NO DM. A lost invite is fine —
+ * reconnect starts a fresh cycle.
  */
 async function sendConnectInvite(
   deps: PhoneDeliveryDeps,
   row: { id: string; toNumber: string; body: string },
   pair: { requesterBotId: string; targetBotId: string },
   context: AdapterContext,
-): Promise<"sent" | "skipped" | "retry"> {
+): Promise<"sent" | "skipped"> {
   try {
     return await deps.prisma.$transaction(
       async (tx) => {
@@ -261,29 +262,25 @@ async function sendConnectInvite(
           select: { id: true },
         });
         if (!outbound) return "skipped";
-        let sent: { handle: string };
         try {
-          sent = await deps.messaging.sendDirect(
+          const sent = await deps.messaging.sendDirect(
             { to: row.toNumber, body: row.body },
             context,
           );
+          await tx.phoneOutbound.updateMany({
+            where: { id: row.id },
+            data: { providerHandle: sent.handle },
+          });
         } catch {
-          // Provider did not accept — safe for drain to back off and retry.
-          return "retry";
+          // Provider error or lost response is ambiguous without an
+          // idempotency key — do not ask drain to retry.
         }
-        // Handle write failures must not return retry: the provider already
-        // accepted, and a re-queue would duplicate the YES/NO DM.
-        await tx.phoneOutbound.updateMany({
-          where: { id: row.id },
-          data: { providerHandle: sent.handle },
-        });
         return "sent";
       },
       { maxWait: 5_000, timeout: 20_000 },
     );
   } catch {
-    // Lock/timeout after a possible accept: keep the outer claim as sent
-    // (no handle) rather than re-queueing a duplicate invitation.
+    // Lock/timeout after a possible accept: keep the outer claim as sent.
     return "sent";
   }
 }
@@ -344,16 +341,12 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
       }
       const invitePair = connectInvitePair(row.idempotencyKey);
       if (invitePair) {
-        const result = await sendConnectInvite(
+        await sendConnectInvite(
           deps,
           { id: row.id, toNumber: row.toNumber, body: row.body },
           invitePair,
           context,
         );
-        if (result === "retry") {
-          // Surface as a transient failure so the shared backoff path runs.
-          throw new Error("connect invite provider send failed");
-        }
         continue;
       }
       const sent = await deps.messaging.sendDirect({ to: row.toNumber, body: row.body }, context);
