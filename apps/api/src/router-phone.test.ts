@@ -472,7 +472,12 @@ describe("phone.connections", () => {
 
   it("cancels a claimed-but-undelivered connect invite on revoke", async () => {
     const { handler, actor, outboundRows } = phoneDeps({
-      connection: { id: "ac-claimed", requesterBotId: "bot-1", targetBotId: "bot-9", status: "pending" },
+      connection: {
+        id: "ac-claimed",
+        requesterBotId: "bot-1",
+        targetBotId: "bot-9",
+        status: "pending",
+      },
     });
     outboundRows.push({
       idempotencyKey: "connect:bot-1:bot-9",
