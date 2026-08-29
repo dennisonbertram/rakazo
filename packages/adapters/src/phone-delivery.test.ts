@@ -169,9 +169,8 @@ describe("deliverPhoneOutbound", () => {
     const deps = createDeps({ sendError: new Error("SendBlue 500") });
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
 
-    expect(deps.rows).toEqual([
-      expect.objectContaining({ kind: "dm", status: "failed", providerHandle: null }),
-    ]);
+    expect(deps.rows).toEqual([expect.objectContaining({ kind: "dm", status: "failed" })]);
+    expect(deps.rows[0]!.providerHandle ?? null).toBeNull();
   });
 
   it("drains leftover pending rows without a run id", async () => {

@@ -9,6 +9,7 @@ import type {
   SandboxProvider,
 } from "@rakazo/adapter-kit";
 import {
+  applyPhoneOutboundStatus,
   type ComposioProvider,
   type ConnectorRegistry,
   createBackgroundJobHandlers,
@@ -345,6 +346,7 @@ export async function createApp(
   if (messaging && env.sendblueSigningSecret) {
     mountPhoneWebhookRoutes(app, {
       signingSecret: env.sendblueSigningSecret,
+      handleStatus: (event) => applyPhoneOutboundStatus(prisma, event),
       handle: createPhoneInboundHandler({
         prisma,
         events,

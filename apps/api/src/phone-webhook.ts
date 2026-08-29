@@ -1,4 +1,8 @@
-import { parseSendBlueInbound, type SendBlueInboundMessage } from "@rakazo/adapters";
+import {
+  parseSendBlueInbound,
+  type SendBlueInboundMessage,
+  type SendBlueOutboundStatus,
+} from "@rakazo/adapters";
 import { timingSafeStringEqual } from "@rakazo/core";
 import type { Hono } from "hono";
 import { readBoundedBody, WEBHOOK_MAX_BODY_BYTES } from "./webhook.js";
@@ -8,6 +12,7 @@ export const PHONE_WEBHOOK_PATH = "/api/v1/phone/webhook";
 export type PhoneWebhookDeps = {
   signingSecret: string;
   handle: (event: SendBlueInboundMessage) => Promise<void>;
+  handleStatus?: (event: SendBlueOutboundStatus) => Promise<void>;
 };
 
 /**
@@ -36,9 +41,11 @@ export function mountPhoneWebhookRoutes(app: Hono, deps: PhoneWebhookDeps) {
     }
     const event = parseSendBlueInbound(payload);
     // Always 200: SendBlue retries 3x on 5xx, and non-message events
-    // (call logs, statuses until slice 4) are not actionable here.
+    // (call logs, typing indicators) are not actionable here.
     if (event?.type === "message") {
       await deps.handle(event);
+    } else if (event?.type === "status") {
+      await deps.handleStatus?.(event);
     }
     return c.json({ ok: true });
   });
