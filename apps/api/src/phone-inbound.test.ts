@@ -303,6 +303,30 @@ describe("typing indicators", () => {
 
     expect(deps.typing).not.toHaveBeenCalled();
   });
+
+  it("starts typing before enqueueing the run, so the bubbles beat the reply", async () => {
+    const deps = createDeps();
+    const handle = createPhoneInboundHandler(deps);
+    await handle(dmEvent);
+
+    expect(deps.typing.mock.invocationCallOrder[0]!).toBeLessThan(
+      deps.enqueue.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("still delivers the run when the typing call fails", async () => {
+    const deps = createDeps();
+    deps.typing.mockRejectedValue(new Error("sendblue down"));
+    const handle = createPhoneInboundHandler(deps);
+    await handle(dmEvent);
+    // The rejection is caught inside the handler; give the fire-and-forget
+    // promise a tick to settle so a bad catch surfaces here, not as an
+    // unhandled rejection after the test.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(deps.enqueue).toHaveBeenCalled();
+    expect(deps.sendUserMessage).toHaveBeenCalled();
+  });
 });
 
 describe("createPhoneInboundHandler owner commands", () => {
