@@ -401,6 +401,57 @@ describe("deliverPhoneOutbound", () => {
     );
     expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
   });
+
+  it("retries a connect invite when the provider rejects before accept", async () => {
+    const deps = createDeps({
+      run: null,
+      connectionStatus: "pending",
+      sendError: new Error("provider down"),
+      outboundRows: [
+        {
+          id: "out-connect",
+          idempotencyKey: "connect:bot-1:bot-9",
+          kind: "dm",
+          toNumber: "+15559999999",
+          body: "wants to connect",
+          status: "pending",
+          providerHandle: null,
+          attempts: 0,
+        },
+      ],
+    });
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.rows[0]).toEqual(
+      expect.objectContaining({ status: "pending", attempts: 1 }),
+    );
+  });
+
+  it("does not re-queue a connect invite after a delivery transaction timeout", async () => {
+    const deps = createDeps({
+      run: null,
+      connectionStatus: "pending",
+      outboundRows: [
+        {
+          id: "out-connect",
+          idempotencyKey: "connect:bot-1:bot-9",
+          kind: "dm",
+          toNumber: "+15559999999",
+          body: "wants to connect",
+          status: "pending",
+          providerHandle: null,
+        },
+      ],
+    });
+    (deps.prisma as unknown as { $transaction: unknown }).$transaction = vi.fn(async () => {
+      throw new Error("Transaction API error: Transaction already closed");
+    });
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.sendDirect).not.toHaveBeenCalled();
+    expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
+    expect(deps.jobs.enqueue).not.toHaveBeenCalled();
+  });
 });
 
 describe("applyPhoneOutboundStatus", () => {
