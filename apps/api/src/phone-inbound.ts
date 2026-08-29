@@ -1,81 +1,331 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
+import { phoneDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { SendBlueInboundMessage } from "@rakazo/adapters";
+import type { MessageBlock } from "@rakazo/contracts";
+import { parsePhoneCommand } from "@rakazo/core";
 import type {
   PrismaClient,
   ProvisionedPhoneIdentity,
   SignupPolicyEnv,
   ThreadEvents,
 } from "@rakazo/db";
+import { createThreadMessage } from "@rakazo/db";
 
 export interface PhoneInboundDeps {
   prisma: PrismaClient;
-  events: Pick<ThreadEvents, "sendUserMessage">;
+  events: Pick<ThreadEvents, "sendUserMessage" | "notify">;
   jobs: Pick<JobPublisher, "enqueue">;
   provision: (phoneE164: string, env: SignupPolicyEnv) => Promise<ProvisionedPhoneIdentity>;
   signupPolicy: SignupPolicyEnv;
+  /** The deployment's own line, so it is never treated as a participant. */
+  lineNumber: string;
 }
 
+type PhoneIdentityRow = {
+  id: string;
+  phoneE164: string;
+  userId: string;
+  workspaceId: string;
+  botId: string;
+};
+
 /**
- * 1:1 inbound routing: a text to the deployment line is a message to the
- * sender's own bot, in the same Thread the app uses. Unknown numbers are
- * provisioned first, so the bot's reply doubles as onboarding. Channel
- * (group) routing lands with the channels slice.
+ * Inbound routing. 1:1 texts are messages to the sender's own bot (with
+ * provisioning on first contact and the YES/NO/LEAVE owner commands).
+ * Group texts drive channel discovery — upsert channel + members, DM
+ * invites to linked owners, one intro when strangers are present — and
+ * fan out to every approved member bot's own thread.
  */
 export function createPhoneInboundHandler(deps: PhoneInboundDeps) {
   return async (event: SendBlueInboundMessage): Promise<void> => {
-    if (event.groupId) return;
-
-    // Inbound media arrives as a CDN URL (expires after 30 days); no
-    // artifact ingestion in v1, so it rides along as text.
-    const text = [event.content, event.mediaUrl].filter(Boolean).join("\n");
-
-    const existing = await deps.prisma.phoneIdentity.findUnique({
-      where: { phoneE164: event.fromNumber },
-    });
-    if (existing) {
-      // Any reply — even a content-free tapback — ends the consecutive-
-      // outbound streak, but only real text wakes the bot.
-      await deps.prisma.phoneIdentity.update({
-        where: { id: existing.id },
-        data: { outboundSinceInbound: 0, lastInboundAt: new Date() },
-      });
-      if (!text) return;
-    } else if (!text) {
-      // Never provision a full account for a tapback or empty payload.
+    if (event.groupId) {
+      await handleChannelEvent(deps, event);
       return;
     }
+    await handleDirectEvent(deps, event);
+  };
+}
 
-    let ids: ProvisionedPhoneIdentity;
-    if (existing) {
-      const thread = await deps.prisma.thread.findFirst({ where: { botId: existing.botId } });
-      if (!thread) throw new Error(`phone identity ${existing.id} has no thread`);
-      ids = {
-        phoneE164: existing.phoneE164,
-        userId: existing.userId,
-        workspaceId: existing.workspaceId,
-        botId: existing.botId,
-        threadId: thread.id,
-        created: false,
-      };
-    } else {
-      ids = await deps.provision(event.fromNumber, deps.signupPolicy);
+async function handleDirectEvent(
+  deps: PhoneInboundDeps,
+  event: SendBlueInboundMessage,
+): Promise<void> {
+  // Inbound media arrives as a CDN URL (expires after 30 days); no
+  // artifact ingestion in v1, so it rides along as text.
+  const text = [event.content, event.mediaUrl].filter(Boolean).join("\n");
+
+  const existing = await deps.prisma.phoneIdentity.findUnique({
+    where: { phoneE164: event.fromNumber },
+  });
+  if (existing) {
+    // Any reply — even a content-free tapback — ends the consecutive-
+    // outbound streak, but only real text wakes the bot.
+    await deps.prisma.phoneIdentity.update({
+      where: { id: existing.id },
+      data: { outboundSinceInbound: 0, lastInboundAt: new Date() },
+    });
+    if (!text) return;
+    // Owner commands are only parsed in the verified 1:1 conversation.
+    const command = parsePhoneCommand(event.content);
+    if (command && (await applyPhoneCommand(deps, existing, command))) return;
+  } else if (!text) {
+    // Never provision a full account for a tapback or empty payload.
+    return;
+  }
+
+  let ids: ProvisionedPhoneIdentity;
+  if (existing) {
+    const thread = await deps.prisma.thread.findFirst({ where: { botId: existing.botId } });
+    if (!thread) throw new Error(`phone identity ${existing.id} has no thread`);
+    ids = {
+      phoneE164: existing.phoneE164,
+      userId: existing.userId,
+      workspaceId: existing.workspaceId,
+      botId: existing.botId,
+      threadId: thread.id,
+      created: false,
+    };
+  } else {
+    ids = await deps.provision(event.fromNumber, deps.signupPolicy);
+  }
+
+  const sent = await deps.events.sendUserMessage({
+    workspaceId: ids.workspaceId,
+    threadId: ids.threadId,
+    botId: ids.botId,
+    userId: ids.userId,
+    blocks: [{ kind: "text", text }],
+    prompt: text,
+    trigger: "phone",
+    clientNonce: `phone:${event.handle}`,
+  });
+  if (sent.runId) {
+    await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
+      console.error("phone inbound run enqueue error", error);
+    });
+  }
+}
+
+/** Returns true when the command matched a pending item and was handled. */
+async function applyPhoneCommand(
+  deps: PhoneInboundDeps,
+  identity: PhoneIdentityRow,
+  command: "approve" | "decline" | "leave",
+): Promise<boolean> {
+  if (command === "leave") {
+    const membership = await deps.prisma.phoneChannelMember.findFirst({
+      where: { identityId: identity.id, status: "approved" },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (!membership) return false;
+    await deps.prisma.phoneChannelMember.update({
+      where: { id: membership.id },
+      data: { status: "left" },
+    });
+    await enqueueConfirmation(
+      deps,
+      identity.phoneE164,
+      `command:leave:${membership.id}`,
+      "You've left the channel; your agent will no longer post there. The iMessage group itself is unchanged — SendBlue has no leave API, so leaving only stops your agent's participation.",
+    );
+    return true;
+  }
+
+  const membership = await deps.prisma.phoneChannelMember.findFirst({
+    where: { identityId: identity.id, status: "invited" },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (!membership) return false;
+  const approved = command === "approve";
+  await deps.prisma.phoneChannelMember.update({
+    where: { id: membership.id },
+    data: { status: approved ? "approved" : "declined" },
+  });
+  await enqueueConfirmation(
+    deps,
+    identity.phoneE164,
+    `command:${command}:${membership.id}`,
+    approved
+      ? "You're in — your agent will now see and reply to that group."
+      : "No problem, your agent will stay out of that group.",
+  );
+  return true;
+}
+
+async function enqueueConfirmation(
+  deps: PhoneInboundDeps,
+  toNumber: string,
+  key: string,
+  body: string,
+): Promise<void> {
+  await deps.prisma.phoneOutbound.createMany({
+    data: [{ idempotencyKey: key, kind: "dm", toNumber, body }],
+    skipDuplicates: true,
+  });
+  await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
+    console.error("phone confirmation enqueue error", error);
+  });
+}
+
+async function handleChannelEvent(
+  deps: PhoneInboundDeps,
+  event: SendBlueInboundMessage,
+): Promise<void> {
+  const channel = await deps.prisma.phoneChannel.upsert({
+    where: { providerGroupId: event.groupId! },
+    create: { providerGroupId: event.groupId!, name: event.groupName },
+    update: event.groupName ? { name: event.groupName } : {},
+  });
+
+  const participants = event.participants.filter((phone) => phone !== deps.lineNumber);
+  if (!participants.includes(event.fromNumber)) participants.push(event.fromNumber);
+
+  let hasUnlinked = false;
+  for (const phone of participants) {
+    const identity = await deps.prisma.phoneIdentity.findUnique({
+      where: { phoneE164: phone },
+    });
+    const member = await deps.prisma.phoneChannelMember.findUnique({
+      where: { channelId_phoneE164: { channelId: channel.id, phoneE164: phone } },
+    });
+    if (member) {
+      if (identity && !member.identityId) {
+        await deps.prisma.phoneChannelMember.update({
+          where: { id: member.id },
+          data: { identityId: identity.id },
+        });
+        if (member.status === "invited") await inviteMember(deps, channel, identity);
+      }
+      if (!identity) hasUnlinked = true;
+      continue;
     }
+    await deps.prisma.phoneChannelMember.create({
+      data: {
+        channelId: channel.id,
+        phoneE164: phone,
+        identityId: identity?.id ?? null,
+        status: "invited",
+      },
+    });
+    if (identity) await inviteMember(deps, channel, identity);
+    else hasUnlinked = true;
+  }
 
+  if (hasUnlinked && !channel.introPostedAt) {
+    await deps.prisma.phoneOutbound.createMany({
+      data: [
+        {
+          idempotencyKey: `intro:${channel.id}`,
+          kind: "intro",
+          providerGroupId: channel.providerGroupId,
+          body: "Hi — this number hosts Rakazo personal agents. Some people in this group haven't texted this line yet; send any message to this number first if you want your own agent here.",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    await deps.prisma.phoneChannel.update({
+      where: { id: channel.id },
+      data: { introPostedAt: new Date() },
+    });
+    await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
+      console.error("phone intro enqueue error", error);
+    });
+  }
+
+  // Only approved owners' bots participate.
+  const senderMember = await deps.prisma.phoneChannelMember.findUnique({
+    where: {
+      channelId_phoneE164: { channelId: channel.id, phoneE164: event.fromNumber },
+    },
+  });
+  if (senderMember?.status !== "approved") return;
+
+  const senderIdentity = senderMember.identityId
+    ? await deps.prisma.phoneIdentity.findUnique({ where: { id: senderMember.identityId } })
+    : null;
+  const fromLabel = senderIdentity
+    ? await ownerFirstName(deps.prisma, senderIdentity.userId, event.fromNumber)
+    : event.fromNumber;
+
+  const approved = await deps.prisma.phoneChannelMember.findMany({
+    where: { channelId: channel.id, status: "approved", identityId: { not: null } },
+  });
+  const block: MessageBlock = {
+    kind: "phone_channel_message",
+    channelId: channel.id,
+    fromNumber: event.fromNumber,
+    fromLabel,
+    text: event.content,
+    hop: 0,
+  };
+  const prompt = `[iMessage group "${channel.name ?? "group"}" — ${fromLabel}]: ${event.content}`;
+  for (const member of approved) {
+    const identity = await deps.prisma.phoneIdentity.findUnique({
+      where: { id: member.identityId! },
+    });
+    if (!identity) continue;
+    const thread = await deps.prisma.thread.findFirst({ where: { botId: identity.botId } });
+    if (!thread) continue;
     const sent = await deps.events.sendUserMessage({
-      workspaceId: ids.workspaceId,
-      threadId: ids.threadId,
-      botId: ids.botId,
-      userId: ids.userId,
-      blocks: [{ kind: "text", text }],
-      prompt: text,
+      workspaceId: identity.workspaceId,
+      threadId: thread.id,
+      botId: identity.botId,
+      userId: identity.userId,
+      blocks: [block],
+      prompt,
       trigger: "phone",
       clientNonce: `phone:${event.handle}`,
     });
     if (sent.runId) {
       await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
-        console.error("phone inbound run enqueue error", error);
+        console.error("phone channel fan-out enqueue error", error);
       });
     }
-  };
+  }
+}
+
+async function inviteMember(
+  deps: PhoneInboundDeps,
+  channel: { id: string; name: string | null },
+  identity: PhoneIdentityRow,
+): Promise<void> {
+  const name = channel.name ?? "an iMessage group";
+  await deps.prisma.phoneOutbound.createMany({
+    data: [
+      {
+        idempotencyKey: `invite:${channel.id}:${identity.phoneE164}`,
+        kind: "dm",
+        toNumber: identity.phoneE164,
+        body: `"${name}" was linked to your Rakazo line. Reply YES to let your agent join the conversation there, or NO to stay out.`,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  const thread = await deps.prisma.thread.findFirst({ where: { botId: identity.botId } });
+  if (thread) {
+    const note = await createThreadMessage(deps.prisma, {
+      threadId: thread.id,
+      role: "system",
+      blocks: [
+        {
+          kind: "meta",
+          text: `You were added to iMessage group "${name}". Reply YES in this conversation to join it with your agent.`,
+        },
+      ],
+    });
+    await deps.events.notify(thread.id, note.seq).catch(() => undefined);
+  }
+  await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
+    console.error("phone invite enqueue error", error);
+  });
+}
+
+async function ownerFirstName(
+  prisma: PrismaClient,
+  userId: string,
+  fallback: string,
+): Promise<string> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  const first = user?.name.trim().split(/\s+/)[0];
+  return first || fallback;
 }

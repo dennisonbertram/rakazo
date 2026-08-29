@@ -4367,6 +4367,18 @@ const MessageView = memo(function MessageView({
             />
           );
         }
+        if (block.kind === "phone_channel_message") {
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-center gap-2 py-1 text-[13.5px] text-[#85858A]"
+            >
+              <span>
+                iMessage · {block.fromLabel}: {block.text}
+              </span>
+            </div>
+          );
+        }
         if (block.kind === "meta") {
           return (
             <div

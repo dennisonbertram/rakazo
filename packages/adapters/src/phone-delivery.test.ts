@@ -5,6 +5,7 @@ import {
   applyPhoneOutboundStatus,
   deliverPhoneOutbound,
   PHONE_DM_OUTBOUND_CAP,
+  type PhoneDeliveryDeps,
 } from "./phone-delivery.js";
 
 const context: AdapterContext = {
@@ -119,6 +120,11 @@ function createDeps(overrides: {
   return {
     prisma: prisma as unknown as PrismaClient & typeof prisma,
     messaging,
+    events: {
+      sendUserMessage: vi.fn(),
+      notify: vi.fn(async () => undefined),
+    } as unknown as PhoneDeliveryDeps["events"],
+    jobs: { enqueue: vi.fn(async () => undefined) },
     sendDirect,
     sendGroup,
     rows,
@@ -167,21 +173,6 @@ describe("deliverPhoneOutbound", () => {
     const noIdentity = createDeps({ identity: null });
     await deliverPhoneOutbound(noIdentity, { runId: "run-1" }, context);
     expect(noIdentity.sendDirect).not.toHaveBeenCalled();
-  });
-
-  it("skips runs triggered by channel messages", async () => {
-    const deps = createDeps({
-      run: {
-        ...phoneRun,
-        sourceMessage: {
-          blocks: [{ kind: "phone_channel_message", channelId: "ch-1", text: "group hi" }],
-        },
-      },
-    });
-    await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
-
-    expect(deps.sendDirect).not.toHaveBeenCalled();
-    expect(deps.prisma.phoneOutbound.createMany).not.toHaveBeenCalled();
   });
 
   it("holds DM sends at the consecutive-outbound cap", async () => {
@@ -300,12 +291,14 @@ describe("applyPhoneOutboundStatus", () => {
   });
 });
 
-function createChannelDeps(overrides: {
-  text?: string;
-  sourceHop?: number;
-  peerBotName?: string | null;
-  messages?: unknown[];
-} = {}) {
+function createChannelDeps(
+  overrides: {
+    text?: string;
+    sourceHop?: number;
+    peerBotName?: string | null;
+    messages?: unknown[];
+  } = {},
+) {
   const text = overrides.text ?? "found it";
   const channelRun = {
     id: "run-1",
@@ -348,7 +341,7 @@ function createChannelDeps(overrides: {
   const enqueue = vi.fn(async () => undefined);
   const peerBotName = overrides.peerBotName === undefined ? "Helper" : overrides.peerBotName;
   const txMock = {
-    thread: { update: vi.fn(async () => ({ nextMessageSeq: 5 })) },
+    thread: { update: vi.fn(async () => ({ nextMessageSeq: 5, nextEventSeq: 10 })) },
     message: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const message = { id: `ctx-${contextMessages.length + 1}`, seq: 4, ...data };
@@ -357,14 +350,18 @@ function createChannelDeps(overrides: {
       }),
     },
     run: { findUnique: vi.fn(async () => null) },
-    event: { create: vi.fn(async () => ({ id: "evt-1", seq: 9 })) },
+    event: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: "evt-1",
+        ...data,
+      })),
+    },
   };
   const prisma = {
     run: { findUnique: vi.fn(async () => channelRun) },
     message: {
       findMany: vi.fn(
-        async () =>
-          overrides.messages ?? [{ id: "m-1", blocks: [{ kind: "text", text }] }],
+        async () => overrides.messages ?? [{ id: "m-1", blocks: [{ kind: "text", text }] }],
       ),
       findUnique: vi.fn(async () => null),
     },
@@ -388,13 +385,20 @@ function createChannelDeps(overrides: {
     },
     phoneChannelMember: {
       findMany: vi.fn(async () => [
-        { id: "pm-2", channelId: "ch-1", phoneE164: "+15553333333", identityId: "pi-2", status: "approved" },
+        {
+          id: "pm-2",
+          channelId: "ch-1",
+          phoneE164: "+15553333333",
+          identityId: "pi-2",
+          status: "approved",
+        },
       ]),
     },
     phoneOutbound: {
       findMany: vi.fn(async () => rows.filter((row) => row.status === "pending")),
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
-        for (const item of data) rows.push({ id: `out-${rows.length + 1}`, status: "pending", ...item });
+        for (const item of data)
+          rows.push({ id: `out-${rows.length + 1}`, status: "pending", ...item });
         return { count: data.length };
       }),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: unknown }) => {
@@ -402,16 +406,18 @@ function createChannelDeps(overrides: {
         if (row) Object.assign(row, data);
         return row;
       }),
-      updateMany: vi.fn(async ({ where, data }: { where: { id?: string; status?: string }; data: unknown }) => {
-        let count = 0;
-        for (const row of rows) {
-          if (where.id && row.id !== where.id) continue;
-          if (where.status && row.status !== where.status) continue;
-          Object.assign(row, data);
-          count += 1;
-        }
-        return { count };
-      }),
+      updateMany: vi.fn(
+        async ({ where, data }: { where: { id?: string; status?: string }; data: unknown }) => {
+          let count = 0;
+          for (const row of rows) {
+            if (where.id && row.id !== where.id) continue;
+            if (where.status && row.status !== where.status) continue;
+            Object.assign(row, data);
+            count += 1;
+          }
+          return { count };
+        },
+      ),
     },
     user: { findUnique: vi.fn(async () => ({ id: "user-1", name: "Alice Owner" })) },
     bot: {
@@ -440,7 +446,7 @@ function createChannelDeps(overrides: {
   return {
     prisma: prisma as unknown as PrismaClient & typeof prisma,
     messaging,
-    events: { sendUserMessage, notify },
+    events: { sendUserMessage, notify } as unknown as PhoneDeliveryDeps["events"],
     jobs: { enqueue },
     sendGroup,
     sendUserMessage,

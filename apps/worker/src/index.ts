@@ -8,6 +8,7 @@ import {
   createBackgroundJobHandlers,
   createConnectorStack,
   createJobReconciler,
+  createPhoneContextLoader,
   createPostgresReconciliationLeadership,
   createRunExecutor,
   createRunSandbox,
@@ -151,6 +152,7 @@ async function main() {
     notifications: new ExpoPushProvider(dataDir),
     jobs,
     events,
+    phone: messaging ? createPhoneContextLoader(prisma) : undefined,
   });
 
   const jobHandlers = createBackgroundJobHandlers({

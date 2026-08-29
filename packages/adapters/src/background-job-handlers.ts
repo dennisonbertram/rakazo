@@ -44,13 +44,17 @@ export function createBackgroundJobHandlers(deps: {
     },
     "phone.deliver": async (payload) => {
       if (!deps.messaging) return;
-      await deliverPhoneOutbound({ prisma: deps.prisma, messaging: deps.messaging }, payload, {
-        operationId: `phone.deliver:${payload.runId ?? "drain"}`,
-        traceId: `phone.deliver:${payload.runId ?? "drain"}`,
-        workspaceId: "",
-        userId: "",
-        signal: new AbortController().signal,
-      });
+      await deliverPhoneOutbound(
+        { prisma: deps.prisma, messaging: deps.messaging, events: deps.events, jobs: deps.jobs },
+        payload,
+        {
+          operationId: `phone.deliver:${payload.runId ?? "drain"}`,
+          traceId: `phone.deliver:${payload.runId ?? "drain"}`,
+          workspaceId: "",
+          userId: "",
+          signal: new AbortController().signal,
+        },
+      );
     },
     "routine.wakeup": async (payload) => {
       await deps.executor.wakeRoutine(payload.routineId, payload.scheduledFor);

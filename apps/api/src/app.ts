@@ -16,6 +16,7 @@ import {
   createBackgroundJobHandlers,
   createConnectorStack,
   createJobReconciler,
+  createPhoneContextLoader,
   createRunExecutor,
   createRunSandbox,
   createRunSecretWriter,
@@ -270,6 +271,7 @@ export async function createApp(
     notifications,
     jobs,
     events,
+    phone: messaging ? createPhoneContextLoader(prisma) : undefined,
   });
 
   const jobHandlers = createBackgroundJobHandlers({
@@ -376,6 +378,7 @@ export async function createApp(
           signupsEnabled: env.signupsEnabled,
           signupAllowlist: env.signupAllowlist,
         },
+        lineNumber: env.sendbluePhoneNumber ?? "",
       }),
     });
   }
