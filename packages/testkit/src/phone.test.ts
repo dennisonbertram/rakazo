@@ -65,12 +65,12 @@ describePhone("phone surface journeys", () => {
     await waitForDatabase(async () =>
       Boolean(await prisma.phoneIdentity.findUnique({ where: { phoneE164: sender } })),
     );
-    // The outbox row flips to sent after the provider call and counter update,
-    // so it is the last durable signal of the whole mirror loop.
+    // A non-null provider handle is the last durable signal of the whole
+    // mirror loop (the claim flips status before the provider call lands).
     await waitForDatabase(async () =>
       Boolean(
         await prisma.phoneOutbound.findFirst({
-          where: { toNumber: sender, kind: "dm", status: "sent" },
+          where: { toNumber: sender, kind: "dm", status: "sent", providerHandle: { not: null } },
         }),
       ),
     );
@@ -141,7 +141,12 @@ describePhone("phone surface journeys", () => {
     await waitForDatabase(async () =>
       Boolean(
         await prisma.phoneOutbound.findFirst({
-          where: { providerGroupId: groupId, kind: "intro", status: "sent" },
+          where: {
+            providerGroupId: groupId,
+            kind: "intro",
+            status: "sent",
+            providerHandle: { not: null },
+          },
         }),
       ),
     );
@@ -197,7 +202,12 @@ describePhone("phone surface journeys", () => {
     await waitForDatabase(async () =>
       Boolean(
         await prisma.phoneOutbound.findFirst({
-          where: { providerGroupId: groupId, kind: "group", status: "sent" },
+          where: {
+            providerGroupId: groupId,
+            kind: "group",
+            status: "sent",
+            providerHandle: { not: null },
+          },
         }),
       ),
     );

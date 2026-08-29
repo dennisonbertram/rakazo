@@ -6,6 +6,7 @@ import {
   buildBotMessageWakePrompt,
   clampBotMessage,
   nextBotMessageHop,
+  sanitizePhoneLabel,
 } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
@@ -47,7 +48,10 @@ export async function connectAgent(
   const targetIdentity = await deps.prisma.phoneIdentity.findUnique({
     where: { phoneE164: phone },
   });
-  if (!targetIdentity) return { ok: false, error: "no agent is registered for that number" };
+  // One generic answer for unknown and unavailable numbers: the tool is
+  // reachable by every bot on the deployment, so it must not enumerate
+  // which numbers are registered.
+  if (!targetIdentity) return { ok: false, error: "no agent can be reached at that number" };
   if (targetIdentity.botId === sender.id) {
     return { ok: false, error: "a bot cannot connect to itself" };
   }
@@ -55,7 +59,9 @@ export async function connectAgent(
     where: { id: targetIdentity.botId },
     select: { id: true, name: true, archivedAt: true },
   });
-  if (!target || target.archivedAt) return { ok: false, error: "that agent is not available" };
+  if (!target || target.archivedAt) {
+    return { ok: false, error: "no agent can be reached at that number" };
+  }
 
   const existing = await deps.prisma.agentConnection.findUnique({
     where: {
@@ -63,10 +69,10 @@ export async function connectAgent(
     },
   });
   if (existing?.status === "approved") {
-    return { ok: true, status: "approved", botId: target.id, name: target.name };
+    return { ok: true, status: "approved" };
   }
   if (existing?.status === "pending") {
-    return { ok: true, status: "pending", note: "Connection already requested; still pending." };
+    return { ok: true, status: "pending" };
   }
 
   const requesterIdentity = await deps.prisma.phoneIdentity.findUnique({
@@ -78,7 +84,9 @@ export async function connectAgent(
         select: { name: true },
       })
     : null;
-  const requesterFirst = requesterOwner?.name.trim().split(/\s+/)[0] || "Someone";
+  const requesterFirst = sanitizePhoneLabel(
+    requesterOwner?.name.trim().split(/\s+/)[0] || "Someone",
+  );
 
   if (existing) {
     await deps.prisma.agentConnection.update({
@@ -90,13 +98,17 @@ export async function connectAgent(
       data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
     });
   }
+  const inviteKey = `connect:${sender.id}:${target.id}`;
+  // A declined/revoked pair starts a fresh approval cycle; clear the old
+  // invite row or skipDuplicates would silently swallow the new request.
+  await deps.prisma.phoneOutbound.deleteMany({ where: { idempotencyKey: inviteKey } });
   await deps.prisma.phoneOutbound.createMany({
     data: [
       {
-        idempotencyKey: `connect:${sender.id}:${target.id}`,
+        idempotencyKey: inviteKey,
         kind: "dm",
         toNumber: targetIdentity.phoneE164,
-        body: `${requesterFirst}'s agent (${sender.name}) wants to connect with your agent. Reply YES to allow, NO to decline.`,
+        body: `${requesterFirst}'s agent (${sanitizePhoneLabel(sender.name)}) wants to connect with your agent. Reply YES to allow, NO to decline.`,
       },
     ],
     skipDuplicates: true,
@@ -104,7 +116,7 @@ export async function connectAgent(
   await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
     console.error("agent connection invite enqueue error", error);
   });
-  return { ok: true, status: "pending", botId: target.id, name: target.name };
+  return { ok: true, status: "pending" };
 }
 
 /** The target bot answers a pending request on its owner's instruction. */
@@ -180,92 +192,116 @@ export async function messageConnectedAgent(
   const deliveryKey = input.deliveryKey ? `agent-message:${input.deliveryKey}` : undefined;
   const wakePrompt = buildBotMessageWakePrompt({ from: sender, text: message });
 
-  const committed = await deps.prisma.$transaction(async (tx) => {
-    if (deliveryKey) {
-      const already = await tx.message.findUnique({
+  let committed!: Awaited<ReturnType<typeof deliverTx>>;
+  const deliverTx = () =>
+    deps.prisma.$transaction(async (tx) => {
+      if (deliveryKey) {
+        const already = await tx.message.findUnique({
+          where: { threadId_clientNonce: { threadId: targetThreadId, clientNonce: deliveryKey } },
+          select: { id: true },
+        });
+        if (already) return { replayed: true as const };
+      }
+      const senderStillRunning = await tx.run.findFirst({
+        where: { id: run.id, status: "running" },
+        select: { id: true },
+      });
+      if (!senderStillRunning)
+        return { ok: false as const, error: "source run is no longer active" };
+
+      const inboundBlock: MessageBlock = {
+        kind: "bot_message_received",
+        fromBotId: sender.id,
+        fromBotName: sender.name,
+        text: message,
+        hop,
+      };
+      const outboundBlock: MessageBlock = {
+        kind: "bot_message_sent",
+        toBotId: target.id,
+        toBotName: target.name,
+        text: message,
+      };
+      const inbound = await createThreadMessageInTransaction(tx, {
+        threadId: targetThreadId,
+        role: "user",
+        blocks: [inboundBlock],
+        clientNonce: deliveryKey,
+      });
+      const outbound = await createThreadMessageInTransaction(tx, {
+        threadId: run.threadId,
+        role: "bot",
+        blocks: [outboundBlock],
+        botId: run.botId,
+        runId: run.id,
+      });
+      const task = await tx.task.create({
+        data: {
+          workspaceId: targetIdentity.workspaceId,
+          botId: target.id,
+          threadId: targetThreadId,
+          userId: targetIdentity.userId,
+          prompt: wakePrompt,
+          status: "queued",
+        },
+      });
+      const nextRun = await tx.run.create({
+        data: {
+          workspaceId: targetIdentity.workspaceId,
+          botId: target.id,
+          threadId: targetThreadId,
+          taskId: task.id,
+          userId: targetIdentity.userId,
+          status: "queued",
+          trigger: "bot_message",
+          sourceMessageId: inbound.id,
+        },
+        select: { id: true },
+      });
+      await tx.message.update({ where: { id: inbound.id }, data: { runId: nextRun.id } });
+      const inboundEvent = await appendEventInTransaction(tx, {
+        workspaceId: targetIdentity.workspaceId,
+        threadId: targetThreadId,
+        botId: target.id,
+        type: "thread.message.created",
+        runId: nextRun.id,
+        payload: { messageId: inbound.id, role: "user", blocks: [inboundBlock] },
+      });
+      const outboundEvent = await appendEventInTransaction(tx, {
+        workspaceId: run.workspaceId,
+        threadId: run.threadId,
+        botId: run.botId,
+        type: "thread.message.created",
+        runId: run.id,
+        payload: { messageId: outbound.id, role: "bot", blocks: [outboundBlock] },
+      });
+      return {
+        runId: nextRun.id,
+        targetEventSeq: inboundEvent.seq,
+        senderEventSeq: outboundEvent.seq,
+      };
+    });
+  try {
+    committed = await deliverTx();
+  } catch (error) {
+    // Two concurrent retries can both miss the in-transaction lookup; the
+    // loser hits the unique key. Treat that as a successful replay.
+    if (deliveryKey && isUniqueConstraintError(error)) {
+      const winner = await deps.prisma.message.findUnique({
         where: { threadId_clientNonce: { threadId: targetThreadId, clientNonce: deliveryKey } },
         select: { id: true },
       });
-      if (already) return { replayed: true as const };
+      if (winner) {
+        return {
+          ok: true,
+          botId: target.id,
+          name: target.name,
+          note: `Already sent to ${target.name} in this turn; it was not sent again.`,
+        };
+      }
     }
-    const senderStillRunning = await tx.run.findFirst({
-      where: { id: run.id, status: "running" },
-      select: { id: true },
-    });
-    if (!senderStillRunning) return { ok: false as const, error: "source run is no longer active" };
-
-    const inboundBlock: MessageBlock = {
-      kind: "bot_message_received",
-      fromBotId: sender.id,
-      fromBotName: sender.name,
-      text: message,
-      hop,
-    };
-    const outboundBlock: MessageBlock = {
-      kind: "bot_message_sent",
-      toBotId: target.id,
-      toBotName: target.name,
-      text: message,
-    };
-    const inbound = await createThreadMessageInTransaction(tx, {
-      threadId: targetThreadId,
-      role: "user",
-      blocks: [inboundBlock],
-      clientNonce: deliveryKey,
-    });
-    const outbound = await createThreadMessageInTransaction(tx, {
-      threadId: run.threadId,
-      role: "bot",
-      blocks: [outboundBlock],
-      botId: run.botId,
-      runId: run.id,
-    });
-    const task = await tx.task.create({
-      data: {
-        workspaceId: targetIdentity.workspaceId,
-        botId: target.id,
-        threadId: targetThreadId,
-        userId: targetIdentity.userId,
-        prompt: wakePrompt,
-        status: "queued",
-      },
-    });
-    const nextRun = await tx.run.create({
-      data: {
-        workspaceId: targetIdentity.workspaceId,
-        botId: target.id,
-        threadId: targetThreadId,
-        taskId: task.id,
-        userId: targetIdentity.userId,
-        status: "queued",
-        trigger: "bot_message",
-        sourceMessageId: inbound.id,
-      },
-      select: { id: true },
-    });
-    await tx.message.update({ where: { id: inbound.id }, data: { runId: nextRun.id } });
-    const inboundEvent = await appendEventInTransaction(tx, {
-      workspaceId: targetIdentity.workspaceId,
-      threadId: targetThreadId,
-      botId: target.id,
-      type: "thread.message.created",
-      runId: nextRun.id,
-      payload: { messageId: inbound.id, role: "user", blocks: [inboundBlock] },
-    });
-    const outboundEvent = await appendEventInTransaction(tx, {
-      workspaceId: run.workspaceId,
-      threadId: run.threadId,
-      botId: run.botId,
-      type: "thread.message.created",
-      runId: run.id,
-      payload: { messageId: outbound.id, role: "bot", blocks: [outboundBlock] },
-    });
-    return {
-      runId: nextRun.id,
-      targetEventSeq: inboundEvent.seq,
-      senderEventSeq: outboundEvent.seq,
-    };
-  });
+    throw error;
+  }
 
   if ("replayed" in committed) {
     return {
@@ -290,6 +326,10 @@ export async function messageConnectedAgent(
     name: target.name,
     note: `Sent to ${target.name}. Delivery is async; a reply wakes you later as a new message.`,
   };
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
 }
 
 async function approvedConnectionBetween(

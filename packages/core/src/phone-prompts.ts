@@ -29,3 +29,15 @@ export function isPhoneChannelRun(
     Boolean(sourceBlocks?.some((block) => block.kind === "phone_channel_message"))
   );
 }
+
+/**
+ * Group names and owner names are attacker-controlled text interpolated
+ * into prompts and DMs; strip framing characters before they get near one.
+ */
+export function sanitizePhoneLabel(value: string): string {
+  return value
+    .replace(/[\r\n"[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64);
+}

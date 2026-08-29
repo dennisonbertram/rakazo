@@ -117,6 +117,13 @@ function createDeps(
         outboundRows.push(...data);
         return { count: data.length };
       }),
+      deleteMany: vi.fn(async ({ where }: { where: { idempotencyKey?: string } }) => {
+        const before = outboundRows.length;
+        for (let i = outboundRows.length - 1; i >= 0; i -= 1) {
+          if (outboundRows[i]!.idempotencyKey === where.idempotencyKey) outboundRows.splice(i, 1);
+        }
+        return { count: before - outboundRows.length };
+      }),
     },
     message: {
       findUnique: vi.fn(async () =>
