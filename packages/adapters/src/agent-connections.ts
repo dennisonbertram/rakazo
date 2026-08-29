@@ -1,12 +1,12 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
 import { phoneDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
+import type { MessageBlock } from "@rakazo/contracts";
 import {
   botMessageHopExhausted,
   buildBotMessageWakePrompt,
   clampBotMessage,
   nextBotMessageHop,
 } from "@rakazo/core";
-import type { MessageBlock } from "@rakazo/contracts";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
 import { currentBotMessageHop } from "./bot-messages.js";
@@ -38,7 +38,7 @@ type Result =
  */
 export async function connectAgent(
   deps: AgentConnectionDeps,
-  run: ConnectionRun,
+  _run: ConnectionRun,
   sender: { id: string; name: string },
   input: { phone?: string },
 ): Promise<Result> {
@@ -110,7 +110,7 @@ export async function connectAgent(
 /** The target bot answers a pending request on its owner's instruction. */
 export async function respondAgentConnection(
   deps: AgentConnectionDeps,
-  run: ConnectionRun,
+  _run: ConnectionRun,
   sender: { id: string; name: string },
   input: { accept: boolean },
 ): Promise<Result> {
@@ -260,7 +260,11 @@ export async function messageConnectedAgent(
       runId: run.id,
       payload: { messageId: outbound.id, role: "bot", blocks: [outboundBlock] },
     });
-    return { runId: nextRun.id, targetEventSeq: inboundEvent.seq, senderEventSeq: outboundEvent.seq };
+    return {
+      runId: nextRun.id,
+      targetEventSeq: inboundEvent.seq,
+      senderEventSeq: outboundEvent.seq,
+    };
   });
 
   if ("replayed" in committed) {
@@ -271,7 +275,9 @@ export async function messageConnectedAgent(
       note: `Already sent to ${target.name} in this turn; it was not sent again.`,
     };
   }
-  if ("ok" in committed) return committed;
+  if ("ok" in committed) {
+    return { ok: false as const, error: committed.error ?? "delivery failed" };
+  }
 
   await deps.events.notify(targetThreadId, committed.targetEventSeq).catch(() => undefined);
   await deps.events.notify(run.threadId, committed.senderEventSeq).catch(() => undefined);

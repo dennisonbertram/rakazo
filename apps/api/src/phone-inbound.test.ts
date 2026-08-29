@@ -107,9 +107,7 @@ function createDeps(
           create: Record<string, unknown>;
           update: Record<string, unknown>;
         }) => {
-          const existing = members.find(
-            (m) => m.phoneE164 === where.channelId_phoneE164.phoneE164,
-          );
+          const existing = members.find((m) => m.phoneE164 === where.channelId_phoneE164.phoneE164);
           if (existing) {
             Object.assign(existing, update);
             return existing;
@@ -126,6 +124,10 @@ function createDeps(
         outboundRows.push(...data);
         return { count: data.length };
       }),
+    },
+    agentConnection: {
+      findFirst: vi.fn(async () => null),
+      update: vi.fn(async () => ({})),
     },
     user: {
       findUnique: vi.fn(async () => ({ id: "user-1", name: "Alice Owner" })),

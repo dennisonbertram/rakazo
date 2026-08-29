@@ -70,6 +70,11 @@ import {
   type ThreadEvents,
 } from "@rakazo/db";
 import { parse as parseShellCommand } from "shell-quote";
+import {
+  connectAgent,
+  messageConnectedAgent,
+  respondAgentConnection,
+} from "./agent-connections.js";
 import { buildApprovalAskBlock } from "./approval-ask.js";
 import {
   approvalPausedToolResult,
@@ -93,7 +98,7 @@ import {
   runAutoReviewJudge,
 } from "./auto-review.js";
 import { messageBot } from "./bot-messages.js";
-import { builtinAgentTools } from "./builtin-tools.js";
+import { agentConnectionTools, builtinAgentTools } from "./builtin-tools.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import {
   collectLogIds,
@@ -956,7 +961,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           filterImageReturningComputerTools(builtinAgentTools, graphicalToolsAllowed),
           thread.groupId,
         );
-        const builtins = selectMemoryTools(availableBuiltins, semanticMemoryEnabled);
+        const builtins = [
+          ...selectMemoryTools(availableBuiltins, semanticMemoryEnabled),
+          // Cross-owner agent connections only exist when the phone surface does.
+          ...(deps.phone ? agentConnectionTools : []),
+        ];
         const exposedConnectorTools = discovered.filter(
           (tool) => !builtinAgentTools.some((builtin) => builtin.name === tool.name),
         );
@@ -2185,6 +2194,40 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
             if (!sent.ok) return finish({ error: sent.error });
             return finish({ ok: true, botId: sent.botId, name: sent.name, note: sent.note });
+          }
+          if (name === "connect_agent") {
+            const result = await connectAgent(
+              deps,
+              { ...run, sourceMessageId: run.sourceMessageId },
+              { id: bot.id, name: bot.name },
+              { phone: args.phone ? String(args.phone) : undefined },
+            );
+            if (!result.ok) return finish({ error: result.error });
+            return finish(result);
+          }
+          if (name === "respond_agent_connection") {
+            const result = await respondAgentConnection(
+              deps,
+              { ...run, sourceMessageId: run.sourceMessageId },
+              { id: bot.id, name: bot.name },
+              { accept: Boolean(args.accept) },
+            );
+            if (!result.ok) return finish({ error: result.error });
+            return finish(result);
+          }
+          if (name === "message_agent") {
+            const result = await messageConnectedAgent(
+              deps,
+              { ...run, sourceMessageId: run.sourceMessageId },
+              { id: bot.id, name: bot.name },
+              {
+                phone: args.phone ? String(args.phone) : undefined,
+                message: redactSecrets(String(args.message ?? ""), runSecrets),
+                deliveryKey: executionId,
+              },
+            );
+            if (!result.ok) return finish({ error: result.error });
+            return finish(result);
           }
           if (name === "handoff_to_bot") {
             if (!thread.groupId) return finish({ error: "handoff_to_bot is only for group chats" });
