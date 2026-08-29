@@ -133,7 +133,14 @@ function phoneDeps(
     email: "user@rakazo.test",
     isDeploymentOwner: false,
   } satisfies Actor;
-  return { prisma, deps, actor, outboundRows, enqueue, handler: new RPCHandler(createRouter(deps)) };
+  return {
+    prisma,
+    deps,
+    actor,
+    outboundRows,
+    enqueue,
+    handler: new RPCHandler(createRouter(deps)),
+  };
 }
 
 async function call(handler: RPCHandler<never>, actor: Actor, path: string, body: unknown = {}) {
