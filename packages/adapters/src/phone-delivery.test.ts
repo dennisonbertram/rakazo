@@ -76,17 +76,44 @@ function createDeps(overrides: {
     phoneOutbound: {
       findUnique: vi.fn(async () => overrides.existingOutbox ?? null),
       findMany: vi.fn(async () => rows.filter((row) => row.status === "pending")),
-      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-        const row = { id: `out-${rows.length + 1}`, status: "pending", ...data };
-        rows.push(row);
-        return row;
+      createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+        let count = 0;
+        for (const item of data) {
+          // Simulates skipDuplicates against the idempotencyKey unique key.
+          const duplicate =
+            rows.some((row) => row.idempotencyKey === item.idempotencyKey) ||
+            (overrides.existingOutbox as { idempotencyKey?: string } | null)?.idempotencyKey ===
+              item.idempotencyKey;
+          if (duplicate) continue;
+          rows.push({ id: `out-${rows.length + 1}`, status: "pending", ...item });
+          count += 1;
+        }
+        return { count };
       }),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: unknown }) => {
         const row = rows.find((candidate) => candidate.id === where.id);
         if (row) Object.assign(row, data);
         return row;
       }),
-      updateMany: vi.fn(async () => ({ count: 1 })),
+      updateMany: vi.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id?: string; providerHandle?: string; status?: string };
+          data: Record<string, unknown>;
+        }) => {
+          let count = 0;
+          for (const row of rows) {
+            if (where.id && row.id !== where.id) continue;
+            if (where.providerHandle && row.providerHandle !== where.providerHandle) continue;
+            if (where.status && row.status !== where.status) continue;
+            Object.assign(row, data);
+            count += 1;
+          }
+          return { count };
+        },
+      ),
     },
   };
   return {
@@ -123,10 +150,12 @@ describe("deliverPhoneOutbound", () => {
   });
 
   it("does not mirror a message that already has an outbox row", async () => {
-    const deps = createDeps({ existingOutbox: { id: "out-1", status: "sent" } });
+    const deps = createDeps({
+      existingOutbox: { id: "out-1", idempotencyKey: "msg:m-1", status: "sent" },
+    });
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
 
-    expect(deps.prisma.phoneOutbound.create).not.toHaveBeenCalled();
+    expect(deps.rows).toHaveLength(0);
     expect(deps.sendDirect).not.toHaveBeenCalled();
   });
 
@@ -152,7 +181,7 @@ describe("deliverPhoneOutbound", () => {
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
 
     expect(deps.sendDirect).not.toHaveBeenCalled();
-    expect(deps.prisma.phoneOutbound.create).not.toHaveBeenCalled();
+    expect(deps.prisma.phoneOutbound.createMany).not.toHaveBeenCalled();
   });
 
   it("holds DM sends at the consecutive-outbound cap", async () => {
@@ -195,6 +224,50 @@ describe("deliverPhoneOutbound", () => {
       context,
     );
     expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "sent" }));
+  });
+
+  it("claims a row before sending so concurrent drains cannot double-send", async () => {
+    const deps = createDeps({});
+    await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
+
+    const claim = deps.prisma.phoneOutbound.updateMany.mock.calls.find(
+      ([args]: [{ where?: { status?: string } }]) => args.where?.status === "pending",
+    );
+    expect(claim).toBeTruthy();
+    expect(
+      deps.prisma.phoneOutbound.updateMany.mock.invocationCallOrder[
+        deps.prisma.phoneOutbound.updateMany.mock.calls.indexOf(claim)
+      ]!,
+    ).toBeLessThan(deps.sendDirect.mock.invocationCallOrder[0]!);
+  });
+
+  it("skips the send when another drain won the claim", async () => {
+    const deps = createDeps({});
+    deps.prisma.phoneOutbound.updateMany = vi.fn(async () => ({ count: 0 }));
+    await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
+
+    expect(deps.sendDirect).not.toHaveBeenCalled();
+  });
+
+  it("fails malformed rows instead of re-scanning them forever", async () => {
+    const deps = createDeps({
+      run: null,
+      outboundRows: [
+        {
+          id: "out-bad",
+          idempotencyKey: "broken:1",
+          kind: "dm",
+          toNumber: null,
+          body: "nowhere to go",
+          status: "pending",
+          providerHandle: null,
+        },
+      ],
+    });
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.sendDirect).not.toHaveBeenCalled();
+    expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "failed" }));
   });
 });
 
