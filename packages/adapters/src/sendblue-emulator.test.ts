@@ -50,6 +50,17 @@ describe("SendBlueEmulator", () => {
     expect(emulator.typingIndicators).toEqual(["+15551234567"]);
   });
 
+  it("rejects a typing indicator with no recipient so empty sends cannot pass silently", async () => {
+    const emulator = new SendBlueEmulator();
+    const response = await emulator.fetch("https://api.sendblue.com/api/send-typing-indicator", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+    expect(emulator.typingIndicators).toEqual([]);
+  });
+
   it("returns registered group participants", async () => {
     const emulator = new SendBlueEmulator();
     emulator.registerGroup("grp-1", {

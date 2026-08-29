@@ -35,7 +35,7 @@ describe("SendBlueMessagingProvider", () => {
       id: "sendblue",
       contractVersion: "1",
       adapterVersion: "0.1.0",
-      capabilities: { direct: true, groups: true },
+      capabilities: { direct: true, groups: true, typing: true },
     });
   });
 
@@ -53,6 +53,15 @@ describe("SendBlueMessagingProvider", () => {
       number: "+15551234567",
       from_number: "+15550009999",
     });
+  });
+
+  it("throws on a non-2xx typing response so the caller's catch is meaningful", async () => {
+    const { provider } = providerReturning(
+      Response.json({ status: "ERROR", message: "no chat" }, { status: 422 }),
+    );
+    await expect(provider.sendTypingIndicator({ to: "+15551234567" }, context)).rejects.toThrow(
+      /send-typing-indicator.*422/,
+    );
   });
 
   it("sends a direct message with auth headers and returns the handle", async () => {
