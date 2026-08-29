@@ -32,6 +32,7 @@ function createDeps(
   );
   const notify = vi.fn(async () => undefined);
   const enqueue = vi.fn(async () => undefined);
+  const typing = vi.fn(async (_toNumber: string) => undefined);
   const provision = vi.fn(async (phone: string) => ({
     phoneE164: phone,
     userId: "user-new",
@@ -145,6 +146,7 @@ function createDeps(
     provision,
     signupPolicy,
     lineNumber: "+15550009999",
+    typing,
     sendUserMessage,
     notify,
     enqueue,
@@ -155,6 +157,7 @@ function createDeps(
     sendUserMessage: ReturnType<typeof vi.fn>;
     notify: ReturnType<typeof vi.fn>;
     enqueue: ReturnType<typeof vi.fn>;
+    typing: ReturnType<typeof vi.fn>;
     provision: ReturnType<typeof vi.fn>;
     outboundRows: Array<Record<string, unknown>>;
     members: Array<Record<string, unknown>>;
@@ -263,6 +266,42 @@ describe("createPhoneInboundHandler DM routing", () => {
     await handle(dmEvent);
 
     expect(deps.enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe("typing indicators", () => {
+  it("shows typing bubbles to the sender once their DM run is enqueued", async () => {
+    const deps = createDeps();
+    const handle = createPhoneInboundHandler(deps);
+    await handle(dmEvent);
+
+    expect(deps.typing).toHaveBeenCalledWith("+15551111111");
+  });
+
+  it("stays silent when the message produced no run", async () => {
+    const deps = createDeps({ sendResult: { messageId: "msg-1", runId: null, seq: 3 } });
+    const handle = createPhoneInboundHandler(deps);
+    await handle(dmEvent);
+
+    expect(deps.typing).not.toHaveBeenCalled();
+  });
+
+  it("stays silent for owner commands, which get a text confirmation instead", async () => {
+    const deps = createDeps({
+      invitedMember: { id: "pm-1", status: "invited", identityId: "pi-1" },
+    });
+    const handle = createPhoneInboundHandler(deps);
+    await handle({ ...dmEvent, content: "YES" });
+
+    expect(deps.typing).not.toHaveBeenCalled();
+  });
+
+  it("never shows typing in groups — SendBlue cannot deliver it there", async () => {
+    const deps = createDeps();
+    const handle = createPhoneInboundHandler(deps);
+    await handle(groupEvent);
+
+    expect(deps.typing).not.toHaveBeenCalled();
   });
 });
 

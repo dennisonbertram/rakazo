@@ -34,6 +34,22 @@ describe("SendBlueEmulator", () => {
     ]);
   });
 
+  it("records typing indicators", async () => {
+    const emulator = new SendBlueEmulator();
+    const provider = new SendBlueMessagingProvider(
+      {
+        apiKeyId: "key-id",
+        apiSecret: "secret",
+        signingSecret: emulator.signingSecret,
+        phoneNumber: emulator.phoneNumber,
+      },
+      { fetch: emulator.fetch },
+    );
+
+    await provider.sendTypingIndicator({ to: "+15551234567" }, context);
+    expect(emulator.typingIndicators).toEqual(["+15551234567"]);
+  });
+
   it("returns registered group participants", async () => {
     const emulator = new SendBlueEmulator();
     emulator.registerGroup("grp-1", {

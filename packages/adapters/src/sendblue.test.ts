@@ -39,6 +39,22 @@ describe("SendBlueMessagingProvider", () => {
     });
   });
 
+  it("posts a typing indicator with auth headers", async () => {
+    const { provider, fetchMock } = providerReturning(Response.json({ status: "SENT" }));
+    await provider.sendTypingIndicator({ to: "+15551234567" }, context);
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("https://api.sendblue.com/api/send-typing-indicator");
+    expect(init?.method).toBe("POST");
+    const headers = new Headers(init?.headers);
+    expect(headers.get("sb-api-key-id")).toBe("key-id");
+    expect(headers.get("sb-api-secret-key")).toBe("secret");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      number: "+15551234567",
+      from_number: "+15550009999",
+    });
+  });
+
   it("sends a direct message with auth headers and returns the handle", async () => {
     const { provider, fetchMock } = providerReturning(
       Response.json({ message_handle: "handle-1" }),
