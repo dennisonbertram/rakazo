@@ -120,6 +120,96 @@ describePhone("phone surface journeys", () => {
     );
   });
 
+  it("runs the channel loop: discovery, invite, intro, YES, fan-out, attributed post", async () => {
+    const stranger = `+1666${String(stamp).slice(-7)}`;
+    const groupId = `grp-${stamp}`;
+
+    // 1. Discovery: first group message creates the channel, invites the
+    // linked sender, and posts one intro for the unlinked stranger.
+    const discovery = await app.request(
+      emulator.buildInboundRequest({
+        fromNumber: sender,
+        content: "hey everyone",
+        groupId,
+        participants: [sender, stranger, emulator.phoneNumber],
+        handle: `grp-discover-${stamp}`,
+      }),
+    );
+    expect(discovery.status).toBe(200);
+
+    await waitForDatabase(async () =>
+      Boolean(
+        await prisma.phoneOutbound.findFirst({
+          where: { providerGroupId: groupId, kind: "intro", status: "sent" },
+        }),
+      ),
+    );
+    const channel = await prisma.phoneChannel.findUnique({ where: { providerGroupId: groupId } });
+    expect(channel).toBeTruthy();
+    const members = await prisma.phoneChannelMember.findMany({
+      where: { channelId: channel.id },
+      orderBy: { phoneE164: "asc" },
+    });
+    expect(members).toHaveLength(2);
+    const senderMember = members.find((m: any) => m.phoneE164 === sender);
+    expect(senderMember.status).toBe("invited");
+    expect(senderMember.identityId).toBeTruthy();
+    const strangerMember = members.find((m: any) => m.phoneE164 === stranger);
+    expect(strangerMember.identityId).toBeNull();
+    // invite DM went out to the sender, intro went to the group, both once
+    expect(
+      emulator.sent.filter((send) => send.kind === "group" && send.groupId === groupId),
+    ).toHaveLength(1);
+    // the invited-only sender's message was not fanned out to any bot
+    const identity = await prisma.phoneIdentity.findUnique({ where: { phoneE164: sender } });
+    const runsBefore = await prisma.run.count({ where: { botId: identity.botId } });
+
+    // 2. The owner approves by text command.
+    const yes = await app.request(
+      emulator.buildInboundRequest({
+        fromNumber: sender,
+        content: "YES",
+        handle: `grp-yes-${stamp}`,
+      }),
+    );
+    expect(yes.status).toBe(200);
+    await waitForDatabase(async () => {
+      const member = await prisma.phoneChannelMember.findUnique({
+        where: { channelId_phoneE164: { channelId: channel.id, phoneE164: sender } },
+      });
+      return member?.status === "approved";
+    });
+
+    // 3. The next group message fans out to the approved bot, whose reply
+    // is posted back to the group with attribution.
+    const second = await app.request(
+      emulator.buildInboundRequest({
+        fromNumber: sender,
+        content: "what do you think?",
+        groupId,
+        participants: [sender, stranger, emulator.phoneNumber],
+        handle: `grp-second-${stamp}`,
+      }),
+    );
+    expect(second.status).toBe(200);
+
+    await waitForDatabase(async () =>
+      Boolean(
+        await prisma.phoneOutbound.findFirst({
+          where: { providerGroupId: groupId, kind: "group", status: "sent" },
+        }),
+      ),
+    );
+    const posts = await prisma.phoneOutbound.findMany({
+      where: { providerGroupId: groupId, kind: "group", status: "sent" },
+    });
+    expect(posts).toHaveLength(1);
+    expect(posts[0].body).toMatch(/^Phone's agent: /);
+    expect(await prisma.run.count({ where: { botId: identity.botId } })).toBeGreaterThan(
+      runsBefore,
+    );
+  });
+
   it("rejects a bad signing secret", async () => {
     const request = emulator.buildInboundRequest({
       fromNumber: "+15550000001",
