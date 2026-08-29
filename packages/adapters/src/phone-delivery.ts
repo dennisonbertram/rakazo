@@ -159,7 +159,7 @@ async function mirrorChannelRun(
       };
       const clientNonce = `phone-peer:${message.id}:${peerIdentity.botId}`;
       const mentioned = peerBot?.name
-        ? new RegExp(`@${escapeRegExp(peerBot.name)}\\b`).test(text)
+        ? new RegExp(`@${escapeRegExp(peerBot.name)}\\b`, "i").test(text)
         : false;
       if (mentioned && !botMessageHopExhausted(hop)) {
         const sent = await deps.events.sendUserMessage({

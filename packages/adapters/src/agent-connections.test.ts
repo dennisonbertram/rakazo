@@ -4,7 +4,6 @@ import {
   connectAgent,
   messageConnectedAgent,
   respondAgentConnection,
-  type AgentConnectionDeps,
 } from "./agent-connections.js";
 
 const requesterIdentity = {
@@ -24,13 +23,19 @@ const targetIdentity = {
   outboundSinceInbound: 0,
 };
 
-function createDeps(overrides: {
-  connection?: Record<string, unknown> | null;
-  pendingConnection?: Record<string, unknown> | null;
-  sourceHop?: number;
-} = {}) {
+function createDeps(
+  overrides: {
+    connection?: Record<string, unknown> | null;
+    pendingConnection?: Record<string, unknown> | null;
+    sourceHop?: number;
+  } = {},
+) {
   const outboundRows: Array<Record<string, unknown>> = [];
-  const txCalls: Record<string, unknown[]> = { messageCreate: [], runCreate: [], taskCreate: [] };
+  const txCalls = {
+    messageCreate: [] as unknown[],
+    runCreate: [] as unknown[],
+    taskCreate: [] as unknown[],
+  };
   const txMock = {
     message: {
       findUnique: vi.fn(async () => null),
@@ -46,7 +51,7 @@ function createDeps(overrides: {
         txCalls.runCreate.push(data);
         return { id: "run-wake", ...(data as object) };
       }),
-      findUnique: vi.fn(async () => null),
+      findUnique: vi.fn(async () => ({ id: "run-1", status: "running" })),
     },
     task: {
       create: vi.fn(async ({ data }: { data: unknown }) => {
@@ -54,14 +59,13 @@ function createDeps(overrides: {
         return { id: "task-1", ...(data as object) };
       }),
     },
-    event: { create: vi.fn(async ({ data }: { data: object }) => ({ id: "evt-1", seq: 8, ...data })) },
+    event: {
+      create: vi.fn(async ({ data }: { data: object }) => ({ id: "evt-1", seq: 8, ...data })),
+    },
     thread: { update: vi.fn(async () => ({ nextMessageSeq: 4, nextEventSeq: 9 })) },
     bot: { findFirst: vi.fn(async () => ({ id: "bot-2" })) },
   };
-  const connection =
-    overrides.connection === undefined
-      ? null
-      : overrides.connection;
+  const connection = overrides.connection === undefined ? null : overrides.connection;
   const prisma = {
     phoneIdentity: {
       findUnique: vi.fn(
@@ -90,9 +94,14 @@ function createDeps(overrides: {
     },
     agentConnection: {
       findUnique: vi.fn(async () => connection),
-      findFirst: vi.fn(async () =>
-        overrides.pendingConnection === undefined ? null : overrides.pendingConnection,
-      ),
+      findFirst: vi.fn(async ({ where }: { where?: { status?: string } }) => {
+        if (where?.status === "approved") {
+          return connection && (connection as { status?: string }).status === "approved"
+            ? connection
+            : null;
+        }
+        return overrides.pendingConnection === undefined ? null : overrides.pendingConnection;
+      }),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         id: "ac-1",
         status: "pending",
@@ -150,10 +159,7 @@ const sender = { id: "bot-1", name: "Assistant" };
 describe("connectAgent", () => {
   it("creates a pending connection and texts the target owner for approval", async () => {
     const deps = createDeps();
-    const result = await connectAgent(deps, run, sender, {
-      phone: "+15552222222",
-      deliveryKey: "exec-1",
-    });
+    const result = await connectAgent(deps, run, sender, { phone: "+15552222222" });
 
     expect(result).toEqual(expect.objectContaining({ ok: true, status: "pending" }));
     expect(deps.prisma.agentConnection.create).toHaveBeenCalledWith({
@@ -171,9 +177,9 @@ describe("connectAgent", () => {
 
   it("rejects unknown numbers, self-connections, and repeat requests", async () => {
     const unknown = createDeps();
-    expect(
-      await connectAgent(unknown, run, sender, { phone: "+15559999999" }),
-    ).toEqual(expect.objectContaining({ ok: false }));
+    expect(await connectAgent(unknown, run, sender, { phone: "+15559999999" })).toEqual(
+      expect.objectContaining({ ok: false }),
+    );
 
     const self = createDeps();
     expect(await connectAgent(self, run, sender, { phone: "+15551111111" })).toEqual(
@@ -274,6 +280,8 @@ describe("messageConnectedAgent", () => {
       sender,
       { phone: "+15552222222", message: "again" },
     );
-    expect(result).toEqual(expect.objectContaining({ ok: false, error: expect.stringMatching(/limit/i) }));
+    expect(result).toEqual(
+      expect.objectContaining({ ok: false, error: expect.stringMatching(/limit/i) }),
+    );
   });
 });

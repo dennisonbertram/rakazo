@@ -135,20 +135,62 @@ async function applyPhoneCommand(
     where: { identityId: identity.id, status: "invited" },
     orderBy: { updatedAt: "desc" },
   });
-  if (!membership) return false;
+  const connection = await deps.prisma.agentConnection.findFirst({
+    where: { targetBotId: identity.botId, status: "pending" },
+    orderBy: { updatedAt: "desc" },
+  });
+  // YES/NO answers whichever pending item is newest, channel invite or
+  // agent connection.
+  const target =
+    membership && (!connection || membership.updatedAt >= connection.updatedAt)
+      ? ({ kind: "channel", membership } as const)
+      : connection
+        ? ({ kind: "connection", connection } as const)
+        : null;
+  if (!target) return false;
   const approved = command === "approve";
-  await deps.prisma.phoneChannelMember.update({
-    where: { id: membership.id },
+
+  if (target.kind === "channel") {
+    await deps.prisma.phoneChannelMember.update({
+      where: { id: target.membership.id },
+      data: { status: approved ? "approved" : "declined" },
+    });
+    await enqueueConfirmation(
+      deps,
+      identity.phoneE164,
+      `command:${command}:${target.membership.id}`,
+      approved
+        ? "You're in — your agent will now see and reply to that group."
+        : "No problem, your agent will stay out of that group.",
+    );
+    return true;
+  }
+
+  await deps.prisma.agentConnection.update({
+    where: { id: target.connection.id },
     data: { status: approved ? "approved" : "declined" },
   });
   await enqueueConfirmation(
     deps,
     identity.phoneE164,
-    `command:${command}:${membership.id}`,
+    `command:${command}:${target.connection.id}`,
     approved
-      ? "You're in — your agent will now see and reply to that group."
-      : "No problem, your agent will stay out of that group.",
+      ? "Connection approved — your agents can now message each other."
+      : "Connection declined.",
   );
+  if (approved) {
+    const requesterIdentity = await deps.prisma.phoneIdentity.findUnique({
+      where: { botId: target.connection.requesterBotId },
+    });
+    if (requesterIdentity) {
+      await enqueueConfirmation(
+        deps,
+        requesterIdentity.phoneE164,
+        `command:connected:${target.connection.id}`,
+        "Your connection request was accepted — your agents can now message each other.",
+      );
+    }
+  }
   return true;
 }
 
@@ -171,10 +213,11 @@ async function handleChannelEvent(
   deps: PhoneInboundDeps,
   event: SendBlueInboundMessage,
 ): Promise<void> {
+  const groupName = event.groupName ? sanitizePhoneLabel(event.groupName) : null;
   const channel = await deps.prisma.phoneChannel.upsert({
     where: { providerGroupId: event.groupId! },
-    create: { providerGroupId: event.groupId!, name: event.groupName },
-    update: event.groupName ? { name: event.groupName } : {},
+    create: { providerGroupId: event.groupId!, name: groupName },
+    update: groupName ? { name: groupName } : {},
   });
 
   const participants = event.participants.filter((phone) => phone !== deps.lineNumber);
@@ -199,17 +242,30 @@ async function handleChannelEvent(
       if (!identity) hasUnlinked = true;
       continue;
     }
-    await deps.prisma.phoneChannelMember.create({
-      data: {
+    // Upsert, not create: concurrent group webhooks race on the unique key.
+    await deps.prisma.phoneChannelMember.upsert({
+      where: { channelId_phoneE164: { channelId: channel.id, phoneE164: phone } },
+      create: {
         channelId: channel.id,
         phoneE164: phone,
         identityId: identity?.id ?? null,
         status: "invited",
       },
+      update: {},
     });
     if (identity) await inviteMember(deps, channel, identity);
     else hasUnlinked = true;
   }
+
+  // Someone removed from the iMessage group must stop receiving its content.
+  await deps.prisma.phoneChannelMember.updateMany({
+    where: {
+      channelId: channel.id,
+      phoneE164: { notIn: participants },
+      status: { in: ["invited", "approved"] },
+    },
+    data: { status: "left" },
+  });
 
   if (hasUnlinked && !channel.introPostedAt) {
     await deps.prisma.phoneOutbound.createMany({
@@ -327,5 +383,17 @@ async function ownerFirstName(
 ): Promise<string> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
   const first = user?.name.trim().split(/\s+/)[0];
-  return first || fallback;
+  return first ? sanitizePhoneLabel(first) : fallback;
+}
+
+/**
+ * Group names and owner names are attacker-controlled text interpolated
+ * into prompts and DMs; strip framing characters before they get near one.
+ */
+export function sanitizePhoneLabel(value: string): string {
+  return value
+    .replace(/[\r\n"[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64);
 }
