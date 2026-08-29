@@ -46,6 +46,17 @@ export function isSendBlueEnabled(config: Partial<SendBlueConfig>): boolean {
   );
 }
 
+/**
+ * Phone-created users have no per-user model credential, so the surface also
+ * requires the deployment model key — without it their runs cannot execute.
+ */
+export function isPhoneSurfaceEnabled(
+  config: Partial<SendBlueConfig>,
+  deploymentModelKey: string | undefined,
+): boolean {
+  return isSendBlueEnabled(config) && Boolean(deploymentModelKey);
+}
+
 export type SendBlueInboundEvent = SendBlueInboundMessage | SendBlueOutboundStatus;
 
 export interface SendBlueInboundMessage {
@@ -77,19 +88,21 @@ export function parseSendBlueInbound(payload: unknown): SendBlueInboundEvent | n
       status: typeof body.status === "string" ? body.status : "",
     };
   }
-  if (body.is_outbound !== false || typeof body.from_number !== "string") return null;
-  return {
-    type: "message",
-    handle: body.message_handle,
-    fromNumber: body.from_number,
-    groupId: typeof body.group_id === "string" && body.group_id ? body.group_id : null,
-    groupName: typeof body.group_display_name === "string" ? body.group_display_name : null,
-    participants: Array.isArray(body.participants)
-      ? body.participants.filter((p): p is string => typeof p === "string")
-      : [],
-    content: typeof body.content === "string" ? body.content : "",
-    mediaUrl: typeof body.media_url === "string" && body.media_url ? body.media_url : null,
-  };
+  if (body.is_outbound !== true && typeof body.from_number === "string") {
+    return {
+      type: "message",
+      handle: body.message_handle,
+      fromNumber: body.from_number,
+      groupId: typeof body.group_id === "string" && body.group_id ? body.group_id : null,
+      groupName: typeof body.group_display_name === "string" ? body.group_display_name : null,
+      participants: Array.isArray(body.participants)
+        ? body.participants.filter((p): p is string => typeof p === "string")
+        : [],
+      content: typeof body.content === "string" ? body.content : "",
+      mediaUrl: typeof body.media_url === "string" && body.media_url ? body.media_url : null,
+    };
+  }
+  return null;
 }
 
 export class SendBlueMessagingProvider implements MessagingProvider {
@@ -109,33 +122,45 @@ export class SendBlueMessagingProvider implements MessagingProvider {
 
   async sendDirect(
     request: MessagingDirectRequest,
-    _context: AdapterContext,
+    context: AdapterContext,
   ): Promise<MessagingSendResult> {
-    const data = await this.call("/api/send-message", {
-      number: request.to,
-      from_number: this.config.phoneNumber,
-      content: request.body,
-    });
+    const data = await this.call(
+      "/api/send-message",
+      {
+        number: request.to,
+        from_number: this.config.phoneNumber,
+        content: request.body,
+      },
+      context,
+    );
     return { handle: messageHandle(data) };
   }
 
   async sendGroup(
     request: MessagingGroupRequest,
-    _context: AdapterContext,
+    context: AdapterContext,
   ): Promise<MessagingSendResult> {
-    const data = await this.call("/api/send-group-message", {
-      group_id: request.groupId,
-      from_number: this.config.phoneNumber,
-      content: request.body,
-    });
+    const data = await this.call(
+      "/api/send-group-message",
+      {
+        group_id: request.groupId,
+        from_number: this.config.phoneNumber,
+        content: request.body,
+      },
+      context,
+    );
     return { handle: messageHandle(data) };
   }
 
-  async getGroup(groupId: string, _context: AdapterContext): Promise<MessagingGroup> {
+  async getGroup(groupId: string, context: AdapterContext): Promise<MessagingGroup> {
     const fetchImpl = this.dependencies.fetch ?? globalThis.fetch;
-    const response = await fetchImpl(`${this.baseUrl()}/api/v2/groups/${groupId}`, {
-      headers: this.headers(),
-    });
+    const response = await fetchImpl(
+      `${this.baseUrl()}/api/v2/groups/${encodeURIComponent(groupId)}`,
+      {
+        headers: this.headers(),
+        signal: context.signal,
+      },
+    );
     const data = await parseResponse(response, `GET /api/v2/groups/${groupId}`);
     const record = asRecord(data);
     return {
@@ -167,12 +192,17 @@ export class SendBlueMessagingProvider implements MessagingProvider {
     };
   }
 
-  private async call(path: string, body: Record<string, unknown>): Promise<unknown> {
+  private async call(
+    path: string,
+    body: Record<string, unknown>,
+    context: AdapterContext,
+  ): Promise<unknown> {
     const fetchImpl = this.dependencies.fetch ?? globalThis.fetch;
     const response = await fetchImpl(`${this.baseUrl()}${path}`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),
+      signal: context.signal,
     });
     return parseResponse(response, `POST ${path}`);
   }

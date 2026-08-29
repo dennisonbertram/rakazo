@@ -30,8 +30,8 @@ import {
   InMemoryRealtimeFanout,
   InstalledConnectorProvider,
   isComposioEnabled,
+  isPhoneSurfaceEnabled,
   isPipedreamEnabled,
-  isSendBlueEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
@@ -185,7 +185,9 @@ export async function createApp(
   const sendBlueConfig = sendBlueConfigFromEnv(env);
   const messaging =
     messagingOverride ??
-    (isSendBlueEnabled(sendBlueConfig) ? new SendBlueMessagingProvider(sendBlueConfig) : undefined);
+    (isPhoneSurfaceEnabled(sendBlueConfig, env.deploymentModelKey)
+      ? new SendBlueMessagingProvider(sendBlueConfig)
+      : undefined);
   const installed = new InstalledConnectorProvider(prisma, secrets, remoteConnectors);
   const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride, [
     installed,
