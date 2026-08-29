@@ -18,8 +18,8 @@ import {
   InMemoryJobQueue,
   InstalledConnectorProvider,
   isComposioEnabled,
+  isPhoneSurfaceEnabled,
   isPipedreamEnabled,
-  isSendBlueEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
@@ -98,7 +98,7 @@ async function main() {
     sendblueSigningSecret: process.env.SENDBLUE_SIGNING_SECRET,
     sendbluePhoneNumber: process.env.SENDBLUE_PHONE_NUMBER,
   });
-  const messaging = isSendBlueEnabled(sendBlueConfig)
+  const messaging = isPhoneSurfaceEnabled(sendBlueConfig, deploymentModelKey)
     ? new SendBlueMessagingProvider(sendBlueConfig)
     : undefined;
   const stack = createConnectorStack(isComposioEnabled(process.env.COMPOSIO_API_KEY), undefined, [
