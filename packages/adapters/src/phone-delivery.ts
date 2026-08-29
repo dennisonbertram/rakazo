@@ -225,37 +225,49 @@ function connectInvitePair(
 }
 
 /**
- * Last gate before texting a connect invite. Holds the connection row so a
- * concurrent revoke either waits (and then deletes this claimed outbox row)
- * or has already committed revoked — in which case we abort without sending.
+ * Deliver a connect invite while holding the connection row lock.
+ * Revoke's status update blocks behind this lock, so it cannot commit
+ * (and delete the claim) between the pending check and sendDirect.
+ * Only used for rare approval DMs — not for ordinary mirrored traffic.
  */
-async function connectInviteMaySend(
+async function sendConnectInvite(
   deps: PhoneDeliveryDeps,
-  outboundId: string,
+  row: { id: string; toNumber: string; body: string },
   pair: { requesterBotId: string; targetBotId: string },
-): Promise<boolean> {
-  return deps.prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw<Array<{ status: string }>>`
-      SELECT status FROM agent_connections
-      WHERE "requesterBotId" = ${pair.requesterBotId}
-        AND "targetBotId" = ${pair.targetBotId}
-      FOR UPDATE
-    `;
-    if (locked[0]?.status !== "pending") {
-      await tx.phoneOutbound.updateMany({
-        where: { id: outboundId },
-        data: { status: "failed" },
+  context: AdapterContext,
+): Promise<"sent" | "skipped"> {
+  return deps.prisma.$transaction(
+    async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ status: string }>>`
+        SELECT status FROM agent_connections
+        WHERE "requesterBotId" = ${pair.requesterBotId}
+          AND "targetBotId" = ${pair.targetBotId}
+        FOR UPDATE
+      `;
+      if (locked[0]?.status !== "pending") {
+        await tx.phoneOutbound.updateMany({
+          where: { id: row.id },
+          data: { status: "failed" },
+        });
+        return "skipped";
+      }
+      const outbound = await tx.phoneOutbound.findUnique({
+        where: { id: row.id },
+        select: { id: true },
       });
-      return false;
-    }
-    // Revoke deletes claimed-without-handle rows under the same lock
-    // ordering; if it won, the invite is already gone.
-    const outbound = await tx.phoneOutbound.findUnique({
-      where: { id: outboundId },
-      select: { id: true },
-    });
-    return outbound != null;
-  });
+      if (!outbound) return "skipped";
+      const sent = await deps.messaging.sendDirect(
+        { to: row.toNumber, body: row.body },
+        context,
+      );
+      await tx.phoneOutbound.updateMany({
+        where: { id: row.id },
+        data: { providerHandle: sent.handle },
+      });
+      return "sent";
+    },
+    { maxWait: 5_000, timeout: 20_000 },
+  );
 }
 
 async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<void> {
@@ -312,15 +324,18 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
         });
         continue;
       }
-      // Connect invites: serialize with revoke on the connection row. Revoke
-      // either waits and deletes this claimed row, or we see revoked/missing
-      // and skip sendDirect so the target never gets an obsolete YES/NO.
       const invitePair = connectInvitePair(row.idempotencyKey);
-      if (invitePair && !(await connectInviteMaySend(deps, row.id, invitePair))) {
+      if (invitePair) {
+        await sendConnectInvite(
+          deps,
+          { id: row.id, toNumber: row.toNumber, body: row.body },
+          invitePair,
+          context,
+        );
         continue;
       }
       const sent = await deps.messaging.sendDirect({ to: row.toNumber, body: row.body }, context);
-      await deps.prisma.phoneOutbound.update({
+      await deps.prisma.phoneOutbound.updateMany({
         where: { id: row.id },
         data: { providerHandle: sent.handle },
       });
@@ -336,7 +351,7 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
       const attempts = (row.attempts ?? 0) + 1;
       const exhausted = attempts >= PHONE_OUTBOUND_MAX_ATTEMPTS;
       const retryAt = exhausted ? null : new Date(Date.now() + phoneOutboundRetryDelayMs(attempts));
-      await deps.prisma.phoneOutbound.update({
+      await deps.prisma.phoneOutbound.updateMany({
         where: { id: row.id },
         data: {
           attempts,
