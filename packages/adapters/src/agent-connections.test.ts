@@ -68,14 +68,16 @@ function createDeps(
     },
     thread: { update: vi.fn(async () => ({ nextMessageSeq: 4, nextEventSeq: 9 })) },
     bot: { findFirst: vi.fn(async () => ({ id: "bot-2" })) },
-    // What a `SELECT ... FOR UPDATE` on the connection row would see: the
-    // AfterRead variant stays approved for plain reads and only shows the
-    // revoke to a locking read.
-    $queryRaw: vi.fn(async () =>
-      overrides.connectionRevokedInsideTx || overrides.connectionRevokedAfterReadInsideTx
-        ? [{ status: "revoked" }]
-        : [{ status: "approved" }],
-    ),
+    // What a `SELECT ... FOR UPDATE` on the connection row would see.
+    $queryRaw: vi.fn(async () => {
+      if (overrides.connectionRevokedInsideTx || overrides.connectionRevokedAfterReadInsideTx) {
+        return [{ status: "revoked" }];
+      }
+      if (overrides.connection && typeof overrides.connection === "object") {
+        return [{ status: (overrides.connection as { status: string }).status }];
+      }
+      return [{ status: "approved" }];
+    }),
   };
   const connection = overrides.connection === undefined ? null : overrides.connection;
   const prisma = {
@@ -148,7 +150,13 @@ function createDeps(
     user: { findUnique: vi.fn(async () => ({ id: "user-1", name: "Alice Owner" })) },
     thread: { findFirst: vi.fn(async () => ({ id: "thread-2" })) },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(txMock)),
+    $queryRaw: txMock.$queryRaw,
   };
+  // connectAgent claim+invite runs on the transaction client.
+  Object.assign(txMock, {
+    agentConnection: prisma.agentConnection,
+    phoneOutbound: prisma.phoneOutbound,
+  });
   const sendUserMessage = vi.fn(async () => ({ messageId: "m", runId: "r", seq: 1 }));
   const notify = vi.fn(async () => undefined);
   const enqueue = vi.fn(async () => undefined);
@@ -209,25 +217,10 @@ describe("connectAgent", () => {
     const declined = createDeps({
       connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" },
     });
-    const declinedModel = declined.prisma.agentConnection as unknown as Record<string, unknown>;
-    declinedModel.findUnique = vi
-      .fn()
-      .mockResolvedValueOnce({
-        id: "ac-1",
-        requesterBotId: "bot-1",
-        targetBotId: "bot-2",
-        status: "declined",
-      })
-      .mockResolvedValue({
-        id: "ac-1",
-        requesterBotId: "bot-1",
-        targetBotId: "bot-2",
-        status: "pending",
-      });
     const reinvite = await connectAgent(declined, run, sender, { phone: "+15552222222" });
     expect(reinvite).toEqual(expect.objectContaining({ ok: true, status: "pending" }));
-    expect(declined.prisma.agentConnection.updateMany).toHaveBeenCalledWith({
-      where: { id: "ac-1", status: "declined" },
+    expect(declined.prisma.agentConnection.update).toHaveBeenCalledWith({
+      where: { id: "ac-1" },
       data: { status: "pending" },
     });
     expect(declined.outboundRows).toEqual([
@@ -242,62 +235,17 @@ describe("connectAgent", () => {
     expect(approved.prisma.agentConnection.create).not.toHaveBeenCalled();
   });
 
-  it("does not reopen a connection when a concurrent revoke wins the claim", async () => {
-    const state = { status: "declined" };
+  it("does not reopen a connection when the locked row is already revoked", async () => {
     const deps = createDeps({
       connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" },
-    });
-    const model = deps.prisma.agentConnection as unknown as Record<string, unknown>;
-    model.findUnique = vi.fn(async () => ({
-      id: "ac-1",
-      requesterBotId: "bot-1",
-      targetBotId: "bot-2",
-      status: state.status,
-    }));
-    model.updateMany = vi.fn(
-      async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
-        // Interleaved: owner revokes the declined row before the reconnect write.
-        state.status = "revoked";
-        if (where.status && state.status !== where.status) return { count: 0 };
-        Object.assign(state, data);
-        return { count: 1 };
-      },
-    );
-
-    const result = await connectAgent(deps, run, sender, { phone: "+15552222222" });
-
-    expect(result).toEqual({ ok: false, error: "connection changed; try again" });
-    expect(state.status).toBe("revoked");
-    expect(deps.outboundRows).toHaveLength(0);
-  });
-
-  it("does not queue an invite when revoke lands after the reconnect claim", async () => {
-    const state = { status: "declined" };
-    const deps = createDeps({
-      connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" },
-    });
-    const model = deps.prisma.agentConnection as unknown as Record<string, unknown>;
-    let reads = 0;
-    model.findUnique = vi.fn(async () => {
-      reads += 1;
-      // First read: declined (pre-claim). After a successful claim, a revoke
-      // flips the row before the post-claim live check.
-      if (reads === 1)
-        return { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "declined" };
-      return { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: state.status };
-    });
-    model.updateMany = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-      Object.assign(state, data);
-      // Revoke wins after the claim, before the invite is written.
-      state.status = "revoked";
-      return { count: 1 };
+      connectionRevokedInsideTx: true,
     });
 
     const result = await connectAgent(deps, run, sender, { phone: "+15552222222" });
 
     expect(result).toEqual({ ok: false, error: "connection changed; try again" });
-    expect(state.status).toBe("revoked");
     expect(deps.outboundRows).toHaveLength(0);
+    expect(deps.prisma.agentConnection.update).not.toHaveBeenCalled();
   });
 });
 

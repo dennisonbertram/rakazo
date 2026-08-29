@@ -93,54 +93,54 @@ export async function connectAgent(
     requesterOwner?.name.trim().split(/\s+/)[0] || "Someone",
   );
 
-  if (existing) {
-    // Claim the status we observed. A concurrent revoke of the same declined
-    // or revoked row must win; an unconditional update-by-id would undo it.
-    const { count } = await deps.prisma.agentConnection.updateMany({
-      where: { id: existing.id, status: existing.status },
-      data: { status: "pending" },
-    });
-    if (count === 0) {
-      const current = await deps.prisma.agentConnection.findUnique({
-        where: {
-          requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
-        },
-      });
-      if (current?.status === "approved" || current?.status === "pending") {
-        return { ok: true, status: current.status };
-      }
-      return { ok: false, error: "connection changed; try again" };
-    }
-    // A concurrent revoke after the claim must not leave a stale invite DM.
-    const live = await deps.prisma.agentConnection.findUnique({
-      where: {
-        requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
-      },
-    });
-    if (live?.status !== "pending") {
-      if (live?.status === "approved") return { ok: true, status: "approved" };
-      return { ok: false, error: "connection changed; try again" };
-    }
-  } else {
-    await deps.prisma.agentConnection.create({
-      data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
-    });
-  }
   const inviteKey = `connect:${sender.id}:${target.id}`;
-  // A declined/revoked pair starts a fresh approval cycle; clear the old
-  // invite row or skipDuplicates would silently swallow the new request.
-  await deps.prisma.phoneOutbound.deleteMany({ where: { idempotencyKey: inviteKey } });
-  await deps.prisma.phoneOutbound.createMany({
-    data: [
-      {
-        idempotencyKey: inviteKey,
-        kind: "dm",
-        toNumber: targetIdentity.phoneE164,
-        body: `${requesterFirst}'s agent (${sanitizePhoneLabel(sender.name)}) wants to connect with your agent. Reply YES to allow, NO to decline.`,
-      },
-    ],
-    skipDuplicates: true,
+  const inviteBody = `${requesterFirst}'s agent (${sanitizePhoneLabel(sender.name)}) wants to connect with your agent. Reply YES to allow, NO to decline.`;
+
+  // Claim + invite in one locked transaction so a concurrent revoke cannot
+  // leave a pending invite after the connection is already revoked.
+  const claimed = await deps.prisma.$transaction(async (tx) => {
+    if (existing) {
+      const locked = await tx.$queryRaw<Array<{ status: string }>>`
+        SELECT status FROM agent_connections WHERE id = ${existing.id} FOR UPDATE
+      `;
+      const status = locked[0]?.status;
+      if (status === "approved" || status === "pending") {
+        return { ok: true as const, status };
+      }
+      // Only reopen the status we observed. A concurrent revoke of a declined
+      // row would show up here as revoked and must win.
+      if (status !== existing.status) {
+        return { ok: false as const, error: "connection changed; try again" };
+      }
+      await tx.agentConnection.update({
+        where: { id: existing.id },
+        data: { status: "pending" },
+      });
+    } else {
+      await tx.agentConnection.create({
+        data: { requesterBotId: sender.id, targetBotId: target.id, status: "pending" },
+      });
+    }
+    // Fresh approval cycle: clear the old invite row or skipDuplicates would
+    // silently swallow the new request.
+    await tx.phoneOutbound.deleteMany({ where: { idempotencyKey: inviteKey } });
+    await tx.phoneOutbound.createMany({
+      data: [
+        {
+          idempotencyKey: inviteKey,
+          kind: "dm",
+          toNumber: targetIdentity.phoneE164,
+          body: inviteBody,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return { ok: true as const, status: "pending" as const };
   });
+
+  if (!claimed.ok) return claimed;
+  if (claimed.status !== "pending") return { ok: true, status: claimed.status };
+
   await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
     console.error("agent connection invite enqueue error", error);
   });
