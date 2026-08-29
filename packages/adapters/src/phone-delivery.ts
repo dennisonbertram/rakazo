@@ -49,22 +49,19 @@ async function mirrorRun(deps: PhoneDeliveryDeps, runId: string): Promise<void> 
     where: { runId: run.id, role: "bot" },
     orderBy: { seq: "asc" },
   });
-  for (const message of messages) {
-    const text = extractText(message.blocks);
-    if (!text) continue;
-    const idempotencyKey = `msg:${message.id}`;
-    const existing = await deps.prisma.phoneOutbound.findUnique({ where: { idempotencyKey } });
-    if (existing) continue;
-    await deps.prisma.phoneOutbound.create({
-      data: {
-        idempotencyKey,
-        kind: "dm",
-        toNumber: identity.phoneE164,
-        body: text,
-        sourceMessageId: message.id,
-      },
-    });
-  }
+  const rows = messages
+    .map((message) => ({
+      idempotencyKey: `msg:${message.id}`,
+      kind: "dm",
+      toNumber: identity.phoneE164,
+      body: extractText(message.blocks),
+      sourceMessageId: message.id,
+    }))
+    .filter((row) => row.body);
+  if (rows.length === 0) return;
+  // Atomic dedupe: a concurrent phone.deliver for the same run loses on the
+  // idempotencyKey unique key instead of throwing P2002.
+  await deps.prisma.phoneOutbound.createMany({ data: rows, skipDuplicates: true });
 }
 
 async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<void> {
@@ -73,28 +70,54 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
     orderBy: { createdAt: "asc" },
   });
   for (const row of pending) {
+    // Claim before sending: concurrent drains (job keys are per runId) and
+    // crash retries must never deliver the same iMessage twice.
+    const claim = await deps.prisma.phoneOutbound.updateMany({
+      where: { id: row.id, status: "pending" },
+      data: { status: "sent" },
+    });
+    if (claim.count === 0) continue;
     try {
       if (row.kind === "group" || row.kind === "intro") {
-        if (!row.providerGroupId) continue;
+        if (!row.providerGroupId) {
+          await deps.prisma.phoneOutbound.update({
+            where: { id: row.id },
+            data: { status: "failed" },
+          });
+          continue;
+        }
         const sent = await deps.messaging.sendGroup(
           { groupId: row.providerGroupId, body: row.body },
           context,
         );
         await deps.prisma.phoneOutbound.update({
           where: { id: row.id },
-          data: { status: "sent", providerHandle: sent.handle },
+          data: { providerHandle: sent.handle },
         });
         continue;
       }
-      if (!row.toNumber) continue;
+      if (!row.toNumber) {
+        await deps.prisma.phoneOutbound.update({
+          where: { id: row.id },
+          data: { status: "failed" },
+        });
+        continue;
+      }
       const identity = await deps.prisma.phoneIdentity.findUnique({
         where: { phoneE164: row.toNumber },
       });
-      if (identity && identity.outboundSinceInbound >= PHONE_DM_OUTBOUND_CAP) continue;
+      if (identity && identity.outboundSinceInbound >= PHONE_DM_OUTBOUND_CAP) {
+        // Cap holds are not failures: release the claim back to pending.
+        await deps.prisma.phoneOutbound.update({
+          where: { id: row.id },
+          data: { status: "pending" },
+        });
+        continue;
+      }
       const sent = await deps.messaging.sendDirect({ to: row.toNumber, body: row.body }, context);
       await deps.prisma.phoneOutbound.update({
         where: { id: row.id },
-        data: { status: "sent", providerHandle: sent.handle },
+        data: { providerHandle: sent.handle },
       });
       if (identity) {
         await deps.prisma.phoneIdentity.update({
