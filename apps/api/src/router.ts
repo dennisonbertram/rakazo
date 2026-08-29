@@ -8,6 +8,7 @@ import {
   computerControlExpireJobKey,
   type JobPublisher,
   type MemoryStore,
+  phoneDeliverJob,
   routineJobKey,
   routineWakeupJob,
   runContinueJob,
@@ -2830,7 +2831,7 @@ export function createRouter(deps: RouterDeps) {
           if (!identity) return [];
           const memberships = await deps.prisma.phoneChannelMember.findMany({
             where: { identityId: identity.id },
-            include: { channel: { include: { members: { select: { id: true } } } } },
+            include: { channel: { include: { members: ACTIVE_CHANNEL_MEMBERS } } },
             orderBy: { updatedAt: "desc" },
           });
           return memberships.map((membership) => phoneChannelDto(membership));
@@ -2840,7 +2841,7 @@ export function createRouter(deps: RouterDeps) {
           const membership = identity
             ? await deps.prisma.phoneChannelMember.findFirst({
                 where: { channelId: input.channelId, identityId: identity.id },
-                include: { channel: { include: { members: { select: { id: true } } } } },
+                include: { channel: { include: { members: ACTIVE_CHANNEL_MEMBERS } } },
               })
             : null;
           if (membership?.status !== "invited") {
@@ -2849,7 +2850,7 @@ export function createRouter(deps: RouterDeps) {
           const updated = await deps.prisma.phoneChannelMember.update({
             where: { id: membership.id },
             data: { status: input.accept ? "approved" : "declined" },
-            include: { channel: { include: { members: { select: { id: true } } } } },
+            include: { channel: { include: { members: ACTIVE_CHANNEL_MEMBERS } } },
           });
           return phoneChannelDto(updated);
         }),
@@ -2894,6 +2895,28 @@ export function createRouter(deps: RouterDeps) {
             where: { id: connection.id },
             data: { status: input.accept ? "approved" : "declined" },
           });
+          if (input.accept) {
+            // Parity with the text-command path: the requester hears about it.
+            const requesterIdentity = await deps.prisma.phoneIdentity.findUnique({
+              where: { botId: connection.requesterBotId },
+            });
+            if (requesterIdentity) {
+              await deps.prisma.phoneOutbound.createMany({
+                data: [
+                  {
+                    idempotencyKey: `command:connected:${connection.id}`,
+                    kind: "dm",
+                    toNumber: requesterIdentity.phoneE164,
+                    body: "Your connection request was accepted — your agents can now message each other.",
+                  },
+                ],
+                skipDuplicates: true,
+              });
+              await deps.jobs.enqueue(phoneDeliverJob()).catch((error) => {
+                console.error("phone connection confirmation enqueue error", error);
+              });
+            }
+          }
           return phoneConnectionDto(deps.prisma, identity, updated);
         }),
         revoke: authed.phone.connections.revoke.handler(async ({ context, input }) => {
@@ -3646,6 +3669,11 @@ function duplicateBotName(name: string) {
   return `${name.slice(0, 75)} copy`;
 }
 
+const ACTIVE_CHANNEL_MEMBERS = {
+  where: { status: { in: ["invited", "approved"] } },
+  select: { id: true },
+};
+
 type PhoneIdentityRecord = {
   id: string;
   botId: string;
@@ -3657,6 +3685,7 @@ async function phoneIdentityFor(
 ): Promise<PhoneIdentityRecord | null> {
   return prisma.phoneIdentity.findFirst({
     where: { userId },
+    orderBy: { createdAt: "asc" },
     select: { id: true, botId: true },
   });
 }
@@ -3685,6 +3714,16 @@ async function phoneConnectionDto(
   },
 ) {
   const incoming = connection.targetBotId === identity.botId;
+  // The target's identity stays opaque until they approve (mirrors connect_agent).
+  if (!incoming && connection.status !== "approved") {
+    return {
+      id: connection.id,
+      peerBotName: "agent",
+      peerOwnerLabel: "owner",
+      status: connection.status as "pending" | "approved" | "declined" | "revoked",
+      incoming,
+    };
+  }
   const peerBotId = incoming ? connection.requesterBotId : connection.targetBotId;
   const peerBot = await prisma.bot.findUnique({
     where: { id: peerBotId },
