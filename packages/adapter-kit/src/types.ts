@@ -457,6 +457,7 @@ export interface NotificationMessage {
 export interface MessagingCapabilities {
   direct: boolean;
   groups: boolean;
+  typing: boolean;
 }
 
 export interface MessagingDirectRequest {

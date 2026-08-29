@@ -52,7 +52,10 @@ export class SendBlueEmulator {
     }
     if (url.pathname === "/api/send-typing-indicator" && method === "POST") {
       const body = parseBody(init?.body);
-      this.typingIndicators.push(String(body.number ?? ""));
+      if (typeof body.number !== "string" || !body.number) {
+        return Response.json({ status: "ERROR", message: "number is required" }, { status: 400 });
+      }
+      this.typingIndicators.push(body.number);
       return Response.json({ status: "SENT" });
     }
     if (url.pathname === "/api/send-group-message" && method === "POST") {

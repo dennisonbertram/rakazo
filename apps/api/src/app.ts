@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
@@ -380,17 +381,25 @@ export async function createApp(
           signupAllowlist: env.signupAllowlist,
         },
         lineNumber: env.sendbluePhoneNumber ?? "",
-        typing: (toNumber) =>
-          messaging.sendTypingIndicator?.(
-            { to: toNumber },
-            {
-              operationId: `phone.typing:${toNumber}`,
-              traceId: `phone.typing:${toNumber}`,
-              workspaceId: "",
-              userId: "",
-              signal: new AbortController().signal,
-            },
-          ) ?? Promise.resolve(),
+        typing: (toNumber) => {
+          // Keep the raw phone number out of trace ids — those reach logs
+          // and telemetry, a different trust boundary than the database.
+          const operationId = `phone.typing:${randomUUID()}`;
+          return (
+            messaging.sendTypingIndicator?.(
+              { to: toNumber },
+              {
+                operationId,
+                traceId: operationId,
+                workspaceId: "",
+                userId: "",
+                // Cosmetic side call: bound it so a stalled vendor response
+                // can never pin the webhook handler's event loop slot.
+                signal: AbortSignal.timeout(2000),
+              },
+            ) ?? Promise.resolve()
+          );
+        },
       }),
     });
   }

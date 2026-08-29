@@ -117,7 +117,7 @@ export class SendBlueMessagingProvider implements MessagingProvider {
       id: "sendblue",
       contractVersion: "1",
       adapterVersion: "0.1.0",
-      capabilities: { direct: true, groups: true },
+      capabilities: { direct: true, groups: true, typing: true },
     };
   }
 
