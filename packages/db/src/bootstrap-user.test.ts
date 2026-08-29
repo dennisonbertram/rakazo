@@ -75,24 +75,18 @@ describe("bootstrapUserWorkspace", () => {
 
   it("never claims deployment ownership when claimDeploymentOwner is false", async () => {
     const prisma = makePrisma({ id: "default", ownerUserId: null });
-    await bootstrapUserWorkspace(
-      prisma as unknown as PrismaClient,
-      { id: "user-1" },
-      env,
-      { claimDeploymentOwner: false },
-    );
+    await bootstrapUserWorkspace(prisma as unknown as PrismaClient, { id: "user-1" }, env, {
+      claimDeploymentOwner: false,
+    });
 
     expect(prisma.deploymentSettings.update).not.toHaveBeenCalled();
   });
 
   it("seeds settings without an owner when claimDeploymentOwner is false", async () => {
     const prisma = makePrisma(null);
-    await bootstrapUserWorkspace(
-      prisma as unknown as PrismaClient,
-      { id: "user-1" },
-      env,
-      { claimDeploymentOwner: false },
-    );
+    await bootstrapUserWorkspace(prisma as unknown as PrismaClient, { id: "user-1" }, env, {
+      claimDeploymentOwner: false,
+    });
 
     const data = prisma.deploymentSettings.create.mock.calls[0]![0].data;
     expect(data.ownerUserId).toBeNull();

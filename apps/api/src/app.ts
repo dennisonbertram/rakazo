@@ -4,6 +4,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import type {
   JobPublisher,
   ManagedConnectorProvider,
+  MessagingProvider,
   RealtimeFanout,
   SandboxProvider,
 } from "@rakazo/adapter-kit";
@@ -26,6 +27,7 @@ import {
   InstalledConnectorProvider,
   isComposioEnabled,
   isPipedreamEnabled,
+  isSendBlueEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
@@ -38,6 +40,8 @@ import {
   pushTokenPath,
   type RemoteConnectorDependencies,
   ScriptedAgentRuntime,
+  SendBlueMessagingProvider,
+  sendBlueConfigFromEnv,
   WorkspaceMemoryProviderResolver,
 } from "@rakazo/adapters";
 import { blockedAuthPaths, createAuth } from "@rakazo/auth";
@@ -59,6 +63,7 @@ export interface AppHandles {
   connector: DestinationEmulator;
   composio?: ComposioProvider;
   connectors: ConnectorRegistry;
+  messaging?: MessagingProvider;
   executor: ReturnType<typeof createRunExecutor>;
   stop: () => Promise<void>;
 }
@@ -69,6 +74,7 @@ export async function createApp(
     realtime?: RealtimeFanout;
     composio?: ComposioProvider;
     pipedream?: ManagedConnectorProvider;
+    messaging?: MessagingProvider;
     remoteConnectors?: RemoteConnectorDependencies;
   } = {},
 ): Promise<AppHandles> {
@@ -77,6 +83,7 @@ export async function createApp(
     realtime: realtimeOverride,
     composio: composioOverride,
     pipedream: pipedreamOverride,
+    messaging: messagingOverride,
     remoteConnectors,
     ...envOverrides
   } = overrides;
@@ -158,6 +165,10 @@ export async function createApp(
   const pipedream =
     pipedreamOverride ??
     (isPipedreamEnabled(pipedreamConfig) ? new PipedreamConnector(pipedreamConfig) : undefined);
+  const sendBlueConfig = sendBlueConfigFromEnv(env);
+  const messaging =
+    messagingOverride ??
+    (isSendBlueEnabled(sendBlueConfig) ? new SendBlueMessagingProvider(sendBlueConfig) : undefined);
   const installed = new InstalledConnectorProvider(prisma, secrets, remoteConnectors);
   const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride, [
     installed,
@@ -243,6 +254,7 @@ export async function createApp(
     secretStore: secrets,
     memoryProviders,
     deploymentModelKey: env.deploymentModelKey,
+    messaging,
   });
   if (inMemoryJobs) {
     await inMemoryJobs.start(jobHandlers);
@@ -327,6 +339,7 @@ export async function createApp(
       sandbox: env.sandboxProvider,
       composio: Boolean(stack.composio),
       pipedream: Boolean(pipedream),
+      phone: Boolean(messaging),
       jobs: jobKind,
       realtime: realtime.describe().id,
       revision: env.gitSha ?? null,
@@ -341,6 +354,7 @@ export async function createApp(
     connector,
     composio: stack.composio,
     connectors: stack.connector,
+    messaging,
     executor,
     stop: async () => {
       oauthLogins.abortAll();

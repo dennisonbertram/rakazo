@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  isSendBlueEnabled,
-  parseSendBlueInbound,
-  SendBlueMessagingProvider,
-} from "./sendblue.js";
+import { isSendBlueEnabled, parseSendBlueInbound, SendBlueMessagingProvider } from "./sendblue.js";
 
 const config = {
   apiKeyId: "key-id",
@@ -23,7 +19,7 @@ const context = {
 };
 
 function providerReturning(response: Response) {
-  const fetchMock = vi.fn(async () => response);
+  const fetchMock = vi.fn(async (_input: unknown, _init?: RequestInit) => response);
   return { provider: new SendBlueMessagingProvider(config, { fetch: fetchMock }), fetchMock };
 }
 
