@@ -14,6 +14,7 @@ const describePhone = hasDb ? describe.sequential : describe.skip;
 
 type App = { request: (input: string | Request, init?: RequestInit) => Promise<Response> };
 
+// Offline journeys: injected SendBlueEmulator fetch, no live vendor or paid line.
 describePhone("phone surface journeys", () => {
   let app: App;
   let stop: () => Promise<void>;
