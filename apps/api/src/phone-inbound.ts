@@ -1,6 +1,5 @@
-import type { JobPublisher } from "@rakazo/adapter-kit";
+import type { JobPublisher, MessagingInboundMessage } from "@rakazo/adapter-kit";
 import { phoneDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
-import type { SendBlueInboundMessage } from "@rakazo/adapters";
 import type { MessageBlock } from "@rakazo/contracts";
 import { parsePhoneCommand, sanitizePhoneLabel } from "@rakazo/core";
 import type {
@@ -43,7 +42,7 @@ type PhoneIdentityRow = {
  * fan out to every approved member bot's own thread.
  */
 export function createPhoneInboundHandler(deps: PhoneInboundDeps) {
-  return async (event: SendBlueInboundMessage): Promise<void> => {
+  return async (event: MessagingInboundMessage): Promise<void> => {
     if (event.groupId) {
       await handleChannelEvent(deps, event);
       return;
@@ -54,7 +53,7 @@ export function createPhoneInboundHandler(deps: PhoneInboundDeps) {
 
 async function handleDirectEvent(
   deps: PhoneInboundDeps,
-  event: SendBlueInboundMessage,
+  event: MessagingInboundMessage,
 ): Promise<void> {
   // Inbound media arrives as a CDN URL (expires after 30 days); no
   // artifact ingestion in v1, so it rides along as text.
@@ -108,7 +107,7 @@ async function handleDirectEvent(
   if (sent.runId) {
     // Typing bubbles only make sense once a reply is actually coming. Fire
     // before the enqueue so they land ahead of a fast reply, and never await:
-    // a stalled SendBlue call must not hold the webhook open. The bubbles
+    // a stalled vendor typing call must not hold the webhook open. The bubbles
     // clear on their own after a short display window or when the reply
     // arrives, so long runs simply outlive them.
     void deps.typing?.(event.fromNumber).catch((error) => {
@@ -143,7 +142,7 @@ async function applyPhoneCommand(
       deps,
       identity.phoneE164,
       `command:leave:${membership.id}`,
-      "You've left the channel; your agent will no longer post there. The iMessage group itself is unchanged — SendBlue has no leave API, so leaving only stops your agent's participation.",
+      "You've left the channel; your agent will no longer post there. The iMessage group itself is unchanged. This deployment cannot remove the line from the group, so leaving only stops your agent's participation.",
     );
     return true;
   }
@@ -273,7 +272,7 @@ async function enqueueConfirmation(
 
 async function handleChannelEvent(
   deps: PhoneInboundDeps,
-  event: SendBlueInboundMessage,
+  event: MessagingInboundMessage,
 ): Promise<void> {
   const groupName = event.groupName ? sanitizePhoneLabel(event.groupName) : null;
   const channel = await deps.prisma.phoneChannel.upsert({

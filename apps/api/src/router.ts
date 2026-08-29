@@ -311,7 +311,7 @@ export interface RouterDeps {
   remoteConnectors?: RemoteConnectorDependencies;
   artifacts: ArtifactStore;
   dataDir: string;
-  /** Present when the SendBlue phone surface is enabled. */
+  /** Present when the phone messaging surface is enabled. */
   phone?: { enabled: boolean };
   env: {
     defaultProvider: string;
@@ -2938,10 +2938,14 @@ export function createRouter(deps: RouterDeps) {
               })
             : null;
           if (!connection) throw new ORPCError("NOT_FOUND");
-          await deps.prisma.agentConnection.update({
-            where: { id: connection.id },
+          // Claim the status we observed: a concurrent re-request can move a
+          // declined/revoked row back to pending, and an unconditional write
+          // would drop that newer request.
+          const { count } = await deps.prisma.agentConnection.updateMany({
+            where: { id: connection.id, status: connection.status },
             data: { status: "revoked" },
           });
+          if (count === 0) throw new ORPCError("NOT_FOUND");
           return { ok: true as const };
         }),
       },

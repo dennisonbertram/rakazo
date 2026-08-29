@@ -951,12 +951,13 @@ model PhoneOutbound {
   body            String
   status          String    @default("pending")
   attempts        Int       @default(0)
+  nextAttemptAt   DateTime?
   providerHandle  String?
   sourceMessageId String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  @@index([status])
+  @@index([status, nextAttemptAt])
   @@map("phone_outbound")
 }
 

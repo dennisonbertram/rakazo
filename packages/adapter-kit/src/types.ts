@@ -483,3 +483,24 @@ export interface MessagingGroup {
   name: string | null;
   participants: string[];
 }
+
+/** Provider-neutral inbound message after vendor webhook parsing. */
+export interface MessagingInboundMessage {
+  type: "message";
+  handle: string;
+  fromNumber: string;
+  groupId: string | null;
+  groupName: string | null;
+  participants: string[];
+  content: string;
+  mediaUrl: string | null;
+}
+
+/** Provider-neutral outbound delivery status after vendor webhook parsing. */
+export interface MessagingOutboundStatus {
+  type: "status";
+  handle: string;
+  status: string;
+}
+
+export type MessagingInboundEvent = MessagingInboundMessage | MessagingOutboundStatus;

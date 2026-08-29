@@ -5,6 +5,9 @@ import type {
   MessagingDirectRequest,
   MessagingGroup,
   MessagingGroupRequest,
+  MessagingInboundEvent,
+  MessagingInboundMessage,
+  MessagingOutboundStatus,
   MessagingProvider,
   MessagingSendResult,
   MessagingTypingRequest,
@@ -58,27 +61,15 @@ export function isPhoneSurfaceEnabled(
   return isSendBlueEnabled(config) && Boolean(deploymentModelKey);
 }
 
-export type SendBlueInboundEvent = SendBlueInboundMessage | SendBlueOutboundStatus;
+/** @deprecated Prefer MessagingInboundEvent from adapter-kit. */
+export type SendBlueInboundEvent = MessagingInboundEvent;
+/** @deprecated Prefer MessagingInboundMessage from adapter-kit. */
+export type SendBlueInboundMessage = MessagingInboundMessage;
+/** @deprecated Prefer MessagingOutboundStatus from adapter-kit. */
+export type SendBlueOutboundStatus = MessagingOutboundStatus;
 
-export interface SendBlueInboundMessage {
-  type: "message";
-  handle: string;
-  fromNumber: string;
-  groupId: string | null;
-  groupName: string | null;
-  participants: string[];
-  content: string;
-  mediaUrl: string | null;
-}
-
-export interface SendBlueOutboundStatus {
-  type: "status";
-  handle: string;
-  status: string;
-}
-
-/** Normalize a SendBlue webhook payload; null for non-message events. */
-export function parseSendBlueInbound(payload: unknown): SendBlueInboundEvent | null {
+/** Normalize a SendBlue webhook payload into provider-neutral inbound events. */
+export function parseSendBlueInbound(payload: unknown): MessagingInboundEvent | null {
   if (typeof payload !== "object" || payload === null) return null;
   const body = payload as Record<string, unknown>;
   if (typeof body.message_handle !== "string" || !body.message_handle) return null;
@@ -146,7 +137,7 @@ export class SendBlueMessagingProvider implements MessagingProvider {
     request: MessagingTypingRequest,
     context: AdapterContext,
   ): Promise<void> {
-    // Best effort: SendBlue answers SENT even when the bubbles cannot be
+    // Best effort: the vendor answers SENT even when bubbles cannot be
     // delivered (stale chat, non-iMessage recipient), so there is nothing
     // useful to return.
     await this.call(
@@ -184,21 +175,27 @@ export class SendBlueMessagingProvider implements MessagingProvider {
       },
     );
     const data = await parseResponse(response, `GET /api/v2/groups/${groupId}`);
-    const record = asRecord(data);
+    // Live SendBlue wraps the group under `data`; older flat fixtures still work.
+    const envelope = asRecord(data);
+    const record = asRecord(envelope.data ?? data);
     return {
       id:
         (typeof record.group_id === "string" && record.group_id) ||
         (typeof record.id === "string" && record.id) ||
         groupId,
       name:
-        typeof record.group_display_name === "string"
-          ? record.group_display_name
-          : typeof record.name === "string"
-            ? record.name
-            : null,
-      participants: Array.isArray(record.participants)
-        ? record.participants.filter((p): p is string => typeof p === "string")
-        : [],
+        typeof record.group_name === "string"
+          ? record.group_name
+          : typeof record.group_display_name === "string"
+            ? record.group_display_name
+            : typeof record.name === "string"
+              ? record.name
+              : null,
+      participants: Array.isArray(record.participant_numbers)
+        ? record.participant_numbers.filter((p): p is string => typeof p === "string")
+        : Array.isArray(record.participants)
+          ? record.participants.filter((p): p is string => typeof p === "string")
+          : [],
     };
   }
 

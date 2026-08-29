@@ -345,7 +345,7 @@ describe("typing indicators", () => {
     expect(deps.typing).not.toHaveBeenCalled();
   });
 
-  it("never shows typing in groups — SendBlue cannot deliver it there", async () => {
+  it("never shows typing in groups — vendors cannot deliver it there", async () => {
     const deps = createDeps();
     const handle = createPhoneInboundHandler(deps);
     await handle(groupEvent);
@@ -365,7 +365,7 @@ describe("typing indicators", () => {
 
   it("still delivers the run when the typing call fails", async () => {
     const deps = createDeps();
-    deps.typing.mockRejectedValue(new Error("sendblue down"));
+    deps.typing.mockRejectedValue(new Error("messaging provider down"));
     const handle = createPhoneInboundHandler(deps);
     await handle(dmEvent);
     // The rejection is caught inside the handler; give the fire-and-forget

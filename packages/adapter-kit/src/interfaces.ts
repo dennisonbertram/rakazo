@@ -285,8 +285,8 @@ export interface MessagingProvider {
   getGroup(groupId: string, context: AdapterContext): Promise<MessagingGroup>;
   /**
    * Best-effort "…" typing bubbles for 1:1 chats. Optional because vendors
-   * may not support it (SendBlue itself cannot deliver it in groups); it is
-   * cosmetic and must never gate message delivery.
+   * may not support it in groups; it is cosmetic and must never gate message
+   * delivery.
    */
   sendTypingIndicator?(request: MessagingTypingRequest, context: AdapterContext): Promise<void>;
 }

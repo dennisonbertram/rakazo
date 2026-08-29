@@ -1,13 +1,17 @@
-import type { AdapterContext, JobPublisher, MessagingProvider } from "@rakazo/adapter-kit";
+import type {
+  AdapterContext,
+  JobPublisher,
+  MessagingOutboundStatus,
+  MessagingProvider,
+} from "@rakazo/adapter-kit";
 import { phoneDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import { botMessageHopExhausted, nextBotMessageHop } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
-import type { SendBlueOutboundStatus } from "./sendblue.js";
 
 /**
- * Margin under SendBlue's hard 150-consecutive-outbound cap: past this many
+ * Margin under the vendor's hard consecutive-outbound cap: past this many
  * DMs without a reply from the owner, mirror rows stay pending until the
  * next inbound resets the counter.
  */
@@ -29,7 +33,7 @@ export interface PhoneDeliveryDeps {
  * not depend on prompt compliance. DM runs go to the owner's number;
  * channel runs go to the group with an attribution prefix and are fanned
  * out internally to peer approved bots (agent-to-agent traffic never
- * transits SendBlue). Also drains pending outbox rows (invites and intros
+ * transits the messaging provider). Also drains pending outbox rows (invites and intros
  * are enqueued by the channels slice).
  */
 export async function deliverPhoneOutbound(
@@ -212,8 +216,12 @@ function escapeRegExp(value: string): string {
 }
 
 async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<void> {
+  const now = new Date();
   const pending = await deps.prisma.phoneOutbound.findMany({
-    where: { status: "pending" },
+    where: {
+      status: "pending",
+      OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+    },
     orderBy: { createdAt: "asc" },
   });
   for (const row of pending) {
@@ -221,7 +229,7 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
     // crash retries must never deliver the same iMessage twice.
     const claim = await deps.prisma.phoneOutbound.updateMany({
       where: { id: row.id, status: "pending" },
-      data: { status: "sent" },
+      data: { status: "sent", nextAttemptAt: null },
     });
     if (claim.count === 0) continue;
     try {
@@ -277,17 +285,21 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
       // retry; only an exhausted budget is terminal.
       const attempts = (row.attempts ?? 0) + 1;
       const exhausted = attempts >= PHONE_OUTBOUND_MAX_ATTEMPTS;
+      const retryAt = exhausted ? null : new Date(Date.now() + phoneOutboundRetryDelayMs(attempts));
       await deps.prisma.phoneOutbound.update({
         where: { id: row.id },
-        data: { attempts, status: exhausted ? "failed" : "pending" },
+        data: {
+          attempts,
+          status: exhausted ? "failed" : "pending",
+          nextAttemptAt: retryAt,
+        },
       });
-      if (!exhausted) {
-        const retryAt = new Date(Date.now() + phoneOutboundRetryDelayMs(attempts));
+      if (!exhausted && retryAt) {
         // Propagate an enqueue failure: the phone.deliver job then fails and
         // the queue's own retry re-runs the drain. Swallowing it would strand
         // the row in pending — no reconciler reclaims phone_outbound rows.
-        // Re-entry is safe: the row is pending again and the claim flips it
-        // before the next provider call.
+        // Re-entry is safe: the row is pending again and nextAttemptAt keeps
+        // other drains from racing the backoff window.
         await deps.jobs.enqueue(phoneDeliverJob(undefined, retryAt));
       }
     }
@@ -302,7 +314,7 @@ function phoneOutboundRetryDelayMs(attempts: number): number {
 /** Outbound status webhooks update outbox rows by provider handle. */
 export async function applyPhoneOutboundStatus(
   prisma: PrismaClient,
-  event: SendBlueOutboundStatus,
+  event: MessagingOutboundStatus,
 ): Promise<void> {
   const status =
     event.status === "ERROR" || event.status === "DECLINED"

@@ -1,13 +1,20 @@
+import { parseSendBlueInbound } from "@rakazo/adapters";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { mountPhoneWebhookRoutes, PHONE_WEBHOOK_PATH } from "./phone-webhook.js";
 
 const SIGNING_SECRET = "phone-signing-secret-test-value";
+const SIGNING_HEADER = "sb-signing-secret";
 
 function mount(handle?: (event: unknown) => Promise<void>) {
   const handler = vi.fn(handle ?? (async () => undefined));
   const app = new Hono();
-  mountPhoneWebhookRoutes(app, { signingSecret: SIGNING_SECRET, handle: handler });
+  mountPhoneWebhookRoutes(app, {
+    signingSecret: SIGNING_SECRET,
+    signingHeader: SIGNING_HEADER,
+    parseInbound: parseSendBlueInbound,
+    handle: handler,
+  });
   return { app, handler };
 }
 
@@ -38,7 +45,7 @@ describe("phone webhook HTTP route", () => {
     const missing = await app.request(PHONE_WEBHOOK_PATH, post(receivePayload));
     const wrong = await app.request(
       PHONE_WEBHOOK_PATH,
-      post(receivePayload, { "sb-signing-secret": "wrong-secret" }),
+      post(receivePayload, { [SIGNING_HEADER]: "wrong-secret" }),
     );
 
     expect(missing.status).toBe(401);
@@ -55,7 +62,7 @@ describe("phone webhook HTTP route", () => {
     });
     const res = await app.request(
       PHONE_WEBHOOK_PATH,
-      post(oversized, { "sb-signing-secret": SIGNING_SECRET }),
+      post(oversized, { [SIGNING_HEADER]: SIGNING_SECRET }),
     );
 
     expect(res.status).toBe(413);
@@ -66,7 +73,7 @@ describe("phone webhook HTTP route", () => {
     const { app, handler } = mount();
     const res = await app.request(
       PHONE_WEBHOOK_PATH,
-      post(receivePayload, { "sb-signing-secret": SIGNING_SECRET }),
+      post(receivePayload, { [SIGNING_HEADER]: SIGNING_SECRET }),
     );
 
     expect(res.status).toBe(200);
@@ -91,7 +98,7 @@ describe("phone webhook HTTP route", () => {
     });
     const res = await app.request(
       PHONE_WEBHOOK_PATH,
-      post(groupPayload, { "sb-signing-secret": SIGNING_SECRET }),
+      post(groupPayload, { [SIGNING_HEADER]: SIGNING_SECRET }),
     );
 
     expect(res.status).toBe(200);
@@ -109,7 +116,7 @@ describe("phone webhook HTTP route", () => {
     });
     const res = await app.request(
       PHONE_WEBHOOK_PATH,
-      post(statusPayload, { "sb-signing-secret": SIGNING_SECRET }),
+      post(statusPayload, { [SIGNING_HEADER]: SIGNING_SECRET }),
     );
 
     expect(res.status).toBe(200);
@@ -121,6 +128,8 @@ describe("phone webhook HTTP route", () => {
     const app = new Hono();
     mountPhoneWebhookRoutes(app, {
       signingSecret: SIGNING_SECRET,
+      signingHeader: SIGNING_HEADER,
+      parseInbound: parseSendBlueInbound,
       handle: vi.fn(async () => undefined),
       handleStatus,
     });
@@ -131,7 +140,7 @@ describe("phone webhook HTTP route", () => {
     });
     const res = await app.request(
       PHONE_WEBHOOK_PATH,
-      post(statusPayload, { "sb-signing-secret": SIGNING_SECRET }),
+      post(statusPayload, { [SIGNING_HEADER]: SIGNING_SECRET }),
     );
 
     expect(res.status).toBe(200);
@@ -146,11 +155,11 @@ describe("phone webhook HTTP route", () => {
     const { app, handler } = mount();
     const callLog = await app.request(
       PHONE_WEBHOOK_PATH,
-      post(JSON.stringify({ event_type: "call_log" }), { "sb-signing-secret": SIGNING_SECRET }),
+      post(JSON.stringify({ event_type: "call_log" }), { [SIGNING_HEADER]: SIGNING_SECRET }),
     );
     const garbage = await app.request(
       PHONE_WEBHOOK_PATH,
-      post("not json at all", { "sb-signing-secret": SIGNING_SECRET }),
+      post("not json at all", { [SIGNING_HEADER]: SIGNING_SECRET }),
     );
 
     expect(callLog.status).toBe(200);

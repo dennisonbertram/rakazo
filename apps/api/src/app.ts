@@ -39,6 +39,7 @@ import {
   PiOAuthLogins,
   PipedreamConnector,
   PostgresRealtimeFanout,
+  parseSendBlueInbound,
   pipedreamConfigFromEnv,
   pushTokenPath,
   type RemoteConnectorDependencies,
@@ -346,10 +347,12 @@ export async function createApp(
     return requireMembership(prisma, session.user.id).catch(() => null);
   });
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });
-  // The phone webhook only exists when the SendBlue surface is enabled.
+  // The phone webhook only exists when the messaging surface is enabled.
   if (messaging && env.sendblueSigningSecret) {
     mountPhoneWebhookRoutes(app, {
       signingSecret: env.sendblueSigningSecret,
+      signingHeader: "sb-signing-secret",
+      parseInbound: parseSendBlueInbound,
       handleStatus: (event) => applyPhoneOutboundStatus(prisma, event),
       handle: createPhoneInboundHandler({
         prisma,

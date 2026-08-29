@@ -100,12 +100,14 @@ describe("SendBlueMessagingProvider", () => {
     });
   });
 
-  it("reads group participants", async () => {
+  it("reads group participants from the nested vendor envelope", async () => {
     const { provider, fetchMock } = providerReturning(
       Response.json({
-        group_id: "group-9",
-        group_display_name: "Family",
-        participants: ["+15551111111", "+15552222222"],
+        data: {
+          group_id: "group-9",
+          group_name: "Family",
+          participant_numbers: ["+15551111111", "+15552222222"],
+        },
       }),
     );
     const group = await provider.getGroup("group-9", context);
@@ -118,6 +120,21 @@ describe("SendBlueMessagingProvider", () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(String(url)).toBe("https://api.sendblue.com/api/v2/groups/group-9");
     expect(init?.method ?? "GET").toBe("GET");
+  });
+
+  it("still accepts a flat group fixture for older emulator shapes", async () => {
+    const { provider } = providerReturning(
+      Response.json({
+        group_id: "group-flat",
+        group_display_name: "Flat",
+        participants: ["+15551111111"],
+      }),
+    );
+    await expect(provider.getGroup("group-flat", context)).resolves.toEqual({
+      id: "group-flat",
+      name: "Flat",
+      participants: ["+15551111111"],
+    });
   });
 
   it("throws on non-2xx responses", async () => {

@@ -116,7 +116,7 @@ export function resolveUpdaterToken(env: NodeJS.ProcessEnv = process.env): strin
 
 /**
  * Constant-time string comparison for shared-secret headers that carry no
- * `Bearer ` prefix (e.g. SendBlue's static `sb-signing-secret`).
+ * `Bearer ` prefix (e.g. a vendor static signing-secret header).
  * Same XOR rationale as `hasValidBearerToken` below.
  */
 export function timingSafeStringEqual(supplied: string | undefined, expected: string): boolean {

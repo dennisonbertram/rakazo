@@ -31,6 +31,7 @@ export class SendBlueEmulator {
   readonly sent: SentMessage[] = [];
   readonly typingIndicators: string[] = [];
   private handleCounter = 0;
+  private failRemaining = 0;
   private readonly groups = new Map<string, RegisteredGroup>();
 
   readonly fetch: typeof globalThis.fetch = async (input, init) => {
@@ -39,6 +40,14 @@ export class SendBlueEmulator {
       throw new Error(`SendBlue emulator received unexpected URL ${url}`);
     }
     const method = init?.method ?? "GET";
+    if (
+      (url.pathname === "/api/send-message" || url.pathname === "/api/send-group-message") &&
+      method === "POST" &&
+      this.failRemaining > 0
+    ) {
+      this.failRemaining -= 1;
+      return Response.json({ status: "ERROR", message: "emulated failure" }, { status: 500 });
+    }
     if (url.pathname === "/api/send-message" && method === "POST") {
       const body = parseBody(init?.body);
       const handle = this.nextHandle();
@@ -76,10 +85,13 @@ export class SendBlueEmulator {
       if (!group) {
         return Response.json({ status: "ERROR", message: "Group not found" }, { status: 404 });
       }
+      // Match the live vendor envelope (`data.group_*` / participant_numbers).
       return Response.json({
-        group_id: groupId,
-        group_display_name: group.name,
-        participants: group.participants,
+        data: {
+          group_id: groupId,
+          group_name: group.name,
+          participant_numbers: group.participants,
+        },
       });
     }
     throw new Error(`SendBlue emulator received unexpected request ${method} ${url.pathname}`);
@@ -88,6 +100,11 @@ export class SendBlueEmulator {
   private nextHandle(): string {
     this.handleCounter += 1;
     return `emulated-handle-${this.handleCounter}`;
+  }
+
+  /** Next N send-message / send-group-message calls fail with HTTP 500. */
+  failNextSends(count: number): void {
+    this.failRemaining = count;
   }
 
   registerGroup(groupId: string, group: RegisteredGroup): void {
@@ -112,6 +129,29 @@ export class SendBlueEmulator {
         media_url: input.mediaUrl ?? "",
         group_id: input.groupId ?? "",
         participants: input.participants ?? [input.fromNumber, this.phoneNumber],
+        group_display_name: null,
+      }),
+    });
+  }
+
+  /** Outbound delivery-status webhook (same auth header as inbound). */
+  buildStatusRequest(input: { handle: string; status: string }): Request {
+    return new Request("https://rakazo.test/api/v1/phone/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "sb-signing-secret": this.signingSecret,
+      },
+      body: JSON.stringify({
+        content: "",
+        is_outbound: true,
+        status: input.status,
+        message_handle: input.handle,
+        from_number: this.phoneNumber,
+        sendblue_number: this.phoneNumber,
+        media_url: "",
+        group_id: "",
+        participants: [],
         group_display_name: null,
       }),
     });

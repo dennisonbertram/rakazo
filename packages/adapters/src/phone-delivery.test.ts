@@ -77,7 +77,17 @@ function createDeps(overrides: {
     },
     phoneOutbound: {
       findUnique: vi.fn(async () => overrides.existingOutbox ?? null),
-      findMany: vi.fn(async () => rows.filter((row) => row.status === "pending")),
+      findMany: vi.fn(async ({ where }: { where?: { status?: string; OR?: unknown[] } } = {}) => {
+        const now = Date.now();
+        return rows.filter((row) => {
+          if (where?.status && row.status !== where.status) return false;
+          if (!where?.OR) return row.status === "pending";
+          const next = row.nextAttemptAt;
+          if (next == null) return true;
+          const nextMs = next instanceof Date ? next.getTime() : new Date(String(next)).getTime();
+          return nextMs <= now;
+        });
+      }),
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
         let count = 0;
         for (const item of data) {
@@ -187,16 +197,44 @@ describe("deliverPhoneOutbound", () => {
   });
 
   it("returns a transient send failure to pending and schedules a delayed retry", async () => {
-    const deps = createDeps({ sendError: new Error("SendBlue 500") });
+    const deps = createDeps({ sendError: new Error("messaging provider 500") });
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
 
     expect(deps.rows).toEqual([
-      expect.objectContaining({ kind: "dm", status: "pending", attempts: 1 }),
+      expect.objectContaining({
+        kind: "dm",
+        status: "pending",
+        attempts: 1,
+        nextAttemptAt: expect.any(Date),
+      }),
     ]);
     expect(deps.rows[0]!.providerHandle ?? null).toBeNull();
     expect(deps.jobs.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({ name: "phone.deliver", availableAt: expect.any(Date) }),
     );
+  });
+
+  it("skips pending rows whose nextAttemptAt is still in the future", async () => {
+    const deps = createDeps({
+      run: null,
+      outboundRows: [
+        {
+          id: "out-wait",
+          idempotencyKey: "invite:ch-1:+15551234567",
+          kind: "dm",
+          toNumber: "+15551234567",
+          body: "backoff hold",
+          status: "pending",
+          attempts: 1,
+          nextAttemptAt: new Date(Date.now() + 60_000),
+          providerHandle: null,
+        },
+      ],
+    });
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.sendDirect).not.toHaveBeenCalled();
+    expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "pending", attempts: 1 }));
   });
 
   it("drains leftover pending rows without a run id", async () => {
@@ -401,7 +439,17 @@ function createChannelDeps(
       ]),
     },
     phoneOutbound: {
-      findMany: vi.fn(async () => rows.filter((row) => row.status === "pending")),
+      findMany: vi.fn(async ({ where }: { where?: { status?: string; OR?: unknown[] } } = {}) => {
+        const now = Date.now();
+        return rows.filter((row) => {
+          if (where?.status && row.status !== where.status) return false;
+          if (!where?.OR) return row.status === "pending";
+          const next = row.nextAttemptAt;
+          if (next == null) return true;
+          const nextMs = next instanceof Date ? next.getTime() : new Date(String(next)).getTime();
+          return nextMs <= now;
+        });
+      }),
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
         for (const item of data)
           rows.push({ id: `out-${rows.length + 1}`, status: "pending", ...item });
@@ -548,7 +596,7 @@ describe("deliverPhoneOutbound transient failure retry", () => {
   it("marks the row failed only once the attempt budget is exhausted", async () => {
     const deps = createDeps({
       run: null,
-      sendError: new Error("SendBlue 500"),
+      sendError: new Error("messaging provider 500"),
       outboundRows: [
         {
           id: "out-9",
@@ -574,7 +622,7 @@ describe("deliverPhoneOutbound transient failure retry", () => {
 describe("deliverPhoneOutbound retry enqueue failure", () => {
   it("propagates the enqueue failure so the job queue retries the drain", async () => {
     const deps = createDeps({});
-    deps.sendDirect.mockRejectedValueOnce(new Error("SendBlue 500"));
+    deps.sendDirect.mockRejectedValueOnce(new Error("messaging provider 500"));
     deps.jobs.enqueue.mockRejectedValueOnce(new Error("queue down"));
 
     // A swallowed enqueue failure would strand the row in pending forever:
@@ -583,11 +631,16 @@ describe("deliverPhoneOutbound retry enqueue failure", () => {
       "queue down",
     );
     expect(deps.rows).toEqual([
-      expect.objectContaining({ kind: "dm", status: "pending", attempts: 1 }),
+      expect.objectContaining({
+        kind: "dm",
+        status: "pending",
+        attempts: 1,
+        nextAttemptAt: expect.any(Date),
+      }),
     ]);
 
-    // The queue's retry re-enters the drain: the row is pending by design,
-    // the claim flips it before the provider call, and it is sent once.
+    // The delayed phone.deliver job fires at nextAttemptAt: make the row due.
+    deps.rows[0]!.nextAttemptAt = new Date(Date.now() - 1);
     await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
     expect(deps.sendDirect).toHaveBeenCalledTimes(2);
     expect(deps.rows).toEqual([

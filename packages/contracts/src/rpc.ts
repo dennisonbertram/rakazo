@@ -532,7 +532,7 @@ export const appContract = {
       .output(ConnectionSchema),
     revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
   },
-  /** SendBlue phone surface: link state, iMessage channels, agent connections. */
+  /** Phone messaging surface: link state, iMessage channels, agent connections. */
   phone: {
     status: oc.output(PhoneStatusSchema),
     channels: {

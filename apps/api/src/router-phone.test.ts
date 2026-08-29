@@ -404,10 +404,50 @@ describe("phone.connections", () => {
     const response = await call(handler, actor, "phone/connections/revoke", {
       connectionId: "ac-3",
     });
-    expect(prisma.agentConnection.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "revoked" } }),
+    expect(prisma.agentConnection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ac-3", status: "approved" },
+        data: { status: "revoked" },
+      }),
     );
     await expect(response.json()).resolves.toEqual({ json: { ok: true } });
+  });
+
+  it("does not let a stale revoke overwrite a newer pending re-request", async () => {
+    const { handler, actor, prisma } = phoneDeps({
+      connection: {
+        id: "ac-stale",
+        requesterBotId: "bot-1",
+        targetBotId: "bot-9",
+        status: "approved",
+      },
+    });
+    const state = { status: "approved" };
+    const connectionModel = prisma.agentConnection as unknown as Record<string, unknown>;
+    connectionModel.findFirst = vi.fn(async () => {
+      const snapshot = {
+        id: "ac-stale",
+        requesterBotId: "bot-1",
+        targetBotId: "bot-9",
+        status: state.status,
+      };
+      // Interleaved: a new request flips the row back to pending after the read.
+      state.status = "pending";
+      return snapshot;
+    });
+    connectionModel.updateMany = vi.fn(
+      async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
+        if (where.status && state.status !== where.status) return { count: 0 };
+        Object.assign(state, data);
+        return { count: 1 };
+      },
+    );
+    const response = await call(handler, actor, "phone/connections/revoke", {
+      connectionId: "ac-stale",
+    });
+
+    expect(state.status).toBe("pending");
+    expect(response.status).toBeGreaterThanOrEqual(400);
   });
 });
 
