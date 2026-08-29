@@ -149,8 +149,24 @@ function createDeps(
     },
     phoneOutbound: {
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
-        outboundRows.push(...data);
-        return { count: data.length };
+        let count = 0;
+        for (const item of data) {
+          // Honors skipDuplicates against the idempotencyKey unique key.
+          if (outboundRows.some((row) => row.idempotencyKey === item.idempotencyKey)) continue;
+          outboundRows.push(item);
+          count += 1;
+        }
+        return { count };
+      }),
+      deleteMany: vi.fn(async ({ where }: { where: { idempotencyKey?: string } }) => {
+        let count = 0;
+        for (let i = outboundRows.length - 1; i >= 0; i -= 1) {
+          if (outboundRows[i]!.idempotencyKey === where.idempotencyKey) {
+            outboundRows.splice(i, 1);
+            count += 1;
+          }
+        }
+        return { count };
       }),
     },
     agentConnection: {
@@ -788,5 +804,66 @@ describe("createPhoneInboundHandler owner-command status races", () => {
     expect(rejoined.status).toBe("invited");
     expect(deps.outboundRows).toHaveLength(0);
     expect(deps.sendUserMessage).toHaveBeenCalled();
+  });
+});
+
+describe("createPhoneInboundHandler approval-cycle notifications", () => {
+  it("sends a fresh invite DM when a member returns after leaving", async () => {
+    const member = {
+      id: "pm-1",
+      channelId: "ch-1",
+      phoneE164: "+15551111111",
+      identityId: "pi-1",
+      status: "left",
+    };
+    const deps = createDeps({ members: [member], approvedMember: member });
+    const handle = createPhoneInboundHandler(deps);
+    const inviteRows = () =>
+      deps.outboundRows.filter((row) => row.idempotencyKey === "invite:ch-1:+15551111111");
+
+    // First return: invited and prompted.
+    await handle(groupEvent);
+    expect(member.status).toBe("invited");
+    expect(inviteRows()).toHaveLength(1);
+
+    // The owner approves, then leaves again.
+    member.status = "approved";
+    await handle({ ...dmEvent, content: "LEAVE" });
+    expect(member.status).toBe("left");
+
+    // Second return: the stale invite row from the first cycle must not
+    // suppress the new prompt.
+    await handle(groupEvent);
+    expect(member.status).toBe("invited");
+    expect(deps.prisma.phoneOutbound.deleteMany).toHaveBeenCalledWith({
+      where: { idempotencyKey: "invite:ch-1:+15551111111" },
+    });
+    expect(inviteRows()).toHaveLength(1);
+  });
+
+  it("confirms a repeated LEAVE of the same membership with a fresh text", async () => {
+    const member = {
+      id: "pm-1",
+      channelId: "ch-1",
+      phoneE164: "+15551111111",
+      identityId: "pi-1",
+      status: "approved",
+    };
+    const deps = createDeps({ members: [member], approvedMember: member });
+    const handle = createPhoneInboundHandler(deps);
+    const leaveRows = () =>
+      deps.outboundRows.filter((row) => row.idempotencyKey === "command:leave:pm-1");
+
+    await handle({ ...dmEvent, content: "LEAVE" });
+    expect(leaveRows()).toHaveLength(1);
+
+    // Rejoin and leave again: the second confirmation must not be swallowed
+    // by the first cycle's idempotency key.
+    member.status = "approved";
+    await handle({ ...dmEvent, content: "LEAVE" });
+    expect(deps.prisma.phoneOutbound.deleteMany).toHaveBeenCalledWith({
+      where: { idempotencyKey: "command:leave:pm-1" },
+    });
+    expect(leaveRows()).toHaveLength(1);
   });
 });

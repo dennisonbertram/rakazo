@@ -13,6 +13,9 @@ import type { SendBlueOutboundStatus } from "./sendblue.js";
  */
 export const PHONE_DM_OUTBOUND_CAP = 140;
 
+/** Provider-send attempts before a mirrored row is declared lost. */
+export const PHONE_OUTBOUND_MAX_ATTEMPTS = 5;
+
 export interface PhoneDeliveryDeps {
   prisma: PrismaClient;
   messaging: MessagingProvider;

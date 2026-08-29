@@ -75,3 +75,47 @@ describe("provisionPhoneIdentity", () => {
     ).rejects.toThrow(/thread/i);
   });
 });
+
+describe("provisionPhoneIdentity create race", () => {
+  it("resolves the thread for the winning identity's bot, not the loser's", async () => {
+    const winner = {
+      id: "pi-winner",
+      phoneE164: "+15551234567",
+      userId: "user-1",
+      workspaceId: "ws-1",
+      botId: "bot-winner",
+    };
+    const prisma = {
+      phoneIdentity: {
+        findUnique: vi
+          .fn()
+          .mockImplementationOnce(async () => null)
+          .mockImplementationOnce(async () => winner),
+        create: vi.fn(async () => {
+          throw new Error("Unique constraint failed on the fields: (`phoneE164`)");
+        }),
+      },
+      user: { findUnique: vi.fn(async () => ({ id: "user-1", email: "phone-x@phone.invalid" })) },
+      member: { findFirst: vi.fn(async () => ({ organizationId: "ws-1" })) },
+      bot: { findFirst: vi.fn(async () => ({ id: "bot-loser" })) },
+      thread: {
+        findFirst: vi.fn(async ({ where }: { where: { botId: string } }) =>
+          where.botId === "bot-winner" ? { id: "thread-winner" } : { id: "thread-loser" },
+        ),
+      },
+    };
+    const result = await provisionPhoneIdentity(prisma as unknown as PrismaClient, "+15551234567", {
+      signupsEnabled: undefined,
+      signupAllowlist: undefined,
+    });
+
+    expect(result).toEqual({
+      phoneE164: "+15551234567",
+      userId: "user-1",
+      workspaceId: "ws-1",
+      botId: "bot-winner",
+      threadId: "thread-winner",
+      created: false,
+    });
+  });
+});

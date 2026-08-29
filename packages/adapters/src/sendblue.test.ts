@@ -240,3 +240,17 @@ describe("isPhoneSurfaceEnabled", () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe("SendBlueMessagingProvider base URL policy", () => {
+  it("rejects a non-HTTPS base URL before any authenticated request", () => {
+    // The API secret rides every request header; a cleartext base URL would
+    // expose it on the wire.
+    expect(
+      () => new SendBlueMessagingProvider({ ...config, baseUrl: "http://sendblue.example" }),
+    ).toThrow(/https/i);
+    expect(
+      () => new SendBlueMessagingProvider({ ...config, baseUrl: "https://sendblue.example" }),
+    ).not.toThrow();
+    expect(() => new SendBlueMessagingProvider(config)).not.toThrow();
+  });
+});

@@ -5,6 +5,7 @@ import {
   applyPhoneOutboundStatus,
   deliverPhoneOutbound,
   PHONE_DM_OUTBOUND_CAP,
+  PHONE_OUTBOUND_MAX_ATTEMPTS,
   type PhoneDeliveryDeps,
 } from "./phone-delivery.js";
 
@@ -535,5 +536,44 @@ describe("deliverPhoneOutbound channel runs", () => {
     expect(deps.contextMessages[0]).toEqual(
       expect.objectContaining({ clientNonce: "phone-peer:m-1:bot-2" }),
     );
+  });
+});
+
+describe("deliverPhoneOutbound transient failure retry", () => {
+  it("returns a transient send failure to pending and schedules a delayed retry", async () => {
+    const deps = createDeps({ sendError: new Error("SendBlue 500") });
+    await deliverPhoneOutbound(deps, { runId: "run-1" }, context);
+
+    expect(deps.rows).toEqual([
+      expect.objectContaining({ kind: "dm", status: "pending", attempts: 1 }),
+    ]);
+    expect(deps.jobs.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "phone.deliver", availableAt: expect.any(Date) }),
+    );
+  });
+
+  it("marks the row failed only once the attempt budget is exhausted", async () => {
+    const deps = createDeps({
+      run: null,
+      sendError: new Error("SendBlue 500"),
+      outboundRows: [
+        {
+          id: "out-9",
+          idempotencyKey: "msg:m-9",
+          kind: "dm",
+          toNumber: "+15551234567",
+          body: "fourth failure",
+          status: "pending",
+          providerHandle: null,
+          attempts: PHONE_OUTBOUND_MAX_ATTEMPTS - 1,
+        },
+      ],
+    });
+    await deliverPhoneOutbound(deps, {}, context);
+
+    expect(deps.rows).toEqual([
+      expect.objectContaining({ status: "failed", attempts: PHONE_OUTBOUND_MAX_ATTEMPTS }),
+    ]);
+    expect(deps.jobs.enqueue).not.toHaveBeenCalled();
   });
 });

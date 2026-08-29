@@ -368,3 +368,50 @@ describe("agent connection status races", () => {
     expect(deps.enqueue).not.toHaveBeenCalled();
   });
 });
+
+describe("agent connection enumeration and sender gating", () => {
+  it("gives one generic answer for unregistered and unconnected numbers", async () => {
+    const unregistered = await messageConnectedAgent(createDeps(), run, sender, {
+      phone: "+15550000000",
+      message: "hi",
+    });
+    const unconnected = await messageConnectedAgent(createDeps(), run, sender, {
+      phone: "+15552222222",
+      message: "hi",
+    });
+
+    expect(unregistered.ok).toBe(false);
+    expect(unconnected.ok).toBe(false);
+    // A registered-but-unconnected number must be indistinguishable from an
+    // unregistered one (mirrors connect_agent's anti-enumeration contract).
+    expect((unregistered as { error: string }).error).toBe(
+      (unconnected as { error: string }).error,
+    );
+  });
+
+  it("refuses connection requests from bots without a phone identity", async () => {
+    const deps = createDeps();
+    const result = await connectAgent(deps, run, { id: "bot-3", name: "Rogue" }, {
+      phone: "+15552222222",
+    });
+
+    expect(result).toEqual(expect.objectContaining({ ok: false }));
+    expect(deps.outboundRows).toHaveLength(0);
+    expect(deps.prisma.agentConnection.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses connected messages from bots without a phone identity", async () => {
+    const deps = createDeps({
+      connection: { id: "ac-1", requesterBotId: "bot-3", targetBotId: "bot-2", status: "approved" },
+    });
+    const result = await messageConnectedAgent(
+      deps,
+      { ...run, botId: "bot-3" },
+      { id: "bot-3", name: "Rogue" },
+      { phone: "+15552222222", message: "hi" },
+    );
+
+    expect(result).toEqual(expect.objectContaining({ ok: false }));
+    expect(deps.txCalls.messageCreate).toHaveLength(0);
+  });
+});

@@ -111,3 +111,37 @@ describe("bootstrapUserWorkspace", () => {
     expect(prefData.userId).toBe("user-1");
   });
 });
+
+describe("bootstrapUserWorkspace concurrency", () => {
+  it("recovers when a concurrent bootstrap wins the org, member, and settings races", async () => {
+    const uniqueViolation = () => {
+      throw new Error("Unique constraint failed on the fields: (`slug`)");
+    };
+    const prisma = {
+      organization: {
+        create: vi.fn(uniqueViolation),
+        findUniqueOrThrow: vi.fn(async () => ({ id: "org-winner" })),
+      },
+      member: { create: vi.fn(uniqueViolation) },
+      deploymentSettings: {
+        findUnique: vi.fn(async () => null),
+        create: vi.fn(uniqueViolation),
+        upsert: vi.fn(async () => ({ id: "default" })),
+        update: vi.fn(async () => ({})),
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+      memoryDocument: {
+        findFirst: vi.fn(async () => ({ id: "mem-1" })),
+        create: vi.fn(async () => ({})),
+      },
+      notificationPreference: { create: vi.fn(uniqueViolation) },
+    };
+    const result = await bootstrapUserWorkspace(
+      prisma as unknown as PrismaClient,
+      { id: "user-1" },
+      env,
+    );
+
+    expect(result.workspaceId).toBe("org-winner");
+  });
+});
