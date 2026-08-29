@@ -452,3 +452,28 @@ export interface NotificationMessage {
   botId: string;
   threadId: string;
 }
+
+export interface MessagingCapabilities {
+  direct: boolean;
+  groups: boolean;
+}
+
+export interface MessagingDirectRequest {
+  to: string;
+  body: string;
+}
+
+export interface MessagingGroupRequest {
+  groupId: string;
+  body: string;
+}
+
+export interface MessagingSendResult {
+  handle: string;
+}
+
+export interface MessagingGroup {
+  id: string;
+  name: string | null;
+  participants: string[];
+}

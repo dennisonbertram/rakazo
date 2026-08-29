@@ -3,6 +3,7 @@ import type {
   AgentRuntime,
   BackgroundJobHandlers,
   JobPublisher,
+  MessagingProvider,
   SandboxProvider,
 } from "@rakazo/adapter-kit";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
@@ -26,6 +27,7 @@ export function createBackgroundJobHandlers(deps: {
   secretStore: EncryptedSecretStore;
   memoryProviders: MemoryProviderResolver;
   deploymentModelKey?: string;
+  messaging?: MessagingProvider;
 }): BackgroundJobHandlers {
   return {
     "run.continue": async (payload) => {

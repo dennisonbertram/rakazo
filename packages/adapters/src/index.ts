@@ -63,6 +63,8 @@ export * from "./scratchpad-tools.js";
 export * from "./scripted-runtime.js";
 export * from "./scripted-voice.js";
 export * from "./secrets.js";
+export * from "./sendblue.js";
+export * from "./sendblue-emulator.js";
 export * from "./skill-tools.js";
 export { SupermemoryMemoryProvider } from "./supermemory-memory-provider.js";
 export * from "./teaching-session.js";
