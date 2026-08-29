@@ -261,20 +261,23 @@ async function sendConnectInvite(
           select: { id: true },
         });
         if (!outbound) return "skipped";
+        let sent: { handle: string };
         try {
-          const sent = await deps.messaging.sendDirect(
+          sent = await deps.messaging.sendDirect(
             { to: row.toNumber, body: row.body },
             context,
           );
-          await tx.phoneOutbound.updateMany({
-            where: { id: row.id },
-            data: { providerHandle: sent.handle },
-          });
-          return "sent";
         } catch {
           // Provider did not accept — safe for drain to back off and retry.
           return "retry";
         }
+        // Handle write failures must not return retry: the provider already
+        // accepted, and a re-queue would duplicate the YES/NO DM.
+        await tx.phoneOutbound.updateMany({
+          where: { id: row.id },
+          data: { providerHandle: sent.handle },
+        });
+        return "sent";
       },
       { maxWait: 5_000, timeout: 20_000 },
     );
