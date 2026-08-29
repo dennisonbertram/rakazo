@@ -1,0 +1,134 @@
+import { Hono } from "hono";
+import { describe, expect, it, vi } from "vitest";
+import { mountPhoneWebhookRoutes, PHONE_WEBHOOK_PATH } from "./phone-webhook.js";
+
+const SIGNING_SECRET = "phone-signing-secret-test-value";
+
+function mount(handle?: (event: unknown) => Promise<void>) {
+  const handler = vi.fn(handle ?? (async () => undefined));
+  const app = new Hono();
+  mountPhoneWebhookRoutes(app, { signingSecret: SIGNING_SECRET, handle: handler });
+  return { app, handler };
+}
+
+function post(body: string, headers: Record<string, string> = {}) {
+  return {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body,
+  };
+}
+
+const receivePayload = JSON.stringify({
+  content: "hi",
+  is_outbound: false,
+  status: "RECEIVED",
+  message_handle: "handle-1",
+  from_number: "+15551234567",
+  sendblue_number: "+15550009999",
+  media_url: "",
+  group_id: "",
+  participants: ["+15551234567", "+15550009999"],
+  group_display_name: null,
+});
+
+describe("phone webhook HTTP route", () => {
+  it("rejects missing and wrong signing secrets with a uniform 401", async () => {
+    const { app, handler } = mount();
+    const missing = await app.request(PHONE_WEBHOOK_PATH, post(receivePayload));
+    const wrong = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post(receivePayload, { "sb-signing-secret": "wrong-secret" }),
+    );
+
+    expect(missing.status).toBe(401);
+    expect(wrong.status).toBe(401);
+    expect(await missing.text()).toBe(await wrong.text());
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("caps bodies at 64KB", async () => {
+    const { app, handler } = mount();
+    const oversized = JSON.stringify({
+      ...JSON.parse(receivePayload),
+      content: "x".repeat(70 * 1024),
+    });
+    const res = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post(oversized, { "sb-signing-secret": SIGNING_SECRET }),
+    );
+
+    expect(res.status).toBe(413);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("dispatches a parsed 1:1 message to the handler", async () => {
+    const { app, handler } = mount();
+    const res = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post(receivePayload, { "sb-signing-secret": SIGNING_SECRET }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(handler).toHaveBeenCalledWith({
+      type: "message",
+      handle: "handle-1",
+      fromNumber: "+15551234567",
+      groupId: null,
+      groupName: null,
+      participants: ["+15551234567", "+15550009999"],
+      content: "hi",
+      mediaUrl: null,
+    });
+  });
+
+  it("dispatches group messages with their group id", async () => {
+    const { app, handler } = mount();
+    const groupPayload = JSON.stringify({
+      ...JSON.parse(receivePayload),
+      group_id: "grp-1",
+      group_display_name: "Family",
+    });
+    const res = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post(groupPayload, { "sb-signing-secret": SIGNING_SECRET }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "message", groupId: "grp-1", groupName: "Family" }),
+    );
+  });
+
+  it("acknowledges outbound status events without calling the message handler", async () => {
+    const { app, handler } = mount();
+    const statusPayload = JSON.stringify({
+      ...JSON.parse(receivePayload),
+      is_outbound: true,
+      status: "DELIVERED",
+    });
+    const res = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post(statusPayload, { "sb-signing-secret": SIGNING_SECRET }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges non-message events and invalid JSON without calling the handler", async () => {
+    const { app, handler } = mount();
+    const callLog = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post(JSON.stringify({ event_type: "call_log" }), { "sb-signing-secret": SIGNING_SECRET }),
+    );
+    const garbage = await app.request(
+      PHONE_WEBHOOK_PATH,
+      post("not json at all", { "sb-signing-secret": SIGNING_SECRET }),
+    );
+
+    expect(callLog.status).toBe(200);
+    expect(garbage.status).toBe(200);
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
