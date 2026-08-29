@@ -179,6 +179,8 @@ export class SendBlueMessagingProvider implements MessagingProvider {
       {
         headers: this.headers(),
         signal: context.signal,
+        // Never let a redirect forward the sb-api-* headers cross-origin.
+        redirect: "error",
       },
     );
     const data = await parseResponse(response, `GET /api/v2/groups/${groupId}`);
@@ -223,6 +225,8 @@ export class SendBlueMessagingProvider implements MessagingProvider {
       headers: this.headers(),
       body: JSON.stringify(body),
       signal: context.signal,
+      // Never let a redirect forward the sb-api-* headers cross-origin.
+      redirect: "error",
     });
     return parseResponse(response, `POST ${path}`);
   }

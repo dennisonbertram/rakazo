@@ -259,7 +259,11 @@ describe("SendBlueMessagingProvider redirect policy", () => {
   it("sends every credential-bearing request with redirect: error", async () => {
     // Without an explicit redirect mode, fetch follows cross-origin
     // redirects and forwards the sb-api-* headers to the new origin.
-    const { provider, fetchMock } = providerReturning(Response.json({ message_handle: "h-1" }));
+    // Fresh body per call: a shared Response is consumed after one read.
+    const fetchMock = vi.fn(async (_input: unknown, _init?: RequestInit) =>
+      Response.json({ message_handle: "h-1" }),
+    );
+    const provider = new SendBlueMessagingProvider(config, { fetch: fetchMock });
     await provider.sendDirect({ to: "+15551234567", body: "hi" }, context);
     await provider.sendGroup({ groupId: "group-9", body: "hi all" }, context);
     await provider.sendTypingIndicator({ to: "+15551234567" }, context);

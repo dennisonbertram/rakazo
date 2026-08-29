@@ -283,9 +283,12 @@ async function drain(deps: PhoneDeliveryDeps, context: AdapterContext): Promise<
       });
       if (!exhausted) {
         const retryAt = new Date(Date.now() + phoneOutboundRetryDelayMs(attempts));
-        await deps.jobs.enqueue(phoneDeliverJob(undefined, retryAt)).catch((error) => {
-          console.error("phone outbound retry enqueue error", error);
-        });
+        // Propagate an enqueue failure: the phone.deliver job then fails and
+        // the queue's own retry re-runs the drain. Swallowing it would strand
+        // the row in pending — no reconciler reclaims phone_outbound rows.
+        // Re-entry is safe: the row is pending again and the claim flips it
+        // before the next provider call.
+        await deps.jobs.enqueue(phoneDeliverJob(undefined, retryAt));
       }
     }
   }
