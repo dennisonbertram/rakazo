@@ -197,6 +197,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     fromBotId: Id,
     toBotId: Id,
     text: z.string(),
+    /** Links ownership transfers in one user-started group turn. */
+    hop: z.number().int().positive().optional(),
   }),
   z.object({
     /** An iMessage group message delivered into a member bot's own thread. */
