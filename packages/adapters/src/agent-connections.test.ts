@@ -330,6 +330,32 @@ describe("messageConnectedAgent", () => {
     expect(deps.enqueue).toHaveBeenCalled();
   });
 
+  it("delivers repeated messages when each call has a distinct deliveryKey", async () => {
+    const deps = createDeps({
+      connection: { id: "ac-1", requesterBotId: "bot-1", targetBotId: "bot-2", status: "approved" },
+    });
+    const first = await messageConnectedAgent(deps, run, sender, {
+      phone: "+15552222222",
+      message: "one",
+      deliveryKey: "run-1:message_agent:0",
+    });
+    const second = await messageConnectedAgent(deps, run, sender, {
+      phone: "+15552222222",
+      message: "two",
+      deliveryKey: "run-1:message_agent:1",
+    });
+    expect(first).toEqual(expect.objectContaining({ ok: true }));
+    expect(second).toEqual(expect.objectContaining({ ok: true }));
+    const inboundNonces = deps.txCalls.messageCreate
+      .map((row) => row as { clientNonce?: string; role?: string })
+      .filter((row) => row.clientNonce)
+      .map((row) => row.clientNonce);
+    expect(inboundNonces).toEqual([
+      "agent-message:run-1:message_agent:0",
+      "agent-message:run-1:message_agent:1",
+    ]);
+  });
+
   it("refuses without an approved connection", async () => {
     const deps = createDeps();
     const result = await messageConnectedAgent(deps, run, sender, {
