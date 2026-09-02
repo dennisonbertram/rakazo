@@ -10,7 +10,7 @@ const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 const MEET_API = "https://meet.googleapis.com/v2";
 
-type Actor = { workspaceId: string; userId: string };
+type Actor = { spaceId: string; userId: string };
 
 export type DriveFileSummary = {
   id: string;

@@ -22,7 +22,7 @@ export const GOOGLE_SCOPES = [
 ];
 const SECRET_KIND = "google-oauth";
 
-type Actor = { workspaceId: string; userId: string };
+type Actor = { spaceId: string; userId: string };
 
 type StoredTokens = {
   access_token: string;
@@ -95,7 +95,7 @@ export class GoogleAuthBroker {
     if (
       !pending ||
       pending.actor.userId !== actor.userId ||
-      pending.actor.workspaceId !== actor.workspaceId
+      pending.actor.spaceId !== actor.spaceId
     ) {
       throw new Error("Google OAuth session is invalid or expired");
     }
@@ -144,7 +144,7 @@ export class GoogleAuthBroker {
   /** Valid access token, refreshing (and persisting the rotation) when stale.
       Concurrent callers share one refresh request. */
   async accessToken(actor: Actor): Promise<string | undefined> {
-    const key = `${actor.workspaceId}:${actor.userId}`;
+    const key = `${actor.spaceId}:${actor.userId}`;
     const inFlight = this.refreshing.get(key);
     if (inFlight) return inFlight;
     const task = this.accessTokenInner(actor).finally(() => this.refreshing.delete(key));
@@ -221,7 +221,7 @@ export class GoogleAuthBroker {
 
   private async secretRow(actor: Actor) {
     return this.prisma.secret.findFirst({
-      where: { workspaceId: actor.workspaceId, userId: actor.userId, kind: SECRET_KIND },
+      where: { spaceId: actor.spaceId, userId: actor.userId, kind: SECRET_KIND },
     });
   }
 
@@ -229,7 +229,7 @@ export class GoogleAuthBroker {
     const stored = await this.secrets.put(JSON.stringify(tokens), {
       operationId: "google.oauth",
       traceId: "google.oauth",
-      workspaceId: actor.workspaceId,
+      spaceId: actor.spaceId,
       userId: actor.userId,
       signal: new AbortController().signal,
     });
@@ -237,7 +237,7 @@ export class GoogleAuthBroker {
       this.prisma.secret.create({
         data: {
           id: stored.id,
-          workspaceId: actor.workspaceId,
+          spaceId: actor.spaceId,
           userId: actor.userId,
           kind: SECRET_KIND,
           ciphertext: stored.ciphertext,

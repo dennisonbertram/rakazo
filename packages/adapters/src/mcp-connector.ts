@@ -7,6 +7,16 @@ import type {
 } from "@rakazo/adapter-kit";
 import { isLocalMcpHost } from "@rakazo/contracts";
 import type { McpServer, PrismaClient } from "@rakazo/db";
+import { sanitizeConnectorError } from "./connector-safety.js";
+import {
+  CATALOG_EXECUTE,
+  catalogEntries,
+  DIRECT_TOOL_LIMIT,
+  executeLazyCatalogControl,
+  isLazyCatalogControlRoute,
+  lazyCatalogTools,
+  resolveCatalogCall,
+} from "./lazy-tool-catalog.js";
 import type { McpOAuthBroker, OAuthMaterial } from "./mcp-oauth.js";
 import { McpSession } from "./mcp-transport.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
@@ -38,7 +48,7 @@ export function allowlistDrift(
 function reportAllowlistDrift(
   assignment: { allowAllTools: boolean; allowedTools: unknown; server: { slug: string } },
   offered: Array<{ name: string }>,
-  context: { workspaceId: string; botId?: string },
+  context: { spaceId: string; botId?: string },
 ): void {
   if (assignment.allowAllTools) return;
   const drift = allowlistDrift(assignment.allowedTools, offered);
@@ -46,7 +56,7 @@ function reportAllowlistDrift(
   console.warn(
     `mcp allowlist drift on ${assignment.server.slug}: ${drift.missing.length}/${drift.stringAllowedCount} allowed tools are not offered (server offers ${drift.offered})`,
     {
-      workspaceId: context.workspaceId,
+      spaceId: context.spaceId,
       botId: context.botId,
       // Cap the list: the point is to name the drift, not to print an allowlist.
       missing: drift.missing.slice(0, 10),
@@ -78,11 +88,26 @@ export class McpConnector implements ConnectorProvider {
   }
 
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
+    const tools = await this.authorizedTools(context);
+    if (tools.length <= DIRECT_TOOL_LIMIT) return tools;
+    return lazyCatalogTools("mcp", "mcp", "MCP", catalogEntries(tools));
+  }
+
+  async resolveCall(
+    call: ConnectorCall,
+    context: AdapterContext,
+  ): Promise<{ call: ConnectorCall; tool: ConnectorTool } | undefined> {
+    // Wrappers have no resourceId; real tools always do.
+    if (call.route?.resourceId || call.route?.toolName !== CATALOG_EXECUTE) return undefined;
+    return resolveCatalogCall(call, catalogEntries(await this.authorizedTools(context)));
+  }
+
+  private async authorizedTools(context: AdapterContext): Promise<ConnectorTool[]> {
     if (!context.botId) return [];
     const assignments = await this.prisma.botMcpServer.findMany({
       where: {
         botId: context.botId,
-        workspaceId: context.workspaceId,
+        spaceId: context.spaceId,
         userId: context.userId,
         server: { enabled: true },
       },
@@ -107,14 +132,16 @@ export class McpConnector implements ConnectorProvider {
               route: {
                 connectorId: "mcp",
                 resourceId: assignment.serverId,
+                resourceRevision: assignment.server.revision,
                 toolName: tool.name,
+                catalogGroup: assignment.server.slug,
               },
             }));
         } catch (error) {
           // A single unavailable server must not hide tools from other connectors.
           console.error(
             `mcp discovery failed for server ${assignment.server.slug}:`,
-            error instanceof Error ? error.message : error,
+            sanitizeConnectorError(error),
           );
           await this.evict(this.sessionKey(assignment.server, context));
           return [];
@@ -125,7 +152,23 @@ export class McpConnector implements ConnectorProvider {
   }
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
-    if (call.route?.connectorId !== "mcp" || !call.route.resourceId) {
+    if (call.route?.connectorId !== "mcp") {
+      yield { type: "error", message: `MCP route required for ${call.tool}` };
+      return;
+    }
+    if (isLazyCatalogControlRoute(call.route)) {
+      try {
+        yield* executeLazyCatalogControl(
+          call,
+          catalogEntries(await this.authorizedTools(context)),
+          (resolved) => this.execute(resolved, context),
+        );
+      } catch (error) {
+        yield { type: "error", message: sanitizeConnectorError(error) };
+      }
+      return;
+    }
+    if (!call.route.resourceId) {
       yield { type: "error", message: `MCP route required for ${call.tool}` };
       return;
     }
@@ -137,7 +180,7 @@ export class McpConnector implements ConnectorProvider {
       where: {
         botId: context.botId,
         serverId: call.route.resourceId,
-        workspaceId: context.workspaceId,
+        spaceId: context.spaceId,
         userId: context.userId,
         server: { enabled: true },
       },
@@ -175,7 +218,7 @@ export class McpConnector implements ConnectorProvider {
   private sessionKey(server: McpServer, context: AdapterContext): string {
     // Identity headers are applied once, at connect time, so a session is only
     // valid for the identity it connected as. The key has to carry that identity.
-    return `${server.id} ${context.workspaceId} ${context.userId}`;
+    return `${server.id} ${context.spaceId} ${context.userId}`;
   }
 
   private async evict(sessionKey: string): Promise<void> {
@@ -217,7 +260,7 @@ export class McpConnector implements ConnectorProvider {
         ? await this.prisma.secret.findFirst({
             where: {
               id: server.secretId,
-              workspaceId: context.workspaceId,
+              spaceId: context.spaceId,
               userId: context.userId,
             },
           })
@@ -256,10 +299,10 @@ export class McpConnector implements ConnectorProvider {
         };
         await session.connectRemote({
           url: server.endpoint,
-          urlPolicy: { allowHttpLocalhost: true },
+          urlPolicy: { allowHttpLocalhost: true, allowLocalHttpCredentials: localHttp },
           transport: server.transport === "sse" ? "sse" : "streamable-http",
           allowLegacySse: server.transport === "sse",
-          headerPolicy: localHttp ? undefined : { headers },
+          headerPolicy: { headers },
           fallbackToSse: false,
           authProvider,
           network: this.options.network,

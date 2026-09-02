@@ -158,7 +158,7 @@ export function PluginsOverlay({
         displayName: item.name,
       });
       if (started.authorizationUrl)
-        window.open(started.authorizationUrl, "_blank", "noopener,noreferrer");
+        window.open(started.authorizationUrl, "rakazo-plugin-connect", "noopener,noreferrer");
       if (item.noAuth && !started.authorizationUrl) {
         if (controller.signal.aborted) return;
         setItemConnected(item, true);
@@ -298,7 +298,7 @@ export function PluginsOverlay({
         </div>
 
         <div id="integration-list" className="rk-scroll flex-1 overflow-y-auto px-8 py-6">
-          {catalogError ? <p className="mb-4 text-sm text-[#C94244]">{catalogError}</p> : null}
+          {catalogError ? <p className="mb-4 text-sm text-[#EF4444]">{catalogError}</p> : null}
           {google?.configured ? (
             <div className="mb-4 flex items-center gap-3.5 rounded-[16px] border border-[#2A2A31] bg-[#17171A] px-4 py-3.5">
               <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-white text-[15px] font-semibold text-[#4285F4]">
@@ -535,7 +535,7 @@ export function PluginsOverlay({
                 </Button>
               </div>
 
-              {sourceError ? <p className="text-sm text-[#C94244]">{sourceError}</p> : null}
+              {sourceError ? <p className="text-sm text-[#EF4444]">{sourceError}</p> : null}
 
               {sourceKind ? (
                 <div className="space-y-3 rounded-[16px] border border-[#2C2C30] bg-[#101012] p-5">

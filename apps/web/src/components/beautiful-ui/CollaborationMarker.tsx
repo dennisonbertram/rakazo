@@ -1,6 +1,7 @@
 import { BotAvatar, GroupAvatar, type GroupAvatarMember } from "@rakazo/ui-web";
 import { LoadingState } from "./primitives";
 
+/** Lightweight peer event shown without exposing the exchanged message body. */
 export function CollaborationMarker({
   ariaLabel,
   color,
@@ -15,15 +16,20 @@ export function CollaborationMarker({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      onClick={onClick}
-      className="flex items-center justify-center gap-1.5 self-center rounded-full px-2.5 py-1 text-[13px] text-[#85858A] transition-colors hover:bg-[#161618] hover:text-[#B8B8BD]"
-    >
-      <BotAvatar color={color} identity={identity} size={16} />
-      <span dir="auto">{label}</span>
-    </button>
+    <div className="flex justify-start">
+      <button
+        type="button"
+        data-testid="peer-receipt-chip"
+        aria-label={ariaLabel}
+        onClick={onClick}
+        className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] text-[#85858A] transition-colors hover:bg-[#161618] hover:text-[#B8B8BD]"
+      >
+        <BotAvatar color={color} identity={identity} size={16} />
+        <span dir="auto" className="truncate">
+          {label}
+        </span>
+      </button>
+    </div>
   );
 }
 

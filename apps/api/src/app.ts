@@ -1,25 +1,33 @@
+import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import type {
   JobPublisher,
   ManagedConnectorProvider,
+  MessagingSurface,
   RealtimeFanout,
   SandboxProvider,
+  TransactionalEmailProvider,
 } from "@rakazo/adapter-kit";
 import {
+  applyMessagingOutboundStatus,
   CalendarNative,
+  ChatSdkMessagingSurface,
   type ComposioProvider,
   type ConnectorRegistry,
   createBackgroundJobHandlers,
   createConnectorStack,
   createJobReconciler,
+  createMessagingContextLoader,
   createRunExecutor,
   createRunSandbox,
   createRunSecretWriter,
+  createWebProvider,
   type DestinationEmulator,
   DriveNative,
   destroyBot,
+  EmailEmulator,
   EncryptedSecretStore,
   ExpoPushProvider,
   GmailNative,
@@ -29,12 +37,14 @@ import {
   InMemoryRealtimeFanout,
   InstalledConnectorProvider,
   isComposioEnabled,
+  isMessagingSurfaceEnabled,
   isPipedreamEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
   McpOAuthBroker,
   MeetNative,
+  messagingPlatformsFromEnv,
   PiAgentRuntime,
   PiOAuthLogins,
   PipedreamConnector,
@@ -43,15 +53,24 @@ import {
   pushTokenPath,
   type RemoteConnectorDependencies,
   ScriptedAgentRuntime,
-  WorkspaceMemoryProviderResolver,
+  SmtpEmailProvider,
+  SpaceMemoryProviderResolver,
 } from "@rakazo/adapters";
 import { blockedAuthPaths, createAuth } from "@rakazo/auth";
 import { signupPolicyFromEnv } from "@rakazo/core";
-import { createDb, createThreadEvents, type PrismaClient, requireMembership } from "@rakazo/db";
+import {
+  createDb,
+  createThreadEvents,
+  type PrismaClient,
+  provisionMessagingIdentity,
+  requireMembership,
+} from "@rakazo/db";
 import { MarkdownMemoryStore } from "@rakazo/memory";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { type AppEnv, loadEnv } from "./env.js";
+import { createMessagingInboundHandler } from "./messaging-inbound.js";
+import { mountMessagingWebhookRoutes } from "./messaging-webhook.js";
 import { createRouter } from "./router.js";
 import { mountVoiceHttpRoutes } from "./voice.js";
 import { mountWebhookHttpRoutes } from "./webhook.js";
@@ -64,6 +83,8 @@ export interface AppHandles {
   connector: DestinationEmulator;
   composio?: ComposioProvider;
   connectors: ConnectorRegistry;
+  messaging?: MessagingSurface;
+  email?: TransactionalEmailProvider;
   executor: ReturnType<typeof createRunExecutor>;
   stop: () => Promise<void>;
 }
@@ -74,6 +95,8 @@ export async function createApp(
     realtime?: RealtimeFanout;
     composio?: ComposioProvider;
     pipedream?: ManagedConnectorProvider;
+    messaging?: MessagingSurface;
+    email?: TransactionalEmailProvider;
     remoteConnectors?: RemoteConnectorDependencies;
   } = {},
 ): Promise<AppHandles> {
@@ -82,6 +105,8 @@ export async function createApp(
     realtime: realtimeOverride,
     composio: composioOverride,
     pipedream: pipedreamOverride,
+    messaging: messagingOverride,
+    email: emailOverride,
     remoteConnectors,
     ...envOverrides
   } = overrides;
@@ -144,7 +169,7 @@ export async function createApp(
     prisma,
   });
   const mcpOAuth = new McpOAuthBroker(prisma, secrets, remoteConnectors);
-  const memoryProviders = new WorkspaceMemoryProviderResolver(prisma, secrets);
+  const memoryProviders = new SpaceMemoryProviderResolver(prisma, secrets);
   const googleAuth = new GoogleAuthBroker(
     prisma,
     secrets,
@@ -175,6 +200,29 @@ export async function createApp(
   const pipedream =
     pipedreamOverride ??
     (isPipedreamEnabled(pipedreamConfig) ? new PipedreamConnector(pipedreamConfig) : undefined);
+  const messagingPlatforms = messagingPlatformsFromEnv(env);
+  const messaging =
+    messagingOverride ??
+    (isMessagingSurfaceEnabled(messagingPlatforms, {
+      deploymentModelKey: env.deploymentModelKey,
+      openSignup: env.messagingOpenSignup,
+    })
+      ? new ChatSdkMessagingSurface(messagingPlatforms)
+      : undefined);
+  const localEmailEmulator =
+    !emailOverride && !env.smtpUrl && env.emailEmulator
+      ? new EmailEmulator((message) => {
+          console.info(`[email-emulator] captured ${message.subject} to ${message.to}`);
+        })
+      : undefined;
+  if (localEmailEmulator && !isLoopbackHost(env.apiHost)) {
+    throw new Error("EMAIL_EMULATOR requires API_HOST to be a loopback host");
+  }
+  const email: TransactionalEmailProvider | undefined =
+    emailOverride ??
+    (env.smtpUrl
+      ? new SmtpEmailProvider({ url: env.smtpUrl, from: env.emailFrom ?? "" })
+      : localEmailEmulator);
   const installed = new InstalledConnectorProvider(prisma, secrets, remoteConnectors);
   const stack = createConnectorStack(isComposioEnabled(env.composioApiKey), composioOverride, [
     installed,
@@ -194,6 +242,8 @@ export async function createApp(
     webOrigin: env.webOrigin,
     signupsEnabled: env.signupsEnabled,
     signupAllowlist: env.signupAllowlist,
+    email,
+    onEmailError: (error) => console.error("transactional email delivery failed", error),
     extraOrigins: [
       "rakazo://",
       "exp://",
@@ -206,7 +256,7 @@ export async function createApp(
     beforeDeleteUser: async (userId) => {
       const bots = await prisma.bot.findMany({
         where: { userId },
-        select: { id: true, workspaceId: true, name: true, archivedAt: true },
+        select: { id: true, spaceId: true, name: true, archivedAt: true },
       });
       await Promise.all(
         bots.map((bot) =>
@@ -216,7 +266,7 @@ export async function createApp(
             {
               operationId: `account-delete:${userId}`,
               traceId: `account-delete:${userId}`,
-              workspaceId: bot.workspaceId,
+              spaceId: bot.spaceId,
               userId,
               botId: bot.id,
               signal: new AbortController().signal,
@@ -248,6 +298,8 @@ export async function createApp(
     notifications,
     jobs,
     events,
+    messaging: messaging ? createMessagingContextLoader(prisma) : undefined,
+    web: createWebProvider(),
   });
 
   const jobHandlers = createBackgroundJobHandlers({
@@ -262,6 +314,7 @@ export async function createApp(
     secretStore: secrets,
     memoryProviders,
     deploymentModelKey: env.deploymentModelKey,
+    messaging,
   });
   if (inMemoryJobs) {
     await inMemoryJobs.start(jobHandlers);
@@ -287,6 +340,11 @@ export async function createApp(
     remoteConnectors,
     artifacts,
     dataDir: env.dataDir,
+    messaging: {
+      enabled: Boolean(messaging),
+      providers: messaging?.platforms().map((platform) => platform.provider) ?? [],
+      openSignup: env.messagingOpenSignup,
+    },
     env: {
       defaultProvider: env.defaultProvider,
       defaultModel: env.defaultModel,
@@ -314,6 +372,21 @@ export async function createApp(
       credentials: true,
     }),
   );
+  app.get("/api/auth/capabilities", (c) =>
+    c.json({
+      passwordReset: Boolean(email),
+      resetUrl: email ? new URL("/reset-password", env.webOrigin).href : null,
+    }),
+  );
+  if (localEmailEmulator && env.nodeEnv === "development") {
+    app.get(
+      "/api/dev/emails",
+      () =>
+        new Response(JSON.stringify(localEmailEmulator.sent), {
+          headers: { "cache-control": "no-store", "content-type": "application/json" },
+        }),
+    );
+  }
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
     const path = new URL(c.req.url).pathname.replace("/api/auth", "");
     if (blockedAuthPaths.some((blocked) => path.startsWith(blocked))) {
@@ -323,8 +396,9 @@ export async function createApp(
   });
   app.use("/rpc/*", async (c, next) => {
     const session = await auth.api.getSession({ headers: sessionHeaders(c.req.raw) });
+    const requestedSpaceId = c.req.header("x-rakazo-space-id");
     const actor = session?.user
-      ? await requireMembership(prisma, session.user.id).catch(() => null)
+      ? await requireMembership(prisma, session.user.id, requestedSpaceId).catch(() => null)
       : null;
     const { matched, response } = await rpc.handle(c.req.raw, {
       prefix: "/rpc",
@@ -336,9 +410,45 @@ export async function createApp(
   mountVoiceHttpRoutes(app, { prisma, secrets }, async (c) => {
     const session = await auth.api.getSession({ headers: sessionHeaders(c.req.raw) });
     if (!session?.user) return null;
-    return requireMembership(prisma, session.user.id).catch(() => null);
+    return requireMembership(prisma, session.user.id, c.req.header("x-rakazo-space-id")).catch(
+      () => null,
+    );
   });
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });
+  // Messaging webhooks only exist when the surface is enabled.
+  if (messaging) {
+    const inbound = createMessagingInboundHandler({
+      prisma,
+      events,
+      jobs,
+      provision: (request, policyEnv) => provisionMessagingIdentity(prisma, request, policyEnv),
+      openSignup: env.messagingOpenSignup,
+      signupPolicy: {
+        signupsEnabled: env.signupsEnabled,
+        signupAllowlist: env.signupAllowlist,
+      },
+      typing: (threadId) => {
+        // Keep conversation addresses out of trace ids — those reach logs
+        // and telemetry, a different trust boundary than the database.
+        const operationId = `messaging.typing:${randomUUID()}`;
+        return messaging.sendTyping(threadId, {
+          operationId,
+          traceId: operationId,
+          spaceId: "",
+          userId: "",
+          // Cosmetic side call: the wait is bounded so a stalled vendor
+          // response never holds our callback chain (the Chat SDK adapter
+          // API cannot cancel the underlying request itself).
+          signal: AbortSignal.timeout(2000),
+        });
+      },
+    });
+    messaging.onInbound(async (event) => {
+      if (event.type === "message") await inbound(event);
+      else await applyMessagingOutboundStatus(prisma, event);
+    });
+    mountMessagingWebhookRoutes(app, { messaging });
+  }
 
   app.get("/health", (c) =>
     c.json({
@@ -347,6 +457,8 @@ export async function createApp(
       sandbox: env.sandboxProvider,
       composio: Boolean(stack.composio),
       pipedream: Boolean(pipedream),
+      messaging: Boolean(messaging),
+      email: email?.describe().id ?? null,
       jobs: jobKind,
       realtime: realtime.describe().id,
       revision: env.gitSha ?? null,
@@ -361,9 +473,12 @@ export async function createApp(
     connector,
     composio: stack.composio,
     connectors: stack.connector,
+    messaging,
+    email,
     executor,
     stop: async () => {
       oauthLogins.abortAll();
+      await email?.drain?.();
       await reconciler?.stop();
       await jobs.close();
       await realtime.close();
@@ -381,10 +496,14 @@ function isTrustedOrigin(origin: string, env: AppEnv) {
   if (origin.startsWith("rakazo://") || origin.startsWith("exp://")) return true;
   try {
     const host = new URL(origin).hostname;
-    return host === "localhost" || host === "127.0.0.1";
+    return isLoopbackHost(host);
   } catch {
     return false;
   }
+}
+
+function isLoopbackHost(host: string): boolean {
+  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
 }
 
 function sessionHeaders(request: Request) {

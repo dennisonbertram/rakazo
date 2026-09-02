@@ -3,6 +3,7 @@ import * as z from "zod";
 import { ATTACHMENT_MAX_BASE64_LENGTH, ATTACHMENT_MAX_COUNT } from "./attachments.js";
 import {
   ActionApprovalRuleSchema,
+  ActionAutoReviewSettingsSchema,
   AgentSkillCatalogEntrySchema,
   AgentSkillSchema,
   AppBootstrapSchema,
@@ -32,10 +33,15 @@ import {
   MemoryDocumentSchema,
   MemoryScopeSchema,
   MeSchema,
+  MessagingAgentConnectionSchema,
+  MessagingChannelMembershipSchema,
+  MessagingLinkedIdentitySchema,
+  MessagingStatusSchema,
   ModelCatalogEntrySchema,
   ModelConnectInputSchema,
   ModelCredentialSchema,
   ModelOAuthBeginSchema,
+  ReorderBotsInput,
   RoutineSchema,
   ScratchpadItemSchema,
   ScratchpadItemStatusSchema,
@@ -44,6 +50,9 @@ import {
   ServerUpdateRunSchema,
   ServerUpdateStatusSchema,
   SkillPlaybookSchema,
+  SpaceMemoryConfigSchema,
+  SpaceNavigationSchema,
+  SpaceSchema,
   TaughtSkillSchema,
   TeachRecordingEventSchema,
   ThreadMessagePageSchema,
@@ -56,7 +65,6 @@ import {
   VoiceCredentialSchema,
   VoiceInfoSchema,
   VoiceStatusSchema,
-  WorkspaceMemoryConfigSchema,
 } from "./domain.js";
 import { ProductEventSchema } from "./events.js";
 import { Id, IsoDate } from "./ids.js";
@@ -119,6 +127,10 @@ export const appContract = {
   me: oc.output(MeSchema),
   preferences: {
     update: oc.input(z.object({ avatarStyle: AvatarStyleSchema })).output(MeSchema),
+  },
+  spaces: {
+    list: oc.output(SpaceNavigationSchema),
+    create: oc.input(z.object({ name: z.string().trim().min(1).max(60) })).output(SpaceSchema),
   },
   bootstrap: oc.input(z.object({ botId: Id.optional() })).output(AppBootstrapSchema),
   deployment: {
@@ -190,6 +202,7 @@ export const appContract = {
     get: oc.input(botId).output(BotSchema),
     create: oc.input(CreateBotInput).output(BotSchema),
     duplicate: oc.input(botId).output(BotSchema),
+    reorder: oc.input(ReorderBotsInput).output(z.object({ ok: z.literal(true) })),
     update: oc.input(UpdateBotInput).output(BotSchema),
     setComputer: oc.input(z.object({ botId: Id, mode: ComputerModeSchema })).output(BotSchema),
     archive: oc.input(botId).output(z.object({ ok: z.literal(true) })),
@@ -223,11 +236,19 @@ export const appContract = {
       .output(BotSectionSchema),
   },
   threads: {
+    head: oc.input(threadTarget).output(
+      z.object({
+        threadId: Id,
+        cursor: z.number().int().min(-1),
+      }),
+    ),
     get: oc.input(threadTarget).output(ThreadSnapshotSchema),
     messages: oc
       .input(
         threadTarget.safeExtend({
           before: z.number().int().nonnegative().optional(),
+          includePeerRuns: z.boolean().optional(),
+          includePeerReceipts: z.boolean().optional(),
           around: z
             .object({
               messageId: Id.optional(),
@@ -248,6 +269,14 @@ export const appContract = {
         runIds: z.array(Id).optional(),
       }),
     ),
+    react: oc
+      .input(
+        threadTarget.safeExtend({
+          messageId: Id,
+          thumbsUp: z.boolean(),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
     stop: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
     followUp: oc
       .input(threadTarget.safeExtend({ text: z.string().min(1) }))
@@ -309,7 +338,7 @@ export const appContract = {
       .input(z.object({ documentId: Id, content: z.string() }))
       .output(MemoryDocumentSchema),
     exportMarkdown: oc.input(z.object({ botId: Id.optional() })).output(z.string()),
-    providerConfig: oc.output(WorkspaceMemoryConfigSchema.nullable()),
+    providerConfig: oc.output(SpaceMemoryConfigSchema.nullable()),
     connectProvider: oc
       .input(
         z.object({
@@ -319,10 +348,10 @@ export const appContract = {
           defaultMemoryScope: MemoryScopeSchema.default("isolated"),
         }),
       )
-      .output(WorkspaceMemoryConfigSchema),
+      .output(SpaceMemoryConfigSchema),
     setDefaultScope: oc
       .input(z.object({ defaultMemoryScope: MemoryScopeSchema }))
-      .output(WorkspaceMemoryConfigSchema),
+      .output(SpaceMemoryConfigSchema),
     disconnectProvider: oc.output(z.object({ ok: z.literal(true) })),
   },
   routines: {
@@ -546,6 +575,38 @@ export const appContract = {
       .output(ConnectionSchema),
     revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
   },
+  /** External messaging surface: link state, group channels, agent connections. */
+  messaging: {
+    status: oc.output(MessagingStatusSchema),
+    link: {
+      /** Issue a short-lived code the user sends to the line from a chat app. */
+      start: oc
+        .input(z.object({ botId: Id }))
+        .output(z.object({ code: z.string(), expiresAt: z.string() })),
+    },
+    identities: {
+      setBot: oc
+        .input(z.object({ identityId: Id, botId: Id }))
+        .output(MessagingLinkedIdentitySchema),
+      unlink: oc.input(z.object({ identityId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+    channels: {
+      list: oc.output(z.array(MessagingChannelMembershipSchema)),
+      // Addressed by membership, not channel: one user can have two linked
+      // chat apps in the same group, and each answers for its own agent.
+      respond: oc
+        .input(z.object({ membershipId: Id, accept: z.boolean() }))
+        .output(MessagingChannelMembershipSchema),
+      leave: oc.input(z.object({ membershipId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+    connections: {
+      list: oc.output(z.array(MessagingAgentConnectionSchema)),
+      respond: oc
+        .input(z.object({ connectionId: Id, accept: z.boolean() }))
+        .output(MessagingAgentConnectionSchema),
+      revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+  },
   approvalRules: {
     list: oc.output(z.array(ActionApprovalRuleSchema)),
     set: oc
@@ -558,6 +619,10 @@ export const appContract = {
       )
       .output(ActionApprovalRuleSchema),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  autoReview: {
+    get: oc.output(ActionAutoReviewSettingsSchema),
+    set: oc.input(z.object({ enabled: z.boolean() })).output(ActionAutoReviewSettingsSchema),
   },
   artifacts: {
     list: oc.input(botId).output(z.array(ArtifactSchema)),
@@ -591,6 +656,7 @@ export const appContract = {
     registerPush: oc
       .input(z.object({ token: z.string().min(8).max(512) }))
       .output(z.object({ ok: z.literal(true) })),
+    unregisterPush: oc.output(z.object({ ok: z.literal(true) })),
   },
   search: {
     query: oc.input(z.object({ q: z.string().max(200) })).output(SearchQueryOutputSchema),

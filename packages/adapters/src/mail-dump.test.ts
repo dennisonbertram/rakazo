@@ -34,7 +34,7 @@ function fakeConnector(pages: FakePage[]) {
 }
 
 const CONTEXT = {
-  workspaceId: "w",
+  spaceId: "w",
   userId: "u",
   botId: "b",
   signal: new AbortController().signal,

@@ -42,6 +42,7 @@ export const MAX_COMPACTED_SUMMARY_CHARS = 20_000;
 export const MAX_RECALLED_MEMORIES = 5;
 
 export type CompactedHistoryMessage = {
+  id?: string;
   seq: number;
   role: "user" | "assistant" | "system";
   content: string;
@@ -125,7 +126,7 @@ export interface CompactHistoryDeps {
   deploymentModelKey?: string;
   resolveModel?: (scope: {
     userId: string;
-    workspaceId: string;
+    spaceId: string;
     botId?: string;
   }) => Promise<AgentRunRequest["model"]>;
 }
@@ -244,7 +245,7 @@ export async function compactHistory(deps: CompactHistoryDeps, threadId: string)
   const model = deps.resolveModel
     ? await deps.resolveModel({
         userId: thread.userId,
-        workspaceId: thread.workspaceId,
+        spaceId: thread.spaceId,
         botId: thread.botId,
       })
     : deps.deploymentModelKey
@@ -286,7 +287,7 @@ export async function compactHistory(deps: CompactHistoryDeps, threadId: string)
     {
       operationId: `compact:${threadId}`,
       traceId: `compact:${threadId}`,
-      workspaceId: thread.workspaceId,
+      spaceId: thread.spaceId,
       userId: thread.userId,
       signal: AbortSignal.timeout(SUMMARIZE_TIMEOUT_MS),
     },
@@ -329,7 +330,7 @@ export async function compactHistory(deps: CompactHistoryDeps, threadId: string)
   // Saving only after the compare-and-set also prevents losing workers from creating duplicates.
   let semanticMemory: ConfiguredMemoryProvider | null = null;
   try {
-    semanticMemory = await deps.memoryProviders.resolve(thread.workspaceId);
+    semanticMemory = await deps.memoryProviders.resolve(thread.spaceId);
   } catch (error) {
     console.error("Failed to load semantic memory provider for history compaction", error);
   }
@@ -337,7 +338,7 @@ export async function compactHistory(deps: CompactHistoryDeps, threadId: string)
   const memoryContext = {
     operationId: `history-compact:${threadId}`,
     traceId: `history-compact:${threadId}`,
-    workspaceId: thread.workspaceId,
+    spaceId: thread.spaceId,
     userId: thread.userId,
     botId: thread.botId,
     signal: new AbortController().signal,

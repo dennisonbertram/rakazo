@@ -23,6 +23,8 @@ export interface McpUrlPolicy {
   maxUrlLength?: number;
   /** Permit plain HTTP only for explicitly local hosts. */
   allowHttpLocalhost?: boolean;
+  /** Permit configured credentials on an explicitly local HTTP endpoint. */
+  allowLocalHttpCredentials?: boolean;
   /** Hosts allowed after redirects (redirects are rejected by default). */
   allowedHosts?: readonly string[];
 }
@@ -98,9 +100,9 @@ export function secureFetch(
   const allowed = new Set(
     (headerPolicy.allowedHeaders ?? DEFAULT_HEADERS).map((h) => h.toLowerCase()),
   );
-  const configured = Object.entries(headerPolicy.headers ?? {}).filter(([name]) =>
-    allowed.has(name.toLowerCase()),
-  );
+  // Operator-configured headers are always allowed toward their own origin; the
+  // allowedHeaders filter applies to SDK-supplied init headers only.
+  const configured = Object.entries(headerPolicy.headers ?? {});
   const configuredNames = new Set(
     Object.keys(headerPolicy.headers ?? {}).map((name) => name.toLowerCase()),
   );
@@ -119,13 +121,13 @@ export function secureFetch(
     const url = validateUrl(source.url, urlPolicy);
     const headers = new Headers(source.headers);
     const localHttp = url.protocol === "http:" && isLocalMcpHost(url.hostname);
-    if (localHttp) {
+    if (localHttp && urlPolicy.allowLocalHttpCredentials !== true) {
       for (const name of [...headers.keys()]) {
         if (localCredentialHeaders.has(name.toLowerCase())) headers.delete(name);
       }
     }
     const sameOrigin = url.origin === resourceUrl.origin;
-    if (!localHttp && sameOrigin) {
+    if (sameOrigin && (!localHttp || urlPolicy.allowLocalHttpCredentials === true)) {
       for (const [name, value] of configured) headers.set(name, value);
     } else if (!sameOrigin) {
       // Operator-configured credentials belong to the MCP endpoint only; never
@@ -134,7 +136,12 @@ export function secureFetch(
       for (const [name] of configured) headers.delete(name);
     }
     for (const [name, value] of new Headers(init?.headers)) {
-      if (localHttp && localCredentialHeaders.has(name.toLowerCase())) continue;
+      if (
+        localHttp &&
+        urlPolicy.allowLocalHttpCredentials !== true &&
+        localCredentialHeaders.has(name.toLowerCase())
+      )
+        continue;
       if (!sameOrigin && configuredNames.has(name.toLowerCase())) continue;
       if (allowed.has(name.toLowerCase())) headers.set(name, value);
     }

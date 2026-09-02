@@ -99,6 +99,7 @@ async function main() {
           "packages/testkit/src/voice.test.ts",
           "packages/testkit/src/search.test.ts",
           "packages/testkit/src/connections.test.ts",
+          "packages/db/src/space-membership.postgres.test.ts",
         ],
         worker: [
           "packages/testkit/src/journeys.test.ts",
@@ -127,8 +128,10 @@ async function main() {
       return;
     }
 
-    const [{ ComposioEmulator, PipedreamConnector, ThirdPartyConnectorEmulator }, { createApp }] =
-      await Promise.all([import("@rakazo/adapters"), import("../../../../apps/api/src/app.ts")]);
+    const [
+      { ComposioEmulator, EmailEmulator, PipedreamConnector, ThirdPartyConnectorEmulator },
+      { createApp },
+    ] = await Promise.all([import("@rakazo/adapters"), import("../../../../apps/api/src/app.ts")]);
     const { serve } = await import("@hono/node-server");
     const thirdParties = new ThirdPartyConnectorEmulator();
     const pipedream = new PipedreamConnector(
@@ -141,11 +144,13 @@ async function main() {
       },
       { fetch: thirdParties.fetch, resolveHostname: thirdParties.resolveHostname },
     );
+    const email = new EmailEmulator();
     const handles = await createApp({
       databaseUrl,
       prisma: undefined,
       composio: new ComposioEmulator(),
       pipedream,
+      email,
       remoteConnectors: {
         fetch: thirdParties.fetch,
         resolveHostname: thirdParties.resolveHostname,
@@ -155,6 +160,9 @@ async function main() {
     const requestWaiters = new Set<() => void>();
     const server = serve({
       fetch: async (request) => {
+        if (new URL(request.url).pathname === "/__e2e/emails") {
+          return Response.json(email.sent, { headers: { "cache-control": "no-store" } });
+        }
         activeRequests += 1;
         try {
           return await handles.app.fetch(request);
@@ -233,7 +241,7 @@ async function main() {
               {
                 operationId: "e2e-cleanup",
                 traceId: "e2e-cleanup",
-                workspaceId: computer.workspaceId,
+                spaceId: computer.spaceId,
                 userId: computer.userId,
                 signal: new AbortController().signal,
               },
@@ -264,7 +272,7 @@ async function managedComputers(handles: AppHandles) {
   if (!["e2b", "daytona", "box"].includes(sandboxProvider)) return [];
   return handles.prisma.computer.findMany({
     where: { providerRef: { not: null } },
-    select: { homeKey: true, kind: true, providerRef: true, userId: true, workspaceId: true },
+    select: { homeKey: true, kind: true, providerRef: true, userId: true, spaceId: true },
   });
 }
 

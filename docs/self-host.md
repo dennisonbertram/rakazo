@@ -9,32 +9,77 @@ Same as the README quick start: `.env` from `.env.example`, Postgres via Compose
 ## Published images (no checkout)
 
 Pull Postgres and `ghcr.io/elie222/rakazo/app` into any empty folder. No clone or image build.
-Requires Docker Engine and the Compose plugin.
+Requires Docker Engine, the Compose plugin, curl, and OpenSSL.
 
 ```bash
-mkdir rakazo && cd rakazo
-curl -fsSO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/docker-compose.images.yml
-curl -fsSO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/.env.images.example
-cp .env.images.example .env
+mkdir -p rakazo && cd rakazo &&
+curl -fsSLO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/install-images.sh &&
+bash install-images.sh
 ```
 
-Generate secrets and write them into `.env` (after `cp .env.images.example .env`):
+The installer downloads `docker-compose.images.yml` and `.env.images.example`, creates `.env` with
+random secrets, then pulls and starts the images. It preserves an existing `.env` when rerun. To
+customize the public URL, image tag, or optional providers before startup, run
+`bash install-images.sh --prepare-only`, edit `.env`, then run `bash install-images.sh`.
+Flags may be combined in either order: `--prepare-only`, `--local`.
+
+### Restricted networks / mirror downloads
+
+Stage B of the installer (Compose YAML and `.env.images.example`) downloads from
+`DOWNLOAD_BASE`. Override it with a generic HTTPS mirror of `infra/compose` — do not rely on
+vendor-specific CDN defaults:
 
 ```bash
-POSTGRES_PASSWORD=$(openssl rand -hex 16) &&
-BETTER_AUTH_SECRET=$(openssl rand -hex 32) &&
-ENCRYPTION_KEY=$(openssl rand -hex 32) &&
-SCREEN_PROXY_SECRET=$(openssl rand -hex 32) &&
-SANDBOX_SUPERVISOR_TOKEN=$(openssl rand -hex 32) &&
-: "${POSTGRES_PASSWORD:?}" "${BETTER_AUTH_SECRET:?}" "${ENCRYPTION_KEY:?}" "${SCREEN_PROXY_SECRET:?}" "${SANDBOX_SUPERVISOR_TOKEN:?}" &&
-sed -i.bak \
-  -e "s/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" \
-  -e "s/^BETTER_AUTH_SECRET=$/BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}/" \
-  -e "s/^ENCRYPTION_KEY=$/ENCRYPTION_KEY=${ENCRYPTION_KEY}/" \
-  -e "s/^SCREEN_PROXY_SECRET=$/SCREEN_PROXY_SECRET=${SCREEN_PROXY_SECRET}/" \
-  -e "s/^SANDBOX_SUPERVISOR_TOKEN=$/SANDBOX_SUPERVISOR_TOKEN=${SANDBOX_SUPERVISOR_TOKEN}/" \
-  .env && rm -f .env.bak
+export RAKAZO_DOWNLOAD_BASE=https://example.com/mirror/rakazo/infra/compose
+bash install-images.sh
 ```
+
+Trailing slashes on `RAKAZO_DOWNLOAD_BASE` are trimmed; non-HTTPS bases are rejected. Downloads
+use finite curl retries (`--retry 3 --retry-delay 2 --retry-all-errors` when supported).
+
+To reuse files already present in the working directory (skip curl when the target exists), set
+`RAKAZO_DOWNLOAD_SKIP_EXISTING=1` and/or pass `--local`:
+
+```bash
+# after placing docker-compose.images.yml and .env.images.example locally
+bash install-images.sh --local --prepare-only
+# or
+RAKAZO_DOWNLOAD_SKIP_EXISTING=1 bash install-images.sh --prepare-only
+```
+
+If skip mode is on and a required file is missing, the installer still downloads it (or fails with
+the URL in the error).
+
+Stage A (fetching `install-images.sh` itself) is separate. When raw GitHub is unreachable, point the
+bootstrap curl at your mirror of the installer script, for example:
+
+```bash
+export RAKAZO_INSTALLER_URL=https://example.com/mirror/rakazo/infra/compose/install-images.sh
+mkdir -p rakazo && cd rakazo &&
+curl -fsSLO "${RAKAZO_INSTALLER_URL}" &&
+bash install-images.sh
+```
+
+Stage C (`docker compose pull`) uses `RAKAZO_IMAGE`, `RAKAZO_IMAGE_TAG`,
+`RAKAZO_COMPUTER_IMAGE`, and `RAKAZO_COMPUTER_IMAGE_TAG` (defaults
+`ghcr.io/elie222/rakazo/{app,computer}`). When GHCR is unreachable, override those
+four in `.env` to a registry you control — keep app and computer on the same
+mirror. Do not rely on vendor-specific CDN defaults:
+
+```env
+RAKAZO_IMAGE=registry.example.com/mirror/elie222/rakazo/app
+RAKAZO_IMAGE_TAG=edge
+RAKAZO_COMPUTER_IMAGE=registry.example.com/mirror/elie222/rakazo/computer
+RAKAZO_COMPUTER_IMAGE_TAG=edge
+```
+
+After `--prepare-only`, edit `.env` then rerun `bash install-images.sh` (or
+`docker compose --env-file .env -f docker-compose.images.yml pull`). Arm64 tag
+pairing is unchanged — set both tags to the same published multi-arch release
+(see [Published images and tags](#published-images-and-tags)).
+
+`postgres:16` and `busybox:1` still pull from Docker Hub. Stage C does not cover
+them; configure the Docker daemon `registry-mirrors` or vendor those images.
 
 `SANDBOX_PROVIDER` defaults to `docker`. The images Compose file runs a sandbox supervisor
 (from the app image, on the internal network only) and pulls `ghcr.io/elie222/rakazo/computer`.
@@ -50,16 +95,25 @@ when one exists (see [Published images and tags](#published-images-and-tags)). C
 `RAKAZO_IMAGE_TAG` leaves the computer service on amd64-only `edge`. Do not assume `latest` is
 published.
 
-```bash
-docker compose --env-file .env -f docker-compose.images.yml pull
-docker compose --env-file .env -f docker-compose.images.yml up -d
-```
-
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173). The first registered user becomes the
 deployment owner. Put TLS in front of `:5173` for a public host and set the three public origins to
-that HTTPS URL. Open **Agent computer** on a bot, or send a message that uses the desktop, to see
-the local Docker computer. For automatic HTTPS via Caddy and remote E2B computers, use the
-production Compose path below.
+that HTTPS URL.
+
+Images Compose binds web to loopback (`127.0.0.1:5173`). Terminate TLS on the host and proxy
+there. Vite preview same-origin-proxies `/api` and `/rpc`, so do not expose `:3100`. Set
+`BETTER_AUTH_URL`, `WEB_ORIGIN`, and `API_URL` to that same HTTPS origin, and set
+`RAKAZO_HOST` to its hostname (for example, `app.example.com`).
+
+```Caddyfile
+app.example.com {
+	reverse_proxy 127.0.0.1:5173
+}
+```
+
+Open **Agent computer** on a bot, or send a message that uses the desktop, to see
+the local Docker computer. For in-stack Caddy plus remote E2B computers, use the
+[production Compose](#public-single-vm-deployment) path and `infra/compose/Caddyfile.prod`
+instead of this host proxy.
 
 ## Docker Compose (single machine)
 
@@ -92,6 +146,36 @@ API_URL=https://app.example.com
 ```
 
 Cookies and CORS follow those origins. `SIGNUPS_ENABLED` / `SIGNUP_ALLOWLIST` seed the initial deployment settings. After initialization, the deployment owner's Settings values are the effective signup policy.
+
+### Password recovery email
+
+Password changes for signed-in users require no email configuration. Forgotten-password recovery
+appears on sign-in only when a transactional email provider is available. Rakazo uses a
+provider-neutral contract and ships an SMTP adapter, so Amazon SES, Resend, and self-hosted SMTP
+servers use the same configuration:
+
+```env
+SMTP_URL=smtps://smtp-user:replace-with-password@smtp.example.com:465
+EMAIL_FROM=Rakazo <no-reply@example.com>
+```
+
+For Resend, use `smtp.resend.com`, username `resend`, and an API key as the password. For Amazon
+SES, use the regional SMTP endpoint and SES SMTP credentials; these are different from ordinary AWS
+access keys. Verify the sender/domain with the provider before testing delivery. Keep credentials in
+`.env`, never in tracked files. `smtps://` uses implicit TLS; `smtp://` is also supported but requires
+STARTTLS. Rakazo rejects configuration that disables TLS or certificate verification.
+
+Local source development can use the offline email emulator instead. It captures email without
+contacting a provider:
+
+```env
+EMAIL_EMULATOR=true
+```
+
+The emulator is forcibly disabled when `NODE_ENV=production` and requires the API to bind to a
+loopback host. In `NODE_ENV=development`, captured messages are available from
+`http://127.0.0.1:3100/api/dev/emails` with cache disabled; the API console logs only delivery
+metadata, never reset tokens. The inbox route is not registered in test, staging, or production.
 
 Optional:
 
@@ -307,6 +391,34 @@ image when possible; if that also fails, they report a possible mixed-version ru
 Source checkouts (not Compose) still upgrade the old way: pull, rebuild with
 `GIT_SHA=$(git rev-parse HEAD)`, run `pnpm --filter @rakazo/db migrate`, then restart API and worker.
 Product contracts stay compatible across cloud and self-hosted.
+
+### Space privacy-boundary migration
+
+Before upgrading across migration `20260830200000_space_scope_names_and_user_credentials`, check
+that every existing model and voice credential still belongs to a member of its Space. This query
+uses the pre-migration `workspaceId` column name and must return no rows:
+
+```sql
+SELECT 'model' AS credential_type, credential."id", credential."userId",
+       credential."workspaceId" AS "spaceId"
+FROM "user_model_credentials" AS credential
+LEFT JOIN "space_members" AS membership
+  ON membership."spaceId" = credential."workspaceId"
+ AND membership."userId" = credential."userId"
+WHERE membership."id" IS NULL
+UNION ALL
+SELECT 'voice', credential."id", credential."userId", credential."workspaceId"
+FROM "user_voice_credentials" AS credential
+LEFT JOIN "space_members" AS membership
+  ON membership."spaceId" = credential."workspaceId"
+ AND membership."userId" = credential."userId"
+WHERE membership."id" IS NULL;
+```
+
+The migration renames columns used by the API and worker and is therefore a coordinated cutover,
+not an online rolling migration. Stop the old API and worker, apply the migration, and start the new
+versions together. Its lock waits are bounded so contention fails the migration instead of leaving
+application traffic queued indefinitely.
 
 ### Published images and tags
 

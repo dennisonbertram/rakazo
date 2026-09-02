@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { WorkspaceMemoryConfig } from "@rakazo/contracts";
+import type { SpaceMemoryConfig } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import { useEffect, useState } from "react";
 import { rpc } from "../lib/rpc";
@@ -50,8 +50,8 @@ export function MemorySettingsOverlay({
   onConfigChange,
 }: {
   onClose: () => void;
-  config: WorkspaceMemoryConfig | null | undefined;
-  onConfigChange: (config: WorkspaceMemoryConfig | null) => void;
+  config: SpaceMemoryConfig | null | undefined;
+  onConfigChange: (config: SpaceMemoryConfig | null) => void;
 }) {
   const { t } = useLingui();
   const defaultRegistration = defaultMemoryProviderSettings();
@@ -135,7 +135,7 @@ export function MemorySettingsOverlay({
             </div>
             <p className="mt-1 text-[13.5px] text-[#7A7A80]">
               {registration?.description ?? (
-                <Trans>Manage the workspace semantic memory provider.</Trans>
+                <Trans>Manage the Space semantic memory provider.</Trans>
               )}
             </p>
           </div>
@@ -151,7 +151,7 @@ export function MemorySettingsOverlay({
         </div>
 
         <div className="rk-scroll min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
-          {error ? <p className="mb-4 text-sm text-[#C94244]">{error}</p> : null}
+          {error ? <p className="mb-4 text-sm text-[#EF4444]">{error}</p> : null}
 
           {config === undefined ? (
             <p className="text-sm text-[#85858A]">
@@ -214,7 +214,7 @@ export function MemorySettingsOverlay({
               <registration.SettingsForm busy={busy} onConnect={connect} />
             </>
           ) : (
-            <p className="text-sm text-[#C94244]">
+            <p className="text-sm text-[#EF4444]">
               <Trans>The selected memory provider is not available in this build.</Trans>
             </p>
           )}

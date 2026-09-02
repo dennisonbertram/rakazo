@@ -17,6 +17,9 @@ import { ShellPage } from "./pages/Shell";
 const AuthPage = lazy(() =>
   import("./pages/Auth").then((module) => ({ default: module.AuthPage })),
 );
+const PasswordResetPage = lazy(() =>
+  import("./pages/Auth").then((module) => ({ default: module.PasswordResetPage })),
+);
 const OnboardingPage = lazy(() =>
   import("./pages/Onboarding").then((module) => ({ default: module.OnboardingPage })),
 );
@@ -67,6 +70,13 @@ export function App() {
             path="/sign-up"
             element={user ? <Navigate to="/onboarding" replace /> : <AuthPage key="up" mode="up" />}
           />
+          <Route
+            path="/forgot-password"
+            element={
+              user ? <Navigate to="/app" replace /> : <AuthPage key="forgot" mode="forgot" />
+            }
+          />
+          <Route path="/reset-password" element={<PasswordResetPage />} />
           <Route
             path="/onboarding"
             element={user ? <OnboardingPage /> : <Navigate to="/sign-in" replace />}
@@ -168,7 +178,7 @@ function ShellSkeleton() {
       <main className="flex flex-1 flex-col">
         <div className="h-[74px] border-b border-[#141416]" />
         <div className="flex flex-1 items-center justify-center text-[14px] text-[#55555A]">
-          <Trans>Opening your workspace…</Trans>
+          <Trans>Opening your Space…</Trans>
         </div>
         <div className="mx-6 mb-6 h-[54px] rounded-full border border-[#202023] bg-[#131315]" />
       </main>

@@ -10,7 +10,7 @@ import {
 
 afterEach(() => vi.unstubAllGlobals());
 
-const ACTOR = { workspaceId: "w1", userId: "u1" };
+const ACTOR = { spaceId: "w1", userId: "u1" };
 
 function brokerWith(tokens: Record<string, unknown> | null) {
   const secretRow = tokens ? { id: "s1", ciphertext: "ct" } : null;

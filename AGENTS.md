@@ -7,6 +7,9 @@
 - Keep code simple: reuse existing primitives and one source of truth, remove duplication and unused flexibility, and avoid speculative abstractions. Add an interface when it protects a real external or platform boundary, not for its own sake.
 - Treat auth, secret handling, sandbox boundaries, host commands, and integrations as security-sensitive. Keep tests deterministic and offline by default.
 - After creating a pull request, stay with it until CI and automated review bots have finished. Poll checks, reviews, review threads, and PR comments at roughly 60-second intervals; passing checks alone do not mean the review is complete. Address every actionable issue, push the fixes, and repeat the review cycle until no actionable feedback remains. Do not merge while review bots are still pending or review issues remain unresolved.
+- PR descriptions say why the change exists, what changed, and how it was tested.
+- For UI changes, link the CI E2E screenshot that shows the change on the PR; add the web test that opens that screen if it is missing. For native-only mobile UI that CI cannot capture, say so in the PR instead of linking an unrelated web screenshot.
+
 ## Fork and Upstream Contribution Policy
 
 - The fork is the product-velocity lane. Continue product work on the fork even when an upstream PR is delayed, unreviewed, or conflicting.

@@ -29,7 +29,7 @@ test("bot creation, editing, and deletion persist", async ({ page }, testInfo) =
   await captureScreenshot(page, testInfo, "26a-new-bot-error");
   await page.unroute("**/rpc/bots/create");
   let failedPostCreateRefresh = false;
-  await page.route("**/rpc/botSections/list", async (route) => {
+  await page.route("**/rpc/spaces/list", async (route) => {
     if (failedPostCreateRefresh) {
       await route.fallback();
       return;
@@ -41,7 +41,7 @@ test("bot creation, editing, and deletion persist", async ({ page }, testInfo) =
 
   await expect(botList.getByRole("button", { name: /^Researcher/ })).toBeVisible();
   expect(failedPostCreateRefresh).toBe(true);
-  await page.unroute("**/rpc/botSections/list");
+  await page.unroute("**/rpc/spaces/list");
   await expect(page.getByPlaceholder("Message Researcher")).toBeVisible();
   await page.waitForURL(/\/app\/[^/]+$/);
   const deletedBotPath = new URL(page.url()).pathname;
@@ -73,7 +73,7 @@ test("bot creation, editing, and deletion persist", async ({ page }, testInfo) =
   await expect(teamComputer).toBeVisible();
   await expect(openWork).toBeVisible();
   await expect(modelSelect).toBeVisible();
-  await expect(modelSelect).toContainText("Workspace default");
+  await expect(modelSelect).toContainText("Space default");
   await captureScreenshot(page, testInfo, "27a-bot-settings-model");
   await page.getByRole("button", { name: "Show computer" }).click();
   const sidePanel = page.getByTestId("side-panel");
@@ -82,8 +82,15 @@ test("bot creation, editing, and deletion persist", async ({ page }, testInfo) =
   // Overlay may flash during boot or never appear (already ready/asleep/stopped). Assert panel
   // chrome, then wait until any overlay has cleared — avoid Locator.or() strict-mode multi-hits.
   const bootOverlay = page.getByText(/Booting up .* computer/);
-  await expect(sidePanel.getByRole("button", { name: "Take control" })).toBeVisible();
+  await expect(sidePanel.getByTestId("computer-preview")).toBeVisible();
   await expect(bootOverlay).toBeHidden();
+  await expect(sidePanel.getByText("Teach a task")).toHaveCount(0);
+  await expect(sidePanel.getByTestId("teach-start-button")).toHaveCount(0);
+  await expect(sidePanel.getByRole("button", { name: "Recover computer" })).toHaveCount(0);
+  await expect(sidePanel.getByRole("button", { name: "Reset computer" })).toHaveCount(0);
+  await expect(sidePanel.getByRole("button", { name: "Update computer" })).toHaveCount(0);
+  await expect(sidePanel.getByRole("button", { name: "Take control" })).toHaveCount(0);
+  await expect(sidePanel.getByTestId("computer-more-button")).toHaveCount(0);
   await captureScreenshot(page, testInfo, "27b-computer-panel");
   await page.getByRole("button", { name: "Show settings" }).click();
 

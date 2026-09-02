@@ -5,13 +5,16 @@ loadRootEnv();
 
 import {
   CalendarNative,
+  ChatSdkMessagingSurface,
   createBackgroundJobHandlers,
   createConnectorStack,
   createJobReconciler,
+  createMessagingContextLoader,
   createPostgresReconciliationLeadership,
   createRunExecutor,
   createRunSandbox,
   createRunSecretWriter,
+  createWebProvider,
   DriveNative,
   EncryptedSecretStore,
   ExpoPushProvider,
@@ -22,12 +25,15 @@ import {
   InMemoryJobQueue,
   InstalledConnectorProvider,
   isComposioEnabled,
+  isMessagingSurfaceEnabled,
   isPipedreamEnabled,
   LocalAgentHomeStore,
   LocalArtifactStore,
   McpConnector,
   McpOAuthBroker,
   MeetNative,
+  messagingEnvFromProcess,
+  messagingPlatformsFromEnv,
   PiAgentRuntime,
   PipedreamConnector,
   PostgresRealtimeFanout,
@@ -35,7 +41,7 @@ import {
   resolveDeploymentModel,
   resolveSandboxProvider,
   ScriptedAgentRuntime,
-  WorkspaceMemoryProviderResolver,
+  SpaceMemoryProviderResolver,
 } from "@rakazo/adapters";
 import { resolveEncryptionKey, resolveSupervisorToken } from "@rakazo/core";
 import { createDb, createThreadEvents } from "@rakazo/db";
@@ -106,6 +112,13 @@ async function main() {
   const pipedream = isPipedreamEnabled(pipedreamConfig)
     ? new PipedreamConnector(pipedreamConfig)
     : undefined;
+  const messagingPlatforms = messagingPlatformsFromEnv(messagingEnvFromProcess(process.env));
+  const messaging = isMessagingSurfaceEnabled(messagingPlatforms, {
+    deploymentModelKey,
+    openSignup: process.env.MESSAGING_OPEN_SIGNUP === "true",
+  })
+    ? new ChatSdkMessagingSurface(messagingPlatforms)
+    : undefined;
   const stack = createConnectorStack(isComposioEnabled(process.env.COMPOSIO_API_KEY), undefined, [
     new InstalledConnectorProvider(prisma, secrets),
     ...(pipedream ? [pipedream] : []),
@@ -113,7 +126,7 @@ async function main() {
   ]);
   const connector = stack.destination;
   await connector.start();
-  const memoryProviders = new WorkspaceMemoryProviderResolver(prisma, secrets);
+  const memoryProviders = new SpaceMemoryProviderResolver(prisma, secrets);
   const home = new LocalAgentHomeStore(dataDir);
   const artifacts = new LocalArtifactStore(dataDir);
   const inMemoryJobs = process.env.WAKEUP_DRIVER === "memory" ? new InMemoryJobQueue() : undefined;
@@ -139,6 +152,8 @@ async function main() {
     notifications: new ExpoPushProvider(dataDir),
     jobs,
     events,
+    messaging: messaging ? createMessagingContextLoader(prisma) : undefined,
+    web: createWebProvider(),
   });
 
   const jobHandlers = createBackgroundJobHandlers({
@@ -153,11 +168,13 @@ async function main() {
     secretStore: secrets,
     memoryProviders,
     deploymentModelKey,
+    messaging,
   });
   await jobHost.start(jobHandlers);
   const reconciler = createJobReconciler({
     prisma,
     jobs,
+    events,
     leadership: createPostgresReconciliationLeadership(pool),
   });
   reconciler.start();
