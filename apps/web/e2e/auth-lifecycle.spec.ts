@@ -32,7 +32,10 @@ test("logout protects bot deep links and sign-in restores the session", async ({
   await expect(page.getByRole("heading", { name: "Sign in to Rakazo" })).toBeVisible();
   await page.goto("/");
   await expect(page.getByText(/Your team of always-on agents/)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Sign in/ })).toBeVisible();
+  await page.getByRole("button", { name: /Sign up/ }).click();
+  await expect(page).toHaveURL(/\/sign-up$/);
+  await expect(page.getByRole("heading", { name: "Create your Rakazo" })).toBeVisible();
+  await page.goto("/");
   await captureScreenshot(page, testInfo, "37-logged-out-welcome");
 
   await page.goto(protectedBotPath);
@@ -125,7 +128,8 @@ test("changes and recovers an email password", async ({ page }, testInfo) => {
   await page.getByLabel("Email").fill(email);
   await expect(page.getByLabel("Email")).toHaveValue(email);
   await page.getByRole("button", { name: "Send reset link" }).click();
-  await expect(page.getByText("Check your email")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reset your password" })).not.toBeVisible();
   await captureScreenshot(page, testInfo, "42-password-reset-requested");
 
   const emailApi = process.env.API_URL ?? "http://127.0.0.1:3110";

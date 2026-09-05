@@ -30,7 +30,7 @@ export interface McpUrlPolicy {
 }
 
 export interface McpHeaderPolicy {
-  /** Headers are copied into requests only when named here. */
+  /** Additional SDK request headers allowed beyond defaults and configured headers. */
   allowedHeaders?: readonly string[];
   headers?: Record<string, string>;
 }
@@ -69,7 +69,14 @@ export interface McpClientOptions {
   capabilities?: ConstructorParameters<typeof Client>[1];
 }
 
-const DEFAULT_HEADERS = ["accept", "content-type", "authorization", "user-agent"];
+const DEFAULT_HEADERS = [
+  "accept",
+  "content-type",
+  "authorization",
+  "user-agent",
+  "mcp-session-id",
+  "mcp-protocol-version",
+];
 const DEFAULT_MAX_URL_LENGTH = 2_048;
 
 function validateUrl(raw: string | URL, policy: McpUrlPolicy = {}): URL {
@@ -98,14 +105,18 @@ export function secureFetch(
   network: RemoteTransportDependencies = {},
 ): SafeRemoteFetch {
   const allowed = new Set(
-    (headerPolicy.allowedHeaders ?? DEFAULT_HEADERS).map((h) => h.toLowerCase()),
+    [
+      ...DEFAULT_HEADERS,
+      ...(headerPolicy.allowedHeaders ?? []),
+      ...Object.keys(headerPolicy.headers ?? {}),
+    ].map((header) => header.toLowerCase()),
   );
-  // Operator-configured headers are always allowed toward their own origin; the
-  // allowedHeaders filter applies to SDK-supplied init headers only.
   const configured = Object.entries(headerPolicy.headers ?? {});
-  const configuredNames = new Set(
-    Object.keys(headerPolicy.headers ?? {}).map((name) => name.toLowerCase()),
+  const configuredValues = new Map(
+    configured.map(([name, value]) => [name.toLowerCase(), value] as const),
   );
+  const configuredCredentialValues = new Set(configuredValues.values());
+  const configuredNames = new Set(configuredValues.keys());
   const localCredentialHeaders = new Set([
     ...configuredNames,
     "authorization",
@@ -117,9 +128,19 @@ export function secureFetch(
     network.resolveHostname,
   );
   const request = async (input: Request | URL | string, init?: RequestInit): Promise<Response> => {
-    const source = input instanceof Request ? input : new Request(input, init);
+    const source = new Request(input, init);
     const url = validateUrl(source.url, urlPolicy);
-    const headers = new Headers(source.headers);
+    const headers = new Headers();
+    for (const [name, value] of source.headers) {
+      const normalized = name.toLowerCase();
+      if (!allowed.has(normalized)) continue;
+      if (
+        url.origin !== resourceUrl.origin &&
+        (normalized === "mcp-session-id" || configuredCredentialValues.has(value))
+      )
+        continue;
+      headers.set(name, value);
+    }
     const localHttp = url.protocol === "http:" && isLocalMcpHost(url.hostname);
     if (localHttp && urlPolicy.allowLocalHttpCredentials !== true) {
       for (const name of [...headers.keys()]) {
@@ -135,6 +156,8 @@ export function secureFetch(
       // they arrived through (requestInit merges included).
       for (const [name] of configured) headers.delete(name);
     }
+    // SDK authorization (including refreshed tokens) takes precedence over a
+    // configured static credential, after applying the same origin/value guard.
     for (const [name, value] of new Headers(init?.headers)) {
       if (
         localHttp &&
@@ -142,7 +165,13 @@ export function secureFetch(
         localCredentialHeaders.has(name.toLowerCase())
       )
         continue;
-      if (!sameOrigin && configuredNames.has(name.toLowerCase())) continue;
+      if (
+        !sameOrigin &&
+        (name.toLowerCase() === "mcp-session-id" ||
+          configuredNames.has(name.toLowerCase()) ||
+          configuredCredentialValues.has(value))
+      )
+        continue;
       if (allowed.has(name.toLowerCase())) headers.set(name, value);
     }
     // Buffer the body: a re-wrapped Request body is a stream without a replayable
