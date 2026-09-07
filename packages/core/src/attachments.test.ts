@@ -83,6 +83,10 @@ describe("attachment helpers", () => {
     expect(userTurnBlocksForRun("user", "run-fanout", messages, "message-old")).toEqual(
       messages[0]?.blocks,
     );
+    // A photo texted to the bot rides on a messaging-triggered run.
+    expect(userTurnBlocksForRun("messaging", "run-fanout", messages, "message-old")).toEqual(
+      messages[0]?.blocks,
+    );
   });
 
   it("selects pending attachments only for their originating bot", () => {

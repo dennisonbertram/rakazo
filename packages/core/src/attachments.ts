@@ -180,7 +180,9 @@ export function userTurnBlocksForRun(
   }>,
   sourceMessageId?: string | null,
 ): MessageBlock[] | undefined {
-  if (trigger !== "user") return undefined;
+  // Only triggers backed by a person's own message carry attachments;
+  // routines and wakeups must not re-attach a stale earlier upload.
+  if (trigger !== "user" && trigger !== "messaging") return undefined;
   return messages.find(
     (message) =>
       message.role === "user" &&
