@@ -67,7 +67,11 @@ export class LocalArtifactStore implements ArtifactStore {
  * image, so this keeps both sides on the database they already share.
  */
 export class PrismaArtifactStore implements ArtifactStore {
-  constructor(private readonly prisma: PrismaClient) {}
+  /** `fallback` serves artifacts stored on disk before the switch to Postgres. */
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly fallback?: ArtifactStore,
+  ) {}
 
   describe() {
     return {
@@ -91,23 +95,39 @@ export class PrismaArtifactStore implements ArtifactStore {
       where: { id },
       select: { spaceId: true, bytes: true },
     });
-    if (!row || row.spaceId !== context.spaceId) throw new Error(`Artifact ${id} not found`);
-    return new Uint8Array(row.bytes);
+    if (row) {
+      if (row.spaceId !== context.spaceId) throw new Error(`Artifact ${id} not found`);
+      return new Uint8Array(row.bytes);
+    }
+    if (this.fallback) return this.fallback.get(id, context);
+    throw new Error(`Artifact ${id} not found`);
   }
 
   async remove(id: string, context: AdapterContext) {
     await this.prisma.artifactBlob.deleteMany({ where: { id, spaceId: context.spaceId } });
+    await this.fallback?.remove(id, context);
   }
 }
 
-/** ARTIFACT_STORE=postgres shares artifacts across api and worker hosts; default is the local disk. */
+/**
+ * ARTIFACT_STORE selects where artifact bytes live: `local` (default, the
+ * data directory) or `postgres` (shared across api and worker hosts; disk
+ * artifacts from before the switch stay readable). Anything else is a
+ * misconfiguration and fails at startup rather than silently going local.
+ */
 export function createArtifactStore(
   kind: string | undefined,
   deps: { dataDir: string; prisma: PrismaClient },
 ): ArtifactStore {
-  return kind === "postgres"
-    ? new PrismaArtifactStore(deps.prisma)
-    : new LocalArtifactStore(deps.dataDir);
+  const local = new LocalArtifactStore(deps.dataDir);
+  switch (kind?.trim().toLowerCase() || "local") {
+    case "local":
+      return local;
+    case "postgres":
+      return new PrismaArtifactStore(deps.prisma, local);
+    default:
+      throw new Error(`Unsupported ARTIFACT_STORE: ${kind}`);
+  }
 }
 
 export class CapturingNotificationProvider implements NotificationProvider {

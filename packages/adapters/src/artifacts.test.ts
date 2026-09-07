@@ -91,9 +91,27 @@ describe("PrismaArtifactStore", () => {
     await expect(store.get(id, context)).rejects.toThrow(/not found/);
   });
 
-  it("selects the store by ARTIFACT_STORE", () => {
+  it("falls back to disk for artifacts stored before the switch", async () => {
+    const { store: postgres } = createStore();
+    const disk = {
+      get: vi.fn(async () => new Uint8Array([9])),
+      remove: vi.fn(async () => undefined),
+    };
+    const store = new PrismaArtifactStore(
+      (postgres as unknown as { prisma: unknown }).prisma as never,
+      disk as never,
+    );
+    expect(Array.from(await store.get("old-id", context))).toEqual([9]);
+    expect(disk.get).toHaveBeenCalledWith("old-id", context);
+    await store.remove("old-id", context);
+    expect(disk.remove).toHaveBeenCalledWith("old-id", context);
+  });
+
+  it("selects the store by ARTIFACT_STORE and rejects unknown values", () => {
     const deps = { dataDir: "/tmp/x", prisma: {} as never };
-    expect(createArtifactStore("postgres", deps).describe().id).toBe("postgres-artifacts");
+    expect(createArtifactStore(" Postgres ", deps).describe().id).toBe("postgres-artifacts");
     expect(createArtifactStore(undefined, deps).describe().id).toBe("local-artifacts");
+    expect(createArtifactStore("", deps).describe().id).toBe("local-artifacts");
+    expect(() => createArtifactStore("s3", deps)).toThrow(/Unsupported ARTIFACT_STORE/);
   });
 });
