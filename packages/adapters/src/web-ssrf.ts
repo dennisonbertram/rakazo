@@ -83,6 +83,15 @@ export async function fetchSafeWebText(
   url: string,
   options: SafeWebFetchOptions = {},
 ): Promise<{ url: string; body: string; contentType: string | null }> {
+  const { url: finalUrl, bytes, contentType } = await fetchSafeWebBytes(url, options);
+  return { url: finalUrl, body: new TextDecoder().decode(bytes), contentType };
+}
+
+/** Same pinned-DNS, capped, redirect-checked fetch, returning the raw body. */
+export async function fetchSafeWebBytes(
+  url: string,
+  options: SafeWebFetchOptions = {},
+): Promise<{ url: string; bytes: Uint8Array; contentType: string | null }> {
   const resolve = options.resolveHostname ?? defaultResolveHostname;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
@@ -140,7 +149,7 @@ async function followRedirects(
     signal: AbortSignal;
     redirectsRemaining: number;
   },
-): Promise<{ url: string; body: string; contentType: string | null }> {
+): Promise<{ url: string; bytes: Uint8Array; contentType: string | null }> {
   if (state.signal.aborted) {
     throw abortError(state.signal);
   }
@@ -171,11 +180,13 @@ async function followRedirects(
       await cancelResponseBody(response, state.signal);
       throw new Error("Redirect missing Location header");
     }
-    const next = new URL(location, validated.href).href;
+    const next = new URL(location, validated.href);
+    const headers = next.origin === validated.origin ? state.headers : undefined;
     // Release this hop before following — do not leave the body open across recursion.
     await cancelResponseBody(response, state.signal);
-    return followRedirects(next, {
+    return followRedirects(next.href, {
       ...state,
+      headers,
       redirectsRemaining: state.redirectsRemaining - 1,
     });
   }
@@ -195,7 +206,7 @@ async function followRedirects(
 
   return {
     url: validated.href,
-    body: new TextDecoder().decode(buffer),
+    bytes: buffer,
     contentType: response.headers.get("content-type"),
   };
 }
@@ -209,15 +220,13 @@ async function cancelResponseBody(response: Response, signal: AbortSignal): Prom
   ).catch(() => undefined);
 }
 
-/** Best-effort cancel that never waits past an already-fired deadline. */
-async function cancelReader(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  signal?: AbortSignal,
-): Promise<void> {
-  await withAbort(
-    reader.cancel().catch(() => undefined),
-    signal,
-  ).catch(() => undefined);
+/** Best-effort release; an untrusted stream cancellation must never delay the caller. */
+function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): void {
+  try {
+    void Promise.resolve(reader.cancel()).catch(() => undefined);
+  } catch {
+    // sync throw from an injected stream
+  }
 }
 
 /** Read the body as a stream and abort once maxBytes is exceeded (DoS guard). */
@@ -244,13 +253,12 @@ export async function readBodyCapped(
       if (!value?.byteLength) continue;
       total += value.byteLength;
       if (total > maxBytes) {
-        await cancelReader(reader, signal);
         throw new Error("Response is too large");
       }
       chunks.push(value);
     }
   } catch (error) {
-    await cancelReader(reader, signal);
+    cancelReader(reader);
     throw error;
   } finally {
     try {

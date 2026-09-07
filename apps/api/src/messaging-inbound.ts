@@ -1,7 +1,11 @@
-import type { JobPublisher, MessagingInboundMessage } from "@rakazo/adapter-kit";
+import type { ArtifactStore, JobPublisher, MessagingInboundMessage } from "@rakazo/adapter-kit";
 import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
-import { parseMessagingCommand, sanitizeMessagingLabel } from "@rakazo/core";
+import {
+  parseMessagingCommand,
+  promptTextForAttachments,
+  sanitizeMessagingLabel,
+} from "@rakazo/core";
 import type {
   MessagingIdentityRequest,
   Prisma,
@@ -15,6 +19,8 @@ import {
   normalizeMessagingLinkCode,
   redeemMessagingLinkCode,
 } from "@rakazo/db";
+import { getLogger } from "@rakazo/logging";
+import { ingestInboundMedia } from "./messaging-media.js";
 
 export interface MessagingInboundDeps {
   prisma: PrismaClient;
@@ -35,6 +41,11 @@ export interface MessagingInboundDeps {
    * Cosmetic only — callers must catch failures; groups never get it.
    */
   typing?: (threadId: string) => Promise<void>;
+  /**
+   * Stores inbound photos as artifacts so the model sees the image. Without
+   * it (or when ingestion fails) the media URL rides along as text.
+   */
+  artifacts?: ArtifactStore;
 }
 
 type IdentityRow = {
@@ -123,15 +134,38 @@ async function handleDirectEvent(
     );
   }
 
+  const clientNonce = `messaging:${event.provider}:${event.handle}`;
+  // Provider retries replay the same handle; sendUserMessage returns the
+  // original message then, so do not store a second copy of the photo.
+  const replayed =
+    deps.artifacts && event.mediaUrl
+      ? await deps.prisma.message.findUnique({
+          where: { threadId_clientNonce: { threadId: ids.threadId, clientNonce } },
+          select: { id: true },
+        })
+      : null;
+  const media =
+    deps.artifacts && event.mediaUrl && !replayed
+      ? await ingestInboundMedia(
+          { prisma: deps.prisma, artifacts: deps.artifacts },
+          { url: event.mediaUrl, spaceId: ids.spaceId, userId: ids.userId, botId: ids.botId },
+        ).catch((error) => {
+          getLogger().error("messaging inbound media ingest error", error);
+          return null;
+        })
+      : null;
+  const blocks: MessageBlock[] = media
+    ? [...(event.content ? [{ kind: "text" as const, text: event.content }] : []), media.block]
+    : [{ kind: "text", text }];
   const sent = await deps.events.sendUserMessage({
     spaceId: ids.spaceId,
     threadId: ids.threadId,
     botId: ids.botId,
     userId: ids.userId,
-    blocks: [{ kind: "text", text }],
-    prompt: text,
+    blocks,
+    prompt: media ? promptTextForAttachments(event.content, [media.artifact]) : text,
     trigger: "messaging",
-    clientNonce: `messaging:${event.provider}:${event.handle}`,
+    clientNonce,
   });
   if (sent.runId) {
     // Typing bubbles only make sense once a reply is actually coming. Fire
@@ -140,10 +174,10 @@ async function handleDirectEvent(
     // clear on their own after a short display window or when the reply
     // arrives, so long runs simply outlive them.
     void deps.typing?.(event.threadId).catch((error) => {
-      console.error("messaging typing indicator error", error);
+      getLogger().error("messaging typing indicator error", error);
     });
     await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
-      console.error("messaging inbound run enqueue error", error);
+      getLogger().error("messaging inbound run enqueue error", error);
     });
   }
 }
@@ -310,7 +344,7 @@ async function writeConfirmation(
 
 async function enqueueDeliverJob(deps: MessagingInboundDeps): Promise<void> {
   await deps.jobs.enqueue(messagingDeliverJob()).catch((error) => {
-    console.error("messaging confirmation enqueue error", error);
+    getLogger().error("messaging confirmation enqueue error", error);
   });
 }
 
@@ -328,7 +362,7 @@ async function enqueueConfirmation(
     skipDuplicates: true,
   });
   await deps.jobs.enqueue(messagingDeliverJob()).catch((error) => {
-    console.error("messaging confirmation enqueue error", error);
+    getLogger().error("messaging confirmation enqueue error", error);
   });
 }
 
@@ -423,7 +457,7 @@ async function handleChannelEvent(
       data: { introPostedAt: new Date() },
     });
     await deps.jobs.enqueue(messagingDeliverJob()).catch((error) => {
-      console.error("messaging intro enqueue error", error);
+      getLogger().error("messaging intro enqueue error", error);
     });
   }
 
@@ -472,7 +506,7 @@ async function handleChannelEvent(
     });
     if (sent.runId) {
       await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
-        console.error("messaging channel fan-out enqueue error", error);
+        getLogger().error("messaging channel fan-out enqueue error", error);
       });
     }
   }
@@ -515,7 +549,7 @@ async function inviteMember(
     await deps.events.notify(thread.id, note.seq).catch(() => undefined);
   }
   await deps.jobs.enqueue(messagingDeliverJob()).catch((error) => {
-    console.error("messaging invite enqueue error", error);
+    getLogger().error("messaging invite enqueue error", error);
   });
 }
 

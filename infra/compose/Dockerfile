@@ -1,5 +1,8 @@
 FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d4350ea9c3d9494a
 RUN corepack enable
+# heif-convert turns iPhone HEIC photos from messaging surfaces into JPEG.
+RUN apt-get update && apt-get install -y --no-install-recommends libheif-examples \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Normalize modes: a restrictive host umask (e.g. 077 on hardened hosts) would otherwise
 # leave the copied tree unreadable to USER node at runtime.

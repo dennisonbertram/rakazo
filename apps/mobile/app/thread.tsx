@@ -22,7 +22,6 @@ import {
   type SlashActionId,
   selectedAskActionLabel,
   serializeComposerPrompt,
-  toolActivityLabel,
   truncateSlashDescription,
   userVisibleMessages,
 } from "@rakazo/core";
@@ -76,6 +75,8 @@ import {
 import { mobileTokens } from "../lib/appearance";
 import { type MobileArtifactTarget, openMobileArtifact } from "../lib/artifact-open";
 import { confirmDeleteBot } from "../lib/bot-lifecycle";
+import { cancelFocusPrompt, focusPromptThreadActive } from "../lib/focus-prompt";
+import { t, useI18n } from "../lib/i18n";
 import { saveLastBotId } from "../lib/last-bot";
 import {
   dismissThreadNotifications,
@@ -86,7 +87,6 @@ import {
   hasVisibleMessagePresentation,
   isCenteredAgentEvent,
   messagePresentationSegments,
-  toolOwnerId,
 } from "../lib/message-presentation";
 import { native, useResolvedAppearance } from "../lib/native";
 import {
@@ -119,15 +119,27 @@ function formatApprovalAnswer(
   actions: AskAction[] | undefined,
   approval: boolean,
 ): string {
-  if (!answer) return "Answered";
+  if (!answer) return t("Answered");
   const selectedAction = actions?.find((action) => action.id === answer);
   const outcome = selectedAction?.outcome;
-  if (approval && outcome === "created") return "Created";
-  if (approval && outcome === "cancelled") return "Cancelled";
-  if (approval && answer === "allow") return "Allowed once";
-  if (approval && answer === "always") return "Always allowed";
-  if (approval && answer === "deny") return "Denied";
-  return `Answered: ${selectedAskActionLabel(answer, actions)}`;
+  if (approval && outcome === "created") return t("Created");
+  if (approval && outcome === "cancelled") return t("Cancelled");
+  if (approval && answer === "allow") return t("Allowed once");
+  if (approval && answer === "always") return t("Always allowed");
+  if (approval && answer === "deny") return t("Denied");
+  return t("Answered: {answer}", { answer: selectedAskActionLabel(answer, actions) });
+}
+
+function formatAttachmentSkip(item: { name: string; reason: string }): string {
+  const name = item.name === "camera" ? t("Camera") : item.name;
+  if (item.reason === "permission denied") return t("{name} (permission denied)", { name });
+  if (item.reason === "over 10 MiB") return t("{name} (over 10 MiB)", { name });
+  if (item.reason === "unsupported type") return t("{name} (unsupported type)", { name });
+  const maxMatch = /^max (\d+) attachments$/.exec(item.reason);
+  if (maxMatch) {
+    return t("{name} (max {count} attachments)", { name, count: maxMatch[1] ?? "" });
+  }
+  return `${name} (${item.reason})`;
 }
 
 function isWorkingStatus(status: string | undefined): boolean {
@@ -144,6 +156,7 @@ type NotificationRouteState = "loading" | "ready" | "failed";
 
 export default function ThreadRoute() {
   useResolvedAppearance();
+  const { t } = useI18n();
   const router = useRouter();
   const { spaceId } = useLocalSearchParams<{ spaceId?: string | string[] }>();
   const requestedSpaceId = typeof spaceId === "string" && spaceId ? spaceId : null;
@@ -187,7 +200,7 @@ export default function ThreadRoute() {
         <ActivityIndicator color="#ECECEE" />
       ) : (
         <Pressable accessibilityRole="button" onPress={() => router.replace("/")}>
-          <Text style={{ color: "#ECECEE", fontSize: 16 }}>Return to inbox</Text>
+          <Text style={{ color: "#ECECEE", fontSize: 16 }}>{t("Return to inbox")}</Text>
         </Pressable>
       )}
     </View>
@@ -195,6 +208,7 @@ export default function ThreadRoute() {
 }
 
 function Thread() {
+  const { t } = useI18n();
   const navigation = useNavigation();
   const router = useRouter();
   const headerHeight = useHeaderHeight();
@@ -331,10 +345,14 @@ function Thread() {
       : [];
   const slashActionOptions =
     slashQuery !== null && mentionQuery === null
-      ? SLASH_ACTIONS.filter(
-          (action) =>
-            !slashQueryNormalized || action.label.toLowerCase().includes(slashQueryNormalized),
-        )
+      ? SLASH_ACTIONS.filter((action) => {
+          if (!slashQueryNormalized) return true;
+          const label = t(action.label);
+          return (
+            action.label.toLowerCase().includes(slashQueryNormalized) ||
+            label.toLowerCase().includes(slashQueryNormalized)
+          );
+        })
       : [];
   const currentBot = botId ? mentionBots.find((bot) => bot.id === botId) : undefined;
   const notificationThreadId = snap?.threadId ?? currentBot?.threadId;
@@ -445,7 +463,7 @@ function Thread() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: name || "Thread",
+      title: name || t("Thread"),
       headerTitle: () => (
         <View
           style={{
@@ -465,14 +483,14 @@ function Thread() {
             />
           ) : null}
           <Text numberOfLines={1} style={{ color: "#ECECEE", fontSize: 18, fontWeight: "600" }}>
-            {name || "Thread"}
+            {name || t("Thread")}
           </Text>
         </View>
       ),
       headerRight: () =>
         inGroup ? (
           <Pressable
-            accessibilityLabel="Group settings"
+            accessibilityLabel={t("Group settings")}
             hitSlop={8}
             onPress={() =>
               router.push({
@@ -484,12 +502,12 @@ function Thread() {
             <NativeSymbol ios="gearshape" android="settings-outline" size={21} color="#ECECEE" />
           </Pressable>
         ) : (
-          <Pressable accessibilityLabel="Bot actions" hitSlop={8} onPress={showBotActions}>
+          <Pressable accessibilityLabel={t("Bot actions")} hitSlop={8} onPress={showBotActions}>
             <NativeSymbol ios="ellipsis" android="ellipsis-horizontal" size={21} color="#ECECEE" />
           </Pressable>
         ),
     });
-  }, [botId, currentBot, currentBotStatus, groupId, inGroup, name, navigation, router]);
+  }, [botId, currentBot, currentBotStatus, groupId, inGroup, name, navigation, router, t]);
 
   function leaveBot() {
     router.dismissAll();
@@ -509,26 +527,28 @@ function Thread() {
         );
       })
       .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Could not clear conversation"),
+        setError(err instanceof Error ? err.message : t("Could not clear conversation")),
       );
   }
 
   function showBotActions() {
     if (!botId) return;
-    const bot = { id: botId, name: name || "Bot" };
-    Alert.alert(bot.name, "Archive keeps everything and can be undone. Delete is permanent.", [
-      { text: "Cancel", style: "cancel" },
+    const bot = { id: botId, name: name || t("Bot") };
+    Alert.alert(bot.name, t("Archive keeps everything and can be undone. Delete is permanent."), [
+      { text: t("Cancel"), style: "cancel" },
       {
-        text: "Clear conversation",
+        text: t("Clear conversation"),
         style: "destructive",
         onPress: () => {
           Alert.alert(
-            "Clear conversation?",
-            "This removes every message and stops current work. The bot, computer, memory, and routines are kept.",
+            t("Clear conversation?"),
+            t(
+              "This removes every message and stops current work. The bot, computer, memory, and routines are kept.",
+            ),
             [
-              { text: "Cancel", style: "cancel" },
+              { text: t("Cancel"), style: "cancel" },
               {
-                text: "Clear",
+                text: t("Clear"),
                 style: "destructive",
                 onPress: clearConversation,
               },
@@ -537,19 +557,19 @@ function Thread() {
         },
       },
       {
-        text: "Archive",
+        text: t("Archive"),
         onPress: () =>
           void rpc("bots/archive", { botId })
             .then(leaveBot)
             .catch((error) =>
               Alert.alert(
-                "Could not archive bot",
-                error instanceof Error ? error.message : "Try again.",
+                t("Could not archive bot"),
+                error instanceof Error ? error.message : t("Try again."),
               ),
             ),
       },
       {
-        text: "Delete…",
+        text: t("Delete…"),
         style: "destructive",
         onPress: () => confirmDeleteBot(bot, leaveBot),
       },
@@ -637,7 +657,7 @@ function Thread() {
       setSnap((prev) => prependMobileMessagePage(prev, page));
     } catch (err) {
       loadingOlderContent.current = false;
-      setError(err instanceof Error ? err.message : "Could not load earlier messages");
+      setError(err instanceof Error ? err.message : t("Could not load earlier messages"));
     } finally {
       setLoadingOlder(false);
     }
@@ -671,10 +691,25 @@ function Thread() {
     void dismissThreadNotifications({ threadId: notificationThreadId }).catch(() => undefined);
   }, [botId, navigation, notificationThreadId]);
 
+  // Cancel delayed setup only when leaving this bot's thread (unmount or botId
+  // change). Blur alone is not leave — settings/computer push must keep the timer.
+  useEffect(() => {
+    if (!botId) return;
+    return () => {
+      cancelFocusPrompt(botId);
+    };
+  }, [botId]);
+
   // Covers returning from a pushed screen; the AppState listener covers returning from background.
   useFocusEffect(
     useCallback(() => {
-      if (botId) void saveLastBotId(botId).catch(() => undefined);
+      if (botId) {
+        focusPromptThreadActive(botId);
+        void saveLastBotId(botId).catch(() => undefined);
+      } else {
+        // Group thread focus: prior bot screen may stay mounted, so clear any delayed setup.
+        cancelFocusPrompt();
+      }
       if (AppState.currentState === "active" && notificationThreadId) {
         void setOpenNotificationThread({
           botId,
@@ -811,7 +846,7 @@ function Thread() {
     if ((!botId && !groupId) || !messageId) return;
     void applyMessageJump(groupId ? { groupId, messageId } : { botId: botId!, messageId }).catch(
       (err) => {
-        setError(err instanceof Error ? err.message : "Could not open message");
+        setError(err instanceof Error ? err.message : t("Could not open message"));
       },
     );
   }, [botId, groupId, messageId]);
@@ -905,6 +940,11 @@ function Thread() {
     const groupTarget = plan.rerouteGroupId ?? initialGroupTarget;
     const botTarget = reroutedToGroup ? undefined : initialBotTarget;
     const trimmed = plan.trimmed;
+    const dropDelayedSetup = () => {
+      // Only after successful engagement so a failed upload/send keeps the setup card.
+      // Covers group-mention reroute while the bot thread stays mounted underneath.
+      if (initialBotTarget) cancelFocusPrompt(initialBotTarget);
+    };
     setSending(true);
     setError(null);
     try {
@@ -932,13 +972,14 @@ function Thread() {
         setAttachmentNotice(null);
       };
       if (!plan.shouldSend) {
+        dropDelayedSetup();
         clearOriginComposer();
         if (reroutedToGroup && groupTarget) {
           router.push({
             pathname: "/group-thread",
             params: {
               groupId: groupTarget,
-              name: plan.rerouteGroupName ?? "Group",
+              name: plan.rerouteGroupName ?? t("Group"),
             },
           });
           return;
@@ -979,6 +1020,7 @@ function Thread() {
               replyToMessageId: replyTarget?.id,
             },
       );
+      dropDelayedSetup();
       void loadSessionToken()
         .then((token) => resumeLiveNotifications(currentApiBase(), token, selectedSpaceId() ?? ""))
         .catch(() => undefined);
@@ -988,7 +1030,7 @@ function Thread() {
           pathname: "/group-thread",
           params: {
             groupId: groupTarget,
-            name: plan.rerouteGroupName ?? "Group",
+            name: plan.rerouteGroupName ?? t("Group"),
           },
         });
         return;
@@ -998,9 +1040,9 @@ function Thread() {
       }
     } catch (err) {
       if (reroutedToGroup && groupTarget) {
-        setError(err instanceof Error ? err.message : "Failed to send message");
+        setError(err instanceof Error ? err.message : t("Failed to send message"));
       } else if (isCurrentTarget(botTarget, groupTarget)) {
-        setError(err instanceof Error ? err.message : "Failed to send message");
+        setError(err instanceof Error ? err.message : t("Failed to send message"));
       }
     } finally {
       setSending(false);
@@ -1020,7 +1062,7 @@ function Thread() {
       );
     } catch (err) {
       if (isCurrentTarget(targetBotId, targetGroupId)) {
-        setError(err instanceof Error ? err.message : "Failed to stop work");
+        setError(err instanceof Error ? err.message : t("Failed to stop work"));
       }
       setSending(false);
       return;
@@ -1029,8 +1071,8 @@ function Thread() {
       await refresh();
     } catch (err) {
       if (isCurrentTarget(targetBotId, targetGroupId)) {
-        const detail = err instanceof Error ? err.message : "Failed to refresh";
-        setError(`Work stopped, but the thread could not refresh: ${detail}`);
+        const detail = err instanceof Error ? err.message : t("Failed to refresh");
+        setError(t("Work stopped, but the thread could not refresh: {detail}", { detail }));
       }
     } finally {
       setSending(false);
@@ -1062,20 +1104,21 @@ function Thread() {
   const speak = useCallback(
     (message: MobileMessage) =>
       void speakMessage(message.botId ?? botId ?? snap?.members?.[0]?.botId ?? "", message).catch(
-        (err) => Alert.alert("Could not speak", err instanceof Error ? err.message : "Try again."),
+        (err) =>
+          Alert.alert(t("Could not speak"), err instanceof Error ? err.message : t("Try again.")),
       ),
     [botId, snap?.members],
   );
 
   function showAttachMenu() {
-    Alert.alert("Attach", undefined, [
+    Alert.alert(t("Attach"), undefined, [
       {
-        text: "Photo library",
+        text: t("Photo library"),
         onPress: () => void addAttachments(pickFromLibrary),
       },
-      { text: "Camera", onPress: () => void addAttachments(takePhoto) },
-      { text: "File", onPress: () => void addAttachments(pickDocuments) },
-      { text: "Cancel", style: "cancel" },
+      { text: t("Camera"), onPress: () => void addAttachments(takePhoto) },
+      { text: t("File"), onPress: () => void addAttachments(pickDocuments) },
+      { text: t("Cancel"), style: "cancel" },
     ]);
   }
 
@@ -1100,7 +1143,9 @@ function Thread() {
     }
     setAttachmentNotice(
       result.skipped.length
-        ? `Skipped ${result.skipped.map((item) => `${item.name} (${item.reason})`).join(", ")}`
+        ? t("Skipped {items}", {
+            items: result.skipped.map((item) => formatAttachmentSkip(item)).join(", "),
+          })
         : null,
     );
   }
@@ -1147,17 +1192,15 @@ function Thread() {
       });
     } catch (err) {
       if (!isCurrentTarget(targetBotId, targetGroupId)) return;
-      setError(err instanceof Error ? err.message : "Could not update reaction");
+      setError(err instanceof Error ? err.message : t("Could not update reaction"));
     }
   }
 
   function renderMessageRow(message: MobileMessage, options?: { enableJump?: boolean }) {
-    const ownerId = toolOwnerId(message, inGroup);
     const activityBotId =
-      ownerId ??
-      (!inGroup && message.role === "bot" && message.id.startsWith("progress:")
+      !inGroup && message.role === "bot" && message.id.startsWith("progress:")
         ? (message.botId ?? botId)
-        : undefined);
+        : undefined;
     const activityBot = activityBotId
       ? (snap?.members?.find((member) => member.botId === activityBotId) ??
         (currentBot?.id === activityBotId ? currentBot : undefined))
@@ -1222,12 +1265,12 @@ function Thread() {
               marginBottom: 4,
             }}
           >
-            <Pressable accessibilityLabel="Reply" onPress={() => setReplyTarget(message)}>
-              <Text style={{ color: "#6C6C70", fontSize: 12 }}>Reply</Text>
+            <Pressable accessibilityLabel={t("Reply")} onPress={() => setReplyTarget(message)}>
+              <Text style={{ color: "#6C6C70", fontSize: 12 }}>{t("Reply")}</Text>
             </Pressable>
             {canReactToThreadMessage(message) ? (
               <Pressable
-                accessibilityLabel={message.thumbsUp ? "Remove thumbs-up" : "Add thumbs-up"}
+                accessibilityLabel={message.thumbsUp ? t("Remove thumbs-up") : t("Add thumbs-up")}
                 accessibilityState={{ selected: Boolean(message.thumbsUp) }}
                 onPress={() => void reactToMessage(message)}
               >
@@ -1275,7 +1318,9 @@ function Thread() {
           size={28}
           status={currentBotStatus}
         />
-        <Text style={{ color: "#85858A", fontSize: 13.5 }}>{currentBot.name} is working</Text>
+        <Text style={{ color: "#85858A", fontSize: 13.5 }}>
+          {t("{name} is working", { name: currentBot.name })}
+        </Text>
       </View>
     ) : inGroup && workingGroupBots.length > 0 ? (
       <View
@@ -1302,8 +1347,8 @@ function Thread() {
         </View>
         <Text style={{ color: "#85858A", fontSize: 13.5, flexShrink: 1 }}>
           {workingGroupBots.length === 1
-            ? `${workingGroupBots[0]?.name ?? "Agent"} is working`
-            : `${workingGroupBots.length} agents working`}
+            ? t("{name} is working", { name: workingGroupBots[0]?.name ?? t("Agent") })
+            : t("{count} agents working", { count: workingGroupBots.length })}
         </Text>
       </View>
     ) : null;
@@ -1320,7 +1365,7 @@ function Thread() {
         }}
       >
         <Text style={{ color: "#85858A", fontSize: 13 }}>
-          {loadingOlder ? "Loading…" : "Load earlier messages"}
+          {loadingOlder ? t("Loading…") : t("Load earlier messages")}
         </Text>
       </Pressable>
     ) : null;
@@ -1393,7 +1438,7 @@ function Thread() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              threadScrollState.unread ? "Jump to latest, new messages" : "Jump to latest"
+              threadScrollState.unread ? t("Jump to latest, new messages") : t("Jump to latest")
             }
             onPress={() => {
               performScroll(scrollBehavior.current.jumpToLatest());
@@ -1418,7 +1463,7 @@ function Thread() {
               ios="arrow.down"
               android="arrow-down"
               size={18}
-              color={mobileTokens().ink}
+              color={mobileTokens().foreground}
             />
             {threadScrollState.unread ? (
               <View
@@ -1453,12 +1498,12 @@ function Thread() {
             }}
           >
             <View style={{ flex: 1 }}>
-              <Text style={{ color: "#85858A", fontSize: 12 }}>Replying to</Text>
+              <Text style={{ color: "#85858A", fontSize: 12 }}>{t("Replying to")}</Text>
               <Text style={{ color: "#C9C9CE", fontSize: 13 }} numberOfLines={1}>
                 {previewMessageText(replyTarget)}
               </Text>
             </View>
-            <Pressable accessibilityLabel="Cancel reply" onPress={() => setReplyTarget(null)}>
+            <Pressable accessibilityLabel={t("Cancel reply")} onPress={() => setReplyTarget(null)}>
               <Text style={{ color: "#85858A" }}>✕</Text>
             </Pressable>
           </View>
@@ -1502,7 +1547,7 @@ function Thread() {
                   {attachment.name}
                 </Text>
                 <Pressable
-                  accessibilityLabel={`Remove ${attachment.name}`}
+                  accessibilityLabel={t("Remove {name}", { name: attachment.name })}
                   onPress={() =>
                     setPendingAttachments((current) =>
                       current.filter((item) => item.id !== attachment.id),
@@ -1530,7 +1575,7 @@ function Thread() {
             {mentionOptions.map((mention) => (
               <Pressable
                 key={mentionChipKey(mention)}
-                accessibilityLabel={`@${mention.name}`}
+                accessibilityLabel={t("@{name}", { name: mention.name })}
                 onPress={() => insertMention(mention)}
                 style={{
                   flexDirection: "row",
@@ -1575,7 +1620,7 @@ function Thread() {
             {slashSkillOptions.map((skill) => (
               <Pressable
                 key={skill.id}
-                accessibilityLabel={`Skill ${skill.name}`}
+                accessibilityLabel={t("Skill {name}", { name: skill.name })}
                 onPress={() => insertSkill(skill)}
                 style={{
                   flexDirection: "row",
@@ -1600,7 +1645,7 @@ function Thread() {
             {slashActionOptions.map((action) => (
               <Pressable
                 key={action.id}
-                accessibilityLabel={action.label}
+                accessibilityLabel={t(action.label)}
                 onPress={() => runSlashAction(action.id)}
                 style={{
                   flexDirection: "row",
@@ -1616,7 +1661,7 @@ function Thread() {
                   size={16}
                   color="#9A9AA0"
                 />
-                <Text style={{ color: "#ECECEE", fontSize: 14 }}>{action.label}</Text>
+                <Text style={{ color: "#ECECEE", fontSize: 14 }}>{t(action.label)}</Text>
               </Pressable>
             ))}
           </View>
@@ -1630,7 +1675,7 @@ function Thread() {
           }}
         >
           <Pressable
-            accessibilityLabel="Attach file"
+            accessibilityLabel={t("Attach file")}
             onPress={showAttachMenu}
             style={{
               width: 44,
@@ -1677,7 +1722,7 @@ function Thread() {
                   {selectedSkill.name}
                 </Text>
                 <Pressable
-                  accessibilityLabel={`Remove skill ${selectedSkill.name}`}
+                  accessibilityLabel={t("Remove skill {name}", { name: selectedSkill.name })}
                   hitSlop={8}
                   onPress={() => setSelectedSkill(null)}
                 >
@@ -1705,7 +1750,7 @@ function Thread() {
                   {mention.name}
                 </Text>
                 <Pressable
-                  accessibilityLabel={`Remove mention ${mention.name}`}
+                  accessibilityLabel={t("Remove mention {name}", { name: mention.name })}
                   hitSlop={8}
                   onPress={() =>
                     setSelectedMentions((current) =>
@@ -1722,7 +1767,7 @@ function Thread() {
             <TextInput
               value={draft}
               onChangeText={updateDraft}
-              accessibilityLabel={name ? `Message ${name}` : "Message"}
+              accessibilityLabel={name ? t("Message {name}", { name }) : t("Message")}
               onKeyPress={(event) => {
                 if (
                   event.nativeEvent.key === "Backspace" &&
@@ -1736,8 +1781,8 @@ function Thread() {
                 selectedSkill || selectedMentions.length
                   ? undefined
                   : name
-                    ? `Message ${name}`
-                    : "Message…"
+                    ? t("Message {name}", { name })
+                    : t("Message…")
               }
               placeholderTextColor="#6C6C70"
               keyboardAppearance="dark"
@@ -1756,7 +1801,7 @@ function Thread() {
             />
           </View>
           <Pressable
-            accessibilityLabel="Send"
+            accessibilityLabel={t("Send")}
             disabled={sending || !canSend}
             onPress={() => void send()}
             style={{
@@ -1773,7 +1818,7 @@ function Thread() {
           </Pressable>
           {working ? (
             <Pressable
-              accessibilityLabel="Stop"
+              accessibilityLabel={t("Stop")}
               disabled={sending}
               onPress={() => void stop()}
               style={{
@@ -1795,12 +1840,12 @@ function Thread() {
           <Link
             href={{
               pathname: "/computer",
-              params: { botId: botId ?? "", name: name ?? "Bot" },
+              params: { botId: botId ?? "", name: name ?? t("Bot") },
             }}
             asChild
           >
             <Pressable style={{ marginTop: 16 }}>
-              <Text style={{ color: "#C9C9CE" }}>Open computer →</Text>
+              <Text style={{ color: "#C9C9CE" }}>{t("Open computer →")}</Text>
             </Pressable>
           </Link>
         ) : null}
@@ -1930,9 +1975,9 @@ function previewMessageText(message: MobileMessage): string {
     .trim();
   if (text) return text;
   if (message.blocks.some((block) => block.kind === "image" || block.kind === "file")) {
-    return "Attachment";
+    return t("Attachment");
   }
-  return "Message";
+  return t("Message");
 }
 
 function memberName(
@@ -1947,7 +1992,7 @@ async function speakMessage(botId: string, message: MobileMessage) {
   const text = blockText(message);
   if (!text.trim()) return;
   if (!(await speakText(text, { botId }))) {
-    throw new Error("Add a voice provider in Voice settings.");
+    throw new Error(t("Add a voice provider in Voice settings."));
   }
 }
 
@@ -1978,6 +2023,7 @@ const MessageBubble = memo(function MessageBubble({
   onPreviewMarkdown: (target: MarkdownArtifactPreviewTarget) => void;
   onSpeak?: (message: MobileMessage) => void;
 }) {
+  const { t } = useI18n();
   const [peerExpanded, setPeerExpanded] = useState(false);
   const artifactTarget: MobileArtifactTarget = groupId ? { groupId } : { botId };
   const cardBotId = message.botId ?? botId;
@@ -2005,11 +2051,11 @@ const MessageBubble = memo(function MessageBubble({
   }
   const handoff = message.blocks.find((block) => block.kind === "handoff");
   if (handoff) {
-    const from = memberName(members, handoff.fromBotId) ?? "bot";
-    const to = memberName(members, handoff.toBotId) ?? "bot";
+    const from = memberName(members, handoff.fromBotId) ?? t("bot");
+    const to = memberName(members, handoff.toBotId) ?? t("bot");
     return (
       <AgentEventLabel
-        label={`${from} messaged ${to}`}
+        label={t("{from} messaged {to}", { from, to })}
         detail={handoff.text}
         expanded={peerExpanded}
         onToggle={() => setPeerExpanded((expanded) => !expanded)}
@@ -2026,7 +2072,9 @@ const MessageBubble = memo(function MessageBubble({
     const sent = peerMessage.kind === "bot_message_sent";
     const peer = sent ? peerMessage.toBotName : peerMessage.fromBotName;
     const peerBotId = sent ? peerMessage.toBotId : peerMessage.fromBotId;
-    const label = sent ? `Messaged ${peer}` : `Message from ${peer}`;
+    const label = sent
+      ? t("Messaged {peer}", { peer: peer ?? t("Bot") })
+      : t("Message from {peer}", { peer: peer ?? t("Bot") });
     const peerColor =
       bots.find((bot) => bot.id === peerBotId)?.color ??
       members?.find((member) => member.botId === peerBotId)?.color ??
@@ -2093,7 +2141,7 @@ const MessageBubble = memo(function MessageBubble({
           }}
         >
           <Text style={{ color: "#ECECEE", fontSize: 15, fontWeight: "600" }}>
-            {special.name || "subagent"}
+            {special.name || t("subagent")}
           </Text>
           <Text
             style={{
@@ -2101,7 +2149,13 @@ const MessageBubble = memo(function MessageBubble({
               fontSize: 13,
             }}
           >
-            {running ? "subagent" : special.status}
+            {running
+              ? t("Running")
+              : special.status === "failed"
+                ? t("Failed")
+                : special.status === "completed"
+                  ? t("Completed")
+                  : special.status}
           </Text>
         </View>
         {special.task ? (
@@ -2122,7 +2176,7 @@ const MessageBubble = memo(function MessageBubble({
     return (
       <Pressable
         disabled={removed}
-        onPress={() => onOpenBot(special.botId ?? "", special.name ?? "Bot")}
+        onPress={() => onOpenBot(special.botId ?? "", special.name ?? t("Bot"))}
         style={{
           width: "90%",
           borderRadius: 18,
@@ -2142,14 +2196,14 @@ const MessageBubble = memo(function MessageBubble({
           }}
         >
           <Text style={{ color: "#ECECEE", fontSize: 15, fontWeight: "600" }}>
-            {special.name || "Bot"}
+            {special.name || t("Bot")}
           </Text>
           <Text style={{ color: removed ? "#EF4444" : "#4ECB71", fontSize: 13 }}>
             {special.status === "archived"
-              ? "archived"
+              ? t("archived")
               : special.status === "deleted"
-                ? "deleted"
-                : "bot"}
+                ? t("deleted")
+                : t("bot")}
           </Text>
         </View>
         <Text
@@ -2162,9 +2216,9 @@ const MessageBubble = memo(function MessageBubble({
         >
           {removed
             ? special.status === "archived"
-              ? "Archived. Chat, memory, and files kept."
-              : "Removed with chat, computer, and memory."
-            : special.title || "Opened its thread."}
+              ? t("Archived. Chat, memory, and files kept.")
+              : t("Removed with chat, computer, and memory.")
+            : special.title || t("Opened its thread.")}
         </Text>
       </Pressable>
     );
@@ -2235,7 +2289,7 @@ const MessageBubble = memo(function MessageBubble({
             />
           ) : (
             <Text style={{ color: "#85858A", marginTop: 12, fontSize: 13.5 }}>
-              No longer active
+              {t("No longer active")}
             </Text>
           )}
         </View>
@@ -2299,12 +2353,12 @@ const MessageBubble = memo(function MessageBubble({
                   ? void openMobileArtifact(
                       artifactTarget,
                       attachment.artifactId,
-                      attachment.name ?? "Image",
+                      attachment.name ?? t("Image"),
                       attachment.mimeType ?? "image/png",
                     ).catch((err) =>
                       Alert.alert(
-                        "Could not open image",
-                        err instanceof Error ? err.message : "Try again.",
+                        t("Could not open image"),
+                        err instanceof Error ? err.message : t("Try again."),
                       ),
                     )
                   : undefined
@@ -2316,7 +2370,7 @@ const MessageBubble = memo(function MessageBubble({
                   fontSize: 15,
                 }}
               >
-                🖼 {attachment.name ?? "Image"}
+                🖼 {attachment.name ?? t("Image")}
               </Text>
             </Pressable>
           ) : (
@@ -2327,18 +2381,18 @@ const MessageBubble = memo(function MessageBubble({
                   ? attachment.mimeType === "text/markdown"
                     ? onPreviewMarkdown({
                         artifactId: attachment.artifactId,
-                        name: attachment.name ?? "Markdown file",
+                        name: attachment.name ?? t("Markdown file"),
                         mimeType: attachment.mimeType,
                       })
                     : void openMobileArtifact(
                         artifactTarget,
                         attachment.artifactId,
-                        attachment.name ?? "File",
+                        attachment.name ?? t("File"),
                         attachment.mimeType ?? "text/plain",
                       ).catch((err) =>
                         Alert.alert(
-                          "Could not open file",
-                          err instanceof Error ? err.message : "Try again.",
+                          t("Could not open file"),
+                          err instanceof Error ? err.message : t("Try again."),
                         ),
                       )
                   : undefined
@@ -2350,7 +2404,7 @@ const MessageBubble = memo(function MessageBubble({
                   fontSize: 15,
                 }}
               >
-                📎 {attachment.name ?? "File"}
+                📎 {attachment.name ?? t("File")}
               </Text>
               {attachment.size ? (
                 <Text style={{ color: "#85858A", marginTop: 4, fontSize: 13 }}>
@@ -2376,23 +2430,15 @@ const MessageBubble = memo(function MessageBubble({
   );
   return (
     <View style={{ gap: 8, width: "100%" }}>
-      {segments.map((segment, index) =>
-        segment.kind === "tool" ? (
-          <ExpandableToolBlock
-            key={`${message.id}-${message.id.startsWith("progress:") ? "working" : "actions"}-${index}`}
-            block={segment.block}
-            live={message.id.startsWith("progress:")}
-          />
-        ) : (
-          <MessageTextCard
-            key={`${message.id}-content-${index}`}
-            message={{ ...message, blocks: segment.blocks }}
-            speaker={index === firstContent ? speaker : undefined}
-            replyPreview={index === firstContent ? replyPreview : undefined}
-            onSpeak={index === lastContent && onSpeak ? () => onSpeak(message) : undefined}
-          />
-        ),
-      )}
+      {segments.map((segment, index) => (
+        <MessageTextCard
+          key={`${message.id}-content-${index}`}
+          message={{ ...message, blocks: segment.blocks }}
+          speaker={index === firstContent ? speaker : undefined}
+          replyPreview={index === firstContent ? replyPreview : undefined}
+          onSpeak={index === lastContent && onSpeak ? () => onSpeak(message) : undefined}
+        />
+      ))}
       {appConnectBlocks.map((block, index) => (
         <AppConnectCard key={`${block.provider}-${index}`} botId={cardBotId} block={block} />
       ))}
@@ -2411,6 +2457,7 @@ function MessageTextCard({
   replyPreview?: MobileMessage;
   onSpeak?: () => void;
 }) {
+  const { t } = useI18n();
   const contentText = blockText(message);
   if (!contentText) return null;
   return (
@@ -2442,12 +2489,12 @@ function MessageTextCard({
           {onSpeak ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Speak message"
+              accessibilityLabel={t("Speak message")}
               onPress={onSpeak}
               hitSlop={8}
               style={{ marginTop: 8 }}
             >
-              <Text style={{ color: "#85858A", fontSize: 13 }}>Speak</Text>
+              <Text style={{ color: "#85858A", fontSize: 13 }}>{t("Speak")}</Text>
             </Pressable>
           ) : null}
         </>
@@ -2467,11 +2514,12 @@ function AgentEventLabel({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <Pressable
       onPress={onToggle}
       accessibilityRole="button"
-      accessibilityLabel={`${expanded ? "Hide" : "Show"} ${label}`}
+      accessibilityLabel={expanded ? t("Hide {label}", { label }) : t("Show {label}", { label })}
       style={{ width: "100%", paddingVertical: 4, alignItems: "center" }}
     >
       <Text style={{ color: "#85858A", fontSize: 13.5, textAlign: "center" }}>↔ {label}</Text>
@@ -2495,77 +2543,6 @@ function AgentEventLabel({
   );
 }
 
-function ExpandableToolBlock({
-  block,
-  live,
-}: {
-  block: Extract<MessageBlock, { kind: "progress" | "steps" }>;
-  live: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const provider =
-    block.kind === "progress" ? /^Using\s+([^:]+)/i.exec(block.text)?.[1] : undefined;
-  const tools =
-    block.kind === "steps"
-      ? block.steps.map((step) => `${step.label}${step.count > 1 ? ` ×${step.count}` : ""}`)
-      : [
-          ...(provider && block.text.includes(":")
-            ? [block.text.split(":").slice(1).join(":").trim()]
-            : []),
-          ...(block.pendingToolNames ?? []),
-        ].filter(Boolean);
-  const title = toolActivityLabel(block.kind === "steps" ? block.durationMs : undefined, live);
-
-  return (
-    <View
-      style={{
-        alignSelf: "flex-start",
-        maxWidth: "100%",
-      }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${expanded ? "Hide" : "Show"} ${title}`}
-        accessibilityState={{ expanded }}
-        hitSlop={10}
-        onPress={() => setExpanded((current) => !current)}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 5,
-          paddingVertical: 2,
-        }}
-      >
-        <Text style={{ color: live ? "#C9C9CE" : "#85858A", fontSize: 12.5, fontWeight: "600" }}>
-          {title}
-        </Text>
-        <Text style={{ color: "#6C6C70", fontSize: 12 }}>{expanded ? "⌃" : "⌄"}</Text>
-      </Pressable>
-      {expanded ? (
-        <View
-          style={{
-            marginTop: 4,
-            gap: 3,
-          }}
-        >
-          {tools.map((tool) => (
-            <Text
-              key={tool}
-              style={{
-                color: "#77777D",
-                fontSize: 11.5,
-                fontFamily: "monospace",
-              }}
-            >
-              {tool.split("__").at(-1)?.replaceAll("_", " ")}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 function AskBlock({
   ask,
   canAnswer,
@@ -2575,6 +2552,7 @@ function AskBlock({
   canAnswer: boolean;
   onAnswer: (answer: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -2590,7 +2568,7 @@ function AskBlock({
     try {
       await onAnswer(submitValue);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not send answer");
+      setError(cause instanceof Error ? cause.message : t("Could not send answer"));
     } finally {
       setSubmitting(false);
     }
@@ -2613,15 +2591,17 @@ function AskBlock({
       {ask.detail ? <Text style={{ color: "#85858A", fontSize: 13.5 }}>{ask.detail}</Text> : null}
       {answered ? (
         <Text style={{ color: "#4ECB71", fontSize: 14 }}>
-          {secretInput ? "Submitted" : `Answered: ${ask.answer ?? "Done"}`}
+          {secretInput
+            ? t("Submitted")
+            : t("Answered: {answer}", { answer: ask.answer ?? t("Done") })}
         </Text>
       ) : canAnswer ? (
         <>
           <TextInput
-            accessibilityLabel={secretInput ? "Code" : "Answer"}
+            accessibilityLabel={secretInput ? t("Code") : t("Answer")}
             value={answer}
             onChangeText={setAnswer}
-            placeholder={secretInput ? "Code" : "Type your answer"}
+            placeholder={secretInput ? t("Code") : t("Type your answer")}
             placeholderTextColor="#6C6C70"
             secureTextEntry={secretInput}
             autoComplete="off"
@@ -2638,7 +2618,7 @@ function AskBlock({
           />
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Send answer"
+            accessibilityLabel={t("Send answer")}
             disabled={(secretInput ? answer.length === 0 : !answer.trim()) || submitting}
             onPress={() => void submit()}
             style={{
@@ -2651,12 +2631,14 @@ function AskBlock({
             }}
           >
             <Text style={{ color: "#17171A", fontWeight: "600" }}>
-              {submitting ? "Sending…" : "Send answer"}
+              {submitting ? t("Sending…") : t("Send answer")}
             </Text>
           </Pressable>
         </>
       ) : (
-        <Text style={{ color: "#85858A", fontSize: 13.5 }}>Waiting for this bot’s response.</Text>
+        <Text style={{ color: "#85858A", fontSize: 13.5 }}>
+          {t("Waiting for this bot’s response.")}
+        </Text>
       )}
       {error ? <Text style={{ color: "#EF4444", fontSize: 13 }}>{error}</Text> : null}
     </View>

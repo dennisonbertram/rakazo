@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMessagingInboundHandler, type MessagingInboundDeps } from "./messaging-inbound.js";
+
+vi.mock("./messaging-media.js", () => ({ ingestInboundMedia: vi.fn() }));
+const { ingestInboundMedia } = vi.mocked(await import("./messaging-media.js"));
+beforeEach(() => {
+  ingestInboundMedia.mockReset();
+});
 
 const signupPolicy = { signupsEnabled: undefined, signupAllowlist: undefined };
 
@@ -349,6 +355,71 @@ describe("createMessagingInboundHandler DM routing", () => {
 
     expect(deps.sendUserMessage).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "https://cdn.example.com/pic.jpg" }),
+    );
+  });
+
+  it("sends an ingested photo as an image block alongside the caption", async () => {
+    const base = createDeps();
+    const deps = {
+      ...base,
+      prisma: { ...base.prisma, message: { findUnique: vi.fn(async () => null) } },
+      artifacts: { put: vi.fn(), get: vi.fn(), remove: vi.fn(), describe: vi.fn() },
+    } as unknown as MessagingInboundDeps;
+    ingestInboundMedia.mockResolvedValueOnce({
+      artifact: { id: "art-1", name: "pic.jpg", mimeType: "image/jpeg", size: 3 },
+      block: { kind: "image", artifactId: "art-1", mimeType: "image/jpeg", name: "pic.jpg" },
+    });
+    const handle = createMessagingInboundHandler(deps);
+    await handle({
+      ...dmEvent,
+      content: "any comment?",
+      mediaUrl: "https://cdn.example.com/pic.jpg",
+    });
+
+    expect(ingestInboundMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ artifacts: deps.artifacts }),
+      { url: "https://cdn.example.com/pic.jpg", spaceId: "ws-1", userId: "user-1", botId: "bot-1" },
+    );
+    expect(base.sendUserMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blocks: [
+          { kind: "text", text: "any comment?" },
+          { kind: "image", artifactId: "art-1", mimeType: "image/jpeg", name: "pic.jpg" },
+        ],
+        prompt: "any comment?",
+      }),
+    );
+  });
+
+  it("falls back to the media link as text when ingestion fails", async () => {
+    const base = createDeps();
+    const deps = {
+      ...base,
+      prisma: { ...base.prisma, message: { findUnique: vi.fn(async () => null) } },
+      artifacts: { put: vi.fn(), get: vi.fn(), remove: vi.fn(), describe: vi.fn() },
+    } as unknown as MessagingInboundDeps;
+    ingestInboundMedia.mockRejectedValueOnce(new Error("Request failed: HTTP 404"));
+    const handle = createMessagingInboundHandler(deps);
+    await handle({ ...dmEvent, content: "", mediaUrl: "https://cdn.example.com/pic.jpg" });
+
+    expect(base.sendUserMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: "https://cdn.example.com/pic.jpg" }),
+    );
+  });
+
+  it("does not store the photo again when the provider replays the same handle", async () => {
+    const base = createDeps();
+    const deps = {
+      ...base,
+      prisma: { ...base.prisma, message: { findUnique: vi.fn(async () => ({ id: "msg-1" })) } },
+      artifacts: { put: vi.fn(), get: vi.fn(), remove: vi.fn(), describe: vi.fn() },
+    } as unknown as MessagingInboundDeps;
+    const handle = createMessagingInboundHandler(deps);
+    await handle({ ...dmEvent, mediaUrl: "https://cdn.example.com/pic.jpg" });
+
+    expect(ingestInboundMedia).not.toHaveBeenCalled();
+    expect(base.sendUserMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ clientNonce: "messaging:sendblue:handle-1" }),
     );
   });
 
