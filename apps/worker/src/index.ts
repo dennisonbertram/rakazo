@@ -6,6 +6,7 @@ loadRootEnv();
 import {
   CalendarNative,
   ChatSdkMessagingSurface,
+  createArtifactStore,
   createBackgroundJobHandlers,
   createConnectorStack,
   createJobReconciler,
@@ -28,7 +29,6 @@ import {
   isMessagingSurfaceEnabled,
   isPipedreamEnabled,
   LocalAgentHomeStore,
-  LocalArtifactStore,
   McpConnector,
   McpOAuthBroker,
   MeetNative,
@@ -132,7 +132,7 @@ async function main() {
   await connector.start();
   const memoryProviders = new SpaceMemoryProviderResolver(prisma, secrets);
   const home = new LocalAgentHomeStore(dataDir);
-  const artifacts = new LocalArtifactStore(dataDir);
+  const artifacts = createArtifactStore(process.env.ARTIFACT_STORE, { dataDir, prisma });
   const inMemoryJobs = process.env.WAKEUP_DRIVER === "memory" ? new InMemoryJobQueue() : undefined;
   const jobs: JobPublisher = inMemoryJobs ?? new GraphileJobPublisher(databaseUrl);
   const jobHost: JobWorkerHost = inMemoryJobs ?? new GraphileJobWorkerHost(databaseUrl);

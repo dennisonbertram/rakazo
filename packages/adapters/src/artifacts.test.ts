@@ -1,8 +1,8 @@
 import { mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { LocalArtifactStore } from "./artifacts.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createArtifactStore, LocalArtifactStore, PrismaArtifactStore } from "./artifacts.js";
 
 const dirs: string[] = [];
 const context = { spaceId: "space-1" } as never;
@@ -41,5 +41,77 @@ describe("LocalArtifactStore", () => {
     await symlink(target, file);
 
     await expect(store.get(stored.id, context)).rejects.toThrow();
+  });
+});
+
+describe("PrismaArtifactStore", () => {
+  const context = {
+    operationId: "op",
+    traceId: "op",
+    spaceId: "ws-1",
+    userId: "user-1",
+    signal: new AbortController().signal,
+  };
+
+  function createStore() {
+    const rows = new Map<string, { spaceId: string; bytes: Buffer }>();
+    const prisma = {
+      artifactBlob: {
+        create: vi.fn(
+          async ({ data }: { data: { id: string; spaceId: string; bytes: Buffer } }) => {
+            rows.set(data.id, { spaceId: data.spaceId, bytes: data.bytes });
+            return data;
+          },
+        ),
+        findUnique: vi.fn(
+          async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null,
+        ),
+        deleteMany: vi.fn(async ({ where }: { where: { id: string; spaceId: string } }) => {
+          const row = rows.get(where.id);
+          if (row?.spaceId === where.spaceId) rows.delete(where.id);
+          return { count: row ? 1 : 0 };
+        }),
+      },
+    };
+    return { store: new PrismaArtifactStore(prisma as never), rows };
+  }
+
+  it("round-trips bytes and scopes reads to the owning space", async () => {
+    const { store } = createStore();
+    const { id, hash } = await store.put(
+      { name: "a.png", mimeType: "image/png", bytes: new Uint8Array([1, 2, 3]) },
+      context,
+    );
+    expect(hash).toHaveLength(64);
+    expect(Array.from(await store.get(id, context))).toEqual([1, 2, 3]);
+    await expect(store.get(id, { ...context, spaceId: "ws-2" })).rejects.toThrow(/not found/);
+    await store.remove(id, { ...context, spaceId: "ws-2" });
+    expect(Array.from(await store.get(id, context))).toEqual([1, 2, 3]);
+    await store.remove(id, context);
+    await expect(store.get(id, context)).rejects.toThrow(/not found/);
+  });
+
+  it("falls back to disk for artifacts stored before the switch", async () => {
+    const { store: postgres } = createStore();
+    const disk = {
+      get: vi.fn(async () => new Uint8Array([9])),
+      remove: vi.fn(async () => undefined),
+    };
+    const store = new PrismaArtifactStore(
+      (postgres as unknown as { prisma: unknown }).prisma as never,
+      disk as never,
+    );
+    expect(Array.from(await store.get("old-id", context))).toEqual([9]);
+    expect(disk.get).toHaveBeenCalledWith("old-id", context);
+    await store.remove("old-id", context);
+    expect(disk.remove).toHaveBeenCalledWith("old-id", context);
+  });
+
+  it("selects the store by ARTIFACT_STORE and rejects unknown values", () => {
+    const deps = { dataDir: "/tmp/x", prisma: {} as never };
+    expect(createArtifactStore(" Postgres ", deps).describe().id).toBe("postgres-artifacts");
+    expect(createArtifactStore(undefined, deps).describe().id).toBe("local-artifacts");
+    expect(createArtifactStore("", deps).describe().id).toBe("local-artifacts");
+    expect(() => createArtifactStore("s3", deps)).toThrow(/Unsupported ARTIFACT_STORE/);
   });
 });
