@@ -134,8 +134,18 @@ async function handleDirectEvent(
     );
   }
 
-  const media =
+  const clientNonce = `messaging:${event.provider}:${event.handle}`;
+  // Provider retries replay the same handle; sendUserMessage returns the
+  // original message then, so do not store a second copy of the photo.
+  const replayed =
     deps.artifacts && event.mediaUrl
+      ? await deps.prisma.message.findUnique({
+          where: { threadId_clientNonce: { threadId: ids.threadId, clientNonce } },
+          select: { id: true },
+        })
+      : null;
+  const media =
+    deps.artifacts && event.mediaUrl && !replayed
       ? await ingestInboundMedia(
           { prisma: deps.prisma, artifacts: deps.artifacts },
           { url: event.mediaUrl, spaceId: ids.spaceId, userId: ids.userId, botId: ids.botId },
@@ -155,7 +165,7 @@ async function handleDirectEvent(
     blocks,
     prompt: media ? promptTextForAttachments(event.content, [media.artifact]) : text,
     trigger: "messaging",
-    clientNonce: `messaging:${event.provider}:${event.handle}`,
+    clientNonce,
   });
   if (sent.runId) {
     // Typing bubbles only make sense once a reply is actually coming. Fire

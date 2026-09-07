@@ -83,6 +83,15 @@ export async function fetchSafeWebText(
   url: string,
   options: SafeWebFetchOptions = {},
 ): Promise<{ url: string; body: string; contentType: string | null }> {
+  const { url: finalUrl, bytes, contentType } = await fetchSafeWebBytes(url, options);
+  return { url: finalUrl, body: new TextDecoder().decode(bytes), contentType };
+}
+
+/** Same pinned-DNS, capped, redirect-checked fetch, returning the raw body. */
+export async function fetchSafeWebBytes(
+  url: string,
+  options: SafeWebFetchOptions = {},
+): Promise<{ url: string; bytes: Uint8Array; contentType: string | null }> {
   const resolve = options.resolveHostname ?? defaultResolveHostname;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
@@ -140,7 +149,7 @@ async function followRedirects(
     signal: AbortSignal;
     redirectsRemaining: number;
   },
-): Promise<{ url: string; body: string; contentType: string | null }> {
+): Promise<{ url: string; bytes: Uint8Array; contentType: string | null }> {
   if (state.signal.aborted) {
     throw abortError(state.signal);
   }
@@ -197,7 +206,7 @@ async function followRedirects(
 
   return {
     url: validated.href,
-    body: new TextDecoder().decode(buffer),
+    bytes: buffer,
     contentType: response.headers.get("content-type"),
   };
 }

@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMessagingInboundHandler, type MessagingInboundDeps } from "./messaging-inbound.js";
+
+vi.mock("./messaging-media.js", () => ({ ingestInboundMedia: vi.fn() }));
+const { ingestInboundMedia } = vi.mocked(await import("./messaging-media.js"));
+beforeEach(() => {
+  ingestInboundMedia.mockReset();
+});
 
 const signupPolicy = { signupsEnabled: undefined, signupAllowlist: undefined };
 
@@ -352,44 +358,27 @@ describe("createMessagingInboundHandler DM routing", () => {
     );
   });
 
-  it("stores an inbound photo as an artifact and sends it as an image block", async () => {
+  it("sends an ingested photo as an image block alongside the caption", async () => {
     const base = createDeps();
-    const put = vi.fn(async () => ({ id: "storage-1", hash: "h" }));
-    const artifactCreate = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
-      id: "art-1",
-      runId: null,
-      createdAt: new Date(),
-      ...data,
-    }));
     const deps = {
       ...base,
-      prisma: { ...base.prisma, artifact: { create: artifactCreate } },
-      artifacts: { put, get: vi.fn(), remove: vi.fn(), describe: vi.fn() },
+      prisma: { ...base.prisma, message: { findUnique: vi.fn(async () => null) } },
+      artifacts: { put: vi.fn(), get: vi.fn(), remove: vi.fn(), describe: vi.fn() },
     } as unknown as MessagingInboundDeps;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(new Uint8Array([1, 2, 3]), {
-            status: 200,
-            headers: { "content-type": "image/jpeg" },
-          }),
-      ),
-    );
-    try {
-      const handle = createMessagingInboundHandler(deps);
-      await handle({
-        ...dmEvent,
-        content: "any comment?",
-        mediaUrl: "https://cdn.example.com/pic.jpg",
-      });
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    ingestInboundMedia.mockResolvedValueOnce({
+      artifact: { id: "art-1", name: "pic.jpg", mimeType: "image/jpeg", size: 3 },
+      block: { kind: "image", artifactId: "art-1", mimeType: "image/jpeg", name: "pic.jpg" },
+    });
+    const handle = createMessagingInboundHandler(deps);
+    await handle({
+      ...dmEvent,
+      content: "any comment?",
+      mediaUrl: "https://cdn.example.com/pic.jpg",
+    });
 
-    expect(put).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "pic.jpg", mimeType: "image/jpeg" }),
-      expect.objectContaining({ spaceId: "ws-1", userId: "user-1", botId: "bot-1" }),
+    expect(ingestInboundMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ artifacts: deps.artifacts }),
+      { url: "https://cdn.example.com/pic.jpg", spaceId: "ws-1", userId: "user-1", botId: "bot-1" },
     );
     expect(base.sendUserMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -406,20 +395,31 @@ describe("createMessagingInboundHandler DM routing", () => {
     const base = createDeps();
     const deps = {
       ...base,
+      prisma: { ...base.prisma, message: { findUnique: vi.fn(async () => null) } },
       artifacts: { put: vi.fn(), get: vi.fn(), remove: vi.fn(), describe: vi.fn() },
     } as unknown as MessagingInboundDeps;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(null, { status: 404 })),
-    );
-    try {
-      const handle = createMessagingInboundHandler(deps);
-      await handle({ ...dmEvent, content: "", mediaUrl: "https://cdn.example.com/pic.jpg" });
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    ingestInboundMedia.mockRejectedValueOnce(new Error("Request failed: HTTP 404"));
+    const handle = createMessagingInboundHandler(deps);
+    await handle({ ...dmEvent, content: "", mediaUrl: "https://cdn.example.com/pic.jpg" });
+
     expect(base.sendUserMessage).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "https://cdn.example.com/pic.jpg" }),
+    );
+  });
+
+  it("does not store the photo again when the provider replays the same handle", async () => {
+    const base = createDeps();
+    const deps = {
+      ...base,
+      prisma: { ...base.prisma, message: { findUnique: vi.fn(async () => ({ id: "msg-1" })) } },
+      artifacts: { put: vi.fn(), get: vi.fn(), remove: vi.fn(), describe: vi.fn() },
+    } as unknown as MessagingInboundDeps;
+    const handle = createMessagingInboundHandler(deps);
+    await handle({ ...dmEvent, mediaUrl: "https://cdn.example.com/pic.jpg" });
+
+    expect(ingestInboundMedia).not.toHaveBeenCalled();
+    expect(base.sendUserMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ clientNonce: "messaging:sendblue:handle-1" }),
     );
   });
 

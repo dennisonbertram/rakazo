@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ArtifactStore } from "@rakazo/adapter-kit";
+import { fetchSafeWebBytes, type SafeWebFetchOptions } from "@rakazo/adapters";
 import { ATTACHMENT_MAX_BYTES, type MessageBlock } from "@rakazo/contracts";
 import { inferAttachmentMimeType, messageBlockForArtifact } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
@@ -21,28 +22,32 @@ export interface IngestedInboundMedia {
 /**
  * Pull an inbound attachment off the provider CDN and store it as an artifact
  * owned by the sender, so image blocks reach the model like a web upload
- * would. iPhones send HEIC over iMessage; that is converted to JPEG with
- * libheif's `heif-convert` (sharp's bundled libvips has no HEVC decoder).
- * Returns null for anything the attachment pipeline does not accept (video,
- * audio, oversize) — callers fall back to passing the URL as text.
+ * would. The download goes through the SSRF-guarded fetch (public addresses
+ * only, pinned DNS, capped body) because the URL is provider-supplied.
+ * iPhones send HEIC over iMessage; that is converted to JPEG with libheif's
+ * `heif-convert` (sharp's bundled libvips has no HEVC decoder). Returns null
+ * for anything the attachment pipeline does not accept (video, audio,
+ * oversize) — callers fall back to passing the URL as text.
  */
 export async function ingestInboundMedia(
   deps: { prisma: PrismaClient; artifacts: ArtifactStore },
   input: { url: string; spaceId: string; userId: string; botId: string },
+  fetchOptions: Pick<SafeWebFetchOptions, "fetch" | "resolveHostname"> = {},
 ): Promise<IngestedInboundMedia | null> {
-  const url = new URL(input.url);
-  if (url.protocol !== "https:") return null;
-  const response = await fetch(url, {
-    redirect: "error",
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  const {
+    url,
+    bytes: downloaded,
+    contentType,
+  } = await fetchSafeWebBytes(input.url, {
+    ...fetchOptions,
+    timeoutMs: FETCH_TIMEOUT_MS,
+    maxBytes: ATTACHMENT_MAX_BYTES,
   });
-  if (!response.ok) return null;
-  if (Number(response.headers.get("content-length")) > ATTACHMENT_MAX_BYTES) return null;
-  let bytes: Uint8Array = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength === 0 || bytes.byteLength > ATTACHMENT_MAX_BYTES) return null;
+  if (downloaded.byteLength === 0) return null;
 
-  let name = path.posix.basename(url.pathname) || "attachment";
-  const reported = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+  let bytes = downloaded;
+  let name = path.posix.basename(new URL(url).pathname) || "attachment";
+  const reported = contentType?.split(";")[0]?.trim().toLowerCase();
   let mimeType = inferAttachmentMimeType(name, reported);
   if (!mimeType && isHeic(name, reported)) {
     bytes = await heicToJpeg(bytes);
