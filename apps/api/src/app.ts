@@ -16,6 +16,7 @@ import {
   ChatSdkMessagingSurface,
   type ComposioProvider,
   type ConnectorRegistry,
+  createArtifactStore,
   createBackgroundJobHandlers,
   createConnectorStack,
   createJobReconciler,
@@ -40,7 +41,6 @@ import {
   isMessagingSurfaceEnabled,
   isPipedreamEnabled,
   LocalAgentHomeStore,
-  LocalArtifactStore,
   McpConnector,
   McpOAuthBroker,
   MeetNative,
@@ -197,7 +197,7 @@ export async function createApp(
   };
   const oauthLogins = new PiOAuthLogins();
   const home = new LocalAgentHomeStore(env.dataDir);
-  const artifacts = new LocalArtifactStore(env.dataDir);
+  const artifacts = createArtifactStore(env.artifactStore, { dataDir: env.dataDir, prisma });
   const memory = new MarkdownMemoryStore(prisma);
   const mcp = new McpConnector(
     prisma,

@@ -882,6 +882,17 @@ model Artifact {
   @@map("artifacts")
 }
 
+/// Artifact bytes for deployments where api and worker do not share a disk.
+model ArtifactBlob {
+  id        String   @id
+  spaceId   String
+  bytes     Bytes
+  createdAt DateTime @default(now())
+
+  @@index([spaceId])
+  @@map("artifact_blobs")
+}
+
 model UsageRecord {
   id           String   @id @default(cuid())
   spaceId      String
