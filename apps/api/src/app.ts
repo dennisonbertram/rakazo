@@ -445,6 +445,7 @@ export async function createApp(
       prisma,
       events,
       jobs,
+      artifacts,
       provision: (request, policyEnv) => provisionMessagingIdentity(prisma, request, policyEnv),
       openSignup: env.messagingOpenSignup,
       signupPolicy: {

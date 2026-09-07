@@ -11,7 +11,11 @@ import {
 } from "@rakazo/core";
 import { IsolationError, type PrismaClient } from "@rakazo/db";
 
-function adapterContext(actor: Actor, botId: string, operationId: string) {
+function adapterContext(
+  actor: Pick<Actor, "spaceId" | "userId">,
+  botId: string,
+  operationId: string,
+) {
   return {
     operationId,
     traceId: operationId,
@@ -22,23 +26,22 @@ function adapterContext(actor: Actor, botId: string, operationId: string) {
   };
 }
 
-export async function createOwnedArtifact(
+export async function storeOwnedArtifact(
   deps: {
     prisma: PrismaClient;
     artifacts: ArtifactStore;
   },
-  actor: Actor,
+  owner: Pick<Actor, "spaceId" | "userId">,
   input: {
     botId: string;
     groupId?: string;
     name: string;
     mimeType: string;
-    contentBase64: string;
+    bytes: Uint8Array;
   },
 ) {
-  validateAttachmentMimeType(input.mimeType);
-  const bytes = decodeAttachmentBase64(input.contentBase64);
-  const context = adapterContext(actor, input.botId, `artifact-create:${input.botId}`);
+  const { bytes } = input;
+  const context = adapterContext(owner, input.botId, `artifact-create:${input.botId}`);
   const stored = await deps.artifacts.put(
     { name: input.name, mimeType: input.mimeType, bytes },
     context,
@@ -47,8 +50,8 @@ export async function createOwnedArtifact(
   const row = await deps.prisma.artifact
     .create({
       data: {
-        spaceId: actor.spaceId,
-        userId: actor.userId,
+        spaceId: owner.spaceId,
+        userId: owner.userId,
         botId: input.botId,
         groupId: input.groupId,
         name: input.name,
@@ -72,6 +75,25 @@ export async function createOwnedArtifact(
     size: row.size,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+export async function createOwnedArtifact(
+  deps: {
+    prisma: PrismaClient;
+    artifacts: ArtifactStore;
+  },
+  actor: Actor,
+  input: {
+    botId: string;
+    groupId?: string;
+    name: string;
+    mimeType: string;
+    contentBase64: string;
+  },
+) {
+  validateAttachmentMimeType(input.mimeType);
+  const bytes = decodeAttachmentBase64(input.contentBase64);
+  return storeOwnedArtifact(deps, actor, { ...input, bytes });
 }
 
 export async function getOwnedArtifact(

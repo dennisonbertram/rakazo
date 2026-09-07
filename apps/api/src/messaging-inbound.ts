@@ -1,7 +1,11 @@
-import type { JobPublisher, MessagingInboundMessage } from "@rakazo/adapter-kit";
+import type { ArtifactStore, JobPublisher, MessagingInboundMessage } from "@rakazo/adapter-kit";
 import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
-import { parseMessagingCommand, sanitizeMessagingLabel } from "@rakazo/core";
+import {
+  parseMessagingCommand,
+  promptTextForAttachments,
+  sanitizeMessagingLabel,
+} from "@rakazo/core";
 import type {
   MessagingIdentityRequest,
   Prisma,
@@ -16,6 +20,7 @@ import {
   redeemMessagingLinkCode,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { ingestInboundMedia } from "./messaging-media.js";
 
 export interface MessagingInboundDeps {
   prisma: PrismaClient;
@@ -36,6 +41,11 @@ export interface MessagingInboundDeps {
    * Cosmetic only — callers must catch failures; groups never get it.
    */
   typing?: (threadId: string) => Promise<void>;
+  /**
+   * Stores inbound photos as artifacts so the model sees the image. Without
+   * it (or when ingestion fails) the media URL rides along as text.
+   */
+  artifacts?: ArtifactStore;
 }
 
 type IdentityRow = {
@@ -124,13 +134,26 @@ async function handleDirectEvent(
     );
   }
 
+  const media =
+    deps.artifacts && event.mediaUrl
+      ? await ingestInboundMedia(
+          { prisma: deps.prisma, artifacts: deps.artifacts },
+          { url: event.mediaUrl, spaceId: ids.spaceId, userId: ids.userId, botId: ids.botId },
+        ).catch((error) => {
+          getLogger().error("messaging inbound media ingest error", error);
+          return null;
+        })
+      : null;
+  const blocks: MessageBlock[] = media
+    ? [...(event.content ? [{ kind: "text" as const, text: event.content }] : []), media.block]
+    : [{ kind: "text", text }];
   const sent = await deps.events.sendUserMessage({
     spaceId: ids.spaceId,
     threadId: ids.threadId,
     botId: ids.botId,
     userId: ids.userId,
-    blocks: [{ kind: "text", text }],
-    prompt: text,
+    blocks,
+    prompt: media ? promptTextForAttachments(event.content, [media.artifact]) : text,
     trigger: "messaging",
     clientNonce: `messaging:${event.provider}:${event.handle}`,
   });
