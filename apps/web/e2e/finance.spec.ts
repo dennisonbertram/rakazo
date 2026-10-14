@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   connectedOverview,
+  cryptoData,
   emptyOverview,
   receiptPng,
   transactionOf,
@@ -176,4 +177,80 @@ test("Finance fits a phone and works in dark mode", async ({ page }, testInfo) =
   await page.goto(`/app/finance/vendor/acme-hosting`);
   await expect(main.getByRole("heading", { name: "Acme Hosting", level: 1 })).toBeVisible();
   expect(await overflow()).toBeLessThanOrEqual(0);
+});
+
+test("Finance crypto card and page", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  const overview = { ...connectedOverview, crypto: cryptoData.summary };
+  await mockFinance(page, overview);
+  // mockFinance 404s unknown calls; answer the crypto ones after it (later routes win).
+  const added: unknown[] = [];
+  await page.route("**/rpc/finance/wallet*", async (route) => {
+    const name = new URL(route.request().url()).pathname.split("/rpc/finance/")[1];
+    if (name === "walletAdd") {
+      added.push(route.request().postDataJSON());
+      return route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          json: {
+            defined: true,
+            code: "CONFLICT",
+            status: 409,
+            message: "That wallet is already added",
+            data: {},
+          },
+        }),
+      });
+    }
+    return route.fulfill({ status: 404, body: "not mocked" });
+  });
+  await page.route("**/rpc/finance/crypto", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ json: cryptoData, meta: [] }),
+    }),
+  );
+  await signup(page, `finance-crypto-${Date.now()}@rakazo.test`, "password12", "Finance Crypto");
+  await completeOnboarding(page);
+  await page.goto("/app/finance");
+  const main = page.getByRole("main");
+  // The Crypto card sits apart from the cash figures.
+  await expect(main.getByText("$250,020")).toBeVisible();
+  const card = main.locator('a[href="/app/finance/crypto"]');
+  await expect(card).toContainText("$3,003");
+  await expect(card).toContainText("1 unpriced");
+  await captureScreenshot(page, testInfo, "finance-crypto-card");
+
+  await card.click();
+  await expect(page).toHaveURL(/\/app\/finance\/crypto$/);
+  await expect(main.getByRole("heading", { name: "Crypto", level: 1 })).toBeVisible();
+  await expect(main.getByText("Safe · 2 of 3")).toBeVisible();
+  await expect(main.getByText("alice.eth")).toBeVisible();
+  await expect(main.getByRole("cell", { name: "$3,000.00" }).first()).toBeVisible();
+  await expect(main.getByRole("cell", { name: "1.5", exact: true })).toBeVisible();
+  await expect(main.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Finance");
+  await captureScreenshot(page, testInfo, "finance-crypto-page");
+
+  await main.getByRole("button", { name: "Add wallet" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Address or ENS").fill("alice.eth");
+  await dialog.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("That wallet is already added");
+  expect(JSON.stringify(added[0])).toContain("alice.eth");
+  await captureScreenshot(page, testInfo, "finance-crypto-add-error");
+
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await main.getByRole("button", { name: "Actions for Treasury" }).click();
+  await page.getByRole("menuitem", { name: "Remove" }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("Remove Treasury?");
+});
+
+test("Finance hides the Crypto card without crypto data", async ({ page }) => {
+  await mockFinance(page);
+  await signup(page, `finance-nocrypto-${Date.now()}@rakazo.test`, "password12", "No Crypto");
+  await completeOnboarding(page);
+  await page.goto("/app/finance");
+  await expect(page.getByRole("main").getByText("$250,020")).toBeVisible();
+  await expect(page.locator('a[href="/app/finance/crypto"]')).toHaveCount(0);
 });

@@ -1,6 +1,7 @@
 import type {
   CashPoint,
   FinanceAccountOutput,
+  FinanceCryptoOutput,
   FinanceOverview,
   FinanceTransaction,
   FinanceTransactionOutput,
@@ -276,3 +277,69 @@ export const receiptPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
   "base64",
 );
+
+// Invented wallets and balances for the crypto page.
+const SAFE = "0x1111111111111111111111111111111111111111";
+const ALICE = "0x2222222222222222222222222222222222222222";
+const holding = (
+  walletId: string,
+  chainId: number,
+  symbol: string,
+  rawBalance: string,
+  decimals: number,
+  usdValueCents: number | null,
+) => ({
+  walletId,
+  chainId,
+  tokenAddress: symbol === "ETH" ? null : "0x4444444444444444444444444444444444444444",
+  symbol,
+  name: symbol,
+  decimals,
+  rawBalance,
+  usdPrice: usdValueCents === null ? null : "1",
+  usdValueCents,
+  syncedAt: "2026-10-14T10:00:00.000Z",
+});
+export const cryptoData: FinanceCryptoOutput = {
+  connected: true,
+  hasApiKey: false,
+  lastError: null,
+  wallets: [
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      address: SAFE,
+      ensName: null,
+      label: "Treasury",
+      type: "safe",
+      safeOwners: [ALICE, SAFE, "0x3333333333333333333333333333333333333333"],
+      safeThreshold: 2,
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000002",
+      address: ALICE,
+      ensName: "alice.eth",
+      label: null,
+      type: "personal",
+      safeOwners: null,
+      safeThreshold: null,
+    },
+  ],
+  holdings: [
+    holding("00000000-0000-4000-8000-000000000001", 1, "ETH", "1500000000000000000", 18, 300_000),
+    holding("00000000-0000-4000-8000-000000000002", 8453, "USDC", "2500000", 6, 250),
+    holding("00000000-0000-4000-8000-000000000002", 137, "SPAM", "9000000000", 6, null),
+  ],
+  summary: {
+    totalCents: 300_250,
+    byChain: [
+      { chainId: 1, cents: 300_000 },
+      { chainId: 8453, cents: 250 },
+    ],
+    byWallet: [
+      { walletId: "00000000-0000-4000-8000-000000000001", cents: 300_000 },
+      { walletId: "00000000-0000-4000-8000-000000000002", cents: 250 },
+    ],
+    lastSyncedAt: "2026-10-14T10:00:00.000Z",
+    unpricedTokenCount: 1,
+  },
+};
