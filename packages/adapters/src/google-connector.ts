@@ -253,9 +253,15 @@ export class GoogleConnector implements ManagedConnectorProvider {
     }
   }
 
-  async revoke(connectionRef: string, context: AdapterContext): Promise<void> {
+  async revoke(
+    connectionRef: string,
+    context: AdapterContext,
+    options: { provider?: string } = {},
+  ): Promise<void> {
+    const provider = providerOf(options.provider ?? "gmail");
+    if (!provider) return;
     // The router marks the row revoked before calling here, so status is not filtered. Rows of the
-    // other Google apps share this providerRef; the one being revoked is the not-connected one.
+    // other Google apps share this providerRef; the one being revoked is picked by provider.
     const rows = await this.config.prisma.connection.findMany({
       where: {
         connectorId: "google",
@@ -265,7 +271,7 @@ export class GoogleConnector implements ManagedConnectorProvider {
         secretId: { not: null },
       },
     });
-    const row = rows.find((candidate) => candidate.status !== "connected") ?? rows[0];
+    const row = rows.find((candidate) => providerOf(candidate.provider) === provider);
     if (!row?.secretId) return;
     const credential = await this.loadCredential(row.secretId, context);
     // Google ties every app's scopes to one grant: revoking this token would disconnect the siblings.

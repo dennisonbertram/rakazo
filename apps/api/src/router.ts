@@ -4816,7 +4816,9 @@ export function createRouter(deps: RouterDeps) {
                   }
                 }
                 if (revokeRef) {
-                  await connector.revoke(revokeRef, adapterContext).catch(() => undefined);
+                  await connector
+                    .revoke(revokeRef, adapterContext, { provider: input.provider })
+                    .catch(() => undefined);
                 }
               }
             } else if (state === input.provider) {
@@ -5017,7 +5019,9 @@ export function createRouter(deps: RouterDeps) {
                         revokeRef = resolved ?? "";
                       }
                       if (revokeRef) {
-                        await transactionConnector.revoke(revokeRef, revokedContext);
+                        await transactionConnector.revoke(revokeRef, revokedContext, {
+                          provider: current.provider,
+                        });
                       }
                     }
                   } else {
@@ -5249,6 +5253,7 @@ export function createRouter(deps: RouterDeps) {
         type RemoteRevoke = {
           connectorId: string;
           connectionRef: string;
+          provider: string;
           accountSpecific: boolean;
         };
         const snapshot = await deps.prisma.connection.findFirst({
@@ -5379,6 +5384,7 @@ export function createRouter(deps: RouterDeps) {
                 await connector.revoke(
                   connectionRef,
                   connectionContext(context.actor, "connections.revoke", revokeSignal),
+                  { provider: row.provider },
                 );
               } catch (error) {
                 if (error instanceof ORPCError) throw error;
@@ -5394,6 +5400,7 @@ export function createRouter(deps: RouterDeps) {
               remote: {
                 connectorId: row.connectorId,
                 connectionRef,
+                provider: row.provider,
                 accountSpecific,
               },
               previousStatus: row.status,
@@ -5435,6 +5442,7 @@ export function createRouter(deps: RouterDeps) {
             await connector.revoke(
               outcome.remote.connectionRef,
               connectionContext(context.actor, "connections.revoke", context.signal),
+              { provider: outcome.remote.provider },
             );
           } catch (error) {
             // Restore when DELETE clearly did not run (including pre-delete list

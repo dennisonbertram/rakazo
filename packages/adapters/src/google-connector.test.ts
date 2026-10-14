@@ -811,16 +811,44 @@ describe("GoogleConnector providers", () => {
     const [gmailRow, calendarRow] = s.db.connections;
 
     calendarRow!.status = "revoked";
-    await s.connector.revoke("sub-1", context);
+    await s.connector.revoke("sub-1", context, { provider: "googlecalendar" });
     expect(s.google.revokeCalls).toEqual([]);
     expect(s.db.secrets).toHaveLength(1);
     expect(calendarRow!.secretId).toBeNull();
     expect(gmailRow!.secretId).not.toBeNull();
 
     gmailRow!.status = "revoked";
-    await s.connector.revoke("sub-1", context);
+    await s.connector.revoke("sub-1", context, { provider: "gmail" });
     expect(s.google.revokeCalls).toEqual(["refresh-1"]);
     expect(s.db.secrets).toHaveLength(0);
+  });
+
+  it("revokes the row of the named provider, not a neighbour that is in error", async () => {
+    const s = setup();
+    s.db.connections.length = 0;
+    const gmail = await connectApp(s, "gmail", `openid ${EMAIL} ${GMAIL_READONLY}`);
+    const calendar = await connectApp(s, "googlecalendar", `openid ${EMAIL} ${CALENDAR_EVENTS}`);
+    s.db.connections[0]!.status = "error"; // Gmail keeps its secret but is not connected
+    s.db.connections[1]!.status = "revoked";
+    await s.connector.revoke("sub-1", context, { provider: "googlecalendar" });
+    expect(s.db.connections[1]!.secretId).toBeNull();
+    expect(s.db.connections[0]!.secretId).toBe(gmail.secretId);
+    expect(s.db.secrets.map((secret) => secret.id)).toEqual([gmail.secretId]);
+    expect(calendar.secretId).not.toBe(gmail.secretId);
+    // No connected app is left, so this was the last live grant.
+    expect(s.google.revokeCalls).toHaveLength(1);
+  });
+
+  it("keeps Google's grant when the revoked app has a connected neighbour", async () => {
+    const s = setup();
+    s.db.connections.length = 0;
+    const gmail = await connectApp(s, "gmail", `openid ${EMAIL} ${GMAIL_READONLY}`);
+    await connectApp(s, "googlecalendar", `openid ${EMAIL} ${CALENDAR_EVENTS}`);
+    s.db.connections[1]!.status = "revoked";
+    await s.connector.revoke("sub-1", context, { provider: "googlecalendar" });
+    expect(s.google.revokeCalls).toEqual([]);
+    expect(s.db.connections[0]!.secretId).toBe(gmail.secretId);
+    expect(s.db.secrets.map((secret) => secret.id)).toEqual([gmail.secretId]);
   });
 
   it("sends each request with the token of the row for its own app", async () => {
