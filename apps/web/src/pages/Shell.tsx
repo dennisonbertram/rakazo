@@ -481,6 +481,8 @@ export function ShellPage() {
   const [inboxAgentCollapsed, setInboxAgentCollapsed] = useState(
     () => !window.matchMedia("(min-width: 768px)").matches,
   );
+  // With no Inbox agent the panel only holds a Create button, so it stays closed until asked for.
+  const [showEmptyInboxAgent, setShowEmptyInboxAgent] = useState(false);
   const [creatingInboxAgent, setCreatingInboxAgent] = useState(false);
   const [inboxAgentError, setInboxAgentError] = useState("");
   // The Finance agent panel starts closed on every visit; "Ask agent" opens it.
@@ -874,6 +876,7 @@ export function ShellPage() {
       : financeMode
         ? findFinanceAgent(bots, userId)
         : (bots.find((b) => b.id === botId) ?? bots[0]);
+  const inboxAgentHidden = inboxAgentCollapsed || (!active && !showEmptyInboxAgent);
   const computerBot =
     (computerBotId ? bots.find((bot) => bot.id === computerBotId) : undefined) ?? active;
   computerOpenRef.current = computerOpen;
@@ -2502,7 +2505,7 @@ export function ShellPage() {
     ? {
         name: "inbox-agent",
         testId: "inbox-agent-panel",
-        open: !inboxAgentCollapsed,
+        open: !inboxAgentHidden,
         collapse: () => setInboxAgentCollapsedPref(true),
         collapseLabel: t`Collapse Inbox agent`,
         create: createInboxAgent,
@@ -3920,7 +3923,14 @@ export function ShellPage() {
         ) : inboxMode ? (
           <InboxPage
             paused={pluginsOpen}
-            onShowAgent={inboxAgentCollapsed ? () => setInboxAgentCollapsedPref(false) : undefined}
+            onShowAgent={
+              inboxAgentHidden
+                ? () => {
+                    setInboxAgentCollapsedPref(false);
+                    setShowEmptyInboxAgent(true);
+                  }
+                : undefined
+            }
             onRefreshed={refreshInboxUnread}
             onConnectMail={() => {
               setPluginsQuery("gmail");
