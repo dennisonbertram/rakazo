@@ -65,6 +65,16 @@ msgstr "{0} (10 MiB üzeri)"
 msgid "{0} {unitLabel}"
 msgstr "{0} {unitLabel}"
 
+#. placeholder {0}: bot.name
+#: src/components/integrations/parts.tsx
+msgid "{0} can use {appName}"
+msgstr ""
+
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} connected"
+msgstr ""
+
 #. placeholder {0}: block.name
 #: src/pages/shell/message-cards.tsx
 msgid "{0} connection"
@@ -75,9 +85,19 @@ msgstr "{0} bağlantısı"
 msgid "{0} default"
 msgstr ""
 
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} did not accept the sign-in."
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} handling"
+msgstr ""
+
+#. placeholder {0}: row?.displayName ?? item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} is ready."
 msgstr ""
 
 #. placeholder {0}: format(size / 1024)
@@ -100,6 +120,11 @@ msgstr ""
 msgid "{0} non-USD not counted"
 msgstr ""
 
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} now appears under Connected."
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -114,6 +139,11 @@ msgstr "{0} çalıştırma · {1} token"
 #. placeholder {0}: card.count
 #: src/components/FinanceCards.tsx
 msgid "{0} transactions"
+msgstr ""
+
+#. placeholder {0}: target.name
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "{0} was added and shows Needs reconnect until you sign in."
 msgstr ""
 
 #. placeholder {0}: bot.name
@@ -132,6 +162,10 @@ msgstr ""
 
 #: src/lib/billing.ts
 msgid "{amount} / {period}"
+msgstr ""
+
+#: src/components/integrations/SignInStep.tsx
+msgid "{appName} was not connected"
 msgstr ""
 
 #: src/pages/Shell.tsx
@@ -199,6 +233,10 @@ msgstr "{name} başarısız oldu"
 msgid "{name} finished"
 msgstr "{name} çalışmasını tamamladı"
 
+#: src/components/integrations/AppDetail.tsx
+msgid "{name} is not connected."
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/lib/browser-notifications.ts
 msgid "{name} stopped"
@@ -228,6 +266,10 @@ msgstr ""
 msgid "{seats, plural, one {# seat} other {# seats}}"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "{serverName} connected"
+msgstr ""
+
 #: src/components/ArtifactFileCard.tsx
 msgid "{size} B"
 msgstr "{size} B"
@@ -243,10 +285,6 @@ msgstr ""
 #: src/pages/ActivityList.tsx
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "{toolCount, plural, one {# tool} other {# tools}}"
-msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "{workingBotName} is working"
@@ -310,10 +348,6 @@ msgstr ""
 msgid "Access token"
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Access token (optional)"
-msgstr "Erişim token'ı (isteğe bağlı)"
-
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Account"
 msgstr "Hesap"
@@ -327,13 +361,14 @@ msgstr "Hesap varsayılanı"
 msgid "Account ID"
 msgstr "Hesap kimliği"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Account label"
+#: src/components/integrations/AppDetail.tsx
+msgid "Account name"
 msgstr ""
 
+#: src/components/integrations/AppDetail.tsx
+#: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceTransaction.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Accounts"
 msgstr ""
 
@@ -367,11 +402,29 @@ msgstr "Etkin model"
 msgid "Activity"
 msgstr "Etkinlik"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelBackupsSettings.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Add"
 msgstr "Ekle"
+
+#. placeholder {0}: providerName(onlyOne.provider)
+#: src/pages/Finance.tsx
+msgid "Add {0}"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Add a custom connection"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Add a GraphQL endpoint"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Add a local command"
+msgstr ""
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Add a model in Settings to use this."
@@ -393,20 +446,8 @@ msgstr ""
 msgid "Add a schedule, webhook, GitHub, or message trigger to run this routine."
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Add a server name."
-msgstr "Bir sunucu adı gir."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Add a stdio command."
-msgstr "Bir stdio komutu gir."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Add an HTTPS server URL."
-msgstr "Bir HTTPS sunucu URL'si gir."
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add another"
+#: src/components/integrations/AppDetail.tsx
+msgid "Add another account"
 msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
@@ -421,38 +462,17 @@ msgstr "Yedek olarak kullanmak için bağlı modeller ekleyin."
 msgid "Add credential"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Add Executor"
-msgstr "Executor ekle"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add GraphQL"
-msgstr "GraphQL ekle"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add GraphQL endpoint"
-msgstr "GraphQL uç noktası ekle"
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Add custom connection"
+msgstr ""
 
 #: src/pages/ScratchpadSection.tsx
 msgid "Add item"
 msgstr "Öğe ekle"
 
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Add MCP server"
 msgstr "MCP sunucusu ekle"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add OpenAPI"
-msgstr "OpenAPI ekle"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add remote MCP server"
-msgstr "Uzak MCP sunucusu ekle"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Add server"
-msgstr "Sunucu ekle"
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Add server URL"
@@ -462,28 +482,14 @@ msgstr ""
 msgid "Add to routine"
 msgstr "Rutine ekle"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Add Treg"
-msgstr "Treg ekle"
-
 #: src/pages/RoutineEditor.tsx
 msgid "Add trigger"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Added"
-msgstr ""
-
-#: src/pages/McpServersOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
-msgid "Adding…"
-msgstr "Ekleniyor…"
-
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/AccountSettingsOverlay.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -506,17 +512,27 @@ msgstr "Agent bilgisayarı"
 msgid "Agent connections"
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Agents:"
-msgstr "Agent'lar:"
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Agents lose access to its tools."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Agents lose access to this account."
+msgstr ""
 
 #: src/components/AiDataSharing.tsx
 msgid "AI data sharing"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/Inbox.tsx
 msgid "All"
+msgstr ""
+
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "All agents can use {0}."
 msgstr ""
 
 #: src/pages/Artifacts.tsx
@@ -565,6 +581,10 @@ msgstr "E-posta işlemlerine sormadan izin ver"
 #: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "Bir kez izin ver"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Allow pop-ups for this site, or open the sign-in page directly."
+msgstr ""
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Allow purchase actions without asking"
@@ -624,6 +644,10 @@ msgstr "Yanıtlandı: {answer}"
 msgid "Any model, with your own key"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Anything else"
+msgstr ""
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "API is back, but the update did not finish. Check the host logs."
 msgstr ""
@@ -637,9 +661,13 @@ msgstr ""
 msgid "API key"
 msgstr "API anahtarı"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "API key header"
 msgstr "API anahtarı üstbilgisi"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "App connections aren't set up on this server yet."
+msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Appearance"
@@ -662,6 +690,10 @@ msgstr "Onayla"
 msgid "Approve this server to let your agent use its tools."
 msgstr "Agent'ının bu sunucunun araçlarını kullanabilmesi için sunucuyu onayla."
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Apps"
+msgstr ""
+
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 #: src/components/inbox/InboxShortcuts.tsx
@@ -682,7 +714,7 @@ msgstr "Arşivlendi"
 msgid "Archived. Chat, memory, and files kept."
 msgstr "Arşivlendi. Sohbet, hafıza ve dosyalar korundu."
 
-#: src/pages/McpServersOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Arguments"
 msgstr "Argümanlar"
 
@@ -730,6 +762,10 @@ msgstr "Dışarıya e-posta göndermeden önce sor"
 msgid "Ask the server owner to configure this provider."
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Ask the server owner to set up the app catalog."
+msgstr ""
+
 #. placeholder {0}: preset.time
 #: src/pages/RoutineSchedule.tsx
 msgid "at {0}"
@@ -768,6 +804,14 @@ msgstr ""
 #. placeholder {0}: email.attachments
 #: src/components/EmailCards.tsx
 msgid "Attachments: {0}"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Auth header"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Authentication"
 msgstr ""
 
 #: src/lib/model-connection-preflight.ts
@@ -816,8 +860,8 @@ msgid "Avatars"
 msgstr ""
 
 #: src/components/computer/FilesApp.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/Board.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Back"
 msgstr ""
@@ -862,8 +906,8 @@ msgstr ""
 msgid "Bcc"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Bearer token"
 msgstr "Bearer token"
@@ -941,10 +985,6 @@ msgstr ""
 msgid "Bots are working"
 msgstr "Botlar çalışıyor"
 
-#: src/components/integrations/McpServerRow.tsx
-msgid "Bots lose access to its tools."
-msgstr ""
-
 #: src/pages/Paywall.tsx
 msgid "Bots with their own computer and browser"
 msgstr ""
@@ -960,10 +1000,6 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Breakdown"
-msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Browse MCP servers"
 msgstr ""
 
 #: src/components/computer/ComputerWorkspace.tsx
@@ -1011,14 +1047,16 @@ msgstr "Sunucuya ulaşılamıyor."
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/SignInStep.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Cancel"
@@ -1080,6 +1118,7 @@ msgid "Categories"
 msgstr ""
 
 #: src/components/finance/ui.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Category"
@@ -1102,6 +1141,10 @@ msgstr ""
 msgid "Change password"
 msgstr "Parolayı değiştir"
 
+#: src/components/integrations/AppDetail.tsx
+msgid "Changes your account"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Changing…"
 msgstr "Değiştiriliyor…"
@@ -1117,6 +1160,10 @@ msgstr ""
 #: src/pages/shell/message-cards.tsx
 msgid "Chart failed to render: {error}"
 msgstr "Grafik çizilemedi: {error}"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Chat"
+msgstr ""
 
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Chat apps"
@@ -1203,6 +1250,10 @@ msgstr "Yeni bir parola seçin"
 msgid "Choose file"
 msgstr "Dosya seç"
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Choose the account to connect, then come back here."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Choose which connected model Rakazo uses."
 msgstr "Rakazo'nun hangi bağlı modeli kullanacağını seç."
@@ -1246,6 +1297,7 @@ msgstr ""
 #: src/components/ErrorBoundary.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/SignInStep.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
 #: src/pages/PeerMessagesOverlay.tsx
@@ -1270,14 +1322,6 @@ msgstr "Bilgisayarı kapat"
 #: src/pages/shell/message-cards.tsx
 msgid "Close image preview"
 msgstr "Görsel önizlemesini kapat"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Close integrations"
-msgstr "Entegrasyonları kapat"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Close MCP servers"
-msgstr "MCP sunucularını kapat"
 
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/SettingsOverlay.tsx
@@ -1353,7 +1397,7 @@ msgstr ""
 msgid "Coming soon"
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Command"
 msgstr "Komut"
 
@@ -1413,20 +1457,11 @@ msgstr ""
 msgid "Computers are off. Set SANDBOX_PROVIDER=docker with SANDBOX_SUPERVISOR_TOKEN, or set SANDBOX_PROVIDER to e2b, daytona, or box with its API key. Recreate the stack after changing .env."
 msgstr "Bilgisayarlar kapalı. SANDBOX_PROVIDER=docker ve SANDBOX_SUPERVISOR_TOKEN ayarlayın; ya da SANDBOX_PROVIDER değerini e2b, daytona veya box yapıp API anahtarını ekleyin. .env değişince stacki yeniden oluşturun."
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Configure a plugin catalog on the server to connect apps."
-msgstr ""
-
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Configured by deployment"
 msgstr "Dağıtım tarafından yapılandırıldı"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Configured servers"
-msgstr "Yapılandırılmış sunucular"
-
 #: src/pages/KnowledgeSection.tsx
-#: src/pages/McpServersOverlay.tsx
 msgid "Confirm delete"
 msgstr "Silmeyi onayla"
 
@@ -1439,14 +1474,24 @@ msgstr "Parolayı doğrulayın"
 msgid "Confirm the URL is reachable from this browser session, then test again."
 msgstr "URL'nin bu tarayıcı oturumundan erişilebilir olduğunu doğrula, sonra yeniden test et."
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Connect"
 msgstr "Bağlan"
 
-#: src/pages/Finance.tsx
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "Connect {0}"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Connect {name}"
 msgstr ""
 
@@ -1458,15 +1503,19 @@ msgstr "Model bağla"
 msgid "Connect a provider to add backups."
 msgstr "Yedek eklemek için bir sağlayıcı bağlayın."
 
+#: src/pages/Finance.tsx
+msgid "Connect accounts"
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Connect any app that offers an MCP server URL."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connect API key"
 msgstr "API anahtarıyla bağlan"
 
-#: src/pages/Finance.tsx
-msgid "Connect Brex"
-msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Executor"
 msgstr "Executor'a bağlan"
 
@@ -1479,22 +1528,24 @@ msgid "Connect MCP server “{name}”"
 msgstr "“{name}” MCP sunucusunu bağla"
 
 #: src/pages/Finance.tsx
-msgid "Connect Mercury"
+msgid "Connect Mercury, Brex or both to see cash, burn, runway and spend."
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Connect OAuth"
-msgstr "OAuth ile bağlan"
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Connect the apps you use so your agents can read and act in them. You choose which agents get access to each one."
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connect this provider to use it as your personal model."
 msgstr "Kişisel modelin olarak kullanmak için bu sağlayıcıyı bağla."
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Treg"
 msgstr "Treg'i bağla"
 
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/parts.tsx
 #: src/pages/GoogleOAuthCallback.tsx
 #: src/pages/McpOAuthCallback.tsx
 #: src/pages/MemorySettingsOverlay.tsx
@@ -1508,6 +1559,11 @@ msgstr "Bağlandı"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connected · {0}"
 msgstr "Bağlı · {0}"
+
+#. placeholder {0}: new Date(row.createdAt).toLocaleDateString()
+#: src/components/integrations/AppDetail.tsx
+msgid "Connected {0}"
+msgstr ""
 
 #. placeholder {0}: selected.name
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -1524,10 +1580,10 @@ msgstr "Bağlandı, {0} kullanılıyor."
 msgid "Connected. Its tools are available from your next message."
 msgstr "Bağlandı. Araçları bir sonraki mesajından itibaren kullanılabilir."
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/parts.tsx
 #: src/pages/GoogleOAuthCallback.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 #: src/pages/shell/message-cards.tsx
@@ -1539,16 +1595,12 @@ msgstr "Bağlanıyor…"
 msgid "Connection test failed."
 msgstr "Bağlantı testi başarısız."
 
-#. placeholder {0}: item.name
-#: src/pages/PluginsOverlay.tsx
-msgid "Connection to {0} is still pending. You can close this and check again."
-msgstr "{0} bağlantısı hâlâ beklemede. Bunu kapatıp daha sonra tekrar kontrol edebilirsin."
-
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Context limit"
 msgstr "Bağlam sınırı"
 
+#: src/components/integrations/AgentStep.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/Onboarding.tsx
 msgid "Continue"
@@ -1587,9 +1639,9 @@ msgstr ""
 msgid "Could not add"
 msgstr "Eklenemedi"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not add MCP server"
-msgstr "MCP sunucusu eklenemedi"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not add the connection"
+msgstr ""
 
 #: src/pages/shell/message-cards.tsx
 msgid "Could not approve this server"
@@ -1632,8 +1684,9 @@ msgstr "OAuth tamamlanamadı"
 msgid "Could not complete the update. Try again."
 msgstr ""
 
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Could not connect"
 msgstr "Bağlanılamadı"
 
@@ -1695,10 +1748,6 @@ msgstr "Bot silinemedi"
 msgid "Could not delete group"
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not delete MCP server"
-msgstr "MCP sunucusu silinemedi"
-
 #: src/pages/shell/dialogs.tsx
 msgid "Could not delete routine"
 msgstr "Rutin silinemedi"
@@ -1715,13 +1764,14 @@ msgstr ""
 msgid "Could not delete this artifact."
 msgstr ""
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
+msgid "Could not disconnect"
+msgstr ""
+
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Could not disconnect memory provider"
 msgstr "Hafıza sağlayıcısının bağlantısı kesilemedi"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not disconnect OAuth"
-msgstr "OAuth bağlantısı kesilemedi"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not disconnect this provider"
@@ -1751,10 +1801,6 @@ msgstr "{name} indirilemedi. Tekrar dene."
 #: src/components/computer/FilesApp.tsx
 msgid "Could not download file"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not install connector"
-msgstr "Bağlayıcı kurulamadı"
 
 #: src/components/computer/FilesApp.tsx
 msgid "Could not list files"
@@ -1798,13 +1844,9 @@ msgid "Could not load credentials."
 msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/useIntegrations.ts
 msgid "Could not load integrations"
 msgstr "Entegrasyonlar yüklenemedi"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not load MCP servers"
-msgstr "MCP sunucuları yüklenemedi"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not load model settings"
@@ -1822,6 +1864,10 @@ msgstr "Giriş seçenekleri yüklenemedi"
 #: src/pages/KnowledgeSection.tsx
 msgid "Could not load skill"
 msgstr "Beceri yüklenemedi"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Could not load the app list. Reload to try again."
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Could not load this artifact."
@@ -1875,16 +1921,16 @@ msgstr "Model sunucusuna ulaşılamadı."
 msgid "Could not reach the server"
 msgstr "Sunucuya ulaşılamadı"
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/useMcpReconnect.ts
 msgid "Could not reconnect"
 msgstr ""
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Could not remove"
 msgstr "Kaldırılamadı"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Could not remove connector"
 msgstr "Bağlayıcı kaldırılamadı"
 
@@ -1896,12 +1942,9 @@ msgstr "Kural kaldırılamadı"
 msgid "Could not remove the credential"
 msgstr ""
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Could not rename"
-msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not rename connection"
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx
@@ -1920,10 +1963,6 @@ msgstr "Grafik çizilemedi"
 msgid "Could not reset password"
 msgstr "Parola sıfırlanamadı"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not revoke connection"
-msgstr "Bağlantı iptal edilemedi"
-
 #: src/pages/Shell.tsx
 msgid "Could not run routine"
 msgstr ""
@@ -1933,6 +1972,11 @@ msgstr ""
 #: src/pages/shell/bot-panel.tsx
 msgid "Could not save"
 msgstr "Kaydedilemedi"
+
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not save agent access"
+msgstr ""
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Could not save Auto Review"
@@ -1982,8 +2026,8 @@ msgstr ""
 msgid "Could not save this choice"
 msgstr "Bu seçim kaydedilemedi"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not search catalog"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not search"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -1994,9 +2038,9 @@ msgstr "Sıfırlama e-postası gönderilemedi"
 msgid "Could not send that"
 msgstr "Gönderilemedi"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not start OAuth"
-msgstr "OAuth başlatılamadı"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not start sign-in."
+msgstr ""
 
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not start teaching"
@@ -2014,7 +2058,8 @@ msgstr "Kontrol alınamadı"
 msgid "Could not update"
 msgstr "Güncellenemedi"
 
-#: src/pages/McpServersOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Could not update agent access"
 msgstr "Agent erişimi güncellenemedi"
 
@@ -2128,20 +2173,11 @@ msgstr ""
 msgid "Creating…"
 msgstr "Oluşturuluyor…"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Credential"
-msgstr "Kimlik bilgisi"
-
-#: src/pages/McpServersOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
-msgid "credential saved"
-msgstr "kimlik bilgisi kaydedildi"
-
 #: src/pages/shell/bot-credentials.tsx
 msgid "Credentials"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Credentials are encrypted and never sent to the model."
 msgstr "Kimlik bilgileri şifrelenir ve modele asla gönderilmez."
 
@@ -2157,6 +2193,10 @@ msgstr "Cron ifadesi"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
 msgstr "Mevcut parola"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Custom connections still work."
+msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Custom header"
@@ -2227,7 +2267,6 @@ msgstr "Varsayılan kapsam"
 #: src/pages/Artifacts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/KnowledgeSection.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/dialogs.tsx
@@ -2312,6 +2351,14 @@ msgstr ""
 msgid "Desktop update"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Developer"
+msgstr ""
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Didn't open?"
+msgstr ""
+
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Direct MCP"
 msgstr ""
@@ -2328,7 +2375,6 @@ msgstr ""
 msgid "Discard attachments?"
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -2337,6 +2383,18 @@ msgstr "Bağlantıyı kes"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Disconnect {disconnectName}?"
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Disconnect {name}"
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Disconnect {name}?"
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "Disconnect sign-in"
 msgstr ""
 
 #. placeholder {0}: selected.providerName ?? selected.provider
@@ -2364,7 +2422,7 @@ msgstr ""
 msgid "Dismissed. Reconnect anytime from MCP settings."
 msgstr "Kapatıldı. MCP ayarlarından istediğin zaman yeniden bağlanabilirsin."
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Display name"
 msgstr "Görünen ad"
 
@@ -2384,10 +2442,16 @@ msgstr ""
 msgid "Docker limits access to your computer for added security. Using {hostLabel} lets bots work with your local files and tools."
 msgstr "Docker, ek güvenlik için bilgisayarına erişimi sınırlar. {hostLabel} kullanıldığında botlar yerel dosyaların ve araçlarınla çalışabilir."
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Docs & files"
+msgstr ""
+
 #: src/pages/Auth.tsx
 msgid "Don’t have an account?"
 msgstr "Hesabın yok mu?"
 
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/lib/ticket-status.ts
 #: src/pages/ActivityList.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
@@ -2470,6 +2534,10 @@ msgstr "Profili Düzenle"
 msgid "Email"
 msgstr "E-posta"
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Email & calendar"
+msgstr ""
+
 #: src/lib/user-error.ts
 msgid "Email is not allowed to register"
 msgstr "Bu e-posta adresinin kaydolmasına izin verilmiyor"
@@ -2517,6 +2585,18 @@ msgstr "Görüntü sınırı için 1 ile 1000 arasında bir tam sayı girin."
 msgid "Enter an API key before testing."
 msgstr "Test etmeden önce bir API anahtarı gir."
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Enter the command to run."
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Enter the server URL, starting with https://."
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Enter the URL, starting with https://."
+msgstr ""
+
 #: src/lib/roster-status.ts
 #: src/pages/Shell.tsx
 msgid "Error"
@@ -2530,6 +2610,14 @@ msgstr "Her"
 #: src/pages/RoutineSchedule.tsx
 msgid "every {intervalAmountSelect} {intervalUnitSelect}"
 msgstr "her {intervalAmountSelect} {intervalUnitSelect}"
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Every agent loses access to {name}."
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "Every agent loses access to its tools."
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
@@ -2562,10 +2650,6 @@ msgstr "Her hafta"
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Excluded"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Executor token"
-msgstr "Executor belirteci"
 
 #: src/pages/shell/message-cards.tsx
 msgid "Expand"
@@ -2608,6 +2692,7 @@ msgstr ""
 msgid "failed"
 msgstr "başarısız"
 
+#: src/components/integrations/parts.tsx
 #: src/pages/ActivityList.tsx
 msgid "Failed"
 msgstr "Başarısız"
@@ -2659,6 +2744,7 @@ msgstr ""
 
 #: src/components/finance/ui.tsx
 #: src/components/FinanceCards.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
@@ -2672,6 +2758,10 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Financing"
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Find an app"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -2830,15 +2920,10 @@ msgstr ""
 msgid "Header \"{header}\""
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Header name"
 msgstr "Üstbilgi adı"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Header value"
-msgstr "Üstbilgi değeri"
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Hear a sample"
@@ -2904,9 +2989,9 @@ msgstr ""
 msgid "Image upload area"
 msgstr "Görüntü yükleme alanı"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Import OpenAPI JSON"
-msgstr "OpenAPI JSON içe aktar"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Import an OpenAPI description"
+msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Important"
@@ -2961,15 +3046,13 @@ msgstr "Instance API anahtarı"
 msgid "Instruction"
 msgstr "Talimat"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Integration domain"
-msgstr ""
-
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Integration options"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/pages/Shell.tsx
 msgid "Integrations"
 msgstr "Entegrasyonlar"
@@ -2994,6 +3077,10 @@ msgstr "Yalıtılmış"
 
 #: src/pages/Artifacts.tsx
 msgid "Isolated preview — no access to your account"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "It now appears under Connected."
 msgstr ""
 
 #: src/components/compose/RichTextEditor.tsx
@@ -3128,10 +3215,6 @@ msgstr "Web görsellerini otomatik yükle"
 msgid "Loading activity…"
 msgstr "Etkinlik yükleniyor…"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Loading integrations…"
-msgstr "Entegrasyonlar yükleniyor…"
-
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Loading memory settings…"
 msgstr "Hafıza ayarları yükleniyor…"
@@ -3148,7 +3231,7 @@ msgstr "Önizleme yükleniyor…"
 msgid "Loading rules…"
 msgstr "Kurallar yükleniyor…"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
 msgid "Loading tools…"
 msgstr ""
 
@@ -3177,6 +3260,14 @@ msgstr "Yerel"
 msgid "Local access lets bots run commands without asking. Avoid it on shared or public servers."
 msgstr "Yerel erişim, botların sormadan komut çalıştırmasına izin verir. Paylaşılan veya herkese açık sunucularda bunu kullanma."
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Local command"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Local server"
+msgstr ""
+
 #: src/pages/LocalSettings.tsx
 msgid "Local Server Settings"
 msgstr ""
@@ -3201,6 +3292,14 @@ msgstr ""
 msgid "Lowercase letters, numbers, hyphens and underscores, starting with a letter."
 msgstr ""
 
+#: src/components/integrations/AppDetail.tsx
+msgid "Mail data from this account that Rakazo cached is removed."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Mail data Rakazo cached from these accounts is removed."
+msgstr ""
+
 #: src/components/ComputerUpdateProgress.tsx
 msgid "Make sure nothing is still running on this computer."
 msgstr "Bu bilgisayarda hâlâ çalışan bir şey olmadığından emin ol."
@@ -3209,18 +3308,9 @@ msgstr "Bu bilgisayarda hâlâ çalışan bir şey olmadığından emin ol."
 msgid "Manage"
 msgstr ""
 
-#. placeholder {0}: server.name
-#: src/components/integrations/McpServerRow.tsx
-msgid "Manage {0}"
-msgstr ""
-
 #: src/pages/Paywall.tsx
 msgid "Manage billing"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Manage MCP servers"
-msgstr "MCP sunucularını yönet"
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Manage messaging settings"
@@ -3230,11 +3320,7 @@ msgstr ""
 msgid "Manage the Space semantic memory provider."
 msgstr "Çalışma alanının semantik hafıza sağlayıcısını yönet."
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Manual"
-msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Manual setup required"
 msgstr ""
 
@@ -3303,10 +3389,6 @@ msgstr "Maksimum çıktı token sayısı"
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "MCP endpoint"
 msgstr ""
-
-#: src/pages/McpServersOverlay.tsx
-msgid "MCP servers"
-msgstr "MCP sunucuları"
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -3534,7 +3616,7 @@ msgstr "Taşı"
 msgid "Mute"
 msgstr "Sesi kapat"
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Auth.tsx
 #: src/pages/GroupPanel.tsx
@@ -3565,6 +3647,10 @@ msgstr ""
 msgid "Needs input"
 msgstr "Girdi bekliyor"
 
+#: src/components/integrations/parts.tsx
+msgid "Needs reconnect"
+msgstr ""
+
 #: src/pages/Inbox.tsx
 msgid "Needs reply"
 msgstr ""
@@ -3581,6 +3667,10 @@ msgstr ""
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Net"
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Never changes your account"
 msgstr ""
 
 #: src/pages/Shell.tsx
@@ -3646,19 +3736,20 @@ msgstr ""
 msgid "No agent connections yet."
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "No apps match your search."
-msgstr "Aramanla eşleşen uygulama yok."
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "No agent uses {0} yet. Choose agents on its page."
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "No apps match."
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "No artifacts found."
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "no auth"
-msgstr "kimlik doğrulamasız"
-
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "No authentication"
 msgstr "Kimlik doğrulaması yok"
 
@@ -3698,10 +3789,6 @@ msgstr ""
 msgid "No mail matches this filter"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "No managed app catalog is configured on this deployment."
-msgstr ""
-
 #: src/pages/Artifacts.tsx
 msgid "No matching artifacts on this page."
 msgstr ""
@@ -3709,14 +3796,6 @@ msgstr ""
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "No matching models"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "No MCP or API tool sources installed yet."
-msgstr "Henüz MCP veya API araç kaynağı kurulmadı."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "No MCP servers yet."
-msgstr "Henüz MCP sunucusu yok."
 
 #: src/pages/PeerMessagesOverlay.tsx
 msgid "No messages with {peerBotName} yet."
@@ -3746,7 +3825,7 @@ msgstr ""
 msgid "No remote MCP servers found"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/SpaceSearch.tsx
 msgid "No results"
 msgstr "Sonuç yok"
@@ -3775,7 +3854,7 @@ msgstr ""
 msgid "No tickets yet"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
 msgid "No tools available."
 msgstr ""
 
@@ -3799,6 +3878,7 @@ msgstr ""
 msgid "Not confirmed as sent. Check Sent before trying again."
 msgstr ""
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Not connected"
 msgstr "Bağlı değil"
@@ -3813,10 +3893,6 @@ msgstr ""
 
 #: src/pages/finance/FinanceNotFound.tsx
 msgid "Not found"
-msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Not in the plugin catalog"
 msgstr ""
 
 #: src/pages/shell/message-cards.tsx
@@ -3858,19 +3934,10 @@ msgstr ""
 msgid "OAuth authorization was cancelled."
 msgstr "OAuth yetkilendirmesi iptal edildi."
 
-#: src/pages/McpServersOverlay.tsx
-msgid "OAuth connected"
-msgstr "OAuth bağlandı"
-
 #: src/pages/GoogleOAuthCallback.tsx
 #: src/pages/McpOAuthCallback.tsx
 msgid "OAuth connection failed"
 msgstr "OAuth bağlantısı başarısız"
-
-#: src/components/integrations/McpServerRow.tsx
-#: src/pages/McpServersOverlay.tsx
-msgid "OAuth expired"
-msgstr ""
 
 #. placeholder {0}: call.botName
 #: src/components/call/CallCard.tsx
@@ -3888,6 +3955,10 @@ msgstr "her ayın 1'inde saat {0}"
 
 #: src/pages/Shell.tsx
 msgid "Only empty spaces can be deleted. Delete its bots and groups first."
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Only if the server does not use sign-in"
 msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
@@ -3914,6 +3985,10 @@ msgstr ""
 msgid "Open <0>{0}</0> to finish signing in."
 msgstr ""
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Open again"
+msgstr ""
+
 #: src/components/ComputersUnavailableHint.tsx
 msgid "Open computer settings"
 msgstr ""
@@ -3921,6 +3996,10 @@ msgstr ""
 #: src/components/markdown-link-prompt.tsx
 msgid "Open external link?"
 msgstr "Harici bağlantı açılsın mı?"
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Open Finance"
+msgstr ""
 
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Open in Brex"
@@ -3945,6 +4024,10 @@ msgstr ""
 #: src/components/computer/TerminalApp.tsx
 msgid "Open shell"
 msgstr "Kabuğu aç"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Open sign-in"
+msgstr ""
 
 #: src/pages/ScratchpadSection.tsx
 msgid "Open work"
@@ -3977,10 +4060,6 @@ msgstr "Çalışma alanın açılıyor…"
 msgid "Optional"
 msgstr "İsteğe bağlı"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Optional header value"
-msgstr "İsteğe bağlı üstbilgi değeri"
-
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Or connect an API key"
 msgstr "Veya bir API anahtarı bağla"
@@ -4004,6 +4083,10 @@ msgstr "Orijinal mesaj kullanılamıyor"
 #: src/components/finance/ui.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Other"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Other connection types"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4070,6 +4153,10 @@ msgstr ""
 msgid "Paste a replacement key"
 msgstr "Yeni bir anahtar yapıştır"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Paste the MCP server URL from the app's documentation."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Paste the OpenAI-compatible address from your server. Rakazo adds /v1 if needed."
 msgstr "Sunucundaki OpenAI uyumlu adresi yapıştır. Gerekirse Rakazo /v1 ekler."
@@ -4127,6 +4214,10 @@ msgstr "Çalınıyor…"
 #: src/pages/KnowledgeSection.tsx
 msgid "Plugin"
 msgstr "Eklenti"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Popular"
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "POST to"
@@ -4217,6 +4308,18 @@ msgstr "Tepki ver"
 msgid "Reactions"
 msgstr "Tepkiler"
 
+#: src/components/integrations/AppDetail.tsx
+msgid "Read"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read balances and transactions"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read cards, expenses and bills"
+msgstr ""
+
 #: src/pages/shell/bot-panel.tsx
 msgid "Read replies aloud"
 msgstr "Yanıtları sesli oku"
@@ -4248,17 +4351,16 @@ msgstr ""
 msgid "Recent"
 msgstr "Son"
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Reconnect"
 msgstr ""
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/Finance.tsx
 msgid "Reconnect {name}"
 msgstr ""
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Reconnect OAuth"
-msgstr "OAuth'u yeniden bağla"
 
 #: src/App.tsx
 #: src/components/ComputerUpdateProgress.tsx
@@ -4361,9 +4463,9 @@ msgid "Release interrupted computer?"
 msgstr ""
 
 #: src/components/ApprovalRulesSettings.tsx
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/ModelBackupsSettings.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Remove"
@@ -4374,12 +4476,19 @@ msgstr "Kaldır"
 #. placeholder {0}: file.name
 #: src/components/compose/RecipientField.tsx
 #: src/components/ComposeEmail.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/pages/Shell.tsx
 msgid "Remove {0}"
 msgstr "{0} kaldır"
 
+#. placeholder {0}: removing?.name
+#. placeholder {0}: removingRow?.displayName ?? ""
 #. placeholder {0}: server.name
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Remove {0}?"
 msgstr ""
 
@@ -4429,11 +4538,20 @@ msgstr "Sohbeti, bilgisayarı ve hafızasıyla birlikte kaldırıldı."
 msgid "Removed, but list refresh failed"
 msgstr "Kaldırıldı ama liste yenilenemedi"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Removing…"
-msgstr "Kaldırılıyor…"
+#: src/components/integrations/AppDetail.tsx
+msgid "Removes all {accountCount} accounts and agent access."
+msgstr ""
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+msgid "Removes the account and agent access."
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "Removes the connection and agent access."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Rename"
 msgstr ""
 
@@ -4652,6 +4770,10 @@ msgstr ""
 msgid "Runway"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Sales & CRM"
+msgstr ""
+
 #: src/components/AskCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
@@ -4731,8 +4853,8 @@ msgid "Scheduling"
 msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelSettingsOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/bot-picker.tsx
 #: src/pages/shell/command-palette.tsx
@@ -4743,8 +4865,9 @@ msgstr "Ara"
 msgid "Search activity"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Search apps"
 msgstr "Uygulama ara"
 
@@ -4756,8 +4879,12 @@ msgstr ""
 msgid "Search bots and switch conversations"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Search by domain"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Search directory"
 msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
@@ -4784,12 +4911,15 @@ msgstr "Sağlayıcı ara"
 msgid "Search runs"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Search the directory"
+msgstr ""
+
 #. placeholder {0}: filters.query.trim()
 #: src/pages/ActivityList.tsx
 msgid "Search: {0}"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/SpaceSearch.tsx
 msgid "Searching…"
 msgstr "Aranıyor…"
@@ -4862,16 +4992,16 @@ msgstr ""
 msgid "Server integrations"
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Server name"
-msgstr "Sunucu adı"
-
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Server URL"
 msgstr "Sunucu URL'si"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Set up app catalog"
+msgstr ""
 
 #: src/components/call/CallCard.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -4918,6 +5048,10 @@ msgstr "Paylaşılan beceriler"
 msgid "Shell"
 msgstr "Kabuk"
 
+#: src/pages/Finance.tsx
+msgid "Show all {total}"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "Show bots"
 msgstr ""
@@ -4931,6 +5065,7 @@ msgid "Show Inbox agent"
 msgstr ""
 
 #: src/components/inbox/TodoCard.tsx
+#: src/pages/Finance.tsx
 msgid "Show less"
 msgstr ""
 
@@ -4938,7 +5073,7 @@ msgstr ""
 msgid "Show list"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Show more"
 msgstr "Daha fazla göster"
 
@@ -4980,6 +5115,10 @@ msgstr "Oturum aç"
 msgid "Sign in again"
 msgstr ""
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Sign in to {appName} in the new window"
+msgstr ""
+
 #: src/pages/Auth.tsx
 msgid "Sign in to Rakazo"
 msgstr "Rakazo'da oturum aç"
@@ -4997,6 +5136,32 @@ msgstr "Abonelikle oturum aç veya bunun yerine API anahtarını test et."
 msgid "Sign up"
 msgstr "Kaydol"
 
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Sign-in did not finish in time."
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Sign-in did not finish."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Sign-in failed"
+msgstr ""
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Sign-in was cancelled"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/useMcpReconnect.ts
+msgid "Sign-in was cancelled or did not finish. Try again."
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Sign-in was denied or failed."
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Site"
 msgstr ""
@@ -5006,6 +5171,7 @@ msgstr ""
 msgid "Skill {0}"
 msgstr "Beceri: {0}"
 
+#: src/components/integrations/AgentStep.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/Shell.tsx
 msgid "Skip"
@@ -5129,6 +5295,14 @@ msgstr "Başlatılıyor…"
 msgid "Status"
 msgstr ""
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Step 1 of 3"
+msgstr ""
+
+#: src/components/integrations/AgentStep.tsx
+msgid "Step 2 of 3"
+msgstr ""
+
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Steps"
 msgstr "Adımlar"
@@ -5149,10 +5323,6 @@ msgstr "Öğretmeyi durdur"
 #: src/lib/browser-notifications.ts
 msgid "Stopped."
 msgstr "Durduruldu."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Stored encrypted"
-msgstr "Şifreli saklanıyor"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Stored securely. Never shown here."
@@ -5279,6 +5449,11 @@ msgstr "Oturum açmayı test et"
 msgid "Testing…"
 msgstr "Test ediliyor…"
 
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "The agents you chose can use {0}."
+msgstr ""
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "The API did not come back. Refresh this page."
 msgstr ""
@@ -5287,6 +5462,10 @@ msgstr ""
 msgid "The connection timed out."
 msgstr "Bağlantı zaman aşımına uğradı."
 
+#: src/components/integrations/AppDetail.tsx
+msgid "The Inbox page stops showing new mail until you reconnect."
+msgstr ""
+
 #: src/lib/model-connection-preflight.ts
 msgid "The provider is rate-limiting requests."
 msgstr "Sağlayıcı istek hızını sınırlıyor."
@@ -5294,6 +5473,10 @@ msgstr "Sağlayıcı istek hızını sınırlıyor."
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "The selected memory provider is not available in this build."
 msgstr "Seçilen hafıza sağlayıcısı bu sürümde kullanılamıyor."
+
+#: src/components/integrations/SignInStep.tsx
+msgid "The sign-in window closed before finishing. Nothing was changed."
+msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "These saved settings can't be read. Remove it and add it again."
@@ -5330,6 +5513,10 @@ msgstr "Bu sohbet yalnızca görüntülenebilir"
 #: src/pages/HostComputerPrompt.tsx
 msgid "this computer"
 msgstr "bu bilgisayar"
+
+#: src/components/integrations/McpDetail.tsx
+msgid "This connection no longer exists."
+msgstr ""
 
 #. placeholder {0}: pendingDelete.versionCount
 #: src/pages/Artifacts.tsx
@@ -5376,14 +5563,9 @@ msgstr "Bu sıfırlama bağlantısı geçersiz veya süresi dolmuş"
 msgid "This server cannot be assigned without a bot."
 msgstr "Bu sunucu bir bot olmadan atanamaz."
 
-#: src/components/integrations/McpServerRow.tsx
-#: src/pages/McpServersOverlay.tsx
-msgid "This server did not request browser authorization."
-msgstr "Bu sunucu tarayıcı yetkilendirmesi istemedi."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "This server is already connected. Disconnect it first to authorize again."
-msgstr "Bu sunucu zaten bağlı. Yeniden yetkilendirmek için önce bağlantısını kes."
+#: src/components/integrations/useMcpReconnect.ts
+msgid "This server did not ask for a sign-in."
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "This subscription sign-in is not available in Rakazo yet. Use a deployment credential or choose another provider."
@@ -5435,12 +5617,17 @@ msgstr "Kime:"
 msgid "Today"
 msgstr "Bugün"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Tool sources"
-msgstr "Araç kaynakları"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Token"
+msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
 msgid "Tools"
+msgstr ""
+
+#. placeholder {0}: tools.length
+#: src/components/integrations/AppDetail.tsx
+msgid "Tools · {0}"
 msgstr ""
 
 #: src/pages/finance/FinanceAccounts.tsx
@@ -5469,10 +5656,6 @@ msgstr ""
 msgid "Treat like a person"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Treg token"
-msgstr "Treg token'ı"
-
 #: src/pages/BillingSettingsPanel.tsx
 msgid "Trial"
 msgstr ""
@@ -5484,6 +5667,8 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/finance/ui.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/SignInStep.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/Onboarding.tsx
@@ -5526,10 +5711,6 @@ msgstr ""
 #: src/components/MailOutbox.tsx
 #: src/pages/Inbox.tsx
 msgid "Undo"
-msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Uninstall"
 msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
@@ -5636,6 +5817,10 @@ msgstr "Yükle"
 msgid "Urgent"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "URL"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/SettingsOverlay.tsx
 #: src/pages/Shell.tsx
@@ -5671,6 +5856,12 @@ msgstr "Bu modeli kullan"
 msgid "Use your own key"
 msgstr "Kendi anahtarınızı kullanın"
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
+msgid "Used by"
+msgstr ""
+
 #: src/components/AskCard.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Username"
@@ -5703,16 +5894,25 @@ msgstr ""
 msgid "Vendors"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Verify and add"
 msgstr "Doğrula ve ekle"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Verifying…"
 msgstr "Doğrulanıyor…"
 
 #: src/pages/Artifacts.tsx
 msgid "Version"
+msgstr ""
+
+#. placeholder {0}: providerLabel(connectorId)
+#: src/components/integrations/AppDetail.tsx
+msgid "via {0}"
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "via MCP · {host}"
 msgstr ""
 
 #: src/pages/RoutineRunHistory.tsx
@@ -5746,8 +5946,17 @@ msgstr ""
 msgid "Wait a moment and test again."
 msgstr "Biraz bekle ve yeniden test et."
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/SignInStep.tsx
+msgid "Waiting for sign-in"
+msgstr ""
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Waiting for the API to come back…"
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Waiting for you to finish signing in."
 msgstr ""
 
 #: src/lib/roster-status.ts
@@ -5827,6 +6036,10 @@ msgstr ""
 msgid "Where should bots run?"
 msgstr "Botlar nerede çalışsın?"
 
+#: src/components/integrations/AgentStep.tsx
+msgid "Which agents can use {appName}?"
+msgstr ""
+
 #: src/components/EmailCards.tsx
 msgid "Within 3 days"
 msgstr ""
@@ -5839,6 +6052,10 @@ msgstr ""
 #: src/pages/Auth.tsx
 msgid "Working…"
 msgstr "Çalışıyor…"
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Write"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Writing"
@@ -5873,6 +6090,10 @@ msgstr ""
 msgid "You"
 msgstr "Sen"
 
+#: src/components/integrations/AgentStep.tsx
+msgid "You can change this later."
+msgstr ""
+
 #: src/pages/McpOAuthCallback.tsx
 msgid "You can close this tab if it does not redirect automatically."
 msgstr "Otomatik yönlendirilmezsen bu sekmeyi kapatabilirsin."
@@ -5885,6 +6106,19 @@ msgstr "Bu pencereyi kapatabilirsin."
 #: src/pages/Shell.tsx
 msgid "You have control"
 msgstr "Kontrol sende"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Your browser blocked the sign-in window"
+msgstr ""
+
+#. placeholder {0}: server.name
+#: src/components/integrations/McpDetail.tsx
+msgid "Your data in {0} is not deleted."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Your data in {name} is not deleted."
+msgstr ""
 
 #: src/pages/Auth.tsx
 msgid "Your email address"

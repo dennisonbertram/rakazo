@@ -8,7 +8,7 @@ import type {
   UpcomingItem,
 } from "@rakazo/contracts";
 import { Button, Skeleton } from "@rakazo/ui-web";
-import { ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BurnBars, Sparkline } from "../components/finance/charts";
@@ -27,9 +27,10 @@ import {
   useFinanceQuery,
   useRowNavigate,
 } from "../components/finance/ui";
-import { connectFinanceProvider } from "../lib/finance-connect";
+import { AppLogo } from "../components/integrations/AppLogo";
 import { changeText, money, monthFull, paidWithLabel, shortDay } from "../lib/finance-format";
 import { financePath, parseFinanceRoute } from "../lib/finance-route";
+import { FINANCE_PROVIDERS } from "../lib/integrations";
 import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
@@ -45,6 +46,13 @@ import {
 import { FinanceReceiptPage, FinanceTransactionPage } from "./finance/FinanceTransaction";
 
 const providerName = (provider: FinanceProvider) => (provider === "brex" ? "Brex" : "Mercury");
+
+/** Connecting and reconnecting happen on the Integrations page. */
+const CONNECT_PATH = "/app/integrations?category=finance";
+
+/** The most rows a Breakdown or Upcoming card shows before "Show all". */
+const MAX_ROWS = 7;
+const MIN_ROWS = 5;
 
 /** The Finance area: the dashboard at /app/finance and its detail pages. */
 export function FinancePage({ onAskAgent }: { onAskAgent?: () => void }) {
@@ -89,8 +97,6 @@ function Dashboard() {
   const overview = useFinanceQuery(() => rpc.finance.overview(), []);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
-  const [connecting, setConnecting] = useState<FinanceProvider | null>(null);
-  const [connectError, setConnectError] = useState("");
   const reload = useRef(overview.reload);
   reload.current = overview.reload;
 
@@ -116,62 +122,31 @@ function Dashboard() {
     sync();
   }, [connected]);
 
-  const connect = (provider: FinanceProvider, reconnect = false) => {
-    setConnecting(provider);
-    setConnectError("");
-    connectFinanceProvider(provider, reconnect)
-      .then((result) => {
-        if (result === "connected" || result === "already_connected") {
-          synced.current = true;
-          sync();
-        }
-      })
-      .catch((cause) => setConnectError(errorText(cause)))
-      .finally(() => setConnecting(null));
-  };
-
   const data = overview.data;
   if (overview.error) return <ErrorNotice message={overview.error} onRetry={overview.retry} />;
   if (!data) return <DashboardSkeleton />;
-  if (!connected) {
-    return (
-      <div className="flex h-full min-h-72 flex-col items-center justify-center gap-4">
-        <h1 className="text-lg font-medium">
-          <Trans>Finance</Trans>
-        </h1>
-        <div className="flex gap-2">
-          {(["mercury", "brex"] as const).map((provider, i) => (
-            <Button
-              key={provider}
-              variant={i === 0 ? "default" : "outline"}
-              disabled={connecting !== null}
-              onClick={() => connect(provider)}
-            >
-              {provider === "mercury" ? (
-                <Trans>Connect Mercury</Trans>
-              ) : (
-                <Trans>Connect Brex</Trans>
-              )}
-            </Button>
-          ))}
-        </div>
-        {connectError ? (
-          <p role="alert" className="text-sm text-destructive">
-            {connectError}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
+  if (!connected) return <EmptyState />;
+  return <Overview data={data} syncing={syncing} error={syncError} onRefresh={sync} />;
+}
+
+function EmptyState() {
   return (
-    <Overview
-      data={data}
-      syncing={syncing}
-      error={syncError || connectError}
-      connecting={connecting}
-      onRefresh={sync}
-      onConnect={connect}
-    />
+    <div className="flex h-full min-h-72 flex-col items-center justify-center gap-4 text-center">
+      <div className="flex gap-3">
+        {FINANCE_PROVIDERS.map(({ provider, name, logo }) => (
+          <AppLogo key={provider} name={name} logo={logo} size="lg" />
+        ))}
+      </div>
+      <h1 className="text-lg font-medium">
+        <Trans>Finance</Trans>
+      </h1>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        <Trans>Connect Mercury, Brex or both to see cash, burn, runway and spend.</Trans>
+      </p>
+      <Button render={<Link to={CONNECT_PATH} />}>
+        <Trans>Connect accounts</Trans>
+      </Button>
+    </div>
   );
 }
 
@@ -190,32 +165,10 @@ function DashboardSkeleton() {
   );
 }
 
-function SourceChip({
-  source,
-  connecting,
-  onConnect,
-}: {
-  source: FinanceSource;
-  connecting: boolean;
-  onConnect: (provider: FinanceProvider, reconnect?: boolean) => void;
-}) {
+function SourceChip({ source }: { source: FinanceSource }) {
   const name = providerName(source.provider);
   const chip =
     "inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-foreground hover:text-foreground";
-  if (source.status === "not_connected") {
-    return (
-      <button
-        type="button"
-        className={chip}
-        disabled={connecting}
-        aria-label={t`Connect ${name}`}
-        onClick={() => onConnect(source.provider)}
-      >
-        <Plus aria-hidden="true" className="size-3" />
-        {name}
-      </button>
-    );
-  }
   const dot =
     source.status === "ok"
       ? "bg-success"
@@ -224,16 +177,10 @@ function SourceChip({
         : "bg-warning";
   const dotEl = <span aria-hidden="true" className={`size-1.5 rounded-full ${dot}`} />;
   return source.status === "needs_reconnect" ? (
-    <button
-      type="button"
-      className={chip}
-      disabled={connecting}
-      aria-label={t`Reconnect ${name}`}
-      onClick={() => onConnect(source.provider, true)}
-    >
+    <Link to={CONNECT_PATH} className={chip} aria-label={t`Reconnect ${name}`}>
       {dotEl}
       {name}
-    </button>
+    </Link>
   ) : (
     <Link to={financePath.accounts()} className={chip}>
       {dotEl}
@@ -246,20 +193,18 @@ function Overview({
   data,
   syncing,
   error,
-  connecting,
   onRefresh,
-  onConnect,
 }: {
   data: FinanceOverview;
   syncing: boolean;
   error: string;
-  connecting: FinanceProvider | null;
   onRefresh: () => void;
-  onConnect: (provider: FinanceProvider, reconnect?: boolean) => void;
 }) {
   const navigate = useNavigate();
   const [period, setPeriod] = useState<SpendPeriod>("month");
   const [by, setBy] = useState<"category" | "vendor">("category");
+  const [allBreakdown, setAllBreakdown] = useState(false);
+  const [allUpcoming, setAllUpcoming] = useState(false);
   const totals = data.spendTotals[period];
   const month = data.spendTotals.month;
   const change = changeText(totals.changePct);
@@ -267,6 +212,15 @@ function Overview({
   // Less spend than before is good news.
   const tone = (pct: number | null) => ((pct ?? 0) <= 0 ? "text-success" : "text-destructive");
   const burning = data.burn.monthlyCents > 0;
+  // Without a cash balance (Brex only, or no cash accounts) there is nothing to run out of.
+  const hasCash = data.hasCashAccounts;
+  const missing = data.sources.filter((source) => source.status === "not_connected");
+  const onlyOne = missing.length === 1 && data.sources.length > 1 ? missing[0] : undefined;
+  const breakdownRows = data.breakdown[by];
+  const rowCap = Math.max(MIN_ROWS, Math.min(MAX_ROWS, breakdownRows.length));
+  const upcomingRows = [...data.upcoming.items].sort((a, b) =>
+    (a.dates[0] ?? "").localeCompare(b.dates[0] ?? ""),
+  );
   const runwayMonths = data.runway.months?.toFixed(1);
   const runOutMonth = data.runway.runOutDate ? monthFull(data.runway.runOutDate.slice(0, 7)) : "";
   const previousSpend = month.previousCents === null ? null : money(month.previousCents);
@@ -304,41 +258,62 @@ function Overview({
           </span>
         ) : null}
         <div className="flex gap-1">
-          {data.sources.map((source) => (
-            <SourceChip
-              key={source.provider}
-              source={source}
-              connecting={connecting !== null}
-              onConnect={onConnect}
-            />
-          ))}
+          {data.sources
+            .filter((source) => source.status !== "not_connected")
+            .map((source) => (
+              <SourceChip key={source.provider} source={source} />
+            ))}
         </div>
-        <AskAgentButton />
+        {onlyOne ? (
+          <Link
+            to={CONNECT_PATH}
+            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+          >
+            {t`Add ${providerName(onlyOne.provider)}`}
+          </Link>
+        ) : null}
+        <div className="ms-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-10 rounded-[10px] px-4 text-sm"
+            render={<Link to={financePath.accounts()} />}
+          >
+            <Trans>Accounts</Trans>
+          </Button>
+          <AskAgentButton />
+        </div>
       </div>
       {error ? <ErrorNotice message={error} onRetry={onRefresh} /> : null}
       {showSkeleton ? (
         <DashboardSkeleton />
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
-            <Kpi
-              title={t`Cash`}
-              value={money(data.cash.cashCents)}
-              sub={t`Checking + Treasury`}
-              to={financePath.accounts()}
-            />
+          <div
+            className={`grid grid-cols-2 gap-3 ${hasCash ? "@3xl:grid-cols-4" : "@3xl:grid-cols-2"}`}
+          >
+            {hasCash ? (
+              <Kpi
+                title={t`Cash`}
+                value={money(data.cash.cashCents)}
+                sub={t`Checking + Treasury`}
+                to={financePath.accounts()}
+              />
+            ) : null}
             <Kpi
               title={t`Monthly burn`}
               value={burning ? money(data.burn.monthlyCents) : "—"}
               sub={t`3-mo avg`}
               to={financePath.burn()}
             />
-            <Kpi
-              title={t`Runway`}
-              value={runwayMonths === undefined ? "—" : t`${runwayMonths} mo`}
-              sub={runOutMonth ? t`Until ${runOutMonth}` : undefined}
-              to={financePath.runway()}
-            />
+            {hasCash ? (
+              <Kpi
+                title={t`Runway`}
+                value={runwayMonths === undefined ? "—" : t`${runwayMonths} mo`}
+                sub={runOutMonth ? t`Until ${runOutMonth}` : undefined}
+                to={financePath.runway()}
+              />
+            ) : null}
             <Kpi
               title={t`Spend this month`}
               value={money(month.currentCents)}
@@ -430,13 +405,19 @@ function Overview({
               }
             >
               <BreakdownRows
-                rows={data.breakdown[by].slice(0, 7)}
+                rows={allBreakdown ? breakdownRows : breakdownRows.slice(0, rowCap)}
                 to={(row) =>
                   by === "category" ? financePath.category(row.key) : financePath.vendor(row.key)
                 }
               />
-              <div className="text-[11px] text-muted-foreground">
+              <div className="mt-auto flex items-center justify-between text-[11px] text-muted-foreground">
                 <Trans>Last 90 days</Trans>
+                <ShowAll
+                  total={breakdownRows.length}
+                  cap={rowCap}
+                  expanded={allBreakdown}
+                  onToggle={() => setAllBreakdown((v) => !v)}
+                />
               </div>
             </Section>
 
@@ -449,9 +430,17 @@ function Overview({
               }
             >
               <div className="-mx-2">
-                {data.upcoming.items.map((item) => (
+                {(allUpcoming ? upcomingRows : upcomingRows.slice(0, rowCap)).map((item) => (
                   <UpcomingRow key={`${item.kind}:${item.key}`} item={item} />
                 ))}
+              </div>
+              <div className="mt-auto flex justify-end text-[11px] text-muted-foreground">
+                <ShowAll
+                  total={upcomingRows.length}
+                  cap={rowCap}
+                  expanded={allUpcoming}
+                  onToggle={() => setAllUpcoming((v) => !v)}
+                />
               </div>
             </Section>
           </div>
@@ -482,6 +471,25 @@ function Overview({
         </div>
       )}
     </div>
+  );
+}
+
+function ShowAll({
+  total,
+  cap,
+  expanded,
+  onToggle,
+}: {
+  total: number;
+  cap: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  if (total <= cap) return null;
+  return (
+    <button type="button" className="hover:text-foreground hover:underline" onClick={onToggle}>
+      {expanded ? <Trans>Show less</Trans> : <Trans>Show all {total}</Trans>}
+    </button>
   );
 }
 

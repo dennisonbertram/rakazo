@@ -88,6 +88,7 @@ export const connectedOverview: FinanceOverview = {
     cardOwedCents: 492_000,
   },
   burn: { monthlyCents: 2_100_000, months: ["2026-07", "2026-08", "2026-09"] },
+  hasCashAccounts: true,
   runway: { months: 11.9, runOutDate: "2027-10-11" },
   spendTotals: {
     week: totals("week", 305_000, 640_000),

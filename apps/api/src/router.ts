@@ -164,10 +164,12 @@ import {
   callClientNonce,
   clampCatalogThinkingLevel,
   containsSecret,
+  dedupeCatalogBySlug,
   expandSkillReferencesInPrompt,
   hasMixedOneShotSchedule,
   isOneShotRoutineCrons,
   nextCronDateAcrossStrict,
+  withAppDirectory,
 } from "@rakazo/core";
 import type { BoardEvents, Board as BoardRow, PrismaClient, ThreadEvents } from "@rakazo/db";
 import {
@@ -244,7 +246,7 @@ import {
   resolveBusyBotName,
   toComputerStatus,
 } from "./computer-status.js";
-import { completeNativeOAuth } from "./connection-oauth.js";
+import { completeNativeOAuth, connectionError } from "./connection-oauth.js";
 import {
   financeAccountDetail,
   financeAccounts,
@@ -498,6 +500,7 @@ function mcpServerDto(
     updatedAt: Date;
   },
   oauthStatus: McpServer["oauthStatus"] = "none",
+  oauthAttempted = false,
 ): McpServer {
   const args = Array.isArray(row.args)
     ? row.args.filter((item): item is string => typeof item === "string")
@@ -522,11 +525,28 @@ function mcpServerDto(
     headerKeys,
     hasSecret: row.secretId !== null,
     oauthStatus,
+    oauthAttempted,
     enabled: row.enabled,
     revision: row.revision,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId: string) {
+  const row = await prisma.connection.findFirst({
+    where: { id: connectionId, spaceId: actor.spaceId, userId: actor.userId },
+    select: {
+      allAgents: true,
+      botAccess: {
+        where: { spaceId: actor.spaceId, userId: actor.userId },
+        select: { botId: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  if (!row) throw new IsolationError();
+  return { allAgents: row.allAgents, botIds: row.botAccess.map((entry) => entry.botId) };
 }
 
 function connectionContext(
@@ -4140,6 +4160,11 @@ export function createRouter(deps: RouterDeps) {
               })
             : [];
           const ciphertextById = new Map(secrets.map((secret) => [secret.id, secret.ciphertext]));
+          const open = await deps.prisma.mcpOAuthSession.findMany({
+            where: { spaceId: context.actor.spaceId, userId: context.actor.userId },
+            select: { serverId: true },
+          });
+          const attempted = new Set(open.map((session) => session.serverId));
           return Promise.all(
             rows.map(async (row) =>
               mcpServerDto(
@@ -4148,6 +4173,7 @@ export function createRouter(deps: RouterDeps) {
                   row.secretId ? ciphertextById.get(row.secretId) : undefined,
                   row.secretId ?? undefined,
                 ),
+                attempted.has(row.id),
               ),
             ),
           );
@@ -4702,11 +4728,15 @@ export function createRouter(deps: RouterDeps) {
             }
           }),
         );
-        return catalogs.flat();
+        return dedupeCatalogBySlug(withAppDirectory(catalogs.flat()));
       }),
       list: authed.connections.list.handler(async ({ context }) => {
         const rows = await deps.prisma.connection.findMany({
-          where: { spaceId: context.actor.spaceId, userId: context.actor.userId },
+          where: {
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+            status: { in: ["connected", "pending", "error"] },
+          },
         });
         return rows.map((row) => ({
           id: row.id,
@@ -4714,6 +4744,7 @@ export function createRouter(deps: RouterDeps) {
           provider: row.provider,
           displayName: row.displayName,
           status: row.status as "pending" | "connected" | "revoked" | "error",
+          error: connectionError(row),
           capabilities: [],
           createdAt: row.createdAt.toISOString(),
         }));
@@ -4747,7 +4778,12 @@ export function createRouter(deps: RouterDeps) {
               connectorId: input.connectorId,
               provider: input.provider,
             },
-            select: { id: true, status: true },
+            select: {
+              id: true,
+              status: true,
+              allAgents: true,
+              botAccess: { select: { botId: true } },
+            },
             orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
           });
           const reusable = pickReusableConnection(existing);
@@ -4762,7 +4798,9 @@ export function createRouter(deps: RouterDeps) {
               },
             });
           }
-          return tx.connection.create({
+          // A new account of an app inherits the app's agent access.
+          const inherited = existing[0];
+          const created = await tx.connection.create({
             data: {
               spaceId: context.actor.spaceId,
               userId: context.actor.userId,
@@ -4770,8 +4808,20 @@ export function createRouter(deps: RouterDeps) {
               provider: input.provider,
               displayName: input.displayName,
               status: "pending",
+              allAgents: inherited?.allAgents ?? true,
             },
           });
+          if (inherited && inherited.botAccess.length > 0) {
+            await tx.botConnectionAccess.createMany({
+              data: inherited.botAccess.map((entry) => ({
+                connectionId: created.id,
+                botId: entry.botId,
+                spaceId: context.actor.spaceId,
+                userId: context.actor.userId,
+              })),
+            });
+          }
+          return created;
         });
         try {
           const auth = await connector.begin(
@@ -5260,6 +5310,7 @@ export function createRouter(deps: RouterDeps) {
           provider: row.provider,
           displayName: row.displayName,
           status: row.status as "pending" | "connected" | "revoked" | "error",
+          error: connectionError(row),
           capabilities: [],
           createdAt: row.createdAt.toISOString(),
         };
@@ -5283,9 +5334,59 @@ export function createRouter(deps: RouterDeps) {
           provider: row.provider,
           displayName: row.displayName,
           status: row.status as "pending" | "connected" | "revoked" | "error",
+          error: connectionError(row),
           capabilities: [],
           createdAt: row.createdAt.toISOString(),
         };
+      }),
+      access: authed.connections.access.handler(async ({ context, input }) => {
+        return connectionAccess(deps.prisma, context.actor, input.connectionId);
+      }),
+      setAccess: authed.connections.setAccess.handler(async ({ context, input }) => {
+        const { actor } = context;
+        const botIds = [...new Set(input.botIds)];
+        await deps.prisma.$transaction(async (tx) => {
+          const connection = await tx.connection.findFirst({
+            where: { id: input.connectionId, spaceId: actor.spaceId, userId: actor.userId },
+            select: { id: true, connectorId: true, provider: true },
+          });
+          if (!connection) throw new IsolationError();
+          const bots = await tx.bot.count({
+            where: { id: { in: botIds }, spaceId: actor.spaceId, userId: actor.userId },
+          });
+          if (bots !== botIds.length) throw new IsolationError();
+          // Agent access belongs to the app, so every account of it gets the same setting.
+          const siblings = await tx.connection.findMany({
+            where: {
+              spaceId: actor.spaceId,
+              userId: actor.userId,
+              connectorId: connection.connectorId,
+              provider: connection.provider,
+            },
+            select: { id: true },
+          });
+          const ids = siblings.map((row) => row.id);
+          await tx.connection.updateMany({
+            where: { id: { in: ids }, spaceId: actor.spaceId, userId: actor.userId },
+            data: { allAgents: input.allAgents },
+          });
+          await tx.botConnectionAccess.deleteMany({
+            where: { connectionId: { in: ids }, spaceId: actor.spaceId, userId: actor.userId },
+          });
+          if (botIds.length > 0) {
+            await tx.botConnectionAccess.createMany({
+              data: ids.flatMap((connectionId) =>
+                botIds.map((botId) => ({
+                  connectionId,
+                  botId,
+                  spaceId: actor.spaceId,
+                  userId: actor.userId,
+                })),
+              ),
+            });
+          }
+        });
+        return connectionAccess(deps.prisma, actor, input.connectionId);
       }),
       revoke: authed.connections.revoke.handler(async ({ context, input }) => {
         type RemoteRevoke = {

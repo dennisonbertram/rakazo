@@ -8,6 +8,8 @@ const item = (connectorId: string, slug: string): ConnectionCatalogItem => ({
   logo: null,
   connected: false,
   noAuth: false,
+  description: null,
+  category: "other" as const,
 });
 const google = item("google", "gmail");
 const composio = item("composio", "gmail");

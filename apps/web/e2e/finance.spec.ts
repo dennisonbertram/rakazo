@@ -140,20 +140,20 @@ test("Finance shows the dashboard and drills down to a vendor, a charge and its 
   await expect.poll(() => calls.filter((c) => c === "refresh").length).toBeGreaterThan(1);
 });
 
-test("Finance with nothing connected offers Connect Mercury and Connect Brex", async ({
-  page,
-}, testInfo) => {
-  const calls = await mockFinance(page, emptyOverview);
+test("Finance with nothing connected links to Integrations", async ({ page }, testInfo) => {
+  await mockFinance(page, emptyOverview);
   await signup(page, `finance-empty-${Date.now()}@rakazo.test`, "password12", "Finance Empty");
   await completeOnboarding(page);
   await page.getByTestId("sidebar-finance").click();
   const main = page.getByRole("main");
-  await expect(main.getByRole("button", { name: "Connect Mercury" })).toBeVisible();
-  await expect(main.getByRole("button", { name: "Connect Brex" })).toBeVisible();
+  await expect(
+    main.getByText("Connect Mercury, Brex or both to see cash, burn, runway and spend."),
+  ).toBeVisible();
   await expect(main.getByRole("button", { name: "Ask agent" })).toHaveCount(0);
   await captureScreenshot(page, testInfo, "finance-empty");
-  await main.getByRole("button", { name: "Connect Mercury" }).click();
-  await expect.poll(() => calls.includes("connect")).toBe(true);
+  await main.getByRole("link", { name: "Connect accounts" }).click();
+  await expect(page).toHaveURL(/\/app\/integrations\?category=finance$/);
+  await expect(page.getByTestId("finance-section")).toBeVisible();
 });
 
 test("Finance fits a phone and works in dark mode", async ({ page }, testInfo) => {

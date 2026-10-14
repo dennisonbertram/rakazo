@@ -220,6 +220,21 @@ describe("finance overview", () => {
     expect(accounts.map((x) => x.id)).toEqual(["acc-a"]);
   });
 
+  it("reports no runway when only card accounts exist (Brex only), and one when cash exists", async () => {
+    const brexOnly = setup({
+      financeAccount: [account(a, { id: "acc-card", provider: "brex", kind: "card" })],
+    });
+    metrics.runway.mockClear();
+    const brexOverview = await financeOverview(brexOnly.deps, a);
+    expect(brexOverview.runway).toEqual({ months: null, runOutDate: null });
+    expect(brexOverview.hasCashAccounts).toBe(false);
+    expect(metrics.runway).not.toHaveBeenCalled();
+
+    const withCash = setup({ financeAccount: [account(a)] });
+    expect((await financeOverview(withCash.deps, a)).hasCashAccounts).toBe(true);
+    expect(metrics.runway).toHaveBeenCalledTimes(1);
+  });
+
   it("shows the empty state when nothing is connected, and starts no sync", async () => {
     const { deps, enqueue } = setup();
 

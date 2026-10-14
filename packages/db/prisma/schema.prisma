@@ -448,6 +448,7 @@ model Bot {
   runs              Run[]
   steeringMessages  SteeringMessage[]
   mcpServers        BotMcpServer[]
+  connectionAccess  BotConnectionAccess[]
   groupMembers      ChatGroupMember[]
   botSecrets BotSecret[]
   assignedTickets   Ticket[]          @relation("TicketAssigneeBot")
@@ -924,9 +925,27 @@ model Connection {
   inboxTodos         InboxTodo[]
   mailSyncState      MailSyncState?
   composeSends       ComposeSend[]
+  /// false: only bots with a BotConnectionAccess row may use this connection's tools.
+  allAgents          Boolean  @default(true)
+  botAccess          BotConnectionAccess[]
 
   @@index([spaceId, userId, connectorId])
   @@map("connections")
+}
+
+model BotConnectionAccess {
+  id           String     @id @default(cuid())
+  spaceId      String
+  userId       String
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  botId        String
+  bot          Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([connectionId, botId])
+  @@index([botId])
+  @@map("bot_connection_access")
 }
 
 model CapabilityInstall {

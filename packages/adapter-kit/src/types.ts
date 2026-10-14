@@ -265,7 +265,8 @@ export interface ConnectorCapabilities {
   secretsBrokered: boolean;
 }
 
-export type ConnectorCatalogItem = ConnectionCatalogItem;
+/** What a connector reports; the API adds the app directory description and category. */
+export type ConnectorCatalogItem = Omit<ConnectionCatalogItem, "description" | "category">;
 
 export interface MemoryReadRequest {
   scope: "bot" | "user";

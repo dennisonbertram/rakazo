@@ -124,6 +124,7 @@ import {
 import type { ClipboardEvent, DragEvent, MutableRefObject, ReactNode, RefObject } from "react";
 import {
   Fragment,
+  lazy,
   memo,
   Suspense,
   useCallback,
@@ -151,7 +152,7 @@ import { CallCard } from "../components/call/CallCard";
 import { VoiceChatCard } from "../components/call/VoiceChatCard";
 import { ComputerWorkspace } from "../components/computer/ComputerWorkspace";
 import { EmailCards } from "../components/EmailCards";
-import { lazyOverlay } from "../components/ErrorBoundary";
+import { ErrorBoundary, lazyOverlay, SectionLoadFailed } from "../components/ErrorBoundary";
 import { FinanceCards } from "../components/FinanceCards";
 import { MessageHoverMetadata } from "../components/MessageHoverMetadata";
 import {
@@ -312,11 +313,8 @@ const SettingsOverlay = lazyOverlay(() =>
 const PeerMessagesOverlay = lazyOverlay(() =>
   import("./PeerMessagesOverlay").then((module) => module.PeerMessagesOverlay),
 );
-const PluginsOverlay = lazyOverlay(() =>
-  import("./PluginsOverlay").then((module) => module.PluginsOverlay),
-);
-const McpServersOverlay = lazyOverlay(() =>
-  import("./McpServersOverlay").then((module) => module.McpServersOverlay),
+const IntegrationsPage = lazy(() =>
+  import("./Integrations").then((module) => ({ default: module.IntegrationsPage })),
 );
 
 type PendingAttachment = {
@@ -620,8 +618,6 @@ export function ShellPage() {
   function updateSnapshot(update: (prev: ThreadSnapshot | null) => ThreadSnapshot | null) {
     commitSnapshot(update(snapshotRef.current));
   }
-  const [pluginsOpen, setPluginsOpen] = useState(false);
-  const [pluginsQuery, setPluginsQuery] = useState("");
   const [inboxUnread, setInboxUnread] = useState(0);
   const refreshInboxUnread = useCallback(() => {
     void rpc.inbox
@@ -630,7 +626,6 @@ export function ShellPage() {
       .catch(() => undefined);
   }, []);
   useEffect(refreshInboxUnread, [refreshInboxUnread]);
-  const [mcpOpen, setMcpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
   const [messagingSettingsOpen, setMessagingSettingsOpen] = useState(false);
@@ -864,19 +859,22 @@ export function ShellPage() {
 
   const inGroup = Boolean(groupId);
   const inboxMode = useMatch("/app/inbox") != null;
+  const integrationsMode = useMatch("/app/integrations/*") != null;
   const financeMode = useMatch("/app/finance/*") != null;
-  // Inbox and Finance are pages of their own: no bot route, and their agent sits in a side panel.
-  const pageMode = inboxMode || financeMode;
+  // Inbox, Finance and Integrations are pages of their own: no bot route. Inbox and Finance
+  // keep their agent in a side panel.
+  const pageMode = inboxMode || financeMode || integrationsMode;
   useEffect(() => {
     if (!financeMode) setFinanceAgentOpen(false);
   }, [financeMode]);
-  const active = inGroup
-    ? undefined
-    : inboxMode
-      ? findInboxAgent(bots, userId)
-      : financeMode
-        ? findFinanceAgent(bots, userId)
-        : (bots.find((b) => b.id === botId) ?? bots[0]);
+  const active =
+    inGroup || integrationsMode
+      ? undefined
+      : inboxMode
+        ? findInboxAgent(bots, userId)
+        : financeMode
+          ? findFinanceAgent(bots, userId)
+          : (bots.find((b) => b.id === botId) ?? bots[0]);
   const inboxAgentHidden = inboxAgentCollapsed || (!active && !showEmptyInboxAgent);
   const computerBot =
     (computerBotId ? bots.find((bot) => bot.id === computerBotId) : undefined) ?? active;
@@ -3677,11 +3675,15 @@ export function ShellPage() {
         </div>
         <button
           type="button"
+          data-testid="sidebar-integrations"
+          aria-current={integrationsMode ? "page" : undefined}
           onClick={() => {
-            setPluginsQuery("");
-            setPluginsOpen(true);
+            setMobileSidebarOpen(false);
+            navigate("/app/integrations");
           }}
-          className="mx-3 mb-1 flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-sidebar-accent"
+          className={`mx-3 mb-1 flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-sidebar-accent ${
+            integrationsMode ? "bg-sidebar-accent" : ""
+          }`}
         >
           <span className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-accent text-foreground/80">
             <LayoutGrid size={15} strokeWidth={1.8} />
@@ -3919,11 +3921,17 @@ export function ShellPage() {
             ) : null}
           </div>
         </div>
-        {financeMode ? (
+        {integrationsMode ? (
+          <ErrorBoundary fallback={<SectionLoadFailed />}>
+            <Suspense fallback={null}>
+              <IntegrationsPage activeBotId={activeBotId.current} />
+            </Suspense>
+          </ErrorBoundary>
+        ) : financeMode ? (
           <FinancePage onAskAgent={financeAgentOpen ? undefined : askFinanceAgent} />
         ) : inboxMode ? (
           <InboxPage
-            paused={pluginsOpen}
+            paused={false}
             onShowAgent={
               inboxAgentHidden
                 ? () => {
@@ -3933,10 +3941,7 @@ export function ShellPage() {
                 : undefined
             }
             onRefreshed={refreshInboxUnread}
-            onConnectMail={() => {
-              setPluginsQuery("gmail");
-              setPluginsOpen(true);
-            }}
+            onConnectMail={() => navigate("/app/integrations?q=gmail")}
           />
         ) : !active && !activeGroup && initialBotsLoaded ? (
           <div className="grid flex-1 place-items-center">
@@ -4779,18 +4784,6 @@ export function ShellPage() {
           />
         ) : null}
 
-        {pluginsOpen ? (
-          <PluginsOverlay
-            activeBotId={activeBotId.current}
-            initialQuery={pluginsQuery}
-            onClose={() => setPluginsOpen(false)}
-            onOpenMcp={() => {
-              setPluginsOpen(false);
-              setMcpOpen(true);
-            }}
-          />
-        ) : null}
-        {mcpOpen ? <McpServersOverlay onClose={() => setMcpOpen(false)} /> : null}
         {messagingSettingsOpen ? (
           <MessagingSettingsOverlay onClose={() => setMessagingSettingsOpen(false)} />
         ) : null}

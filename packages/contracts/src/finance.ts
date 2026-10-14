@@ -296,6 +296,8 @@ export const FinanceOverviewSchema = z.object({
   /** The unarchived Finance agent, if any. */
   agent: z.object({ botId: Id, name: z.string() }).nullable(),
   cash: CashSummarySchema,
+  /** False with no cash account (for example Brex only); a zero or negative balance is still shown. */
+  hasCashAccounts: z.boolean(),
   burn: MonthlyBurnSchema,
   runway: RunwaySchema,
   spendTotals: z.object({

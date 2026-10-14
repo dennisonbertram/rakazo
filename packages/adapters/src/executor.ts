@@ -3445,6 +3445,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               providerRef: true,
               displayName: true,
               status: true,
+              allAgents: true,
+              botAccess: { where: { botId: run.botId }, select: { botId: true } },
             },
           }),
           findDefaultModelCredential(deps.prisma, run),
@@ -3512,10 +3514,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // The Finance agent reads synced finance data through finance_* tools, with its Mercury and
         // Brex MCP tools for details. Composio and the other connectors only slow it down.
         const financeOnly = isFinanceAgentSpawnKey(bot.spawnKey);
+        // Connections limited to chosen agents stay out of this run unless the bot was granted access.
+        const deniedIds = deniedConnectionIds(storedConnections);
         const composioRows =
           mailOnly || financeOnly
             ? []
-            : storedConnections.filter((connection) => connection.connectorId === "composio");
+            : storedConnections.filter(
+                (connection) =>
+                  connection.connectorId === "composio" && !deniedIds.has(connection.id),
+              );
         let liveSlugs: string[] = [];
         if (needsLivePluginSync(composioRows)) {
           const listing = await loadLivePluginSlugs(deps.listConnectedPluginSlugs, run.userId);
@@ -3531,7 +3538,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           mailOnly || financeOnly
             ? []
             : selectRunConnections(
-                storedConnections,
+                storedConnections.filter((row) => !deniedIds.has(row.id)),
                 connectedComposio.map((connection) => connection.provider),
               );
         const context = {
@@ -3886,7 +3893,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let mailAccountsPromise: Promise<MailAccount[]> | undefined;
         const mailAccounts = () => {
           mailAccountsPromise ??= deps.mail
-            ? deps.mail.listAccounts({ spaceId: run.spaceId, userId: bot.userId }, context)
+            ? deps.mail
+                .listAccounts({ spaceId: run.spaceId, userId: bot.userId }, context)
+                .then((accounts) => accounts.filter((a) => !deniedIds.has(a.id)))
             : Promise.resolve([]);
           return mailAccountsPromise;
         };
@@ -3896,7 +3905,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           calendarAccountsPromise ??= listCalendarAccounts(deps.prisma, {
             spaceId: run.spaceId,
             userId: bot.userId,
-          });
+          }).then((accounts) => accounts.filter((a) => !deniedIds.has(a.id)));
           return calendarAccountsPromise;
         };
         const calendarEnabled =
@@ -3921,7 +3930,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           driveAccountsPromise ??= listDriveAccounts(deps.prisma, {
             spaceId: run.spaceId,
             userId: bot.userId,
-          });
+          }).then((accounts) => accounts.filter((a) => !deniedIds.has(a.id)));
           return driveAccountsPromise;
         };
         const driveEnabled =
@@ -8822,6 +8831,35 @@ function cloudflareRunFields(resolved: { accountId?: string; gatewayId?: string 
     ...(resolved.accountId ? { accountId: resolved.accountId } : {}),
     ...(resolved.gatewayId ? { gatewayId: resolved.gatewayId } : {}),
   };
+}
+
+/** A connection limited to chosen agents is usable only by a bot with an access row. */
+export function botMayUseConnection(row: {
+  allAgents: boolean;
+  botAccess: { botId: string }[];
+}): boolean {
+  return row.allAgents || row.botAccess.length > 0;
+}
+
+/**
+ * Agent access is per app: if any live account of an app (connected, pending or error) is limited
+ * to other agents, every account of that app is denied, so no sibling can stand in for it.
+ */
+export function deniedConnectionIds(
+  rows: {
+    id: string;
+    connectorId: string;
+    provider: string;
+    status: string;
+    allAgents: boolean;
+    botAccess: { botId: string }[];
+  }[],
+): Set<string> {
+  const appKey = (row: { connectorId: string; provider: string }) =>
+    `${row.connectorId}\u0000${row.provider}`;
+  const live = rows.filter((row) => row.status !== "revoked");
+  const deniedApps = new Set(live.filter((row) => !botMayUseConnection(row)).map(appKey));
+  return new Set(live.filter((row) => deniedApps.has(appKey(row))).map((row) => row.id));
 }
 
 export function selectRunConnections<

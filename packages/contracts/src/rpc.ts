@@ -201,6 +201,8 @@ const threadSendInput = threadTarget
     }
   });
 
+const ConnectionAccessSchema = z.object({ allAgents: z.boolean(), botIds: z.array(Id) });
+
 const spaceName = z.string().trim().min(1).max(60);
 
 export const appContract = {
@@ -833,6 +835,11 @@ export const appContract = {
       .input(z.object({ connectionId: Id, displayName: z.string().trim().min(1).max(80) }))
       .output(ConnectionSchema),
     revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Which agents may use this connection's tools. */
+    access: oc.input(z.object({ connectionId: Id })).output(ConnectionAccessSchema),
+    setAccess: oc
+      .input(z.object({ connectionId: Id, allAgents: z.boolean(), botIds: z.array(Id).max(500) }))
+      .output(ConnectionAccessSchema),
     /** Tools the connected provider exposes. Read-only; no per-tool allowlist yet. */
     tools: oc.input(z.object({ connectorId: z.string(), provider: z.string() })).output(
       z.array(

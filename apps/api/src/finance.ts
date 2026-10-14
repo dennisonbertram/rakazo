@@ -346,6 +346,7 @@ export async function financeOverview(
   }
 
   const cash = cashSummary(accounts);
+  const hasCashAccounts = accounts.some((a) => a.kind !== "card");
   const burn = monthlyBurn(txns, now);
   const since = earliestDay(txns);
   const range = last90(now);
@@ -356,8 +357,12 @@ export async function financeOverview(
     sources,
     agent: agent ? { botId: agent.id, name: agent.name } : null,
     cash,
+    hasCashAccounts,
     burn,
-    runway: runway(cash.cashCents, burn.monthlyCents, now),
+    // No cash account (for example Brex only) means no runway, not a runway of zero.
+    runway: hasCashAccounts
+      ? runway(cash.cashCents, burn.monthlyCents, now)
+      : { months: null, runOutDate: null },
     spendTotals: {
       week: spendTotals(txns, "week", now, since),
       month: spendTotals(txns, "month", now, since),

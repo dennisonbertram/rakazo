@@ -630,10 +630,23 @@ export const ConnectionSchema = z.object({
   provider: z.string(),
   displayName: z.string(),
   status: z.enum(["pending", "connected", "revoked", "error"]),
+  /** Short user-safe reason when status is "error"; null otherwise. */
+  error: z.string().nullable(),
   capabilities: z.array(z.string()),
   createdAt: z.string(),
 });
 export type Connection = z.infer<typeof ConnectionSchema>;
+
+export const ConnectionCategorySchema = z.enum([
+  "email_calendar",
+  "chat",
+  "docs_files",
+  "finance",
+  "developer",
+  "sales_crm",
+  "other",
+]);
+export type ConnectionCategory = z.infer<typeof ConnectionCategorySchema>;
 
 export const ConnectionCatalogItemSchema = z.object({
   connectorId: z.string(),
@@ -642,6 +655,9 @@ export const ConnectionCatalogItemSchema = z.object({
   logo: z.string().nullable(),
   connected: z.boolean(),
   noAuth: z.boolean(),
+  /** One line on what an agent can do with the app; null for apps not in the directory. */
+  description: z.string().nullable(),
+  category: ConnectionCategorySchema,
 });
 export type ConnectionCatalogItem = z.infer<typeof ConnectionCatalogItemSchema>;
 
@@ -779,6 +795,8 @@ export const McpServerSchema = z.object({
   headerKeys: z.array(z.string()),
   hasSecret: z.boolean(),
   oauthStatus: z.enum(["none", "connected", "reconnect"]),
+  /** A browser sign-in was started and has not finished (its session is still open). */
+  oauthAttempted: z.boolean(),
   enabled: z.boolean(),
   revision: z.number().int().positive(),
   createdAt: z.string(),

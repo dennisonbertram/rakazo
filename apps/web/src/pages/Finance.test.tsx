@@ -62,6 +62,7 @@ const connectedOverview = (over: Partial<FinanceOverview> = {}): FinanceOverview
     cardOwedCents: null,
   },
   burn: { monthlyCents: 800_000, months: ["2026-07", "2026-08", "2026-09"] },
+  hasCashAccounts: true,
   runway: { months: 6.25, runOutDate: "2027-04-20" },
   spendTotals: {
     week: totals("week", 11_100, 50_000),
@@ -147,20 +148,19 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-it("shows Connect Mercury and Connect Brex when nothing is connected, and connects then syncs", async () => {
-  rpcMock.overview.mockResolvedValueOnce(emptyOverview()).mockResolvedValue(connectedOverview());
-  rpcMock.connect.mockResolvedValue("connected");
+it("shows one Connect accounts link to Integrations when nothing is connected", async () => {
+  rpcMock.overview.mockResolvedValue(emptyOverview());
   await show("/app/finance");
-  expect(button("Connect Brex")).toBeDefined();
+  expect(container.textContent).toContain(
+    "Connect Mercury, Brex or both to see cash, burn, runway and spend.",
+  );
+  expect(container.querySelectorAll('[data-testid="app-logo"]').length).toBe(2);
+  const link = [...container.querySelectorAll("a")].find(
+    (a) => a.textContent === "Connect accounts",
+  );
+  expect(link?.getAttribute("href")).toBe("/app/integrations?category=finance");
   expect(container.textContent).not.toContain("Ask agent");
-
-  await act(async () => button("Connect Mercury")?.click());
-  await flush();
-
-  expect(rpcMock.connect).toHaveBeenCalledWith("mercury", false);
-  expect(rpcMock.refresh).toHaveBeenCalledTimes(1);
-  // The dashboard is read again after the sync.
-  expect(container.textContent).toContain("$50,000");
+  expect(rpcMock.connect).not.toHaveBeenCalled();
 });
 
 it("notes non-USD transactions only when some are left out", async () => {
@@ -176,7 +176,7 @@ it("notes non-USD transactions only when some are left out", async () => {
   expect(container.textContent).toContain("3 non-USD not counted");
 });
 
-it("sends reconnect: true from the Reconnect chip", async () => {
+it("sends the Reconnect chip to Integrations instead of connecting", async () => {
   const base = connectedOverview();
   rpcMock.overview.mockResolvedValue({
     ...base,
@@ -185,11 +185,164 @@ it("sends reconnect: true from the Reconnect chip", async () => {
       ...base.sources.slice(1),
     ],
   });
-  rpcMock.connect.mockResolvedValue("connected");
   await show("/app/finance");
   await flush();
-  await act(async () => button(/Reconnect Mercury/)?.click());
-  expect(rpcMock.connect).toHaveBeenCalledWith("mercury", true);
+  const chip = container.querySelector('a[aria-label="Reconnect Mercury"]');
+  expect(chip?.getAttribute("href")).toBe("/app/integrations?category=finance");
+  expect(rpcMock.connect).not.toHaveBeenCalled();
+});
+
+it("links the header to Accounts and offers Add Brex when only Mercury is connected", async () => {
+  rpcMock.overview.mockResolvedValue(connectedOverview());
+  await show("/app/finance", vi.fn());
+  await flush();
+  const links = [...container.querySelectorAll("a")];
+  const accounts = links.find((a) => a.textContent === "Accounts");
+  expect(accounts?.getAttribute("href")).toBe("/app/finance/accounts");
+  const add = links.find((a) => a.textContent === "Add Brex");
+  expect(add?.getAttribute("href")).toBe("/app/integrations?category=finance");
+  // Accounts comes before Ask agent in the header.
+  const ask = button("Ask agent") as HTMLElement;
+  expect(accounts && ask && accounts.compareDocumentPosition(ask)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+});
+
+it("shows Cash and Runway for Mercury only, and no Add link when both are connected", async () => {
+  rpcMock.overview.mockResolvedValue(connectedOverview());
+  await show("/app/finance");
+  await flush();
+  expect(container.querySelector('a[href="/app/finance/runway"]')).not.toBeNull();
+  expect(container.textContent).toContain("Cash");
+
+  act(() => root.unmount());
+  root = createRoot(container);
+  const base = connectedOverview();
+  rpcMock.overview.mockResolvedValue({
+    ...base,
+    sources: base.sources.map((s) => ({ ...s, status: "ok" as const, serverId: "s" })),
+  });
+  await show("/app/finance");
+  await flush();
+  expect(container.textContent).not.toContain("Add Brex");
+  expect(container.textContent).not.toContain("Add Mercury");
+});
+
+it("hides Cash and Runway when only Brex is connected, and still shows spend", async () => {
+  const base = connectedOverview();
+  rpcMock.overview.mockResolvedValue(
+    connectedOverview({
+      sources: [
+        { provider: "mercury", serverId: null, status: "not_connected", lastSyncedAt: null },
+        { provider: "brex", serverId: "s2", status: "ok", lastSyncedAt: base.lastSyncedAt },
+      ],
+      cash: { cashCents: 0, checkingCents: 0, savingsCents: 0, treasuryCents: 0, cardOwedCents: 0 },
+      hasCashAccounts: false,
+      runway: { months: null, runOutDate: null },
+    }),
+  );
+  await show("/app/finance");
+  await flush();
+  expect(container.querySelector('a[href="/app/finance/runway"]')).toBeNull();
+  expect(container.textContent).not.toContain("Runway");
+  expect(container.textContent).not.toContain("Cash");
+  expect(container.textContent).toContain("Spend this month");
+  expect(container.textContent).toContain("Monthly burn");
+  expect(container.textContent).toContain("Add Mercury");
+});
+
+it("still shows Cash and Runway when the cash balance is zero or negative", async () => {
+  rpcMock.overview.mockResolvedValue(
+    connectedOverview({
+      cash: {
+        cashCents: -250_000,
+        checkingCents: -250_000,
+        savingsCents: 0,
+        treasuryCents: 0,
+        cardOwedCents: null,
+      },
+      runway: { months: 0, runOutDate: null },
+    }),
+  );
+  await show("/app/finance");
+  await flush();
+  expect(container.querySelector('a[href="/app/finance/runway"]')).not.toBeNull();
+  expect(container.textContent).toContain("Cash");
+});
+
+const manyRows = () => {
+  const vendors = Array.from({ length: 12 }, (_, i) => ({
+    key: `v${i}`,
+    label: `Vendor ${i}`,
+    cents: 100_000 - i * 1_000,
+  }));
+  const items = Array.from({ length: 24 }, (_, i) => ({
+    key: `u${i}`,
+    kind: "recurring" as const,
+    name: `Upcoming ${i}`,
+    dates: [`2026-10-${String(15 + (i % 14)).padStart(2, "0")}`],
+    amountCents: 1_000,
+  }));
+  return connectedOverview({
+    breakdown: { category: vendors, vendor: vendors },
+    upcoming: { items, totalCents: 24_000 },
+  });
+};
+
+it("caps Breakdown and Upcoming at the same row count and expands inline", async () => {
+  rpcMock.overview.mockResolvedValue(manyRows());
+  await show("/app/finance");
+  await flush();
+  const rows = () => ({
+    breakdown: container.querySelectorAll('a[href^="/app/finance/category/v"]').length,
+    upcoming: [...container.querySelectorAll("a")].filter((a) =>
+      a.textContent?.includes("Upcoming "),
+    ).length,
+  });
+  expect(rows()).toEqual({ breakdown: 7, upcoming: 7 });
+  // The header total still covers every upcoming row.
+  expect(container.textContent).toContain("~$240");
+  // The soonest rows come first.
+  expect(container.textContent).toContain("Upcoming 0");
+  expect(container.textContent).not.toContain("Upcoming 13");
+
+  const showAll = [...container.querySelectorAll("button")].filter(
+    (b) => b.textContent === "Show all 24",
+  );
+  expect(showAll.length).toBe(1);
+  expect(button("Show all 12")).toBeDefined();
+  await act(async () => showAll[0]?.click());
+  expect(rows().upcoming).toBe(24);
+  expect(rows().breakdown).toBe(7);
+  await act(async () => button("Show less")?.click());
+  expect(rows().upcoming).toBe(7);
+});
+
+it("uses the Breakdown row count (minimum 5) as the cap and hides Show all when everything fits", async () => {
+  const base = manyRows();
+  rpcMock.overview.mockResolvedValue({
+    ...base,
+    breakdown: { category: base.breakdown.category.slice(0, 6), vendor: [] },
+    upcoming: { ...base.upcoming, items: base.upcoming.items.slice(0, 6) },
+  });
+  await show("/app/finance");
+  await flush();
+  expect(container.querySelectorAll('a[href^="/app/finance/category/v"]').length).toBe(6);
+  expect(button(/^Show all/)).toBeUndefined();
+
+  act(() => root.unmount());
+  root = createRoot(container);
+  rpcMock.overview.mockResolvedValue({
+    ...base,
+    breakdown: { category: base.breakdown.category.slice(0, 2), vendor: [] },
+  });
+  await show("/app/finance");
+  await flush();
+  // Fewer than 5 breakdown rows: both cards cap at 5.
+  expect(button("Show all 24")).toBeDefined();
+  expect(
+    [...container.querySelectorAll("a")].filter((a) => a.textContent?.includes("Upcoming ")).length,
+  ).toBe(5);
 });
 
 it("hides the comparison when the previous period is not fully synced", async () => {
@@ -207,15 +360,6 @@ it("hides the comparison when the previous period is not fully synced", async ()
   await flush();
   expect(container.textContent).not.toMatch(/vs \$[\d,]+ last month/);
   expect(container.textContent).not.toContain("vs previous");
-});
-
-it("reports a failed connect without leaving the empty state", async () => {
-  rpcMock.overview.mockResolvedValue(emptyOverview());
-  rpcMock.connect.mockRejectedValue(new Error("Could not reach the server"));
-  await show("/app/finance");
-  await act(async () => button("Connect Brex")?.click());
-  expect(container.querySelector('[role="alert"]')?.textContent).toContain("Could not reach");
-  expect(button("Connect Brex")).toBeDefined();
 });
 
 it("shows the figures, syncs once, and lets the period chips change the spend number", async () => {

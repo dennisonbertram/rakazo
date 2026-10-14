@@ -65,6 +65,16 @@ msgstr "{0} (plus de 10 MiB)"
 msgid "{0} {unitLabel}"
 msgstr "{0} {unitLabel}"
 
+#. placeholder {0}: bot.name
+#: src/components/integrations/parts.tsx
+msgid "{0} can use {appName}"
+msgstr ""
+
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} connected"
+msgstr ""
+
 #. placeholder {0}: block.name
 #: src/pages/shell/message-cards.tsx
 msgid "{0} connection"
@@ -75,10 +85,20 @@ msgstr "Connexion {0}"
 msgid "{0} default"
 msgstr "Défaut de {0}"
 
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} did not accept the sign-in."
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} handling"
 msgstr "Gestion de {0}"
+
+#. placeholder {0}: row?.displayName ?? item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} is ready."
+msgstr ""
 
 #. placeholder {0}: format(size / 1024)
 #: src/components/ArtifactFileCard.tsx
@@ -100,6 +120,11 @@ msgstr ""
 msgid "{0} non-USD not counted"
 msgstr ""
 
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "{0} now appears under Connected."
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -114,6 +139,11 @@ msgstr "{0} exécutions · {1} jetons"
 #. placeholder {0}: card.count
 #: src/components/FinanceCards.tsx
 msgid "{0} transactions"
+msgstr ""
+
+#. placeholder {0}: target.name
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "{0} was added and shows Needs reconnect until you sign in."
 msgstr ""
 
 #. placeholder {0}: bot.name
@@ -132,6 +162,10 @@ msgstr ""
 
 #: src/lib/billing.ts
 msgid "{amount} / {period}"
+msgstr ""
+
+#: src/components/integrations/SignInStep.tsx
+msgid "{appName} was not connected"
 msgstr ""
 
 #: src/pages/Shell.tsx
@@ -199,6 +233,10 @@ msgstr "{name} échoué"
 msgid "{name} finished"
 msgstr "{name} terminé"
 
+#: src/components/integrations/AppDetail.tsx
+msgid "{name} is not connected."
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/lib/browser-notifications.ts
 msgid "{name} stopped"
@@ -228,6 +266,10 @@ msgstr ""
 msgid "{seats, plural, one {# seat} other {# seats}}"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "{serverName} connected"
+msgstr ""
+
 #: src/components/ArtifactFileCard.tsx
 msgid "{size} B"
 msgstr "{size} o"
@@ -243,10 +285,6 @@ msgstr ""
 #: src/pages/ActivityList.tsx
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "{toolCount, plural, one {# tool} other {# tools}}"
-msgstr "{toolCount, plural, one {# outil} other {# outils}}"
 
 #: src/pages/Shell.tsx
 msgid "{workingBotName} is working"
@@ -310,10 +348,6 @@ msgstr "À propos des espaces"
 msgid "Access token"
 msgstr "Jeton d'accès"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Access token (optional)"
-msgstr "Jeton d'accès (optionnel)"
-
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Account"
 msgstr "Compte"
@@ -327,13 +361,14 @@ msgstr "Défaut du compte"
 msgid "Account ID"
 msgstr "ID de compte"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Account label"
-msgstr "Libellé du compte"
+#: src/components/integrations/AppDetail.tsx
+msgid "Account name"
+msgstr ""
 
+#: src/components/integrations/AppDetail.tsx
+#: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceTransaction.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Accounts"
 msgstr "Comptes"
 
@@ -367,11 +402,29 @@ msgstr "Modèle actif"
 msgid "Activity"
 msgstr "Activité"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelBackupsSettings.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Add"
 msgstr "Ajouter"
+
+#. placeholder {0}: providerName(onlyOne.provider)
+#: src/pages/Finance.tsx
+msgid "Add {0}"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Add a custom connection"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Add a GraphQL endpoint"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Add a local command"
+msgstr ""
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Add a model in Settings to use this."
@@ -393,21 +446,9 @@ msgstr "Ajoutez une planification, un webhook, GitHub ou un déclencheur de mess
 msgid "Add a schedule, webhook, GitHub, or message trigger to run this routine."
 msgstr "Ajoutez une planification, un webhook, GitHub ou un déclencheur de message pour exécuter cette routine."
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Add a server name."
-msgstr "Ajoutez un nom de serveur."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Add a stdio command."
-msgstr "Ajoutez une commande stdio."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Add an HTTPS server URL."
-msgstr "Ajoutez une URL de serveur HTTPS."
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add another"
-msgstr "En ajouter un autre"
+#: src/components/integrations/AppDetail.tsx
+msgid "Add another account"
+msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Add connected model"
@@ -421,38 +462,17 @@ msgstr "Ajoutez des modèles connectés pour les utiliser comme modèles de seco
 msgid "Add credential"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Add Executor"
-msgstr "Ajouter un exécuteur"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add GraphQL"
-msgstr "Ajouter GraphQL"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add GraphQL endpoint"
-msgstr "Ajouter un point de terminaison GraphQL"
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Add custom connection"
+msgstr ""
 
 #: src/pages/ScratchpadSection.tsx
 msgid "Add item"
 msgstr "Ajouter un élément"
 
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Add MCP server"
 msgstr "Ajouter un serveur MCP"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add OpenAPI"
-msgstr "Ajouter OpenAPI"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Add remote MCP server"
-msgstr "Ajouter un serveur MCP distant"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Add server"
-msgstr "Ajouter un serveur"
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Add server URL"
@@ -462,28 +482,14 @@ msgstr "Ajouter une URL de serveur"
 msgid "Add to routine"
 msgstr "Ajouter à la routine"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Add Treg"
-msgstr "Ajouter Treg"
-
 #: src/pages/RoutineEditor.tsx
 msgid "Add trigger"
 msgstr "Ajouter un déclencheur"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Added"
-msgstr "Ajouté"
-
-#: src/pages/McpServersOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
-msgid "Adding…"
-msgstr "Ajout en cours…"
-
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/AccountSettingsOverlay.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -506,17 +512,27 @@ msgstr "Ordinateur de l'agent"
 msgid "Agent connections"
 msgstr "Connexions d'agent"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Agents:"
-msgstr "Agents :"
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Agents lose access to its tools."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Agents lose access to this account."
+msgstr ""
 
 #: src/components/AiDataSharing.tsx
 msgid "AI data sharing"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/Inbox.tsx
 msgid "All"
+msgstr ""
+
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "All agents can use {0}."
 msgstr ""
 
 #: src/pages/Artifacts.tsx
@@ -565,6 +581,10 @@ msgstr "Autoriser les actions e-mail sans demander"
 #: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "Autoriser une fois"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Allow pop-ups for this site, or open the sign-in page directly."
+msgstr ""
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Allow purchase actions without asking"
@@ -624,6 +644,10 @@ msgstr "Répondu : {answer}"
 msgid "Any model, with your own key"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Anything else"
+msgstr ""
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "API is back, but the update did not finish. Check the host logs."
 msgstr "L'API est de retour, mais la mise à jour n'est pas terminée. Vérifiez les journaux de l'hôte."
@@ -637,9 +661,13 @@ msgstr "L'API est de retour, mais la mise à jour n'est pas terminée. Vérifiez
 msgid "API key"
 msgstr "Clé API"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "API key header"
 msgstr "En-tête de clé API"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "App connections aren't set up on this server yet."
+msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Appearance"
@@ -662,6 +690,10 @@ msgstr "Approuver"
 msgid "Approve this server to let your agent use its tools."
 msgstr "Approuvez ce serveur pour permettre à votre agent d'utiliser ses outils."
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Apps"
+msgstr ""
+
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 #: src/components/inbox/InboxShortcuts.tsx
@@ -682,7 +714,7 @@ msgstr "Archivé"
 msgid "Archived. Chat, memory, and files kept."
 msgstr "Archivé. Conversation, mémoire et fichiers conservés."
 
-#: src/pages/McpServersOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Arguments"
 msgstr "Arguments"
 
@@ -730,6 +762,10 @@ msgstr "Demander avant d'envoyer un e-mail externe"
 msgid "Ask the server owner to configure this provider."
 msgstr "Demandez au propriétaire du serveur de configurer ce fournisseur."
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Ask the server owner to set up the app catalog."
+msgstr ""
+
 #. placeholder {0}: preset.time
 #: src/pages/RoutineSchedule.tsx
 msgid "at {0}"
@@ -768,6 +804,14 @@ msgstr ""
 #. placeholder {0}: email.attachments
 #: src/components/EmailCards.tsx
 msgid "Attachments: {0}"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Auth header"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Authentication"
 msgstr ""
 
 #: src/lib/model-connection-preflight.ts
@@ -816,8 +860,8 @@ msgid "Avatars"
 msgstr "Avatars"
 
 #: src/components/computer/FilesApp.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/Board.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Back"
 msgstr "Retour"
@@ -862,8 +906,8 @@ msgstr ""
 msgid "Bcc"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Bearer token"
 msgstr "Jeton porteur"
@@ -941,10 +985,6 @@ msgstr "Bots"
 msgid "Bots are working"
 msgstr "Les bots sont en cours d'exécution"
 
-#: src/components/integrations/McpServerRow.tsx
-msgid "Bots lose access to its tools."
-msgstr ""
-
 #: src/pages/Paywall.tsx
 msgid "Bots with their own computer and browser"
 msgstr ""
@@ -961,10 +1001,6 @@ msgstr ""
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Breakdown"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Browse MCP servers"
-msgstr "Parcourir les serveurs MCP"
 
 #: src/components/computer/ComputerWorkspace.tsx
 msgid "Browser"
@@ -1011,14 +1047,16 @@ msgstr "Impossible d'atteindre le serveur."
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/SignInStep.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Cancel"
@@ -1080,6 +1118,7 @@ msgid "Categories"
 msgstr ""
 
 #: src/components/finance/ui.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Category"
@@ -1102,6 +1141,10 @@ msgstr ""
 msgid "Change password"
 msgstr "Changer le mot de passe"
 
+#: src/components/integrations/AppDetail.tsx
+msgid "Changes your account"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Changing…"
 msgstr "Modification en cours…"
@@ -1117,6 +1160,10 @@ msgstr ""
 #: src/pages/shell/message-cards.tsx
 msgid "Chart failed to render: {error}"
 msgstr "Le graphique n'a pas pu s'afficher : {error}"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Chat"
+msgstr ""
 
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Chat apps"
@@ -1203,6 +1250,10 @@ msgstr "Choisissez un nouveau mot de passe"
 msgid "Choose file"
 msgstr "Choisir un fichier"
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Choose the account to connect, then come back here."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Choose which connected model Rakazo uses."
 msgstr "Choisissez le modèle connecté utilisé par Rakazo."
@@ -1246,6 +1297,7 @@ msgstr "Secret client"
 #: src/components/ErrorBoundary.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/SignInStep.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
 #: src/pages/PeerMessagesOverlay.tsx
@@ -1270,14 +1322,6 @@ msgstr "Fermer l'ordinateur"
 #: src/pages/shell/message-cards.tsx
 msgid "Close image preview"
 msgstr "Fermer l'aperçu de l'image"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Close integrations"
-msgstr "Fermer les intégrations"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Close MCP servers"
-msgstr "Fermer les serveurs MCP"
 
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/SettingsOverlay.tsx
@@ -1353,7 +1397,7 @@ msgstr ""
 msgid "Coming soon"
 msgstr "Bientôt disponible"
 
-#: src/pages/McpServersOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Command"
 msgstr "Commande"
 
@@ -1413,20 +1457,11 @@ msgstr ""
 msgid "Computers are off. Set SANDBOX_PROVIDER=docker with SANDBOX_SUPERVISOR_TOKEN, or set SANDBOX_PROVIDER to e2b, daytona, or box with its API key. Recreate the stack after changing .env."
 msgstr "Les ordinateurs sont désactivés. Définissez SANDBOX_PROVIDER=docker avec SANDBOX_SUPERVISOR_TOKEN, ou définissez SANDBOX_PROVIDER sur e2b, daytona ou box avec sa clé API. Recréez la pile après avoir modifié .env."
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Configure a plugin catalog on the server to connect apps."
-msgstr "Configurez un catalogue de plugins sur le serveur pour connecter des applications."
-
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Configured by deployment"
 msgstr "Configuré par le déploiement"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Configured servers"
-msgstr "Serveurs configurés"
-
 #: src/pages/KnowledgeSection.tsx
-#: src/pages/McpServersOverlay.tsx
 msgid "Confirm delete"
 msgstr "Confirmer la suppression"
 
@@ -1439,14 +1474,24 @@ msgstr "Confirmer le mot de passe"
 msgid "Confirm the URL is reachable from this browser session, then test again."
 msgstr "Confirmez que l'URL est accessible depuis cette session du navigateur, puis testez à nouveau."
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Connect"
 msgstr "Connecter"
 
-#: src/pages/Finance.tsx
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "Connect {0}"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Connect {name}"
 msgstr ""
 
@@ -1458,15 +1503,19 @@ msgstr "Connecter un modèle"
 msgid "Connect a provider to add backups."
 msgstr "Connectez un fournisseur pour ajouter des modèles de secours."
 
+#: src/pages/Finance.tsx
+msgid "Connect accounts"
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Connect any app that offers an MCP server URL."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connect API key"
 msgstr "Connecter la clé API"
 
-#: src/pages/Finance.tsx
-msgid "Connect Brex"
-msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Executor"
 msgstr "Connecter l'exécuteur"
 
@@ -1479,22 +1528,24 @@ msgid "Connect MCP server “{name}”"
 msgstr "Connecter le serveur MCP « {name} »"
 
 #: src/pages/Finance.tsx
-msgid "Connect Mercury"
+msgid "Connect Mercury, Brex or both to see cash, burn, runway and spend."
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Connect OAuth"
-msgstr "Connecter OAuth"
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Connect the apps you use so your agents can read and act in them. You choose which agents get access to each one."
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connect this provider to use it as your personal model."
 msgstr "Connectez ce fournisseur pour l'utiliser comme modèle personnel."
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Treg"
 msgstr "Connecter Treg"
 
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/parts.tsx
 #: src/pages/GoogleOAuthCallback.tsx
 #: src/pages/McpOAuthCallback.tsx
 #: src/pages/MemorySettingsOverlay.tsx
@@ -1508,6 +1559,11 @@ msgstr "Connecté"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connected · {0}"
 msgstr "Connecté · {0}"
+
+#. placeholder {0}: new Date(row.createdAt).toLocaleDateString()
+#: src/components/integrations/AppDetail.tsx
+msgid "Connected {0}"
+msgstr ""
 
 #. placeholder {0}: selected.name
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -1524,10 +1580,10 @@ msgstr "Connecté et utilise {0}."
 msgid "Connected. Its tools are available from your next message."
 msgstr "Connecté. Ses outils sont disponibles dès votre prochain message."
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/parts.tsx
 #: src/pages/GoogleOAuthCallback.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 #: src/pages/shell/message-cards.tsx
@@ -1539,16 +1595,12 @@ msgstr "Connexion en cours…"
 msgid "Connection test failed."
 msgstr "Le test de connexion a échoué."
 
-#. placeholder {0}: item.name
-#: src/pages/PluginsOverlay.tsx
-msgid "Connection to {0} is still pending. You can close this and check again."
-msgstr "La connexion à {0} est toujours en attente. Vous pouvez fermer cette fenêtre et réessayer."
-
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Context limit"
 msgstr "Limite de contexte"
 
+#: src/components/integrations/AgentStep.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/Onboarding.tsx
 msgid "Continue"
@@ -1587,9 +1639,9 @@ msgstr ""
 msgid "Could not add"
 msgstr "Impossible d'ajouter"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not add MCP server"
-msgstr "Impossible d'ajouter le serveur MCP"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not add the connection"
+msgstr ""
 
 #: src/pages/shell/message-cards.tsx
 msgid "Could not approve this server"
@@ -1632,8 +1684,9 @@ msgstr "Impossible de terminer OAuth"
 msgid "Could not complete the update. Try again."
 msgstr "Impossible de terminer la mise à jour. Réessayez."
 
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Could not connect"
 msgstr "Impossible de se connecter"
 
@@ -1695,10 +1748,6 @@ msgstr "Impossible de supprimer le bot"
 msgid "Could not delete group"
 msgstr "Impossible de supprimer le groupe"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not delete MCP server"
-msgstr "Impossible de supprimer le serveur MCP"
-
 #: src/pages/shell/dialogs.tsx
 msgid "Could not delete routine"
 msgstr "Impossible de supprimer la routine"
@@ -1715,13 +1764,14 @@ msgstr "Impossible de supprimer l'espace"
 msgid "Could not delete this artifact."
 msgstr "Impossible de supprimer cet artefact."
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
+msgid "Could not disconnect"
+msgstr ""
+
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Could not disconnect memory provider"
 msgstr "Impossible de déconnecter le fournisseur de mémoire"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not disconnect OAuth"
-msgstr "Impossible de déconnecter OAuth"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not disconnect this provider"
@@ -1751,10 +1801,6 @@ msgstr "Impossible de télécharger {name}. Réessayez."
 #: src/components/computer/FilesApp.tsx
 msgid "Could not download file"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not install connector"
-msgstr "Impossible d'installer le connecteur"
 
 #: src/components/computer/FilesApp.tsx
 msgid "Could not list files"
@@ -1798,13 +1844,9 @@ msgid "Could not load credentials."
 msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/useIntegrations.ts
 msgid "Could not load integrations"
 msgstr "Impossible de charger les intégrations"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not load MCP servers"
-msgstr "Impossible de charger les serveurs MCP"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not load model settings"
@@ -1822,6 +1864,10 @@ msgstr "Impossible de charger les options de connexion"
 #: src/pages/KnowledgeSection.tsx
 msgid "Could not load skill"
 msgstr "Impossible de charger la compétence"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Could not load the app list. Reload to try again."
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Could not load this artifact."
@@ -1875,16 +1921,16 @@ msgstr "Impossible de joindre le serveur du modèle."
 msgid "Could not reach the server"
 msgstr "Impossible d'atteindre le serveur"
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/useMcpReconnect.ts
 msgid "Could not reconnect"
 msgstr ""
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Could not remove"
 msgstr "Impossible de retirer"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Could not remove connector"
 msgstr "Impossible de retirer le connecteur"
 
@@ -1896,13 +1942,10 @@ msgstr "Impossible de retirer la règle"
 msgid "Could not remove the credential"
 msgstr ""
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Could not rename"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not rename connection"
-msgstr "Impossible de renommer la connexion"
 
 #: src/pages/shell/dialogs.tsx
 msgid "Could not rename section"
@@ -1920,10 +1963,6 @@ msgstr "Impossible d'afficher le graphique"
 msgid "Could not reset password"
 msgstr "Impossible de réinitialiser le mot de passe"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not revoke connection"
-msgstr "Impossible de révoquer la connexion"
-
 #: src/pages/Shell.tsx
 msgid "Could not run routine"
 msgstr "Impossible d'exécuter la routine"
@@ -1933,6 +1972,11 @@ msgstr "Impossible d'exécuter la routine"
 #: src/pages/shell/bot-panel.tsx
 msgid "Could not save"
 msgstr "Impossible d'enregistrer"
+
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not save agent access"
+msgstr ""
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Could not save Auto Review"
@@ -1982,9 +2026,9 @@ msgstr ""
 msgid "Could not save this choice"
 msgstr "Impossible d'enregistrer ce choix"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Could not search catalog"
-msgstr "Impossible de rechercher dans le catalogue"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not search"
+msgstr ""
 
 #: src/pages/Auth.tsx
 msgid "Could not send reset email"
@@ -1994,9 +2038,9 @@ msgstr "Impossible d'envoyer l'e-mail de réinitialisation"
 msgid "Could not send that"
 msgstr "Impossible d'envoyer cela"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Could not start OAuth"
-msgstr "Impossible de démarrer OAuth"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Could not start sign-in."
+msgstr ""
 
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not start teaching"
@@ -2014,7 +2058,8 @@ msgstr "Impossible de prendre le contrôle"
 msgid "Could not update"
 msgstr "Impossible de mettre à jour"
 
-#: src/pages/McpServersOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Could not update agent access"
 msgstr "Impossible de mettre à jour l'accès de l'agent"
 
@@ -2128,20 +2173,11 @@ msgstr "Créé"
 msgid "Creating…"
 msgstr "Création en cours…"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Credential"
-msgstr "Identifiant"
-
-#: src/pages/McpServersOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
-msgid "credential saved"
-msgstr "Identifiant enregistré"
-
 #: src/pages/shell/bot-credentials.tsx
 msgid "Credentials"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Credentials are encrypted and never sent to the model."
 msgstr "Les identifiants sont chiffrés et jamais envoyés au modèle."
 
@@ -2157,6 +2193,10 @@ msgstr "Expression Cron"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
 msgstr "Mot de passe actuel"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Custom connections still work."
+msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Custom header"
@@ -2227,7 +2267,6 @@ msgstr "Portée par défaut"
 #: src/pages/Artifacts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/KnowledgeSection.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/dialogs.tsx
@@ -2312,6 +2351,14 @@ msgstr ""
 msgid "Desktop update"
 msgstr "Mise à jour du bureau"
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Developer"
+msgstr ""
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Didn't open?"
+msgstr ""
+
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Direct MCP"
 msgstr "MCP direct"
@@ -2328,7 +2375,6 @@ msgstr ""
 msgid "Discard attachments?"
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -2337,6 +2383,18 @@ msgstr "Déconnecter"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Disconnect {disconnectName}?"
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Disconnect {name}"
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Disconnect {name}?"
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "Disconnect sign-in"
 msgstr ""
 
 #. placeholder {0}: selected.providerName ?? selected.provider
@@ -2364,7 +2422,7 @@ msgstr "Fermer l'erreur"
 msgid "Dismissed. Reconnect anytime from MCP settings."
 msgstr "Fermé. Reconnectez-vous à tout moment depuis les paramètres MCP."
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Display name"
 msgstr "Nom d'affichage"
 
@@ -2384,10 +2442,16 @@ msgstr ""
 msgid "Docker limits access to your computer for added security. Using {hostLabel} lets bots work with your local files and tools."
 msgstr "Docker limite l'accès à votre ordinateur pour une sécurité renforcée. Utiliser {hostLabel} permet aux bots de travailler avec vos fichiers et outils locaux."
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Docs & files"
+msgstr ""
+
 #: src/pages/Auth.tsx
 msgid "Don’t have an account?"
 msgstr "Vous n'avez pas de compte ?"
 
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/lib/ticket-status.ts
 #: src/pages/ActivityList.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
@@ -2470,6 +2534,10 @@ msgstr "Modifier le profil"
 msgid "Email"
 msgstr "E-mail"
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Email & calendar"
+msgstr ""
+
 #: src/lib/user-error.ts
 msgid "Email is not allowed to register"
 msgstr "Cette adresse e-mail ne peut pas s’inscrire"
@@ -2517,6 +2585,18 @@ msgstr "Saisissez un nombre entier de 1 à 1000 pour la limite d'images."
 msgid "Enter an API key before testing."
 msgstr "Saisissez une clé API avant de tester."
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Enter the command to run."
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Enter the server URL, starting with https://."
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Enter the URL, starting with https://."
+msgstr ""
+
 #: src/lib/roster-status.ts
 #: src/pages/Shell.tsx
 msgid "Error"
@@ -2530,6 +2610,14 @@ msgstr "Chaque"
 #: src/pages/RoutineSchedule.tsx
 msgid "every {intervalAmountSelect} {intervalUnitSelect}"
 msgstr "tous les {intervalAmountSelect} {intervalUnitSelect}"
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Every agent loses access to {name}."
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "Every agent loses access to its tools."
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
@@ -2562,10 +2650,6 @@ msgstr "Chaque semaine"
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Excluded"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Executor token"
-msgstr "Jeton de l'exécuteur"
 
 #: src/pages/shell/message-cards.tsx
 msgid "Expand"
@@ -2608,6 +2692,7 @@ msgstr ""
 msgid "failed"
 msgstr "échoué"
 
+#: src/components/integrations/parts.tsx
 #: src/pages/ActivityList.tsx
 msgid "Failed"
 msgstr "Échoué"
@@ -2659,6 +2744,7 @@ msgstr "Filtres"
 
 #: src/components/finance/ui.tsx
 #: src/components/FinanceCards.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
@@ -2672,6 +2758,10 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Financing"
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Find an app"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -2830,15 +2920,10 @@ msgstr "en-tête"
 msgid "Header \"{header}\""
 msgstr ""
 
-#: src/pages/McpServersOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Header name"
 msgstr "Nom de l'en-tête"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Header value"
-msgstr "Valeur de l'en-tête"
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Hear a sample"
@@ -2904,9 +2989,9 @@ msgstr "Ignorer"
 msgid "Image upload area"
 msgstr "Zone de téléchargement d'image"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Import OpenAPI JSON"
-msgstr "Importer OpenAPI JSON"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Import an OpenAPI description"
+msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Important"
@@ -2961,15 +3046,13 @@ msgstr "Clé API de l'instance"
 msgid "Instruction"
 msgstr "Instruction"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Integration domain"
-msgstr "Domaine d'intégration"
-
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Integration options"
 msgstr "Options d'intégration"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/pages/Shell.tsx
 msgid "Integrations"
 msgstr "Intégrations"
@@ -2995,6 +3078,10 @@ msgstr "Isolé"
 #: src/pages/Artifacts.tsx
 msgid "Isolated preview — no access to your account"
 msgstr "Aperçu isolé — aucun accès à votre compte"
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "It now appears under Connected."
+msgstr ""
 
 #: src/components/compose/RichTextEditor.tsx
 msgid "Italic"
@@ -3128,10 +3215,6 @@ msgstr "Charger automatiquement les images web"
 msgid "Loading activity…"
 msgstr "Chargement de l'activité…"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Loading integrations…"
-msgstr "Chargement des intégrations…"
-
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Loading memory settings…"
 msgstr "Chargement des paramètres de mémoire…"
@@ -3148,7 +3231,7 @@ msgstr "Chargement de l'aperçu…"
 msgid "Loading rules…"
 msgstr "Chargement des règles…"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
 msgid "Loading tools…"
 msgstr "Chargement des outils…"
 
@@ -3177,6 +3260,14 @@ msgstr "Local"
 msgid "Local access lets bots run commands without asking. Avoid it on shared or public servers."
 msgstr "L'accès local permet aux bots d'exécuter des commandes sans demander. Évitez-le sur les serveurs partagés ou publics."
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Local command"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Local server"
+msgstr ""
+
 #: src/pages/LocalSettings.tsx
 msgid "Local Server Settings"
 msgstr "Paramètres du serveur local"
@@ -3201,6 +3292,14 @@ msgstr ""
 msgid "Lowercase letters, numbers, hyphens and underscores, starting with a letter."
 msgstr ""
 
+#: src/components/integrations/AppDetail.tsx
+msgid "Mail data from this account that Rakazo cached is removed."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Mail data Rakazo cached from these accounts is removed."
+msgstr ""
+
 #: src/components/ComputerUpdateProgress.tsx
 msgid "Make sure nothing is still running on this computer."
 msgstr "Assurez-vous qu'aucun processus ne tourne encore sur cet ordinateur."
@@ -3209,18 +3308,9 @@ msgstr "Assurez-vous qu'aucun processus ne tourne encore sur cet ordinateur."
 msgid "Manage"
 msgstr ""
 
-#. placeholder {0}: server.name
-#: src/components/integrations/McpServerRow.tsx
-msgid "Manage {0}"
-msgstr ""
-
 #: src/pages/Paywall.tsx
 msgid "Manage billing"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Manage MCP servers"
-msgstr "Gérer les serveurs MCP"
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Manage messaging settings"
@@ -3230,11 +3320,7 @@ msgstr "Gérer les paramètres de messagerie"
 msgid "Manage the Space semantic memory provider."
 msgstr "Gérer le fournisseur de mémoire sémantique de l'espace."
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Manual"
-msgstr "Manuel"
-
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Manual setup required"
 msgstr "Configuration manuelle requise"
 
@@ -3303,10 +3389,6 @@ msgstr "Jetons de sortie maximum"
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "MCP endpoint"
 msgstr "Point de terminaison MCP"
-
-#: src/pages/McpServersOverlay.tsx
-msgid "MCP servers"
-msgstr "Serveurs MCP"
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -3534,7 +3616,7 @@ msgstr "Déplacer vers"
 msgid "Mute"
 msgstr "Couper le micro"
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Auth.tsx
 #: src/pages/GroupPanel.tsx
@@ -3565,6 +3647,10 @@ msgstr ""
 msgid "Needs input"
 msgstr "Nécessite une saisie"
 
+#: src/components/integrations/parts.tsx
+msgid "Needs reconnect"
+msgstr ""
+
 #: src/pages/Inbox.tsx
 msgid "Needs reply"
 msgstr ""
@@ -3581,6 +3667,10 @@ msgstr "A besoin de vous"
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Net"
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Never changes your account"
 msgstr ""
 
 #: src/pages/Shell.tsx
@@ -3646,19 +3736,20 @@ msgstr ""
 msgid "No agent connections yet."
 msgstr "Aucune connexion d'agent pour le moment."
 
-#: src/pages/PluginsOverlay.tsx
-msgid "No apps match your search."
-msgstr "Aucune application ne correspond à votre recherche."
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "No agent uses {0} yet. Choose agents on its page."
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "No apps match."
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "No artifacts found."
 msgstr "Aucun artefact trouvé."
 
-#: src/pages/PluginsOverlay.tsx
-msgid "no auth"
-msgstr "pas d'authentification"
-
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "No authentication"
 msgstr "Aucune authentification"
 
@@ -3698,10 +3789,6 @@ msgstr ""
 msgid "No mail matches this filter"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
-msgid "No managed app catalog is configured on this deployment."
-msgstr "Aucun catalogue d'applications géré n'est configuré sur ce déploiement."
-
 #: src/pages/Artifacts.tsx
 msgid "No matching artifacts on this page."
 msgstr "Aucun artefact correspondant sur cette page."
@@ -3709,14 +3796,6 @@ msgstr "Aucun artefact correspondant sur cette page."
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "No matching models"
 msgstr "Aucun modèle correspondant"
-
-#: src/pages/PluginsOverlay.tsx
-msgid "No MCP or API tool sources installed yet."
-msgstr "Aucune source d'outils MCP ou API installée pour le moment."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "No MCP servers yet."
-msgstr "Aucun serveur MCP pour le moment."
 
 #: src/pages/PeerMessagesOverlay.tsx
 msgid "No messages with {peerBotName} yet."
@@ -3746,7 +3825,7 @@ msgstr ""
 msgid "No remote MCP servers found"
 msgstr "Aucun serveur MCP distant trouvé"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/SpaceSearch.tsx
 msgid "No results"
 msgstr "Aucun résultat"
@@ -3775,7 +3854,7 @@ msgstr "Aucune conversation d'équipe pour le moment."
 msgid "No tickets yet"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
 msgid "No tools available."
 msgstr "Aucun outil disponible."
 
@@ -3799,6 +3878,7 @@ msgstr ""
 msgid "Not confirmed as sent. Check Sent before trying again."
 msgstr ""
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Not connected"
 msgstr "Non connecté"
@@ -3814,10 +3894,6 @@ msgstr ""
 #: src/pages/finance/FinanceNotFound.tsx
 msgid "Not found"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Not in the plugin catalog"
-msgstr "Pas dans le catalogue de plugins"
 
 #: src/pages/shell/message-cards.tsx
 msgid "Not now"
@@ -3858,19 +3934,10 @@ msgstr ""
 msgid "OAuth authorization was cancelled."
 msgstr "L'autorisation OAuth a été annulée."
 
-#: src/pages/McpServersOverlay.tsx
-msgid "OAuth connected"
-msgstr "OAuth connecté"
-
 #: src/pages/GoogleOAuthCallback.tsx
 #: src/pages/McpOAuthCallback.tsx
 msgid "OAuth connection failed"
 msgstr "Échec de la connexion OAuth"
-
-#: src/components/integrations/McpServerRow.tsx
-#: src/pages/McpServersOverlay.tsx
-msgid "OAuth expired"
-msgstr "OAuth expiré"
 
 #. placeholder {0}: call.botName
 #: src/components/call/CallCard.tsx
@@ -3889,6 +3956,10 @@ msgstr "le 1er à {0}"
 #: src/pages/Shell.tsx
 msgid "Only empty spaces can be deleted. Delete its bots and groups first."
 msgstr "Seuls les espaces vides peuvent être supprimés. Supprimez d'abord ses bots et groupes."
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Only if the server does not use sign-in"
+msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/markdown-link-prompt.tsx
@@ -3914,6 +3985,10 @@ msgstr ""
 msgid "Open <0>{0}</0> to finish signing in."
 msgstr ""
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Open again"
+msgstr ""
+
 #: src/components/ComputersUnavailableHint.tsx
 msgid "Open computer settings"
 msgstr ""
@@ -3921,6 +3996,10 @@ msgstr ""
 #: src/components/markdown-link-prompt.tsx
 msgid "Open external link?"
 msgstr "Ouvrir le lien externe ?"
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Open Finance"
+msgstr ""
 
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Open in Brex"
@@ -3945,6 +4024,10 @@ msgstr ""
 #: src/components/computer/TerminalApp.tsx
 msgid "Open shell"
 msgstr "Ouvrir le shell"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Open sign-in"
+msgstr ""
 
 #: src/pages/ScratchpadSection.tsx
 msgid "Open work"
@@ -3977,10 +4060,6 @@ msgstr "Ouverture de votre espace…"
 msgid "Optional"
 msgstr "Optionnel"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Optional header value"
-msgstr "Valeur d'en-tête optionnelle"
-
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Or connect an API key"
 msgstr "Ou connectez une clé API"
@@ -4004,6 +4083,10 @@ msgstr "Message d’origine indisponible"
 #: src/components/finance/ui.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Other"
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Other connection types"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4070,6 +4153,10 @@ msgstr ""
 msgid "Paste a replacement key"
 msgstr "Collez une clé de remplacement"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Paste the MCP server URL from the app's documentation."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Paste the OpenAI-compatible address from your server. Rakazo adds /v1 if needed."
 msgstr "Collez l'adresse compatible OpenAI de votre serveur. Rakazo ajoute /v1 si nécessaire."
@@ -4127,6 +4214,10 @@ msgstr "Lecture en cours…"
 #: src/pages/KnowledgeSection.tsx
 msgid "Plugin"
 msgstr "Plugin"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Popular"
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "POST to"
@@ -4217,6 +4308,18 @@ msgstr "Réagir"
 msgid "Reactions"
 msgstr "Réactions"
 
+#: src/components/integrations/AppDetail.tsx
+msgid "Read"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read balances and transactions"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read cards, expenses and bills"
+msgstr ""
+
 #: src/pages/shell/bot-panel.tsx
 msgid "Read replies aloud"
 msgstr "Lire les réponses à voix haute"
@@ -4248,17 +4351,16 @@ msgstr ""
 msgid "Recent"
 msgstr "Récent"
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Reconnect"
 msgstr ""
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/Finance.tsx
 msgid "Reconnect {name}"
 msgstr ""
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Reconnect OAuth"
-msgstr "Reconnecter OAuth"
 
 #: src/App.tsx
 #: src/components/ComputerUpdateProgress.tsx
@@ -4361,9 +4463,9 @@ msgid "Release interrupted computer?"
 msgstr "Libérer l'ordinateur interrompu ?"
 
 #: src/components/ApprovalRulesSettings.tsx
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/ModelBackupsSettings.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Remove"
@@ -4374,12 +4476,19 @@ msgstr "Retirer"
 #. placeholder {0}: file.name
 #: src/components/compose/RecipientField.tsx
 #: src/components/ComposeEmail.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 #: src/pages/Shell.tsx
 msgid "Remove {0}"
 msgstr "Retirer {0}"
 
+#. placeholder {0}: removing?.name
+#. placeholder {0}: removingRow?.displayName ?? ""
 #. placeholder {0}: server.name
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Remove {0}?"
 msgstr ""
 
@@ -4429,11 +4538,20 @@ msgstr "Retiré avec la conversation, l'ordinateur et la mémoire."
 msgid "Removed, but list refresh failed"
 msgstr "Retiré, mais l'actualisation de la liste a échoué"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Removing…"
-msgstr "Retrait en cours…"
+#: src/components/integrations/AppDetail.tsx
+msgid "Removes all {accountCount} accounts and agent access."
+msgstr ""
 
-#: src/components/integrations/McpServerRow.tsx
+#: src/components/integrations/AppDetail.tsx
+msgid "Removes the account and agent access."
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "Removes the connection and agent access."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/McpDetail.tsx
 msgid "Rename"
 msgstr ""
 
@@ -4652,6 +4770,10 @@ msgstr "S'exécute lorsque ce bot reçoit un message vérifié de ce fournisseur
 msgid "Runway"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Sales & CRM"
+msgstr ""
+
 #: src/components/AskCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
@@ -4731,8 +4853,8 @@ msgid "Scheduling"
 msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelSettingsOverlay.tsx
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/bot-picker.tsx
 #: src/pages/shell/command-palette.tsx
@@ -4743,8 +4865,9 @@ msgstr "Rechercher"
 msgid "Search activity"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Search apps"
 msgstr "Rechercher des applications"
 
@@ -4756,9 +4879,13 @@ msgstr "Rechercher des artefacts…"
 msgid "Search bots and switch conversations"
 msgstr "Rechercher des bots et changer de conversation"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Search by domain"
 msgstr "Rechercher par domaine"
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Search directory"
+msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Search integrations.sh"
@@ -4784,12 +4911,15 @@ msgstr "Rechercher des fournisseurs"
 msgid "Search runs"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Search the directory"
+msgstr ""
+
 #. placeholder {0}: filters.query.trim()
 #: src/pages/ActivityList.tsx
 msgid "Search: {0}"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
 #: src/pages/SpaceSearch.tsx
 msgid "Searching…"
 msgstr "Recherche en cours…"
@@ -4862,16 +4992,16 @@ msgstr "Le point de terminaison Serenity est obligatoire."
 msgid "Server integrations"
 msgstr "Intégrations du serveur"
 
-#: src/pages/McpServersOverlay.tsx
-msgid "Server name"
-msgstr "Nom du serveur"
-
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/McpServersOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Server URL"
 msgstr "URL du serveur"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Set up app catalog"
+msgstr ""
 
 #: src/components/call/CallCard.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -4918,6 +5048,10 @@ msgstr "Compétences partagées"
 msgid "Shell"
 msgstr "Shell"
 
+#: src/pages/Finance.tsx
+msgid "Show all {total}"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "Show bots"
 msgstr "Afficher les bots"
@@ -4931,6 +5065,7 @@ msgid "Show Inbox agent"
 msgstr ""
 
 #: src/components/inbox/TodoCard.tsx
+#: src/pages/Finance.tsx
 msgid "Show less"
 msgstr ""
 
@@ -4938,7 +5073,7 @@ msgstr ""
 msgid "Show list"
 msgstr "Afficher la liste"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 msgid "Show more"
 msgstr "Afficher plus"
 
@@ -4980,6 +5115,10 @@ msgstr "Se connecter"
 msgid "Sign in again"
 msgstr ""
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Sign in to {appName} in the new window"
+msgstr ""
+
 #: src/pages/Auth.tsx
 msgid "Sign in to Rakazo"
 msgstr "Connectez-vous à Rakazo"
@@ -4997,6 +5136,32 @@ msgstr "Connectez-vous avec l'abonnement, ou testez la clé API à la place."
 msgid "Sign up"
 msgstr "S'inscrire"
 
+#: src/components/integrations/ConnectAppDialog.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Sign-in did not finish in time."
+msgstr ""
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Sign-in did not finish."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Sign-in failed"
+msgstr ""
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Sign-in was cancelled"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/useMcpReconnect.ts
+msgid "Sign-in was cancelled or did not finish. Try again."
+msgstr ""
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Sign-in was denied or failed."
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Site"
 msgstr ""
@@ -5006,6 +5171,7 @@ msgstr ""
 msgid "Skill {0}"
 msgstr "Compétence {0}"
 
+#: src/components/integrations/AgentStep.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/Shell.tsx
 msgid "Skip"
@@ -5129,6 +5295,14 @@ msgstr "Démarrage en cours…"
 msgid "Status"
 msgstr ""
 
+#: src/components/integrations/SignInStep.tsx
+msgid "Step 1 of 3"
+msgstr ""
+
+#: src/components/integrations/AgentStep.tsx
+msgid "Step 2 of 3"
+msgstr ""
+
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Steps"
 msgstr "Étapes"
@@ -5149,10 +5323,6 @@ msgstr "Arrêter l'enseignement"
 #: src/lib/browser-notifications.ts
 msgid "Stopped."
 msgstr "Arrêté."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "Stored encrypted"
-msgstr "Stocké chiffré"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Stored securely. Never shown here."
@@ -5279,6 +5449,11 @@ msgstr "Tester la connexion"
 msgid "Testing…"
 msgstr "Test en cours…"
 
+#. placeholder {0}: item.name
+#: src/components/integrations/ConnectAppDialog.tsx
+msgid "The agents you chose can use {0}."
+msgstr ""
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "The API did not come back. Refresh this page."
 msgstr "L'API n'est pas revenue. Actualisez cette page."
@@ -5287,6 +5462,10 @@ msgstr "L'API n'est pas revenue. Actualisez cette page."
 msgid "The connection timed out."
 msgstr "La connexion a expiré."
 
+#: src/components/integrations/AppDetail.tsx
+msgid "The Inbox page stops showing new mail until you reconnect."
+msgstr ""
+
 #: src/lib/model-connection-preflight.ts
 msgid "The provider is rate-limiting requests."
 msgstr "Le fournisseur limite le débit des requêtes."
@@ -5294,6 +5473,10 @@ msgstr "Le fournisseur limite le débit des requêtes."
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "The selected memory provider is not available in this build."
 msgstr "Le fournisseur de mémoire sélectionné n'est pas disponible dans cette version."
+
+#: src/components/integrations/SignInStep.tsx
+msgid "The sign-in window closed before finishing. Nothing was changed."
+msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "These saved settings can't be read. Remove it and add it again."
@@ -5330,6 +5513,10 @@ msgstr "Cette conversation est en lecture seule"
 #: src/pages/HostComputerPrompt.tsx
 msgid "this computer"
 msgstr "cet ordinateur"
+
+#: src/components/integrations/McpDetail.tsx
+msgid "This connection no longer exists."
+msgstr ""
 
 #. placeholder {0}: pendingDelete.versionCount
 #: src/pages/Artifacts.tsx
@@ -5376,14 +5563,9 @@ msgstr "Ce lien de réinitialisation est invalide ou a expiré"
 msgid "This server cannot be assigned without a bot."
 msgstr "Ce serveur ne peut pas être assigné sans bot."
 
-#: src/components/integrations/McpServerRow.tsx
-#: src/pages/McpServersOverlay.tsx
-msgid "This server did not request browser authorization."
-msgstr "Ce serveur n'a pas demandé l'autorisation du navigateur."
-
-#: src/pages/McpServersOverlay.tsx
-msgid "This server is already connected. Disconnect it first to authorize again."
-msgstr "Ce serveur est déjà connecté. Déconnectez-le d'abord pour l'autoriser à nouveau."
+#: src/components/integrations/useMcpReconnect.ts
+msgid "This server did not ask for a sign-in."
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "This subscription sign-in is not available in Rakazo yet. Use a deployment credential or choose another provider."
@@ -5435,13 +5617,18 @@ msgstr "À :"
 msgid "Today"
 msgstr "Aujourd'hui"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Tool sources"
-msgstr "Sources d'outils"
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Token"
+msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/AppDetail.tsx
 msgid "Tools"
 msgstr "Outils"
+
+#. placeholder {0}: tools.length
+#: src/components/integrations/AppDetail.tsx
+msgid "Tools · {0}"
+msgstr ""
 
 #: src/pages/finance/FinanceAccounts.tsx
 msgid "Total balance"
@@ -5469,10 +5656,6 @@ msgstr ""
 msgid "Treat like a person"
 msgstr "Traiter comme une personne"
 
-#: src/pages/PluginsOverlay.tsx
-msgid "Treg token"
-msgstr "Jeton Treg"
-
 #: src/pages/BillingSettingsPanel.tsx
 msgid "Trial"
 msgstr ""
@@ -5484,6 +5667,8 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/finance/ui.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/SignInStep.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/Onboarding.tsx
@@ -5527,10 +5712,6 @@ msgstr ""
 #: src/pages/Inbox.tsx
 msgid "Undo"
 msgstr ""
-
-#: src/pages/PluginsOverlay.tsx
-msgid "Uninstall"
-msgstr "Désinstaller"
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Unknown tool"
@@ -5636,6 +5817,10 @@ msgstr "Télécharger"
 msgid "Urgent"
 msgstr ""
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "URL"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/SettingsOverlay.tsx
 #: src/pages/Shell.tsx
@@ -5671,6 +5856,12 @@ msgstr "Utiliser ce modèle"
 msgid "Use your own key"
 msgstr "Utiliser votre propre clé"
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/McpDetail.tsx
+msgid "Used by"
+msgstr ""
+
 #: src/components/AskCard.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Username"
@@ -5703,17 +5894,26 @@ msgstr ""
 msgid "Vendors"
 msgstr ""
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Verify and add"
 msgstr "Vérifier et ajouter"
 
-#: src/pages/PluginsOverlay.tsx
+#: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Verifying…"
 msgstr "Vérification en cours…"
 
 #: src/pages/Artifacts.tsx
 msgid "Version"
 msgstr "Version"
+
+#. placeholder {0}: providerLabel(connectorId)
+#: src/components/integrations/AppDetail.tsx
+msgid "via {0}"
+msgstr ""
+
+#: src/components/integrations/McpDetail.tsx
+msgid "via MCP · {host}"
+msgstr ""
 
 #: src/pages/RoutineRunHistory.tsx
 msgid "View chat"
@@ -5746,9 +5946,18 @@ msgstr ""
 msgid "Wait a moment and test again."
 msgstr "Patientez un instant et testez à nouveau."
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/SignInStep.tsx
+msgid "Waiting for sign-in"
+msgstr ""
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Waiting for the API to come back…"
 msgstr "En attente du retour de l'API…"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Waiting for you to finish signing in."
+msgstr ""
 
 #: src/lib/roster-status.ts
 msgid "Waiting in line…"
@@ -5827,6 +6036,10 @@ msgstr ""
 msgid "Where should bots run?"
 msgstr "Où les bots doivent-ils s'exécuter ?"
 
+#: src/components/integrations/AgentStep.tsx
+msgid "Which agents can use {appName}?"
+msgstr ""
+
 #: src/components/EmailCards.tsx
 msgid "Within 3 days"
 msgstr ""
@@ -5839,6 +6052,10 @@ msgstr ""
 #: src/pages/Auth.tsx
 msgid "Working…"
 msgstr "En cours…"
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Write"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Writing"
@@ -5873,6 +6090,10 @@ msgstr ""
 msgid "You"
 msgstr "Vous"
 
+#: src/components/integrations/AgentStep.tsx
+msgid "You can change this later."
+msgstr ""
+
 #: src/pages/McpOAuthCallback.tsx
 msgid "You can close this tab if it does not redirect automatically."
 msgstr "Vous pouvez fermer cet onglet s'il ne redirige pas automatiquement."
@@ -5885,6 +6106,19 @@ msgstr "Vous pouvez fermer cette fenêtre."
 #: src/pages/Shell.tsx
 msgid "You have control"
 msgstr "Vous avez le contrôle"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "Your browser blocked the sign-in window"
+msgstr ""
+
+#. placeholder {0}: server.name
+#: src/components/integrations/McpDetail.tsx
+msgid "Your data in {0} is not deleted."
+msgstr ""
+
+#: src/components/integrations/AppDetail.tsx
+msgid "Your data in {name} is not deleted."
+msgstr ""
 
 #: src/pages/Auth.tsx
 msgid "Your email address"
