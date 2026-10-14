@@ -379,6 +379,25 @@ it("offers Undo after an archive, which restores the thread and reloads the list
   expect(c.querySelector('[role="status"]')?.textContent).toBe("");
 });
 
+it("waits for a slow archive to finish before Undo restores the thread", async () => {
+  let finish: (value: unknown) => void = () => {};
+  rpcMock.archive.mockReturnValue(new Promise((r) => (finish = r)));
+  const c = await render();
+  await click(byText(c, "archive b"));
+  await click(byText(c.querySelector('[role="status"]') as HTMLElement, "Undo"));
+  expect(rpcMock.unarchive).not.toHaveBeenCalled();
+  await act(async () => finish({ ok: true }));
+  expect(rpcMock.unarchive).toHaveBeenCalledWith({ messageId: "b" });
+});
+
+it("skips Undo when the archive itself failed", async () => {
+  rpcMock.archive.mockRejectedValue(new Error("nope"));
+  const c = await render();
+  await click(byText(c, "archive b"));
+  await click(byText(c.querySelector('[role="status"]') as HTMLElement, "Undo"));
+  expect(rpcMock.unarchive).not.toHaveBeenCalled();
+});
+
 it("marks an unread row read when it opens, and does not touch a read one", async () => {
   rpcMock.list.mockResolvedValue(list([row("a"), row("b", { unread: false })]));
   const c = await render();
@@ -413,6 +432,8 @@ it("pages a search with a Loading label and ends with No more results", async ()
 
 it("ends the default list with a way to search older mail", async () => {
   const c = await render();
+  // Let a focus-restoring frame queued by an earlier test fire first.
+  await act(async () => new Promise((r) => requestAnimationFrame(() => r(null))));
   await click(byText(c, "Search older mail"));
   expect(document.activeElement).toBe(c.querySelector("input"));
 });

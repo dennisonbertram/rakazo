@@ -133,6 +133,7 @@ export function InboxPage({
   const [reload, setReload] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const polls = useRef(0);
+  const archiving = useRef(new Map<string, Promise<boolean>>());
   const [composing, setComposing] = useState(false);
 
   // A message sent from any composer: reload, since the send synced the account.
@@ -319,11 +320,24 @@ export function InboxPage({
     if (selectedId === messageId) setSelectedId(neighbor);
     patchRows((list) => list.filter((row) => row.id !== messageId));
     setStatus({ kind: "archived", messageId });
-    change(rpc.inbox.archive({ messageId }));
+    const call = rpc.inbox.archive({ messageId });
+    // Resolves to whether the archive saved, so Undo never overtakes it.
+    archiving.current.set(
+      messageId,
+      call.then(
+        () => true,
+        () => false,
+      ),
+    );
+    change(call);
     return neighbor;
   };
-  const unarchive = (messageId: string) => {
+  const unarchive = async (messageId: string) => {
     setStatus(null);
+    const saved = await archiving.current.get(messageId);
+    archiving.current.delete(messageId);
+    // A failed archive already showed its error and reloaded the list.
+    if (saved === false) return;
     setError("");
     rpc.inbox
       .unarchive({ messageId })
