@@ -352,20 +352,31 @@ async function request(
 ): Promise<unknown> {
   const connector = deps.connectors.managed(account.connectorId);
   if (!connector?.proxy) throw new CalendarToolError("This calendar connection cannot be used");
-  const response = await (deps.google ?? defaultGoogle).request({
-    connector,
-    account: {
-      connectorId: account.connectorId,
-      providerRef: account.accountRef,
-      app: CALENDAR_APP,
-    },
-    method,
-    url,
-    ...(body === undefined ? {} : { body }),
-    context,
-  });
-  return response.data;
+  try {
+    const response = await (deps.google ?? defaultGoogle).request({
+      connector,
+      account: {
+        connectorId: account.connectorId,
+        providerRef: account.accountRef,
+        app: CALENDAR_APP,
+      },
+      method,
+      url,
+      ...(body === undefined ? {} : { body }),
+      context,
+    });
+    return response.data;
+  } catch (error) {
+    // Google may have created the event; a model retry would get a new id and duplicate it.
+    const status = error instanceof GoogleApiError ? error.response?.status : undefined;
+    if (method === "POST" && status !== undefined && (status === 408 || status >= 500))
+      throw new CalendarToolError(UNCLEAR_OUTCOME);
+    throw error;
+  }
 }
+
+const UNCLEAR_OUTCOME =
+  "The request may not have reached Google Calendar and the outcome is unclear. Do not retry; tell the user to check their calendar.";
 
 function errorText(error: unknown): string {
   if (error instanceof CalendarToolError) return error.message;
@@ -383,7 +394,5 @@ function errorText(error: unknown): string {
     }
     return `Google Calendar returned an error (${response.status})`;
   }
-  return error.kind === "aborted"
-    ? "Calendar request aborted"
-    : "The request may not have reached Google Calendar and the outcome is unclear. Do not retry; tell the user to check their calendar.";
+  return error.kind === "aborted" ? "Calendar request aborted" : UNCLEAR_OUTCOME;
 }

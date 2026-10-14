@@ -114,6 +114,32 @@ describe("calendar tools", () => {
     expect(calendar.all("a")).toHaveLength(1);
   });
 
+  it.each([408, 500, 503])(
+    "says a create answered %i may have been applied and must not be retried",
+    async (status) => {
+      let posts = 0;
+      const connector = {
+        proxy: async () => {
+          posts++;
+          return { status, data: {} };
+        },
+      } as unknown as ManagedConnectorProvider;
+      const result = (await calendarToolFromTool(
+        "calendar_create_event",
+        {
+          accounts: async () => accounts,
+          connectors: { managed: () => connector },
+          google: new GoogleApiClient({ sleep: async () => undefined }),
+          now: () => new Date("2026-10-01T12:00:00Z"),
+        },
+        context,
+        { summary: "x", start: timed("2026-10-03T12:00:00Z"), end: timed("2026-10-03T13:00:00Z") },
+      )) as { error: string };
+      expect(posts).toBe(1);
+      expect(result.error).toMatch(/Do not retry/);
+    },
+  );
+
   it("rejects a client event id outside base32hex", async () => {
     const { calendar } = setup();
     expect(

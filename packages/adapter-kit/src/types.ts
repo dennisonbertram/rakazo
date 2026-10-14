@@ -1004,6 +1004,8 @@ export interface ConnectorProxyRequest {
   body?: unknown;
   /** Media type of a raw string `body` (a Drive media upload). Omit for JSON. */
   contentType?: string;
+  /** "text" returns the response body as the exact string, unparsed (empty stays ""). Default: JSON when the response is JSON. */
+  responseType?: "text";
 }
 
 /**

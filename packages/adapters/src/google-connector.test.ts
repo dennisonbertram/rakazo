@@ -851,6 +851,70 @@ describe("GoogleConnector providers", () => {
     expect(s.db.secrets.map((secret) => secret.id)).toEqual([gmail.secretId]);
   });
 
+  it.each([
+    ["another space", { spaceId: "space-2" }],
+    ["another Rakazo user", { userId: "user-2" }],
+  ])(
+    "keeps Google's grant when the same Google account is connected in %s",
+    async (_name, other) => {
+      const s = setup();
+      s.db.connections.length = 0;
+      await connectApp(s, "googlecalendar", `openid ${EMAIL} ${CALENDAR_EVENTS}`);
+      s.db.connections[0]!.status = "revoked";
+      s.db.connections.push({ ...row("elsewhere", "gmail", "secret-x"), ...other });
+      await s.connector.revoke("sub-1", context, { provider: "googlecalendar" });
+      expect(s.google.revokeCalls).toEqual([]);
+      expect(s.db.secrets).toHaveLength(0); // only the target's secret is deleted
+      expect(s.db.connections[1]!.secretId).toBe("secret-x");
+    },
+  );
+
+  it("does not revoke a rejected grant that another space has connected", async () => {
+    const s = setup();
+    s.db.connections.length = 0;
+    s.db.connections.push({ ...row("elsewhere", "gmail", "secret-x"), spaceId: "space-2" });
+    s.google.scope = `openid ${EMAIL}`;
+    const { state } = await s.connector.begin(
+      { provider: "googledrive", redirectUrl: "" },
+      context,
+    );
+    await expect(
+      s.connector.complete({ state, code: "code-1", provider: "googledrive" }, context),
+    ).rejects.toThrow(/Google Drive/);
+    expect(s.google.revokeCalls).toEqual([]);
+  });
+
+  it("returns text bodies untouched when asked: empty stays empty, big integers keep every digit", async () => {
+    const s = setup();
+    s.db.connections.length = 0;
+    await connectApp(s, "googledrive", `openid ${EMAIL} ${DRIVE}`);
+    const asText = (url: string) =>
+      s.connector.proxy(
+        { app: "googledrive", accountRef: "sub-1", method: "GET", url, responseType: "text" },
+        context,
+      );
+    s.google.gmail = () => ({ status: 200, data: null });
+    const realFetch = s.google.fetch;
+    let reply = new Response("", { headers: { "content-type": "application/json" } });
+    const connector = new GoogleConnector({
+      clientId: "id",
+      clientSecret: CLIENT_SECRET,
+      identitySecret: IDENTITY,
+      redirectUri: REDIRECT,
+      prisma: s.db.prisma,
+      secrets: s.secrets,
+      fetch: (async (input: string | URL | Request, init?: RequestInit) =>
+        String(input).startsWith("https://www.googleapis.com/drive")
+          ? reply.clone()
+          : realFetch(input, init)) as typeof fetch,
+    });
+    s.connector = connector;
+    expect((await asText(`${DRIVE_URL}/f1?alt=media`)).data).toBe("");
+    const big = '{"amount":9007199254740993}';
+    reply = new Response(big, { headers: { "content-type": "application/json" } });
+    expect((await asText(`${DRIVE_URL}/f2?alt=media`)).data).toBe(big);
+  });
+
   it("sends each request with the token of the row for its own app", async () => {
     const s = setup();
     s.db.connections.length = 0;

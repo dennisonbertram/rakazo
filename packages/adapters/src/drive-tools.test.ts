@@ -260,6 +260,43 @@ describe("drive_create_file", () => {
   });
 });
 
+describe("drive reads and ambiguous creates", () => {
+  it("treats a create that timed out (408) as unclear too", async () => {
+    const s = setup();
+    s.deps.connectors = {
+      managed: () =>
+        ({ proxy: async () => ({ status: 408, data: {} }) }) as unknown as ManagedConnectorProvider,
+    };
+    const r = (await driveToolFromTool("drive_create_file", s.deps, context, {
+      name: "x",
+      content: "y",
+      kind: "doc",
+    })) as { error: string };
+    expect(r.error).toMatch(/Check Drive/);
+  });
+
+  it("asks the connector for the raw text of a file and returns it unchanged", async () => {
+    const s = setup();
+    const seen: Array<{ url: string; responseType?: string }> = [];
+    const inner = s.deps.connectors.managed("google") as unknown as {
+      proxy: (r: never) => Promise<{ status: number; data: unknown }>;
+    };
+    s.deps.connectors = {
+      managed: () =>
+        ({
+          proxy: async (r: { url: string; responseType?: string }) => {
+            seen.push(r);
+            if (r.responseType === "text") return { status: 200, data: "" };
+            return inner.proxy(r as never);
+          },
+        }) as unknown as ManagedConnectorProvider,
+    };
+    const r = (await s.run("drive_read", { fileId: "txt1" })) as { content?: string };
+    expect(seen.find((x) => /alt=media|export/.test(x.url))?.responseType).toBe("text");
+    expect(r.content).toBe("");
+  });
+});
+
 describe("drive_update_file", () => {
   it("replaces a Doc's content and renames it", async () => {
     const s = setup();

@@ -222,7 +222,7 @@ export class GoogleConnector implements ManagedConnectorProvider {
         const profile = await this.userinfo(token.accessToken, context.signal).catch(
           () => undefined,
         );
-        if (profile && !(await this.hasConnectedSibling(profile.sub, context)))
+        if (profile && !(await this.hasConnectedSibling(profile.sub)))
           await this.revokeToken(token.refreshToken ?? token.accessToken, context.signal).catch(
             () => undefined,
           );
@@ -275,9 +275,7 @@ export class GoogleConnector implements ManagedConnectorProvider {
     if (!row?.secretId) return;
     const credential = await this.loadCredential(row.secretId, context);
     // Google ties every app's scopes to one grant: revoking this token would disconnect the siblings.
-    const siblingRemains = rows.some(
-      (candidate) => candidate.id !== row.id && candidate.status === "connected",
-    );
+    const siblingRemains = await this.hasConnectedSibling(connectionRef, row.id);
     if (credential && !siblingRemains)
       await this.revokeToken(credential.refreshToken, context.signal);
     this.tokens.delete(row.id);
@@ -356,22 +354,26 @@ export class GoogleConnector implements ManagedConnectorProvider {
       status: response.status,
       // Drive exports and media downloads are not JSON; hand those back as the text they are.
       data:
-        body.text && !(response.headers.get("content-type") ?? "").includes("json")
+        request.responseType === "text" ||
+        (body.text && !(response.headers.get("content-type") ?? "").includes("json"))
           ? body.text
           : parseJson(body.text),
       ...(Number.isFinite(retryAfter) && retryAfter > 0 ? { retryAfterMs: retryAfter * 1000 } : {}),
     };
   }
 
-  /** True when another connected Google app of this user already holds a grant for this Google account. */
-  private async hasConnectedSibling(sub: string, context: AdapterContext): Promise<boolean> {
+  /**
+   * True when any other connected Google app holds a grant for this Google account. Google's grant
+   * belongs to the account and OAuth client, not to a Rakazo space or user, so this looks across all
+   * of them and returns only a boolean.
+   */
+  private async hasConnectedSibling(sub: string, excludeId?: string): Promise<boolean> {
     const sibling = await this.config.prisma.connection.findFirst({
       where: {
         connectorId: "google",
         providerRef: sub,
-        spaceId: context.spaceId,
-        userId: context.userId,
         status: "connected",
+        ...(excludeId ? { id: { not: excludeId } } : {}),
       },
       select: { id: true },
     });

@@ -97,6 +97,7 @@ export interface GoogleApiCall {
   body?: unknown;
   /** Media type of a raw string `body`; omit for JSON. */
   contentType?: string;
+  responseType?: "text";
   /** Only `signal` is read here; the whole context goes to the connector. */
   context: AdapterContext;
 }
@@ -123,7 +124,7 @@ export class GoogleApiClient {
 
   /** Resolves with the 2xx response; throws `GoogleApiError` for anything else. */
   async request(call: GoogleApiCall): Promise<ConnectorProxyResponse> {
-    const { connector, account, method, url, body, contentType, context } = call;
+    const { connector, account, method, url, body, contentType, responseType, context } = call;
     const repeatable = method !== "POST";
     const proxy = connector.proxy?.bind(connector);
     if (!proxy) throw new GoogleApiError("transport", undefined, "connector has no proxy");
@@ -141,6 +142,7 @@ export class GoogleApiClient {
               url,
               ...(body === undefined ? {} : { body }),
               ...(contentType ? { contentType } : {}),
+              ...(responseType ? { responseType } : {}),
             },
             context,
           ),

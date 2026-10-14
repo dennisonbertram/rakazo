@@ -191,7 +191,7 @@ class DriveCall {
   async request(
     method: ConnectorProxyRequest["method"],
     url: string,
-    init: { body?: unknown; contentType?: string } = {},
+    init: { body?: unknown; contentType?: string; responseType?: "text" } = {},
   ): Promise<unknown> {
     const connector = this.deps.connectors.managed(this.account.connectorId);
     if (!connector?.proxy) throw new DriveToolError("This Drive connection cannot be used");
@@ -207,6 +207,7 @@ class DriveCall {
         url,
         ...(init.body === undefined ? {} : { body: init.body }),
         ...(init.contentType ? { contentType: init.contentType } : {}),
+        ...(init.responseType ? { responseType: init.responseType } : {}),
         context: this.context,
       });
       return response.data;
@@ -218,7 +219,7 @@ class DriveCall {
       if (response && isGoogleRateLimited(response))
         throw new DriveToolError("Drive rate limit reached; try again later");
       if (response?.status === 404) throw new DriveToolError("File not found");
-      if (response && response.status >= 400 && response.status < 500)
+      if (response && response.status >= 400 && response.status < 500 && response.status !== 408)
         throw new DriveToolError(`Drive did not accept the request (${response.status})`);
       throw new DriveToolError(
         method === "GET"
@@ -292,7 +293,7 @@ async function driveRead(call: DriveCall, args: Record<string, unknown>) {
   const url = exportType
     ? `${API}/files/${id}/export?mimeType=${encodeURIComponent(exportType)}`
     : `${API}/files/${id}?alt=media&${SHARED}`;
-  const data = await call.request("GET", url);
+  const data = await call.request("GET", url, { responseType: "text" });
   const full = typeof data === "string" ? data : JSON.stringify(data);
   const truncated = full.length > MAX_CONTENT_CHARS;
   return {
