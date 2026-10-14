@@ -66,7 +66,7 @@ it("connects through the Finance API and shows Open Finance once connected", asy
   expect(tile("brex")?.textContent).toContain("Connected");
   expect(tile("brex")?.querySelector("a")?.getAttribute("href")).toBe("/app/finance");
   expect(tile("brex")?.querySelector("img")?.getAttribute("src")).toContain("brex");
-  expect(tile("mercury")?.querySelector("img")).toBeNull();
+  expect(tile("mercury")?.querySelector("img")?.getAttribute("src")).toBe("/logos/mercury.svg");
 
   await press("mercury");
   expect(connect).toHaveBeenCalledWith("mercury", false);

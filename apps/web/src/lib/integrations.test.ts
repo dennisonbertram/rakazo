@@ -166,7 +166,8 @@ describe("FINANCE_PROVIDERS logos", () => {
   it("gives every provider a logo, and vendored ones exist under public/", () => {
     for (const { logo } of FINANCE_PROVIDERS) {
       expect(logo).toBeTruthy();
-      if (logo.startsWith("/")) expect(existsSync(`public${logo}`)).toBe(true);
+      if (logo.startsWith("/"))
+        expect(existsSync(new URL(`../../public${logo}`, import.meta.url))).toBe(true);
     }
   });
 });
