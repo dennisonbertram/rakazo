@@ -165,7 +165,9 @@ function setup(
       | "financeTreasuryYield"
       | "financeSyncState"
       | "bot"
-      | "botMcpServer",
+      | "botMcpServer"
+      | "financeWallet"
+      | "financeCryptoHolding",
       Row[]
     >
   > = {},
@@ -181,6 +183,8 @@ function setup(
     financeSyncState: t("financeSyncState"),
     bot: t("bot"),
     botMcpServer: t("botMcpServer"),
+    financeWallet: t("financeWallet"),
+    financeCryptoHolding: t("financeCryptoHolding"),
   };
   const enqueue = vi.fn(async () => undefined);
   const beginMcpOAuth = vi.fn(async (input: { serverId: string }) => ({
@@ -203,6 +207,48 @@ function setup(
 }
 
 beforeEach(() => vi.clearAllMocks());
+
+describe("finance overview crypto", () => {
+  const wallet = (actor: Actor) => ({
+    id: "w-1",
+    ...scope(actor),
+    address: `0x${"ab".repeat(20)}`,
+    type: "personal",
+    createdAt: new Date(),
+  });
+  const holding = (actor: Actor) => ({
+    ...scope(actor),
+    walletId: "w-1",
+    chainId: 1,
+    tokenAddress: "",
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    rawBalance: "1",
+    usdPrice: "1",
+    usdValueCents: 12_345n,
+    syncedAt: new Date("2026-10-14T00:00:00Z"),
+  });
+
+  it("is null without a wallet, even when another user has one", async () => {
+    const { deps } = setup({ financeWallet: [wallet(b)], financeCryptoHolding: [holding(b)] });
+    expect((await financeOverview(deps, a)).crypto).toBeNull();
+  });
+
+  it("is the summary of the actor's holdings, and never touches cash, burn or runway", async () => {
+    const { deps } = setup({
+      financeWallet: [wallet(a), wallet(b)],
+      financeCryptoHolding: [holding(a), { ...holding(b), usdValueCents: 999_999n }],
+    });
+    const overview = await financeOverview(deps, a);
+    expect(overview.crypto).toMatchObject({
+      totalCents: 12_345,
+      byChain: [{ chainId: 1, cents: 12_345 }],
+    });
+    expect(overview.cash.cashCents).toBe(0);
+    expect(overview.burn.monthlyCents).toBe(0);
+  });
+});
 
 describe("finance overview", () => {
   it("passes the calculations only the actor's own rows", async () => {
