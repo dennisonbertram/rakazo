@@ -379,18 +379,12 @@ export function InboxPage({
         setError(errorText(cause));
       });
   };
-  // Opening an unread message reads it.
-  const readOnOpen = (id: string) => {
-    if ([...(shown?.rows ?? []), ...moreRows].find((row) => row.id === id)?.unread)
-      setRead(id, true);
-  };
   // `?mail=` is the source of truth for the open message, so Back and deep links work.
   // A list-opened message pushes an entry marked with LIST_OPEN, and closing goes Back to it.
   const openMessage = (id: string) => {
     const next = new URLSearchParams(params);
     next.set("mail", id);
     setSelectedId(id);
-    readOnOpen(id);
     setParams(next, { state: LIST_OPEN });
   };
   const closeMessage = () => {
@@ -403,10 +397,21 @@ export function InboxPage({
     const next = new URLSearchParams(params);
     next.set("mail", id);
     setSelectedId(id);
-    readOnOpen(id);
     setParams(next, { replace: true, state: location.state });
   };
   const openRow = [...(shown?.rows ?? []), ...moreRows].find((row) => row.id === openId);
+  // Opening a message, by click, j/k in the dialog or a deep link, reads it once. Selecting in the
+  // list does not. The id is remembered even when the row is already read, so Mark unread sticks.
+  const readFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openId) {
+      readFor.current = null;
+      return;
+    }
+    if (!openRow || readFor.current === openId) return;
+    readFor.current = openId;
+    if (openRow.unread) setRead(openId, true);
+  });
   const openIndex = openId ? ids.indexOf(openId) : -1;
   const focusSearch = () => searchRef.current?.querySelector("input")?.focus();
   const clearFilters = () => {
@@ -423,7 +428,9 @@ export function InboxPage({
     open: openMessage,
     focusSearch,
     compose: accounts.length > 0 ? () => setComposing(true) : undefined,
-    archive,
+    archive: (id) => {
+      if (rows.find((row) => row.id === id)?.inInbox) archive(id);
+    },
     help: () => setHelp(true),
   });
   // Warm the cache so the first messages and the selected one open instantly.
@@ -449,6 +456,27 @@ export function InboxPage({
       );
     }
   }, [openId, selectedId]);
+
+  const toast = status ? (
+    <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border bg-card py-1 ps-3 pe-1 text-sm text-card-foreground shadow-md">
+      {status.kind === "archived" ? (
+        <Trans>Archived</Trans>
+      ) : status.mark === "noise" ? (
+        <Trans>Marked noise</Trans>
+      ) : (
+        <Trans>Marked important</Trans>
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() =>
+          status.kind === "archived" ? unarchive(status.messageId) : mark(status.messageId, null)
+        }
+      >
+        <Trans>Undo</Trans>
+      </Button>
+    </div>
+  ) : null;
 
   return (
     <div className="@container rk-scroll flex-1 overflow-y-auto px-4 pb-6 pt-2 md:px-7 md:pt-5">
@@ -650,7 +678,7 @@ export function InboxPage({
             <Skeleton key={n} className="h-9 w-full" />
           ))}
         </div>
-      ) : shown && shown.rows.length === 0 ? (
+      ) : shown && rows.length === 0 ? (
         failed ? null : (
           <div className="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
             {query ? (
@@ -776,7 +804,7 @@ export function InboxPage({
         onNavigate={goToMessage}
         unread={openRow?.unread}
         onArchive={
-          openRow
+          openRow?.inInbox
             ? () => {
                 const next = archive(openRow.id);
                 if (next) goToMessage(next);
@@ -785,34 +813,14 @@ export function InboxPage({
             : undefined
         }
         onRead={openRow ? (read) => setRead(openRow.id, read) : undefined}
+        notice={openId ? toast : null}
       />
       <InboxShortcuts open={help} onClose={() => setHelp(false)} />
       <div
         role="status"
         className="pointer-events-none fixed inset-x-0 bottom-4 z-100 flex justify-center px-4"
       >
-        {status ? (
-          <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border bg-card py-1 ps-3 pe-1 text-sm text-card-foreground shadow-md">
-            {status.kind === "archived" ? (
-              <Trans>Archived</Trans>
-            ) : status.mark === "noise" ? (
-              <Trans>Marked noise</Trans>
-            ) : (
-              <Trans>Marked important</Trans>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                status.kind === "archived"
-                  ? unarchive(status.messageId)
-                  : mark(status.messageId, null)
-              }
-            >
-              <Trans>Undo</Trans>
-            </Button>
-          </div>
-        ) : null}
+        {openId ? null : toast}
       </div>
       {composing ? (
         <ComposeEmail

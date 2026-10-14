@@ -55,9 +55,13 @@ vi.mock("../components/inbox/InboxMessageDialog", () => ({
   InboxMessageDialog: ({
     messageId,
     onClose,
+    onArchive,
+    notice,
   }: {
     messageId: string | null;
     onClose: () => void;
+    onArchive?: () => void;
+    notice?: ReactNode;
   }) =>
     messageId ? (
       <div role="dialog" data-testid="message">
@@ -65,6 +69,12 @@ vi.mock("../components/inbox/InboxMessageDialog", () => ({
         <button type="button" onClick={onClose}>
           close
         </button>
+        {onArchive ? (
+          <button type="button" onClick={onArchive}>
+            dialog archive
+          </button>
+        ) : null}
+        <div data-testid="notice">{notice}</div>
       </div>
     ) : null,
 }));
@@ -123,6 +133,7 @@ const row = (id: string, extra: Partial<MailRow> = {}): MailRow => ({
   snippet: "",
   receivedAt: new Date().toISOString(),
   unread: true,
+  inInbox: true,
   needsReply: null,
   priority: null,
   reason: null,
@@ -436,4 +447,60 @@ it("ends the default list with a way to search older mail", async () => {
   await act(async () => new Promise<void>((r) => requestAnimationFrame(() => r())));
   await click(byText(c, "Search older mail"));
   expect(document.activeElement).toBe(c.querySelector("input"));
+});
+
+it("does not archive a selected row that a new filter hid", async () => {
+  const c = await render();
+  await press("j");
+  expect(selected(c)).toBe("a");
+  rpcMock.list.mockResolvedValue(list([row("z")]));
+  await act(async () => go("/app/inbox?filter=unread"));
+  await press("e");
+  await press("Enter");
+  expect(rpcMock.archive).not.toHaveBeenCalled();
+  expect(new URLSearchParams(location.search).get("mail")).toBeNull();
+});
+
+it("offers no archive for mail that is not in the inbox", async () => {
+  rpcMock.list.mockResolvedValue(list([row("a", { inInbox: false })]));
+  const c = await render(["/app/inbox?q=old"]);
+  await press("j");
+  await press("e");
+  expect(rpcMock.archive).not.toHaveBeenCalled();
+  await click(c.querySelector('[data-row-id="a"]'));
+  expect(byText(c, "dialog archive")).toBeUndefined();
+});
+
+it("does not say No results while loaded pages still have rows", async () => {
+  rpcMock.list.mockResolvedValue(list([row("a")], { nextPageToken: "p2" }));
+  const c = await render(["/app/inbox?q=zebra"]);
+  rpcMock.list.mockResolvedValue(list([row("b")]));
+  await click(byText(c, "Load more"));
+  await click(byText(c, "archive a"));
+  expect(c.textContent).not.toContain("No results");
+  expect(c.textContent).toContain("Subject b");
+});
+
+it("marks an unread deep-linked message read once, and j and k never mark read", async () => {
+  const c = await render(["/app/inbox?mail=a"]);
+  expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
+  expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "a", read: true });
+  await act(async () => window.dispatchEvent(new Event("rakazo:mail-sent")));
+  expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
+  await click(byText(c, "close"));
+  rpcMock.markRead.mockClear();
+  await press("j");
+  await press("j");
+  await press("k");
+  expect(rpcMock.markRead).not.toHaveBeenCalled();
+});
+
+it("shows the Archived toast inside the open message, not behind it", async () => {
+  const c = await render(["/app/inbox?mail=a"]);
+  await click(byText(c, "dialog archive"));
+  const notice = c.querySelector('[data-testid="notice"]') as HTMLElement;
+  expect(notice.textContent).toContain("Archived");
+  expect(c.querySelector('[role="status"]')?.textContent).toBe("");
+  await click(byText(notice, "Undo"));
+  expect(rpcMock.unarchive).toHaveBeenCalled();
 });

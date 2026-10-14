@@ -24,6 +24,7 @@ const mail = (extra: Partial<MailRow> = {}): MailRow => ({
   snippet: "Can you do the 14th?",
   receivedAt: "2026-10-12T13:42:00.000Z",
   unread: true,
+  inInbox: true,
   needsReply: null,
   priority: null,
   reason: null,
@@ -228,4 +229,11 @@ it("shows the row count beside a group heading, and no heading without a title",
   expect(container.querySelector("h2")?.textContent).toBe("Earlier2");
   await show(undefined);
   expect(container.querySelector("h2")).toBeNull();
+});
+
+it("offers Archive only for mail that is in the inbox", async () => {
+  const gone = await render(mail({ inInbox: false }), { onArchive: () => {} });
+  expect(gone.querySelector('[aria-label="Archive"]')).toBeNull();
+  const here = await render(mail(), { onArchive: () => {} });
+  expect(here.querySelector('[aria-label="Archive"]')).not.toBeNull();
 });
