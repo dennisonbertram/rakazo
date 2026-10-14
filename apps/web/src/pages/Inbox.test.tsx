@@ -433,7 +433,7 @@ it("pages a search with a Loading label and ends with No more results", async ()
 it("ends the default list with a way to search older mail", async () => {
   const c = await render();
   // Let a focus-restoring frame queued by an earlier test fire first.
-  await act(async () => new Promise((r) => requestAnimationFrame(() => r(null))));
+  await act(async () => new Promise<void>((r) => requestAnimationFrame(() => r())));
   await click(byText(c, "Search older mail"));
   expect(document.activeElement).toBe(c.querySelector("input"));
 });
