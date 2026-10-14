@@ -268,8 +268,9 @@ describe("finance.crypto", () => {
 
 describe("finance.cryptoConnect", () => {
   it("creates one keyless Blockscout server, idempotently", async () => {
-    const { deps, prisma, put } = setup();
+    const { deps, prisma, put, sync } = setup();
     const first = await financeCryptoConnect(deps, a, {});
+    expect(sync).not.toHaveBeenCalled();
     const second = await financeCryptoConnect(deps, a, {});
     expect(second).toEqual(first);
     expect(first.hasApiKey).toBe(false);
@@ -283,9 +284,10 @@ describe("finance.cryptoConnect", () => {
   });
 
   it("stores the key as an encrypted header secret and never returns it", async () => {
-    const { deps, prisma, put } = setup();
+    const { deps, prisma, put, sync } = setup();
     const out = await financeCryptoConnect(deps, a, { apiKey: KEY });
     expect(out.hasApiKey).toBe(true);
+    expect(sync).toHaveBeenCalledWith(expect.anything(), { force: true });
     expect(JSON.stringify(out)).not.toContain(KEY);
     expect(JSON.parse(put.mock.calls[0]?.[0] as string).headers).toEqual({
       [CRYPTO_API_KEY_HEADER]: KEY,

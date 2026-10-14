@@ -5,6 +5,13 @@ import type { PrismaClient } from "@rakazo/db";
 import { Prisma } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { findCryptoServer } from "./blockscout-crypto-call-tool.js";
+import type { CryptoFailureKind } from "./blockscout-crypto-errors.js";
+import {
+  classifyCryptoError,
+  cryptoFailureMessage,
+  isKeyFailure,
+  mostActionable,
+} from "./blockscout-crypto-errors.js";
 import type { ChainSnapshot, SafeDetails } from "./blockscout-crypto-source.js";
 import { fetchChainSnapshot, fetchSafeDetails } from "./blockscout-crypto-source.js";
 import type { FinanceCallTool } from "./finance-sync.js";
@@ -16,6 +23,10 @@ export interface CryptoSyncDeps {
     signal: AbortSignal,
   ): Promise<FinanceCallTool>;
   now?: () => Date;
+  /** Minimum gap between Blockscout calls (default 250 ms keeps a 5 requests/second plan under its limit). */
+  callGapMs?: number;
+  /** First wait before retrying a rate-limited call; doubles per retry (default 1000 ms). */
+  retryDelayMs?: number;
 }
 
 export interface CryptoSyncOptions {
@@ -33,7 +44,11 @@ export type CryptoSyncResult =
 const DB_NOW = Prisma.sql`timezone('utc', now())`;
 /** Shorter than the 2-minute stale claim. */
 const DEADLINE_MS = 100_000;
-const CHAIN_NAME = new Map<number, string>(CRYPTO_CHAINS.map((c) => [c.id, c.name]));
+/** A chain Blockscout refused with 402 (not on the user's plan) is not called again for this long, unless forced. */
+const UNAVAILABLE_MS = 6 * 3_600_000;
+const MAX_RATE_LIMIT_RETRIES = 2;
+// ponytail: remembered in this process only; a restart costs one failed call per such chain. Persist if that ever matters.
+const unavailable = new Map<string, number>();
 
 /**
  * Replaces every tracked wallet's holdings with Blockscout's current balances on each chain. The
@@ -75,12 +90,14 @@ export async function syncCryptoHoldings(
     RETURNING "mcpServerId"`;
   if (claimed.length === 0) return { ok: true, outcome: "skipped", failedChains: [] };
 
-  const release = (error: unknown) => {
+  const release = (
+    error: unknown,
+    reason: { message: string; reconnect: boolean } = failureOf(error),
+  ) => {
     if (opts.signal?.aborted)
       return prisma.$executeRaw`
         UPDATE finance_sync_states SET "syncStartedAt" = NULL, "claimToken" = NULL
         WHERE "mcpServerId" = ${server.id} AND "claimToken" = ${token}`;
-    const reason = failureReason(error);
     getLogger().warn("crypto sync failed", { serverId: server.id, reason: reason.message });
     return prisma.$executeRaw`
       UPDATE finance_sync_states
@@ -91,7 +108,7 @@ export async function syncCryptoHoldings(
   const fail = async (error: unknown): Promise<CryptoSyncResult> => {
     await release(error);
     if (opts.signal?.aborted) return { ok: true, outcome: "skipped", failedChains: [] };
-    return { ok: false, error: "failed", message: failureReason(error).message };
+    return { ok: false, error: "failed", message: failureOf(error).message };
   };
 
   const signal = AbortSignal.any([
@@ -105,32 +122,52 @@ export async function syncCryptoHoldings(
     safe: SafeDetails | null;
   };
   const reads: WalletRead[] = [];
-  let lastError: unknown;
+  const problems: Array<{ chainId: number; kind: CryptoFailureKind }> = [];
+  const nowMs = () => (deps.now ?? (() => new Date()))().getTime();
   try {
-    const callTool = await deps.callToolFor(server, signal);
-    // ponytail: wallets one after another, chains in parallel; fine for a handful of wallets inside the deadline.
+    const callTool = pace(await deps.callToolFor(server, signal), deps);
     for (const wallet of wallets) {
       const read: WalletRead = { id: wallet.id, snapshots: new Map(), failed: [], safe: null };
+      // Chains are started together, but `pace` runs the calls one at a time.
       await Promise.all(
         CRYPTO_CHAINS.map(async ({ id }) => {
+          const key = `${server.id}:${id}`;
+          if (!force && (unavailable.get(key) ?? 0) > nowMs()) {
+            read.failed.push(id);
+            problems.push({ chainId: id, kind: "plan" });
+            return;
+          }
           try {
             read.snapshots.set(id, await fetchChainSnapshot(callTool, id, wallet.address));
+            unavailable.delete(key);
           } catch (error) {
-            lastError = error;
+            const kind = classifyCryptoError(error);
+            if (kind === "plan") unavailable.set(key, nowMs() + UNAVAILABLE_MS);
             read.failed.push(id);
+            problems.push({ chainId: id, kind });
           }
         }),
       );
       signal.throwIfAborted();
       const safeChain = [...read.snapshots].find(([, s]) => s.maybeSafe)?.[0];
-      if (safeChain !== undefined && wallet.type !== "exchange")
-        read.safe = await fetchSafeDetails(callTool, safeChain, wallet.address);
+      if (safeChain !== undefined && wallet.type !== "exchange") {
+        try {
+          read.safe = await fetchSafeDetails(callTool, safeChain, wallet.address);
+        } catch (error) {
+          problems.push({ chainId: safeChain, kind: classifyCryptoError(error) });
+        }
+      }
       reads.push(read);
     }
   } catch (error) {
     return fail(error);
   }
-  if (reads.every((r) => r.snapshots.size === 0)) return fail(lastError);
+  const problem = describeProblems(problems);
+  if (reads.every((r) => r.snapshots.size === 0)) {
+    const message = problem?.message ?? cryptoFailureMessage("failed");
+    await release(null, problem ?? failureOf(null));
+    return { ok: false, error: "failed", message };
+  }
 
   const failedChains = [...new Set(reads.flatMap((r) => r.failed))].sort((a, b) => a - b);
   const syncedAt = (deps.now ?? (() => new Date()))();
@@ -176,13 +213,11 @@ export async function syncCryptoHoldings(
               data: { safeOwners: read.safe.owners, safeThreshold: read.safe.threshold },
             });
         }
-        const message = failedChains.length
-          ? `Could not read ${failedChains.map((c) => CHAIN_NAME.get(c) ?? c).join(", ")}`
-          : null;
+        const message = problem?.message ?? null;
         await tx.$executeRaw`
           UPDATE finance_sync_states
           SET "lastSyncedAt" = ${DB_NOW}, "lastErrorAt" = ${message ? DB_NOW : null},
-              "lastError" = ${message}, "needsReconnect" = false,
+              "lastError" = ${message}, "needsReconnect" = ${problem?.reconnect ?? false},
               "syncStartedAt" = NULL, "claimToken" = NULL
           WHERE "mcpServerId" = ${server.id} AND "claimToken" = ${token}`;
         return "synced" as const;
@@ -195,14 +230,53 @@ export async function syncCryptoHoldings(
   }
 }
 
-/** A short reason for the page: never a vendor payload, key or URL. */
-function failureReason(error: unknown): { message: string; reconnect: boolean } {
-  const text = error instanceof Error ? error.message : "";
-  if (/unauthori[sz]ed|\b40[13]\b|api key|session_id.*no longer/i.test(text))
-    return { message: "Blockscout rejected the API key", reconnect: true };
-  if (/out of credits|\b402\b/i.test(text))
-    return { message: "Blockscout is out of credits", reconnect: false };
-  if (error instanceof Error && (error.name === "TimeoutError" || /timed? ?out/i.test(text)))
-    return { message: "The request timed out", reconnect: false };
-  return { message: "The request failed", reconnect: false };
+/** The one message for the page: the most actionable reason, naming the chains that failed for it. */
+function describeProblems(
+  problems: Array<{ chainId: number; kind: CryptoFailureKind }>,
+): { message: string; reconnect: boolean } | null {
+  if (problems.length === 0) return null;
+  const kind = mostActionable(problems.map((p) => p.kind));
+  const failed = new Set(problems.filter((p) => p.kind === kind).map((p) => p.chainId));
+  const chains = CRYPTO_CHAINS.filter((c) => failed.has(c.id)).map((c) => c.name);
+  return { message: cryptoFailureMessage(kind, chains), reconnect: isKeyFailure(kind) };
+}
+
+/** A message for an error that is not tied to one chain. */
+function failureOf(error: unknown): { message: string; reconnect: boolean } {
+  const kind = classifyCryptoError(error);
+  return { message: cryptoFailureMessage(kind), reconnect: isKeyFailure(kind) };
+}
+
+/**
+ * Wraps the tool caller so calls run one at a time at least `callGapMs` apart (Blockscout's Free plan
+ * allows 5 requests/second), retries a rate-limited call with a doubling wait, and stops calling for
+ * the rest of the run once the key is missing or rejected, since every further call would fail alike.
+ */
+function pace(raw: FinanceCallTool, deps: CryptoSyncDeps): FinanceCallTool {
+  const gap = deps.callGapMs ?? 250;
+  const retryDelay = deps.retryDelayMs ?? 1000;
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  let tail: Promise<unknown> = Promise.resolve();
+  let lastStart = 0;
+  let keyError: unknown;
+  return (name, args) => {
+    const run = tail.then(async () => {
+      for (let attempt = 0; ; attempt++) {
+        if (keyError) throw keyError;
+        const wait = lastStart + gap - Date.now();
+        if (wait > 0) await sleep(wait);
+        lastStart = Date.now();
+        try {
+          return await raw(name, args);
+        } catch (error) {
+          const kind = classifyCryptoError(error);
+          if (isKeyFailure(kind)) keyError = error;
+          if (kind !== "rate_limit" || attempt >= MAX_RATE_LIMIT_RETRIES) throw error;
+          await sleep(retryDelay * 2 ** attempt);
+        }
+      }
+    });
+    tail = run.catch(() => undefined);
+    return run;
+  };
 }

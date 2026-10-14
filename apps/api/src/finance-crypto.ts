@@ -283,6 +283,8 @@ export async function financeCryptoConnect(
     select: { id: true },
   });
   if (bot) await assignFinanceServers(deps.prisma, actor, bot.id);
+  // A new or replaced key should show results right away.
+  if (input.apiKey !== undefined) await syncCryptoQuietly(deps, actor);
   return {
     serverId: current.id,
     hasApiKey: Boolean(
