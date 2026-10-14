@@ -115,7 +115,9 @@ export function InboxRow({
       ] as const)
     : [];
   const actions = [
-    ...(onArchive ? [{ name: t`Archive`, Icon: Archive, run: () => onArchive(row.id) }] : []),
+    ...(onArchive && row.inInbox
+      ? [{ name: t`Archive`, Icon: Archive, run: () => onArchive(row.id) }]
+      : []),
     ...(onRead
       ? [
           {
