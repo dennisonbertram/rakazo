@@ -80,6 +80,123 @@ const MonthId = z.string().regex(/^\d{4}-\d{2}$/);
 /** YYYY-MM-DD */
 const DayId = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+// ---- Crypto (separate from the Mercury/Brex cash model) ----
+//
+// Blockscout is NOT a FinanceProvider: that enum drives cash, burn and runway and is iterated
+// exhaustively (sources, sync, agent assignment). A separate source keeps crypto out of all of it.
+
+/** Blockscout's hosted MCP server. Read-only; an optional Pro API key goes in `CRYPTO_API_KEY_HEADER`. */
+export const CRYPTO_MCP_ENDPOINT = "https://mcp.blockscout.com/mcp";
+export const CRYPTO_API_KEY_HEADER = "Blockscout-MCP-Pro-Api-Key";
+
+/** True for a Blockscout MCP endpoint, matched by https host like `financeProviderForEndpoint`. */
+export function isCryptoEndpoint(endpoint: string | null | undefined): boolean {
+  if (!endpoint) return false;
+  try {
+    const url = new URL(endpoint);
+    return url.protocol === "https:" && url.host === new URL(CRYPTO_MCP_ENDPOINT).host;
+  } catch {
+    return false;
+  }
+}
+
+/** The only Blockscout tools the agent may use and sync calls. `read_contract` is an eth_call view. */
+export const CRYPTO_READ_TOOLS = [
+  "get_address_info",
+  "get_tokens_by_address",
+  "get_address_by_ens_name",
+  "get_chains_list",
+  "read_contract",
+] as const;
+
+/** The chains tracked in v1 (Blockscout chain ids). */
+export const CRYPTO_CHAINS = [
+  { id: 1, name: "Ethereum" },
+  { id: 8453, name: "Base" },
+  { id: 42161, name: "Arbitrum One" },
+  { id: 10, name: "Optimism" },
+  { id: 137, name: "Polygon" },
+] as const;
+
+export const WalletTypeSchema = z.enum(["personal", "safe", "exchange", "contract"]);
+
+/** Lowercase 0x + 40 hex. */
+export const EvmAddress = z.string().regex(/^0x[0-9a-f]{40}$/);
+
+export const FinanceWalletSchema = z.object({
+  id: Id,
+  address: EvmAddress,
+  ensName: z.string().nullable(),
+  label: z.string().nullable(),
+  type: WalletTypeSchema,
+  /** Safe only: lowercase owner addresses; null otherwise or until first sync. */
+  safeOwners: z.array(EvmAddress).nullable(),
+  safeThreshold: z.number().int().positive().nullable(),
+});
+
+/** One token balance of one wallet on one chain. */
+export const CryptoHoldingSchema = z.object({
+  walletId: Id,
+  chainId: z.number().int(),
+  /** Lowercase contract address; null for the chain's native coin. */
+  tokenAddress: EvmAddress.nullable(),
+  symbol: z.string(),
+  name: z.string(),
+  decimals: z.number().int().nonnegative(),
+  /** uint256 as a decimal string, in the token's smallest unit. Never a float. */
+  rawBalance: z.string().regex(/^\d+$/),
+  /** USD per whole token as a decimal string; null when Blockscout has no price. */
+  usdPrice: z.string().nullable(),
+  /** Whole USD cents, rounded half up; null when unpriced. */
+  usdValueCents: Cents.nullable(),
+  syncedAt: IsoDate,
+});
+
+/** Priced holdings only. Never part of cash, burn or runway. */
+export const CryptoSummarySchema = z.object({
+  totalCents: Cents,
+  byChain: z.array(z.object({ chainId: z.number().int(), cents: Cents })),
+  byWallet: z.array(z.object({ walletId: Id, cents: Cents })),
+  /** Oldest holding sync; null with no holdings. */
+  lastSyncedAt: IsoDate.nullable(),
+  /** Non-zero holdings without a price (often spam); counted here, never in the total. */
+  unpricedTokenCount: z.number().int().nonnegative(),
+});
+
+export const FinanceWalletsOutputSchema = z.array(FinanceWalletSchema);
+
+/** `addressOrEns`: a 0x address (any case) or an ENS name; the server resolves and lowercases it. */
+export const FinanceWalletAddInputSchema = z.object({
+  addressOrEns: z.string().trim().min(1).max(255),
+  label: z.string().trim().min(1).max(100).optional(),
+  type: WalletTypeSchema,
+});
+export const FinanceWalletUpdateInputSchema = z.object({
+  id: Id,
+  /** null clears the label. */
+  label: z.string().trim().min(1).max(100).nullable().optional(),
+  type: WalletTypeSchema.optional(),
+});
+export const FinanceWalletRemoveInputSchema = z.object({ id: Id });
+
+export const FinanceCryptoOutputSchema = z.object({
+  /** Whether the Blockscout McpServer exists and is enabled. */
+  connected: z.boolean(),
+  /** Whether a Pro API key is stored (never the key itself). */
+  hasApiKey: z.boolean(),
+  summary: CryptoSummarySchema,
+  holdings: z.array(CryptoHoldingSchema),
+  wallets: z.array(FinanceWalletSchema),
+  /** Short reason the last crypto sync failed; null when fine. */
+  lastError: z.string().nullable(),
+});
+
+/** Creates or updates the Blockscout McpServer; the key is optional (shared stricter rate limit without it). */
+export const FinanceCryptoConnectInputSchema = z.object({
+  apiKey: z.string().trim().min(1).max(500).optional(),
+});
+export const FinanceCryptoConnectOutputSchema = z.object({ serverId: Id, hasApiKey: z.boolean() });
+
 // ---- Normalized records (what sync stores and the pure calculations read) ----
 
 export const FinanceAccountKindSchema = z.enum(["checking", "savings", "treasury", "card"]);
@@ -342,6 +459,8 @@ export const FinanceOverviewSchema = z.object({
   lastSyncedAt: IsoDate.nullable(),
   /** Transactions left out of every total because they are not in USD (v1 is USD only). */
   excludedNonUsdCount: z.number().int().nonnegative(),
+  /** Crypto holdings for the separate card; null or absent when no wallet is added. Never part of cash, burn or runway. */
+  crypto: CryptoSummarySchema.nullable().optional(),
 });
 
 /** `redirectUri` is the web app's /mcp/oauth/callback, as for `mcp.oauth.begin`. */
@@ -491,6 +610,16 @@ export const FinanceReceiptUrlOutputSchema = z.object({
   mimeType: z.string().nullable(),
 });
 
+export type WalletType = z.infer<typeof WalletTypeSchema>;
+export type FinanceWallet = z.infer<typeof FinanceWalletSchema>;
+export type CryptoHolding = z.infer<typeof CryptoHoldingSchema>;
+export type CryptoSummary = z.infer<typeof CryptoSummarySchema>;
+export type FinanceWalletAddInput = z.infer<typeof FinanceWalletAddInputSchema>;
+export type FinanceWalletUpdateInput = z.infer<typeof FinanceWalletUpdateInputSchema>;
+export type FinanceWalletRemoveInput = z.infer<typeof FinanceWalletRemoveInputSchema>;
+export type FinanceCryptoOutput = z.infer<typeof FinanceCryptoOutputSchema>;
+export type FinanceCryptoConnectInput = z.infer<typeof FinanceCryptoConnectInputSchema>;
+export type FinanceCryptoConnectOutput = z.infer<typeof FinanceCryptoConnectOutputSchema>;
 export type FinanceAccount = z.infer<typeof FinanceAccountSchema>;
 export type FinanceAccountKind = z.infer<typeof FinanceAccountKindSchema>;
 export type FinanceTransaction = z.infer<typeof FinanceTransactionSchema>;
