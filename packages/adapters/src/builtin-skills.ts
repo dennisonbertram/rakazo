@@ -82,11 +82,11 @@ Rules for every finance answer:
   },
   {
     name: "finance-crypto",
-    description: "Crypto wallet balances and allocation, priced by Blockscout. Read only.",
+    description: "Crypto wallet balances and allocation, priced by DefiLlama. Read only.",
     body: `Use this when the user asks about their crypto: what they hold, what it is worth, how it is spread across wallets or chains, or what changed. You only read and report. All crypto tools are read-only: never move, swap, approve or send funds, and say so if asked to.
 
 - Call finance_crypto first. It reads the synced wallet balances in one call and matches the Crypto page: total value, value by chain and wallet, each wallet's top holdings, tokens without a price, and when it last synced. Use the Blockscout tools (such as get_address_info, get_tokens_by_address and read_contract) only for details it does not have, such as a fresh balance, a token's contract, or a Safe's owners.
-- Crypto is valued at Blockscout prices in US dollars. Those are indicative, not what a sale would fetch. Say when the data is old (lastSyncedAt).
+- Crypto is valued at DefiLlama prices in US dollars, and holdings come from a curated token list, so tokens outside it are not shown. Those are indicative, not what a sale would fetch. Say when the data is old (lastSyncedAt).
 - Crypto is separate from cash. Never add it to cash, burn or runway, and do not use it in runway scenarios unless the user asks and states the assumption (for example, "if I sold half of it").
 - Holdings with a null usd have no price, often spam or dust tokens. They are not in the total; report how many there are instead of guessing a value.
 - Compute totals, shares and changes with code, never in your head.

@@ -88,7 +88,7 @@ export interface FinanceDeps {
   now?: () => Date;
 }
 
-/** The two crypto adapter calls the handlers need (syncCryptoHoldings and resolveEnsName behind the user's Blockscout server). */
+/** The two crypto adapter calls the handlers need (syncCryptoHoldings and resolveEnsName, read from public EVM RPC). */
 export interface FinanceCryptoDeps {
   sync(
     scope: { spaceId: string; userId: string },

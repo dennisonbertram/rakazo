@@ -5,27 +5,29 @@ import type { PrismaClient } from "@rakazo/db";
 import { Prisma } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { findCryptoServer } from "./blockscout-crypto-call-tool.js";
-import type { CryptoFailureKind } from "./blockscout-crypto-errors.js";
+import type { TokenRow } from "./crypto-token-list.js";
+import type {
+  ChainSnapshot,
+  RpcClientOptions,
+  RpcFailureKind,
+  SafeDetails,
+} from "./rpc-crypto-source.js";
 import {
-  classifyCryptoError,
-  cryptoFailureMessage,
-  isKeyFailure,
+  classifyRpcError,
+  createRpcClient,
+  fetchChainSnapshot,
+  fetchPrices,
+  fetchSafeDetails,
   mostActionable,
-} from "./blockscout-crypto-errors.js";
-import type { ChainSnapshot, SafeDetails } from "./blockscout-crypto-source.js";
-import { fetchChainSnapshot, fetchSafeDetails } from "./blockscout-crypto-source.js";
-import type { FinanceCallTool } from "./finance-sync.js";
+  rpcFailureMessage,
+} from "./rpc-crypto-source.js";
 
-export interface CryptoSyncDeps {
+export interface CryptoSyncDeps extends Pick<RpcClientOptions, "fetch" | "urls"> {
   prisma: PrismaClient;
-  callToolFor(
-    server: { id: string; endpoint: string },
-    signal: AbortSignal,
-  ): Promise<FinanceCallTool>;
   now?: () => Date;
-  /** Minimum gap between Blockscout calls (default 250 ms keeps a 5 requests/second plan under its limit). */
+  /** Minimum gap between requests to one RPC host (default 200 ms). */
   callGapMs?: number;
-  /** First wait before retrying a rate-limited call; doubles per retry (default 1000 ms). */
+  /** First wait before retrying a 429 or 5xx; doubles per retry (default 1000 ms). */
   retryDelayMs?: number;
 }
 
@@ -44,18 +46,14 @@ export type CryptoSyncResult =
 const DB_NOW = Prisma.sql`timezone('utc', now())`;
 /** Shorter than the 2-minute stale claim. */
 const DEADLINE_MS = 100_000;
-/** A chain Blockscout refused with 402 (not on the user's plan) is not called again for this long, unless forced. */
-const UNAVAILABLE_MS = 6 * 3_600_000;
-const MAX_RATE_LIMIT_RETRIES = 2;
-// ponytail: remembered in this process only; a restart costs one failed call per such chain. Persist if that ever matters.
-const unavailable = new Map<string, number>();
 
 /**
- * Replaces every tracked wallet's holdings with Blockscout's current balances on each chain. The
- * throttle and claim use `finance_sync_states` keyed by the Blockscout McpServer id, like Mercury
- * and Brex. A chain that fails keeps its previous rows and is listed in `failedChains`; the sync
- * fails only when no chain could be read. Without a Blockscout server it returns `not_connected`
- * (the hosted endpoint rejects keyless calls, and calls go through the user's server).
+ * Replaces every tracked wallet's holdings with current balances read from public EVM JSON-RPC on
+ * each chain, priced by DefiLlama. No vendor account or key is needed. The throttle and claim use
+ * `finance_sync_states`, which is keyed by an McpServer id, so the user's Blockscout server row
+ * (created with the first wallet) is reused as that key; Blockscout itself is never called. A chain
+ * that fails keeps its previous rows and is listed in `failedChains`; the sync fails only when no
+ * chain could be read. Without that row it returns `not_connected`.
  */
 export async function syncCryptoHoldings(
   deps: CryptoSyncDeps,
@@ -65,7 +63,7 @@ export async function syncCryptoHoldings(
   const { prisma } = deps;
   const { spaceId, userId } = scope;
   const server = await findCryptoServer(prisma, scope);
-  if (!server) return { ok: false, error: "not_connected", message: "Blockscout is not connected" };
+  if (!server) return { ok: false, error: "not_connected", message: "Crypto is not connected" };
   const wallets = await prisma.financeWallet.findMany({
     where: { spaceId, userId, ...(opts.walletIds ? { id: { in: opts.walletIds } } : {}) },
     select: { id: true, address: true, type: true },
@@ -90,31 +88,35 @@ export async function syncCryptoHoldings(
     RETURNING "mcpServerId"`;
   if (claimed.length === 0) return { ok: true, outcome: "skipped", failedChains: [] };
 
-  const release = (
-    error: unknown,
-    reason: { message: string; reconnect: boolean } = failureOf(error),
-  ) => {
+  const release = (message: string) => {
     if (opts.signal?.aborted)
       return prisma.$executeRaw`
         UPDATE finance_sync_states SET "syncStartedAt" = NULL, "claimToken" = NULL
         WHERE "mcpServerId" = ${server.id} AND "claimToken" = ${token}`;
-    getLogger().warn("crypto sync failed", { serverId: server.id, reason: reason.message });
+    getLogger().warn("crypto sync failed", { serverId: server.id, reason: message });
     return prisma.$executeRaw`
       UPDATE finance_sync_states
-      SET "lastErrorAt" = ${DB_NOW}, "lastError" = ${reason.message},
-          "needsReconnect" = ${reason.reconnect}, "syncStartedAt" = NULL, "claimToken" = NULL
+      SET "lastErrorAt" = ${DB_NOW}, "lastError" = ${message},
+          "needsReconnect" = false, "syncStartedAt" = NULL, "claimToken" = NULL
       WHERE "mcpServerId" = ${server.id} AND "claimToken" = ${token}`;
   };
-  const fail = async (error: unknown): Promise<CryptoSyncResult> => {
-    await release(error);
+  const fail = async (message: string): Promise<CryptoSyncResult> => {
+    await release(message);
     if (opts.signal?.aborted) return { ok: true, outcome: "skipped", failedChains: [] };
-    return { ok: false, error: "failed", message: failureOf(error).message };
+    return { ok: false, error: "failed", message };
   };
 
   const signal = AbortSignal.any([
     ...(opts.signal ? [opts.signal] : []),
     AbortSignal.timeout(DEADLINE_MS),
   ]);
+  const rpc = createRpcClient({
+    fetch: deps.fetch,
+    urls: deps.urls,
+    gapMs: deps.callGapMs,
+    retryDelayMs: deps.retryDelayMs,
+    signal,
+  });
   type WalletRead = {
     id: string;
     snapshots: Map<number, ChainSnapshot>;
@@ -122,51 +124,74 @@ export async function syncCryptoHoldings(
     safe: SafeDetails | null;
   };
   const reads: WalletRead[] = [];
-  const problems: Array<{ chainId: number; kind: CryptoFailureKind }> = [];
-  const nowMs = () => (deps.now ?? (() => new Date()))().getTime();
+  const problems: Array<{ chainId: number; kind: RpcFailureKind }> = [];
   try {
-    const callTool = pace(await deps.callToolFor(server, signal), deps);
+    // Tokens already stored for a wallet are always re-read, even when the bundled list lacks them.
+    const stored = await prisma.financeCryptoHolding.findMany({
+      where: {
+        spaceId,
+        userId,
+        walletId: { in: wallets.map((w) => w.id) },
+        tokenAddress: { not: "" },
+      },
+      select: {
+        walletId: true,
+        chainId: true,
+        tokenAddress: true,
+        symbol: true,
+        name: true,
+        decimals: true,
+      },
+    });
     for (const wallet of wallets) {
       const read: WalletRead = { id: wallet.id, snapshots: new Map(), failed: [], safe: null };
-      // Chains are started together, but `pace` runs the calls one at a time.
+      // Chains are started together; requests to one host still run one at a time.
       await Promise.all(
         CRYPTO_CHAINS.map(async ({ id }) => {
-          const key = `${server.id}:${id}`;
-          if (!force && (unavailable.get(key) ?? 0) > nowMs()) {
-            read.failed.push(id);
-            problems.push({ chainId: id, kind: "plan" });
-            return;
-          }
+          const extra: TokenRow[] = stored
+            .filter((s) => s.walletId === wallet.id && s.chainId === id)
+            .map((s) => [s.tokenAddress, s.symbol, s.name, s.decimals]);
           try {
-            read.snapshots.set(id, await fetchChainSnapshot(callTool, id, wallet.address));
-            unavailable.delete(key);
+            read.snapshots.set(id, await fetchChainSnapshot(rpc, id, wallet.address, extra));
           } catch (error) {
-            const kind = classifyCryptoError(error);
-            if (kind === "plan") unavailable.set(key, nowMs() + UNAVAILABLE_MS);
             read.failed.push(id);
-            problems.push({ chainId: id, kind });
+            problems.push({ chainId: id, kind: classifyRpcError(error) });
           }
         }),
       );
       signal.throwIfAborted();
-      const safeChain = [...read.snapshots].find(([, s]) => s.maybeSafe)?.[0];
-      if (safeChain !== undefined && wallet.type !== "exchange") {
-        try {
-          read.safe = await fetchSafeDetails(callTool, safeChain, wallet.address);
-        } catch (error) {
-          problems.push({ chainId: safeChain, kind: classifyCryptoError(error) });
+      if (wallet.type !== "exchange") {
+        for (const [chainId, snapshot] of read.snapshots) {
+          if (!snapshot.isContract) continue;
+          try {
+            read.safe = await fetchSafeDetails(rpc, chainId, wallet.address);
+          } catch (error) {
+            problems.push({ chainId, kind: classifyRpcError(error) });
+          }
+          if (read.safe) break;
         }
       }
       reads.push(read);
     }
   } catch (error) {
-    return fail(error);
+    return fail(rpcFailureMessage(classifyRpcError(error), []));
   }
   const problem = describeProblems(problems);
-  if (reads.every((r) => r.snapshots.size === 0)) {
-    const message = problem?.message ?? cryptoFailureMessage("failed");
-    await release(null, problem ?? failureOf(null));
-    return { ok: false, error: "failed", message };
+  if (reads.every((r) => r.snapshots.size === 0))
+    return fail(problem ?? rpcFailureMessage("failed", []));
+
+  // One price request for everything held. Without prices the sync fails and the old rows stay.
+  try {
+    const keys = reads.flatMap((r) =>
+      [...r.snapshots.values()].flatMap((s) => s.holdings.map((h) => h.llamaKey)),
+    );
+    const prices = await fetchPrices(rpc, keys);
+    for (const read of reads)
+      for (const snapshot of read.snapshots.values())
+        for (const h of snapshot.holdings)
+          h.usdPrice = prices.get(h.llamaKey.toLowerCase()) ?? null;
+  } catch (error) {
+    return fail(rpcFailureMessage(classifyRpcError(error), ["Prices"], "the price service"));
   }
 
   const failedChains = [...new Set(reads.flatMap((r) => r.failed))].sort((a, b) => a - b);
@@ -179,7 +204,7 @@ export async function syncCryptoHoldings(
           WHERE "mcpServerId" = ${server.id} AND "claimToken" = ${token}
           FOR UPDATE`;
         if (owned.length === 0) return "skipped" as const;
-        // A wallet removed while Blockscout was read is simply not written.
+        // A wallet removed while the chains were read is simply not written.
         const live = new Set(
           (
             await tx.financeWallet.findMany({
@@ -195,7 +220,7 @@ export async function syncCryptoHoldings(
               where: { spaceId, userId, walletId: read.id, chainId },
             });
             await tx.financeCryptoHolding.createMany({
-              data: snapshot.holdings.map((h) => ({
+              data: snapshot.holdings.map(({ llamaKey: _key, ...h }) => ({
                 spaceId,
                 userId,
                 walletId: read.id,
@@ -213,11 +238,10 @@ export async function syncCryptoHoldings(
               data: { safeOwners: read.safe.owners, safeThreshold: read.safe.threshold },
             });
         }
-        const message = problem?.message ?? null;
         await tx.$executeRaw`
           UPDATE finance_sync_states
-          SET "lastSyncedAt" = ${DB_NOW}, "lastErrorAt" = ${message ? DB_NOW : null},
-              "lastError" = ${message}, "needsReconnect" = ${problem?.reconnect ?? false},
+          SET "lastSyncedAt" = ${DB_NOW}, "lastErrorAt" = ${problem ? DB_NOW : null},
+              "lastError" = ${problem}, "needsReconnect" = false,
               "syncStartedAt" = NULL, "claimToken" = NULL
           WHERE "mcpServerId" = ${server.id} AND "claimToken" = ${token}`;
         return "synced" as const;
@@ -226,57 +250,19 @@ export async function syncCryptoHoldings(
     );
     return { ok: true, outcome, failedChains };
   } catch (error) {
-    return fail(error);
+    return fail(rpcFailureMessage(classifyRpcError(error), []));
   }
 }
 
 /** The one message for the page: the most actionable reason, naming the chains that failed for it. */
 function describeProblems(
-  problems: Array<{ chainId: number; kind: CryptoFailureKind }>,
-): { message: string; reconnect: boolean } | null {
+  problems: Array<{ chainId: number; kind: RpcFailureKind }>,
+): string | null {
   if (problems.length === 0) return null;
   const kind = mostActionable(problems.map((p) => p.kind));
   const failed = new Set(problems.filter((p) => p.kind === kind).map((p) => p.chainId));
-  const chains = CRYPTO_CHAINS.filter((c) => failed.has(c.id)).map((c) => c.name);
-  return { message: cryptoFailureMessage(kind, chains), reconnect: isKeyFailure(kind) };
-}
-
-/** A message for an error that is not tied to one chain. */
-function failureOf(error: unknown): { message: string; reconnect: boolean } {
-  const kind = classifyCryptoError(error);
-  return { message: cryptoFailureMessage(kind), reconnect: isKeyFailure(kind) };
-}
-
-/**
- * Wraps the tool caller so calls run one at a time at least `callGapMs` apart (Blockscout's Free plan
- * allows 5 requests/second), retries a rate-limited call with a doubling wait, and stops calling for
- * the rest of the run once the key is missing or rejected, since every further call would fail alike.
- */
-function pace(raw: FinanceCallTool, deps: CryptoSyncDeps): FinanceCallTool {
-  const gap = deps.callGapMs ?? 250;
-  const retryDelay = deps.retryDelayMs ?? 1000;
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  let tail: Promise<unknown> = Promise.resolve();
-  let lastStart = 0;
-  let keyError: unknown;
-  return (name, args) => {
-    const run = tail.then(async () => {
-      for (let attempt = 0; ; attempt++) {
-        if (keyError) throw keyError;
-        const wait = lastStart + gap - Date.now();
-        if (wait > 0) await sleep(wait);
-        lastStart = Date.now();
-        try {
-          return await raw(name, args);
-        } catch (error) {
-          const kind = classifyCryptoError(error);
-          if (isKeyFailure(kind)) keyError = error;
-          if (kind !== "rate_limit" || attempt >= MAX_RATE_LIMIT_RETRIES) throw error;
-          await sleep(retryDelay * 2 ** attempt);
-        }
-      }
-    });
-    tail = run.catch(() => undefined);
-    return run;
-  };
+  return rpcFailureMessage(
+    kind,
+    CRYPTO_CHAINS.filter((c) => failed.has(c.id)).map((c) => c.name),
+  );
 }

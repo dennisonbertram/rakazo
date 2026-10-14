@@ -571,7 +571,7 @@ function tokenAmount(raw: string, decimals: number): string {
   return fraction ? `${whole}.${fraction}` : whole;
 }
 
-/** Wallet balances at Blockscout prices. Read-only, and never part of cash, burn or runway. */
+/** Wallet balances at DefiLlama prices. Read-only, and never part of cash, burn or runway. */
 async function financeCrypto(deps: FinanceToolDeps) {
   const where = scopeWhere(deps);
   const [walletRows, holdingRows] = await Promise.all([
@@ -624,7 +624,7 @@ async function financeCrypto(deps: FinanceToolDeps) {
             : {}),
         };
       }),
-      note: "USD at Blockscout prices; holdings with usd null have no price and are not in the total. Not part of cash, burn or runway.",
+      note: "USD at DefiLlama prices; holdings with usd null have no price and are not in the total. Not part of cash, burn or runway.",
     },
     "wallets",
   );
