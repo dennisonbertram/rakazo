@@ -22,6 +22,7 @@ const rpcMock = vi.hoisted(() => ({
   walletAdd: vi.fn(),
   walletUpdate: vi.fn(),
   walletRemove: vi.fn(),
+  cryptoConnect: vi.fn(),
 }));
 vi.mock("../../lib/rpc", () => ({ rpc: { finance: rpcMock } }));
 
@@ -170,4 +171,23 @@ it("shows the server's error inline when adding a wallet fails", async () => {
   await flush();
   expect(rpcMock.walletAdd).toHaveBeenCalledWith({ addressOrEns: "alice.eth", type: "personal" });
   expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("already added");
+});
+
+it("offers Connect, opening the modal, only when there is no API key", async () => {
+  rpcMock.crypto.mockResolvedValue(data({ hasApiKey: true }));
+  await show();
+  expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Connect")).toBe(
+    false,
+  );
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  rpcMock.crypto.mockResolvedValue(data({ connected: true, hasApiKey: false }));
+  await show();
+  const connect = [...container.querySelectorAll("button")].find(
+    (b) => b.textContent === "Connect",
+  );
+  await act(async () => (connect as HTMLElement).click());
+  expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain(
+    "Connect Blockscout",
+  );
 });

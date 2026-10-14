@@ -90,31 +90,54 @@ it("shows a failed connect", async () => {
   expect(tile("brex")?.querySelector('[role="alert"]')?.textContent).toContain("Could not reach");
 });
 
-it("connects Blockscout without a key, then adds one from a disclosure", async () => {
-  cryptoRpc.cryptoConnect.mockResolvedValue({ serverId: "s2", hasApiKey: false });
-  await show([source("mercury", "ok"), source("brex", "ok")]);
-  const crypto = () => container.querySelector('[data-testid="finance-tile-crypto"]') as Element;
-  const click = (label: string) =>
-    act(async () => {
-      (
-        [...crypto().querySelectorAll("button")].find((b) => b.textContent === label) as HTMLElement
-      ).click();
-    });
-  expect(crypto().textContent).toContain("Not connected");
-  await click("Connect");
-  expect(cryptoRpc.cryptoConnect).toHaveBeenCalledWith({});
-  expect(crypto().textContent).toContain("Connected");
-  expect(crypto().querySelector("input")).toBeNull();
-  await click("Add API key");
-  const input = crypto().querySelector("input") as HTMLInputElement;
-  expect(input.type).toBe("password");
-  cryptoRpc.cryptoConnect.mockResolvedValue({ serverId: "s2", hasApiKey: true });
+const crypto = () => container.querySelector('[data-testid="finance-tile-crypto"]') as Element;
+const typeKey = async (value: string) => {
+  const input = document.body.querySelector('[role="dialog"] input') as HTMLInputElement;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "k-123");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await click("Save");
-  expect(cryptoRpc.cryptoConnect).toHaveBeenLastCalledWith({ apiKey: "k-123" });
+};
+const press2 = (root: ParentNode, label: string) =>
+  act(async () => {
+    (
+      [...root.querySelectorAll("button")].find((b) => b.textContent === label) as HTMLElement
+    ).click();
+  });
+
+it("shows a keyless Blockscout server as Not connected", async () => {
+  cryptoRpc.crypto.mockResolvedValue({ connected: true, hasApiKey: false });
+  await show([source("mercury", "ok"), source("brex", "ok")]);
+  expect(crypto().textContent).toContain("Not connected");
+  expect(crypto().textContent).not.toContain("Connected");
+});
+
+it("opens a modal from Connect, saves the key and then shows Connected", async () => {
+  cryptoRpc.crypto
+    .mockResolvedValueOnce({ connected: false, hasApiKey: false })
+    .mockResolvedValue({ connected: true, hasApiKey: true });
+  cryptoRpc.cryptoConnect.mockResolvedValue({ serverId: "s2", hasApiKey: true });
+  await show([source("mercury", "ok"), source("brex", "ok")]);
+  expect(crypto().querySelector("input")).toBeNull();
+  await press2(crypto(), "Connect");
+  const dialog = document.body.querySelector('[role="dialog"]') as Element;
+  expect(dialog.textContent).toContain("Get an API key");
+  expect(dialog.querySelector("a")?.getAttribute("href")).toBe("https://dev.blockscout.com");
+  await typeKey("k-123");
+  await press2(dialog, "Save");
+  expect(cryptoRpc.cryptoConnect).toHaveBeenCalledWith({ apiKey: "k-123" });
+  expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  expect(crypto().textContent).toContain("Connected");
   expect(crypto().textContent).toContain("Replace API key");
-  expect(crypto().textContent).not.toContain("k-123");
+});
+
+it("shows the server's error inside the modal", async () => {
+  cryptoRpc.cryptoConnect.mockRejectedValue(new Error("Invalid API key"));
+  await show([source("mercury", "ok"), source("brex", "ok")]);
+  await press2(crypto(), "Connect");
+  await typeKey("bad");
+  await press2(document.body.querySelector('[role="dialog"]') as Element, "Save");
+  expect(document.body.querySelector('[role="dialog"] [role="alert"]')?.textContent).toContain(
+    "Invalid API key",
+  );
 });

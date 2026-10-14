@@ -26,6 +26,7 @@ import { MoreHorizontal } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { DetailPage, Section, Th, useFinanceQuery } from "../../components/finance/ui";
 import { useTypeNames, WalletDialog, walletName } from "../../components/finance/WalletDialog";
+import { BlockscoutConnectDialog } from "../../components/integrations/BlockscoutConnectDialog";
 import { chainName, shortAddress, tokenAmount } from "../../lib/crypto-format";
 import { moneyExact } from "../../lib/finance-format";
 import { financePath } from "../../lib/finance-route";
@@ -140,6 +141,7 @@ export function FinanceCryptoPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<FinanceWallet | null>(null);
   const [removing, setRemoving] = useState<FinanceWallet | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const data = q.data;
   const updated = data?.summary.lastSyncedAt ? formatRelativeTime(data.summary.lastSyncedAt) : "";
   const unpriced = data?.summary.unpricedTokenCount ?? 0;
@@ -157,6 +159,16 @@ export function FinanceCryptoPage() {
     >
       {data ? (
         <>
+          {data.connected && data.hasApiKey ? null : (
+            <div>
+              <Button size="sm" onClick={() => setConnecting(true)}>
+                <Trans>Connect</Trans>
+              </Button>
+            </div>
+          )}
+          {connecting ? (
+            <BlockscoutConnectDialog onConnected={q.reload} onClose={() => setConnecting(false)} />
+          ) : null}
           {data.lastError ? (
             <p role="alert" className="text-sm text-destructive">
               {data.lastError}
