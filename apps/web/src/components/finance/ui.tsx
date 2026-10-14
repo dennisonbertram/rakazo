@@ -129,6 +129,7 @@ export function DetailPage({
   crumbs,
   title,
   subtitle,
+  action,
   loading,
   error,
   onRetry,
@@ -137,6 +138,8 @@ export function DetailPage({
   crumbs: Crumb[];
   title?: ReactNode;
   subtitle?: ReactNode;
+  /** Sits at the end of the title row. */
+  action?: ReactNode;
   loading: boolean;
   error: string;
   onRetry: () => void;
@@ -155,7 +158,10 @@ export function DetailPage({
         </div>
       ) : (
         <>
-          <h1 className="mt-1.5 text-xl font-semibold">{title}</h1>
+          <div className="mt-1.5 flex items-center gap-3">
+            <h1 className="text-xl font-semibold">{title}</h1>
+            {action ? <div className="ms-auto">{action}</div> : null}
+          </div>
           {subtitle ? <div className="mb-3 text-xs text-muted-foreground">{subtitle}</div> : null}
           <div className={cn("flex flex-col gap-3", subtitle ? "" : "mt-3")}>{children}</div>
         </>

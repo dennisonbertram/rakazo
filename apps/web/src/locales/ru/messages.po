@@ -125,6 +125,12 @@ msgstr ""
 msgid "{0} now appears under Connected."
 msgstr ""
 
+#. placeholder {0}: wallet.safeThreshold
+#. placeholder {1}: wallet.safeOwners.length
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{0} of {1}"
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -139,6 +145,11 @@ msgstr "Запусков: {0} · токенов: {1}"
 #. placeholder {0}: card.count
 #: src/components/FinanceCards.tsx
 msgid "{0} transactions"
+msgstr ""
+
+#. placeholder {0}: data.crypto.unpricedTokenCount
+#: src/pages/Finance.tsx
+msgid "{0} unpriced"
 msgstr ""
 
 #. placeholder {0}: target.name
@@ -286,6 +297,10 @@ msgstr ""
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{unpriced} unpriced"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "{workingBotName} is working"
 msgstr "{workingBotName} работает"
@@ -309,6 +324,10 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 msgid "+{more} more"
+msgstr ""
+
+#: src/components/finance/WalletDialog.tsx
+msgid "0x… or name.eth"
 msgstr ""
 
 #: src/pages/Finance.tsx
@@ -387,6 +406,10 @@ msgstr "Подтверждения действий"
 msgid "Actions for {0}"
 msgstr "Действия для {0}"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Actions for {name}"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "Actions for space"
 msgstr "Действия для пространства"
@@ -405,6 +428,7 @@ msgstr "Активная модель"
 msgid "Activity"
 msgstr "Активность"
 
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
@@ -449,8 +473,16 @@ msgstr "Добавьте расписание, вебхук, GitHub или тр�
 msgid "Add a schedule, webhook, GitHub, or message trigger to run this routine."
 msgstr "Добавьте расписание, вебхук, GitHub или триггер сообщения для запуска этой задачи."
 
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Add account"
+msgstr ""
+
 #: src/components/integrations/AppDetail.tsx
 msgid "Add another account"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Add API key"
 msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
@@ -488,6 +520,15 @@ msgstr "Добавить в задачу"
 #: src/pages/RoutineEditor.tsx
 msgid "Add trigger"
 msgstr "Добавить триггер"
+
+#: src/components/finance/WalletDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Add wallet"
+msgstr ""
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Address or ENS"
+msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/AccountSettingsOverlay.tsx
@@ -656,6 +697,7 @@ msgid "API is back, but the update did not finish. Check the host logs."
 msgstr "API вернулся, но обновление не завершилось. Проверьте журналы хоста."
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/ModelSettingsOverlay.tsx
@@ -886,6 +928,7 @@ msgid "Backup models saved."
 msgstr "Резервные модели сохранены."
 
 #: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Balance"
 msgstr ""
 
@@ -1050,6 +1093,7 @@ msgstr "Не удаётся связаться с сервером."
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -1057,6 +1101,7 @@ msgstr "Не удаётся связаться с сервером."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -1137,6 +1182,14 @@ msgstr ""
 #. placeholder {0}: message.cc
 #: src/components/inbox/InboxMessageDialog.tsx
 msgid "cc {0}"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chain"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chains"
 msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
@@ -1525,6 +1578,10 @@ msgstr ""
 msgid "Connect API key"
 msgstr "Подключить API-ключ"
 
+#: src/components/integrations/FinanceSection.tsx
+msgid "Connect Blockscout"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Executor"
 msgstr "Подключить Executor"
@@ -1628,6 +1685,10 @@ msgstr "Продолжить с {0}"
 #: src/pages/Auth.tsx
 msgid "Continue with email"
 msgstr "Продолжить по электронной почте"
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Contract"
+msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -2199,6 +2260,16 @@ msgstr "Крон"
 msgid "Cron expression"
 msgstr "Выражение Cron"
 
+#: src/pages/Finance.tsx
+#: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Crypto"
+msgstr ""
+
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Crypto wallet"
+msgstr ""
+
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
@@ -2532,6 +2603,10 @@ msgstr "напр. Hivenet Agent, Presales, бот табелей"
 msgid "Earlier"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Edit"
+msgstr ""
+
 #: src/components/AskCard.tsx
 msgid "Edit first"
 msgstr "Сначала отредактируйте"
@@ -2539,6 +2614,10 @@ msgstr "Сначала отредактируйте"
 #: src/pages/BotContextMenu.tsx
 msgid "Edit Profile"
 msgstr "Редактировать профиль"
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Edit wallet"
+msgstr ""
 
 #: src/pages/Auth.tsx
 msgid "Email"
@@ -2657,6 +2736,10 @@ msgstr ""
 msgid "Every week"
 msgstr "Каждую неделю"
 
+#: src/components/finance/WalletDialog.tsx
+msgid "Exchange"
+msgstr ""
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Excluded"
 msgstr ""
@@ -2758,6 +2841,7 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/finance/FinanceNotFound.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
@@ -2970,6 +3054,10 @@ msgstr "Высокий"
 msgid "High"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Holdings"
+msgstr ""
+
 #: src/pages/RoutineSchedule.tsx
 msgid "hour"
 msgstr "час"
@@ -3145,6 +3233,14 @@ msgstr ""
 #: src/pages/KnowledgeSection.tsx
 msgid "Knowledge"
 msgstr "Знание"
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Label"
+msgstr ""
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Label (optional)"
+msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Language"
@@ -3980,6 +4076,7 @@ msgid "Only if the server does not use sign-in"
 msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
@@ -4205,6 +4302,7 @@ msgstr ""
 msgid "Period"
 msgstr ""
 
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/Inbox.tsx
 msgid "Personal"
 msgstr ""
@@ -4342,6 +4440,10 @@ msgstr ""
 #: src/pages/shell/bot-panel.tsx
 msgid "Read replies aloud"
 msgstr "Читать ответы вслух"
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read wallet balances"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -4484,6 +4586,7 @@ msgstr "Освободить прерванный компьютер?"
 #: src/components/ApprovalRulesSettings.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -4508,6 +4611,7 @@ msgstr "Удалить {0}"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Remove {0}?"
 msgstr ""
 
@@ -4593,6 +4697,7 @@ msgstr ""
 msgid "Reopen"
 msgstr "Открыть заново"
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Replace API key"
 msgstr "Заменить ключ API"
@@ -4789,11 +4894,17 @@ msgstr "Запускается, когда этот бот получает пр
 msgid "Runway"
 msgstr ""
 
+#: src/components/finance/WalletDialog.tsx
+msgid "Safe"
+msgstr ""
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Sales & CRM"
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/components/finance/WalletDialog.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx
@@ -5633,6 +5744,7 @@ msgid "Today"
 msgstr "Сегодня"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Token"
 msgstr ""
 
@@ -5698,6 +5810,7 @@ msgstr ""
 msgid "Try the test again."
 msgstr "Повторите тест."
 
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
 msgstr ""
@@ -5804,6 +5917,7 @@ msgid "Updated"
 msgstr "Обновлено"
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Updated {updated}"
 msgstr ""
@@ -5895,6 +6009,7 @@ msgstr "Использует собственные учётные данные 
 msgid "Using {0}"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Value"
 msgstr ""
@@ -5985,6 +6100,10 @@ msgstr "Ожидание в очереди…"
 #: src/pages/shell/message-cards.tsx
 msgid "Waiting…"
 msgstr "Ожидание…"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Wallets"
+msgstr ""
 
 #: src/pages/Paywall.tsx
 msgid "Web, desktop and mobile apps"

@@ -125,6 +125,12 @@ msgstr ""
 msgid "{0} now appears under Connected."
 msgstr ""
 
+#. placeholder {0}: wallet.safeThreshold
+#. placeholder {1}: wallet.safeOwners.length
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{0} of {1}"
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -139,6 +145,11 @@ msgstr "{0}회 실행 · 토큰 {1}개"
 #. placeholder {0}: card.count
 #: src/components/FinanceCards.tsx
 msgid "{0} transactions"
+msgstr ""
+
+#. placeholder {0}: data.crypto.unpricedTokenCount
+#: src/pages/Finance.tsx
+msgid "{0} unpriced"
 msgstr ""
 
 #. placeholder {0}: target.name
@@ -286,6 +297,10 @@ msgstr ""
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{unpriced} unpriced"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "{workingBotName} is working"
 msgstr "{workingBotName} 작업 중"
@@ -309,6 +324,10 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 msgid "+{more} more"
+msgstr ""
+
+#: src/components/finance/WalletDialog.tsx
+msgid "0x… or name.eth"
 msgstr ""
 
 #: src/pages/Finance.tsx
@@ -387,6 +406,10 @@ msgstr "작업 실행 전 확인"
 msgid "Actions for {0}"
 msgstr "{0} 작업 메뉴"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Actions for {name}"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "Actions for space"
 msgstr ""
@@ -405,6 +428,7 @@ msgstr "현재 모델"
 msgid "Activity"
 msgstr "활동"
 
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
@@ -449,8 +473,16 @@ msgstr ""
 msgid "Add a schedule, webhook, GitHub, or message trigger to run this routine."
 msgstr ""
 
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Add account"
+msgstr ""
+
 #: src/components/integrations/AppDetail.tsx
 msgid "Add another account"
+msgstr ""
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Add API key"
 msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
@@ -488,6 +520,15 @@ msgstr "자동 실행에 추가"
 #: src/pages/RoutineEditor.tsx
 msgid "Add trigger"
 msgstr "트리거 추가"
+
+#: src/components/finance/WalletDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Add wallet"
+msgstr ""
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Address or ENS"
+msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/AccountSettingsOverlay.tsx
@@ -656,6 +697,7 @@ msgid "API is back, but the update did not finish. Check the host logs."
 msgstr "API가 다시 작동하지만 업데이트가 완료되지 않았습니다. 호스트 로그를 확인하세요."
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/ModelSettingsOverlay.tsx
@@ -886,6 +928,7 @@ msgid "Backup models saved."
 msgstr "백업 모델을 저장했습니다."
 
 #: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Balance"
 msgstr ""
 
@@ -1050,6 +1093,7 @@ msgstr "서버에 연결할 수 없습니다."
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -1057,6 +1101,7 @@ msgstr "서버에 연결할 수 없습니다."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -1137,6 +1182,14 @@ msgstr ""
 #. placeholder {0}: message.cc
 #: src/components/inbox/InboxMessageDialog.tsx
 msgid "cc {0}"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chain"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chains"
 msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
@@ -1525,6 +1578,10 @@ msgstr ""
 msgid "Connect API key"
 msgstr "API 키 연결"
 
+#: src/components/integrations/FinanceSection.tsx
+msgid "Connect Blockscout"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Executor"
 msgstr "Executor 연결"
@@ -1628,6 +1685,10 @@ msgstr "{0}(으)로 계속"
 #: src/pages/Auth.tsx
 msgid "Continue with email"
 msgstr "이메일로 계속하기"
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Contract"
+msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -2199,6 +2260,16 @@ msgstr "Cron"
 msgid "Cron expression"
 msgstr "Cron 표현식"
 
+#: src/pages/Finance.tsx
+#: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Crypto"
+msgstr ""
+
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Crypto wallet"
+msgstr ""
+
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
@@ -2532,6 +2603,10 @@ msgstr "예: Hivenet Agent, Presales, 근무표 봇"
 msgid "Earlier"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Edit"
+msgstr ""
+
 #: src/components/AskCard.tsx
 msgid "Edit first"
 msgstr "수정 후 보내기"
@@ -2539,6 +2614,10 @@ msgstr "수정 후 보내기"
 #: src/pages/BotContextMenu.tsx
 msgid "Edit Profile"
 msgstr "Bot 정보 수정"
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Edit wallet"
+msgstr ""
 
 #: src/pages/Auth.tsx
 msgid "Email"
@@ -2657,6 +2736,10 @@ msgstr ""
 msgid "Every week"
 msgstr "매주"
 
+#: src/components/finance/WalletDialog.tsx
+msgid "Exchange"
+msgstr ""
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Excluded"
 msgstr ""
@@ -2758,6 +2841,7 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/finance/FinanceNotFound.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
@@ -2970,6 +3054,10 @@ msgstr "높음"
 msgid "High"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Holdings"
+msgstr ""
+
 #: src/pages/RoutineSchedule.tsx
 msgid "hour"
 msgstr "시간"
@@ -3145,6 +3233,14 @@ msgstr ""
 #: src/pages/KnowledgeSection.tsx
 msgid "Knowledge"
 msgstr "지식"
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Label"
+msgstr ""
+
+#: src/components/finance/WalletDialog.tsx
+msgid "Label (optional)"
+msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Language"
@@ -3980,6 +4076,7 @@ msgid "Only if the server does not use sign-in"
 msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
@@ -4205,6 +4302,7 @@ msgstr ""
 msgid "Period"
 msgstr ""
 
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/Inbox.tsx
 msgid "Personal"
 msgstr ""
@@ -4342,6 +4440,10 @@ msgstr ""
 #: src/pages/shell/bot-panel.tsx
 msgid "Read replies aloud"
 msgstr "답변을 자동으로 읽기"
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read wallet balances"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -4484,6 +4586,7 @@ msgstr ""
 #: src/components/ApprovalRulesSettings.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -4508,6 +4611,7 @@ msgstr "{0} 삭제"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Remove {0}?"
 msgstr ""
 
@@ -4593,6 +4697,7 @@ msgstr ""
 msgid "Reopen"
 msgstr "다시 열기"
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Replace API key"
 msgstr "API 키 교체"
@@ -4789,11 +4894,17 @@ msgstr ""
 msgid "Runway"
 msgstr ""
 
+#: src/components/finance/WalletDialog.tsx
+msgid "Safe"
+msgstr ""
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Sales & CRM"
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/components/finance/WalletDialog.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx
@@ -5633,6 +5744,7 @@ msgid "Today"
 msgstr "오늘"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Token"
 msgstr ""
 
@@ -5698,6 +5810,7 @@ msgstr "다시 시도"
 msgid "Try the test again."
 msgstr "테스트를 다시 시도하세요."
 
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
 msgstr ""
@@ -5804,6 +5917,7 @@ msgid "Updated"
 msgstr "업데이트됨"
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Updated {updated}"
 msgstr ""
@@ -5895,6 +6009,7 @@ msgstr "이 서버의 자체 {hostCredentialSource} 자격 증명으로 {selecte
 msgid "Using {0}"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Value"
 msgstr ""
@@ -5985,6 +6100,10 @@ msgstr "줄에서 기다리는 중…"
 #: src/pages/shell/message-cards.tsx
 msgid "Waiting…"
 msgstr "기다리는 중…"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Wallets"
+msgstr ""
 
 #: src/pages/Paywall.tsx
 msgid "Web, desktop and mobile apps"
