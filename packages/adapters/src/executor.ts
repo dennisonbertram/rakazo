@@ -197,6 +197,13 @@ import {
 } from "./browser-tools.js";
 import { INBOX_SEARCH_SKILL_NAME } from "./builtin-skills.js";
 import { agentConnectionTools, builtinAgentTools, sharedMemorySaveError } from "./builtin-tools.js";
+import {
+  CALENDAR_TOOL_NAMES,
+  type CalendarAccount,
+  calendarToolFromTool,
+  listCalendarAccounts,
+  selectCalendarTools,
+} from "./calendar-tools.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import type { CloudAgentConnection } from "./cloud-agent-factory.js";
 import { cloudAgentsEnabled } from "./cloud-agent-factory.js";
@@ -243,6 +250,12 @@ import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
 import { formatCurrentTimeInstruction } from "./current-time.js";
 import { resolveDeploymentModel } from "./deployment-model.js";
+import {
+  DRIVE_TOOL_NAMES,
+  driveToolFromTool,
+  driveToolsAllowed,
+  listDriveAccounts,
+} from "./drive-tools.js";
 import { handoffToGroupBot, loadGroupContext } from "./group-handoff.js";
 import {
   COMPACTION_BATCH_SIZE,
@@ -419,6 +432,10 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "mail_get",
   "show_emails",
   "inbox_overview",
+  "calendar_list_events",
+  "calendar_get_event",
+  "drive_search",
+  "drive_read",
   "browser_snapshot",
   "list_secrets",
   "cloud_agent_status",
@@ -2688,7 +2705,7 @@ export interface ExecutorDeps {
   cloudAgent?: CloudAgentConnection | null;
   /** Mail tools (mail_search, mail_grep, mail_get, show_emails, inbox_overview). Null/omit means they are never offered. */
   mail?: MailProvider | null;
-  /** MAIL_WRITES_DISABLED: mail_draft and mail_modify change nothing. */
+  /** MAIL_WRITES_DISABLED: mail_draft, mail_modify and mail_send change nothing. */
   mailWritesDisabled?: boolean;
   /** Optional Auto Review verifier. When omitted, the factory selects from env (llm | jev | scripted). */
   autoReview?: AutoReviewProvider;
@@ -3851,6 +3868,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : Promise.resolve([]);
           return mailAccountsPromise;
         };
+        // Native Google Calendar accounts of the bot owner, looked up once per run.
+        let calendarAccountsPromise: Promise<CalendarAccount[]> | undefined;
+        const calendarAccounts = () => {
+          calendarAccountsPromise ??= listCalendarAccounts(deps.prisma, {
+            spaceId: run.spaceId,
+            userId: bot.userId,
+          });
+          return calendarAccountsPromise;
+        };
+        const calendarEnabled =
+          mailToolsAllowed({
+            hasProvider: Boolean(deps.connectors),
+            groupId: thread.groupId,
+            runUserId: run.userId,
+            botUserId: bot.userId,
+            messagingChannelRun,
+          }) && (await calendarAccounts().catch(() => [])).length > 0;
         const mailEnabled =
           mailToolsAllowed({
             hasProvider: Boolean(deps.mail),
@@ -3859,6 +3893,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botUserId: bot.userId,
             messagingChannelRun,
           }) && (await mailAccounts().catch(() => [])).length > 0;
+        // Connected Google Drive accounts of the bot owner, looked up once per run.
+        let driveAccountsPromise: ReturnType<typeof listDriveAccounts> | undefined;
+        const driveAccounts = () => {
+          driveAccountsPromise ??= listDriveAccounts(deps.prisma, {
+            spaceId: run.spaceId,
+            userId: bot.userId,
+          });
+          return driveAccountsPromise;
+        };
+        const driveEnabled =
+          driveToolsAllowed({
+            hasProvider: Boolean(deps.connectors),
+            groupId: thread.groupId,
+            runUserId: run.userId,
+            botUserId: bot.userId,
+            messagingChannelRun,
+          }) && (await driveAccounts().catch(() => [])).length > 0;
         const builtins = [
           ...selectBuiltinToolsForRun({
             ticketBoardEnabled: deps.ticketBoardEnabled,
@@ -3870,6 +3921,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             semanticMemoryEnabled,
             cloudAgentEnabled: cloudAgentsEnabled(cloudAgent, run.spaceId),
             mailEnabled,
+            calendarEnabled,
+            driveEnabled,
             messagingChannelRun,
             voiceCall,
             disabledBuiltinTools: bot.disabledBuiltinTools,
@@ -5233,6 +5286,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (name === "web_fetch") {
             return finish(await webFetchFromTool(web, context, args));
           }
+          if (CALENDAR_TOOL_NAMES.has(name) && deps.connectors && calendarEnabled) {
+            return finish(
+              await calendarToolFromTool(
+                name,
+                {
+                  accounts: calendarAccounts,
+                  connectors: deps.connectors,
+                  idempotencyKey: effectKey,
+                },
+                context,
+                args,
+              ),
+            );
+          }
           if (MAIL_TOOL_NAMES.has(name) && deps.mail && mailEnabled) {
             return finish(
               await mailToolFromTool(
@@ -5244,7 +5311,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   accounts: mailAccounts,
                   publish: (blocks) => publishMessage(deps, run, "bot", blocks),
                   writesDisabled: deps.mailWritesDisabled,
+                  idempotencyKey: effectKey,
                   scope: { spaceId: run.spaceId, userId: bot.userId, botId: bot.id },
+                },
+                context,
+                args,
+              ),
+            );
+          }
+          if (DRIVE_TOOL_NAMES.has(name) && deps.connectors && driveEnabled) {
+            return finish(
+              await driveToolFromTool(
+                name,
+                {
+                  prisma: deps.prisma,
+                  connectors: deps.connectors,
+                  accounts: driveAccounts,
+                  scope: { spaceId: run.spaceId, userId: bot.userId },
                 },
                 context,
                 args,
@@ -7530,6 +7613,10 @@ export function selectBuiltinToolsForRun(options: {
   cloudAgentEnabled?: boolean;
   /** The run's requester owns the bot and has a connected mail account. */
   mailEnabled?: boolean;
+  /** The run's requester owns the bot and has a connected native Google Calendar. */
+  calendarEnabled?: boolean;
+  /** The run's requester owns the bot and has a connected native Google Drive. */
+  driveEnabled?: boolean;
   messagingChannelRun: boolean;
   /** Hanging up is only offered to a turn the caller spoke on a live call. */
   voiceCall?: boolean;
@@ -7537,27 +7624,31 @@ export function selectBuiltinToolsForRun(options: {
   disabledBuiltinTools?: readonly string[];
 }) {
   const disabled = disabledBuiltinToolSet(options.disabledBuiltinTools);
-  return selectMailTools(
-    selectCloudAgentTools(
-      selectMemoryTools(
-        filterBuiltinToolsForRun(
-          filterBuiltinToolsForThread(
-            filterPageBrowserTools(
-              filterImageReturningComputerTools(builtinAgentTools, options.graphicalToolsAllowed),
-              options.pageBrowserAllowed ?? options.graphicalToolsAllowed,
+  return selectCalendarTools(
+    selectMailTools(
+      selectCloudAgentTools(
+        selectMemoryTools(
+          filterBuiltinToolsForRun(
+            filterBuiltinToolsForThread(
+              filterPageBrowserTools(
+                filterImageReturningComputerTools(builtinAgentTools, options.graphicalToolsAllowed),
+                options.pageBrowserAllowed ?? options.graphicalToolsAllowed,
+              ),
+              options.groupId,
             ),
-            options.groupId,
+            options.trigger,
           ),
-          options.trigger,
+          options.semanticMemoryEnabled,
         ),
-        options.semanticMemoryEnabled,
+        Boolean(options.cloudAgentEnabled),
       ),
-      Boolean(options.cloudAgentEnabled),
+      Boolean(options.mailEnabled),
     ),
-    Boolean(options.mailEnabled),
+    Boolean(options.calendarEnabled),
   ).filter(
     (tool) =>
       !disabled.has(tool.name) &&
+      (options.driveEnabled || !DRIVE_TOOL_NAMES.has(tool.name)) &&
       (options.ticketBoardEnabled ||
         (tool.name !== "board_tickets" && !tool.name.startsWith("ticket_"))) &&
       (!isBackgroundRunTrigger(options.trigger) ||

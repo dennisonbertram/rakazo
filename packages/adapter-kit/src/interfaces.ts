@@ -207,10 +207,16 @@ export interface ConnectionAuthProvider {
     context: AdapterContext,
   ): Promise<{ authorizationUrl: string | null; state: string }>;
   complete(
-    request: { state: string; code?: string; redirectUrl?: string },
+    /** `provider` is the pending Connection's provider, for connectors whose providers need different grants. */
+    request: { state: string; code?: string; redirectUrl?: string; provider?: string },
     context: AdapterContext,
   ): Promise<{ connectionRef: string; secretId?: string }>;
-  revoke(connectionRef: string, context: AdapterContext): Promise<void>;
+  /** `provider` is the Connection's provider, for connectors that hold several apps per account. */
+  revoke(
+    connectionRef: string,
+    context: AdapterContext,
+    options?: { provider?: string },
+  ): Promise<void>;
 }
 
 /** A connector that also owns an end-user app catalog and connection lifecycle. */

@@ -11,6 +11,7 @@ import {
 } from "@rakazo/contracts";
 import { z } from "zod";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
+import { calendarToolDefinitions } from "./calendar-tools.js";
 
 // The owner flag can land in process.env after static imports run (loadRootEnv
 // parses .env once the entry module is already executing), so the model-facing
@@ -665,7 +666,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "mail_draft",
     description:
-      "Save an email draft in the user's mail account, or replace one you saved earlier (pass its draftId; every field is replaced). The user reviews and sends it themselves; you cannot send mail. Needs the user's approval. After saving, tell the user the draft is in their Drafts folder.",
+      "Save an email draft in the user's mail account, or replace one you saved earlier (pass its draftId; every field is replaced). To send it, use mail_send. Needs the user's approval. After saving, tell the user the draft is in their Drafts folder.",
     inputSchema: {
       type: "object",
       properties: {
@@ -695,9 +696,40 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "mail_send",
+    description:
+      "Send an email from the user's mail account: either a draft you saved with mail_draft (pass its draftId) or a new message (to, subject, body). Sending cannot be undone. Needs the user's approval for each send. If the result says the outcome is unclear, do not send again; tell the user to check their Sent folder.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draftId: {
+          type: "string",
+          description: "A draftId from mail_draft. Send this draft instead of a new message.",
+        },
+        account: {
+          type: "string",
+          description: "Address of the connected account. Required with more than one account.",
+        },
+        to: {
+          type: "array",
+          items: { type: "string" },
+          description: "Addresses, e.g. Name <a@b.com>.",
+        },
+        cc: { type: "array", items: { type: "string" } },
+        bcc: { type: "array", items: { type: "string" } },
+        subject: { type: "string" },
+        body: { type: "string", description: "Plain text." },
+        replyToId: {
+          type: "string",
+          description: "Id of the message this answers, to put the message in its conversation.",
+        },
+      },
+    },
+  },
+  {
     name: "mail_modify",
     description:
-      "Change a conversation in the user's mail: mark read or unread, archive or move back to the inbox, add or remove labels. Marking read, archiving and labels apply to every message of the conversation; marking unread applies to the one message. Use the id from a mail_grep row. Cannot delete, trash, report spam or send. Needs the user's approval.",
+      "Change a conversation in the user's mail: mark read or unread, archive or move back to the inbox, add or remove labels. Marking read, archiving and labels apply to every message of the conversation; marking unread applies to the one message. Use the id from a mail_grep row. Cannot delete, trash or report spam. Needs the user's approval.",
     inputSchema: {
       type: "object",
       properties: {
@@ -712,6 +744,71 @@ export const builtinAgentTools: ConnectorTool[] = [
         removeLabels: { type: "array", items: { type: "string" }, description: "Label names." },
       },
       required: ["id"],
+    },
+  },
+  {
+    name: "drive_search",
+    description:
+      "Find files in the user's connected Google Drive by name or content. Returns id, name, mimeType, modifiedTime, owners, webViewLink and size for each match. Use drive_read for the content.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Words to find in file names or content." },
+        mimeType: { type: "string", description: "Only files of this type." },
+        maxResults: { type: "number", description: "Default 25, max 100." },
+        account: {
+          type: "string",
+          description: "The connection name of one Drive account. Required with several.",
+        },
+      },
+      required: ["query"],
+    },
+    readOnly: true,
+  },
+  {
+    name: "drive_read",
+    description:
+      "Read a Drive file as text: Google Docs, Sheets (first sheet, as CSV) and Slides, and text files. Other types return only their details. Long content is truncated (truncated: true).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: { type: "string", description: "The id from drive_search." },
+        account: { type: "string", description: "The connection name of the Drive account." },
+      },
+      required: ["fileId"],
+    },
+    readOnly: true,
+  },
+  {
+    name: "drive_create_file",
+    description:
+      "Create a file in the user's Google Drive from text: a Google Doc (kind doc) or a plain text file (kind text). Needs the user's approval. If the result says the outcome is unclear, check Drive before creating it again.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        content: { type: "string", description: "The text of the file." },
+        kind: { type: "string", enum: ["doc", "text"] },
+        mimeType: { type: "string", description: "For kind text, e.g. text/markdown." },
+        parentFolderId: { type: "string", description: "Folder id. Default: My Drive." },
+        account: { type: "string", description: "The connection name of the Drive account." },
+      },
+      required: ["name", "content", "kind"],
+    },
+  },
+  {
+    name: "drive_update_file",
+    description:
+      "Replace the whole text content of a Google Doc or text file in the user's Drive, and/or rename it. Needs the user's approval.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: { type: "string" },
+        content: { type: "string", description: "The new full content." },
+        name: { type: "string", description: "The new file name." },
+        account: { type: "string", description: "The connection name of the Drive account." },
+      },
+      required: ["fileId"],
     },
   },
   {
@@ -1304,6 +1401,7 @@ export const builtinAgentTools: ConnectorTool[] = [
       required: ["message"],
     },
   },
+  ...calendarToolDefinitions,
 ];
 
 /** Agent-connection tools, exposed only when the messaging surface is enabled. */

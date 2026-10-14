@@ -7,7 +7,7 @@ import type {
   IntegrationCatalogSurface,
   McpServer,
 } from "@rakazo/contracts";
-import { preferNativeGmail } from "@rakazo/contracts";
+import { preferNativeGoogle } from "@rakazo/contracts";
 import {
   abortableDelay,
   buildFeaturedConnectorTiles,
@@ -126,7 +126,7 @@ export function PluginsOverlay({
       optionalCatalogFeedProbe(rpc.capabilities.catalogSearch({ query: "" })),
       rpc.mcp.servers.list(),
     ]);
-    setCatalog(preferNativeGmail(items, { nativeGoogle: nativeGoogleAvailable(desktopBridge()) }));
+    setCatalog(preferNativeGoogle(items, { nativeGoogle: nativeGoogleAvailable(desktopBridge()) }));
     setMcpServers(servers.filter((server) => server.enabled));
     setConnections(rows);
     setLabelDrafts((current) => {

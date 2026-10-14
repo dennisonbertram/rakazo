@@ -997,11 +997,15 @@ export interface ConnectorProxyRequest {
   app: string;
   /** Connection.providerRef. */
   accountRef: string;
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /** Absolute https URL including the query string. */
   url: string;
-  /** JSON body for POST and PUT. */
+  /** JSON body for POST, PUT and PATCH. With `contentType`, a string body is sent as is. */
   body?: unknown;
+  /** Media type of a raw string `body` (a Drive media upload). Omit for JSON. */
+  contentType?: string;
+  /** "text" returns the response body as the exact string, unparsed (empty stays ""). Default: JSON when the response is JSON. */
+  responseType?: "text";
 }
 
 /**
