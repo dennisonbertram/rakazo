@@ -197,6 +197,13 @@ import {
 } from "./browser-tools.js";
 import { INBOX_SEARCH_SKILL_NAME } from "./builtin-skills.js";
 import { agentConnectionTools, builtinAgentTools, sharedMemorySaveError } from "./builtin-tools.js";
+import {
+  CALENDAR_TOOL_NAMES,
+  type CalendarAccount,
+  calendarToolFromTool,
+  listCalendarAccounts,
+  selectCalendarTools,
+} from "./calendar-tools.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import type { CloudAgentConnection } from "./cloud-agent-factory.js";
 import { cloudAgentsEnabled } from "./cloud-agent-factory.js";
@@ -419,6 +426,8 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "mail_get",
   "show_emails",
   "inbox_overview",
+  "calendar_list_events",
+  "calendar_get_event",
   "browser_snapshot",
   "list_secrets",
   "cloud_agent_status",
@@ -3851,6 +3860,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : Promise.resolve([]);
           return mailAccountsPromise;
         };
+        // Native Google Calendar accounts of the bot owner, looked up once per run.
+        let calendarAccountsPromise: Promise<CalendarAccount[]> | undefined;
+        const calendarAccounts = () => {
+          calendarAccountsPromise ??= listCalendarAccounts(deps.prisma, {
+            spaceId: run.spaceId,
+            userId: bot.userId,
+          });
+          return calendarAccountsPromise;
+        };
+        const calendarEnabled =
+          mailToolsAllowed({
+            hasProvider: Boolean(deps.connectors),
+            groupId: thread.groupId,
+            runUserId: run.userId,
+            botUserId: bot.userId,
+            messagingChannelRun,
+          }) && (await calendarAccounts().catch(() => [])).length > 0;
         const mailEnabled =
           mailToolsAllowed({
             hasProvider: Boolean(deps.mail),
@@ -3870,6 +3896,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             semanticMemoryEnabled,
             cloudAgentEnabled: cloudAgentsEnabled(cloudAgent, run.spaceId),
             mailEnabled,
+            calendarEnabled,
             messagingChannelRun,
             voiceCall,
             disabledBuiltinTools: bot.disabledBuiltinTools,
@@ -5232,6 +5259,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "web_fetch") {
             return finish(await webFetchFromTool(web, context, args));
+          }
+          if (CALENDAR_TOOL_NAMES.has(name) && deps.connectors && calendarEnabled) {
+            return finish(
+              await calendarToolFromTool(
+                name,
+                {
+                  accounts: calendarAccounts,
+                  connectors: deps.connectors,
+                  idempotencyKey: effectKey,
+                },
+                context,
+                args,
+              ),
+            );
           }
           if (MAIL_TOOL_NAMES.has(name) && deps.mail && mailEnabled) {
             return finish(
@@ -7531,6 +7572,8 @@ export function selectBuiltinToolsForRun(options: {
   cloudAgentEnabled?: boolean;
   /** The run's requester owns the bot and has a connected mail account. */
   mailEnabled?: boolean;
+  /** The run's requester owns the bot and has a connected native Google Calendar. */
+  calendarEnabled?: boolean;
   messagingChannelRun: boolean;
   /** Hanging up is only offered to a turn the caller spoke on a live call. */
   voiceCall?: boolean;
@@ -7538,24 +7581,27 @@ export function selectBuiltinToolsForRun(options: {
   disabledBuiltinTools?: readonly string[];
 }) {
   const disabled = disabledBuiltinToolSet(options.disabledBuiltinTools);
-  return selectMailTools(
-    selectCloudAgentTools(
-      selectMemoryTools(
-        filterBuiltinToolsForRun(
-          filterBuiltinToolsForThread(
-            filterPageBrowserTools(
-              filterImageReturningComputerTools(builtinAgentTools, options.graphicalToolsAllowed),
-              options.pageBrowserAllowed ?? options.graphicalToolsAllowed,
+  return selectCalendarTools(
+    selectMailTools(
+      selectCloudAgentTools(
+        selectMemoryTools(
+          filterBuiltinToolsForRun(
+            filterBuiltinToolsForThread(
+              filterPageBrowserTools(
+                filterImageReturningComputerTools(builtinAgentTools, options.graphicalToolsAllowed),
+                options.pageBrowserAllowed ?? options.graphicalToolsAllowed,
+              ),
+              options.groupId,
             ),
-            options.groupId,
+            options.trigger,
           ),
-          options.trigger,
+          options.semanticMemoryEnabled,
         ),
-        options.semanticMemoryEnabled,
+        Boolean(options.cloudAgentEnabled),
       ),
-      Boolean(options.cloudAgentEnabled),
+      Boolean(options.mailEnabled),
     ),
-    Boolean(options.mailEnabled),
+    Boolean(options.calendarEnabled),
   ).filter(
     (tool) =>
       !disabled.has(tool.name) &&

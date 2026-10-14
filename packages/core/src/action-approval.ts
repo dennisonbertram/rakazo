@@ -37,6 +37,9 @@ const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "mail_draft",
   "mail_modify",
   "mail_send",
+  "calendar_create_event",
+  "calendar_update_event",
+  "calendar_delete_event",
 ]);
 /** Built-in mail tools that write; the "email" approval category covers them. */
 const BUILTIN_MAIL_WRITE_TOOLS = new Set(["mail_draft", "mail_modify", "mail_send"]);
