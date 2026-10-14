@@ -391,3 +391,13 @@ describe("mail write tools", () => {
     },
   );
 });
+
+describe("calendar write tools", () => {
+  it.each(["calendar_create_event", "calendar_update_event", "calendar_delete_event"])(
+    "%s needs approval, also on an unattended run",
+    (name) => {
+      expect(toolRequiresApproval(name, false)).toBe(true);
+      expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(true);
+    },
+  );
+});
