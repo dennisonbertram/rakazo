@@ -258,7 +258,7 @@ export function InboxPage({
     });
   }, [shown, moreRows, filtered]);
   // The view and category buttons show only when triage can fill them in.
-  const triage = Boolean(shown?.enabled);
+  const triage = Boolean(shown?.enabled ?? data?.enabled);
   const narrowed = triage && (view === "important" || Boolean(category));
   // A search or narrowed list is one date-ordered list under a result count, not Needs reply / Today / Earlier.
   const resultsView = filtered || narrowed;
@@ -559,7 +559,7 @@ export function InboxPage({
                 ? categoryLabels()[category]
                 : null}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuRadioGroup
               value={filter ?? (triage ? category : undefined) ?? ""}
               onValueChange={(value) => {
@@ -751,26 +751,39 @@ export function InboxPage({
             selectedId={selectedId}
             today={false}
           />
-          <InboxGroup
-            title={resultsView ? undefined : <Trans>Today</Trans>}
-            rows={groups.today}
-            onOpen={openMessage}
-            onMark={triage ? mark : undefined}
-            onArchive={archive}
-            onRead={setRead}
-            selectedId={selectedId}
-            today
-          />
-          <InboxGroup
-            title={resultsView ? undefined : <Trans>Earlier</Trans>}
-            rows={groups.earlier}
-            onOpen={openMessage}
-            onMark={triage ? mark : undefined}
-            onArchive={archive}
-            onRead={setRead}
-            selectedId={selectedId}
-            today={false}
-          />
+          {resultsView ? (
+            <InboxGroup
+              rows={[...groups.today, ...groups.earlier]}
+              onOpen={openMessage}
+              onMark={triage ? mark : undefined}
+              onArchive={archive}
+              onRead={setRead}
+              selectedId={selectedId}
+            />
+          ) : (
+            <>
+              <InboxGroup
+                title={<Trans>Today</Trans>}
+                rows={groups.today}
+                onOpen={openMessage}
+                onMark={triage ? mark : undefined}
+                onArchive={archive}
+                onRead={setRead}
+                selectedId={selectedId}
+                today
+              />
+              <InboxGroup
+                title={<Trans>Earlier</Trans>}
+                rows={groups.earlier}
+                onOpen={openMessage}
+                onMark={triage ? mark : undefined}
+                onArchive={archive}
+                onRead={setRead}
+                selectedId={selectedId}
+                today={false}
+              />
+            </>
+          )}
           {filtered && fresh && more.token ? (
             <div className="grid place-items-center pb-2">
               <Button variant="outline" size="sm" disabled={more.busy} onClick={loadMore}>

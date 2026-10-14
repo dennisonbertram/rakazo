@@ -46,7 +46,8 @@ export function InboxGroup({
   onMark: ((messageId: string, mark: InboxMark | null) => void) | undefined;
   onArchive?: (messageId: string) => void;
   onRead?: (messageId: string, read: boolean) => void;
-  today: boolean;
+  /** Omitted for mixed-date lists: each row then decides from its own date. */
+  today?: boolean;
   selectedId?: string;
   /** Set when the group heading already says the rows need attention. */
   hideAttention?: boolean;
@@ -94,11 +95,13 @@ export function InboxRow({
   onMark: ((messageId: string, mark: InboxMark | null) => void) | undefined;
   onArchive?: (messageId: string) => void;
   onRead?: (messageId: string, read: boolean) => void;
-  today: boolean;
+  today?: boolean;
   selected?: boolean;
   hideAttention?: boolean;
 }) {
   const { t } = useLingui();
+  const received = new Date(row.receivedAt);
+  const isToday = today ?? received.toDateString() === new Date().toDateString();
   const labelNames = {
     attention: t`Needs attention`,
     newsletter: t`Newsletter`,
@@ -138,14 +141,17 @@ export function InboxRow({
           aria-current={selected ? "true" : undefined}
           data-row-id={row.id}
           onClick={onOpen}
-          className={`grid h-11 w-full min-w-0 grid-cols-[8px_96px_minmax(0,1fr)_auto_4rem] items-center gap-x-3 border-s-2 ps-2.5 pe-3 text-start text-sm font-normal hover:bg-muted @md:grid-cols-[8px_110px_minmax(0,1fr)_auto_4rem] @xl:grid-cols-[8px_140px_minmax(0,1fr)_auto_4rem] @3xl:grid-cols-[8px_180px_minmax(0,1fr)_auto_4rem] ${selected ? "border-primary bg-muted" : "border-transparent"} ${marks.length + actions.length ? "pointer-coarse:pe-11" : ""} text-muted-foreground`}
+          className={`grid min-h-11 w-full min-w-0 grid-cols-[8px_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-0.5 border-s-2 py-1.5 ps-2.5 pe-3 text-start text-sm font-normal hover:bg-muted @md:h-11 @md:grid-cols-[8px_110px_minmax(0,1fr)_auto_minmax(4rem,auto)] @md:py-0 @xl:grid-cols-[8px_140px_minmax(0,1fr)_auto_minmax(4rem,auto)] @3xl:grid-cols-[8px_180px_minmax(0,1fr)_auto_minmax(4rem,auto)] ${selected ? "border-primary bg-muted" : "border-transparent"} ${marks.length + actions.length ? "pointer-coarse:pe-11" : ""} text-muted-foreground`}
         >
           <span
             aria-hidden="true"
             data-unread-dot={row.unread ? "" : undefined}
-            className={`size-2 rounded-full ${row.unread ? "bg-primary" : ""}`}
+            className={`col-start-1 row-start-1 size-2 rounded-full ${row.unread ? "bg-primary" : ""}`}
           />
-          <span dir="auto" className={`truncate ${row.unread && !muted ? "text-foreground" : ""}`}>
+          <span
+            dir="auto"
+            className={`col-start-2 row-start-1 truncate ${row.unread && !muted ? "text-foreground" : ""}`}
+          >
             {isSuspiciousCategory(row.category) ? (
               <TriangleAlert
                 role="img"
@@ -160,23 +166,26 @@ export function InboxRow({
               </span>
             ) : null}
           </span>
-          <span dir="auto" className="truncate">
+          <span
+            dir="auto"
+            className="col-span-3 col-start-2 row-start-2 truncate @md:col-span-1 @md:col-start-3 @md:row-start-1"
+          >
             {row.subject}
             {row.snippet ? <span> - {row.snippet}</span> : null}
           </span>
           {label ? (
             <Badge
               variant={label === "newsletter" ? "outline" : "secondary"}
-              className={`col-start-4 ${label === "spam" || label === "junk" ? "bg-warning/15 text-warning" : ""}`}
+              className={`col-start-3 row-start-1 @md:col-start-4 ${label === "spam" || label === "junk" ? "bg-warning/15 text-warning" : ""}`}
             >
               {labelNames[label]}
             </Badge>
           ) : null}
           <time
             dateTime={row.receivedAt}
-            className="col-start-5 text-end text-xs whitespace-nowrap tabular-nums"
+            className="col-start-4 row-start-1 text-end @md:col-start-5 text-xs whitespace-nowrap tabular-nums"
           >
-            {formatMailTime(row.receivedAt, today)}
+            {formatMailTime(row.receivedAt, isToday)}
           </time>
         </button>
         {marks.length + actions.length ? (
