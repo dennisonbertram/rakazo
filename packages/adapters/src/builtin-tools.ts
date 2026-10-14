@@ -665,7 +665,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "mail_draft",
     description:
-      "Save an email draft in the user's mail account, or replace one you saved earlier (pass its draftId; every field is replaced). The user reviews and sends it themselves; you cannot send mail. Needs the user's approval. After saving, tell the user the draft is in their Drafts folder.",
+      "Save an email draft in the user's mail account, or replace one you saved earlier (pass its draftId; every field is replaced). To send it, use mail_send. Needs the user's approval. After saving, tell the user the draft is in their Drafts folder.",
     inputSchema: {
       type: "object",
       properties: {
@@ -695,9 +695,40 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "mail_send",
+    description:
+      "Send an email from the user's mail account: either a draft you saved with mail_draft (pass its draftId) or a new message (to, subject, body). Sending cannot be undone. Needs the user's approval for each send. If the result says the outcome is unclear, do not send again; tell the user to check their Sent folder.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draftId: {
+          type: "string",
+          description: "A draftId from mail_draft. Send this draft instead of a new message.",
+        },
+        account: {
+          type: "string",
+          description: "Address of the connected account. Required with more than one account.",
+        },
+        to: {
+          type: "array",
+          items: { type: "string" },
+          description: "Addresses, e.g. Name <a@b.com>.",
+        },
+        cc: { type: "array", items: { type: "string" } },
+        bcc: { type: "array", items: { type: "string" } },
+        subject: { type: "string" },
+        body: { type: "string", description: "Plain text." },
+        replyToId: {
+          type: "string",
+          description: "Id of the message this answers, to put the message in its conversation.",
+        },
+      },
+    },
+  },
+  {
     name: "mail_modify",
     description:
-      "Change a conversation in the user's mail: mark read or unread, archive or move back to the inbox, add or remove labels. Marking read, archiving and labels apply to every message of the conversation; marking unread applies to the one message. Use the id from a mail_grep row. Cannot delete, trash, report spam or send. Needs the user's approval.",
+      "Change a conversation in the user's mail: mark read or unread, archive or move back to the inbox, add or remove labels. Marking read, archiving and labels apply to every message of the conversation; marking unread applies to the one message. Use the id from a mail_grep row. Cannot delete, trash or report spam. Needs the user's approval.",
     inputSchema: {
       type: "object",
       properties: {
