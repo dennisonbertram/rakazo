@@ -1,4 +1,5 @@
 import type { CryptoHolding, CryptoSummary } from "@rakazo/contracts";
+import { isStablecoin } from "./stablecoins.js";
 
 // Pure crypto helpers. Money is BigInt end to end here; no float ever touches a balance or a price.
 
@@ -55,6 +56,7 @@ export function summarizeCrypto(holdings: readonly CryptoHolding[]): CryptoSumma
   const chains = new Map<number, number>();
   const wallets = new Map<string, number>();
   let total = 0;
+  let stable = 0;
   let unpriced = 0;
   let oldest: string | null = null;
   for (const h of holdings) {
@@ -64,12 +66,14 @@ export function summarizeCrypto(holdings: readonly CryptoHolding[]): CryptoSumma
       continue;
     }
     total += h.usdValueCents;
+    if (isStablecoin(h.chainId, h.tokenAddress)) stable += h.usdValueCents;
     chains.set(h.chainId, (chains.get(h.chainId) ?? 0) + h.usdValueCents);
     wallets.set(h.walletId, (wallets.get(h.walletId) ?? 0) + h.usdValueCents);
   }
   const desc = <T extends { cents: number }>(a: T, b: T) => b.cents - a.cents;
   return {
     totalCents: total,
+    stablecoinCents: stable,
     byChain: [...chains].map(([chainId, cents]) => ({ chainId, cents })).sort(desc),
     byWallet: [...wallets].map(([walletId, cents]) => ({ walletId, cents })).sort(desc),
     lastSyncedAt: oldest,

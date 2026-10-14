@@ -244,6 +244,8 @@ function Overview({
     (a.dates[0] ?? "").localeCompare(b.dates[0] ?? ""),
   );
   const runwayMonths = data.runway.months?.toFixed(1);
+  const stablecoins = data.cash.stablecoinCents ?? 0;
+  const bankRunwayMonths = data.bankRunway?.months?.toFixed(1);
   const runOutMonth = data.runway.runOutDate ? monthFull(data.runway.runOutDate.slice(0, 7)) : "";
   const previousSpend = month.previousCents === null ? null : money(month.previousCents);
   const range = (r: { start: string; end: string }) => dayRange(r.start, lastDayOf(r.end));
@@ -330,8 +332,29 @@ function Overview({
               <Kpi
                 title={t`Cash`}
                 value={money(data.cash.cashCents)}
-                sub={t`Checking + Treasury`}
+                sub={
+                  stablecoins > 0 ? t`Checking + Treasury + Stablecoins` : t`Checking + Treasury`
+                }
                 to={financePath.accounts()}
+                hover={
+                  data.crypto ? (
+                    <>
+                      <HoverRow
+                        label={t`Bank`}
+                        value={money(data.cash.bankCashCents ?? data.cash.cashCents - stablecoins)}
+                      />
+                      <HoverRow label={t`Stablecoins`} value={money(stablecoins)} />
+                      <HoverRow
+                        label={t`Other crypto`}
+                        value={money(data.cash.otherCryptoCents ?? 0)}
+                      />
+                      <HoverRow
+                        label={t`Total incl. crypto`}
+                        value={money(data.cash.cashCents + (data.cash.otherCryptoCents ?? 0))}
+                      />
+                    </>
+                  ) : undefined
+                }
               />
             ) : null}
             <Kpi
@@ -346,6 +369,11 @@ function Overview({
                 value={runwayMonths === undefined ? "—" : t`${runwayMonths} mo`}
                 sub={runOutMonth ? t`Until ${runOutMonth}` : undefined}
                 to={financePath.runway()}
+                hover={
+                  stablecoins > 0 && bankRunwayMonths !== undefined ? (
+                    <span>{t`Bank only: ${bankRunwayMonths} mo`}</span>
+                  ) : undefined
+                }
               />
             ) : null}
             <Kpi
@@ -545,6 +573,15 @@ function ShowAll({
     <button type="button" className="hover:text-foreground hover:underline" onClick={onToggle}>
       {expanded ? <Trans>Show less</Trans> : <Trans>Show all {total}</Trans>}
     </button>
+  );
+}
+
+function HoverRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 tabular-nums">
+      <span>{label}</span>
+      <span>{value}</span>
+    </div>
   );
 }
 

@@ -152,9 +152,11 @@ export const CryptoHoldingSchema = z.object({
   syncedAt: IsoDate,
 });
 
-/** Priced holdings only. Never part of cash, burn or runway. */
+/** Priced holdings only. Only the stablecoin part counts as cash; the rest never enters cash, burn or runway. */
 export const CryptoSummarySchema = z.object({
   totalCents: Cents,
+  /** Priced holdings at the canonical stablecoin contracts; part of `totalCents`. */
+  stablecoinCents: Cents.optional(),
   byChain: z.array(z.object({ chainId: z.number().int(), cents: Cents })),
   byWallet: z.array(z.object({ walletId: Id, cents: Cents })),
   /** Oldest holding sync; null with no holdings. */
@@ -279,8 +281,14 @@ export const FinanceBillSchema = z.object({
 export const SpendPeriodSchema = z.enum(["week", "month", "quarter", "year"]);
 
 export const CashSummarySchema = z.object({
-  /** Mercury checking + savings + Treasury. */
+  /** Bank cash (Mercury checking + savings + Treasury) plus stablecoins. */
   cashCents: Cents,
+  /** Bank cash alone, without stablecoins. Absent from older payloads. */
+  bankCashCents: Cents.optional(),
+  /** Priced stablecoins held in the tracked wallets; already inside `cashCents`. */
+  stablecoinCents: Cents.optional(),
+  /** Other priced crypto. Never in `cashCents` or runway; only for the Cash card's total. */
+  otherCryptoCents: Cents.optional(),
   checkingCents: Cents,
   savingsCents: Cents,
   treasuryCents: Cents,
@@ -430,6 +438,8 @@ export const FinanceOverviewSchema = z.object({
   hasCashAccounts: z.boolean(),
   burn: MonthlyBurnSchema,
   runway: RunwaySchema,
+  /** Runway on bank cash alone (no stablecoins). Absent from older payloads. */
+  bankRunway: RunwaySchema.optional(),
   spendTotals: z.object({
     week: SpendTotalsSchema,
     month: SpendTotalsSchema,

@@ -34,10 +34,13 @@ const metrics = vi.hoisted(() => ({
   subscriptions: vi.fn(() => ({ items: [], totalMonthlyCents: 0 })),
   upcoming: vi.fn(() => ({ items: [], totalCents: 0 })),
 }));
-vi.mock("@rakazo/core", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@rakazo/core")>()),
-  ...metrics,
-}));
+vi.mock("@rakazo/core", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@rakazo/core")>();
+  // cashSummary stays real so stablecoin cash is tested end to end; the others are stand-ins.
+  metrics.cashSummary.mockImplementation(((...args: Parameters<typeof original.cashSummary>) =>
+    original.cashSummary(...args)) as never);
+  return { ...original, ...metrics };
+});
 
 const adapters = vi.hoisted(() => ({
   syncFinanceForUser: vi.fn(async () => ({})),
@@ -250,6 +253,77 @@ describe("finance overview crypto", () => {
   });
 });
 
+describe("finance overview stablecoins as cash", () => {
+  const USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+  const wallet = {
+    id: "w-1",
+    ...scope(a),
+    address: `0x${"ab".repeat(20)}`,
+    type: "personal",
+    createdAt: new Date(),
+  };
+  const holding = (over: Record<string, unknown>) => ({
+    ...scope(a),
+    walletId: "w-1",
+    chainId: 1,
+    tokenAddress: "",
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 6,
+    rawBalance: "1",
+    usdPrice: "1",
+    usdValueCents: 0n,
+    syncedAt: new Date("2026-10-14T00:00:00Z"),
+    ...over,
+  });
+  const bank = account(a, { id: "acc-a", kind: "checking", balanceCents: 100_000 });
+  const run = async (holdings: unknown[]) => {
+    const { deps } = setup({
+      financeAccount: [bank],
+      financeWallet: [wallet],
+      financeCryptoHolding: holdings,
+    });
+    metrics.runway.mockClear();
+    const overview = await financeOverview(deps, a);
+    const cashInputs = metrics.runway.mock.calls.map((call) => (call as unknown as number[])[0]);
+    return { overview, cashInputs };
+  };
+
+  it("adds a canonical USDC holding to cash and to runway, and keeps bank-only figures", async () => {
+    const { overview, cashInputs } = await run([
+      holding({ symbol: "USDC", tokenAddress: USDC, usdValueCents: 25_000n }),
+      holding({ symbol: "ETH", usdValueCents: 40_000n }),
+    ]);
+    expect(overview.cash).toMatchObject({
+      cashCents: 125_000,
+      bankCashCents: 100_000,
+      stablecoinCents: 25_000,
+      otherCryptoCents: 40_000,
+    });
+    // Total including crypto is cash plus other crypto.
+    expect(overview.cash.cashCents + (overview.cash.otherCryptoCents ?? 0)).toBe(165_000);
+    // Runway sees stablecoins but not ETH; the bank-only runway sees neither.
+    expect(cashInputs).toEqual([125_000, 100_000]);
+  });
+
+  it("does not count a fake USDC at another address, an unpriced stablecoin, or ETH", async () => {
+    const { overview, cashInputs } = await run([
+      holding({ symbol: "USDC", tokenAddress: `0x${"1".repeat(40)}`, usdValueCents: 9_000n }),
+      holding({
+        symbol: "USDC",
+        tokenAddress: USDC,
+        usdPrice: null,
+        usdValueCents: null,
+        rawBalance: "5",
+      }),
+      holding({ symbol: "ETH", usdValueCents: 7_000n }),
+    ]);
+    expect(overview.cash.cashCents).toBe(100_000);
+    expect(overview.cash.stablecoinCents).toBe(0);
+    expect(cashInputs).toEqual([100_000, 100_000]);
+  });
+});
+
 describe("finance overview", () => {
   it("passes the calculations only the actor's own rows", async () => {
     const { deps } = setup({
@@ -279,7 +353,7 @@ describe("finance overview", () => {
 
     const withCash = setup({ financeAccount: [account(a)] });
     expect((await financeOverview(withCash.deps, a)).hasCashAccounts).toBe(true);
-    expect(metrics.runway).toHaveBeenCalledTimes(1);
+    expect(metrics.runway).toHaveBeenCalledTimes(2);
   });
 
   it("shows the empty state when nothing is connected, and starts no sync", async () => {
