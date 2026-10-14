@@ -258,7 +258,7 @@ export function InboxPage({
     });
   }, [shown, moreRows, filtered]);
   // The view and category buttons show only when triage can fill them in.
-  const triage = Boolean(shown?.enabled);
+  const triage = Boolean(shown?.enabled ?? data?.enabled);
   const narrowed = triage && (view === "important" || Boolean(category));
   // A search or narrowed list is one date-ordered list under a result count, not Needs reply / Today / Earlier.
   const resultsView = filtered || narrowed;
@@ -400,18 +400,25 @@ export function InboxPage({
     setParams(next, { replace: true, state: location.state });
   };
   const openRow = [...(shown?.rows ?? []), ...moreRows].find((row) => row.id === openId);
-  // Opening a message, by click, j/k in the dialog or a deep link, reads it once. Selecting in the
-  // list does not. The id is remembered even when the row is already read, so Mark unread sticks.
+  // A message that stays open for 800ms is read once. Passing through it with j/k, or selecting in
+  // the list, does not. The id is remembered even when the row is already read, so Mark unread sticks.
   const readFor = useRef<string | null>(null);
+  const setReadRef = useRef(setRead);
+  setReadRef.current = setRead;
+  const openUnread = openRow?.unread;
+  const openRowId = openRow?.id;
   useEffect(() => {
     if (!openId) {
       readFor.current = null;
       return;
     }
-    if (!openRow || readFor.current === openId) return;
-    readFor.current = openId;
-    if (openRow.unread) setRead(openId, true);
-  });
+    if (!openRowId || readFor.current === openId) return;
+    const timer = setTimeout(() => {
+      readFor.current = openId;
+      if (openUnread) setReadRef.current(openId, true);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [openId, openRowId, openUnread]);
   const openIndex = openId ? ids.indexOf(openId) : -1;
   const focusSearch = () => searchRef.current?.querySelector("input")?.focus();
   const clearFilters = () => {
@@ -559,7 +566,7 @@ export function InboxPage({
                 ? categoryLabels()[category]
                 : null}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuRadioGroup
               value={filter ?? (triage ? category : undefined) ?? ""}
               onValueChange={(value) => {
@@ -751,26 +758,39 @@ export function InboxPage({
             selectedId={selectedId}
             today={false}
           />
-          <InboxGroup
-            title={resultsView ? undefined : <Trans>Today</Trans>}
-            rows={groups.today}
-            onOpen={openMessage}
-            onMark={triage ? mark : undefined}
-            onArchive={archive}
-            onRead={setRead}
-            selectedId={selectedId}
-            today
-          />
-          <InboxGroup
-            title={resultsView ? undefined : <Trans>Earlier</Trans>}
-            rows={groups.earlier}
-            onOpen={openMessage}
-            onMark={triage ? mark : undefined}
-            onArchive={archive}
-            onRead={setRead}
-            selectedId={selectedId}
-            today={false}
-          />
+          {resultsView ? (
+            <InboxGroup
+              rows={[...groups.today, ...groups.earlier]}
+              onOpen={openMessage}
+              onMark={triage ? mark : undefined}
+              onArchive={archive}
+              onRead={setRead}
+              selectedId={selectedId}
+            />
+          ) : (
+            <>
+              <InboxGroup
+                title={<Trans>Today</Trans>}
+                rows={groups.today}
+                onOpen={openMessage}
+                onMark={triage ? mark : undefined}
+                onArchive={archive}
+                onRead={setRead}
+                selectedId={selectedId}
+                today
+              />
+              <InboxGroup
+                title={<Trans>Earlier</Trans>}
+                rows={groups.earlier}
+                onOpen={openMessage}
+                onMark={triage ? mark : undefined}
+                onArchive={archive}
+                onRead={setRead}
+                selectedId={selectedId}
+                today={false}
+              />
+            </>
+          )}
           {filtered && fresh && more.token ? (
             <div className="grid place-items-center pb-2">
               <Button variant="outline" size="sm" disabled={more.busy} onClick={loadMore}>

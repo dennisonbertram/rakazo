@@ -44,15 +44,21 @@ vi.mock("../lib/rpc", () => ({
     },
   },
 }));
-vi.mock("../lib/inbox-message-cache", () => ({ prefetchInboxMessage: () => {} }));
+vi.mock("../lib/inbox-message-cache", () => ({
+  prefetchInboxMessage: () => {},
+  peekInboxMessage: () => undefined,
+  loadInboxMessage: () => new Promise(() => {}),
+}));
+const realDialog = vi.hoisted(() => ({ on: false }));
 vi.mock("../components/AiDataSharing", () => ({ InboxConsentPrompt: () => null }));
 vi.mock("../components/ComposeEmail", () => ({
   ComposeEmail: () => <div data-testid="compose" />,
   MAIL_SENT_EVENT: "rakazo:mail-sent",
   NEW_MESSAGE: {},
 }));
-vi.mock("../components/inbox/InboxMessageDialog", () => ({
-  InboxMessageDialog: ({
+vi.mock("../components/inbox/InboxMessageDialog", async (importActual) => {
+  const actual = await importActual<typeof import("../components/inbox/InboxMessageDialog")>();
+  const Fake = ({
     messageId,
     onClose,
     onArchive,
@@ -76,8 +82,12 @@ vi.mock("../components/inbox/InboxMessageDialog", () => ({
         ) : null}
         <div data-testid="notice">{notice}</div>
       </div>
-    ) : null,
-}));
+    ) : null;
+  return {
+    InboxMessageDialog: (props: Parameters<typeof actual.InboxMessageDialog>[0]) =>
+      realDialog.on ? actual.InboxMessageDialog(props) : Fake(props),
+  };
+});
 vi.mock("../components/inbox/InboxRow", () => ({
   InboxGroup: ({
     rows,
@@ -186,6 +196,7 @@ async function render(entries = ["/app/inbox"], index?: number) {
 
 const press = (key: string, target: Element | Document = document.body) =>
   act(async () => {
+    vi.setSystemTime(Date.now() + 200); // j/k are throttled to one step per 150ms
     target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
   });
 const click = (el: Element | null | undefined) =>
@@ -197,7 +208,13 @@ const byText = (c: HTMLElement, text: string) =>
 const selected = (c: HTMLElement) =>
   c.querySelector<HTMLElement>('[data-selected="true"]')?.dataset.rowId;
 
+let clock = Date.now();
+const dwell = (ms = 800) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+  clock += 60_000; // each test starts past the j/k throttle the previous one left
+  vi.setSystemTime(clock);
   rpcMock.refresh.mockResolvedValue({});
   rpcMock.todos.mockResolvedValue({ todos: [] });
   rpcMock.feedback.mockResolvedValue({});
@@ -208,6 +225,8 @@ beforeEach(() => {
 });
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  vi.useRealTimers();
+  realDialog.on = false;
   vi.clearAllMocks();
 });
 
@@ -416,8 +435,22 @@ it("marks an unread row read when it opens, and does not touch a read one", asyn
   expect(rpcMock.markRead).not.toHaveBeenCalled();
   await click(byText(c, "close"));
   await click(c.querySelector('[data-row-id="a"]'));
+  expect(rpcMock.markRead).not.toHaveBeenCalled();
+  await dwell();
   expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
   expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "a", read: true });
+});
+
+it("does not mark a message read that was open for less than the dwell", async () => {
+  const c = await render();
+  await click(c.querySelector('[data-row-id="a"]'));
+  await dwell(100);
+  await act(async () => go("/app/inbox?mail=b"));
+  await dwell(700);
+  expect(rpcMock.markRead).not.toHaveBeenCalled();
+  await dwell(100);
+  expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
+  expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "b", read: true });
 });
 
 it("shows one result count with a Clear that drops the search and filter together", async () => {
@@ -483,6 +516,8 @@ it("does not say No results while loaded pages still have rows", async () => {
 
 it("marks an unread deep-linked message read once, and j and k never mark read", async () => {
   const c = await render(["/app/inbox?mail=a"]);
+  expect(rpcMock.markRead).not.toHaveBeenCalled();
+  await dwell();
   expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
   expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "a", read: true });
   await act(async () => window.dispatchEvent(new Event("rakazo:mail-sent")));
@@ -503,4 +538,34 @@ it("shows the Archived toast inside the open message, not behind it", async () =
   expect(c.querySelector('[role="status"]')?.textContent).toBe("");
   await click(byText(notice, "Undo"));
   expect(rpcMock.unarchive).toHaveBeenCalled();
+});
+
+it("takes one list step from a burst of j presses and ignores a held key", async () => {
+  const c = await render();
+  await act(async () => {
+    for (let i = 0; i < 20; i++)
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "j", bubbles: true }));
+  });
+  expect(selected(c)).toBe("a");
+  vi.setSystemTime(Date.now() + 200);
+  await act(async () => {
+    document.body.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "j", repeat: true, bubbles: true }),
+    );
+  });
+  expect(selected(c)).toBe("a");
+});
+
+it("a burst of 140 j presses in the open message moves one row and marks only it read", async () => {
+  realDialog.on = true;
+  const c = await render();
+  await click(c.querySelector('[data-row-id="a"]'));
+  await act(async () => {
+    for (let i = 0; i < 140; i++)
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "j", bubbles: true }));
+  });
+  await dwell(1000);
+  expect(location.search).toBe("?mail=b");
+  expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
+  expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "b", read: true });
 });
