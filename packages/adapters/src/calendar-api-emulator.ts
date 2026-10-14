@@ -46,7 +46,11 @@ export class CalendarApiEmulator {
     if (!id) {
       if (method === "GET") return this.list(store, parsed.searchParams);
       if (method !== "POST") return fail(405, "invalid", "Method not allowed");
-      const eventId = typeof input.id === "string" ? input.id : `evt${this.nextId++}`;
+      const eventId =
+        typeof input.id === "string" ? input.id : `evt${String(this.nextId++).padStart(4, "0")}`;
+      // Google accepts client ids of 5-1024 base32hex characters (a-v, 0-9).
+      if (!/^[a-v0-9]{5,1024}$/.test(eventId))
+        return fail(400, "invalid", "Invalid resource id value.");
       if (store.has(eventId) || this.deleted.has(`${accountRef}:${eventId}`))
         return fail(409, "duplicate", "The requested identifier already exists.");
       const event: Event = {

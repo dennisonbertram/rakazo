@@ -114,19 +114,32 @@ describe("calendar tools", () => {
     expect(calendar.all("a")).toHaveLength(1);
   });
 
-  it("resolves the account by email and requires it when there are several", async () => {
+  it("rejects a client event id outside base32hex", async () => {
+    const { calendar } = setup();
+    expect(
+      calendar.handle({
+        accountRef: "a",
+        method: "POST",
+        url: "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        body: { id: "rkz1" },
+      }).status,
+    ).toBe(400);
+  });
+
+  it("resolves the account by connection name and requires it when there are several", async () => {
     const two = [
       ...accounts,
       { id: "c2", connectorId: "google", accountRef: "b", label: "Bob@example.test" },
     ];
     const { calendar, run } = setup(two);
     expect(await run("calendar_list_events")).toEqual({
-      error: "Pass account when more than one calendar account is connected",
+      error:
+        "Pass account when more than one calendar account is connected. Available: alice@example.test, Bob@example.test",
     });
     await run("calendar_list_events", { account: "bob@EXAMPLE.test" });
     expect(calendar.requests.at(-1)?.accountRef).toBe("b");
     expect(await run("calendar_list_events", { account: "x@y.z" })).toEqual({
-      error: "No connected calendar account x@y.z",
+      error: "No connected calendar account x@y.z. Available: alice@example.test, Bob@example.test",
     });
   });
 

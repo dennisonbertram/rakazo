@@ -24,7 +24,7 @@ export interface CalendarAccount {
   id: string;
   connectorId: string;
   accountRef: string;
-  /** The connection's display name (the Google account email). */
+  /** The connection name, e.g. "Google Calendar 2". */
   label: string;
 }
 
@@ -42,7 +42,7 @@ const SEND_UPDATES = { type: "string", enum: ["all", "externalOnly", "none"] } a
 const eventFields = {
   account: {
     type: "string",
-    description: "Email or name of the connected account. Required with more than one account.",
+    description: "Name of the connected calendar account. Required with more than one account.",
   },
   calendarId: { type: "string", description: 'Default "primary".' },
   summary: { type: "string", description: "Title." },
@@ -219,7 +219,7 @@ export async function calendarToolFromTool(
         throw new CalendarToolError("summary, start and end are required");
       // A replayed call carries the same key, so Google answers 409 instead of creating twice.
       const id = deps.idempotencyKey
-        ? `rkz${createHash("sha256").update(deps.idempotencyKey).digest("hex").slice(0, 40)}`
+        ? `rk${createHash("sha256").update(deps.idempotencyKey).digest("hex").slice(0, 40)}`
         : undefined;
       try {
         const created = await call(
@@ -324,15 +324,20 @@ async function resolveAccount(
   args: Record<string, unknown>,
 ): Promise<CalendarAccount> {
   const accounts = await deps.accounts();
+  const names = accounts.map((entry) => entry.label).join(", ");
   const wanted = text(args.account).toLowerCase();
   if (wanted) {
     const account = accounts.find((entry) => entry.label.toLowerCase() === wanted);
     if (!account)
-      throw new CalendarToolError(`No connected calendar account ${wanted.slice(0, 200)}`);
+      throw new CalendarToolError(
+        `No connected calendar account ${wanted.slice(0, 200)}. Available: ${names}`,
+      );
     return account;
   }
   if (accounts.length > 1)
-    throw new CalendarToolError("Pass account when more than one calendar account is connected");
+    throw new CalendarToolError(
+      `Pass account when more than one calendar account is connected. Available: ${names}`,
+    );
   if (!accounts[0]) throw new CalendarToolError("No connected calendar account");
   return accounts[0];
 }
