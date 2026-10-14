@@ -1020,6 +1020,7 @@ export const appContract = {
     feedback: oc.input(InboxFeedbackInputSchema).output(InboxFeedbackOutputSchema),
     markRead: oc.input(InboxMarkReadInputSchema).output(z.object({ ok: z.literal(true) })),
     archive: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
+    unarchive: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     compose: {
       prefill: oc.input(ComposePrefillInputSchema).output(ComposePrefillOutputSchema),
       draftSave: oc.input(ComposeFieldsSchema).output(ComposeResultSchema),
