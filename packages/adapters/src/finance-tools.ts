@@ -5,13 +5,17 @@ import type {
   FinanceTransaction,
   MessageBlock,
 } from "@rakazo/contracts";
-import { FinanceProviderSchema, financeProviderForEndpoint } from "@rakazo/contracts";
+import {
+  FinanceProviderSchema,
+  financeProviderForEndpoint,
+  isFinanceAgentSpawnKey,
+} from "@rakazo/contracts";
 import {
   breakdown,
   cashSummary,
   categorySlug,
+  countsTowardTotals,
   detectRecurring,
-  earliestDay,
   monthlyBurn,
   runway,
   spendTotals,
@@ -28,8 +32,20 @@ export const FINANCE_TOOL_NAMES = new Set([
   "finance_recurring",
 ]);
 
-/** Same owner-only rule as the mail tools. */
-export const financeToolsAllowed = mailToolsAllowed;
+/** Only the Finance agent, on a run its owner started (a direct message or their own routine). */
+const OWNER_INITIATED_TRIGGERS = new Set(["user", "follow_up", "routine"]);
+export function financeToolsAllowed(
+  options: Parameters<typeof mailToolsAllowed>[0] & {
+    botSpawnKey: string | null | undefined;
+    trigger: string;
+  },
+): boolean {
+  return (
+    isFinanceAgentSpawnKey(options.botSpawnKey) &&
+    OWNER_INITIATED_TRIGGERS.has(options.trigger) &&
+    mailToolsAllowed(options)
+  );
+}
 
 /** Drop the finance tools when the run may not use them. */
 export function selectFinanceTools<T extends { name: string }>(
@@ -131,20 +147,82 @@ const dollars = (cents: number) => Math.round(cents) / 100;
 const isDay = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 
-async function load(deps: FinanceToolDeps) {
-  const where = { spaceId: deps.scope.spaceId, userId: deps.scope.userId };
-  const [accounts, txns] = await Promise.all([
-    deps.prisma.financeAccount.findMany({ where }),
-    deps.prisma.financeTransaction.findMany({ where, orderBy: { postedAt: "desc" } }),
+type TxnWhere = Prisma.FinanceTransactionWhereInput;
+
+const scopeWhere = (deps: FinanceToolDeps) => ({
+  spaceId: deps.scope.spaceId,
+  userId: deps.scope.userId,
+});
+const dayStart = (day: string) => new Date(`${day}T00:00:00Z`);
+
+/** Rows whose counting day (purchasedAt, else postedAt) is in [start, end). */
+function dayWhere(start?: string, end?: string): TxnWhere {
+  if (!start && !end) return {};
+  const bounds = {
+    ...(start ? { gte: dayStart(start) } : {}),
+    ...(end ? { lt: dayStart(end) } : {}),
+  };
+  return { OR: [{ purchasedAt: bounds }, { purchasedAt: null, postedAt: bounds }] };
+}
+
+async function loadTxns(deps: FinanceToolDeps, start?: string, end?: string) {
+  const rows = await deps.prisma.financeTransaction.findMany({
+    where: { ...scopeWhere(deps), ...dayWhere(start, end) },
+    orderBy: { postedAt: "desc" },
+  });
+  return rows.map(toFinanceTransaction);
+}
+
+async function loadAccounts(deps: FinanceToolDeps) {
+  const rows = await deps.prisma.financeAccount.findMany({ where: scopeWhere(deps) });
+  return rows.map(toFinanceAccount);
+}
+
+/** The earliest day any of the user's transactions counts on, without loading them. */
+async function earliestTxnDay(deps: FinanceToolDeps): Promise<string | undefined> {
+  const where = scopeWhere(deps);
+  const [bought, posted] = await Promise.all([
+    deps.prisma.financeTransaction.aggregate({
+      where: { ...where, purchasedAt: { not: null } },
+      _min: { purchasedAt: true },
+    }),
+    deps.prisma.financeTransaction.aggregate({
+      where: { ...where, purchasedAt: null },
+      _min: { postedAt: true },
+    }),
   ]);
-  return { accounts: accounts.map(toFinanceAccount), txns: txns.map(toFinanceTransaction) };
+  const days = [bought._min.purchasedAt, posted._min.postedAt]
+    .filter((date): date is Date => Boolean(date))
+    .map(dayOf);
+  return days.sort()[0];
 }
 
 const nowOf = (deps: FinanceToolDeps) => deps.now?.() ?? new Date();
 
+const MAX_CARD_STRING = 80;
+const MAX_CARD_CHARS = 4_000;
+
+/** Shortens every string in a card, since names come from provider data. */
+const clipStrings = (value: unknown): unknown =>
+  typeof value === "string"
+    ? value.slice(0, MAX_CARD_STRING)
+    : Array.isArray(value)
+      ? value.map(clipStrings)
+      : value && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clipStrings(v)]))
+        : value;
+
 async function show(deps: FinanceToolDeps, card: FinanceCard) {
   // A card is a preview; the tool result already holds the data.
-  await deps.publish?.([{ kind: "finance", card }]).catch(() => undefined);
+  let clipped = clipStrings(card) as FinanceCard & { rows?: unknown[] };
+  while (
+    Array.isArray(clipped.rows) &&
+    clipped.rows.length > 0 &&
+    JSON.stringify(clipped).length > MAX_CARD_CHARS
+  ) {
+    clipped = { ...clipped, rows: clipped.rows.slice(0, -1) };
+  }
+  await deps.publish?.([{ kind: "finance", card: clipped }]).catch(() => undefined);
 }
 
 /** Trims `rows` from the end until the result fits the output budget. */
@@ -217,8 +295,12 @@ export async function financeToolFromTool(
 
 async function financeOverview(deps: FinanceToolDeps) {
   const now = nowOf(deps);
-  const [{ accounts, txns }, states] = await Promise.all([
-    load(deps),
+  // The metrics reach back to the start of last year (year-over-year spend) at most.
+  const windowStart = `${Number(dayOf(now).slice(0, 4)) - 1}-01-01`;
+  const [accounts, txns, since, states] = await Promise.all([
+    loadAccounts(deps),
+    loadTxns(deps, windowStart),
+    earliestTxnDay(deps),
     deps.prisma.financeSyncState.findMany({
       where: { spaceId: deps.scope.spaceId, userId: deps.scope.userId },
     }),
@@ -226,7 +308,6 @@ async function financeOverview(deps: FinanceToolDeps) {
   const cash = cashSummary(accounts);
   const burn = monthlyBurn(txns, now);
   const rw = runway(cash.cashCents, burn.monthlyCents, now);
-  const since = earliestDay(txns);
   const totals = (["week", "month", "quarter", "year"] as const).map((period) => {
     const t = spendTotals(txns, period, now, since);
     return {
@@ -276,7 +357,7 @@ async function financeBreakdown(deps: FinanceToolDeps, args: Record<string, unkn
     MAX_ROWS,
     Math.max(1, typeof args.limit === "number" ? Math.floor(args.limit) : DEFAULT_ROWS),
   );
-  const { txns } = await load(deps);
+  const txns = await loadTxns(deps, range.start, range.end);
   const rows = breakdown(txns, by, { start: range.start, end: range.end });
   const totalCents = rows.reduce((sum, row) => sum + row.cents, 0);
   const top = rows.slice(0, limit);
@@ -299,7 +380,9 @@ async function financeBreakdown(deps: FinanceToolDeps, args: Record<string, unkn
         amount: dollars(row.cents),
         sharePct: totalCents > 0 ? Math.round((row.cents / totalCents) * 1000) / 10 : 0,
       })),
-      ...(rest > 0 ? { other: dollars(rest), otherRows: rows.length - limit } : {}),
+      ...(rows.length > limit
+        ? { otherCount: rows.length - limit, otherAmount: dollars(rest) }
+        : {}),
     },
     "rows",
   );
@@ -317,29 +400,67 @@ async function financeTransactions(deps: FinanceToolDeps, args: Record<string, u
     MAX_TXNS,
     Math.max(1, typeof args.limit === "number" ? Math.floor(args.limit) : DEFAULT_TXNS),
   );
-  const { txns } = await load(deps);
-  const matches = txns
-    .filter((t) => {
-      const day = txnDay(t);
-      return (
-        (!from || day >= from) &&
-        (!to || day <= to) &&
-        (!vendor ||
-          t.counterparty.toLowerCase().includes(vendor) ||
-          t.vendorKey.includes(vendor)) &&
-        (!category ||
-          categorySlug(t.category) === category ||
-          (t.category ?? "uncategorized").toLowerCase().includes(category)) &&
-        Math.abs(t.amountCents) >= minAmountCents &&
-        (!classification || t.classification === classification)
-      );
-    })
-    .sort((a, b) => txnDay(b).localeCompare(txnDay(a)) || a.id.localeCompare(b.id));
-  const shown = matches.slice(0, limit);
-  const totalCents = matches.reduce((sum, t) => sum + t.amountCents, 0);
+  const conditions: TxnWhere[] = [dayWhere(from, to && addDays(to, 1))];
+  if (vendor) {
+    conditions.push({
+      OR: [
+        { counterparty: { contains: vendor, mode: "insensitive" } },
+        { vendorKey: { contains: vendor } },
+      ],
+    });
+  }
+  if (category) {
+    const known = await deps.prisma.financeTransaction.findMany({
+      where: scopeWhere(deps),
+      select: { category: true },
+      distinct: ["category"],
+    });
+    const names = known
+      .map((row) => row.category)
+      .filter((name): name is string => name !== null)
+      .filter((name) => categorySlug(name) === category || name.toLowerCase().includes(category));
+    const nullMatches = "uncategorized".includes(category);
+    conditions.push({
+      OR: [{ category: { in: names } }, ...(nullMatches ? [{ category: null }] : [])],
+    });
+  }
+  if (minAmountCents > 0) {
+    conditions.push({
+      OR: [
+        { amountCents: { gte: BigInt(minAmountCents) } },
+        { amountCents: { lte: -BigInt(minAmountCents) } },
+      ],
+    });
+  }
+  if (classification) conditions.push({ classification });
+  const where: TxnWhere = { ...scopeWhere(deps), AND: conditions };
+  // The counting day is purchasedAt, else postedAt: take the newest `limit` of each kind, then merge.
+  const newest = (purchased: boolean) =>
+    deps.prisma.financeTransaction.findMany({
+      where: { ...where, purchasedAt: purchased ? { not: null } : null },
+      orderBy: [{ [purchased ? "purchasedAt" : "postedAt"]: "desc" }, { id: "asc" }],
+      take: limit,
+    });
+  // Same rule as the dashboard: USD and not failed or reversed. Other rows are listed but not summed.
+  const [boughtRows, postedRows, matchCount, eligible] = await Promise.all([
+    newest(true),
+    newest(false),
+    deps.prisma.financeTransaction.count({ where }),
+    deps.prisma.financeTransaction.aggregate({
+      where: { ...where, status: { not: "other" }, currency: "USD" },
+      _count: { _all: true },
+      _sum: { amountCents: true },
+    }),
+  ]);
+  const shown = [...boughtRows, ...postedRows]
+    .map(toFinanceTransaction)
+    .sort((a, b) => txnDay(b).localeCompare(txnDay(a)) || a.id.localeCompare(b.id))
+    .slice(0, limit);
+  const eligibleCount = eligible._count._all;
+  const totalCents = Number(eligible._sum.amountCents ?? 0n);
   await show(deps, {
     card: "transactions",
-    count: matches.length,
+    count: eligibleCount,
     totalCents,
     rows: shown.slice(0, 5).map((t) => ({
       id: t.id,
@@ -350,13 +471,16 @@ async function financeTransactions(deps: FinanceToolDeps, args: Record<string, u
   });
   return withinBudget(
     {
-      count: matches.length,
+      count: eligibleCount,
+      ...(matchCount > eligibleCount ? { excludedCount: matchCount - eligibleCount } : {}),
       total: dollars(totalCents),
       transactions: shown.map((t) => ({
         id: t.id,
         date: txnDay(t),
         vendor: t.counterparty,
         amount: dollars(t.amountCents),
+        currency: t.currency,
+        ...(countsTowardTotals(t) ? {} : { excludedFromTotal: true }),
         category: t.category,
         status: t.status,
         class: t.classification,
@@ -369,8 +493,10 @@ async function financeTransactions(deps: FinanceToolDeps, args: Record<string, u
 
 async function financeRecurring(deps: FinanceToolDeps) {
   const now = nowOf(deps);
-  const [{ accounts, txns }, bills] = await Promise.all([
-    load(deps),
+  // ponytail: three years covers monthly and annual rhythms; older annual charges no longer count.
+  const [accounts, txns, bills] = await Promise.all([
+    loadAccounts(deps),
+    loadTxns(deps, addDays(dayOf(now), -1100)),
     deps.prisma.financeBill.findMany({
       where: { spaceId: deps.scope.spaceId, userId: deps.scope.userId },
       orderBy: { dueAt: "asc" },

@@ -1,4 +1,5 @@
 import type { MessageBlock } from "@rakazo/contracts";
+import { financeAgentSpawnKey } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import { selectBuiltinToolsForRun } from "./executor.js";
 import {
@@ -103,16 +104,88 @@ const accounts: Row[] = [
   },
 ];
 
-function fakePrisma(rows: { txns: Row[]; accounts: Row[] }) {
-  const table = (list: Row[]) => ({
-    findMany: async ({ where }: { where: { spaceId: string; userId: string } }) =>
-      list.filter((row) => row.spaceId === where.spaceId && row.userId === where.userId),
+type Where = Record<string, unknown>;
+
+/** Evaluates the subset of Prisma `where` the finance tools use. */
+function matches(row: Row, where: Where): boolean {
+  return Object.entries(where).every(([key, cond]) => {
+    if (key === "AND") return (cond as Where[]).every((w) => matches(row, w));
+    if (key === "OR") return (cond as Where[]).some((w) => matches(row, w));
+    const value = row[key];
+    if (cond === null) return value === null || value === undefined;
+    if (cond instanceof Date || typeof cond !== "object") return value === cond;
+    const c = cond as Record<string, unknown>;
+    const v = value as never;
+    return Object.entries(c).every(([op, arg]) => {
+      if (op === "mode") return true;
+      if (op === "not") return arg === null ? value != null : value !== arg;
+      if (op === "in") return (arg as unknown[]).includes(value);
+      if (op === "contains") {
+        return String(value ?? "")
+          .toLowerCase()
+          .includes(String(arg).toLowerCase());
+      }
+      if (op === "gte") return v >= (arg as never);
+      if (op === "gt") return v > (arg as never);
+      if (op === "lte") return v <= (arg as never);
+      if (op === "lt") return v < (arg as never);
+      return false;
+    });
   });
+}
+
+const queries: Array<{ model: string; where: Where; list: boolean }> = [];
+
+function fakePrisma(rows: { txns: Row[]; accounts: Row[] }) {
+  const table = (model: string, list: Row[]) => {
+    const find = (where: Where, isList = false) => {
+      queries.push({ model, where, list: isList });
+      return list.filter((row) => matches(row, where));
+    };
+    return {
+      findMany: async (args: {
+        where: Where;
+        orderBy?: Array<Record<string, "asc" | "desc">> | Record<string, "asc" | "desc">;
+        take?: number;
+        distinct?: string[];
+      }) => {
+        let found = find(args.where, true);
+        for (const order of [args.orderBy ?? []].flat().reverse()) {
+          const [field, dir] = Object.entries(order)[0] as [string, "asc" | "desc"];
+          found = [...found].sort((a, b) =>
+            (a[field] as never) < (b[field] as never) === (dir === "asc") ? -1 : 1,
+          );
+        }
+        if (args.distinct) {
+          const seen = new Set<unknown>();
+          found = found.filter(
+            (row) =>
+              !seen.has(row[args.distinct?.[0] ?? ""]) && seen.add(row[args.distinct?.[0] ?? ""]),
+          );
+        }
+        return args.take ? found.slice(0, args.take) : found;
+      },
+      count: async (args: { where: Where }) => find(args.where).length,
+      aggregate: async (args: { where: Where; _min?: Record<string, true> }) => {
+        const found = find(args.where);
+        const min = (field: string) =>
+          found
+            .map((row) => row[field] as Date | null)
+            .filter((d): d is Date => d !== null)
+            .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+        return {
+          _count: { _all: found.length },
+          _sum: { amountCents: found.reduce((sum, row) => sum + (row.amountCents as bigint), 0n) },
+          _min: { purchasedAt: min("purchasedAt"), postedAt: min("postedAt") },
+        };
+      },
+    };
+  };
   return {
-    financeTransaction: table(rows.txns),
-    financeAccount: table(rows.accounts),
-    financeBill: table([]),
-    financeSyncState: table([]),
+    financeTransaction: table("txn", rows.txns),
+    financeAccount: table("account", rows.accounts),
+    financeBill: table("bill", []),
+    financeSyncState: table("sync", []),
   } as unknown as FinanceToolDeps["prisma"];
 }
 
@@ -167,16 +240,102 @@ describe("finance_breakdown", () => {
       by: "category",
       range: { from: "2026-07-01", to: "2026-10-14" },
       limit: 1,
-    })) as { rows: unknown[]; other: number; total: number };
+    })) as { rows: unknown[]; otherAmount: number; otherCount: number; total: number };
     expect(result.rows).toHaveLength(1);
     expect(result.total).toBe(210);
-    expect(result.other).toBe(110);
+    expect(result.otherAmount).toBe(110);
+    expect(result.otherCount).toBeGreaterThan(0);
     expect(await financeToolFromTool("finance_breakdown", deps, { by: "x" })).toHaveProperty(
       "error",
     );
     expect(
       await financeToolFromTool("finance_breakdown", deps, { by: "vendor", range: "7d" }),
     ).toHaveProperty("error");
+  });
+});
+
+describe("finance_breakdown with refunds", () => {
+  it("reports omitted rows even when their total is negative", async () => {
+    const rows = [
+      txn("r1", MINE, { amountCents: -10_000n, counterparty: "Big", vendorKey: "big" }),
+      txn("r2", MINE, { amountCents: 2_000n, counterparty: "Refunder", vendorKey: "refunder" }),
+    ];
+    const deps: FinanceToolDeps = {
+      prisma: fakePrisma({ txns: rows, accounts }),
+      scope: MINE,
+      now: () => new Date("2026-10-14T12:00:00Z"),
+    };
+    const result = (await financeToolFromTool("finance_breakdown", deps, {
+      by: "vendor",
+      limit: 1,
+    })) as { total: number; otherCount: number; otherAmount: number };
+    expect(result).toMatchObject({ total: 80, otherCount: 1, otherAmount: -20 });
+  });
+});
+
+describe("published cards", () => {
+  it("clip long provider names", async () => {
+    const rows = [
+      txn("long", MINE, { counterparty: "M".repeat(30_000), vendorKey: "k".repeat(30_000) }),
+    ];
+    const published: MessageBlock[] = [];
+    const deps: FinanceToolDeps = {
+      prisma: fakePrisma({ txns: rows, accounts }),
+      scope: MINE,
+      publish: async (blocks) => {
+        published.push(...blocks);
+      },
+      now: () => new Date("2026-10-14T12:00:00Z"),
+    };
+    await financeToolFromTool("finance_breakdown", deps, { by: "vendor" });
+    await financeToolFromTool("finance_transactions", deps, {});
+    expect(published).toHaveLength(2);
+    for (const block of published) expect(JSON.stringify(block).length).toBeLessThan(2_000);
+  });
+});
+
+describe("finance_transactions totals", () => {
+  it("sums only USD, non-failed rows and marks the rest", async () => {
+    const rows = [
+      txn("u", MINE, { amountCents: -10_000n }),
+      txn("e", MINE, { amountCents: -50_000n, currency: "EUR", counterparty: "Euro" }),
+      txn("o", MINE, { amountCents: -70_000n, status: "other", counterparty: "Failed" }),
+    ];
+    const deps: FinanceToolDeps = {
+      prisma: fakePrisma({ txns: rows, accounts }),
+      scope: MINE,
+      now: () => new Date("2026-10-14T12:00:00Z"),
+    };
+    const result = (await financeToolFromTool("finance_transactions", deps, {})) as {
+      count: number;
+      total: number;
+      excludedCount: number;
+      transactions: Array<{ id: string; currency: string; excludedFromTotal?: boolean }>;
+    };
+    expect(result).toMatchObject({ count: 1, total: -100, excludedCount: 2 });
+    expect(result.transactions).toHaveLength(3);
+    expect(result.transactions.find((t) => t.id === "e")).toMatchObject({
+      currency: "EUR",
+      excludedFromTotal: true,
+    });
+    expect(result.transactions.find((t) => t.id === "u")?.excludedFromTotal).toBeUndefined();
+  });
+});
+
+describe("query bounds", () => {
+  it("bounds the transaction query by date instead of loading all history", async () => {
+    const { deps } = setup();
+    for (const [tool, args] of [
+      ["finance_breakdown", { by: "vendor", range: "30d" }],
+      ["finance_overview", {}],
+      ["finance_recurring", {}],
+    ] as const) {
+      queries.length = 0;
+      await financeToolFromTool(tool, deps, args);
+      const lists = queries.filter((q) => q.model === "txn" && q.list);
+      expect(lists.length).toBeGreaterThan(0);
+      for (const q of lists) expect(JSON.stringify(q.where)).toContain('"gte"');
+    }
   });
 });
 
@@ -199,6 +358,21 @@ describe("finance_transactions", () => {
       minAmount: 500,
     })) as { count: number };
     expect(big.count).toBe(0);
+  });
+});
+
+describe("finance_transactions category filter", () => {
+  it("matches a category by slug or name and finds uncategorized rows", async () => {
+    const { deps } = setup();
+    const ids = async (category: string) =>
+      (
+        (await financeToolFromTool("finance_transactions", deps, { category })) as {
+          transactions: Array<{ id: string }>;
+        }
+      ).transactions.map((t) => t.id);
+    expect(await ids("credit-loan-payments")).toEqual(["pay"]);
+    expect(await ids("trav")).toEqual(["b"]);
+    expect(await ids("uncategorized")).toEqual([]);
   });
 });
 
@@ -263,14 +437,28 @@ describe("offering the tools", () => {
     }
   });
 
-  it("is for the owner's own direct runs only", () => {
-    const base = { hasProvider: true, groupId: null, runUserId: "u", botUserId: "u" };
-    expect(financeToolsAllowed({ ...base, messagingChannelRun: false })).toBe(true);
+  it("is for the Finance agent's owner-initiated runs only", () => {
+    const base = {
+      hasProvider: true,
+      groupId: null,
+      runUserId: "u",
+      botUserId: "u",
+      botSpawnKey: financeAgentSpawnKey("u"),
+      trigger: "user",
+      messagingChannelRun: false,
+    };
+    expect(financeToolsAllowed(base)).toBe(true);
+    expect(financeToolsAllowed({ ...base, trigger: "follow_up" })).toBe(true);
+    expect(financeToolsAllowed({ ...base, trigger: "routine" })).toBe(true);
+    // An ordinary owner bot never gets them.
+    expect(financeToolsAllowed({ ...base, botSpawnKey: null })).toBe(false);
+    expect(financeToolsAllowed({ ...base, botSpawnKey: "inbox-agent:u" })).toBe(false);
+    // Another user's connected agent reaches the Finance agent with the owner's userId.
+    expect(financeToolsAllowed({ ...base, trigger: "bot_message" })).toBe(false);
+    expect(financeToolsAllowed({ ...base, trigger: "messaging" })).toBe(false);
     expect(financeToolsAllowed({ ...base, messagingChannelRun: true })).toBe(false);
-    expect(financeToolsAllowed({ ...base, groupId: "g", messagingChannelRun: false })).toBe(false);
-    expect(financeToolsAllowed({ ...base, runUserId: "someone", messagingChannelRun: false })).toBe(
-      false,
-    );
+    expect(financeToolsAllowed({ ...base, groupId: "g" })).toBe(false);
+    expect(financeToolsAllowed({ ...base, runUserId: "someone" })).toBe(false);
   });
 
   it("needs an enabled Mercury or Brex server of the owner", async () => {

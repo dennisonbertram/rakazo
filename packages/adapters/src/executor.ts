@@ -3938,6 +3938,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             groupId: thread.groupId,
             runUserId: run.userId,
             botUserId: bot.userId,
+            botSpawnKey: bot.spawnKey,
+            trigger: run.trigger,
             messagingChannelRun,
           }) &&
           (await hasFinanceSource(deps.prisma, {

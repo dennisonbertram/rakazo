@@ -120,6 +120,8 @@ export const earliestDay = (txns: FinanceTransaction[]): Day | undefined =>
 const txnDay = (t: FinanceTransaction): Day => dayOf(t.purchasedAt ?? t.postedAt);
 // v1 is USD only: a transaction in another currency never enters a sum (see `excludedNonUsdCount`).
 const counts = (t: FinanceTransaction): boolean => t.status !== "other" && t.currency === "USD";
+/** True when a transaction enters sums and counts (USD, not failed or reversed). */
+export const countsTowardTotals = counts;
 const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b);
   const mid = s.length >> 1;
