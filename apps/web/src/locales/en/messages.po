@@ -125,6 +125,12 @@ msgstr "{0} non-USD not counted"
 msgid "{0} now appears under Connected."
 msgstr "{0} now appears under Connected."
 
+#. placeholder {0}: wallet.safeThreshold
+#. placeholder {1}: wallet.safeOwners.length
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{0} of {1}"
+msgstr "{0} of {1}"
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -140,6 +146,11 @@ msgstr "{0} runs · {1} tokens"
 #: src/components/FinanceCards.tsx
 msgid "{0} transactions"
 msgstr "{0} transactions"
+
+#. placeholder {0}: data.crypto.unpricedTokenCount
+#: src/pages/Finance.tsx
+msgid "{0} unpriced"
+msgstr "{0} unpriced"
 
 #. placeholder {0}: target.name
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -286,6 +297,10 @@ msgstr "{stepCount, plural, one {Working… · # tool} other {Working… · # to
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{unpriced} unpriced"
+msgstr "{unpriced} unpriced"
+
 #: src/pages/Shell.tsx
 msgid "{workingBotName} is working"
 msgstr "{workingBotName} is working"
@@ -310,6 +325,10 @@ msgstr "* So far"
 #: src/components/ComposeEmail.tsx
 msgid "+{more} more"
 msgstr "+{more} more"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "0x… or name.eth"
+msgstr "0x… or name.eth"
 
 #: src/pages/Finance.tsx
 msgid "3 mo"
@@ -387,6 +406,10 @@ msgstr "Action confirmations"
 msgid "Actions for {0}"
 msgstr "Actions for {0}"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Actions for {name}"
+msgstr "Actions for {name}"
+
 #: src/pages/Shell.tsx
 msgid "Actions for space"
 msgstr "Actions for space"
@@ -406,6 +429,7 @@ msgid "Activity"
 msgstr "Activity"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Add"
@@ -453,6 +477,10 @@ msgstr "Add a schedule, webhook, GitHub, or message trigger to run this routine.
 msgid "Add another account"
 msgstr "Add another account"
 
+#: src/components/integrations/FinanceSection.tsx
+msgid "Add API key"
+msgstr "Add API key"
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Add connected model"
 msgstr "Add connected model"
@@ -488,6 +516,14 @@ msgstr "Add to routine"
 #: src/pages/RoutineEditor.tsx
 msgid "Add trigger"
 msgstr "Add trigger"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Add wallet"
+msgstr "Add wallet"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Address or ENS"
+msgstr "Address or ENS"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/AccountSettingsOverlay.tsx
@@ -656,6 +692,7 @@ msgid "API is back, but the update did not finish. Check the host logs."
 msgstr "API is back, but the update did not finish. Check the host logs."
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/ModelSettingsOverlay.tsx
@@ -886,6 +923,7 @@ msgid "Backup models saved."
 msgstr "Backup models saved."
 
 #: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Balance"
 msgstr "Balance"
 
@@ -1057,6 +1095,7 @@ msgstr "Can't reach the server."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -1138,6 +1177,14 @@ msgstr "Cc"
 #: src/components/inbox/InboxMessageDialog.tsx
 msgid "cc {0}"
 msgstr "cc {0}"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chain"
+msgstr "Chain"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chains"
+msgstr "Chains"
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Change"
@@ -1525,6 +1572,10 @@ msgstr "Connect any app that offers an MCP server URL."
 msgid "Connect API key"
 msgstr "Connect API key"
 
+#: src/components/integrations/FinanceSection.tsx
+msgid "Connect Blockscout"
+msgstr "Connect Blockscout"
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Executor"
 msgstr "Connect Executor"
@@ -1628,6 +1679,10 @@ msgstr "Continue with {0}"
 #: src/pages/Auth.tsx
 msgid "Continue with email"
 msgstr "Continue with email"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Contract"
+msgstr "Contract"
 
 #: src/components/ComputersUnavailableHint.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -2199,6 +2254,11 @@ msgstr "Cron"
 msgid "Cron expression"
 msgstr "Cron expression"
 
+#: src/pages/Finance.tsx
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Crypto"
+msgstr "Crypto"
+
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
@@ -2532,6 +2592,10 @@ msgstr "e.g. Hivenet Agent, Presales, Timesheets bot"
 msgid "Earlier"
 msgstr "Earlier"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Edit"
+msgstr "Edit"
+
 #: src/components/AskCard.tsx
 msgid "Edit first"
 msgstr "Edit first"
@@ -2539,6 +2603,10 @@ msgstr "Edit first"
 #: src/pages/BotContextMenu.tsx
 msgid "Edit Profile"
 msgstr "Edit Profile"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Edit wallet"
+msgstr "Edit wallet"
 
 #: src/pages/Auth.tsx
 msgid "Email"
@@ -2657,6 +2725,10 @@ msgstr "Every two weeks"
 msgid "Every week"
 msgstr "Every week"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Exchange"
+msgstr "Exchange"
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Excluded"
 msgstr "Excluded"
@@ -2758,6 +2830,7 @@ msgstr "Filters"
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/finance/FinanceNotFound.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
@@ -2970,6 +3043,10 @@ msgstr "High"
 msgid "High"
 msgstr "High"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Holdings"
+msgstr "Holdings"
+
 #: src/pages/RoutineSchedule.tsx
 msgid "hour"
 msgstr "hour"
@@ -3145,6 +3222,14 @@ msgstr "Keyboard shortcuts"
 #: src/pages/KnowledgeSection.tsx
 msgid "Knowledge"
 msgstr "Knowledge"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Label"
+msgstr "Label"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Label (optional)"
+msgstr "Label (optional)"
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Language"
@@ -3980,6 +4065,7 @@ msgid "Only if the server does not use sign-in"
 msgstr "Only if the server does not use sign-in"
 
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
@@ -4205,6 +4291,7 @@ msgstr "Pending"
 msgid "Period"
 msgstr "Period"
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/Inbox.tsx
 msgid "Personal"
 msgstr "Personal"
@@ -4342,6 +4429,10 @@ msgstr "Read cards, expenses and bills"
 #: src/pages/shell/bot-panel.tsx
 msgid "Read replies aloud"
 msgstr "Read replies aloud"
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read wallet balances"
+msgstr "Read wallet balances"
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -4484,6 +4575,7 @@ msgstr "Release interrupted computer?"
 #: src/components/ApprovalRulesSettings.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -4508,6 +4600,7 @@ msgstr "Remove {0}"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Remove {0}?"
 msgstr "Remove {0}?"
 
@@ -4593,6 +4686,7 @@ msgstr "Renews {day}"
 msgid "Reopen"
 msgstr "Reopen"
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Replace API key"
 msgstr "Replace API key"
@@ -4789,14 +4883,20 @@ msgstr "Runs when this bot receives a verified message from this provider."
 msgid "Runway"
 msgstr "Runway"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Safe"
+msgstr "Safe"
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Sales & CRM"
 msgstr "Sales & CRM"
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/GroupPanel.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -5633,6 +5733,7 @@ msgid "Today"
 msgstr "Today"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Token"
 msgstr "Token"
 
@@ -5698,6 +5799,7 @@ msgstr "Try again"
 msgid "Try the test again."
 msgstr "Try the test again."
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
 msgstr "Type"
@@ -5804,6 +5906,7 @@ msgid "Updated"
 msgstr "Updated"
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Updated {updated}"
 msgstr "Updated {updated}"
@@ -5895,6 +5998,7 @@ msgstr "Uses this server's own {hostCredentialSource} credentials to access {sel
 msgid "Using {0}"
 msgstr "Using {0}"
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Value"
 msgstr "Value"
@@ -5985,6 +6089,10 @@ msgstr "Waiting in line…"
 #: src/pages/shell/message-cards.tsx
 msgid "Waiting…"
 msgstr "Waiting…"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Wallets"
+msgstr "Wallets"
 
 #: src/pages/Paywall.tsx
 msgid "Web, desktop and mobile apps"

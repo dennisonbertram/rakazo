@@ -125,6 +125,12 @@ msgstr ""
 msgid "{0} now appears under Connected."
 msgstr ""
 
+#. placeholder {0}: wallet.safeThreshold
+#. placeholder {1}: wallet.safeOwners.length
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{0} of {1}"
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -139,6 +145,11 @@ msgstr "{0} çalıştırma · {1} token"
 #. placeholder {0}: card.count
 #: src/components/FinanceCards.tsx
 msgid "{0} transactions"
+msgstr ""
+
+#. placeholder {0}: data.crypto.unpricedTokenCount
+#: src/pages/Finance.tsx
+msgid "{0} unpriced"
 msgstr ""
 
 #. placeholder {0}: target.name
@@ -286,6 +297,10 @@ msgstr ""
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{unpriced} unpriced"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "{workingBotName} is working"
 msgstr "{workingBotName} çalışıyor"
@@ -309,6 +324,10 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 msgid "+{more} more"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "0x… or name.eth"
 msgstr ""
 
 #: src/pages/Finance.tsx
@@ -387,6 +406,10 @@ msgstr "İşlem onayları"
 msgid "Actions for {0}"
 msgstr "{0} için işlemler"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Actions for {name}"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "Actions for space"
 msgstr ""
@@ -406,6 +429,7 @@ msgid "Activity"
 msgstr "Etkinlik"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Add"
@@ -453,6 +477,10 @@ msgstr ""
 msgid "Add another account"
 msgstr ""
 
+#: src/components/integrations/FinanceSection.tsx
+msgid "Add API key"
+msgstr ""
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Add connected model"
 msgstr "Bağlı model ekle"
@@ -487,6 +515,14 @@ msgstr "Rutine ekle"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Add trigger"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Add wallet"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Address or ENS"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -656,6 +692,7 @@ msgid "API is back, but the update did not finish. Check the host logs."
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/ModelSettingsOverlay.tsx
@@ -886,6 +923,7 @@ msgid "Backup models saved."
 msgstr "Yedek modeller kaydedildi."
 
 #: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Balance"
 msgstr ""
 
@@ -1057,6 +1095,7 @@ msgstr "Sunucuya ulaşılamıyor."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -1137,6 +1176,14 @@ msgstr ""
 #. placeholder {0}: message.cc
 #: src/components/inbox/InboxMessageDialog.tsx
 msgid "cc {0}"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chain"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Chains"
 msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
@@ -1525,6 +1572,10 @@ msgstr ""
 msgid "Connect API key"
 msgstr "API anahtarıyla bağlan"
 
+#: src/components/integrations/FinanceSection.tsx
+msgid "Connect Blockscout"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Executor"
 msgstr "Executor'a bağlan"
@@ -1628,6 +1679,10 @@ msgstr "{0} ile devam et"
 #: src/pages/Auth.tsx
 msgid "Continue with email"
 msgstr "E-posta ile devam et"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Contract"
+msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -2199,6 +2254,11 @@ msgstr "Cron"
 msgid "Cron expression"
 msgstr "Cron ifadesi"
 
+#: src/pages/Finance.tsx
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Crypto"
+msgstr ""
+
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
@@ -2532,6 +2592,10 @@ msgstr "örn. Hivenet Agent, Presales, puantaj botu"
 msgid "Earlier"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Edit"
+msgstr ""
+
 #: src/components/AskCard.tsx
 msgid "Edit first"
 msgstr "Önce düzenle"
@@ -2539,6 +2603,10 @@ msgstr "Önce düzenle"
 #: src/pages/BotContextMenu.tsx
 msgid "Edit Profile"
 msgstr "Profili Düzenle"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Edit wallet"
+msgstr ""
 
 #: src/pages/Auth.tsx
 msgid "Email"
@@ -2657,6 +2725,10 @@ msgstr ""
 msgid "Every week"
 msgstr "Her hafta"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Exchange"
+msgstr ""
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Excluded"
 msgstr ""
@@ -2758,6 +2830,7 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/finance/FinanceNotFound.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
@@ -2970,6 +3043,10 @@ msgstr "Yüksek"
 msgid "High"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Holdings"
+msgstr ""
+
 #: src/pages/RoutineSchedule.tsx
 msgid "hour"
 msgstr "saat"
@@ -3145,6 +3222,14 @@ msgstr ""
 #: src/pages/KnowledgeSection.tsx
 msgid "Knowledge"
 msgstr "Bilgi"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Label"
+msgstr ""
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Label (optional)"
+msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Language"
@@ -3980,6 +4065,7 @@ msgid "Only if the server does not use sign-in"
 msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
@@ -4205,6 +4291,7 @@ msgstr ""
 msgid "Period"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/Inbox.tsx
 msgid "Personal"
 msgstr ""
@@ -4342,6 +4429,10 @@ msgstr ""
 #: src/pages/shell/bot-panel.tsx
 msgid "Read replies aloud"
 msgstr "Yanıtları sesli oku"
+
+#: src/components/integrations/FinanceSection.tsx
+msgid "Read wallet balances"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -4484,6 +4575,7 @@ msgstr ""
 #: src/components/ApprovalRulesSettings.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -4508,6 +4600,7 @@ msgstr "{0} kaldır"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Remove {0}?"
 msgstr ""
 
@@ -4593,6 +4686,7 @@ msgstr ""
 msgid "Reopen"
 msgstr "Yeniden aç"
 
+#: src/components/integrations/FinanceSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Replace API key"
 msgstr "API anahtarını değiştir"
@@ -4789,14 +4883,20 @@ msgstr ""
 msgid "Runway"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Safe"
+msgstr ""
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Sales & CRM"
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/FinanceSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/GroupPanel.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -5633,6 +5733,7 @@ msgid "Today"
 msgstr "Bugün"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 msgid "Token"
 msgstr ""
 
@@ -5698,6 +5799,7 @@ msgstr "Tekrar dene"
 msgid "Try the test again."
 msgstr "Testi yeniden dene."
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
 msgstr ""
@@ -5804,6 +5906,7 @@ msgid "Updated"
 msgstr ""
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Updated {updated}"
 msgstr ""
@@ -5895,6 +5998,7 @@ msgstr "{selectedProviderName} erişimi için bu sunucunun kendi {hostCredential
 msgid "Using {0}"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Value"
 msgstr ""
@@ -5985,6 +6089,10 @@ msgstr "Sırada bekleniyor…"
 #: src/pages/shell/message-cards.tsx
 msgid "Waiting…"
 msgstr "Bekleniyor…"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Wallets"
+msgstr ""
 
 #: src/pages/Paywall.tsx
 msgid "Web, desktop and mobile apps"

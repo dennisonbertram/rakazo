@@ -670,3 +670,32 @@ it("redraws the Burn chart for the selected period and opens the matching detail
   expect(where).toBe("/app/finance/month/2026-10");
   width.mockRestore();
 });
+
+it("shows the Crypto card only when the overview has crypto, apart from cash", async () => {
+  rpcMock.overview.mockResolvedValue(connectedOverview());
+  await show("/app/finance");
+  await flush();
+  expect(container.textContent).not.toContain("Crypto");
+  expect(container.querySelector('a[href="/app/finance/crypto"]')).toBeNull();
+
+  const cashBefore = container.querySelector('a[href="/app/finance/accounts"]')?.textContent;
+  rpcMock.overview.mockResolvedValue(
+    connectedOverview({
+      crypto: {
+        totalCents: 123_456_00,
+        byChain: [],
+        byWallet: [],
+        lastSyncedAt: null,
+        unpricedTokenCount: 2,
+      },
+    }),
+  );
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await show("/app/finance");
+  await flush();
+  const card = container.querySelector('a[href="/app/finance/crypto"]');
+  expect(card?.textContent).toContain("$123,456");
+  expect(card?.textContent).toContain("2 unpriced");
+  expect(container.querySelector('a[href="/app/finance/accounts"]')?.textContent).toBe(cashBefore);
+});

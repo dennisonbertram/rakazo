@@ -5,10 +5,12 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const connect = vi.hoisted(() => vi.fn());
+const cryptoRpc = vi.hoisted(() => ({ crypto: vi.fn(), cryptoConnect: vi.fn() }));
 vi.mock("../../lib/finance-connect", () => ({ connectFinanceProvider: connect }));
+vi.mock("../../lib/rpc", () => ({ rpc: { finance: cryptoRpc } }));
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({
     t: (parts: TemplateStringsArray, ...values: unknown[]) =>
@@ -48,6 +50,9 @@ const press = (p: string) =>
   act(async () => {
     (tile(p)?.querySelector("button") as HTMLButtonElement | null)?.click();
   });
+beforeEach(() => {
+  cryptoRpc.crypto.mockResolvedValue({ connected: false, hasApiKey: false });
+});
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
@@ -83,4 +88,33 @@ it("shows a failed connect", async () => {
   await show([source("mercury", "not_connected"), source("brex", "not_connected")]);
   await press("brex");
   expect(tile("brex")?.querySelector('[role="alert"]')?.textContent).toContain("Could not reach");
+});
+
+it("connects Blockscout without a key, then adds one from a disclosure", async () => {
+  cryptoRpc.cryptoConnect.mockResolvedValue({ serverId: "s2", hasApiKey: false });
+  await show([source("mercury", "ok"), source("brex", "ok")]);
+  const crypto = () => container.querySelector('[data-testid="finance-tile-crypto"]') as Element;
+  const click = (label: string) =>
+    act(async () => {
+      (
+        [...crypto().querySelectorAll("button")].find((b) => b.textContent === label) as HTMLElement
+      ).click();
+    });
+  expect(crypto().textContent).toContain("Not connected");
+  await click("Connect");
+  expect(cryptoRpc.cryptoConnect).toHaveBeenCalledWith({});
+  expect(crypto().textContent).toContain("Connected");
+  expect(crypto().querySelector("input")).toBeNull();
+  await click("Add API key");
+  const input = crypto().querySelector("input") as HTMLInputElement;
+  expect(input.type).toBe("password");
+  cryptoRpc.cryptoConnect.mockResolvedValue({ serverId: "s2", hasApiKey: true });
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "k-123");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await click("Save");
+  expect(cryptoRpc.cryptoConnect).toHaveBeenLastCalledWith({ apiKey: "k-123" });
+  expect(crypto().textContent).toContain("Replace API key");
+  expect(crypto().textContent).not.toContain("k-123");
 });
