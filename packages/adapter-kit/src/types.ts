@@ -647,6 +647,8 @@ export interface BackgroundJobPayloads {
   "mail.search.expire": { searchId: string };
   /** Classifies a user's new inbox mail and syncs their to-dos; one queued job per user and space. */
   "inbox.triage": { userId: string; spaceId: string };
+  /** Syncs a user's finance accounts and transactions from their Mercury and Brex servers; one queued job per user and space. */
+  "finance.sync": { userId: string; spaceId: string };
 }
 
 export type BackgroundJobName = keyof BackgroundJobPayloads;

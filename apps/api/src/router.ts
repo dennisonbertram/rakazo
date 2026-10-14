@@ -28,6 +28,7 @@ import type {
   ComputerExecutionLease,
   ConnectorRegistry,
   FaviconResolver,
+  FinanceSyncDeps,
   getBotSecretMetadata,
   IntegrationProviderSettings,
   MemoryProviderResolver,
@@ -150,6 +151,7 @@ import {
   foldComputerCommands,
   GOOGLE_DESKTOP_REDIRECT_URI,
   IntegrationProviderIdSchema,
+  isFinanceAgentSpawnKey,
   isInboxAgentSpawnKey,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   parseTicketRef,
@@ -243,6 +245,23 @@ import {
   toComputerStatus,
 } from "./computer-status.js";
 import { completeNativeOAuth } from "./connection-oauth.js";
+import {
+  financeAccountDetail,
+  financeAccounts,
+  financeAgent,
+  financeBurn,
+  financeCategory,
+  financeConnect,
+  financeMonth,
+  financeOverview,
+  financeReceiptUrl,
+  financeRecurring,
+  financeRefresh,
+  financeRunway,
+  financeSpend,
+  financeTransaction,
+  financeVendor,
+} from "./finance.js";
 import {
   inboxFeedbackSet,
   inboxGet,
@@ -600,6 +619,8 @@ export interface RouterDeps {
   integrationSettings?: IntegrationProviderSettings;
   composio?: ComposioProvider;
   mcpOAuth?: McpOAuthBroker;
+  /** Builds the read-tool caller for finance servers (refresh, receipts); unset where finance sync is off. */
+  financeCallToolFor?: FinanceSyncDeps["callToolFor"];
   connectors: ConnectorRegistry;
   remoteConnectors?: RemoteConnectorDependencies;
   artifacts: ArtifactStore;
@@ -793,6 +814,27 @@ export function createRouter(deps: RouterDeps) {
   const repos = createRepos(deps.prisma);
   const onboardingDeps = { prisma: deps.prisma, events: deps.events, connectors: deps.connectors };
   const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets);
+  const beginMcpOAuth = (input: {
+    serverId: string;
+    spaceId: string;
+    userId: string;
+    redirectUri: string;
+    reauthorize?: boolean;
+  }) => {
+    const expectedRedirect = new URL("/mcp/oauth/callback", deps.env.webOrigin).toString();
+    if (new URL(input.redirectUri).toString() !== expectedRedirect) {
+      throw new Error("MCP OAuth redirect URI is not allowed");
+    }
+    return mcpOAuth.begin(input);
+  };
+  const financeDeps = {
+    prisma: deps.prisma,
+    jobs: deps.jobs,
+    repos,
+    mcpOAuth,
+    beginMcpOAuth,
+    callToolFor: deps.financeCallToolFor,
+  };
   const codexCatalog = deps.codexCatalog ?? new CodexCatalogCache();
   const favicons = deps.favicons ?? createFaviconResolver();
   const refreshExpiredCredential =
@@ -1612,7 +1654,7 @@ export function createRouter(deps: RouterDeps) {
       }),
       create: authed.bots.create.handler(async ({ context, input }) => {
         // inbox.agent is the only way to create an Inbox agent; reserve its key prefix.
-        if (isInboxAgentSpawnKey(input.spawnKey)) {
+        if (isInboxAgentSpawnKey(input.spawnKey) || isFinanceAgentSpawnKey(input.spawnKey)) {
           throw new ORPCError("BAD_REQUEST", { message: "Reserved spawn key" });
         }
         let bot: Bot;
@@ -4525,11 +4567,7 @@ export function createRouter(deps: RouterDeps) {
       oauth: {
         begin: authed.mcp.oauth.begin.handler(async ({ context, input }) => {
           try {
-            const expectedRedirect = new URL("/mcp/oauth/callback", deps.env.webOrigin).toString();
-            if (new URL(input.redirectUri).toString() !== expectedRedirect) {
-              throw new Error("MCP OAuth redirect URI is not allowed");
-            }
-            return await mcpOAuth.begin({
+            return await beginMcpOAuth({
               ...input,
               spaceId: context.actor.spaceId,
               userId: context.actor.userId,
@@ -5908,6 +5946,53 @@ export function createRouter(deps: RouterDeps) {
         });
         return loadAutoReviewSettings(deps, context.actor);
       }),
+    },
+    finance: {
+      agent: authed.finance.agent.handler(({ context }) =>
+        financeAgent(financeDeps, context.actor).catch((error: unknown) => {
+          throw mapSpaceLifecycleError(error);
+        }),
+      ),
+      overview: authed.finance.overview.handler(({ context }) =>
+        financeOverview(financeDeps, context.actor, context.signal),
+      ),
+      refresh: authed.finance.refresh.handler(({ context }) =>
+        financeRefresh(financeDeps, context.actor, context.signal),
+      ),
+      connect: authed.finance.connect.handler(({ context, input }) =>
+        financeConnect(financeDeps, context.actor, input),
+      ),
+      accounts: authed.finance.accounts.handler(({ context }) =>
+        financeAccounts(financeDeps, context.actor),
+      ),
+      account: authed.finance.account.handler(({ context, input }) =>
+        financeAccountDetail(financeDeps, context.actor, input),
+      ),
+      burn: authed.finance.burn.handler(({ context }) => financeBurn(financeDeps, context.actor)),
+      month: authed.finance.month.handler(({ context, input }) =>
+        financeMonth(financeDeps, context.actor, input),
+      ),
+      runway: authed.finance.runway.handler(({ context }) =>
+        financeRunway(financeDeps, context.actor),
+      ),
+      spend: authed.finance.spend.handler(({ context, input }) =>
+        financeSpend(financeDeps, context.actor, input),
+      ),
+      category: authed.finance.category.handler(({ context, input }) =>
+        financeCategory(financeDeps, context.actor, input),
+      ),
+      recurring: authed.finance.recurring.handler(({ context, input }) =>
+        financeRecurring(financeDeps, context.actor, input),
+      ),
+      vendor: authed.finance.vendor.handler(({ context, input }) =>
+        financeVendor(financeDeps, context.actor, input),
+      ),
+      transaction: authed.finance.transaction.handler(({ context, input }) =>
+        financeTransaction(financeDeps, context.actor, input),
+      ),
+      receiptUrl: authed.finance.receiptUrl.handler(({ context, input }) =>
+        financeReceiptUrl(financeDeps, context.actor, input, context.signal),
+      ),
     },
     inbox: {
       agent: authed.inbox.agent.handler(async ({ context }) =>

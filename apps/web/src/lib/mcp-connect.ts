@@ -42,10 +42,17 @@ export async function connectMcpOauth(
     ...(options.reauthorize ? { reauthorize: true } : {}),
   });
   if (started.status !== "authorization_required") return started.status;
+  return await openMcpOauthPopup(started.authorizationUrl);
+}
+
+/** Open the provider's sign-in page in a popup and wait for the callback page to report the result.
+ * `connectMcpOauth` uses it after `mcp.oauth.begin`; Finance uses it after `finance.connect`, which
+ * begins the same OAuth flow itself. */
+export async function openMcpOauthPopup(authorizationUrl: string): Promise<McpOauthResult> {
   const popup = window.open("about:blank", MCP_OAUTH_CHANNEL, "popup,width=560,height=720");
   if (!popup) {
     // Popup blocked: navigate this tab instead; the callback page returns to /app.
-    window.location.assign(started.authorizationUrl);
+    window.location.assign(authorizationUrl);
     return "cancelled";
   }
   try {
@@ -53,7 +60,7 @@ export async function connectMcpOauth(
   } catch {
     // Without the marker the callback page returns to /app; completion still broadcasts.
   }
-  popup.location.href = started.authorizationUrl;
+  popup.location.href = authorizationUrl;
   return await new Promise<McpOauthResult>((resolve) => {
     const channel = new BroadcastChannel(MCP_OAUTH_CHANNEL);
     let settled = false;

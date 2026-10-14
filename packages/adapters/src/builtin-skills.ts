@@ -58,6 +58,87 @@ Use the steps below for history questions: mail older than two weeks, a person, 
    - To tell whether the user already replied, look for their sent rows in the same thread.
    - Do not show tool field names (coverage, continueFrom, records, searchId). Say it plainly, for example "I found 40 messages back to March; want me to look further back?"`,
   },
+  {
+    name: "finance-cost-cutting",
+    description: "Find recurring and overlapping spend to cut, from Mercury and Brex.",
+    body: `Use this when the user asks where to save money, which subscriptions to cancel, or why spend is up. You only read and suggest. Never pay, cancel, categorize or change anything.
+
+Rules for every finance answer:
+- Compute totals, averages and percentages with code, never in your head.
+- Leave out money moved between the user's own accounts: Mercury transactions with kind treasuryTransfer, and moves between their own Mercury accounts.
+- When Brex is connected, leave out Mercury payments to Brex (counterparty Brex, category "Credit & Loan Payments"). The card purchases are already in the Brex data, so counting both counts the spend twice.
+- Money in (kind incoming*, category Revenue or Financing Proceeds) is not spend.
+- Say which accounts and dates you used.
+
+1. Get the date: Mercury getCurrentDate.
+2. Pull the last 6 months.
+   - Mercury listTransactions with postedStart and postedEnd (YYYY-MM-DD), status ["sent"], limit 300. If the page is full (totalFetched equals the limit) or truncatedAt is set, call again with start_after set to page.nextPage when present, else to the id of the last transaction returned, and repeat until a page comes back short. If a result says it was truncated, halve the limit and start over. Amounts are signed dollars; negative is money out.
+   - Brex list_expenses with an intent, purchased_at_start and purchased_at_end, and group_by ["vendor","month"] with aggregations [{func:"SUM", field:"billing_amount", alias:"total_spend"}], limit 100, following next_cursor. Rows come back under results with amounts as text such as "395.00 USD" and months as "2026-09-01 00:00:00.0"; parse them in code. Use group_by ["category","month"] for categories.
+   - Brex list_bills with statuses ["SUBMITTED","APPROVED","DRAFT"] for bills not yet paid.
+3. Find the candidates with code. Group by vendor name in lower case with company suffixes removed, so "Acme Inc." and "ACME" match.
+   - Recurring: the same vendor charged at least 3 times at a steady interval (about 7, 14, 30 or 365 days, within 3 days) and similar amounts. Convert each to a monthly cost.
+   - Growing: a vendor whose last full month is well above its earlier months.
+   - Overlapping: several vendors doing the same job, such as multiple AI model or coding tools, project trackers or design tools.
+   - Possibly unused: a recurring vendor with no other related activity, or two charges for the same product.
+   - Not candidates: payroll, taxes, rent, insurance and benefits, unless the user asks.
+4. Rank by yearly saving (monthly cost times 12). For each of the top items give the vendor, monthly and yearly cost, the evidence (dates and amounts of the last charges), and what to do: cancel, downgrade, merge with another tool, or check who uses it.
+5. Finish with the total possible saving and what you could not tell (for example, who uses a tool). Offer to look closer at any item.`,
+  },
+  {
+    name: "finance-runway-scenarios",
+    description: "Runway and what-if scenarios from current cash and burn.",
+    body: `Use this when the user asks how long the money lasts or what happens if spend, revenue or cash changes. You only read and calculate.
+
+Follow the finance rules in finance-cost-cutting: compute with code, leave out transfers between the user's accounts, do not count Brex card payments and card purchases both.
+
+1. Cash now.
+   - Mercury getAccounts: checking and savings are accounts with isCredit false; availableBalance is in dollars.
+   - Mercury getTreasury: add each account's currentBalance. Treasury is cash.
+   - Brex list_business_accounts (with an intent): add the available_balance of cash accounts if the user keeps cash at Brex.
+   - Brex card balance owed is not cash. Mention it separately if you find it.
+2. Monthly burn: the average over the last 3 full months of money out minus revenue.
+   - Mercury listTransactions with postedStart and postedEnd, status ["sent"], limit 300, paging with start_after set to the last id returned until a page comes back short.
+   - Brex list_expenses with group_by ["month"] and a SUM of billing_amount, for the same months.
+   - Money out is spend only. Revenue and financing proceeds are not spend. Report revenue separately.
+3. Runway in months is cash divided by burn. If burn is zero or negative, say the business is not burning cash. The run-out date is today plus that many months.
+4. Scenarios, when the user gives them or asks "what if": change one input at a time with code (cut X dollars a month, add a hire, revenue up or down by a percent, a one-time payment, new funding) and show the new burn, runway and run-out date next to the current ones. Label every assumption as the user's, not data. If they gave no numbers, offer two or three sensible ones and say they are examples.
+5. Answer with: cash, burn, runway, run-out date, then each scenario. State the months and accounts used.`,
+  },
+  {
+    name: "finance-monthly-review",
+    description: "Monthly money review: spend, changes, new and upcoming charges.",
+    body: `Use this for "how did last month go", a monthly or weekly review, or "what changed". You only read and report.
+
+Follow the finance rules in finance-cost-cutting: compute with code, leave out transfers between the user's accounts, do not count Brex card payments and card purchases both.
+
+1. Get the date with Mercury getCurrentDate. Review the last full month unless the user names another, and compare it with the month before.
+2. Pull both months and the 3 before them.
+   - Mercury listTransactions with postedStart and postedEnd, status ["sent"], limit 300, paging with start_after set to the last id returned until a page comes back short. Use the category field.
+   - Brex list_expenses with an intent, purchased_at_start and purchased_at_end, group_by ["category"] and ["vendor"] with a SUM of billing_amount.
+   - Brex list_bills with statuses ["SUBMITTED","APPROVED","DRAFT"] and due_at_start and due_at_end for the next 30 days.
+   - Mercury getTreasury netReturns for the month's Treasury yield.
+3. Report, each with numbers from code:
+   - Total spend, money in (revenue apart from financing), and net, against the previous month.
+   - The 5 categories and 5 vendors that moved most, up or down, in dollars and percent.
+   - New vendors: charged this month and never before.
+   - Charges larger than usual: an amount well above that vendor's earlier charges.
+   - Recurring charges due in the next 30 days and unpaid Brex bills with due dates.
+   - Treasury yield for the month.
+4. Keep it short: a few lines of totals, then a list of what needs a look. Name what you could not check, such as expenses with no receipt or no category, and offer finance-cost-cutting or finance-categorize.`,
+  },
+  {
+    name: "finance-categorize",
+    description: "Suggest categories for uncategorized transactions. Suggest only.",
+    body: `Use this when the user asks to clean up or fix categories. You can only suggest. Changing a category in Mercury or Brex is a write that is not available, so end with a list the user can apply.
+
+1. Find the uncategorized ones.
+   - Mercury listCategories for the user's custom categories. listTransactions with postedStart and postedEnd, status ["sent"], limit 300, paging with start_after set to the last id returned until a page comes back short. Rows with a null category are uncategorized.
+   - Brex expenses always carry a merchant category (list_expenses with an intent and the date range, rows under items), so there is usually nothing to fix. Call list_expense_categories only to see whether the company defined its own categories; it may be empty.
+2. Group the uncategorized rows by vendor with code, so one suggestion covers every charge from that vendor.
+3. Suggest a category for each vendor from the user's existing categories first. Only propose a new category name when none fits, and say it is new. Base it on the vendor and on how the user categorized the same or similar vendors. Say when you are unsure instead of guessing.
+4. Answer with a table: vendor, number of charges, total, suggested category, confidence (high or low). Put the largest totals first. Cap it at 30 vendors and say how many are left.
+5. Say plainly that nothing was changed, and that the user can make these changes in Mercury or Brex.`,
+  },
 ];
 
 export const BUILTIN_AGENT_SKILLS: Array<{

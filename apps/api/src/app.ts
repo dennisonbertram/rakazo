@@ -26,6 +26,7 @@ import {
   createBackgroundJobHandlers,
   createCloudAgentConnection,
   createConnectorStack,
+  createFinanceCallToolFor,
   createJobReconciler,
   createMailProvider,
   createMessagingContextLoader,
@@ -526,6 +527,7 @@ export async function createApp(
     deploymentModelConfigured: env.deploymentModelConfigured,
     messaging,
     cloudAgent,
+    financeCallToolFor: createFinanceCallToolFor(prisma, mcp),
   });
   if (inMemoryJobs) {
     await inMemoryJobs.start(jobHandlers);
@@ -564,6 +566,7 @@ export async function createApp(
     remoteConnectors,
     artifacts,
     mail,
+    financeCallToolFor: createFinanceCallToolFor(prisma, mcp),
     resolveModel: executor.resolveModel,
     dataDir: env.dataDir,
     billing,
