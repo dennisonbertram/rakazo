@@ -929,6 +929,48 @@ describe("GoogleConnector providers", () => {
     ).resolves.toEqual({ status: 502, data: {} });
   });
 
+  it("sends a string body as is with its contentType, and JSON by default", async () => {
+    const s = setup();
+    s.db.connections.length = 0;
+    await connectApp(s, "googledrive", `openid ${EMAIL} ${DRIVE}`);
+    const realFetch = s.google.fetch;
+    const sent: Array<{ type: string | null; body: unknown }> = [];
+    s.connector = new GoogleConnector({
+      clientId: "id",
+      clientSecret: CLIENT_SECRET,
+      identitySecret: IDENTITY,
+      redirectUri: REDIRECT,
+      prisma: s.db.prisma,
+      secrets: s.secrets,
+      fetch: (async (input: string | URL | Request, init?: RequestInit) => {
+        if (!String(input).startsWith("https://www.googleapis.com/")) return realFetch(input, init);
+        sent.push({ type: new Headers(init?.headers).get("content-type"), body: init?.body });
+        return Response.json({ id: "f1" });
+      }) as typeof fetch,
+    });
+    const upload = "https://www.googleapis.com/upload/drive/v3/files/f1?uploadType=media";
+    const call = (body: unknown, contentType?: string) =>
+      s.connector.proxy(
+        {
+          app: "googledrive",
+          accountRef: "sub-1",
+          method: "PATCH",
+          url: upload,
+          body,
+          ...(contentType ? { contentType } : {}),
+        },
+        context,
+      );
+    await call('line 1\n"quoted"', "text/plain");
+    await call("json text");
+    await call({ name: "n" });
+    expect(sent).toEqual([
+      { type: "text/plain", body: 'line 1\n"quoted"' },
+      { type: "application/json", body: '"json text"' },
+      { type: "application/json", body: '{"name":"n"}' },
+    ]);
+  });
+
   it("lists all three apps and flags the connected ones", async () => {
     const s = setup();
     s.db.connections.push(row("c2", "googledrive", "secret-2"));

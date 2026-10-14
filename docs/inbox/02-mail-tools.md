@@ -456,9 +456,3 @@ seeded row. This checks the dispatch wiring and the scope that comes from the ru
    PR 1 (both edit `schema.prisma`, `router.ts` and `apps/api/src/app.ts`) and rebases
    onto it, regenerating its migration so the folder timestamp sorts after item 4's. It adds no user-facing copy apart from the model
    guidance and the tool descriptions.
-
-## Calendar tools
-
-When the user has a connected native Google Calendar connection (connector `google`, provider `googlecalendar`) in the run's space, and the run is the bot owner's direct-thread run, the agent also gets `calendar_list_events` and `calendar_get_event` (read-only) and `calendar_create_event`, `calendar_update_event` and `calendar_delete_event`. The three writes are in `APPROVAL_REQUIRED_BUILTIN_TOOLS`, so each call is approved like `mail_send`.
-
-The handlers are in `packages/adapters/src/calendar-tools.ts` and call Calendar v3 through `GoogleApiClient`. `account` is matched against the connection's display name (the Google email). `calendar_create_event` derives the Google event id from the executor's effect key, so a replayed create gets a 409 and returns `alreadyCreated` instead of a second event. A create that fails after sending (timeout, dropped connection) returns an "outcome is unclear" error and is not retried. `sendUpdates` defaults to `none`. `packages/adapters/src/calendar-api-emulator.ts` is the offline fake.
