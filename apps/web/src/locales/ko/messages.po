@@ -481,10 +481,6 @@ msgstr ""
 msgid "Add another account"
 msgstr ""
 
-#: src/components/integrations/FinanceSection.tsx
-msgid "Add API key"
-msgstr ""
-
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Add connected model"
 msgstr "연결된 모델 추가"
@@ -697,7 +693,7 @@ msgid "API is back, but the update did not finish. Check the host logs."
 msgstr "API가 다시 작동하지만 업데이트가 완료되지 않았습니다. 호스트 로그를 확인하세요."
 
 #: src/components/AskCard.tsx
-#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/BlockscoutConnectDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/ModelSettingsOverlay.tsx
@@ -1095,6 +1091,7 @@ msgstr "서버에 연결할 수 없습니다."
 #: src/components/ComputerUpdateProgress.tsx
 #: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
@@ -1538,6 +1535,7 @@ msgstr "이 브라우저 세션에서 URL에 연결할 수 있는지 확인한 �
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -1578,6 +1576,7 @@ msgstr ""
 msgid "Connect API key"
 msgstr "API 키 연결"
 
+#: src/components/integrations/BlockscoutConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 msgid "Connect Blockscout"
 msgstr ""
@@ -2947,6 +2946,10 @@ msgstr "게이트웨이 ID"
 #: src/pages/SettingsOverlay.tsx
 msgid "General"
 msgstr "일반"
+
+#: src/components/integrations/BlockscoutConnectDialog.tsx
+msgid "Get an API key"
+msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Get credentials"
@@ -4904,7 +4907,7 @@ msgstr ""
 
 #: src/components/AskCard.tsx
 #: src/components/finance/WalletDialog.tsx
-#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/BlockscoutConnectDialog.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx

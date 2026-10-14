@@ -300,3 +300,62 @@ test("Finance Accounts lists wallets apart from cash and adds one from the menu"
   await expect(page.getByRole("dialog")).toContainText("Add wallet");
   await captureScreenshot(page, testInfo, "finance-accounts-add-wallet");
 });
+
+test("Blockscout tile: a keyless server is not connected, Connect opens the key modal", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await mockFinance(page, emptyOverview);
+  let keyed = false;
+  await page.route("**/rpc/finance/crypto", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        json: { ...cryptoData, connected: true, hasApiKey: keyed },
+        meta: [],
+      }),
+    }),
+  );
+  await page.route("**/rpc/finance/cryptoConnect", (route) => {
+    const body = route.request().postDataJSON() as { json?: { apiKey?: string } } | null;
+    if (body?.json?.apiKey !== "good-key") {
+      return route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          json: { defined: false, code: "BAD_REQUEST", status: 400, message: "Invalid API key" },
+        }),
+      });
+    }
+    keyed = true;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        json: { serverId: "11111111-1111-4111-8111-111111111111", hasApiKey: true },
+        meta: [],
+      }),
+    });
+  });
+  await signup(page, `finance-bs-${Date.now()}@rakazo.test`, "password12", "Finance Blockscout");
+  await completeOnboarding(page);
+  await page.goto("/app/integrations?category=finance");
+  const tile = page.getByTestId("finance-tile-crypto");
+  await expect(tile).toContainText("Not connected");
+  await captureScreenshot(page, testInfo, "blockscout-tile-not-connected");
+  await tile.getByRole("button", { name: "Connect Blockscout" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("link", { name: "Get an API key" })).toHaveAttribute(
+    "href",
+    "https://dev.blockscout.com",
+  );
+  await dialog.getByLabel("API key").fill("bad-key");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Invalid API key");
+  await captureScreenshot(page, testInfo, "blockscout-modal-error");
+  await dialog.getByLabel("API key").fill("good-key");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(tile).toContainText("Connected");
+  await expect(tile.getByRole("link", { name: "Open" })).toBeVisible();
+  await captureScreenshot(page, testInfo, "blockscout-tile-connected");
+});

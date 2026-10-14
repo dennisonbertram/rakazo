@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { FinanceProvider, FinanceSource } from "@rakazo/contracts";
-import { Button, Input } from "@rakazo/ui-web";
+import { Button } from "@rakazo/ui-web";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { connectFinanceProvider } from "../../lib/finance-connect";
@@ -9,42 +9,23 @@ import { FINANCE_PROVIDERS } from "../../lib/integrations";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { AppLogo } from "./AppLogo";
+import { BlockscoutConnectDialog } from "./BlockscoutConnectDialog";
 import { StatusBadge } from "./parts";
 
-/** Blockscout works without a key; an optional key raises the rate limit. It is never shown back. */
+/** Blockscout needs a PRO API key: a server without one does not count as connected. */
 function CryptoTile() {
   const { t } = useLingui();
-  const [state, setState] = useState<{ connected: boolean; hasApiKey: boolean } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [keyOpen, setKeyOpen] = useState(false);
-  const [apiKey, setApiKey] = useState("");
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [dialog, setDialog] = useState(false);
 
-  useEffect(() => {
-    let live = true;
+  const load = () =>
     rpc.finance
       .crypto()
-      .then((crypto) => live && setState(crypto))
-      .catch(() => live && setState({ connected: false, hasApiKey: false }));
-    return () => {
-      live = false;
-    };
+      .then((crypto) => setHasKey(crypto.connected && crypto.hasApiKey))
+      .catch(() => setHasKey(false));
+  useEffect(() => {
+    void load();
   }, []);
-
-  async function connect(key?: string) {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await rpc.finance.cryptoConnect(key ? { apiKey: key } : {});
-      setState({ connected: true, hasApiKey: result.hasApiKey });
-      setKeyOpen(false);
-      setApiKey("");
-    } catch (err) {
-      setError(errorText(err, t`Could not connect`));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div
@@ -61,17 +42,11 @@ function CryptoTile() {
         </div>
       </div>
       <div className="mt-auto flex items-center gap-2">
-        {state?.connected ? (
+        {hasKey ? (
           <>
             <StatusBadge status="connected" />
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ms-auto"
-              aria-expanded={keyOpen}
-              onClick={() => setKeyOpen((open) => !open)}
-            >
-              {state.hasApiKey ? <Trans>Replace API key</Trans> : <Trans>Add API key</Trans>}
+            <Button size="sm" variant="ghost" className="ms-auto" onClick={() => setDialog(true)}>
+              <Trans>Replace API key</Trans>
             </Button>
             <Link
               to={financePath.crypto()}
@@ -82,50 +57,24 @@ function CryptoTile() {
           </>
         ) : (
           <>
-            {busy ? (
-              <StatusBadge status="connecting" />
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                <Trans>Not connected</Trans>
-              </span>
-            )}
+            <span className="text-xs text-muted-foreground">
+              <Trans>Not connected</Trans>
+            </span>
             <Button
               size="sm"
               variant="outline"
               className="ms-auto"
-              disabled={busy || state === null}
+              disabled={hasKey === null}
               aria-label={t`Connect Blockscout`}
-              onClick={() => void connect()}
+              onClick={() => setDialog(true)}
             >
               <Trans>Connect</Trans>
             </Button>
           </>
         )}
       </div>
-      {keyOpen ? (
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void connect(apiKey.trim());
-          }}
-        >
-          <Input
-            type="password"
-            autoComplete="off"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            aria-label={t`API key`}
-          />
-          <Button type="submit" size="sm" disabled={busy || !apiKey.trim()}>
-            <Trans>Save</Trans>
-          </Button>
-        </form>
-      ) : null}
-      {error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
+      {dialog ? (
+        <BlockscoutConnectDialog onConnected={() => void load()} onClose={() => setDialog(false)} />
       ) : null}
     </div>
   );

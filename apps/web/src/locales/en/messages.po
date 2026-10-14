@@ -481,10 +481,6 @@ msgstr "Add account"
 msgid "Add another account"
 msgstr "Add another account"
 
-#: src/components/integrations/FinanceSection.tsx
-msgid "Add API key"
-msgstr "Add API key"
-
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Add connected model"
 msgstr "Add connected model"
@@ -697,7 +693,7 @@ msgid "API is back, but the update did not finish. Check the host logs."
 msgstr "API is back, but the update did not finish. Check the host logs."
 
 #: src/components/AskCard.tsx
-#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/BlockscoutConnectDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/ModelSettingsOverlay.tsx
@@ -1095,6 +1091,7 @@ msgstr "Can't reach the server."
 #: src/components/ComputerUpdateProgress.tsx
 #: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
@@ -1538,6 +1535,7 @@ msgstr "Confirm the URL is reachable from this browser session, then test again.
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -1578,6 +1576,7 @@ msgstr "Connect any app that offers an MCP server URL."
 msgid "Connect API key"
 msgstr "Connect API key"
 
+#: src/components/integrations/BlockscoutConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 msgid "Connect Blockscout"
 msgstr "Connect Blockscout"
@@ -2947,6 +2946,10 @@ msgstr "Gateway ID"
 #: src/pages/SettingsOverlay.tsx
 msgid "General"
 msgstr "General"
+
+#: src/components/integrations/BlockscoutConnectDialog.tsx
+msgid "Get an API key"
+msgstr "Get an API key"
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Get credentials"
@@ -4904,7 +4907,7 @@ msgstr "Sales & CRM"
 
 #: src/components/AskCard.tsx
 #: src/components/finance/WalletDialog.tsx
-#: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/BlockscoutConnectDialog.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx
