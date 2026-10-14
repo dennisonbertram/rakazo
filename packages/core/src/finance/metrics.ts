@@ -5,6 +5,7 @@ import type {
   BalancePoint,
   BreakdownMode,
   BreakdownRow,
+  CashPoint,
   CashSummary,
   ClassifyContext,
   DayRange,
@@ -262,15 +263,50 @@ export function spendTotals(
   };
 }
 
-function monthTotals(txns: FinanceTransaction[], months: Month[]) {
-  const points = new Map<Month, MonthlyPoint>(
-    months.map((month) => [
-      month,
-      { month, outCents: 0, revenueCents: 0, financingCents: 0, partial: false },
-    ]),
-  );
+export type CashGranularity = "day" | "week" | "month";
+
+/** Monday on or before `day`. */
+const weekStart = (day: Day): Day => addDays(day, -((dayNum(day) + 3) % 7)); // 1970-01-01 was a Thursday
+const lastDayOfMonth = (month: Month): Day => addDays(`${addMonths(month, 1)}-01`, -1);
+
+/**
+ * Out, revenue and financing per bucket for the last `buckets` days, Monday-start weeks or calendar
+ * months ending with the one that holds `now`, oldest first, zero-filled. The last bucket is `partial`.
+ * A bucket's `start` and `end` are inclusive UTC days. Classification and day rules match spendTotals.
+ */
+export function cashSeries(
+  txns: FinanceTransaction[],
+  opts: { granularity: CashGranularity; buckets: number; now: Date },
+): CashPoint[] {
+  const { granularity, buckets, now } = opts;
+  const today = dayOf(now.toISOString());
+  const startOf = (day: Day): Day =>
+    granularity === "day" ? day : granularity === "week" ? weekStart(day) : `${monthOf(day)}-01`;
+  const points = new Map<Day, CashPoint>();
+  for (let i = buckets - 1; i >= 0; i--) {
+    const start =
+      granularity === "day"
+        ? addDays(today, -i)
+        : granularity === "week"
+          ? addDays(weekStart(today), -7 * i)
+          : `${addMonths(monthOf(today), -i)}-01`;
+    const end =
+      granularity === "day"
+        ? start
+        : granularity === "week"
+          ? addDays(start, 6)
+          : lastDayOfMonth(monthOf(start));
+    points.set(start, {
+      start,
+      end,
+      outCents: 0,
+      revenueCents: 0,
+      financingCents: 0,
+      partial: i === 0,
+    });
+  }
   for (const t of txns) {
-    const point = points.get(monthOf(txnDay(t)));
+    const point = points.get(startOf(txnDay(t)));
     if (!point || !counts(t)) continue;
     if (t.classification === "spend") point.outCents -= t.amountCents;
     else if (t.classification === "revenue") point.revenueCents += t.amountCents;
@@ -279,19 +315,21 @@ function monthTotals(txns: FinanceTransaction[], months: Month[]) {
   return [...points.values()];
 }
 
+const monthTotals = (txns: FinanceTransaction[], count: number, now: Date) =>
+  cashSeries(txns, { granularity: "month", buckets: count, now }).map(
+    ({ start, end: _end, ...rest }) => ({ month: start.slice(0, 7), ...rest }),
+  );
+
 /** The last 12 calendar months ending with `now`'s, oldest first; the last is `partial`. */
 export function monthlySeries(txns: FinanceTransaction[], now: Date): MonthlyPoint[] {
-  const points = monthTotals(txns, lastMonths(now, 12));
-  const last = points[points.length - 1];
-  if (last) last.partial = true;
-  return points;
+  return monthTotals(txns, 12, now);
 }
 
 /** Average of (spend out - revenue) over the 3 full months before `now`'s month; financing and transfers excluded. */
 export function monthlyBurn(txns: FinanceTransaction[], now: Date): MonthlyBurn {
-  const months = lastMonths(now, 4).slice(0, 3);
-  const total = monthTotals(txns, months).reduce((sum, p) => sum + p.outCents - p.revenueCents, 0);
-  return { monthlyCents: Math.round(total / 3), months };
+  const months = monthTotals(txns, 4, now).slice(0, 3);
+  const total = months.reduce((sum, p) => sum + p.outCents - p.revenueCents, 0);
+  return { monthlyCents: Math.round(total / 3), months: months.map((p) => p.month) };
 }
 
 /** Months of cash left at the burn rate and the day it runs out; both null when `burnCents` <= 0. */

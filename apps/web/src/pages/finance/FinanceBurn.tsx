@@ -54,9 +54,13 @@ export function FinanceBurnPage() {
           </div>
           <Section title={<Trans>Burn</Trans>}>
             <BurnBars
-              series={data.series}
+              series={data.series.map(({ month, ...rest }) => ({
+                ...rest,
+                start: `${month}-01`,
+                end: `${month}-01`,
+              }))}
               label={t`Cash out and cash in by month`}
-              onOpenMonth={(month) => navigate(financePath.month(month))}
+              onOpen={(point) => navigate(financePath.month(point.start.slice(0, 7)))}
             />
             {data.series.at(-1)?.partial ? (
               <div className="text-[11px] text-muted-foreground">

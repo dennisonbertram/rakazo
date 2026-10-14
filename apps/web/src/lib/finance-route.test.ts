@@ -37,18 +37,37 @@ describe("parseFinanceRoute", () => {
       page: "spend",
       period: "quarter",
       category: "travel",
+      range: null,
     });
     expect(parseFinanceRoute("/app/finance/spend", "?period=decade")).toEqual({
       page: "spend",
       period: "month",
       category: null,
+      range: null,
     });
     const built = new URL(financePath.spend("week", "a b"), "http://localhost");
     expect(parseFinanceRoute(built.pathname, built.search)).toEqual({
       page: "spend",
       period: "week",
       category: "a b",
+      range: null,
     });
+  });
+
+  it("round-trips a from/to range and ignores a malformed or reversed one", () => {
+    const built = new URL(
+      financePath.spend("week", null, { from: "2026-10-06", to: "2026-10-12" }),
+      "http://localhost",
+    );
+    expect(parseFinanceRoute(built.pathname, built.search)).toMatchObject({
+      range: { from: "2026-10-06", to: "2026-10-12" },
+    });
+    expect(parseFinanceRoute("/app/finance/spend", "?from=2026-10-12&to=2026-10-06")).toMatchObject(
+      {
+        range: null,
+      },
+    );
+    expect(parseFinanceRoute("/app/finance/spend", "?from=x&to=y")).toMatchObject({ range: null });
   });
 
   it("rejects unknown pages, a malformed month and extra segments", () => {

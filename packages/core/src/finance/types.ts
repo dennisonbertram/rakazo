@@ -4,6 +4,7 @@ export type {
   BalancePoint,
   BreakdownMode,
   BreakdownRow,
+  CashPoint,
   CashSummary,
   FinanceAccount,
   FinanceAccountKind,

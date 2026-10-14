@@ -22,6 +22,7 @@ import {
 } from "../../components/finance/ui";
 import {
   changeText,
+  dayMonth,
   money,
   moneyExact,
   monthLabel,
@@ -29,21 +30,28 @@ import {
   paidWithLabel,
   shortDay,
 } from "../../lib/finance-format";
-import { financePath } from "../../lib/finance-route";
+import { financePath, type SpendRange } from "../../lib/finance-route";
 import { rpc } from "../../lib/rpc";
 import { ReceiptIcon } from "./FinanceTransaction";
 
 export function FinanceSpendPage({
   period,
   category,
+  range,
 }: {
   period: SpendPeriod;
   category: string | null;
+  range: SpendRange | null;
 }) {
   const navigate = useNavigate();
   const q = useFinanceQuery(
-    () => rpc.finance.spend({ period, ...(category ? { category } : {}) }),
-    [period, category],
+    () =>
+      rpc.finance.spend({
+        period,
+        ...(category ? { category } : {}),
+        ...(range ? { from: range.from, to: range.to } : {}),
+      }),
+    [period, category, range?.from, range?.to],
   );
   const data = q.data;
   return (
@@ -63,14 +71,25 @@ export function FinanceSpendPage({
                 onChange={(next) => navigate(financePath.spend(next, category))}
               />
               <span className="text-lg font-semibold tabular-nums">{money(data.totalCents)}</span>
+              {range ? (
+                <span className="text-xs text-muted-foreground">
+                  {range.from === range.to
+                    ? dayMonth(range.from)
+                    : `${dayMonth(range.from)} – ${dayMonth(range.to)}`}
+                </span>
+              ) : null}
             </div>
           </Section>
           <div className="flex flex-wrap gap-1">
-            <Chip to={financePath.spend(period)} on={!category}>
+            <Chip to={financePath.spend(period, null, range)} on={!category}>
               <Trans>All</Trans>
             </Chip>
             {data.categories.map((row) => (
-              <Chip key={row.key} to={financePath.spend(period, row.key)} on={row.key === category}>
+              <Chip
+                key={row.key}
+                to={financePath.spend(period, row.key, range)}
+                on={row.key === category}
+              >
                 {row.label}
               </Chip>
             ))}

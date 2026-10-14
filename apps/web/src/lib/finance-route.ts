@@ -1,6 +1,9 @@
 import type { SpendPeriod } from "@rakazo/contracts";
 import { SpendPeriodSchema } from "@rakazo/contracts";
 
+/** Inclusive days, from a chart bar. */
+export type SpendRange = { from: string; to: string };
+
 export type FinanceRoute =
   | { page: "dashboard" }
   | { page: "accounts" }
@@ -8,7 +11,7 @@ export type FinanceRoute =
   | { page: "burn" }
   | { page: "month"; month: string }
   | { page: "runway" }
-  | { page: "spend"; period: SpendPeriod; category: string | null }
+  | { page: "spend"; period: SpendPeriod; category: string | null; range: SpendRange | null }
   | { page: "category"; slug: string }
   | { page: "recurring"; key: string }
   | { page: "vendor"; key: string }
@@ -27,8 +30,10 @@ export const financePath = {
   burn: () => `${BASE}/burn`,
   month: (month: string) => `${BASE}/month/${enc(month)}`,
   runway: () => `${BASE}/runway`,
-  spend: (period: SpendPeriod = "month", category?: string | null) =>
-    `${BASE}/spend?period=${period}${category ? `&cat=${enc(category)}` : ""}`,
+  spend: (period: SpendPeriod = "month", category?: string | null, range?: SpendRange | null) =>
+    `${BASE}/spend?period=${period}${category ? `&cat=${enc(category)}` : ""}${
+      range ? `&from=${range.from}&to=${range.to}` : ""
+    }`,
   category: (slug: string) => `${BASE}/category/${enc(slug)}`,
   recurring: (key: string) => `${BASE}/recurring/${enc(key)}`,
   vendor: (key: string) => `${BASE}/vendor/${enc(key)}`,
@@ -37,6 +42,7 @@ export const financePath = {
 };
 
 const MONTH = /^\d{4}-\d{2}$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseFinanceRoute(pathname: string, search = ""): FinanceRoute {
   const rest = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : null;
@@ -56,10 +62,13 @@ export function parseFinanceRoute(pathname: string, search = ""): FinanceRoute {
     if (name === "spend") {
       const params = new URLSearchParams(search);
       const period = SpendPeriodSchema.safeParse(params.get("period"));
+      const from = params.get("from") ?? "";
+      const to = params.get("to") ?? "";
       return {
         page: "spend",
         period: period.success ? period.data : "month",
         category: params.get("cat") || null,
+        range: DAY.test(from) && DAY.test(to) && from <= to ? { from, to } : null,
       };
     }
     return { page: "not-found" };

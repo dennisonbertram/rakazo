@@ -44,6 +44,7 @@ import {
   balanceHistory,
   breakdown,
   cashHistory,
+  cashSeries,
   cashSummary,
   categorySlug,
   detectRecurring,
@@ -369,7 +370,12 @@ export async function financeOverview(
       quarter: spendTotals(txns, "quarter", now, since),
       year: spendTotals(txns, "year", now, since),
     },
-    monthlySeries: monthlySeries(txns, now),
+    cashSeries: {
+      week: cashSeries(txns, { granularity: "day", buckets: 7, now }),
+      month: cashSeries(txns, { granularity: "day", buckets: 30, now }),
+      quarter: cashSeries(txns, { granularity: "week", buckets: 13, now }),
+      year: cashSeries(txns, { granularity: "month", buckets: 12, now }),
+    },
     breakdown: {
       category: breakdown(txns, "category", range),
       vendor: breakdown(txns, "vendor", range),
@@ -554,20 +560,30 @@ export async function financeSpend(
 ): Promise<FinanceSpendOutput> {
   const txns = await loadTransactions(deps, actor);
   const totals = spendTotals(txns, input.period, nowOf(deps), earliestDay(txns));
-  const categories = breakdown(txns, "category", { start: totals.start, end: totals.end });
+  const customRange =
+    input.from !== undefined && input.to !== undefined && input.from <= input.to
+      ? { from: input.from, to: input.to }
+      : null;
+  // The range is inclusive of `to`; the helpers take a half-open end.
+  const start = customRange?.from ?? totals.start;
+  const end = customRange ? addDays(customRange.to, 1) : totals.end;
+  const categories = breakdown(txns, "category", { start, end });
   const category = input.category ?? null;
   return {
     period: input.period,
+    range: customRange,
     category,
     totalCents: category
       ? (categories.find((row) => row.key === category)?.cents ?? 0)
-      : totals.currentCents,
+      : customRange
+        ? categories.reduce((sum, row) => sum + row.cents, 0)
+        : totals.currentCents,
     categories,
     transactions: newest(
       txns.filter(
         (t) =>
           t.classification === "spend" &&
-          inRange(t, totals.start, totals.end) &&
+          inRange(t, start, end) &&
           (!category || categorySlug(t.category) === category),
       ),
       LIST_LIMIT,

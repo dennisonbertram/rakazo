@@ -1,4 +1,5 @@
 import type {
+  CashPoint,
   FinanceAccountOutput,
   FinanceOverview,
   FinanceTransaction,
@@ -23,6 +24,29 @@ const totals = (period: SpendTotals["period"], current: number, previous: number
 const out = [21800, 24400, 23100, 19700, 25600, 22900, 20700, 24800, 19600, 20900, 22500, 10100];
 const revenue = [0, 9000, 0, 7500, 0, 11500, 0, 6500, 0, 8800, 0, 0];
 const financing = [0, 0, 0, 0, 40000, 0, 0, 0, 0, 0, 0, 0];
+
+// Invented bar values for the Burn chart: the newest day is Wed 2026-10-14, the newest week starts Mon 2026-10-12.
+const DAY_MS = 86_400_000;
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const TODAY_MS = Date.UTC(2026, 9, 14);
+const point = (i: number, count: number, start: number, end: number): CashPoint => ({
+  start: isoDay(start),
+  end: isoDay(end),
+  outCents: (60 + ((i * 37) % 90)) * 10_000,
+  revenueCents: i % 4 === 1 ? 45 * 10_000 : 0,
+  financingCents: 0,
+  partial: i === count - 1,
+});
+const dailyPoints = (count: number): CashPoint[] =>
+  Array.from({ length: count }, (_, i) => {
+    const day = TODAY_MS - (count - 1 - i) * DAY_MS;
+    return point(i, count, day, day);
+  });
+const weeklyPoints = (count: number): CashPoint[] =>
+  Array.from({ length: count }, (_, i) => {
+    const start = Date.UTC(2026, 9, 12) - (count - 1 - i) * 7 * DAY_MS;
+    return point(i, count, start, start + 6 * DAY_MS);
+  });
 
 const brexCard = { provider: "brex", kind: "card", name: "Card", lastFour: "4321" } as const;
 const checking = {
@@ -96,16 +120,22 @@ export const connectedOverview: FinanceOverview = {
     quarter: totals("quarter", 5_340_000, 6_900_000),
     year: totals("year", 26_400_000, 24_900_000),
   },
-  monthlySeries: out.map((o, i) => {
-    const month = `${i < 2 ? 2025 : 2026}-${String(((10 + i) % 12) + 1).padStart(2, "0")}`;
-    return {
-      month,
-      outCents: o * 100,
-      revenueCents: revenue[i]! * 100,
-      financingCents: financing[i]! * 100,
-      partial: i === 11,
-    };
-  }),
+  cashSeries: {
+    week: dailyPoints(7),
+    month: dailyPoints(30),
+    quarter: weeklyPoints(13),
+    year: out.map((o, i) => {
+      const month = `${i < 2 ? 2025 : 2026}-${String(((10 + i) % 12) + 1).padStart(2, "0")}`;
+      return {
+        start: `${month}-01`,
+        end: `${month}-28`,
+        outCents: o * 100,
+        revenueCents: revenue[i]! * 100,
+        financingCents: financing[i]! * 100,
+        partial: i === 11,
+      };
+    }),
+  },
   breakdown: {
     category: [
       { key: "payroll", label: "Payroll", cents: 2_285_400 },
@@ -169,7 +199,7 @@ export const emptyOverview: FinanceOverview = {
     { provider: "mercury", serverId: null, status: "not_connected", lastSyncedAt: null },
     { provider: "brex", serverId: null, status: "not_connected", lastSyncedAt: null },
   ],
-  monthlySeries: [],
+  cashSeries: { week: [], month: [], quarter: [], year: [] },
   lastSyncedAt: null,
 };
 

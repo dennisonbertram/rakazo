@@ -3,6 +3,7 @@ import {
   balanceHistory,
   breakdown,
   cashHistory,
+  cashSeries,
   cashSummary,
   classify,
   detectRecurring,
@@ -798,5 +799,72 @@ describe("fixture sanity", () => {
   it("uses the same vendor and category helpers the sync does", () => {
     expect(vendorKey("Brex Inc.")).toBe(vendorKey("Brex"));
     expect(categorySlug("Credit & Loan Payments")).toBe("credit-loan-payments");
+  });
+});
+
+describe("cashSeries", () => {
+  // 2026-10-14 is a Wednesday.
+  const today = new Date("2026-10-14T15:00:00Z");
+  const txns = [
+    txn("2026-10-14", -100), // today, partial
+    txn("2026-10-14", 70, as("revenue")),
+    txn("2026-10-13", -200),
+    txn("2026-10-13", 5000, as("financing")),
+    txn("2026-10-13", -999, as("internal_transfer")),
+    txn("2026-10-12", -300), // Monday
+    txn("2026-10-11", -400), // Sunday: the previous week
+    txn("2026-10-08", -500),
+    txn("2026-10-07", -600), // outside 7 days
+    txn("2026-09-30", -700),
+  ];
+  it("buckets days, oldest first, zero-filled, with today partial", () => {
+    const days = cashSeries(txns, { granularity: "day", buckets: 7, now: today });
+    expect(days.map((d) => d.start)).toEqual([
+      "2026-10-08",
+      "2026-10-09",
+      "2026-10-10",
+      "2026-10-11",
+      "2026-10-12",
+      "2026-10-13",
+      "2026-10-14",
+    ]);
+    expect(days.map((d) => d.outCents)).toEqual([50000, 0, 0, 40000, 30000, 20000, 10000]);
+    expect(days[5]).toMatchObject({ financingCents: 500000, end: "2026-10-13" });
+    expect(days[6]).toMatchObject({ revenueCents: 7000, partial: true });
+    expect(days.filter((d) => d.partial)).toHaveLength(1);
+  });
+  it("starts weeks on Monday and keeps Sunday in the earlier week", () => {
+    const weeks = cashSeries(txns, { granularity: "week", buckets: 3, now: today });
+    expect(weeks.map((w) => [w.start, w.end])).toEqual([
+      ["2026-09-28", "2026-10-04"],
+      ["2026-10-05", "2026-10-11"],
+      ["2026-10-12", "2026-10-18"],
+    ]);
+    expect(weeks.map((w) => w.outCents)).toEqual([70000, 150000, 60000]);
+    expect(weeks[2]?.partial).toBe(true);
+  });
+  it("is on the same Monday for a Sunday and the next Monday", () => {
+    const sunday = cashSeries([], {
+      granularity: "week",
+      buckets: 1,
+      now: new Date("2026-10-18T23:59:00Z"),
+    });
+    const monday = cashSeries([], {
+      granularity: "week",
+      buckets: 1,
+      now: new Date("2026-10-19T00:00:00Z"),
+    });
+    expect(sunday[0]?.start).toBe("2026-10-12");
+    expect(monday[0]?.start).toBe("2026-10-19");
+  });
+  it("buckets calendar months and matches monthlySeries", () => {
+    const months = cashSeries(txns, { granularity: "month", buckets: 2, now: today });
+    expect(months.map((m) => [m.start, m.end])).toEqual([
+      ["2026-09-01", "2026-09-30"],
+      ["2026-10-01", "2026-10-31"],
+    ]);
+    expect(months.map((m) => m.outCents)).toEqual([70000, 210000]);
+    const series = monthlySeries(txns, today);
+    expect(series[11]).toMatchObject({ month: "2026-10", outCents: 210000, partial: true });
   });
 });

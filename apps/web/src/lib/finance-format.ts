@@ -41,6 +41,14 @@ export function shortDay(day: string, now = new Date(), locale?: string): string
   });
 }
 
+/** `Mon`. */
+export const weekdayShort = (day: string, locale?: string) =>
+  dayDate(day).toLocaleDateString(locale, { weekday: "short", timeZone: "UTC" });
+
+/** `Oct 6`, never with a year (chart axes). */
+export const dayMonth = (day: string, locale?: string) =>
+  dayDate(day).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: "UTC" });
+
 /** `Oct 16, 2026`. */
 export function fullDay(day: string, locale?: string): string {
   const date = dayDate(day);

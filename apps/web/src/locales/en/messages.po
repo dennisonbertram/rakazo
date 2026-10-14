@@ -299,10 +299,13 @@ msgstr "{yieldAmount} last month"
 msgid "@{0}"
 msgstr "@{0}"
 
-#: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "* Month to date"
 msgstr "* Month to date"
+
+#: src/pages/Finance.tsx
+msgid "* So far"
+msgstr "* So far"
 
 #: src/components/ComposeEmail.tsx
 msgid "+{more} more"
@@ -1106,10 +1109,13 @@ msgstr "Cash"
 msgid "Cash accounts"
 msgstr "Cash accounts"
 
-#: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Cash out and cash in by month"
 msgstr "Cash out and cash in by month"
+
+#: src/pages/Finance.tsx
+msgid "Cash out and cash in over time"
+msgstr "Cash out and cash in over time"
 
 #: src/components/FinanceCards.tsx
 #: src/pages/finance/FinanceBurn.tsx
@@ -2925,6 +2931,10 @@ msgstr "Header \"{header}\""
 msgid "Header name"
 msgstr "Header name"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Header value"
+msgstr "Header value"
+
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Hear a sample"
 msgstr "Hear a sample"
@@ -2976,6 +2986,10 @@ msgstr "How to check"
 #: src/pages/Shell.tsx
 msgid "I’m done"
 msgstr "I’m done"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "If you closed the sign-in window, try again."
+msgstr "If you closed the sign-in window, try again."
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "If you heard that, voice is ready."
@@ -4054,6 +4068,7 @@ msgstr "Opening chat…"
 msgid "Opening your Space…"
 msgstr "Opening your Space…"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -5149,10 +5164,6 @@ msgstr "Sign-in did not finish."
 msgid "Sign-in failed"
 msgstr "Sign-in failed"
 
-#: src/components/integrations/SignInStep.tsx
-msgid "Sign-in was cancelled"
-msgstr "Sign-in was cancelled"
-
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/useMcpReconnect.ts
 msgid "Sign-in was cancelled or did not finish. Try again."
@@ -5332,6 +5343,10 @@ msgstr "Stored securely. Never shown here."
 msgid "Stream replies"
 msgstr "Stream replies"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Streamable HTTP"
+msgstr "Streamable HTTP"
+
 #: src/pages/Shell.tsx
 msgid "subagent"
 msgstr "subagent"
@@ -5473,10 +5488,6 @@ msgstr "The provider is rate-limiting requests."
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "The selected memory provider is not available in this build."
 msgstr "The selected memory provider is not available in this build."
-
-#: src/components/integrations/SignInStep.tsx
-msgid "The sign-in window closed before finishing. Nothing was changed."
-msgstr "The sign-in window closed before finishing. Nothing was changed."
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "These saved settings can't be read. Remove it and add it again."
@@ -5646,6 +5657,10 @@ msgstr "Transactions"
 #: src/components/call/CallCard.tsx
 msgid "Transcript"
 msgstr "Transcript"
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Transport"
+msgstr "Transport"
 
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx

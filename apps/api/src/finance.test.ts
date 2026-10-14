@@ -16,6 +16,7 @@ const metrics = vi.hoisted(() => ({
   })),
   detectRecurring: vi.fn(() => []),
   monthlyBurn: vi.fn(() => ({ monthlyCents: 0, months: [] })),
+  cashSeries: vi.fn(() => []),
   monthlySeries: vi.fn(() => []),
   monthlySpend: vi.fn(() => []),
   projectCash: vi.fn(() => []),

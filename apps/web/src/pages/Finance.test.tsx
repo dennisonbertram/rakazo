@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 
-import type { FinanceOverview, FinanceTransactionOutput, SpendTotals } from "@rakazo/contracts";
+import type {
+  CashPoint,
+  FinanceOverview,
+  FinanceTransactionOutput,
+  SpendTotals,
+} from "@rakazo/contracts";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const text = vi.hoisted(
@@ -26,6 +31,8 @@ const rpcMock = vi.hoisted(() => ({
   overview: vi.fn(),
   refresh: vi.fn(),
   vendor: vi.fn(),
+  spend: vi.fn(),
+  month: vi.fn(),
   transaction: vi.fn(),
   receiptUrl: vi.fn(),
   connect: vi.fn(),
@@ -47,6 +54,34 @@ const totals = (period: SpendTotals["period"], current: number, previous: number
   previousStart: "2026-09-01",
   previousEnd: "2026-09-30",
 });
+
+/** `count` bars ending 2026-10-14 (a Wednesday), the last one partial; weeks start Monday. */
+const bars = (count: number, size: "day" | "week" | "month"): CashPoint[] =>
+  Array.from({ length: count }, (_, i) => {
+    const back = count - 1 - i;
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const at = (y: number, m: number, d: number) => new Date(Date.UTC(y, m, d));
+    const start =
+      size === "day"
+        ? at(2026, 9, 14 - back)
+        : size === "week"
+          ? at(2026, 9, 12 - 7 * back)
+          : at(2026, 9 - back, 1);
+    const end =
+      size === "day"
+        ? start
+        : size === "week"
+          ? at(2026, start.getUTCMonth(), start.getUTCDate() + 6)
+          : at(2026, start.getUTCMonth() + 1, 0);
+    return {
+      start: iso(start),
+      end: iso(end),
+      outCents: 10_000 * (i + 1),
+      revenueCents: 0,
+      financingCents: 0,
+      partial: i === count - 1,
+    };
+  });
 
 const connectedOverview = (over: Partial<FinanceOverview> = {}): FinanceOverview => ({
   sources: [
@@ -70,7 +105,12 @@ const connectedOverview = (over: Partial<FinanceOverview> = {}): FinanceOverview
     quarter: totals("quarter", 2_222_200, 9_000_000),
     year: totals("year", 7_777_700, 9_000_000),
   },
-  monthlySeries: [],
+  cashSeries: {
+    week: bars(7, "day"),
+    month: bars(30, "day"),
+    quarter: bars(13, "week"),
+    year: bars(12, "month"),
+  },
   breakdown: {
     category: [{ key: "software", label: "Software", cents: 120_000 }],
     vendor: [{ key: "acme-hosting", label: "Acme Hosting", cents: 90_000 }],
@@ -565,4 +605,68 @@ it("does not render a non-https vendor link", async () => {
 it("shows not found for an unknown Finance path", async () => {
   await show("/app/finance/nope");
   expect(container.querySelector("h1")?.textContent).toBe("Not found");
+});
+
+it("redraws the Burn chart for the selected period and opens the matching detail", async () => {
+  // jsdom has no layout, so give the chart a width.
+  const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+  rpcMock.spend.mockReturnValue(new Promise(() => {}));
+  rpcMock.month.mockReturnValue(new Promise(() => {}));
+  rpcMock.overview.mockResolvedValue(connectedOverview());
+  let where = "";
+  const Probe = () => {
+    const l = useLocation();
+    where = l.pathname + l.search;
+    return null;
+  };
+  const home = async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/app/finance"]} key={Math.random()}>
+          <Probe />
+          <FinancePage />
+        </MemoryRouter>,
+      );
+    });
+    await flush();
+  };
+  const tab = (name: string) =>
+    [...container.querySelectorAll('[role="tab"]')].find((n) => n.textContent === name);
+  const labels = () =>
+    [...container.querySelectorAll('svg[aria-label^="Cash out"] text')].map((n) => n.textContent);
+  const barLinks = () => [
+    ...container.querySelectorAll('svg[aria-label^="Cash out"] [role="link"]'),
+  ];
+  const clickBar = (i: number) =>
+    act(async () =>
+      (barLinks()[i] as SVGElement).dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+
+  // Month is the default: 30 daily bars labelled with day numbers.
+  await home();
+  expect(barLinks().length).toBe(30);
+  expect(labels().at(-1)).toBe("14*");
+  expect(container.textContent).toContain("* So far");
+  await clickBar(29);
+  expect(where).toBe("/app/finance/spend?period=month&from=2026-10-14&to=2026-10-14");
+
+  await home();
+  await act(async () => (tab("Week") as HTMLElement).click());
+  expect(barLinks().length).toBe(7);
+  expect(labels()).toContain("Mon");
+  expect(labels().at(-1)).toBe("Wed*");
+
+  await act(async () => (tab("Quarter") as HTMLElement).click());
+  expect(barLinks().length).toBe(13);
+  expect(labels()).toContain("Oct 12*");
+  await clickBar(11);
+  expect(where).toBe("/app/finance/spend?period=quarter&from=2026-10-05&to=2026-10-11");
+
+  await home();
+  await act(async () => (tab("Year") as HTMLElement).click());
+  expect(barLinks().length).toBe(12);
+  expect(labels()).toContain("Oct*");
+  await clickBar(11);
+  expect(where).toBe("/app/finance/month/2026-10");
+  width.mockRestore();
 });

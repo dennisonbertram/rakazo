@@ -299,9 +299,12 @@ msgstr ""
 msgid "@{0}"
 msgstr "@{0}"
 
-#: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "* Month to date"
+msgstr ""
+
+#: src/pages/Finance.tsx
+msgid "* So far"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
@@ -1106,9 +1109,12 @@ msgstr ""
 msgid "Cash accounts"
 msgstr ""
 
-#: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Cash out and cash in by month"
+msgstr ""
+
+#: src/pages/Finance.tsx
+msgid "Cash out and cash in over time"
 msgstr ""
 
 #: src/components/FinanceCards.tsx
@@ -2925,6 +2931,10 @@ msgstr ""
 msgid "Header name"
 msgstr "Название заголовка"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Header value"
+msgstr ""
+
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Hear a sample"
 msgstr "Прослушать образец"
@@ -2976,6 +2986,10 @@ msgstr "Как проверить"
 #: src/pages/Shell.tsx
 msgid "I’m done"
 msgstr "Готово"
+
+#: src/components/integrations/SignInStep.tsx
+msgid "If you closed the sign-in window, try again."
+msgstr ""
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "If you heard that, voice is ready."
@@ -4054,6 +4068,7 @@ msgstr ""
 msgid "Opening your Space…"
 msgstr "Открытие вашего пространства…"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/VoiceSettingsOverlay.tsx
@@ -5149,10 +5164,6 @@ msgstr ""
 msgid "Sign-in failed"
 msgstr ""
 
-#: src/components/integrations/SignInStep.tsx
-msgid "Sign-in was cancelled"
-msgstr ""
-
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/useMcpReconnect.ts
 msgid "Sign-in was cancelled or did not finish. Try again."
@@ -5332,6 +5343,10 @@ msgstr "Хранится безопасно. Здесь не отображае�
 msgid "Stream replies"
 msgstr "Потоковые ответы"
 
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Streamable HTTP"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "subagent"
 msgstr "субагент"
@@ -5473,10 +5488,6 @@ msgstr "Поставщик ограничивает частоту запрос�
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "The selected memory provider is not available in this build."
 msgstr "Выбранный поставщик памяти недоступен в этой сборке."
-
-#: src/components/integrations/SignInStep.tsx
-msgid "The sign-in window closed before finishing. Nothing was changed."
-msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "These saved settings can't be read. Remove it and add it again."
@@ -5646,6 +5657,10 @@ msgstr ""
 #: src/components/call/CallCard.tsx
 msgid "Transcript"
 msgstr "Расшифровка"
+
+#: src/components/integrations/CustomConnectionDialog.tsx
+msgid "Transport"
+msgstr ""
 
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx

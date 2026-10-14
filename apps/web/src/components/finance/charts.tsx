@@ -1,6 +1,6 @@
-import type { MonthlyPoint } from "@rakazo/contracts";
+import type { CashPoint } from "@rakazo/contracts";
 import { useEffect, useId, useRef, useState } from "react";
-import { axisMoney, money, monthShort } from "../../lib/finance-format";
+import { axisMoney, dayMonth, money, monthShort, weekdayShort } from "../../lib/finance-format";
 
 /** Gridline step and top value (in cents) so about three to four lines cover `max`. */
 export function niceScale(max: number): { step: number; top: number } {
@@ -246,16 +246,27 @@ const keyActivate = (action: () => void) => (event: React.KeyboardEvent) => {
   }
 };
 
-/** Out, revenue and financing for each month; each month opens its detail page. */
+export type BarGranularity = "day" | "week" | "month";
+
+/** Axis label: a weekday for a week of days, the day number for more days, `Oct 6` for weeks, `Oct` for months. */
+function barLabel(point: CashPoint, granularity: BarGranularity, count: number): string {
+  if (granularity === "month") return monthShort(point.start.slice(0, 7));
+  if (granularity === "week") return dayMonth(point.start);
+  return count <= 7 ? weekdayShort(point.start) : String(Number(point.start.slice(8, 10)));
+}
+
+/** Out, revenue and financing for each bucket; each bucket opens its detail. */
 export function BurnBars({
   series,
+  granularity = "month",
   height = 230,
-  onOpenMonth,
+  onOpen,
   label,
 }: {
-  series: MonthlyPoint[];
+  series: CashPoint[];
+  granularity?: BarGranularity;
   height?: number;
-  onOpenMonth: (month: string) => void;
+  onOpen: (point: CashPoint) => void;
   label: string;
 }) {
   const hatch = useId();
@@ -273,6 +284,8 @@ export function BurnBars({
         const scale = niceScale(max);
         const slot = (width - left - right) / Math.max(series.length, 1);
         const bw = Math.min(17, slot * 0.28);
+        // Skip labels that would collide, counting back from the newest bar.
+        const labelEvery = Math.max(1, Math.ceil(36 / slot));
         const y = (v: number) => top + (height - top - bottom) * (1 - v / scale.top);
         const bar = (v: number) => Math.max(height - bottom - y(v), 0);
         return (
@@ -302,17 +315,18 @@ export function BurnBars({
               const c = left + slot * (i + 0.5);
               const two = m.revenueCents > 0 || m.financingCents > 0;
               const outX = two ? c - bw - 1 : c - bw / 2;
-              const name = monthShort(m.month);
+              const name = barLabel(m, granularity, series.length);
+              const showLabel = (series.length - 1 - i) % labelEvery === 0;
               return (
                 // biome-ignore lint/a11y/useSemanticElements: an SVG group cannot be an <a> that the router can drive
                 <g
-                  key={m.month}
+                  key={m.start}
                   role="link"
                   tabIndex={0}
-                  aria-label={`${name}: ${money(m.outCents)}`}
+                  aria-label={`${granularity === "month" ? name : dayMonth(m.start)}: ${money(m.outCents)}`}
                   className="group cursor-pointer outline-none"
-                  onClick={() => onOpenMonth(m.month)}
-                  onKeyDown={keyActivate(() => onOpenMonth(m.month))}
+                  onClick={() => onOpen(m)}
+                  onKeyDown={keyActivate(() => onOpen(m))}
                 >
                   <rect
                     x={left + slot * i}
@@ -353,17 +367,19 @@ export function BurnBars({
                       strokeWidth={1}
                     />
                   ) : null}
-                  <text
-                    x={c}
-                    y={height - 8}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    fontSize={10}
-                    fontWeight={m.partial ? 700 : 400}
-                  >
-                    {name}
-                    {m.partial ? "*" : ""}
-                  </text>
+                  {showLabel ? (
+                    <text
+                      x={c}
+                      y={height - 8}
+                      textAnchor="middle"
+                      className="fill-muted-foreground"
+                      fontSize={10}
+                      fontWeight={m.partial ? 700 : 400}
+                    >
+                      {name}
+                      {m.partial ? "*" : ""}
+                    </text>
+                  ) : null}
                 </g>
               );
             })}

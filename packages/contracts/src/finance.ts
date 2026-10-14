@@ -194,6 +194,19 @@ export const MonthlyPointSchema = z.object({
   partial: z.boolean(),
 });
 
+/** One chart bucket: a day, a Monday-start week or a calendar month. */
+export const CashPointSchema = z.object({
+  /** First day of the bucket. */
+  start: DayId,
+  /** Last day of the bucket, inclusive. */
+  end: DayId,
+  outCents: Cents,
+  revenueCents: Cents,
+  financingCents: Cents,
+  /** The bucket that holds today, counted so far. */
+  partial: z.boolean(),
+});
+
 export const MonthlyBurnSchema = z.object({
   /** Average of (cash out - revenue) over the last 3 full months; zero or negative when not burning. */
   monthlyCents: Cents,
@@ -306,8 +319,16 @@ export const FinanceOverviewSchema = z.object({
     quarter: SpendTotalsSchema,
     year: SpendTotalsSchema,
   }),
-  /** 12 months, oldest first, the last one partial. */
-  monthlySeries: z.array(MonthlyPointSchema),
+  /**
+   * Burn chart buckets per period, oldest first, the last one partial: week = 7 days, month = 30
+   * days, quarter = 13 weeks, year = 12 months.
+   */
+  cashSeries: z.object({
+    week: z.array(CashPointSchema),
+    month: z.array(CashPointSchema),
+    quarter: z.array(CashPointSchema),
+    year: z.array(CashPointSchema),
+  }),
   /** Last 90 days, largest first. */
   breakdown: z.object({
     category: z.array(BreakdownRowSchema),
@@ -403,10 +424,15 @@ export const FinanceSpendInputSchema = z.object({
   period: SpendPeriodSchema,
   /** A category slug to filter by. */
   category: z.string().min(1).max(200).optional(),
+  /** Inclusive days; with both, they replace the period's range (a chart bar's days). */
+  from: DayId.optional(),
+  to: DayId.optional(),
 });
 
 export const FinanceSpendOutputSchema = z.object({
   period: SpendPeriodSchema,
+  /** The inclusive days counted when the input had a from/to range; otherwise null. */
+  range: z.object({ from: DayId, to: DayId }).nullable(),
   category: z.string().nullable(),
   totalCents: Cents,
   /** Category chips: the categories that have spend in the period, largest first. */
@@ -475,6 +501,7 @@ export type FinanceBill = z.infer<typeof FinanceBillSchema>;
 export type SpendPeriod = z.infer<typeof SpendPeriodSchema>;
 export type CashSummary = z.infer<typeof CashSummarySchema>;
 export type SpendTotals = z.infer<typeof SpendTotalsSchema>;
+export type CashPoint = z.infer<typeof CashPointSchema>;
 export type MonthlyPoint = z.infer<typeof MonthlyPointSchema>;
 export type MonthlyBurn = z.infer<typeof MonthlyBurnSchema>;
 export type Runway = z.infer<typeof RunwaySchema>;

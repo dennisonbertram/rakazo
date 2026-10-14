@@ -11,7 +11,7 @@ import { Button, Skeleton } from "@rakazo/ui-web";
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BurnBars, Sparkline } from "../components/finance/charts";
+import { type BarGranularity, BurnBars, Sparkline } from "../components/finance/charts";
 import {
   AskAgentButton,
   BreakdownRows,
@@ -53,6 +53,13 @@ const CONNECT_PATH = "/app/integrations?category=finance";
 /** The most rows a Breakdown or Upcoming card shows before "Show all". */
 const MAX_ROWS = 7;
 const MIN_ROWS = 5;
+/** The Burn chart's bucket size for each period. */
+const BAR_GRANULARITY: Record<SpendPeriod, BarGranularity> = {
+  week: "day",
+  month: "day",
+  quarter: "week",
+  year: "month",
+};
 
 /** The Finance area: the dashboard at /app/finance and its detail pages. */
 export function FinancePage({ onAskAgent }: { onAskAgent?: () => void }) {
@@ -74,7 +81,7 @@ export function FinancePage({ onAskAgent }: { onAskAgent?: () => void }) {
         ) : route.page === "runway" ? (
           <FinanceRunwayPage />
         ) : route.page === "spend" ? (
-          <FinanceSpendPage period={route.period} category={route.category} />
+          <FinanceSpendPage period={route.period} category={route.category} range={route.range} />
         ) : route.page === "category" ? (
           <FinanceCategoryPage slug={route.slug} />
         ) : route.page === "recurring" ? (
@@ -225,7 +232,8 @@ function Overview({
   const runOutMonth = data.runway.runOutDate ? monthFull(data.runway.runOutDate.slice(0, 7)) : "";
   const previousSpend = month.previousCents === null ? null : money(month.previousCents);
   const previousPeriod = periodNames()[period].toLowerCase();
-  const lastPartial = data.monthlySeries.at(-1)?.partial ?? false;
+  const bars = data.cashSeries[period];
+  const barGranularity = BAR_GRANULARITY[period];
   const subs = data.subscriptions;
   const monthlyTotal = money(subs.totalMonthlyCents);
   const yieldAmount = data.treasuryYieldLastMonth
@@ -373,13 +381,20 @@ function Overview({
             }
           >
             <BurnBars
-              series={data.monthlySeries}
-              label={t`Cash out and cash in by month`}
-              onOpenMonth={(m) => navigate(financePath.month(m))}
+              series={bars}
+              granularity={barGranularity}
+              label={t`Cash out and cash in over time`}
+              onOpen={(p) =>
+                navigate(
+                  barGranularity === "month"
+                    ? financePath.month(p.start.slice(0, 7))
+                    : financePath.spend(period, null, { from: p.start, to: p.end }),
+                )
+              }
             />
-            {lastPartial ? (
+            {bars.at(-1)?.partial ? (
               <div className="text-[11px] text-muted-foreground">
-                <Trans>* Month to date</Trans>
+                <Trans>* So far</Trans>
               </div>
             ) : null}
           </Section>
