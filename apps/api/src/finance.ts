@@ -370,7 +370,12 @@ export async function financeOverview(
     });
   }
 
-  const cash = cashSummary(accounts);
+  const stablecoinCents = crypto?.stablecoinCents ?? 0;
+  const cash = {
+    ...cashSummary(accounts, stablecoinCents),
+    // Priced crypto that is not a stablecoin: shown in the Cash card's total only.
+    otherCryptoCents: (crypto?.totalCents ?? 0) - stablecoinCents,
+  };
   const hasCashAccounts = accounts.some((a) => a.kind !== "card");
   const burn = monthlyBurn(txns, now);
   const since = earliestDay(txns);
@@ -387,6 +392,9 @@ export async function financeOverview(
     // No cash account (for example Brex only) means no runway, not a runway of zero.
     runway: hasCashAccounts
       ? runway(cash.cashCents, burn.monthlyCents, now)
+      : { months: null, runOutDate: null },
+    bankRunway: hasCashAccounts
+      ? runway(cash.cashCents - stablecoinCents, burn.monthlyCents, now)
       : { months: null, runOutDate: null },
     spendTotals: {
       week: spendTotals(txns, "week", now, since),
@@ -421,7 +429,7 @@ export async function financeOverview(
         : null,
     lastSyncedAt,
     excludedNonUsdCount: excludedNonUsdCount(txns),
-    // Its own card; never part of cash, burn or runway.
+    // Its own card. Only its stablecoins are inside cash and runway.
     crypto,
   };
 }
@@ -449,13 +457,14 @@ export async function financeAccounts(
   actor: Actor,
 ): Promise<FinanceAccountsOutput> {
   const now = nowOf(deps);
-  const [accounts, txns, yieldRows] = await Promise.all([
+  const [accounts, txns, yieldRows, crypto] = await Promise.all([
     loadAccounts(deps, actor),
     loadTransactions(deps, actor),
     deps.prisma.financeTreasuryYield.findMany({ where: scopeOf(actor) }),
+    loadCryptoSummary(deps, actor),
   ]);
   const yields = yieldRows.map(toYield);
-  const summary = cashSummary(accounts);
+  const summary = cashSummary(accounts, crypto?.stablecoinCents ?? 0);
   const row = (account: FinanceAccount) => ({
     ...account,
     annualYieldPct: annualYieldPct(account, yields, now),
@@ -564,11 +573,12 @@ export async function financeMonth(
 
 export async function financeRunway(deps: FinanceDeps, actor: Actor): Promise<FinanceRunwayOutput> {
   const now = nowOf(deps);
-  const [accounts, txns] = await Promise.all([
+  const [accounts, txns, crypto] = await Promise.all([
     loadAccounts(deps, actor),
     loadTransactions(deps, actor),
+    loadCryptoSummary(deps, actor),
   ]);
-  const { cashCents } = cashSummary(accounts);
+  const { cashCents } = cashSummary(accounts, crypto?.stablecoinCents ?? 0);
   const { monthlyCents } = monthlyBurn(txns, now);
   return {
     cashCents,

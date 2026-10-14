@@ -7,7 +7,18 @@ import type {
   SpendPeriod,
 } from "@rakazo/contracts";
 import { SpendPeriodSchema } from "@rakazo/contracts";
-import { Button, Card, cn, Skeleton, Tabs, TabsList, TabsTrigger } from "@rakazo/ui-web";
+import {
+  Button,
+  Card,
+  cn,
+  Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@rakazo/ui-web";
 import { ChevronRight, MessageSquare } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -194,17 +205,19 @@ export function Section({
   );
 }
 
-/** A figure card. With `to` the whole card opens that page. */
+/** A figure card. With `to` the whole card opens that page; with `hover` the card also shows those rows on hover or keyboard focus. */
 export function Kpi({
   title,
   value,
   sub,
   to,
+  hover,
 }: {
   title: ReactNode;
   value: ReactNode;
   sub?: ReactNode;
   to?: string;
+  hover?: ReactNode;
 }) {
   const body = (
     <>
@@ -214,14 +227,20 @@ export function Kpi({
     </>
   );
   const cls = "block px-3.5";
-  return to ? (
-    <Link
-      to={to}
-      className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-    >
-      <Card size="sm" className={cn(cls, "h-full hover:ring-foreground/30")}>
-        {body}
-      </Card>
+  const linkClass = "rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-foreground";
+  const card = (
+    <Card size="sm" className={cn(cls, "h-full hover:ring-foreground/30")}>
+      {body}
+    </Card>
+  );
+  return to && hover ? (
+    <Tooltip>
+      <TooltipTrigger render={<Link to={to} className={linkClass} />}>{card}</TooltipTrigger>
+      <TooltipContent className="flex-col items-stretch gap-0.5">{hover}</TooltipContent>
+    </Tooltip>
+  ) : to ? (
+    <Link to={to} className={linkClass}>
+      {card}
     </Link>
   ) : (
     <Card size="sm" className={cls}>

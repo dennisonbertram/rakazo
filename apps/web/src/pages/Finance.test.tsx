@@ -722,3 +722,71 @@ it("links a crypto-only user from the empty state to Accounts", async () => {
   await flush();
   expect(container.querySelector('a[href="/app/finance/accounts"]')?.textContent).toBe("Accounts");
 });
+
+const cryptoWith = (stablecoinCents: number, totalCents: number) => ({
+  totalCents,
+  stablecoinCents,
+  byChain: [],
+  byWallet: [],
+  lastSyncedAt: null,
+  unpricedTokenCount: 0,
+});
+const withStablecoins = () =>
+  connectedOverview({
+    cash: {
+      ...connectedOverview().cash,
+      cashCents: 125_000_00,
+      bankCashCents: 100_000_00,
+      stablecoinCents: 25_000_00,
+      otherCryptoCents: 40_000_00,
+    },
+    runway: { months: 12.5, runOutDate: "2027-10-30" },
+    bankRunway: { months: 10, runOutDate: "2027-08-12" },
+    crypto: cryptoWith(25_000_00, 65_000_00),
+  });
+const kpi = (title: string) =>
+  [...container.querySelectorAll("a")].find((a) => a.querySelector("h2")?.textContent === title) as
+    | HTMLElement
+    | undefined;
+const hoverOver = async (title: string) => {
+  const link = kpi(title) as HTMLElement;
+  await act(async () => {
+    link.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    link.dispatchEvent(new MouseEvent("mouseenter"));
+    link.focus();
+  });
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+  return document.body.querySelector('[data-slot="tooltip-content"]')?.textContent ?? "";
+};
+
+it("counts stablecoins in Cash and Runway, and the hovers show the figures without crypto", async () => {
+  rpcMock.overview.mockResolvedValue(withStablecoins());
+  await show("/app/finance");
+  await flush();
+  const cash = kpi("Cash");
+  expect(cash?.textContent).toContain("$125,000");
+  expect(cash?.textContent).toContain("Checking + Treasury + Stablecoins");
+  const cashTip = await hoverOver("Cash");
+  expect(cashTip).toContain("Bank$100,000");
+  expect(cashTip).toContain("Stablecoins$25,000");
+  expect(cashTip).toContain("Other crypto$40,000");
+  expect(cashTip).toContain("Total incl. crypto$165,000");
+});
+
+it("shows bank-only runway in the Runway hover", async () => {
+  rpcMock.overview.mockResolvedValue(withStablecoins());
+  await show("/app/finance");
+  await flush();
+  expect(kpi("Runway")?.textContent).toContain("12.5 mo");
+  expect(await hoverOver("Runway")).toContain("Bank only: 10.0 mo");
+});
+
+it("keeps the plain Cash subtitle and no runway hover without stablecoins", async () => {
+  rpcMock.overview.mockResolvedValue(connectedOverview({ crypto: cryptoWith(0, 5_000_00) }));
+  await show("/app/finance");
+  await flush();
+  const cash = kpi("Cash");
+  expect(cash?.textContent).toContain("Checking + Treasury");
+  expect(cash?.textContent).not.toContain("Stablecoins");
+  expect(await hoverOver("Runway")).toBe("");
+});

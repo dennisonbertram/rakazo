@@ -167,6 +167,18 @@ describe("classify", () => {
   });
 });
 
+describe("cashSummary with stablecoins", () => {
+  it("adds stablecoins to cash and keeps the bank figure apart", () => {
+    const s = cashSummary([account({ kind: "checking", balanceCents: 1000 })], 250);
+    expect(s).toMatchObject({ cashCents: 1250, bankCashCents: 1000, stablecoinCents: 250 });
+  });
+  it("runway on cash with stablecoins is longer than on bank cash alone", () => {
+    const now = new Date("2026-10-14T00:00:00Z");
+    expect(runway(1250, 100, now).months).toBe(12.5);
+    expect(runway(1000, 100, now).months).toBe(10);
+  });
+});
+
 describe("cashSummary", () => {
   it("adds checking, savings and Treasury, and keeps card balance owed apart", () => {
     const s = cashSummary([
@@ -178,6 +190,8 @@ describe("cashSummary", () => {
     ]);
     expect(s).toEqual({
       cashCents: 1170,
+      bankCashCents: 1170,
+      stablecoinCents: 0,
       checkingCents: 150,
       savingsCents: 20,
       treasuryCents: 1000,

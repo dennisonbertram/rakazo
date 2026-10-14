@@ -178,15 +178,21 @@ export const excludedNonUsdCount = (txns: FinanceTransaction[]): number =>
 
 // ---- Cash ----
 
-/** Cash = checking + savings + Treasury. A `card` account's balance owed is reported apart and never cash. */
-export function cashSummary(accounts: FinanceAccount[]): CashSummary {
+/**
+ * Cash = checking + savings + Treasury + `stablecoinCents` (priced canonical stablecoins).
+ * A `card` account's balance owed is reported apart and never cash.
+ */
+export function cashSummary(accounts: FinanceAccount[], stablecoinCents = 0): CashSummary {
   const sum = (kind: FinanceAccount["kind"]) =>
     accounts.filter((a) => a.kind === kind).reduce((total, a) => total + a.balanceCents, 0);
   const checkingCents = sum("checking");
   const savingsCents = sum("savings");
   const treasuryCents = sum("treasury");
+  const bankCashCents = checkingCents + savingsCents + treasuryCents;
   return {
-    cashCents: checkingCents + savingsCents + treasuryCents,
+    cashCents: bankCashCents + stablecoinCents,
+    bankCashCents,
+    stablecoinCents,
     checkingCents,
     savingsCents,
     treasuryCents,

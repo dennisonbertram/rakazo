@@ -449,6 +449,41 @@ describe("finance_overview", () => {
   });
 });
 
+describe("finance_overview stablecoins", () => {
+  it("counts a canonical USDC as cash and reports bank-only and other-crypto figures", async () => {
+    const canonical = holding("w-1", MINE, {
+      symbol: "USDC",
+      tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      decimals: 6,
+      rawBalance: "5000000",
+      usdValueCents: 500n,
+    });
+    holdings.push(canonical);
+    try {
+      const { deps } = setup();
+      const result = (await financeToolFromTool("finance_overview", deps, {})) as {
+        cash: {
+          total: number;
+          bankOnly: number;
+          stablecoins: number;
+          otherCrypto: number;
+          totalInclOtherCrypto: number;
+        };
+      };
+      // The Base "USDC" at a made-up address is not a stablecoin; ETH is other crypto.
+      expect(result.cash).toMatchObject({
+        total: 10_005,
+        bankOnly: 10_000,
+        stablecoins: 5,
+        otherCrypto: 3_002.5,
+        totalInclOtherCrypto: 13_007.5,
+      });
+    } finally {
+      holdings.pop();
+    }
+  });
+});
+
 describe("finance_recurring", () => {
   it("lists subscriptions with monthly cost and what is coming", async () => {
     const { deps, published } = setup();

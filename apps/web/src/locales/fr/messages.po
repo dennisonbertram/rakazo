@@ -932,6 +932,14 @@ msgstr ""
 msgid "Balance owed"
 msgstr ""
 
+#: src/pages/Finance.tsx
+msgid "Bank"
+msgstr ""
+
+#: src/pages/Finance.tsx
+msgid "Bank only: {bankRunwayMonths} mo"
+msgstr ""
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Base URL"
 msgstr "URL de base"
@@ -1273,6 +1281,10 @@ msgstr ""
 
 #: src/pages/Finance.tsx
 msgid "Checking + Treasury"
+msgstr ""
+
+#: src/pages/Finance.tsx
+msgid "Checking + Treasury + Stablecoins"
 msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
@@ -4208,6 +4220,10 @@ msgstr ""
 msgid "Other connection types"
 msgstr ""
 
+#: src/pages/Finance.tsx
+msgid "Other crypto"
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Other model…"
@@ -5397,6 +5413,10 @@ msgstr ""
 msgid "SSO is temporarily unavailable. Try again."
 msgstr "SSO est temporairement indisponible. Réessayez."
 
+#: src/pages/Finance.tsx
+msgid "Stablecoins"
+msgstr ""
+
 #: src/pages/Inbox.tsx
 msgid "Starred"
 msgstr ""
@@ -5770,6 +5790,10 @@ msgstr ""
 
 #: src/pages/finance/FinanceAccounts.tsx
 msgid "Total cash"
+msgstr ""
+
+#: src/pages/Finance.tsx
+msgid "Total incl. crypto"
 msgstr ""
 
 #: src/pages/finance/FinanceAccounts.tsx

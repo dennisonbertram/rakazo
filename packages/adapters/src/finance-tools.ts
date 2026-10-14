@@ -311,17 +311,22 @@ async function financeOverview(deps: FinanceToolDeps) {
   const now = nowOf(deps);
   // The metrics reach back to the start of last year (year-over-year spend) at most.
   const windowStart = `${Number(dayOf(now).slice(0, 4)) - 1}-01-01`;
-  const [accounts, txns, since, states] = await Promise.all([
+  const [accounts, txns, since, states, holdingRows] = await Promise.all([
     loadAccounts(deps),
     loadTxns(deps, windowStart),
     earliestTxnDay(deps),
     deps.prisma.financeSyncState.findMany({
       where: { spaceId: deps.scope.spaceId, userId: deps.scope.userId },
     }),
+    deps.prisma.financeCryptoHolding.findMany({ where: scopeWhere(deps) }),
   ]);
-  const cash = cashSummary(accounts);
+  const crypto = summarizeCrypto(holdingRows.map(toHolding));
+  const stablecoinCents = crypto.stablecoinCents ?? 0;
+  const cash = cashSummary(accounts, stablecoinCents);
+  const otherCryptoCents = crypto.totalCents - stablecoinCents;
   const burn = monthlyBurn(txns, now);
   const rw = runway(cash.cashCents, burn.monthlyCents, now);
+  const bankRunway = runway(cash.bankCashCents ?? 0, burn.monthlyCents, now);
   const totals = (["week", "month", "quarter", "year"] as const).map((period) => {
     const t = spendTotals(txns, period, now, since);
     return {
@@ -355,10 +360,16 @@ async function financeOverview(deps: FinanceToolDeps) {
       savings: dollars(cash.savingsCents),
       treasury: dollars(cash.treasuryCents),
       cardOwed: cash.cardOwedCents === null ? null : dollars(cash.cardOwedCents),
+      bankOnly: dollars(cash.bankCashCents ?? 0),
+      stablecoins: dollars(stablecoinCents),
+      otherCrypto: dollars(otherCryptoCents),
+      totalInclOtherCrypto: dollars(cash.cashCents + otherCryptoCents),
+      note: "total includes stablecoins (USDC, USDT, DAI at their canonical contracts, at synced prices). Other crypto is not cash and not in runway.",
     },
     monthlyBurn: dollars(burn.monthlyCents),
     burnMonths: burn.months,
     runwayMonths: rw.months,
+    runwayMonthsBankOnly: bankRunway.months,
     runOutDate: rw.runOutDate,
     spend: totals,
   };
@@ -571,15 +582,19 @@ function tokenAmount(raw: string, decimals: number): string {
   return fraction ? `${whole}.${fraction}` : whole;
 }
 
-/** Wallet balances at DefiLlama prices. Read-only, and never part of cash, burn or runway. */
-async function financeCrypto(deps: FinanceToolDeps) {
-  const where = scopeWhere(deps);
-  const [walletRows, holdingRows] = await Promise.all([
-    deps.prisma.financeWallet.findMany({ where, orderBy: { createdAt: "asc" } }),
-    deps.prisma.financeCryptoHolding.findMany({ where }),
-  ]);
-  if (walletRows.length === 0) return { wallets: [], note: "No crypto wallets are added." };
-  const holdings = holdingRows.map((row) => ({
+function toHolding(row: {
+  walletId: string;
+  chainId: number;
+  tokenAddress: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  rawBalance: string;
+  usdPrice: string | null;
+  usdValueCents: bigint | null;
+  syncedAt: Date;
+}) {
+  return {
     walletId: row.walletId,
     chainId: row.chainId,
     tokenAddress: row.tokenAddress === "" ? null : row.tokenAddress,
@@ -590,7 +605,18 @@ async function financeCrypto(deps: FinanceToolDeps) {
     usdPrice: row.usdPrice,
     usdValueCents: row.usdValueCents === null ? null : Number(row.usdValueCents),
     syncedAt: row.syncedAt.toISOString(),
-  }));
+  };
+}
+
+/** Wallet balances at DefiLlama prices. Read-only; only the canonical stablecoins are part of cash and runway. */
+async function financeCrypto(deps: FinanceToolDeps) {
+  const where = scopeWhere(deps);
+  const [walletRows, holdingRows] = await Promise.all([
+    deps.prisma.financeWallet.findMany({ where, orderBy: { createdAt: "asc" } }),
+    deps.prisma.financeCryptoHolding.findMany({ where }),
+  ]);
+  if (walletRows.length === 0) return { wallets: [], note: "No crypto wallets are added." };
+  const holdings = holdingRows.map(toHolding);
   const summary = summarizeCrypto(holdings);
   const walletCents = new Map(summary.byWallet.map((w) => [w.walletId, w.cents]));
   return withinBudget(

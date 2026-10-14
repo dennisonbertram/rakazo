@@ -105,10 +105,43 @@ describe("summarizeCrypto", () => {
     expect(s.lastSyncedAt).toBe("2026-10-16T09:00:00.000Z");
     expect(summarizeCrypto([])).toEqual({
       totalCents: 0,
+      stablecoinCents: 0,
       byChain: [],
       byWallet: [],
       lastSyncedAt: null,
       unpricedTokenCount: 0,
     });
+  });
+});
+
+describe("summarizeCrypto stablecoins", () => {
+  const USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+  it("counts a USDC at its canonical address and nothing else as stablecoin", () => {
+    const s = summarizeCrypto([
+      holding({ symbol: "USDC", tokenAddress: USDC, usdValueCents: 1000 }),
+      holding({ symbol: "USDC", tokenAddress: `0x${"1".repeat(40)}`, usdValueCents: 5000 }),
+      holding({ symbol: "USDC", chainId: 8453, tokenAddress: USDC, usdValueCents: 700 }),
+      holding({ symbol: "ETH", tokenAddress: null, usdValueCents: 9000 }),
+    ]);
+    expect(s.stablecoinCents).toBe(1000);
+    expect(s.totalCents).toBe(15_700);
+  });
+  it("never counts an unpriced stablecoin", () => {
+    const s = summarizeCrypto([
+      holding({
+        symbol: "USDC",
+        tokenAddress: USDC,
+        usdPrice: null,
+        usdValueCents: null,
+        rawBalance: "5",
+      }),
+    ]);
+    expect(s.stablecoinCents).toBe(0);
+  });
+  it("values a depegged stablecoin at its synced value", () => {
+    const s = summarizeCrypto([
+      holding({ tokenAddress: USDC, usdPrice: "0.9", usdValueCents: 900 }),
+    ]);
+    expect(s.stablecoinCents).toBe(900);
   });
 });
