@@ -12,7 +12,11 @@ const text = vi.hoisted(
     (parts: TemplateStringsArray, ...values: unknown[]) =>
       parts.reduce((out, part, i) => out + part + String(values[i] ?? ""), ""),
 );
-vi.mock("@lingui/core/macro", () => ({ t: text }));
+const plural = vi.hoisted(
+  () => (count: number, forms: { one: string; other: string }) =>
+    (count === 1 ? forms.one : forms.other).replace("#", String(count)),
+);
+vi.mock("@lingui/core/macro", () => ({ t: text, plural }));
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: text, i18n: { locale: "en" } }),
   Trans: ({ children }: { children: ReactNode }) => children,
@@ -23,6 +27,7 @@ const rpcMock = vi.hoisted(() => ({
   refresh: vi.fn(),
   feedback: vi.fn(),
   archive: vi.fn(),
+  unarchive: vi.fn(),
   markRead: vi.fn(),
   todos: vi.fn(),
 }));
@@ -33,6 +38,7 @@ vi.mock("../lib/rpc", () => ({
       refresh: rpcMock.refresh,
       feedback: rpcMock.feedback,
       archive: rpcMock.archive,
+      unarchive: rpcMock.unarchive,
       markRead: rpcMock.markRead,
       todos: { list: rpcMock.todos, setDone: vi.fn() },
     },
@@ -49,9 +55,13 @@ vi.mock("../components/inbox/InboxMessageDialog", () => ({
   InboxMessageDialog: ({
     messageId,
     onClose,
+    onArchive,
+    notice,
   }: {
     messageId: string | null;
     onClose: () => void;
+    onArchive?: () => void;
+    notice?: ReactNode;
   }) =>
     messageId ? (
       <div role="dialog" data-testid="message">
@@ -59,6 +69,12 @@ vi.mock("../components/inbox/InboxMessageDialog", () => ({
         <button type="button" onClick={onClose}>
           close
         </button>
+        {onArchive ? (
+          <button type="button" onClick={onArchive}>
+            dialog archive
+          </button>
+        ) : null}
+        <div data-testid="notice">{notice}</div>
       </div>
     ) : null,
 }));
@@ -117,6 +133,7 @@ const row = (id: string, extra: Partial<MailRow> = {}): MailRow => ({
   snippet: "",
   receivedAt: new Date().toISOString(),
   unread: true,
+  inInbox: true,
   needsReply: null,
   priority: null,
   reason: null,
@@ -185,6 +202,7 @@ beforeEach(() => {
   rpcMock.todos.mockResolvedValue({ todos: [] });
   rpcMock.feedback.mockResolvedValue({});
   rpcMock.archive.mockResolvedValue({ ok: true });
+  rpcMock.unarchive.mockResolvedValue({ ok: true });
   rpcMock.markRead.mockResolvedValue({ ok: true });
   rpcMock.list.mockResolvedValue(list([row("a"), row("b"), row("c")]));
 });
@@ -256,12 +274,12 @@ it("offers a way out of an empty search and an empty filter", async () => {
   rpcMock.list.mockResolvedValue(list([]));
   let c = await render(["/app/inbox?q=zebra"]);
   expect(c.textContent).toContain('No results for "zebra"');
-  await click(byText(c, "Clear search"));
+  await click(byText(c, "Clear"));
   expect(location.search).toBe("");
   await cleanups.pop()?.();
   c = await render(["/app/inbox?view=important"]);
   expect(c.textContent).toContain("No mail matches this filter");
-  await click(byText(c, "Clear filter"));
+  await click(byText(c, "Clear"));
   expect(location.search).toBe("");
 });
 
@@ -351,10 +369,138 @@ it("marks a row read at once and unread again, saving each", async () => {
   expect(rpcMock.markRead).toHaveBeenLastCalledWith({ messageId: "a", read: false });
 });
 
-it("offers no archive while a filter or search lists mail from Gmail", async () => {
-  const c = await render(["/app/inbox?filter=unread"]);
-  expect(byText(c, "archive a")).toBeUndefined();
+it("archives under a filter and a search too", async () => {
+  const c = await render(["/app/inbox?filter=unread&q=zebra"]);
+  await press("j");
+  await press("e");
+  expect(rpcMock.archive).toHaveBeenCalledWith({ messageId: "a" });
+  await click(byText(c, "archive b"));
+  expect(rpcMock.archive).toHaveBeenCalledWith({ messageId: "b" });
+});
+
+it("offers Undo after an archive, which restores the thread and reloads the list", async () => {
+  const c = await render();
+  await click(byText(c, "archive b"));
+  const toast = c.querySelector('[role="status"]');
+  expect(toast?.textContent).toContain("Archived");
+  const lists = rpcMock.list.mock.calls.length;
+  await click(byText(toast as HTMLElement, "Undo"));
+  expect(rpcMock.unarchive).toHaveBeenCalledWith({ messageId: "b" });
+  expect(rpcMock.list.mock.calls.length).toBeGreaterThan(lists);
+  expect(c.querySelector('[role="status"]')?.textContent).toBe("");
+});
+
+it("waits for a slow archive to finish before Undo restores the thread", async () => {
+  let finish: (value: unknown) => void = () => {};
+  rpcMock.archive.mockReturnValue(new Promise((r) => (finish = r)));
+  const c = await render();
+  await click(byText(c, "archive b"));
+  await click(byText(c.querySelector('[role="status"]') as HTMLElement, "Undo"));
+  expect(rpcMock.unarchive).not.toHaveBeenCalled();
+  await act(async () => finish({ ok: true }));
+  expect(rpcMock.unarchive).toHaveBeenCalledWith({ messageId: "b" });
+});
+
+it("skips Undo when the archive itself failed", async () => {
+  rpcMock.archive.mockRejectedValue(new Error("nope"));
+  const c = await render();
+  await click(byText(c, "archive b"));
+  await click(byText(c.querySelector('[role="status"]') as HTMLElement, "Undo"));
+  expect(rpcMock.unarchive).not.toHaveBeenCalled();
+});
+
+it("marks an unread row read when it opens, and does not touch a read one", async () => {
+  rpcMock.list.mockResolvedValue(list([row("a"), row("b", { unread: false })]));
+  const c = await render();
+  await click(c.querySelector('[data-row-id="b"]'));
+  expect(rpcMock.markRead).not.toHaveBeenCalled();
+  await click(byText(c, "close"));
+  await click(c.querySelector('[data-row-id="a"]'));
+  expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
+  expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "a", read: true });
+});
+
+it("shows one result count with a Clear that drops the search and filter together", async () => {
+  const c = await render(["/app/inbox?q=zebra&filter=unread"]);
+  expect(c.textContent).toContain("3 results");
+  expect(c.textContent).not.toContain("Needs reply");
+  await click(byText(c, "Clear"));
+  expect(location.search).toBe("");
+});
+
+it("pages a search with a Loading label and ends with No more results", async () => {
+  rpcMock.list.mockResolvedValue(list([row("a")], { nextPageToken: "p2" }));
+  let settle: (value: InboxListOutput) => void = () => {};
+  const c = await render(["/app/inbox?q=zebra"]);
+  expect(c.textContent).toContain("1+ result");
+  rpcMock.list.mockReturnValue(new Promise((r) => (settle = r)));
+  await click(byText(c, "Load more"));
+  expect(byText(c, "Loading…")?.disabled).toBe(true);
+  await act(async () => settle(list([row("b")])));
+  expect(c.textContent).toContain("No more results");
+  expect(c.textContent).toContain("2 results");
+});
+
+it("ends the default list with a way to search older mail", async () => {
+  const c = await render();
+  // Let a focus-restoring frame queued by an earlier test fire first.
+  await act(async () => new Promise<void>((r) => requestAnimationFrame(() => r())));
+  await click(byText(c, "Search older mail"));
+  expect(document.activeElement).toBe(c.querySelector("input"));
+});
+
+it("does not archive a selected row that a new filter hid", async () => {
+  const c = await render();
+  await press("j");
+  expect(selected(c)).toBe("a");
+  rpcMock.list.mockResolvedValue(list([row("z")]));
+  await act(async () => go("/app/inbox?filter=unread"));
+  await press("e");
+  await press("Enter");
+  expect(rpcMock.archive).not.toHaveBeenCalled();
+  expect(new URLSearchParams(location.search).get("mail")).toBeNull();
+});
+
+it("offers no archive for mail that is not in the inbox", async () => {
+  rpcMock.list.mockResolvedValue(list([row("a", { inInbox: false })]));
+  const c = await render(["/app/inbox?q=old"]);
   await press("j");
   await press("e");
   expect(rpcMock.archive).not.toHaveBeenCalled();
+  await click(c.querySelector('[data-row-id="a"]'));
+  expect(byText(c, "dialog archive")).toBeUndefined();
+});
+
+it("does not say No results while loaded pages still have rows", async () => {
+  rpcMock.list.mockResolvedValue(list([row("a")], { nextPageToken: "p2" }));
+  const c = await render(["/app/inbox?q=zebra"]);
+  rpcMock.list.mockResolvedValue(list([row("b")]));
+  await click(byText(c, "Load more"));
+  await click(byText(c, "archive a"));
+  expect(c.textContent).not.toContain("No results");
+  expect(c.textContent).toContain("Subject b");
+});
+
+it("marks an unread deep-linked message read once, and j and k never mark read", async () => {
+  const c = await render(["/app/inbox?mail=a"]);
+  expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
+  expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "a", read: true });
+  await act(async () => window.dispatchEvent(new Event("rakazo:mail-sent")));
+  expect(rpcMock.markRead).toHaveBeenCalledTimes(1);
+  await click(byText(c, "close"));
+  rpcMock.markRead.mockClear();
+  await press("j");
+  await press("j");
+  await press("k");
+  expect(rpcMock.markRead).not.toHaveBeenCalled();
+});
+
+it("shows the Archived toast inside the open message, not behind it", async () => {
+  const c = await render(["/app/inbox?mail=a"]);
+  await click(byText(c, "dialog archive"));
+  const notice = c.querySelector('[data-testid="notice"]') as HTMLElement;
+  expect(notice.textContent).toContain("Archived");
+  expect(c.querySelector('[role="status"]')?.textContent).toBe("");
+  await click(byText(notice, "Undo"));
+  expect(rpcMock.unarchive).toHaveBeenCalled();
 });

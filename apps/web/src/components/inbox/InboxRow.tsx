@@ -13,14 +13,18 @@ import {
 } from "@rakazo/ui-web";
 import { Archive, BellOff, Ellipsis, Mail, MailOpen, Star, TriangleAlert } from "lucide-react";
 
-/** Time of day for today's mail, month and day otherwise. */
+/** Time of day for today's mail, month and day otherwise, with the year for another year. */
 function formatMailTime(iso: string, today: boolean): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   const locale = i18n.locale || "en";
   return today
     ? date.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleDateString(locale, { month: "short", day: "numeric" });
+    : date.toLocaleDateString(locale, {
+        month: "short",
+        day: "numeric",
+        ...(date.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
+      });
 }
 
 export function InboxGroup({
@@ -34,7 +38,8 @@ export function InboxGroup({
   selectedId,
   hideAttention,
 }: {
-  title: React.ReactNode;
+  /** Omitted for search results, which show one count instead. */
+  title?: React.ReactNode;
   rows: MailRow[];
   onOpen: (id: string) => void;
   /** Present only while triage is enabled. */
@@ -49,7 +54,12 @@ export function InboxGroup({
   if (rows.length === 0) return null;
   return (
     <section className="mb-5">
-      <h2 className="mb-1.5 text-xs font-semibold text-muted-foreground">{title}</h2>
+      {title ? (
+        <h2 className="mb-1.5 text-xs font-semibold text-muted-foreground">
+          {title}
+          <span className="ms-1.5 font-normal tabular-nums">{rows.length}</span>
+        </h2>
+      ) : null}
       <div className="border-t border-border">
         {rows.map((row) => (
           <InboxRow
@@ -105,7 +115,9 @@ export function InboxRow({
       ] as const)
     : [];
   const actions = [
-    ...(onArchive ? [{ name: t`Archive`, Icon: Archive, run: () => onArchive(row.id) }] : []),
+    ...(onArchive && row.inInbox
+      ? [{ name: t`Archive`, Icon: Archive, run: () => onArchive(row.id) }]
+      : []),
     ...(onRead
       ? [
           {
@@ -122,6 +134,7 @@ export function InboxRow({
         <button
           type="button"
           aria-haspopup="dialog"
+          title={hideAttention && row.reason ? row.reason : undefined}
           aria-current={selected ? "true" : undefined}
           data-row-id={row.id}
           onClick={onOpen}

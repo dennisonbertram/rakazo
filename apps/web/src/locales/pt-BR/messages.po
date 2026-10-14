@@ -23,9 +23,19 @@ msgstr " (não lido)"
 msgid "{0, plural, one {# model} other {# models}}"
 msgstr "{0, plural, one {# modelo} other {# modelos}}"
 
+#. placeholder {0}: rows.length
+#: src/pages/Inbox.tsx
+msgid "{0, plural, one {# result} other {# results}}"
+msgstr ""
+
 #. placeholder {0}: subs.items.length
 #: src/pages/Finance.tsx
 msgid "{0, plural, one {# subscription} other {# subscriptions}}"
+msgstr ""
+
+#. placeholder {0}: rows.length
+#: src/pages/Inbox.tsx
+msgid "{0, plural, one {#+ result} other {#+ results}}"
 msgstr ""
 
 #. placeholder {0}: Math.ceil(oauth.expiresInSeconds / 60)
@@ -663,6 +673,7 @@ msgstr "Arquivar"
 msgid "archived"
 msgstr "arquivado"
 
+#: src/pages/Inbox.tsx
 #: src/pages/Shell.tsx
 msgid "Archived"
 msgstr "Arquivado"
@@ -1064,6 +1075,7 @@ msgstr ""
 
 #: src/components/FinanceCards.tsx
 #: src/pages/finance/FinanceBurn.tsx
+#: src/pages/Inbox.tsx
 msgid "Categories"
 msgstr ""
 
@@ -1210,20 +1222,12 @@ msgstr "Limpar a conversa do {0}?"
 msgid "Clear conversation"
 msgstr "Limpar conversa"
 
-#: src/pages/Inbox.tsx
-msgid "Clear filter"
-msgstr ""
-
 #: src/pages/ActivityList.tsx
 msgid "Clear filter {label}"
 msgstr ""
 
 #: src/components/compose/RichTextEditor.tsx
 msgid "Clear formatting"
-msgstr ""
-
-#: src/pages/Inbox.tsx
-msgid "Clear search"
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx
@@ -2781,6 +2785,10 @@ msgstr ""
 msgid "Gmail needs to be reconnected."
 msgstr ""
 
+#: src/pages/Inbox.tsx
+msgid "Gmail tabs"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 #: src/pages/Shell.tsx
 msgid "Group"
@@ -3151,6 +3159,7 @@ msgstr "Carregando provedores de voz..."
 #: src/App.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/Auth.tsx
+#: src/pages/Inbox.tsx
 #: src/pages/IntegrationSetup.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/Onboarding.tsx
@@ -3720,6 +3729,10 @@ msgstr "Nenhum catálogo de modelos está disponível."
 #: src/lib/model-connection-preflight.ts
 msgid "No models listed."
 msgstr "Nenhum modelo listado."
+
+#: src/pages/Inbox.tsx
+msgid "No more results"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "No providers found."
@@ -4757,6 +4770,10 @@ msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Search models"
+msgstr ""
+
+#: src/pages/Inbox.tsx
+msgid "Search older mail"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx

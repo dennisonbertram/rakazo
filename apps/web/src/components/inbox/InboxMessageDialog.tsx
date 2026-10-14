@@ -47,6 +47,7 @@ export function InboxMessageDialog({
   unread,
   onArchive,
   onRead,
+  notice,
   onClose,
 }: {
   messageId: string | null;
@@ -60,6 +61,8 @@ export function InboxMessageDialog({
   unread?: boolean;
   onArchive?: () => void;
   onRead?: (read: boolean) => void;
+  /** A brief message with its own action, shown here because the page behind the dialog is inert. */
+  notice?: React.ReactNode;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -98,6 +101,7 @@ export function InboxMessageDialog({
             setComposing={setComposing}
           />
         ) : null}
+        {messageId && notice ? <div className="flex justify-center">{notice}</div> : null}
       </DialogContent>
     </Dialog>
   );

@@ -278,7 +278,7 @@ import {
   inboxComposePrefill,
   inboxComposeSend,
 } from "./inbox-compose.js";
-import { inboxArchive, inboxMarkRead } from "./inbox-modify.js";
+import { inboxArchive, inboxMarkRead, inboxUnarchive } from "./inbox-modify.js";
 import { searchIntegrationCatalog } from "./integration-catalog.js";
 import {
   dismissMcpServerApprovals,
@@ -6025,6 +6025,14 @@ export function createRouter(deps: RouterDeps) {
       ),
       archive: authed.inbox.archive.handler(({ context, input }) =>
         inboxArchive(
+          { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
+          context.actor,
+          input,
+          context.signal,
+        ),
+      ),
+      unarchive: authed.inbox.unarchive.handler(({ context, input }) =>
+        inboxUnarchive(
           { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
           context.actor,
           input,

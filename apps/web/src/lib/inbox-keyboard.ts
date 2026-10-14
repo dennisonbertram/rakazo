@@ -25,8 +25,17 @@ export function useInboxKeyboard(options: InboxKeyboard) {
   latest.current = options;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const { ids, selectedId, enabled, select, open, focusSearch, compose, archive, help } =
-        latest.current;
+      const {
+        ids,
+        selectedId: selection,
+        enabled,
+        select,
+        open,
+        focusSearch,
+        compose,
+        archive,
+        help,
+      } = latest.current;
       if (!enabled || event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target instanceof Element ? event.target : null;
@@ -34,6 +43,8 @@ export function useInboxKeyboard(options: InboxKeyboard) {
         return;
       if (document.querySelector('[role="dialog"],[role="alertdialog"]')) return;
       const key = event.key;
+      // A selection a filter or search has hidden is no selection.
+      const selectedId = selection && ids.includes(selection) ? selection : undefined;
       const index = selectedId ? ids.indexOf(selectedId) : -1;
       const move = (to: number) => {
         const id = ids[Math.max(0, Math.min(ids.length - 1, to))];
