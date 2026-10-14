@@ -443,6 +443,7 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "finance_breakdown",
   "finance_transactions",
   "finance_recurring",
+  "finance_crypto",
   "calendar_list_events",
   "calendar_get_event",
   "drive_search",

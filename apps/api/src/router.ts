@@ -248,6 +248,7 @@ import {
 } from "./computer-status.js";
 import { completeNativeOAuth, connectionError } from "./connection-oauth.js";
 import {
+  type FinanceCryptoDeps,
   financeAccountDetail,
   financeAccounts,
   financeAgent,
@@ -264,6 +265,14 @@ import {
   financeTransaction,
   financeVendor,
 } from "./finance.js";
+import {
+  financeCrypto,
+  financeCryptoConnect,
+  financeWalletAdd,
+  financeWalletRemove,
+  financeWallets,
+  financeWalletUpdate,
+} from "./finance-crypto.js";
 import {
   inboxFeedbackSet,
   inboxGet,
@@ -641,6 +650,7 @@ export interface RouterDeps {
   mcpOAuth?: McpOAuthBroker;
   /** Builds the read-tool caller for finance servers (refresh, receipts); unset where finance sync is off. */
   financeCallToolFor?: FinanceSyncDeps["callToolFor"];
+  financeCrypto?: FinanceCryptoDeps;
   connectors: ConnectorRegistry;
   remoteConnectors?: RemoteConnectorDependencies;
   artifacts: ArtifactStore;
@@ -854,6 +864,8 @@ export function createRouter(deps: RouterDeps) {
     mcpOAuth,
     beginMcpOAuth,
     callToolFor: deps.financeCallToolFor,
+    secrets: deps.secrets,
+    crypto: deps.financeCrypto,
   };
   const codexCatalog = deps.codexCatalog ?? new CodexCatalogCache();
   const favicons = deps.favicons ?? createFaviconResolver();
@@ -6062,6 +6074,24 @@ export function createRouter(deps: RouterDeps) {
       ),
       connect: authed.finance.connect.handler(({ context, input }) =>
         financeConnect(financeDeps, context.actor, input),
+      ),
+      wallets: authed.finance.wallets.handler(({ context }) =>
+        financeWallets(financeDeps, context.actor),
+      ),
+      walletAdd: authed.finance.walletAdd.handler(({ context, input }) =>
+        financeWalletAdd(financeDeps, context.actor, input, context.signal),
+      ),
+      walletUpdate: authed.finance.walletUpdate.handler(({ context, input }) =>
+        financeWalletUpdate(financeDeps, context.actor, input),
+      ),
+      walletRemove: authed.finance.walletRemove.handler(({ context, input }) =>
+        financeWalletRemove(financeDeps, context.actor, input),
+      ),
+      crypto: authed.finance.crypto.handler(({ context }) =>
+        financeCrypto(financeDeps, context.actor),
+      ),
+      cryptoConnect: authed.finance.cryptoConnect.handler(({ context, input }) =>
+        financeCryptoConnect(financeDeps, context.actor, input),
       ),
       accounts: authed.finance.accounts.handler(({ context }) =>
         financeAccounts(financeDeps, context.actor),

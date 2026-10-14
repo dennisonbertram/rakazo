@@ -6,8 +6,10 @@ import type {
   MessageBlock,
 } from "@rakazo/contracts";
 import {
+  CRYPTO_CHAINS,
   FinanceProviderSchema,
   financeProviderForEndpoint,
+  isCryptoEndpoint,
   isFinanceAgentSpawnKey,
 } from "@rakazo/contracts";
 import {
@@ -20,6 +22,7 @@ import {
   runway,
   spendTotals,
   subscriptions,
+  summarizeCrypto,
   upcoming,
 } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
@@ -30,6 +33,7 @@ export const FINANCE_TOOL_NAMES = new Set([
   "finance_breakdown",
   "finance_transactions",
   "finance_recurring",
+  "finance_crypto",
 ]);
 
 /** Only the Finance agent, on a run its owner started (a direct message or their own routine). */
@@ -60,7 +64,12 @@ type Scope = { spaceId: string; userId: string };
 export type FinanceToolDeps = {
   prisma: Pick<
     PrismaClient,
-    "financeAccount" | "financeTransaction" | "financeBill" | "financeSyncState"
+    | "financeAccount"
+    | "financeTransaction"
+    | "financeBill"
+    | "financeSyncState"
+    | "financeWallet"
+    | "financeCryptoHolding"
   >;
   /** From the run (the bot owner), never from model input. */
   scope: Scope;
@@ -69,7 +78,7 @@ export type FinanceToolDeps = {
   now?: () => Date;
 };
 
-/** True when the user has an enabled Mercury or Brex MCP server, the finance sources. */
+/** True when the user has an enabled Mercury, Brex or Blockscout (crypto) MCP server. */
 export async function hasFinanceSource(
   prisma: Pick<PrismaClient, "mcpServer">,
   scope: Scope,
@@ -78,7 +87,10 @@ export async function hasFinanceSource(
     where: { spaceId: scope.spaceId, userId: scope.userId, enabled: true },
     select: { endpoint: true },
   });
-  return servers.some((server) => financeProviderForEndpoint(server.endpoint) !== null);
+  return servers.some(
+    (server) =>
+      financeProviderForEndpoint(server.endpoint) !== null || isCryptoEndpoint(server.endpoint),
+  );
 }
 
 // ---- Row mapping (shared with the API's Finance pages) ----
@@ -272,6 +284,7 @@ export function describeFinanceActivity(
   }
   if (name === "finance_transactions") return "Looking through transactions";
   if (name === "finance_recurring") return "Looking at subscriptions";
+  if (name === "finance_crypto") return "Looking at crypto holdings";
   return null;
 }
 
@@ -287,6 +300,7 @@ export async function financeToolFromTool(
     if (name === "finance_breakdown") return await financeBreakdown(deps, args);
     if (name === "finance_transactions") return await financeTransactions(deps, args);
     if (name === "finance_recurring") return await financeRecurring(deps);
+    if (name === "finance_crypto") return await financeCrypto(deps);
     return { error: `Unknown finance tool ${name}` };
   } catch {
     return { error: "Finance tool failed" };
@@ -541,5 +555,75 @@ async function financeRecurring(deps: FinanceToolDeps) {
       "subscriptions",
     ),
     "upcoming30",
+  );
+}
+
+const MAX_WALLET_HOLDINGS = 20;
+const chainName = (id: number) => CRYPTO_CHAINS.find((c) => c.id === id)?.name ?? `Chain ${id}`;
+
+/** raw / 10^decimals as an exact decimal string (BigInt, never a float). */
+function tokenAmount(raw: string, decimals: number): string {
+  const digits = raw.padStart(decimals + 1, "0");
+  const whole = digits.slice(0, digits.length - decimals);
+  const fraction = digits.slice(digits.length - decimals).replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
+/** Wallet balances at Blockscout prices. Read-only, and never part of cash, burn or runway. */
+async function financeCrypto(deps: FinanceToolDeps) {
+  const where = scopeWhere(deps);
+  const [walletRows, holdingRows] = await Promise.all([
+    deps.prisma.financeWallet.findMany({ where, orderBy: { createdAt: "asc" } }),
+    deps.prisma.financeCryptoHolding.findMany({ where }),
+  ]);
+  if (walletRows.length === 0) return { wallets: [], note: "No crypto wallets are added." };
+  const holdings = holdingRows.map((row) => ({
+    walletId: row.walletId,
+    chainId: row.chainId,
+    tokenAddress: row.tokenAddress === "" ? null : row.tokenAddress,
+    symbol: row.symbol,
+    name: row.name,
+    decimals: row.decimals,
+    rawBalance: row.rawBalance,
+    usdPrice: row.usdPrice,
+    usdValueCents: row.usdValueCents === null ? null : Number(row.usdValueCents),
+    syncedAt: row.syncedAt.toISOString(),
+  }));
+  const summary = summarizeCrypto(holdings);
+  const walletCents = new Map(summary.byWallet.map((w) => [w.walletId, w.cents]));
+  return withinBudget(
+    {
+      asOf: dayOf(nowOf(deps)),
+      lastSyncedAt: summary.lastSyncedAt,
+      totalUsd: dollars(summary.totalCents),
+      unpricedTokenCount: summary.unpricedTokenCount,
+      byChain: summary.byChain.map((c) => ({
+        chain: chainName(c.chainId),
+        chainId: c.chainId,
+        usd: dollars(c.cents),
+      })),
+      wallets: walletRows.map((wallet) => {
+        const own = holdings
+          .filter((h) => h.walletId === wallet.id && BigInt(h.rawBalance) > 0n)
+          .sort((a, b) => (b.usdValueCents ?? -1) - (a.usdValueCents ?? -1));
+        return {
+          name: wallet.label ?? wallet.ensName ?? wallet.address,
+          address: wallet.address,
+          type: wallet.type,
+          totalUsd: dollars(walletCents.get(wallet.id) ?? 0),
+          holdings: own.slice(0, MAX_WALLET_HOLDINGS).map((h) => ({
+            chain: chainName(h.chainId),
+            symbol: h.symbol,
+            amount: tokenAmount(h.rawBalance, h.decimals),
+            usd: h.usdValueCents === null ? null : dollars(h.usdValueCents),
+          })),
+          ...(own.length > MAX_WALLET_HOLDINGS
+            ? { otherHoldings: own.length - MAX_WALLET_HOLDINGS }
+            : {}),
+        };
+      }),
+      note: "USD at Blockscout prices; holdings with usd null have no price and are not in the total. Not part of cash, burn or runway.",
+    },
+    "wallets",
   );
 }

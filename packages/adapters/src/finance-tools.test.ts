@@ -136,6 +136,62 @@ function matches(row: Row, where: Where): boolean {
 
 const queries: Array<{ model: string; where: Where; list: boolean }> = [];
 
+const wallets: Row[] = [
+  {
+    id: "w-1",
+    ...MINE,
+    address: `0x${"ab".repeat(20)}`,
+    ensName: "me.eth",
+    label: "Main",
+    type: "personal",
+    createdAt: new Date("2026-10-01T00:00:00Z"),
+  },
+  {
+    id: "w-2",
+    ...THEIRS,
+    address: `0x${"cd".repeat(20)}`,
+    ensName: null,
+    label: "Secret",
+    type: "personal",
+    createdAt: new Date("2026-10-01T00:00:00Z"),
+  },
+];
+const holding = (walletId: string, owner: typeof MINE, fields: Record<string, unknown>): Row => ({
+  ...owner,
+  walletId,
+  chainId: 1,
+  tokenAddress: "",
+  symbol: "ETH",
+  name: "Ether",
+  decimals: 18,
+  rawBalance: "1500000000000000000",
+  usdPrice: "2000",
+  usdValueCents: 300_000n,
+  syncedAt: new Date("2026-10-14T00:00:00Z"),
+  ...fields,
+});
+const holdings: Row[] = [
+  holding("w-1", MINE, {}),
+  holding("w-1", MINE, {
+    chainId: 8453,
+    symbol: "USDC",
+    tokenAddress: `0x${"11".repeat(20)}`,
+    decimals: 6,
+    rawBalance: "2500000",
+    usdValueCents: 250n,
+  }),
+  holding("w-1", MINE, {
+    chainId: 10,
+    symbol: "SPAM",
+    tokenAddress: `0x${"22".repeat(20)}`,
+    decimals: 0,
+    rawBalance: "7",
+    usdPrice: null,
+    usdValueCents: null,
+  }),
+  holding("w-2", THEIRS, { symbol: "LEAK", usdValueCents: 99_999_900n }),
+];
+
 function fakePrisma(rows: { txns: Row[]; accounts: Row[] }) {
   const table = (model: string, list: Row[]) => {
     const find = (where: Where, isList = false) => {
@@ -186,6 +242,8 @@ function fakePrisma(rows: { txns: Row[]; accounts: Row[] }) {
     financeAccount: table("account", rows.accounts),
     financeBill: table("bill", []),
     financeSyncState: table("sync", []),
+    financeWallet: table("wallet", wallets),
+    financeCryptoHolding: table("holding", holdings),
   } as unknown as FinanceToolDeps["prisma"];
 }
 
@@ -406,6 +464,43 @@ describe("finance_recurring", () => {
   });
 });
 
+describe("finance_crypto", () => {
+  it("summarizes the owner's wallets in dollars, never another user's", async () => {
+    const { deps, published } = setup();
+    const result = (await financeToolFromTool("finance_crypto", deps, {})) as {
+      totalUsd: number;
+      unpricedTokenCount: number;
+      lastSyncedAt: string;
+      byChain: Array<{ chain: string; usd: number }>;
+      wallets: Array<{
+        name: string;
+        totalUsd: number;
+        holdings: Array<{ chain: string; symbol: string; amount: string; usd: number | null }>;
+      }>;
+    };
+    expect(result.totalUsd).toBe(3002.5);
+    expect(result.unpricedTokenCount).toBe(1);
+    expect(result.lastSyncedAt).toBe("2026-10-14T00:00:00.000Z");
+    expect(result.byChain).toEqual([
+      { chain: "Ethereum", chainId: 1, usd: 3000 },
+      { chain: "Base", chainId: 8453, usd: 2.5 },
+    ]);
+    expect(result.wallets.map((w) => [w.name, w.totalUsd])).toEqual([["Main", 3002.5]]);
+    expect(result.wallets[0]?.holdings.map((h) => [h.symbol, h.amount, h.usd])).toEqual([
+      ["ETH", "1.5", 3000],
+      ["USDC", "2.5", 2.5],
+      ["SPAM", "7", null],
+    ]);
+    expect(JSON.stringify(result)).not.toContain("LEAK");
+    expect(published).toEqual([]);
+  });
+
+  it("says so when there are no wallets", async () => {
+    const { deps } = setup({ spaceId: "space-1", userId: "nobody" });
+    expect(await financeToolFromTool("finance_crypto", deps, {})).toMatchObject({ wallets: [] });
+  });
+});
+
 describe("offering the tools", () => {
   const offered = (financeEnabled: boolean) =>
     selectBuiltinToolsForRun({
@@ -476,6 +571,8 @@ describe("offering the tools", () => {
     expect(await hasFinanceSource(prisma, { spaceId: "s", userId: "u" })).toBe(true);
     expect(await hasFinanceSource(prisma, { spaceId: "s", userId: "v" })).toBe(false);
     expect(await hasFinanceSource(prisma, { spaceId: "s", userId: "none" })).toBe(false);
+    servers.push({ spaceId: "s", userId: "w", endpoint: "https://mcp.blockscout.com/mcp" });
+    expect(await hasFinanceSource(prisma, { spaceId: "s", userId: "w" })).toBe(true);
   });
 });
 
@@ -485,6 +582,7 @@ describe("activity labels", () => {
       "Reading spend by category · last 90 days",
     );
     expect(describeFinanceActivity("finance_recurring", {})).toBe("Looking at subscriptions");
+    expect(describeFinanceActivity("finance_crypto", {})).toBe("Looking at crypto holdings");
     expect(describeFinanceActivity("shell", {})).toBeNull();
   });
 });
