@@ -52,7 +52,7 @@ function CryptoTile() {
       className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <AppLogo name="Blockscout" logo={null} />
+        <AppLogo name="Blockscout" logo="/logos/blockscout.svg" />
         <div className="min-w-0">
           <div className="truncate font-semibold">Blockscout</div>
           <div className="truncate text-xs text-muted-foreground">

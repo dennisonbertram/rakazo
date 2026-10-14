@@ -1,8 +1,10 @@
+import { existsSync } from "node:fs";
 import type { Connection, ConnectionCatalogItem, McpServer } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import {
   appStatus,
   classifyTool,
+  FINANCE_PROVIDERS,
   filterCatalog,
   groupConnections,
   groupTools,
@@ -157,5 +159,14 @@ describe("toolLabel", () => {
     expect(toolLabel("GMAIL_FETCH_EMAILS", "gmail")).toBe("Fetch emails");
     expect(toolLabel("search_files", "drive")).toBe("Search files");
     expect(toolLabel("GMAIL", "gmail")).toBe("Gmail");
+  });
+});
+
+describe("FINANCE_PROVIDERS logos", () => {
+  it("gives every provider a logo, and vendored ones exist under public/", () => {
+    for (const { logo } of FINANCE_PROVIDERS) {
+      expect(logo).toBeTruthy();
+      if (logo.startsWith("/")) expect(existsSync(`public${logo}`)).toBe(true);
+    }
   });
 });

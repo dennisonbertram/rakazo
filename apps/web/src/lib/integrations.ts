@@ -92,8 +92,8 @@ export const FINANCE_PROVIDERS = [
   {
     provider: "mercury",
     name: "Mercury",
-    // No Simple Icons mark exists for Mercury: AppLogo falls back to the letter.
-    logo: null,
+    // No Simple Icons mark exists for Mercury: its own icon, vendored from mercury.com.
+    logo: "/logos/mercury.svg",
   },
   { provider: "brex", name: "Brex", logo: "https://cdn.simpleicons.org/brex" },
 ] as const;
