@@ -135,11 +135,11 @@ function Dashboard() {
   const data = overview.data;
   if (overview.error) return <ErrorNotice message={overview.error} onRetry={overview.retry} />;
   if (!data) return <DashboardSkeleton />;
-  if (!connected) return <EmptyState />;
+  if (!connected) return <EmptyState hasCrypto={Boolean(data.crypto)} />;
   return <Overview data={data} syncing={syncing} error={syncError} onRefresh={sync} />;
 }
 
-function EmptyState() {
+function EmptyState({ hasCrypto }: { hasCrypto: boolean }) {
   return (
     <div className="flex h-full min-h-72 flex-col items-center justify-center gap-4 text-center">
       <div className="flex gap-3">
@@ -156,6 +156,11 @@ function EmptyState() {
       <Button render={<Link to={CONNECT_PATH} />}>
         <Trans>Connect accounts</Trans>
       </Button>
+      {hasCrypto ? (
+        <Button variant="outline" render={<Link to={financePath.accounts()} />}>
+          <Trans>Accounts</Trans>
+        </Button>
+      ) : null}
     </div>
   );
 }

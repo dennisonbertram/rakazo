@@ -326,7 +326,7 @@ msgstr "* So far"
 msgid "+{more} more"
 msgstr "+{more} more"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "0x… or name.eth"
 msgstr "0x… or name.eth"
 
@@ -428,8 +428,8 @@ msgstr "Active model"
 msgid "Activity"
 msgstr "Activity"
 
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
-#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Add"
@@ -472,6 +472,10 @@ msgstr "Add a schedule, webhook, GitHub, or message trigger"
 #: src/pages/RoutineEditor.tsx
 msgid "Add a schedule, webhook, GitHub, or message trigger to run this routine."
 msgstr "Add a schedule, webhook, GitHub, or message trigger to run this routine."
+
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Add account"
+msgstr "Add account"
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Add another account"
@@ -517,11 +521,12 @@ msgstr "Add to routine"
 msgid "Add trigger"
 msgstr "Add trigger"
 
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Add wallet"
 msgstr "Add wallet"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Address or ENS"
 msgstr "Address or ENS"
 
@@ -1088,6 +1093,7 @@ msgstr "Can't reach the server."
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -1680,7 +1686,7 @@ msgstr "Continue with {0}"
 msgid "Continue with email"
 msgstr "Continue with email"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Contract"
 msgstr "Contract"
 
@@ -2255,9 +2261,14 @@ msgid "Cron expression"
 msgstr "Cron expression"
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Crypto"
 msgstr "Crypto"
+
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Crypto wallet"
+msgstr "Crypto wallet"
 
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
@@ -2604,7 +2615,7 @@ msgstr "Edit first"
 msgid "Edit Profile"
 msgstr "Edit Profile"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Edit wallet"
 msgstr "Edit wallet"
 
@@ -2725,7 +2736,7 @@ msgstr "Every two weeks"
 msgid "Every week"
 msgstr "Every week"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Exchange"
 msgstr "Exchange"
 
@@ -3223,11 +3234,11 @@ msgstr "Keyboard shortcuts"
 msgid "Knowledge"
 msgstr "Knowledge"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Label"
 msgstr "Label"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Label (optional)"
 msgstr "Label (optional)"
 
@@ -4291,7 +4302,7 @@ msgstr "Pending"
 msgid "Period"
 msgstr "Period"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/Inbox.tsx
 msgid "Personal"
 msgstr "Personal"
@@ -4883,7 +4894,7 @@ msgstr "Runs when this bot receives a verified message from this provider."
 msgid "Runway"
 msgstr "Runway"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Safe"
 msgstr "Safe"
 
@@ -4892,11 +4903,11 @@ msgid "Sales & CRM"
 msgstr "Sales & CRM"
 
 #: src/components/AskCard.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx
-#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/GroupPanel.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -5799,7 +5810,7 @@ msgstr "Try again"
 msgid "Try the test again."
 msgstr "Try the test again."
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
 msgstr "Type"

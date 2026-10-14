@@ -254,3 +254,49 @@ test("Finance hides the Crypto card without crypto data", async ({ page }) => {
   await expect(page.getByRole("main").getByText("$250,020")).toBeVisible();
   await expect(page.locator('a[href="/app/finance/crypto"]')).toHaveCount(0);
 });
+
+test("Finance Accounts lists wallets apart from cash and adds one from the menu", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await mockFinance(page, { ...connectedOverview, crypto: cryptoData.summary });
+  const reply = (name: string, body: unknown) =>
+    page.route(`**/rpc/finance/${name}`, (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ json: body, meta: [] }),
+      }),
+    );
+  await reply("crypto", cryptoData);
+  await reply("accounts", {
+    totalCashCents: 25_002_000,
+    cardOwedCents: null,
+    history: [],
+    cash: [
+      {
+        id: "acc-1",
+        name: "Mercury Checking",
+        lastFour: "1234",
+        balanceCents: 25_002_000,
+        annualYieldPct: null,
+      },
+    ],
+    cards: [],
+  });
+  await signup(page, `finance-accts-${Date.now()}@rakazo.test`, "password12", "Finance Accounts");
+  await completeOnboarding(page);
+  await page.goto("/app/finance/accounts");
+  const main = page.getByRole("main");
+  await expect(main.getByText("Mercury Checking")).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Crypto" })).toBeVisible();
+  await expect(main.locator('a[href="/app/finance/crypto"]').first()).toHaveText("Treasury");
+  await expect(main.getByText("$250,020", { exact: true }).first()).toBeVisible();
+  await captureScreenshot(page, testInfo, "finance-accounts-crypto-group");
+
+  await main.getByRole("button", { name: "Add account" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Crypto wallet"]);
+  await captureScreenshot(page, testInfo, "finance-accounts-add-menu");
+  await page.getByRole("menuitem", { name: "Crypto wallet" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Add wallet");
+  await captureScreenshot(page, testInfo, "finance-accounts-add-wallet");
+});

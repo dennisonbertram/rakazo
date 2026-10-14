@@ -326,7 +326,7 @@ msgstr ""
 msgid "+{more} more"
 msgstr ""
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "0x… or name.eth"
 msgstr ""
 
@@ -428,8 +428,8 @@ msgstr "Aktives Modell"
 msgid "Activity"
 msgstr "Aktivität"
 
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
-#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Add"
@@ -471,6 +471,10 @@ msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Add a schedule, webhook, GitHub, or message trigger to run this routine."
+msgstr ""
+
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Add account"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
@@ -517,11 +521,12 @@ msgstr "Zur Routine hinzufügen"
 msgid "Add trigger"
 msgstr ""
 
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Add wallet"
 msgstr ""
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Address or ENS"
 msgstr ""
 
@@ -1088,6 +1093,7 @@ msgstr "Server nicht erreichbar."
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -1680,7 +1686,7 @@ msgstr "Mit {0} fortfahren"
 msgid "Continue with email"
 msgstr "Mit E-Mail fortfahren"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Contract"
 msgstr ""
 
@@ -2255,8 +2261,13 @@ msgid "Cron expression"
 msgstr "Cron-Ausdruck"
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Crypto"
+msgstr ""
+
+#: src/pages/finance/FinanceAccounts.tsx
+msgid "Crypto wallet"
 msgstr ""
 
 #: src/components/AccountAccess.tsx
@@ -2604,7 +2615,7 @@ msgstr "Zuerst bearbeiten"
 msgid "Edit Profile"
 msgstr "Profil bearbeiten"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Edit wallet"
 msgstr ""
 
@@ -2725,7 +2736,7 @@ msgstr ""
 msgid "Every week"
 msgstr "Jede Woche"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Exchange"
 msgstr ""
 
@@ -3223,11 +3234,11 @@ msgstr ""
 msgid "Knowledge"
 msgstr "Wissen"
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Label"
 msgstr ""
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Label (optional)"
 msgstr ""
 
@@ -4291,7 +4302,7 @@ msgstr ""
 msgid "Period"
 msgstr ""
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/Inbox.tsx
 msgid "Personal"
 msgstr ""
@@ -4883,7 +4894,7 @@ msgstr ""
 msgid "Runway"
 msgstr ""
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 msgid "Safe"
 msgstr ""
 
@@ -4892,11 +4903,11 @@ msgid "Sales & CRM"
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/ExternalConversationSettings.tsx
-#: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/GroupPanel.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -5799,7 +5810,7 @@ msgstr "Erneut versuchen"
 msgid "Try the test again."
 msgstr "Teste erneut."
 
-#: src/pages/finance/FinanceCrypto.tsx
+#: src/components/finance/WalletDialog.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
 msgstr ""

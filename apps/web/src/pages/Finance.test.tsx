@@ -699,3 +699,19 @@ it("shows the Crypto card only when the overview has crypto, apart from cash", a
   expect(card?.textContent).toContain("2 unpriced");
   expect(container.querySelector('a[href="/app/finance/accounts"]')?.textContent).toBe(cashBefore);
 });
+
+it("links a crypto-only user from the empty state to Accounts", async () => {
+  rpcMock.overview.mockResolvedValue({
+    ...emptyOverview(),
+    crypto: {
+      totalCents: 100,
+      byChain: [],
+      byWallet: [],
+      lastSyncedAt: null,
+      unpricedTokenCount: 0,
+    },
+  });
+  await show("/app/finance");
+  await flush();
+  expect(container.querySelector('a[href="/app/finance/accounts"]')?.textContent).toBe("Accounts");
+});
