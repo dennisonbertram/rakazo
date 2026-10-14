@@ -17,9 +17,9 @@ const totals = (period: SpendTotals["period"], current: number, previous: number
   previousCents: previous,
   changePct: previous ? ((current - previous) / previous) * 100 : null,
   start: "2026-10-01",
-  end: "2026-10-14",
+  end: "2026-10-15",
   previousStart: "2026-09-01",
-  previousEnd: "2026-09-30",
+  previousEnd: "2026-09-15",
 });
 
 const out = [21800, 24400, 23100, 19700, 25600, 22900, 20700, 24800, 19600, 20900, 22500, 10100];

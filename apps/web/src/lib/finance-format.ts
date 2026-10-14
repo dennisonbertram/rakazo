@@ -41,6 +41,19 @@ export function shortDay(day: string, now = new Date(), locale?: string): string
   });
 }
 
+/** `Oct 1 – 14` or `Sep 29 – Oct 14`; one day is `Oct 14`. The year shows when `start` is not in `now`'s year. `end` is inclusive. */
+export function dayRange(start: string, end: string, now = new Date(), locale?: string): string {
+  const a = dayDate(start);
+  const b = dayDate(end);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "";
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    ...(a.getUTCFullYear() === now.getUTCFullYear() ? {} : { year: "numeric" }),
+    timeZone: "UTC",
+  }).formatRange(a, b);
+}
+
 /** `Mon`. */
 export const weekdayShort = (day: string, locale?: string) =>
   dayDate(day).toLocaleDateString(locale, { weekday: "short", timeZone: "UTC" });
@@ -112,3 +125,9 @@ export function paidWithLabel(entries: readonly PaidWithEntry[]): string {
   }
   return parts.join(" + ");
 }
+
+/** The day before a half-open range's exclusive end, as `YYYY-MM-DD`. */
+export const lastDayOf = (endExclusive: string): string =>
+  new Date(Date.parse(`${endExclusive.slice(0, 10)}T00:00:00Z`) - 86_400_000)
+    .toISOString()
+    .slice(0, 10);

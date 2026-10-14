@@ -50,9 +50,9 @@ const totals = (period: SpendTotals["period"], current: number, previous: number
   previousCents: previous,
   changePct: previous ? ((current - previous) / previous) * 100 : null,
   start: "2026-10-01",
-  end: "2026-10-14",
+  end: "2026-10-15",
   previousStart: "2026-09-01",
-  previousEnd: "2026-09-30",
+  previousEnd: "2026-09-15",
 });
 
 /** `count` bars ending 2026-10-14 (a Wednesday), the last one partial; weeks start Monday. */
@@ -398,8 +398,8 @@ it("hides the comparison when the previous period is not fully synced", async ()
   );
   await show("/app/finance");
   await flush();
-  expect(container.textContent).not.toMatch(/vs \$[\d,]+ last month/);
-  expect(container.textContent).not.toContain("vs previous");
+  expect(container.textContent).not.toMatch(/vs \$[\d,]+ for/);
+  expect(container.textContent).not.toContain("vs Sep");
 });
 
 it("shows the figures, syncs once, and lets the period chips change the spend number", async () => {
@@ -426,7 +426,10 @@ it("shows the figures, syncs once, and lets the period chips change the spend nu
   await act(async () => (week as HTMLElement).click());
   expect(total()).toContain("$111");
   expect(container.querySelector('a[href="/app/finance/spend?period=week"]')).not.toBeNull();
-  expect(container.textContent).toContain("vs previous week");
+  // Intl puts thin spaces around the range dash.
+  expect(container.textContent?.replace(/[\s\u2009]+/g, " ")).toContain(
+    "Spent Oct 1 – 14 · ↓ 78% vs Sep 1 – 14",
+  );
 
   const year = [...container.querySelectorAll('[role="tab"]')].find(
     (tab) => tab.textContent === "Year",
@@ -697,6 +700,10 @@ it("shows the Crypto card only when the overview has crypto, apart from cash", a
   const card = container.querySelector('a[href="/app/finance/crypto"]');
   expect(card?.textContent).toContain("$123,456");
   expect(card?.textContent).toContain("2 unpriced");
+  // One row of five on desktop: crypto shares the grid with the other stat cards.
+  const grid = card?.parentElement;
+  expect(grid?.className).toContain("@3xl:grid-cols-5");
+  expect(grid?.querySelector('a[href="/app/finance/accounts"]')).not.toBeNull();
   expect(container.querySelector('a[href="/app/finance/accounts"]')?.textContent).toBe(cashBefore);
 });
 

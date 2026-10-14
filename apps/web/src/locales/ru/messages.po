@@ -5389,6 +5389,10 @@ msgstr ""
 msgid "Spend this month"
 msgstr ""
 
+#: src/pages/Finance.tsx
+msgid "Spent {spentRange}"
+msgstr ""
+
 #: src/lib/user-error.ts
 msgid "SSO is temporarily unavailable. Try again."
 msgstr "SSO временно недоступен. Попробуйте снова."
@@ -6068,15 +6072,15 @@ msgid "Voice chat"
 msgstr "Голосовой чат"
 
 #: src/pages/Finance.tsx
-msgid "vs {previousSpend} last month"
+msgid "vs {previousRange}"
+msgstr ""
+
+#: src/pages/Finance.tsx
+msgid "vs {previousSpend} for {monthPreviousRange}"
 msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "vs 3 mo ago"
-msgstr ""
-
-#: src/pages/Finance.tsx
-msgid "vs previous {previousPeriod}"
 msgstr ""
 
 #: src/lib/model-connection-preflight.ts

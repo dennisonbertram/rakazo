@@ -288,7 +288,7 @@ export const CashSummarySchema = z.object({
   cardOwedCents: Cents.nullable(),
 });
 
-/** The current calendar period to date against the full previous one. */
+/** The current calendar period to date against the same elapsed days at the start of the previous one. */
 export const SpendTotalsSchema = z.object({
   period: SpendPeriodSchema,
   currentCents: Cents,

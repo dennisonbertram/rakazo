@@ -327,6 +327,8 @@ async function financeOverview(deps: FinanceToolDeps) {
     return {
       period,
       from: t.start,
+      previousFrom: t.previousStart,
+      previousTo: addDays(t.previousEnd, -1),
       spend: dollars(t.currentCents),
       previous: t.previousCents === null ? null : dollars(t.previousCents),
       changePct: t.changePct,
