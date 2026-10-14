@@ -1829,3 +1829,52 @@ model FinanceSyncState {
 
   @@map("finance_sync_states")
 }
+
+/// An EVM wallet the user tracks on the Crypto page. Not tied to an McpServer; read-only, never signs.
+model FinanceWallet {
+  id            String                 @id @default(cuid())
+  spaceId       String
+  userId        String
+  /// Lowercase 0x address.
+  address       String
+  ensName       String?
+  label         String?
+  /// "personal" | "safe" | "exchange" | "contract"
+  type          String
+  /// Safe only: lowercase owner addresses.
+  safeOwners    Json?
+  safeThreshold Int?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  holdings      FinanceCryptoHolding[]
+
+  @@unique([spaceId, userId, address])
+  @@index([spaceId, userId])
+  @@map("finance_wallets")
+}
+
+/// One token balance of one wallet on one chain. Replaced on every crypto sync; not cash.
+model FinanceCryptoHolding {
+  id            String        @id @default(cuid())
+  spaceId       String
+  userId        String
+  walletId      String
+  wallet        FinanceWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  chainId       Int
+  /// Lowercase contract address; "" for the chain's native coin.
+  tokenAddress  String
+  symbol        String
+  name          String
+  decimals      Int
+  /// uint256 as a decimal string; never a float.
+  rawBalance    String
+  /// USD per whole token as a decimal string; null when Blockscout has no price.
+  usdPrice      String?
+  /// rawBalance x usdPrice in whole cents, rounded half up; null when unpriced.
+  usdValueCents BigInt?
+  syncedAt      DateTime
+
+  @@unique([walletId, chainId, tokenAddress])
+  @@index([spaceId, userId])
+  @@map("finance_crypto_holdings")
+}
