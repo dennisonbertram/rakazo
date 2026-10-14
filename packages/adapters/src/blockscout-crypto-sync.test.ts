@@ -1,6 +1,10 @@
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
+import { classifyCryptoError, cryptoFailureMessage } from "./blockscout-crypto-errors.js";
 import {
+  ERR_KEYLESS,
+  ERR_PLAN,
+  ERR_REJECTED,
   fakeBlockscout,
   holding,
   OWNER_1,
@@ -17,6 +21,7 @@ import {
   resolveEnsName,
 } from "./blockscout-crypto-source.js";
 import { syncCryptoHoldings } from "./blockscout-crypto-sync.js";
+import type { FinanceCallTool } from "./finance-sync.js";
 
 const scope = { spaceId: "space-1", userId: "user-1" };
 
@@ -91,6 +96,20 @@ describe("fetchChainSnapshot", () => {
     });
   });
 
+  it("reads owners printed as a list, and surfaces a plan error instead of returning null", async () => {
+    const listed: FinanceCallTool = async (_n, args) => ({
+      data: { result: args.function_name === "getOwners" ? `['${OWNER_1}', '${OWNER_2}']` : "2" },
+    });
+    expect(await fetchSafeDetails(listed, 1, SAFE_WALLET)).toEqual({
+      owners: [OWNER_1, OWNER_2],
+      threshold: 2,
+    });
+    const refused: FinanceCallTool = async () => {
+      throw new Error(ERR_PLAN);
+    };
+    await expect(fetchSafeDetails(refused, 1, SAFE_WALLET)).rejects.toThrow("credits exhausted");
+  });
+
   it("returns null Safe details when the contract does not answer", async () => {
     const fake = fakeBlockscout();
     expect(await fetchSafeDetails(fake.callTool, 1, SAFE_WALLET)).toBeNull();
@@ -142,15 +161,108 @@ describe("syncCryptoHoldings", () => {
     expect(callToolFor).not.toHaveBeenCalled();
   });
 
+  const fast = { callGapMs: 0, retryDelayMs: 0 };
+  /** Prisma stand-in that records the values written to the sync state. */
+  const recording = () => {
+    const written: unknown[][] = [];
+    const prisma = base({
+      $executeRaw: async (_s: TemplateStringsArray, ...values: unknown[]) => {
+        written.push(values);
+        return 1;
+      },
+    });
+    return { prisma, errors: () => written.flat().filter((v) => typeof v === "string") };
+  };
+
   it("fails and writes nothing when every chain errors", async () => {
     const fake = fakeBlockscout({ failChains: [1, 8453, 42161, 10, 137] });
     const transaction = vi.fn();
     const prisma = base({ $transaction: transaction });
     const result = await syncCryptoHoldings(
-      { prisma, callToolFor: async () => fake.callTool },
+      { prisma, callToolFor: async () => fake.callTool, ...fast },
       scope,
     );
     expect(result).toMatchObject({ ok: false, error: "failed" });
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("tells the keyless refusal from a rejected key, and stops calling after the first", async () => {
+    for (const [text, message] of [
+      [ERR_KEYLESS, "Add a Blockscout API key"],
+      [ERR_REJECTED, "Blockscout rejected the API key"],
+    ] as const) {
+      const fake = fakeBlockscout({ allError: text });
+      const { prisma, errors } = recording();
+      const result = await syncCryptoHoldings(
+        { prisma, callToolFor: async () => fake.callTool, ...fast },
+        scope,
+        { force: true },
+      );
+      expect(result).toEqual({ ok: false, error: "failed", message });
+      expect(errors()).toContain(message);
+      // One call fails; the other chains' queued calls never reach the server.
+      expect(fake.calls.length).toBe(1);
+    }
+  });
+
+  it("names every chain that needs a paid plan when all of them do", async () => {
+    const fake = fakeBlockscout({
+      chainErrors: { 1: ERR_PLAN, 8453: ERR_PLAN, 42161: ERR_PLAN, 10: ERR_PLAN, 137: ERR_PLAN },
+    });
+    const result = await syncCryptoHoldings(
+      { prisma: base(), callToolFor: async () => fake.callTool, ...fast },
+      scope,
+      { force: true },
+    );
+    expect(result).toMatchObject({
+      message:
+        "Ethereum, Base, Arbitrum One, Optimism and Polygon need a paid Blockscout plan, or your credits ran out",
+    });
+  });
+
+  it("calls one at a time and retries a rate-limited call", async () => {
+    const fake = fakeBlockscout({
+      maxConcurrent: 1,
+      rateLimitFirst: 2,
+      chains: { 1: { [WALLET_A]: { coinBalance: "5", exchangeRate: "1" } } },
+    });
+    const transaction = vi.fn(async () => "synced");
+    const result = await syncCryptoHoldings(
+      {
+        prisma: base({ $transaction: transaction }),
+        callToolFor: async () => fake.callTool,
+        ...fast,
+      },
+      scope,
+      { force: true },
+    );
+    expect(result).toMatchObject({ ok: true, failedChains: [] });
+    expect(fake.calls.length).toBeGreaterThan(10);
+  });
+});
+
+describe("classifyCryptoError", () => {
+  it.each([
+    [ERR_PLAN, "plan"],
+    [ERR_KEYLESS, "missing_key"],
+    [ERR_REJECTED, "rejected_key"],
+    ["Tool failed: 403 Forbidden", "rejected_key"],
+    ["Tool failed: 429 Too Many Requests - Details: x", "rate_limit"],
+    ["The operation timed out", "timeout"],
+    ["boom", "failed"],
+  ])("%s", (text, kind) => {
+    expect(classifyCryptoError(new Error(text))).toBe(kind);
+  });
+
+  it("words each cause for the page without vendor text", () => {
+    expect(cryptoFailureMessage("plan", ["Base", "Polygon"])).toBe(
+      "Base and Polygon need a paid Blockscout plan, or your credits ran out",
+    );
+    expect(cryptoFailureMessage("plan", ["Base"])).toBe(
+      "Base needs a paid Blockscout plan, or your credits ran out",
+    );
+    expect(cryptoFailureMessage("rate_limit", ["Optimism"])).toBe(
+      "Optimism: Blockscout rate limit reached, try again shortly",
+    );
   });
 });

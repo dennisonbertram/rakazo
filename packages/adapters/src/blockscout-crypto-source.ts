@@ -1,5 +1,6 @@
 import { CRYPTO_CHAINS } from "@rakazo/contracts";
 import { z } from "zod";
+import { classifyCryptoError, isKeyFailure } from "./blockscout-crypto-errors.js";
 import { FinanceShapeError, parseToolResponse } from "./finance-source-util.js";
 import type { FinanceCallTool } from "./finance-sync.js";
 
@@ -162,14 +163,26 @@ export async function fetchSafeDetails(
       ) as { result?: unknown } | null
     )?.result;
   try {
-    const owners = await read("getOwners", "address[]");
+    const owners = addressList(await read("getOwners", "address[]"));
     const threshold = Number(await read("getThreshold", "uint256"));
-    if (!Array.isArray(owners) || !Number.isInteger(threshold) || threshold < 1) return null;
-    const lower = owners.map((o) => String(o).toLowerCase());
-    return lower.every((o) => ADDRESS.test(o)) ? { owners: lower, threshold } : null;
-  } catch {
+    return owners && Number.isInteger(threshold) && threshold >= 1 ? { owners, threshold } : null;
+  } catch (error) {
+    // Plan and key problems must reach the user; any other failure just means "not a Safe".
+    const kind = classifyCryptoError(error);
+    if (isKeyFailure(kind) || kind === "plan") throw error;
     return null;
   }
+}
+
+/** getOwners may arrive as an array or as a printed list; either way, lowercase 0x addresses. */
+function addressList(value: unknown): string[] | null {
+  const items = Array.isArray(value)
+    ? value.map(String)
+    : typeof value === "string"
+      ? (value.match(/0x[0-9a-fA-F]{40}/g) ?? [])
+      : [];
+  const lower = items.map((o) => o.toLowerCase());
+  return lower.length > 0 && lower.every((o) => ADDRESS.test(o)) ? lower : null;
 }
 
 /** Lowercase address for an ENS name, or null when it does not resolve. */

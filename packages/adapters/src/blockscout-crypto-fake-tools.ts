@@ -10,6 +10,12 @@ export const TOKEN_USDC = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 export const TOKEN_SPAM = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 export const TOKEN_DAI = "0xcccccccccccccccccccccccccccccccccccccccc";
 export const OWNER_1 = "0x4444444444444444444444444444444444444444";
+/** Real tool error texts seen from the hosted server. */
+export const ERR_PLAN =
+  "Tool failed: Error executing tool get_address_info: Blockscout PRO API credits exhausted (HTTP 402): the API key's credit allowance is depleted. Top up credits or wait for the daily reset; retrying will not succeed";
+export const ERR_KEYLESS =
+  "Tool failed: This session's `session_id` can no longer be used to access Blockscout data. Relay to the user: to continue, obtain a Blockscout PRO API key at https://mcp.blockscout.com";
+export const ERR_REJECTED = "Tool failed: 401 Unauthorized - Details: invalid api key";
 export const OWNER_2 = "0x5555555555555555555555555555555555555555";
 
 export const holding = (address: string, balance: string, over: Record<string, unknown> = {}) => ({
@@ -40,6 +46,14 @@ export interface FakeBlockscoutOptions {
   chains?: Record<number, Record<string, FakeChainAddress>>;
   /** Chains whose calls throw (a rate limit). */
   failChains?: number[];
+  /** Chains whose calls throw this exact message instead, e.g. a real vendor error text. */
+  chainErrors?: Record<number, string>;
+  /** Throws this message on every call (a key problem). */
+  allError?: string;
+  /** Throws a rate-limit error for the first N calls on these chains, then answers. */
+  rateLimitFirst?: number;
+  /** Throws if more than this many calls are in flight at once. */
+  maxConcurrent?: number;
   ens?: Record<string, string | null>;
   safe?: { owners: string[]; threshold: number };
 }
@@ -48,9 +62,29 @@ export function fakeBlockscout(options: FakeBlockscoutOptions = {}): {
   callTool: FinanceCallTool;
 } & FakeCalls {
   const calls: FakeCalls["calls"] = [];
+  let inFlight = 0;
+  let limited = 0;
   const callTool: FinanceCallTool = async (name, args) => {
     calls.push({ name, args });
+    inFlight++;
+    try {
+      if (options.maxConcurrent !== undefined && inFlight > options.maxConcurrent)
+        throw new Error("Tool failed: 429 Too Many Requests");
+      await Promise.resolve();
+      return await answer(name, args);
+    } finally {
+      inFlight--;
+    }
+  };
+  const answer = async (name: string, args: Record<string, unknown>) => {
     const chainId = Number(args.chain_id);
+    if (options.allError) throw new Error(options.allError);
+    const chainError = options.chainErrors?.[chainId];
+    if (chainError) throw new Error(chainError);
+    if (options.rateLimitFirst && limited < options.rateLimitFirst) {
+      limited++;
+      throw new Error("Tool failed: 429 Too Many Requests - Details: slow down");
+    }
     if (options.failChains?.includes(chainId)) throw new Error("Tool failed: rate limited");
     const account = options.chains?.[chainId]?.[String(args.address)];
     switch (name) {

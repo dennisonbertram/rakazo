@@ -3,6 +3,7 @@ import type { PrismaClient } from "@rakazo/db";
 import { createDb } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  ERR_PLAN,
   fakeBlockscout,
   holding,
   OWNER_1,
@@ -30,7 +31,7 @@ describePostgres("crypto sync (PostgreSQL)", () => {
   let fake = fakeBlockscout();
   const sync = (opts: { force?: boolean; user?: string; walletIds?: string[] } = {}) =>
     syncCryptoHoldings(
-      { prisma, callToolFor: async () => fake.callTool },
+      { prisma, callToolFor: async () => fake.callTool, callGapMs: 0, retryDelayMs: 0 },
       { spaceId, userId: opts.user ?? userId },
       opts,
     );
@@ -136,7 +137,44 @@ describePostgres("crypto sync (PostgreSQL)", () => {
     const state = await prisma.financeSyncState.findUniqueOrThrow({
       where: { mcpServerId: server.id },
     });
-    expect(state.lastError).toBe("Could not read Base");
+    expect(state.lastError).toBe("Base: Blockscout rate limit reached, try again shortly");
+  });
+
+  it("shows a chain on a Free plan as needing a paid plan, keeps its rows, and skips it until forced", async () => {
+    const owner = `${userId}-plan`;
+    await prisma.user.create({
+      data: { id: owner, name: owner, email: `${owner}@rakazo.test`, emailVerified: false },
+    });
+    const server = await addServer(owner);
+    await addWallet(owner, WALLET_A);
+    const ok = {
+      chains: {
+        1: { [WALLET_A]: { coinBalance: "1000000000000000000", exchangeRate: "2000" } },
+        8453: { [WALLET_A]: { coinBalance: "1000000000000000000", exchangeRate: "2000" } },
+      },
+    };
+    fake = fakeBlockscout(ok);
+    await sync({ user: owner });
+    expect(await rows(owner)).toHaveLength(2);
+
+    fake = fakeBlockscout({ ...ok, chainErrors: { 8453: ERR_PLAN, 137: ERR_PLAN } });
+    expect(await sync({ user: owner, force: true })).toMatchObject({
+      ok: true,
+      failedChains: [137, 8453].sort((a, b) => a - b),
+    });
+    expect(
+      (await prisma.financeSyncState.findUniqueOrThrow({ where: { mcpServerId: server.id } }))
+        .lastError,
+    ).toBe("Base and Polygon need a paid Blockscout plan, or your credits ran out");
+    expect(await rows(owner)).toHaveLength(2);
+
+    // Not forced: the refused chains are not called again.
+    await prisma.$executeRaw`UPDATE finance_sync_states SET "lastSyncedAt" = now() - interval '20 minutes', "lastErrorAt" = now() - interval '20 minutes' WHERE "mcpServerId" = ${server.id}`;
+    fake = fakeBlockscout(ok);
+    await sync({ user: owner });
+    expect(new Set(fake.calls.map((c) => Number(c.args.chain_id)))).toEqual(
+      new Set([1, 42161, 10]),
+    );
   });
 
   it("records a Safe's owners and threshold without changing the user's type, and never touches an exchange", async () => {
