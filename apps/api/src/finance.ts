@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import type { JobPublisher } from "@rakazo/adapter-kit";
+import type { JobPublisher, SecretStore } from "@rakazo/adapter-kit";
 import { financeSyncJob } from "@rakazo/adapter-kit";
 import type { FinanceSyncDeps, McpOAuthBroker } from "@rakazo/adapters";
 import {
@@ -62,6 +62,7 @@ import {
 import type { createRepos, Prisma, PrismaClient } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { assignFinanceServers, ensureFinanceAgent } from "./finance-agent.js";
+import { loadCryptoSummary, syncCryptoQuietly } from "./finance-crypto.js";
 import { notFound } from "./inbox.js";
 
 export interface FinanceDeps {
@@ -80,7 +81,28 @@ export interface FinanceDeps {
   }): ReturnType<McpOAuthBroker["begin"]>;
   /** Builds the read-tool caller for a server. Unset where finance sync is not wired (tests). */
   callToolFor?: FinanceSyncDeps["callToolFor"];
+  /** Stores the optional Blockscout API key like any custom MCP header. */
+  secrets: SecretStore;
+  /** Crypto sync and ENS lookup, injected from the adapters. Unset where they are not wired (tests). */
+  crypto?: FinanceCryptoDeps;
   now?: () => Date;
+}
+
+/** The two crypto adapter calls the handlers need (syncCryptoHoldings and resolveEnsName behind the user's Blockscout server). */
+export interface FinanceCryptoDeps {
+  sync(
+    scope: { spaceId: string; userId: string },
+    opts: { walletIds?: string[]; force?: boolean; signal?: AbortSignal },
+  ): Promise<
+    | { ok: true; outcome: "synced" | "skipped"; failedChains: number[] }
+    | { ok: false; error: string; message: string }
+  >;
+  /** A lowercase address, or null when the name does not exist. Throws on transport errors. */
+  resolveEns(
+    scope: { spaceId: string; userId: string },
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<string | null>;
 }
 
 /** A page load starts a background sync when a connected source is older than this. */
@@ -268,6 +290,7 @@ export async function financeRefresh(
     scopeOf(actor),
     { force: true, signal },
   );
+  await syncCryptoQuietly(deps, actor, { signal });
   return { ok: true };
 }
 
@@ -321,7 +344,7 @@ export async function financeOverview(
 ): Promise<FinanceOverview> {
   signal?.throwIfAborted();
   const now = nowOf(deps);
-  const [{ sources, syncDue, lastSyncedAt }, accounts, txns, bills, yields, agent] =
+  const [{ sources, syncDue, lastSyncedAt }, accounts, txns, bills, yields, agent, crypto] =
     await Promise.all([
       financeSources(deps, actor, now),
       loadAccounts(deps, actor),
@@ -336,6 +359,7 @@ export async function financeOverview(
         },
         select: { id: true, name: true },
       }),
+      loadCryptoSummary(deps, actor),
     ]);
   if (syncDue) {
     // The job key merges repeats; a lost enqueue only delays the sync until the next page load.
@@ -397,6 +421,8 @@ export async function financeOverview(
         : null,
     lastSyncedAt,
     excludedNonUsdCount: excludedNonUsdCount(txns),
+    // Its own card; never part of cash, burn or runway.
+    crypto,
   };
 }
 

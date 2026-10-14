@@ -8,6 +8,8 @@ describe("parseFinanceRoute", () => {
     expect(parseFinanceRoute("/app/finance/accounts")).toEqual({ page: "accounts" });
     expect(parseFinanceRoute("/app/finance/burn")).toEqual({ page: "burn" });
     expect(parseFinanceRoute("/app/finance/runway")).toEqual({ page: "runway" });
+    expect(parseFinanceRoute(financePath.crypto())).toEqual({ page: "crypto" });
+    expect(parseFinanceRoute("/app/finance/crypto/x")).toEqual({ page: "not-found" });
   });
 
   it("round-trips every detail path it builds", () => {

@@ -44,6 +44,7 @@ export const BUILTIN_TOOL_NAMES = [
   "finance_breakdown",
   "finance_transactions",
   "finance_recurring",
+  "finance_crypto",
   "drive_search",
   "drive_read",
   "drive_create_file",

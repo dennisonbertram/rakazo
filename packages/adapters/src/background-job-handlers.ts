@@ -10,6 +10,8 @@ import type {
 import { messagingDeliverJob } from "@rakazo/adapter-kit";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import type { CryptoSyncDeps } from "./blockscout-crypto-sync.js";
+import { syncCryptoHoldings } from "./blockscout-crypto-sync.js";
 import type { CloudAgentConnection } from "./cloud-agent-factory.js";
 import { pollCloudAgent } from "./cloud-agent-poll.js";
 import { expireComputerControl } from "./computer-control.js";
@@ -43,6 +45,8 @@ export function createBackgroundJobHandlers(deps: {
   cloudAgent?: CloudAgentConnection | null;
   /** Read-tool caller for the user's Mercury and Brex servers; see `createFinanceCallToolFor`. */
   financeCallToolFor?: FinanceSyncDeps["callToolFor"];
+  /** Read-tool caller for the user's Blockscout server; see `createCryptoCallToolFor`. */
+  cryptoCallToolFor?: CryptoSyncDeps["callToolFor"];
 }): BackgroundJobHandlers {
   const deliverMessaging = async (runId?: string) => {
     if (!deps.messaging) return;
@@ -116,6 +120,12 @@ export function createBackgroundJobHandlers(deps: {
         { prisma: deps.prisma, callToolFor: deps.financeCallToolFor },
         { spaceId: payload.spaceId, userId: payload.userId },
       );
+      // Wallets ride the same periodic job; without a Blockscout server this is a no-op.
+      if (deps.cryptoCallToolFor)
+        await syncCryptoHoldings(
+          { prisma: deps.prisma, callToolFor: deps.cryptoCallToolFor },
+          { spaceId: payload.spaceId, userId: payload.userId },
+        );
     },
     "cloud_agent.poll": async (payload) => {
       await pollCloudAgent(

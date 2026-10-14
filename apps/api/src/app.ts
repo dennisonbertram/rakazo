@@ -26,6 +26,7 @@ import {
   createBackgroundJobHandlers,
   createCloudAgentConnection,
   createConnectorStack,
+  createCryptoCallToolFor,
   createFinanceCallToolFor,
   createJobReconciler,
   createMailProvider,
@@ -42,6 +43,7 @@ import {
   EmailEmulator,
   ExpoPushProvider,
   endSessionPushToken,
+  findCryptoServer,
   GraphileJobPublisher,
   InMemoryJobQueue,
   InMemoryRealtimeFanout,
@@ -64,12 +66,14 @@ import {
   reconcileCloudAgents,
   reconcileComputerUpdates,
   removePiUserSessions,
+  resolveEnsName,
   ScriptedAgentRuntime,
   SmtpEmailProvider,
   SpaceMemoryProviderResolver,
   StripeBillingProvider,
   sandboxProviderOptionsFromEnv,
   stripeBillingConfigFromEnv,
+  syncCryptoHoldings,
   toTeamChatInbound,
   withSecretPersistence,
 } from "@rakazo/adapters";
@@ -320,6 +324,7 @@ export async function createApp(
     },
     mcpOAuth,
   );
+  const cryptoCallToolFor = createCryptoCallToolFor(prisma, mcp);
   const pipedreamConfig = pipedreamConfigFromEnv(env);
   const pipedream =
     pipedreamOverride ??
@@ -528,6 +533,7 @@ export async function createApp(
     messaging,
     cloudAgent,
     financeCallToolFor: createFinanceCallToolFor(prisma, mcp),
+    cryptoCallToolFor,
   });
   if (inMemoryJobs) {
     await inMemoryJobs.start(jobHandlers);
@@ -567,6 +573,18 @@ export async function createApp(
     artifacts,
     mail,
     financeCallToolFor: createFinanceCallToolFor(prisma, mcp),
+    financeCrypto: {
+      sync: (scope, opts) =>
+        syncCryptoHoldings({ prisma, callToolFor: cryptoCallToolFor }, scope, opts),
+      resolveEns: async (scope, name, signal) => {
+        const server = await findCryptoServer(prisma, scope);
+        if (!server) throw new Error("not_connected");
+        return resolveEnsName(
+          await cryptoCallToolFor(server, signal ?? new AbortController().signal),
+          name,
+        );
+      },
+    },
     resolveModel: executor.resolveModel,
     dataDir: env.dataDir,
     billing,

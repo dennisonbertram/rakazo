@@ -807,6 +807,13 @@ export const builtinAgentTools: ConnectorTool[] = [
     readOnly: true,
   },
   {
+    name: "finance_crypto",
+    description:
+      "The user's crypto wallets: total value in dollars at Blockscout prices, value by chain and wallet, each wallet's top holdings, tokens without a price, and when it last synced. Separate from cash, burn and runway.",
+    inputSchema: { type: "object", properties: {} },
+    readOnly: true,
+  },
+  {
     name: "drive_search",
     description:
       "Find files in the user's connected Google Drive by name or content. Returns id, name, mimeType, modifiedTime, owners, webViewLink and size for each match. Use drive_read for the content.",

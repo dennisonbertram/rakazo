@@ -1,6 +1,14 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { FinanceAccountsOutput } from "@rakazo/contracts";
+import type { FinanceAccountsOutput, FinanceCryptoOutput } from "@rakazo/contracts";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@rakazo/ui-web";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { LineChart } from "../../components/finance/charts";
 import {
@@ -14,6 +22,7 @@ import {
   useFinanceQuery,
   useRowNavigate,
 } from "../../components/finance/ui";
+import { useTypeNames, WalletDialog, walletName } from "../../components/finance/WalletDialog";
 import { money, moneyExact, monthLabel, monthShort } from "../../lib/finance-format";
 import { financePath } from "../../lib/finance-route";
 import { rpc } from "../../lib/rpc";
@@ -65,19 +74,73 @@ function AccountTable({ rows, owed }: { rows: AccountRow[]; owed?: boolean }) {
   );
 }
 
+/** The wallets, apart from the cash accounts and never part of their totals. */
+function CryptoGroup({ crypto }: { crypto: FinanceCryptoOutput }) {
+  const typeNames = useTypeNames();
+  const rowProps = useRowNavigate();
+  const cents = new Map(crypto.summary.byWallet.map((row) => [row.walletId, row.cents]));
+  return (
+    <Section title={<Trans>Crypto</Trans>}>
+      <table className="w-full border-collapse">
+        <tbody>
+          {crypto.wallets.map((wallet) => (
+            <tr key={wallet.id} className={rowClass} {...rowProps(financePath.crypto())}>
+              <td className="font-semibold">
+                <Link
+                  to={financePath.crypto()}
+                  className="outline-none hover:underline focus-visible:underline"
+                >
+                  {walletName(wallet)}
+                </Link>
+                <span className="ms-1.5 font-normal text-muted-foreground">
+                  {typeNames[wallet.type]}
+                </span>
+              </td>
+              <td className="text-end tabular-nums">{moneyExact(cents.get(wallet.id) ?? 0)}</td>
+              <Chevron />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Section>
+  );
+}
+
 export function FinanceAccountsPage() {
   const q = useFinanceQuery(() => rpc.finance.accounts(), []);
+  const cryptoQuery = useFinanceQuery(() => rpc.finance.crypto(), []);
+  const [adding, setAdding] = useState(false);
+  const crypto = cryptoQuery.data;
   const data = q.data;
   return (
     <DetailPage
       crumbs={[{ label: t`Finance`, to: financePath.dashboard() }, { label: t`Accounts` }]}
       title={<Trans>Accounts</Trans>}
+      action={
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+            <Trans>Add account</Trans>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {/* One line per account type: add the next one here. */}
+            <DropdownMenuItem onClick={() => setAdding(true)}>
+              <Trans>Crypto wallet</Trans>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
       loading={!data}
       error={q.error}
       onRetry={q.retry}
     >
       {data ? (
         <>
+          <WalletDialog
+            key={adding ? "add" : "closed"}
+            open={adding}
+            onClose={() => setAdding(false)}
+            onSaved={cryptoQuery.reload}
+          />
           <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-3">
             <Kpi
               title={t`Total cash`}
@@ -109,6 +172,7 @@ export function FinanceAccountsPage() {
               <AccountTable rows={data.cards} owed />
             </Section>
           ) : null}
+          {crypto && crypto.wallets.length > 0 ? <CryptoGroup crypto={crypto} /> : null}
         </>
       ) : null}
     </DetailPage>

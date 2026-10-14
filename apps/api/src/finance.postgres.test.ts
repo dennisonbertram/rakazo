@@ -1,6 +1,12 @@
 import { createRouterClient } from "@orpc/server";
 import type { Actor } from "@rakazo/contracts";
-import { FINANCE_MCP_ENDPOINTS, FINANCE_READ_TOOLS, financeAgentSpawnKey } from "@rakazo/contracts";
+import {
+  CRYPTO_MCP_ENDPOINT,
+  CRYPTO_READ_TOOLS,
+  FINANCE_MCP_ENDPOINTS,
+  FINANCE_READ_TOOLS,
+  financeAgentSpawnKey,
+} from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { createDb, createRepos } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -33,6 +39,7 @@ describePostgres("finance procedures (PostgreSQL)", () => {
   let close: () => Promise<void>;
   let repos: ReturnType<typeof createRepos>;
   const enqueued: unknown[] = [];
+  let secretCount = 0;
 
   const client = (who: Actor | null) =>
     createRouterClient(
@@ -40,6 +47,18 @@ describePostgres("finance procedures (PostgreSQL)", () => {
         prisma,
         env: { webOrigin },
         jobs: { enqueue: async (job: unknown) => void enqueued.push(job) },
+        // Inline-style fake: the ciphertext is unique per write and nothing leaves the process.
+        secrets: {
+          put: async (plain: string) => ({
+            id: `sec-${++secretCount}-${suffix}`,
+            ciphertext: `ct-${secretCount}-${plain.length}-${suffix}`,
+          }),
+          delete: async () => undefined,
+        },
+        financeCrypto: {
+          sync: async () => ({ ok: true, outcome: "synced", failedChains: [] }),
+          resolveEns: async () => `0x${"cd".repeat(20)}`,
+        },
         // Nobody can sign in to a vendor here; a stored login is simulated by the status below.
         mcpOAuth: {
           statusFor: async () => "connected",
@@ -314,6 +333,76 @@ describePostgres("finance procedures (PostgreSQL)", () => {
       expect(await c.finance.burn()).toHaveProperty("monthlyCents");
       expect(await c.finance.runway()).toHaveProperty("runway");
       expect((await c.finance.spend({ period: "quarter" })).transactions.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("crypto", () => {
+    const address = `0x${"ab".repeat(20)}`;
+
+    it("adds, scopes, updates, removes wallets and cascades holdings", async () => {
+      const wallet = await client(a).finance.walletAdd({ addressOrEns: address, type: "personal" });
+      await expect(
+        client(a).finance.walletAdd({ addressOrEns: address, type: "safe" }),
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+      const ens = await client(a).finance.walletAdd({ addressOrEns: "me.eth", type: "personal" });
+      expect(ens).toMatchObject({ address: `0x${"cd".repeat(20)}`, ensName: "me.eth" });
+
+      await prisma.financeCryptoHolding.create({
+        data: {
+          spaceId,
+          userId: userA,
+          walletId: wallet.id,
+          chainId: 1,
+          tokenAddress: "",
+          symbol: "ETH",
+          name: "Ether",
+          decimals: 18,
+          rawBalance: "1000000000000000000",
+          usdPrice: "2000",
+          usdValueCents: 200_000n,
+          syncedAt: new Date(),
+        },
+      });
+      const crypto = await client(a).finance.crypto();
+      expect(crypto.holdings).toEqual([
+        expect.objectContaining({ tokenAddress: null, usdValueCents: 200_000 }),
+      ]);
+      expect(crypto.summary.totalCents).toBe(200_000);
+      expect(await client(b).finance.wallets()).toEqual([]);
+
+      await expect(
+        client(b).finance.walletUpdate({ id: wallet.id, label: "x" }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(client(b).finance.walletRemove({ id: wallet.id })).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
+      expect(await client(a).finance.walletUpdate({ id: wallet.id, label: "Main" })).toMatchObject({
+        label: "Main",
+      });
+      await client(a).finance.walletRemove({ id: wallet.id });
+      expect(await prisma.financeCryptoHolding.count({ where: { walletId: wallet.id } })).toBe(0);
+    });
+
+    it("connects Blockscout once, stores the key encrypted, and gives the agent only crypto read tools", async () => {
+      const agent = await client(a).finance.agent();
+      const first = await client(a).finance.cryptoConnect({});
+      expect(first.hasApiKey).toBe(false);
+      const keyed = await client(a).finance.cryptoConnect({ apiKey: "pro-key-xyz" });
+      expect(keyed).toEqual({ serverId: first.serverId, hasApiKey: true });
+      const row = await prisma.mcpServer.findFirstOrThrow({ where: { id: first.serverId } });
+      expect(row.secretId).not.toBeNull();
+      expect(JSON.stringify(row)).not.toContain("pro-key-xyz");
+      expect(JSON.stringify(await client(a).finance.crypto())).not.toContain("pro-key-xyz");
+      expect(await client(a).finance.crypto()).toMatchObject({ connected: true, hasApiKey: true });
+      const assigned = await prisma.botMcpServer.findFirstOrThrow({
+        where: { botId: agent.id, serverId: first.serverId },
+      });
+      expect(assigned.allowedTools).toEqual([...CRYPTO_READ_TOOLS]);
+      expect(
+        await prisma.mcpServer.count({
+          where: { spaceId, userId: userA, endpoint: CRYPTO_MCP_ENDPOINT },
+        }),
+      ).toBe(1);
     });
   });
 });

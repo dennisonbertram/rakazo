@@ -107,6 +107,9 @@ import {
   FinanceCategoryOutputSchema,
   FinanceConnectInputSchema,
   FinanceConnectOutputSchema,
+  FinanceCryptoConnectInputSchema,
+  FinanceCryptoConnectOutputSchema,
+  FinanceCryptoOutputSchema,
   FinanceMonthOutputSchema,
   FinanceOverviewSchema,
   FinanceReceiptUrlOutputSchema,
@@ -116,6 +119,11 @@ import {
   FinanceSpendOutputSchema,
   FinanceTransactionOutputSchema,
   FinanceVendorOutputSchema,
+  FinanceWalletAddInputSchema,
+  FinanceWalletRemoveInputSchema,
+  FinanceWalletSchema,
+  FinanceWalletsOutputSchema,
+  FinanceWalletUpdateInputSchema,
 } from "./finance.js";
 import { Id, IsoDate } from "./ids.js";
 import {
@@ -1065,6 +1073,16 @@ export const appContract = {
       .output(FinanceVendorOutputSchema),
     transaction: oc.input(z.object({ id: Id })).output(FinanceTransactionOutputSchema),
     receiptUrl: oc.input(z.object({ transactionId: Id })).output(FinanceReceiptUrlOutputSchema),
+    wallets: oc.output(FinanceWalletsOutputSchema),
+    walletAdd: oc.input(FinanceWalletAddInputSchema).output(FinanceWalletSchema),
+    walletUpdate: oc.input(FinanceWalletUpdateInputSchema).output(FinanceWalletSchema),
+    walletRemove: oc
+      .input(FinanceWalletRemoveInputSchema)
+      .output(z.object({ ok: z.literal(true) })),
+    crypto: oc.output(FinanceCryptoOutputSchema),
+    cryptoConnect: oc
+      .input(FinanceCryptoConnectInputSchema)
+      .output(FinanceCryptoConnectOutputSchema),
   },
   botSecrets: {
     list: oc.input(z.object({ botId: Id })).output(z.array(BotSecretMetadata)),
