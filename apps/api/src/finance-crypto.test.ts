@@ -133,6 +133,17 @@ describe("wallets", () => {
     );
   });
 
+  it("connects Blockscout on the first wallet so the Finance agent gets its crypto tool", async () => {
+    const { deps, prisma } = setup();
+    await financeWalletAdd(deps, a, { addressOrEns: ADDR, type: "personal" });
+    await financeWalletAdd(deps, a, { addressOrEns: ADDR2, type: "safe" });
+    expect(prisma.mcpServer.rows).toHaveLength(1);
+    expect(prisma.mcpServer.rows[0]).toMatchObject({
+      endpoint: CRYPTO_MCP_ENDPOINT,
+      userId: "user-a",
+    });
+  });
+
   it("resolves an ENS name and keeps the name", async () => {
     const { deps, resolveEns } = setup();
     const out = await financeWalletAdd(deps, a, {

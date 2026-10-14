@@ -110,6 +110,9 @@ export async function financeWalletAdd(
   if (!parsed) {
     throw new ORPCError("BAD_REQUEST", { message: "Enter a 0x address or an ENS name" });
   }
+  // The first wallet connects Blockscout (keyless; a stored key is kept) so ENS lookup, sync and
+  // the Finance agent's crypto tool work without a separate connect step.
+  if (!(await cryptoServer(deps, actor))) await financeCryptoConnect(deps, actor, {});
   let address: string;
   let ensName: string | null = null;
   if (parsed.kind === "address") {
