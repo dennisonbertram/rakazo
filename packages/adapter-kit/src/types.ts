@@ -1000,8 +1000,10 @@ export interface ConnectorProxyRequest {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /** Absolute https URL including the query string. */
   url: string;
-  /** JSON body for POST, PUT and PATCH. */
+  /** JSON body for POST, PUT and PATCH. With `contentType`, a string body is sent as is. */
   body?: unknown;
+  /** Media type of a raw string `body` (a Drive media upload). Omit for JSON. */
+  contentType?: string;
 }
 
 /**

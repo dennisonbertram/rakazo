@@ -243,6 +243,12 @@ import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
 import { formatCurrentTimeInstruction } from "./current-time.js";
 import { resolveDeploymentModel } from "./deployment-model.js";
+import {
+  DRIVE_TOOL_NAMES,
+  driveToolFromTool,
+  driveToolsAllowed,
+  listDriveAccounts,
+} from "./drive-tools.js";
 import { handoffToGroupBot, loadGroupContext } from "./group-handoff.js";
 import {
   COMPACTION_BATCH_SIZE,
@@ -419,6 +425,8 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "mail_get",
   "show_emails",
   "inbox_overview",
+  "drive_search",
+  "drive_read",
   "browser_snapshot",
   "list_secrets",
   "cloud_agent_status",
@@ -3859,6 +3867,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botUserId: bot.userId,
             messagingChannelRun,
           }) && (await mailAccounts().catch(() => [])).length > 0;
+        // Connected Google Drive accounts of the bot owner, looked up once per run.
+        let driveAccountsPromise: ReturnType<typeof listDriveAccounts> | undefined;
+        const driveAccounts = () => {
+          driveAccountsPromise ??= listDriveAccounts(deps.prisma, {
+            spaceId: run.spaceId,
+            userId: bot.userId,
+          });
+          return driveAccountsPromise;
+        };
+        const driveEnabled =
+          driveToolsAllowed({
+            hasProvider: Boolean(deps.connectors),
+            groupId: thread.groupId,
+            runUserId: run.userId,
+            botUserId: bot.userId,
+            messagingChannelRun,
+          }) && (await driveAccounts().catch(() => [])).length > 0;
         const builtins = [
           ...selectBuiltinToolsForRun({
             ticketBoardEnabled: deps.ticketBoardEnabled,
@@ -3870,6 +3895,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             semanticMemoryEnabled,
             cloudAgentEnabled: cloudAgentsEnabled(cloudAgent, run.spaceId),
             mailEnabled,
+            driveEnabled,
             messagingChannelRun,
             voiceCall,
             disabledBuiltinTools: bot.disabledBuiltinTools,
@@ -5246,6 +5272,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   writesDisabled: deps.mailWritesDisabled,
                   idempotencyKey: effectKey,
                   scope: { spaceId: run.spaceId, userId: bot.userId, botId: bot.id },
+                },
+                context,
+                args,
+              ),
+            );
+          }
+          if (DRIVE_TOOL_NAMES.has(name) && deps.connectors && driveEnabled) {
+            return finish(
+              await driveToolFromTool(
+                name,
+                {
+                  prisma: deps.prisma,
+                  connectors: deps.connectors,
+                  accounts: driveAccounts,
+                  scope: { spaceId: run.spaceId, userId: bot.userId },
                 },
                 context,
                 args,
@@ -7531,6 +7572,8 @@ export function selectBuiltinToolsForRun(options: {
   cloudAgentEnabled?: boolean;
   /** The run's requester owns the bot and has a connected mail account. */
   mailEnabled?: boolean;
+  /** Same rule, with a connected Google Drive account. */
+  driveEnabled?: boolean;
   messagingChannelRun: boolean;
   /** Hanging up is only offered to a turn the caller spoke on a live call. */
   voiceCall?: boolean;
@@ -7559,6 +7602,7 @@ export function selectBuiltinToolsForRun(options: {
   ).filter(
     (tool) =>
       !disabled.has(tool.name) &&
+      (options.driveEnabled || !DRIVE_TOOL_NAMES.has(tool.name)) &&
       (options.ticketBoardEnabled ||
         (tool.name !== "board_tickets" && !tool.name.startsWith("ticket_"))) &&
       (!isBackgroundRunTrigger(options.trigger) ||

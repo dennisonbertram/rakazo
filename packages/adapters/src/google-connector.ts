@@ -327,14 +327,19 @@ export class GoogleConnector implements ManagedConnectorProvider {
     forceRefresh: boolean,
   ): Promise<ConnectorProxyResponse> {
     const token = await this.accessToken(row, context, forceRefresh);
+    const raw = typeof request.body === "string" && Boolean(request.contentType);
     const response = await (this.config.fetch ?? fetch)(request.url, {
       method: request.method,
       headers: {
         authorization: `Bearer ${token}`,
         accept: "application/json, text/plain;q=0.9, */*;q=0.8",
-        ...(request.body === undefined ? {} : { "content-type": "application/json" }),
+        ...(request.body === undefined
+          ? {}
+          : { "content-type": raw ? (request.contentType as string) : "application/json" }),
       },
-      ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
+      ...(request.body === undefined
+        ? {}
+        : { body: raw ? (request.body as string) : JSON.stringify(request.body) }),
       redirect: "error",
       signal: combineSignals(context.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)),
     });

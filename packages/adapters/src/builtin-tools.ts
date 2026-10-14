@@ -746,6 +746,71 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "drive_search",
+    description:
+      "Find files in the user's connected Google Drive by name or content. Returns id, name, mimeType, modifiedTime, owners, webViewLink and size for each match. Use drive_read for the content.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Words to find in file names or content." },
+        mimeType: { type: "string", description: "Only files of this type." },
+        maxResults: { type: "number", description: "Default 25, max 100." },
+        account: {
+          type: "string",
+          description: "The connection name of one Drive account. Required with several.",
+        },
+      },
+      required: ["query"],
+    },
+    readOnly: true,
+  },
+  {
+    name: "drive_read",
+    description:
+      "Read a Drive file as text: Google Docs, Sheets (first sheet, as CSV) and Slides, and text files. Other types return only their details. Long content is truncated (truncated: true).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: { type: "string", description: "The id from drive_search." },
+        account: { type: "string", description: "The connection name of the Drive account." },
+      },
+      required: ["fileId"],
+    },
+    readOnly: true,
+  },
+  {
+    name: "drive_create_file",
+    description:
+      "Create a file in the user's Google Drive from text: a Google Doc (kind doc) or a plain text file (kind text). Needs the user's approval. If the result says the outcome is unclear, check Drive before creating it again.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        content: { type: "string", description: "The text of the file." },
+        kind: { type: "string", enum: ["doc", "text"] },
+        mimeType: { type: "string", description: "For kind text, e.g. text/markdown." },
+        parentFolderId: { type: "string", description: "Folder id. Default: My Drive." },
+        account: { type: "string", description: "The connection name of the Drive account." },
+      },
+      required: ["name", "content", "kind"],
+    },
+  },
+  {
+    name: "drive_update_file",
+    description:
+      "Replace the whole text content of a Google Doc or text file in the user's Drive, and/or rename it. Needs the user's approval.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: { type: "string" },
+        content: { type: "string", description: "The new full content." },
+        name: { type: "string", description: "The new file name." },
+        account: { type: "string", description: "The connection name of the Drive account." },
+      },
+      required: ["fileId"],
+    },
+  },
+  {
     name: "cloud_agent_launch",
     description:
       "Launch a remote cloud coding agent on a connected repository. Returns immediately with a tracking id and status; the agent link appears when launched. Opens a PR when openPr is true. Not the bot computer.",

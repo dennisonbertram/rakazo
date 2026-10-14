@@ -437,6 +437,33 @@ describe("run tool selection", () => {
     ]);
   });
 
+  it("offers the Drive tools only when a Drive account is connected", () => {
+    const offered = (driveEnabled: boolean) =>
+      selectBuiltinToolsForRun({
+        graphicalToolsAllowed: false,
+        pageBrowserAllowed: false,
+        groupId: null,
+        trigger: "message",
+        semanticMemoryEnabled: false,
+        messagingChannelRun: false,
+        driveEnabled,
+      })
+        .map((tool) => tool.name)
+        .filter((name) => name.startsWith("drive_"))
+        .sort();
+    expect(offered(false)).toEqual([]);
+    expect(offered(true)).toEqual([
+      "drive_create_file",
+      "drive_read",
+      "drive_search",
+      "drive_update_file",
+    ]);
+    expect([...READ_ONLY_AGENT_TOOLS].filter((name) => name.startsWith("drive_")).sort()).toEqual([
+      "drive_read",
+      "drive_search",
+    ]);
+  });
+
   it("offers show_emails exactly when the mail tools are offered", () => {
     const offered = (mailEnabled: boolean, disabledBuiltinTools?: readonly string[]) =>
       selectBuiltinToolsForRun({

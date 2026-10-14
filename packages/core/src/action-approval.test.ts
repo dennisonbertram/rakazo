@@ -391,3 +391,13 @@ describe("mail write tools", () => {
     },
   );
 });
+
+describe("drive write tools", () => {
+  it.each(["drive_create_file", "drive_update_file"])("%s needs approval", (name) => {
+    expect(toolRequiresApproval(name, false)).toBe(true);
+    expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(true);
+  });
+  it.each(["drive_search", "drive_read"])("%s does not", (name) => {
+    expect(toolRequiresApproval(name, false)).toBe(false);
+  });
+});
