@@ -1501,6 +1501,10 @@ msgstr "Connect {0}"
 msgid "Connect {name}"
 msgstr "Connect {name}"
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Connect a Composio or Pipedream account to add apps like Slack, Notion and GitHub."
+msgstr "Connect a Composio or Pipedream account to add apps like Slack, Notion and GitHub."
+
 #: src/pages/Onboarding.tsx
 msgid "Connect a model"
 msgstr "Connect a model"

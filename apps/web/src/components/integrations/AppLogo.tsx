@@ -7,6 +7,19 @@ const SIZES = {
   xl: "size-14 rounded-[14px] text-xl",
 } as const;
 
+const SIMPLE_ICONS = "https://cdn.simpleicons.org/";
+
+/**
+ * Simple Icons marks default to the brand color, which can be black and vanish on a dark tile.
+ * Request an explicit black glyph (the hex is a CDN color parameter, not a product color) and
+ * invert it in dark mode, so the mark stays legible on the themed tile in both themes.
+ */
+export function themedLogoUrl(logo: string): string {
+  if (!logo.startsWith(SIMPLE_ICONS)) return logo;
+  const rest = logo.slice(SIMPLE_ICONS.length);
+  return rest.includes("/") ? logo : `${SIMPLE_ICONS}${rest}/000000`;
+}
+
 /** App logo on a neutral tile; a missing or broken image falls back to the app's first letter. */
 export function AppLogo({
   name,
@@ -19,21 +32,22 @@ export function AppLogo({
 }) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(logo) && !failed;
+  const mono = Boolean(logo?.startsWith(SIMPLE_ICONS));
   return (
     <span
       data-testid="app-logo"
       data-fallback={showImage ? undefined : "true"}
       className={`grid shrink-0 place-items-center overflow-hidden border border-border font-semibold ${SIZES[size]} ${
-        showImage ? "bg-white" : "bg-muted text-muted-foreground"
+        showImage && !mono ? "bg-white" : "bg-muted text-muted-foreground"
       }`}
     >
       {showImage ? (
         <img
-          src={logo ?? undefined}
+          src={logo ? themedLogoUrl(logo) : undefined}
           alt=""
           loading="lazy"
           decoding="async"
-          className="size-[55%] object-contain"
+          className={`size-[55%] object-contain ${mono ? "dark:invert" : ""}`}
           onError={() => setFailed(true)}
         />
       ) : (

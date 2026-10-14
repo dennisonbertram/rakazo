@@ -285,7 +285,15 @@ export function IntegrationsHome({
   const servers = data.servers.filter((server) => !financeServerIds.includes(server.id));
   const filtering = Boolean(query.trim()) || category !== "all";
   const hasConnected = apps.length + servers.length + data.sources.length > 0;
-  const notSetUp = data.loaded && data.catalog.length === 0 && !data.catalogFailed;
+  // Native Google items fill the catalog without a managed provider, so ask the setup state.
+  // Without it (the call failed), fall back to whether the catalog has anything.
+  const managedConfigured = data.setup
+    ? data.setup.providers.some(
+        (provider) =>
+          provider.configured && (provider.id === "composio" || provider.id === "pipedream"),
+      )
+    : data.catalog.length > 0;
+  const notSetUp = data.loaded && !managedConfigured && !data.catalogFailed;
 
   // /app/integrations?category=finance preselects the chip; scroll once the page has content.
   useEffect(() => {
@@ -363,25 +371,35 @@ export function IntegrationsHome({
             className="mt-6 rounded-xl border border-border bg-card p-5"
             data-testid="catalog-not-set-up"
           >
-            <b className="mb-1 block">
-              <Trans>App connections aren't set up on this server yet.</Trans>
-            </b>
-            <span className="text-muted-foreground">
-              <Trans>Custom connections still work.</Trans>
-            </span>
             {data.setup?.canConfigure ? (
-              <div className="mt-3">
-                <Link
-                  to="/integrations/setup"
-                  className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground"
-                >
-                  <Trans>Set up app catalog</Trans>
-                </Link>
-              </div>
+              <>
+                <b className="mb-1 block">
+                  <Trans>
+                    Connect a Composio or Pipedream account to add apps like Slack, Notion and
+                    GitHub.
+                  </Trans>
+                </b>
+                <div className="mt-3">
+                  <Link
+                    to="/integrations/setup"
+                    className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground"
+                  >
+                    <Trans>Set up app catalog</Trans>
+                  </Link>
+                </div>
+              </>
             ) : (
-              <div className="mt-1.5 text-muted-foreground">
-                <Trans>Ask the server owner to set up the app catalog.</Trans>
-              </div>
+              <>
+                <b className="mb-1 block">
+                  <Trans>App connections aren't set up on this server yet.</Trans>
+                </b>
+                <span className="text-muted-foreground">
+                  <Trans>Custom connections still work.</Trans>
+                </span>
+                <div className="mt-1.5 text-muted-foreground">
+                  <Trans>Ask the server owner to set up the app catalog.</Trans>
+                </div>
+              </>
             )}
           </div>
         ) : (

@@ -37,3 +37,11 @@ it("falls back to a letter tile when the image fails to load", async () => {
   expect(container.textContent).toBe("G");
   expect(container.querySelector("[data-fallback]")).not.toBeNull();
 });
+
+it("renders Simple Icons marks as an explicit black glyph that inverts in dark mode", async () => {
+  const { container } = await render("https://cdn.simpleicons.org/brex");
+  const img = container.querySelector("img");
+  expect(img?.getAttribute("src")).toBe("https://cdn.simpleicons.org/brex/000000");
+  expect(img?.className).toContain("dark:invert");
+  expect(container.querySelector("[data-testid=app-logo]")?.className).toContain("bg-muted");
+});
