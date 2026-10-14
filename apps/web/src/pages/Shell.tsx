@@ -152,6 +152,7 @@ import { VoiceChatCard } from "../components/call/VoiceChatCard";
 import { ComputerWorkspace } from "../components/computer/ComputerWorkspace";
 import { EmailCards } from "../components/EmailCards";
 import { lazyOverlay } from "../components/ErrorBoundary";
+import { FinanceCards } from "../components/FinanceCards";
 import { MessageHoverMetadata } from "../components/MessageHoverMetadata";
 import {
   LIVE_TOOL_STEP_WINDOW,
@@ -7274,6 +7275,13 @@ const MessageView = memo(function MessageView({
           return (
             <div key={i} className="flex justify-start">
               <EmailCards block={block} />
+            </div>
+          );
+        }
+        if (block.kind === "finance") {
+          return (
+            <div key={i} className="flex justify-start">
+              <FinanceCards block={block} />
             </div>
           );
         }

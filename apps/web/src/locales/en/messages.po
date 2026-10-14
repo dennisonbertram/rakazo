@@ -80,6 +80,11 @@ msgstr "{0} KB"
 msgid "{0} MB"
 msgstr "{0} MB"
 
+#. placeholder {0}: Math.round(card.runwayMonths)
+#: src/components/FinanceCards.tsx
+msgid "{0} mo"
+msgstr "{0} mo"
+
 #. placeholder {0}: data.excludedNonUsdCount
 #: src/pages/Finance.tsx
 msgid "{0} non-USD not counted"
@@ -95,6 +100,11 @@ msgstr "{0} rollup hours"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "{0} runs · {1} tokens"
 msgstr "{0} runs · {1} tokens"
+
+#. placeholder {0}: card.count
+#: src/components/FinanceCards.tsx
+msgid "{0} transactions"
+msgstr "{0} transactions"
 
 #. placeholder {0}: bot.name
 #: src/pages/ExternalConversationSettings.tsx
@@ -963,6 +973,10 @@ msgstr "Bulleted list"
 msgid "Burn"
 msgstr "Burn"
 
+#: src/components/FinanceCards.tsx
+msgid "Burn / mo"
+msgstr "Burn / mo"
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Burn by category"
 msgstr "Burn by category"
@@ -1033,6 +1047,7 @@ msgstr "Card view"
 msgid "Cardholder"
 msgstr "Cardholder"
 
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Cash"
@@ -1047,6 +1062,7 @@ msgstr "Cash accounts"
 msgid "Cash out and cash in by month"
 msgstr "Cash out and cash in by month"
 
+#: src/components/FinanceCards.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Categories"
 msgstr "Categories"
@@ -2638,6 +2654,7 @@ msgid "Filters"
 msgstr "Filters"
 
 #: src/components/finance/ui.tsx
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
@@ -3606,6 +3623,10 @@ msgstr "Newsletters"
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Next"
 msgstr "Next"
+
+#: src/components/FinanceCards.tsx
+msgid "Next 30 days"
+msgstr "Next 30 days"
 
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxShortcuts.tsx
@@ -4612,6 +4633,7 @@ msgstr "Running…"
 msgid "Runs when this bot receives a verified message from this provider."
 msgstr "Runs when this bot receives a verified message from this provider."
 
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Runway"
@@ -5050,6 +5072,7 @@ msgstr "Speech model"
 msgid "Spend"
 msgstr "Spend"
 
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 msgid "Spend this month"
 msgstr "Spend this month"
@@ -5148,6 +5171,10 @@ msgstr "Subscription required"
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Subscriptions"
 msgstr "Subscriptions"
+
+#: src/components/FinanceCards.tsx
+msgid "Subscriptions / mo"
+msgstr "Subscriptions / mo"
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -5654,6 +5681,7 @@ msgstr "Values are encrypted and never shown again."
 msgid "Vendor"
 msgstr "Vendor"
 
+#: src/components/FinanceCards.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Vendors"
 msgstr "Vendors"

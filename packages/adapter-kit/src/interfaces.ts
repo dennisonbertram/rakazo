@@ -191,7 +191,8 @@ export interface SandboxProvider {
 
 export interface ConnectorProvider {
   describe(): AdapterDescriptor<ConnectorCapabilities>;
-  discoverTools(context: AdapterContext): Promise<ConnectorTool[]>;
+  /** `only` limits discovery to those connector ids when the provider is a registry of several. */
+  discoverTools(context: AdapterContext, only?: readonly string[]): Promise<ConnectorTool[]>;
   /** Resolve a lazy catalog call to its authoritative authorized tool before approval. */
   resolveCall?(
     call: ConnectorCall,
