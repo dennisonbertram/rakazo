@@ -19,6 +19,18 @@ const rowButton = (id: string) =>
     (el) => el.dataset.rowId === id,
   );
 
+let lastStep = Number.NEGATIVE_INFINITY;
+/**
+ * Whether a j/k press may move now. Held keys (`repeat`) and presses within 150ms of the last
+ * accepted one are dropped, so a key burst cannot walk through, and mark read, a whole list.
+ */
+export function allowStep(event: KeyboardEvent): boolean {
+  const now = Date.now();
+  if (event.repeat || now - lastStep < 150) return false;
+  lastStep = now;
+  return true;
+}
+
 /** List shortcuts for the Inbox: j/k and arrows move, Enter or o opens, / searches, c composes, e archives, ? lists them. */
 export function useInboxKeyboard(options: InboxKeyboard) {
   const latest = useRef(options);
@@ -55,8 +67,11 @@ export function useInboxKeyboard(options: InboxKeyboard) {
         el?.scrollIntoView?.({ block: "nearest" });
         el?.focus();
       };
-      if (key === "j" || key === "ArrowDown") move(index + 1);
-      else if (key === "k" || key === "ArrowUp") move(index < 0 ? 0 : index - 1);
+      if (key === "j" || key === "k") {
+        if (allowStep(event)) move(key === "j" ? index + 1 : index < 0 ? 0 : index - 1);
+        else event.preventDefault();
+      } else if (key === "ArrowDown") move(index + 1);
+      else if (key === "ArrowUp") move(index < 0 ? 0 : index - 1);
       else if (key === "o" || (key === "Enter" && !target?.closest("button,a"))) {
         if (index < 0) return;
         event.preventDefault();

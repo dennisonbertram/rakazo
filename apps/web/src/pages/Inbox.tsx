@@ -400,18 +400,25 @@ export function InboxPage({
     setParams(next, { replace: true, state: location.state });
   };
   const openRow = [...(shown?.rows ?? []), ...moreRows].find((row) => row.id === openId);
-  // Opening a message, by click, j/k in the dialog or a deep link, reads it once. Selecting in the
-  // list does not. The id is remembered even when the row is already read, so Mark unread sticks.
+  // A message that stays open for 800ms is read once. Passing through it with j/k, or selecting in
+  // the list, does not. The id is remembered even when the row is already read, so Mark unread sticks.
   const readFor = useRef<string | null>(null);
+  const setReadRef = useRef(setRead);
+  setReadRef.current = setRead;
+  const openUnread = openRow?.unread;
+  const openRowId = openRow?.id;
   useEffect(() => {
     if (!openId) {
       readFor.current = null;
       return;
     }
-    if (!openRow || readFor.current === openId) return;
-    readFor.current = openId;
-    if (openRow.unread) setRead(openId, true);
-  });
+    if (!openRowId || readFor.current === openId) return;
+    const timer = setTimeout(() => {
+      readFor.current = openId;
+      if (openUnread) setReadRef.current(openId, true);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [openId, openRowId, openUnread]);
   const openIndex = openId ? ids.indexOf(openId) : -1;
   const focusSearch = () => searchRef.current?.querySelector("input")?.focus();
   const clearFilters = () => {
