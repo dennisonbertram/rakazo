@@ -46,7 +46,9 @@ describe("crypto contracts", () => {
   });
   it("lists only read tools", () => {
     expect(CRYPTO_READ_TOOLS).toContain("get_tokens_by_address");
-    expect(CRYPTO_READ_TOOLS.length).toBe(5);
+    expect(CRYPTO_READ_TOOLS).toContain("get_token_transfers_by_address");
+    expect(CRYPTO_READ_TOOLS).toContain("get_transactions_by_address");
+    expect(CRYPTO_READ_TOOLS.length).toBe(7);
   });
   it("accepts a wallet add by address or ENS and rejects an unknown type", () => {
     expect(FinanceWalletAddInputSchema.parse({ addressOrEns: wallet, type: "safe" }).type).toBe(

@@ -90,7 +90,34 @@ Rules for every finance answer:
 - Crypto is separate from cash. Never add it to cash, burn or runway, and do not use it in runway scenarios unless the user asks and states the assumption (for example, "if I sold half of it").
 - Holdings with a null usd have no price, often spam or dust tokens. They are not in the total; report how many there are instead of guessing a value.
 - Compute totals, shares and changes with code, never in your head.
+- For suspicious tokens or lookalike addresses, follow crypto-scams.
 - Answer with the total, the largest wallets, chains and holdings, and what you could not tell (unpriced tokens, a stale sync, chains that failed).`,
+  },
+  {
+    name: "crypto-scams",
+    description: "Spot scam tokens and address-poisoning in the user's wallets. Read only.",
+    body: `Use this when the user asks about unknown or suspicious tokens, airdrops, strange transfers, or whether an address is safe to send to. You only read and report. Never move, swap, approve, sign or send anything, and never visit a link or site from a token.
+
+Start with finance_crypto for the synced holdings (a null usd means unpriced). Use these read-only Blockscout tools for history: get_token_transfers_by_address (ERC-20 transfers; needs chain_id, address and age_from) and get_transactions_by_address (native transfers and contract calls; same arguments). Use get_address_info and get_tokens_by_address for one address or token. Follow the cursor to read more pages, and say if you stopped early.
+
+Scam or airdropped tokens. Treat a token as suspect when:
+- The user never asked for it and it has no price or no liquidity.
+- Its name or symbol copies a real asset (for example "USDC" at an unfamiliar contract). Compare the contract address with the real token's address on that chain, never the symbol.
+- Its name contains a URL or words such as claim, visit, reward, voucher or airdrop.
+- Its balance looks large but it cannot be priced or sold (a fake balance).
+Never tell the user to interact with, approve, sell or claim these, and never open their sites. The usual advice is to ignore or hide them.
+
+Address poisoning. An attacker sends a zero-value or dust transfer, or a fake-token transfer, from an address whose first and last characters match one the user has used, hoping the user copies it from history later.
+- List the counterparties in the wallet's transfers and look for pairs of addresses that share the start and end but differ in the middle.
+- Look for zero-value or tiny transfers from addresses the user never sent to, close in time to a real transfer.
+- Compare full addresses, never just the prefix or suffix. Treat any counterparty that differs from a known one in the middle characters as suspect.
+- Advice: get the full address from a trusted source (the user's address book or the recipient directly), never from transaction history, and send a small test transfer first.
+
+Approvals. If asked about token approvals or revoking, say that revoking needs the user's own wallet. You can only read.
+
+How to report. List each suspect token or lookalike address with its full address (never a shortened form like 0x1234…abcd), the chain, why it is suspect, and a confidence level (high, medium or low). Say what you checked. Never present a guess as fact: "looks like" is right when you did not confirm it.
+
+Limits. Say what you cannot see: holdings come from a curated token list, so unlisted spam may not appear; history comes only from the read tools above and may be paged or partial; a clean result does not prove an address is safe.`,
   },
   {
     name: "finance-runway-scenarios",

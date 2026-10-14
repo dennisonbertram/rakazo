@@ -107,6 +107,8 @@ export const CRYPTO_READ_TOOLS = [
   "get_address_by_ens_name",
   "get_chains_list",
   "read_contract",
+  "get_token_transfers_by_address",
+  "get_transactions_by_address",
 ] as const;
 
 /** The chains tracked in v1 (Blockscout chain ids). */
