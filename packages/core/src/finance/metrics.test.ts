@@ -204,26 +204,36 @@ describe("spendTotals", () => {
     txn("2026-10-13", 2, { classification: "spend" }), // refund nets off
     txn("2026-10-13", -77, { status: "other" }),
   ];
-  it("compares the week to date with the whole previous week, starting Monday", () => {
-    expect(spendTotals(txns, "week", NOW)).toEqual({
+  it("compares the week to date with the same weekdays of the previous week, starting Monday", () => {
+    const prior = [
+      ...txns,
+      txn("2026-10-05", -100), // Mon, compared
+      txn("2026-10-07", -50), // Wed, compared
+      txn("2026-10-08", -900), // Thu, after the compared days
+    ];
+    expect(spendTotals(prior, "week", NOW)).toEqual({
       period: "week",
       currentCents: 1300,
-      previousCents: 5000,
-      changePct: -74,
+      previousCents: 18000,
+      changePct: -92.8,
       start: "2026-10-12",
       end: "2026-10-15",
       previousStart: "2026-10-05",
-      previousEnd: "2026-10-12",
+      previousEnd: "2026-10-08",
     });
   });
   it("covers month, quarter and year boundaries", () => {
     const all = [
       txn("2026-10-02", -1),
-      txn("2026-09-30", -2),
-      txn("2026-07-01", -4),
+      txn("2026-09-14", -2),
+      txn("2026-09-15", -64), // after the compared days
+      txn("2026-07-14", -4),
+      txn("2026-07-15", -128), // after the compared days
       txn("2026-06-30", -8),
       txn("2026-01-01", -16),
       txn("2025-12-31", -32),
+      txn("2025-10-14", -256),
+      txn("2025-10-15", -512),
     ];
     const month = spendTotals(all, "month", NOW);
     expect([month.currentCents, month.previousCents, month.start, month.previousStart]).toEqual([
@@ -238,13 +248,29 @@ describe("spendTotals", () => {
       quarter.previousCents,
       quarter.start,
       quarter.previousStart,
-    ]).toEqual([100, 600, "2026-10-01", "2026-07-01"]);
+    ]).toEqual([100, 400, "2026-10-01", "2026-07-01"]);
     const year = spendTotals(all, "year", NOW);
-    expect([year.currentCents, year.previousCents, year.start]).toEqual([3100, 3200, "2026-01-01"]);
+    expect([year.currentCents, year.previousCents, year.start]).toEqual([
+      22300,
+      25600,
+      "2026-01-01",
+    ]);
+  });
+  it("clamps the comparison to the previous period's length", () => {
+    const feb = [txn("2026-02-28", -5), txn("2026-02-01", -7), txn("2026-03-31", -1)];
+    const t = spendTotals(feb, "month", new Date("2026-03-31T12:00:00Z"));
+    expect([t.previousStart, t.previousEnd, t.previousCents]).toEqual([
+      "2026-02-01",
+      "2026-03-01",
+      1200,
+    ]);
+    expect(spendTotals([], "month", new Date("2024-03-31T12:00:00Z")).previousEnd).toBe(
+      "2024-03-01",
+    );
   });
   it("uses the purchase date, in UTC, and gives a null change when nothing was spent before", () => {
-    // Posted after midnight UTC on the 12th but bought on the 11th.
-    const t = txn("2026-10-12", -10, { purchasedAt: "2026-10-11T23:30:00.000Z" });
+    // Posted after midnight UTC on Tuesday the 6th but bought on Monday the 5th.
+    const t = txn("2026-10-06", -10, { purchasedAt: "2026-10-05T23:30:00.000Z" });
     expect(spendTotals([t], "week", NOW)).toMatchObject({ currentCents: 0, previousCents: 1000 });
     expect(spendTotals([txn("2026-10-13", -10)], "week", NOW).changePct).toBeNull();
   });
@@ -430,9 +456,9 @@ describe("balanceHistory", () => {
 
 describe("comparison coverage", () => {
   it("has no previous period that starts before the earliest synced day", () => {
-    const txns = [txn("2025-11-20", -50), txn("2026-10-05", -10)];
+    const txns = [txn("2025-03-20", -50), txn("2026-10-05", -10)];
     const since = earliestDay(txns);
-    expect(since).toBe("2025-11-20");
+    expect(since).toBe("2025-03-20");
     // Last year starts 2025-01-01, before the data; last month starts 2026-09-01, inside it.
     expect(spendTotals(txns, "year", NOW, since)).toMatchObject({
       previousCents: null,

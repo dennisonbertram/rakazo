@@ -229,10 +229,12 @@ function periodStart(period: SpendPeriod, today: Day): { start: Day; previousSta
 }
 
 /**
- * Spend in the current calendar period up to `now` (week starts Monday) against the whole previous
- * period. Counts `spend` transactions by `purchasedAt ?? postedAt`, net of refunds; `card_payment`,
+ * Spend in the current calendar period up to `now` (week starts Monday) against the same number of
+ * elapsed days at the start of the previous period, so a half-finished month is not compared with a
+ * whole one. The previous range is clamped to the previous period's length (Mar 31 against February
+ * ends Feb 28 or 29). Counts `spend` transactions by `purchasedAt ?? postedAt`, net of refunds; `card_payment`,
  * `internal_transfer`, revenue and financing are excluded. `end` is the day after today and
- * `previousEnd` is `start` (ranges are half-open, as `DayRange`). When the previous period starts
+ * `previousEnd` is the day after the last compared day (ranges are half-open, as `DayRange`). When the previous period starts
  * before `coverageStart` (the earliest synced day) its total is incomplete, so `previousCents` and
  * `changePct` are null.
  */
@@ -247,7 +249,10 @@ export function spendTotals(
   const end = addDays(today, 1);
   const currentCents = sumSpend(txns, start, end);
   const covered = coverageStart === undefined || previousStart >= coverageStart;
-  const previousCents = covered ? sumSpend(txns, previousStart, start) : null;
+  const elapsed = dayNum(end) - dayNum(start);
+  const sameDays = addDays(previousStart, elapsed);
+  const previousEnd = sameDays < start ? sameDays : start;
+  const previousCents = covered ? sumSpend(txns, previousStart, previousEnd) : null;
   return {
     period,
     currentCents,
@@ -259,7 +264,7 @@ export function spendTotals(
     start,
     end,
     previousStart,
-    previousEnd: start,
+    previousEnd,
   };
 }
 

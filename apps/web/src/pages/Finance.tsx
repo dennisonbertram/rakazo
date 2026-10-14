@@ -20,7 +20,6 @@ import {
   FinanceChromeProvider,
   Kpi,
   PeriodTabs,
-  periodNames,
   rowClass,
   Section,
   Th,
@@ -28,7 +27,15 @@ import {
   useRowNavigate,
 } from "../components/finance/ui";
 import { AppLogo } from "../components/integrations/AppLogo";
-import { changeText, money, monthFull, paidWithLabel, shortDay } from "../lib/finance-format";
+import {
+  changeText,
+  dayRange,
+  lastDayOf,
+  money,
+  monthFull,
+  paidWithLabel,
+  shortDay,
+} from "../lib/finance-format";
 import { financePath, parseFinanceRoute } from "../lib/finance-route";
 import { FINANCE_PROVIDERS } from "../lib/integrations";
 import { formatRelativeTime } from "../lib/relative-time";
@@ -239,7 +246,10 @@ function Overview({
   const runwayMonths = data.runway.months?.toFixed(1);
   const runOutMonth = data.runway.runOutDate ? monthFull(data.runway.runOutDate.slice(0, 7)) : "";
   const previousSpend = month.previousCents === null ? null : money(month.previousCents);
-  const previousPeriod = periodNames()[period].toLowerCase();
+  const range = (r: { start: string; end: string }) => dayRange(r.start, lastDayOf(r.end));
+  const spentRange = range(totals);
+  const previousRange = range({ start: totals.previousStart, end: totals.previousEnd });
+  const monthPreviousRange = range({ start: month.previousStart, end: month.previousEnd });
   const bars = data.cashSeries[period];
   const barGranularity = BAR_GRANULARITY[period];
   const subs = data.subscriptions;
@@ -306,7 +316,15 @@ function Overview({
       ) : (
         <div className="flex flex-col gap-3">
           <div
-            className={`grid grid-cols-2 gap-3 ${hasCash ? "@3xl:grid-cols-4" : "@3xl:grid-cols-2"}`}
+            className={`grid grid-cols-2 gap-3 ${
+              hasCash
+                ? data.crypto
+                  ? "@3xl:grid-cols-5"
+                  : "@3xl:grid-cols-4"
+                : data.crypto
+                  ? "@3xl:grid-cols-3"
+                  : "@3xl:grid-cols-2"
+            }`}
           >
             {hasCash ? (
               <Kpi
@@ -337,18 +355,15 @@ function Overview({
                 previousSpend === null ? undefined : monthChange ? (
                   <>
                     <span className={tone(month.changePct)}>{monthChange}</span>{" "}
-                    {t`vs ${previousSpend} last month`}
+                    {t`vs ${previousSpend} for ${monthPreviousRange}`}
                   </>
                 ) : (
-                  t`vs ${previousSpend} last month`
+                  t`vs ${previousSpend} for ${monthPreviousRange}`
                 )
               }
               to={financePath.spend("month")}
             />
-          </div>
-
-          {data.crypto ? (
-            <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
+            {data.crypto ? (
               <Kpi
                 title={t`Crypto`}
                 value={money(data.crypto.totalCents)}
@@ -359,8 +374,8 @@ function Overview({
                 }
                 to={financePath.crypto()}
               />
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
           <Section className="@container/strip">
             <div className="flex flex-wrap items-center gap-3.5">
@@ -372,10 +387,12 @@ function Overview({
                 {money(totals.currentCents)}
               </Link>
               <span className="text-[11px] text-muted-foreground">
+                {t`Spent ${spentRange}`}
                 {totals.previousCents === null ? null : (
                   <>
+                    {" · "}
                     {change ? <span className={tone(totals.changePct)}>{change} </span> : null}
-                    {t`vs previous ${previousPeriod}`}
+                    {t`vs ${previousRange}`}
                   </>
                 )}
               </span>
