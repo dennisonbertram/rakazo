@@ -2,7 +2,10 @@
   "mcpServers": {
     "agentation": {
       "command": "npx",
-      "args": ["-y", "agentation-mcp", "server"]
+      "args": ["-y", "agentation-mcp", "server"],
+      "env": {
+        "AGENTATION_HOST": "127.0.0.1"
+      }
     }
   }
 }
