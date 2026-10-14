@@ -1,6 +1,12 @@
 import { BUILTIN_AGENT_SKILLS } from "@rakazo/adapters";
 import type { Actor, Bot } from "@rakazo/contracts";
-import { FINANCE_MCP_ENDPOINTS, FINANCE_READ_TOOLS, financeAgentSpawnKey } from "@rakazo/contracts";
+import {
+  CRYPTO_MCP_ENDPOINT,
+  CRYPTO_READ_TOOLS,
+  FINANCE_MCP_ENDPOINTS,
+  FINANCE_READ_TOOLS,
+  financeAgentSpawnKey,
+} from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { ensureFinanceAgent } from "./finance-agent.js";
 
@@ -82,6 +88,19 @@ describe("ensureFinanceAgent", () => {
   });
 });
 
+describe("crypto server", () => {
+  it("is assigned with only the crypto read tools", async () => {
+    const { upsert, deps } = fakes([{ id: "srv-crypto", endpoint: CRYPTO_MCP_ENDPOINT }]);
+    await ensureFinanceAgent(deps, actor);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect((upsert.mock.calls[0]![0] as { create: unknown }).create).toMatchObject({
+      serverId: "srv-crypto",
+      allowAllTools: false,
+      allowedTools: [...CRYPTO_READ_TOOLS],
+    });
+  });
+});
+
 describe("FINANCE_READ_TOOLS", () => {
   // The live Mercury and Brex servers also offer these write tools; none may be allowed.
   const WRITE_TOOLS = [
@@ -126,19 +145,24 @@ describe("FINANCE_READ_TOOLS", () => {
 
 describe("built-in finance skills", () => {
   const skills = BUILTIN_AGENT_SKILLS.filter((skill) => skill.name.startsWith("finance-"));
-  const readTools = new Set<string>([...FINANCE_READ_TOOLS.mercury, ...FINANCE_READ_TOOLS.brex]);
+  const readTools = new Set<string>([
+    ...FINANCE_READ_TOOLS.mercury,
+    ...FINANCE_READ_TOOLS.brex,
+    ...CRYPTO_READ_TOOLS,
+  ]);
 
-  it("ships the four skills with a short picker description", () => {
+  it("ships the five skills with a short picker description", () => {
     expect(skills.map((skill) => skill.name).sort()).toEqual([
       "finance-categorize",
       "finance-cost-cutting",
+      "finance-crypto",
       "finance-monthly-review",
       "finance-runway-scenarios",
     ]);
     for (const skill of skills) expect(skill.description.length).toBeLessThanOrEqual(72);
   });
 
-  it("names only read tools of Mercury and Brex", () => {
+  it("names only read tools of Mercury, Brex and Blockscout", () => {
     for (const skill of skills) {
       const named =
         skill.content.match(/\b(?:get|list|query)[A-Z]\w*|\b(?:get|list|query)_\w+/g) ?? [];

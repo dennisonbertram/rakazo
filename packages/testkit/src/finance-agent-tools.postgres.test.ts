@@ -186,6 +186,7 @@ describe.skipIf(!databaseAvailable)("finance agent tools in a real run (offline 
       expect(financeTools(offered.noSource ?? [])).toEqual([]);
       expect(financeTools(offered.finance ?? []).sort()).toEqual([
         "finance_breakdown",
+        "finance_crypto",
         "finance_overview",
         "finance_recurring",
         "finance_transactions",

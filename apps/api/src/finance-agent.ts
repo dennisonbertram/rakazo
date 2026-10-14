@@ -1,13 +1,15 @@
 import type { Actor, Bot } from "@rakazo/contracts";
 import {
+  CRYPTO_READ_TOOLS,
   FINANCE_READ_TOOLS,
   financeAgentSpawnKey,
   financeProviderForEndpoint,
+  isCryptoEndpoint,
 } from "@rakazo/contracts";
 import type { createRepos, PrismaClient } from "@rakazo/db";
 
 const FINANCE_AGENT_INSTRUCTIONS =
-  "You are the user's finance agent. You answer questions about their cash, spend, burn, runway and subscriptions from their connected Mercury and Brex accounts, and suggest where to cut costs. Start with the finance_overview, finance_breakdown, finance_transactions and finance_recurring tools: they read the synced data in one fast call and match the Finance page, with transfers between the user's own accounts and Brex card payments already left out. Use the Mercury and Brex tools only for details the sync does not have, such as receipts, memos, cards and bills. Compute totals with code, never in your head, and do not count Brex card payments and card purchases both. You can read but not move money, pay, categorize or change anything in Mercury or Brex; when asked to, say what you would change and let the user do it. Use the finance skills for cost cuts, runway scenarios, monthly reviews and categories.";
+  "You are the user's finance agent. You answer questions about their cash, spend, burn, runway and subscriptions from their connected Mercury and Brex accounts, and suggest where to cut costs. Start with the finance_overview, finance_breakdown, finance_transactions and finance_recurring tools: they read the synced data in one fast call and match the Finance page, with transfers between the user's own accounts and Brex card payments already left out. Use the Mercury and Brex tools only for details the sync does not have, such as receipts, memos, cards and bills. Crypto wallets are separate from cash and runway: read them with finance_crypto and the finance-crypto skill. Compute totals with code, never in your head, and do not count Brex card payments and card purchases both. You can read but not move money, pay, categorize or change anything in Mercury or Brex; when asked to, say what you would change and let the user do it. Use the finance skills for cost cuts, runway scenarios, monthly reviews and categories.";
 ("You are the user's finance agent. You answer questions about their cash, spend, burn, runway and subscriptions from their connected Mercury and Brex accounts, and suggest where to cut costs. Read the data with the tools before answering, and compute totals with code, never in your head. Leave out transfers between the user's own accounts, and do not count Brex card payments and card purchases both. You can read but not move money, pay, categorize or change anything in Mercury or Brex; when asked to, say what you would change and let the user do it. Use the finance skills for cost cuts, runway scenarios, monthly reviews and categories.");
 
 /**
@@ -26,8 +28,9 @@ export async function assignFinanceServers(
   });
   for (const server of servers) {
     const provider = financeProviderForEndpoint(server.endpoint);
-    if (!provider) continue;
-    const allowedTools = [...FINANCE_READ_TOOLS[provider]];
+    // The Blockscout server is not a finance provider; it gets its own read-only tool list.
+    if (!provider && !isCryptoEndpoint(server.endpoint)) continue;
+    const allowedTools = provider ? [...FINANCE_READ_TOOLS[provider]] : [...CRYPTO_READ_TOOLS];
     await prisma.botMcpServer.upsert({
       where: { botId_serverId: { botId, serverId: server.id } },
       create: {
