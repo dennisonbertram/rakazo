@@ -51,6 +51,7 @@ import {
   HistoryReadInputSchema,
   HistorySearchInputSchema,
   isAttachmentImageMimeType,
+  isFinanceAgentSpawnKey,
   isInboxAgentSpawnKey,
   OPENAI_COMPATIBLE_PROVIDER_ID,
 } from "@rakazo/contracts";
@@ -256,6 +257,12 @@ import {
   driveToolsAllowed,
   listDriveAccounts,
 } from "./drive-tools.js";
+import {
+  FINANCE_TOOL_NAMES,
+  financeToolFromTool,
+  financeToolsAllowed,
+  hasFinanceSource,
+} from "./finance-tools.js";
 import { handoffToGroupBot, loadGroupContext } from "./group-handoff.js";
 import {
   COMPACTION_BATCH_SIZE,
@@ -432,6 +439,10 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "mail_get",
   "show_emails",
   "inbox_overview",
+  "finance_overview",
+  "finance_breakdown",
+  "finance_transactions",
+  "finance_recurring",
   "calendar_list_events",
   "calendar_get_event",
   "drive_search",
@@ -3498,9 +3509,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // as well sent it through their search and execute round trips first (about 28s of an
         // 89s run), so it gets none of them and skips the discovery calls.
         const mailOnly = isInboxAgentSpawnKey(bot.spawnKey);
-        const composioRows = mailOnly
-          ? []
-          : storedConnections.filter((connection) => connection.connectorId === "composio");
+        // The Finance agent reads synced finance data through finance_* tools, with its Mercury and
+        // Brex MCP tools for details. Composio and the other connectors only slow it down.
+        const financeOnly = isFinanceAgentSpawnKey(bot.spawnKey);
+        const composioRows =
+          mailOnly || financeOnly
+            ? []
+            : storedConnections.filter((connection) => connection.connectorId === "composio");
         let liveSlugs: string[] = [];
         if (needsLivePluginSync(composioRows)) {
           const listing = await loadLivePluginSlugs(deps.listConnectedPluginSlugs, run.userId);
@@ -3512,12 +3527,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         }
         const connectedComposio = mergeConnectedPlugins(composioRows, liveSlugs);
-        const connectedPlugins = mailOnly
-          ? []
-          : selectRunConnections(
-              storedConnections,
-              connectedComposio.map((connection) => connection.provider),
-            );
+        const connectedPlugins =
+          mailOnly || financeOnly
+            ? []
+            : selectRunConnections(
+                storedConnections,
+                connectedComposio.map((connection) => connection.provider),
+              );
         const context = {
           operationId: runId,
           traceId: runId,
@@ -3551,7 +3567,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
 
         const discoveredPromise =
-          deps.connector && !mailOnly ? deps.connector.discoverTools(context) : Promise.resolve([]);
+          deps.connector && !mailOnly
+            ? deps.connector
+                .discoverTools(context, financeOnly ? ["mcp"] : undefined)
+                .then((tools) =>
+                  financeOnly ? tools.filter((tool) => tool.route?.connectorId === "mcp") : tools,
+                )
+            : Promise.resolve([]);
         const threadContext = threadContextForRun(
           run.trigger,
           {
@@ -3910,6 +3932,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botUserId: bot.userId,
             messagingChannelRun,
           }) && (await driveAccounts().catch(() => [])).length > 0;
+        const financeEnabled =
+          financeToolsAllowed({
+            hasProvider: true,
+            groupId: thread.groupId,
+            runUserId: run.userId,
+            botUserId: bot.userId,
+            messagingChannelRun,
+          }) &&
+          (await hasFinanceSource(deps.prisma, {
+            spaceId: run.spaceId,
+            userId: bot.userId,
+          }).catch(() => false));
         const builtins = [
           ...selectBuiltinToolsForRun({
             ticketBoardEnabled: deps.ticketBoardEnabled,
@@ -3923,6 +3957,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             mailEnabled,
             calendarEnabled,
             driveEnabled,
+            financeEnabled,
             messagingChannelRun,
             voiceCall,
             disabledBuiltinTools: bot.disabledBuiltinTools,
@@ -5319,6 +5354,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ),
             );
           }
+          if (FINANCE_TOOL_NAMES.has(name) && financeEnabled) {
+            return finish(
+              await financeToolFromTool(
+                name,
+                {
+                  prisma: deps.prisma,
+                  scope: { spaceId: run.spaceId, userId: bot.userId },
+                  publish: (blocks) => publishMessage(deps, run, "bot", blocks),
+                },
+                args,
+              ),
+            );
+          }
           if (DRIVE_TOOL_NAMES.has(name) && deps.connectors && driveEnabled) {
             return finish(
               await driveToolFromTool(
@@ -6466,9 +6514,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         const pluginLine = mailOnly
           ? undefined
-          : connectedPlugins.length > 0
-            ? `Connected plugins: ${connectedPlugins.map((row) => `${row.displayName} (${row.connectorId}:${row.provider})`).join(", ")}. Prefer those plugin tools over the computer browser or web search when reading app data (repos, releases, mail, calendar, and similar).`
-            : "No plugins are connected yet.";
+          : financeOnly
+            ? financeEnabled
+              ? "Start with finance_overview, finance_breakdown, finance_transactions and finance_recurring: they read the synced finance data in one call and match the Finance page. Use the Mercury and Brex tools only for details the sync does not have."
+              : undefined
+            : connectedPlugins.length > 0
+              ? `Connected plugins: ${connectedPlugins.map((row) => `${row.displayName} (${row.connectorId}:${row.provider})`).join(", ")}. Prefer those plugin tools over the computer browser or web search when reading app data (repos, releases, mail, calendar, and similar).`
+              : "No plugins are connected yet.";
         const taughtSkillIndex = savedSkills.slice(0, 20);
         const taughtSkillsLine =
           taughtSkillIndex.length > 0
@@ -7617,6 +7669,8 @@ export function selectBuiltinToolsForRun(options: {
   calendarEnabled?: boolean;
   /** The run's requester owns the bot and has a connected native Google Drive. */
   driveEnabled?: boolean;
+  /** The run's requester owns the bot and has a connected finance source. */
+  financeEnabled?: boolean;
   messagingChannelRun: boolean;
   /** Hanging up is only offered to a turn the caller spoke on a live call. */
   voiceCall?: boolean;
@@ -7649,6 +7703,7 @@ export function selectBuiltinToolsForRun(options: {
     (tool) =>
       !disabled.has(tool.name) &&
       (options.driveEnabled || !DRIVE_TOOL_NAMES.has(tool.name)) &&
+      (options.financeEnabled || !FINANCE_TOOL_NAMES.has(tool.name)) &&
       (options.ticketBoardEnabled ||
         (tool.name !== "board_tickets" && !tool.name.startsWith("ticket_"))) &&
       (!isBackgroundRunTrigger(options.trigger) ||

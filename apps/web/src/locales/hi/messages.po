@@ -90,6 +90,11 @@ msgstr "{0} KB"
 msgid "{0} MB"
 msgstr "{0} MB"
 
+#. placeholder {0}: Math.round(card.runwayMonths)
+#: src/components/FinanceCards.tsx
+msgid "{0} mo"
+msgstr ""
+
 #. placeholder {0}: data.excludedNonUsdCount
 #: src/pages/Finance.tsx
 msgid "{0} non-USD not counted"
@@ -105,6 +110,11 @@ msgstr ""
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "{0} runs · {1} tokens"
 msgstr "{0} रन · {1} टोकन"
+
+#. placeholder {0}: card.count
+#: src/components/FinanceCards.tsx
+msgid "{0} transactions"
+msgstr ""
 
 #. placeholder {0}: bot.name
 #: src/pages/ExternalConversationSettings.tsx
@@ -974,6 +984,10 @@ msgstr ""
 msgid "Burn"
 msgstr ""
 
+#: src/components/FinanceCards.tsx
+msgid "Burn / mo"
+msgstr ""
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Burn by category"
 msgstr ""
@@ -1044,6 +1058,7 @@ msgstr ""
 msgid "Cardholder"
 msgstr ""
 
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Cash"
@@ -1058,6 +1073,7 @@ msgstr ""
 msgid "Cash out and cash in by month"
 msgstr ""
 
+#: src/components/FinanceCards.tsx
 #: src/pages/finance/FinanceBurn.tsx
 #: src/pages/Inbox.tsx
 msgid "Categories"
@@ -2642,6 +2658,7 @@ msgid "Filters"
 msgstr ""
 
 #: src/components/finance/ui.tsx
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
@@ -3614,6 +3631,10 @@ msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Next"
+msgstr ""
+
+#: src/components/FinanceCards.tsx
+msgid "Next 30 days"
 msgstr ""
 
 #: src/components/inbox/InboxMessageDialog.tsx
@@ -4625,6 +4646,7 @@ msgstr "चल रहा है…"
 msgid "Runs when this bot receives a verified message from this provider."
 msgstr ""
 
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Runway"
@@ -5067,6 +5089,7 @@ msgstr "वाक् मॉडल"
 msgid "Spend"
 msgstr ""
 
+#: src/components/FinanceCards.tsx
 #: src/pages/Finance.tsx
 msgid "Spend this month"
 msgstr ""
@@ -5164,6 +5187,10 @@ msgstr ""
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Subscriptions"
+msgstr ""
+
+#: src/components/FinanceCards.tsx
+msgid "Subscriptions / mo"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -5671,6 +5698,7 @@ msgstr "मान एन्क्रिप्ट किए जाते है�
 msgid "Vendor"
 msgstr ""
 
+#: src/components/FinanceCards.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Vendors"
 msgstr ""

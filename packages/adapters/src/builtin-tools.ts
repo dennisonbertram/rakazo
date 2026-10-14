@@ -747,6 +747,66 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "finance_overview",
+    description:
+      "The user's cash, monthly burn, runway and spend this week, month, quarter and year with comparisons, from their synced Mercury and Brex data (the same numbers as the Finance page). Dollars. Start here.",
+    inputSchema: { type: "object", properties: {} },
+    readOnly: true,
+  },
+  {
+    name: "finance_breakdown",
+    description:
+      "Spend grouped by category or vendor over a range, largest first, with each row's amount and share of the total. Card payments and transfers between the user's own accounts are already left out. Dollars.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        by: { type: "string", enum: ["category", "vendor"] },
+        range: {
+          description: 'One of "30d", "90d" (default), "365d", or {from, to} as YYYY-MM-DD.',
+          anyOf: [
+            { type: "string", enum: ["30d", "90d", "365d"] },
+            {
+              type: "object",
+              properties: { from: { type: "string" }, to: { type: "string" } },
+              required: ["from", "to"],
+            },
+          ],
+        },
+        limit: { type: "number", description: "Rows to return. Default 10, max 50." },
+      },
+      required: ["by"],
+    },
+    readOnly: true,
+  },
+  {
+    name: "finance_transactions",
+    description:
+      "Individual synced transactions, newest first, with a count and total of everything that matched. Amounts are signed dollars (negative is money out). Filter by day range, vendor name, category, minimum size or classification (spend, revenue, financing, internal_transfer, card_payment).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "First day, YYYY-MM-DD." },
+        to: { type: "string", description: "Last day, YYYY-MM-DD." },
+        vendor: { type: "string", description: "Part of the vendor name." },
+        category: { type: "string" },
+        minAmount: { type: "number", description: "Smallest amount in dollars, either direction." },
+        classification: {
+          type: "string",
+          enum: ["spend", "revenue", "financing", "internal_transfer", "card_payment"],
+        },
+        limit: { type: "number", description: "Rows to return. Default 50, max 200." },
+      },
+    },
+    readOnly: true,
+  },
+  {
+    name: "finance_recurring",
+    description:
+      "Subscriptions and other recurring charges with their monthly cost, cadence and overlaps, plus what is expected to be charged in the next 30 days (recurring, pending and bills due). Dollars.",
+    inputSchema: { type: "object", properties: {} },
+    readOnly: true,
+  },
+  {
     name: "drive_search",
     description:
       "Find files in the user's connected Google Drive by name or content. Returns id, name, mimeType, modifiedTime, owners, webViewLink and size for each match. Use drive_read for the content.",

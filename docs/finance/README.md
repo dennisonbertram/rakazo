@@ -54,6 +54,12 @@ new, which is safe because no existing workflow changes.
    "finance-agent:<userId>"`, created idempotently by `finance.agent`, assigned the
    user's Mercury and Brex servers with the read-only tool list. The panel is closed
    by default; "Ask agent" in the page header opens it and hides while it is open.
+   The agent gets no Composio or Pipedream tools. It reads the synced rows through four
+   read-only built-in tools that reuse the core calculations: `finance_overview`,
+   `finance_breakdown`, `finance_transactions` and `finance_recurring`. Each shows a small
+   preview card (a `finance` message block) in the chat. They are offered only to the
+   owner's own direct runs when a Mercury or Brex server exists. The vendor MCP tools stay
+   for details the sync lacks (receipts, memos, cards).
 6. **Skills** are built-in skills in `packages/adapters/src/builtin-skills.ts`:
    `finance-cost-cutting`, `finance-runway-scenarios`, `finance-monthly-review`,
    `finance-categorize` (suggests categories; applying them is a write and is not

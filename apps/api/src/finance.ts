@@ -6,6 +6,9 @@ import {
   createBrexFinanceSource,
   createMercuryFinanceSource,
   syncFinanceForUser,
+  toFinanceAccount,
+  toFinanceBill,
+  toFinanceTransaction,
 } from "@rakazo/adapters";
 import type {
   Actor,
@@ -13,7 +16,6 @@ import type {
   FinanceAccount,
   FinanceAccountOutput,
   FinanceAccountsOutput,
-  FinanceBill,
   FinanceBurnOutput,
   FinanceCategoryOutput,
   FinanceConnectInput,
@@ -109,48 +111,9 @@ const accountKey = (provider: string, externalId: string) => `${provider}:${exte
 
 // ---- Loading ----
 
-const toAccount = (row: Prisma.FinanceAccountGetPayload<object>): FinanceAccount => ({
-  id: row.id,
-  provider: FinanceProviderSchema.parse(row.provider),
-  externalId: row.externalId,
-  name: row.name,
-  lastFour: row.lastFour,
-  kind: row.kind as FinanceAccount["kind"],
-  balanceCents: Number(row.balanceCents),
-  currency: row.currency,
-});
-
-const toTransaction = (row: Prisma.FinanceTransactionGetPayload<object>): FinanceTransaction => ({
-  id: row.id,
-  provider: FinanceProviderSchema.parse(row.provider),
-  externalId: row.externalId,
-  accountExternalId: row.accountExternalId,
-  postedAt: row.postedAt.toISOString(),
-  purchasedAt: row.purchasedAt?.toISOString() ?? null,
-  amountCents: Number(row.amountCents),
-  currency: row.currency,
-  counterparty: row.counterparty,
-  vendorKey: row.vendorKey,
-  category: row.category,
-  status: row.status as FinanceTransaction["status"],
-  kind: row.kind,
-  classification: row.classification as FinanceTransaction["classification"],
-  cardLastFour: row.cardLastFour,
-  cardholder: row.cardholder,
-  memo: row.memo,
-  hasReceipt: row.hasReceipt,
-  dashboardUrl: row.dashboardUrl,
-});
-
-const toBill = (row: Prisma.FinanceBillGetPayload<object>): FinanceBill => ({
-  provider: FinanceProviderSchema.parse(row.provider),
-  externalId: row.externalId,
-  vendorName: row.vendorName,
-  vendorKey: row.vendorKey,
-  dueAt: row.dueAt.toISOString(),
-  amountCents: Number(row.amountCents),
-  status: row.status,
-});
+const toAccount = toFinanceAccount;
+const toTransaction = toFinanceTransaction;
+const toBill = toFinanceBill;
 
 const toYield = (row: Prisma.FinanceTreasuryYieldGetPayload<object>): TreasuryYieldMonth => ({
   accountExternalId: row.accountExternalId,
