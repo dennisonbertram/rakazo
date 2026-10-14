@@ -1039,6 +1039,11 @@ describe("GoogleConnector providers", () => {
     const s = setup();
     s.db.connections.push(row("c2", "googledrive", "secret-2"));
     const items = await s.connector.catalog(context);
+    expect(items.map((i) => i.logo)).toEqual([
+      "https://cdn.simpleicons.org/gmail",
+      "https://cdn.simpleicons.org/googlecalendar",
+      "https://cdn.simpleicons.org/googledrive",
+    ]);
     expect(items.map((i) => [i.slug, i.name, i.connected])).toEqual([
       ["gmail", "Gmail", true],
       ["googlecalendar", "Google Calendar", false],

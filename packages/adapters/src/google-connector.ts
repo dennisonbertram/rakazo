@@ -134,7 +134,8 @@ export class GoogleConnector implements ManagedConnectorProvider {
         connectorId: "google",
         slug,
         name,
-        logo: null,
+        // Simple Icons slugs match the provider keys; the web app inverts the black glyph in dark mode.
+        logo: `https://cdn.simpleicons.org/${slug}`,
         connected: connected.has(slug),
         noAuth: false,
       })),
