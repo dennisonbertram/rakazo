@@ -23,9 +23,19 @@ msgstr " (읽지 않음)"
 msgid "{0, plural, one {# model} other {# models}}"
 msgstr "{0, plural, one {모델 #개} other {모델 #개}}"
 
+#. placeholder {0}: rows.length
+#: src/pages/Inbox.tsx
+msgid "{0, plural, one {# result} other {# results}}"
+msgstr ""
+
 #. placeholder {0}: subs.items.length
 #: src/pages/Finance.tsx
 msgid "{0, plural, one {# subscription} other {# subscriptions}}"
+msgstr ""
+
+#. placeholder {0}: rows.length
+#: src/pages/Inbox.tsx
+msgid "{0, plural, one {#+ result} other {#+ results}}"
 msgstr ""
 
 #. placeholder {0}: Math.ceil(oauth.expiresInSeconds / 60)
@@ -653,6 +663,7 @@ msgstr "보관"
 msgid "archived"
 msgstr "보관됨"
 
+#: src/pages/Inbox.tsx
 #: src/pages/Shell.tsx
 msgid "Archived"
 msgstr "보관됨"
@@ -1048,6 +1059,7 @@ msgid "Cash out and cash in by month"
 msgstr ""
 
 #: src/pages/finance/FinanceBurn.tsx
+#: src/pages/Inbox.tsx
 msgid "Categories"
 msgstr ""
 
@@ -1194,20 +1206,12 @@ msgstr "{0}와의 대화 내용을 비울까요?"
 msgid "Clear conversation"
 msgstr "대화 내용 비우기"
 
-#: src/pages/Inbox.tsx
-msgid "Clear filter"
-msgstr ""
-
 #: src/pages/ActivityList.tsx
 msgid "Clear filter {label}"
 msgstr ""
 
 #: src/components/compose/RichTextEditor.tsx
 msgid "Clear formatting"
-msgstr ""
-
-#: src/pages/Inbox.tsx
-msgid "Clear search"
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx
@@ -2764,6 +2768,10 @@ msgstr "Git 이벤트"
 msgid "Gmail needs to be reconnected."
 msgstr ""
 
+#: src/pages/Inbox.tsx
+msgid "Gmail tabs"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 #: src/pages/Shell.tsx
 msgid "Group"
@@ -3134,6 +3142,7 @@ msgstr "음성 서비스를 불러오는 중…"
 #: src/App.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/Auth.tsx
+#: src/pages/Inbox.tsx
 #: src/pages/IntegrationSetup.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/Onboarding.tsx
@@ -3699,6 +3708,10 @@ msgstr "사용 가능한 모델 목록이 없습니다."
 #: src/lib/model-connection-preflight.ts
 msgid "No models listed."
 msgstr "나열된 모델이 없습니다."
+
+#: src/pages/Inbox.tsx
+msgid "No more results"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "No providers found."
@@ -4736,6 +4749,10 @@ msgstr ""
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Search models"
 msgstr "모델 검색"
+
+#: src/pages/Inbox.tsx
+msgid "Search older mail"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Search providers"

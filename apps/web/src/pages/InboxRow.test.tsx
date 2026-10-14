@@ -13,7 +13,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 vi.mock("../components/SandboxedHtmlViewer", () => ({ SandboxedHtmlViewer: () => null }));
 
-import { InboxRow } from "../components/inbox/InboxRow";
+import { InboxGroup, InboxRow } from "../components/inbox/InboxRow";
 
 const mail = (extra: Partial<MailRow> = {}): MailRow => ({
   id: "m1",
@@ -46,6 +46,7 @@ async function render(
     onRead?: (id: string, read: boolean) => void;
     selected?: boolean;
     hideAttention?: boolean;
+    today?: boolean;
   } = {},
 ) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -62,7 +63,7 @@ async function render(
         onRead={props.onRead}
         selected={props.selected}
         hideAttention={props.hideAttention}
-        today
+        today={props.today ?? true}
       />,
     ),
   );
@@ -190,4 +191,41 @@ it("archives and toggles read from the row without opening it", async () => {
 it("shows no row actions when the page offers none", async () => {
   const container = await render(mail());
   expect(container.querySelector('button[aria-label="Archive"]')).toBeNull();
+});
+
+it("shows the reason a Needs reply row needs a reply as a tooltip, only there", async () => {
+  const reason = "Asks for dates by Friday";
+  const there = await render(mail({ reason }), { hideAttention: true });
+  expect(there.querySelector("button")?.getAttribute("title")).toBe(reason);
+  const elsewhere = await render(mail({ reason }));
+  expect(elsewhere.querySelector("button")?.hasAttribute("title")).toBe(false);
+});
+
+it("shows the year only for mail from another year", async () => {
+  const old = await render(mail({ receivedAt: "2019-03-05T12:00:00.000Z" }), { today: false });
+  expect(old.querySelector("time")?.textContent).toContain("2019");
+  const recent = await render(mail({ receivedAt: new Date().toISOString() }), { today: false });
+  expect(recent.querySelector("time")?.textContent).not.toMatch(/\d{4}/);
+});
+
+it("shows the row count beside a group heading, and no heading without a title", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  cleanups.push(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+  });
+  const rows = [mail({ id: "a" }), mail({ id: "b" })];
+  const show = (title?: string) =>
+    act(async () =>
+      root.render(
+        <InboxGroup title={title} rows={rows} onOpen={() => {}} onMark={undefined} today />,
+      ),
+    );
+  await show("Earlier");
+  expect(container.querySelector("h2")?.textContent).toBe("Earlier2");
+  await show(undefined);
+  expect(container.querySelector("h2")).toBeNull();
 });

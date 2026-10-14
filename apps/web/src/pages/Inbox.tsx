@@ -1,4 +1,4 @@
-import { t } from "@lingui/core/macro";
+import { plural, t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { InboxListOutput, InboxMark, InboxTodo, MailRow } from "@rakazo/contracts";
 import { InboxFilterSchema, InboxViewCategorySchema } from "@rakazo/contracts";
@@ -7,7 +7,9 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -49,10 +51,13 @@ const ALL = "all";
 const TRIAGE_POLL_MS = 5_000;
 const TRIAGE_MAX_POLLS = 6;
 const STATUS_MS = 6_000;
+const PREFETCH_DELAY_MS = 250;
 /** Marks the `?mail=` history entry the list pushed, so closing the message can go Back. */
 const LIST_OPEN = { inboxList: true };
 
-type Status = { kind: "marked"; messageId: string; mark: InboxMark };
+type Status =
+  | { kind: "marked"; messageId: string; mark: InboxMark }
+  | { kind: "archived"; messageId: string };
 
 type InboxFilter = (typeof InboxFilterSchema.options)[number];
 type InboxViewCategory = (typeof InboxViewCategorySchema.options)[number];
@@ -251,7 +256,19 @@ export function InboxPage({
       return [{ ...row, needsReply: null }];
     });
   }, [shown, moreRows, filtered]);
-  const groups = useMemo(() => groupInbox(rows, new Date()), [rows]);
+  // The view and category buttons show only when triage can fill them in.
+  const triage = Boolean(shown?.enabled);
+  const narrowed = triage && (view === "important" || Boolean(category));
+  // A search or narrowed list is one date-ordered list under a result count, not Needs reply / Today / Earlier.
+  const resultsView = filtered || narrowed;
+  const groups = useMemo(
+    () =>
+      groupInbox(
+        resultsView ? rows.map((row) => ({ ...row, needsReply: null })) : rows,
+        new Date(),
+      ),
+    [rows, resultsView],
+  );
   const ids = useMemo(
     () => [...groups.needsReply, ...groups.today, ...groups.earlier].map((row) => row.id),
     [groups],
@@ -266,9 +283,6 @@ export function InboxPage({
   };
   const setParam = (name: Parameters<typeof setInboxListParam>[1], value: string) =>
     setParams(setInboxListParam(params, name, value));
-  // The view and category buttons show only when triage can fill them in.
-  const triage = Boolean(shown?.enabled);
-  const narrowed = triage && (view === "important" || Boolean(category));
   const showTodos =
     triage && !filtered && !narrowed && shown?.triageBlocked?.reason !== "needs_consent";
   const loading =
@@ -304,8 +318,18 @@ export function InboxPage({
     const neighbor = ids[index + 1] ?? ids[index - 1];
     if (selectedId === messageId) setSelectedId(neighbor);
     patchRows((list) => list.filter((row) => row.id !== messageId));
+    setStatus({ kind: "archived", messageId });
     change(rpc.inbox.archive({ messageId }));
     return neighbor;
+  };
+  const unarchive = (messageId: string) => {
+    setStatus(null);
+    setError("");
+    rpc.inbox
+      .unarchive({ messageId })
+      .then(onRefreshed)
+      .catch((cause) => setError(errorText(cause)))
+      .then(() => setReload((n) => n + 1));
   };
   // The row changes at once; a failed save puts it back.
   const mark = (messageId: string, value: InboxMark | null) => {
@@ -341,12 +365,18 @@ export function InboxPage({
         setError(errorText(cause));
       });
   };
+  // Opening an unread message reads it.
+  const readOnOpen = (id: string) => {
+    if ([...(shown?.rows ?? []), ...moreRows].find((row) => row.id === id)?.unread)
+      setRead(id, true);
+  };
   // `?mail=` is the source of truth for the open message, so Back and deep links work.
   // A list-opened message pushes an entry marked with LIST_OPEN, and closing goes Back to it.
   const openMessage = (id: string) => {
     const next = new URLSearchParams(params);
     next.set("mail", id);
     setSelectedId(id);
+    readOnOpen(id);
     setParams(next, { state: LIST_OPEN });
   };
   const closeMessage = () => {
@@ -359,13 +389,15 @@ export function InboxPage({
     const next = new URLSearchParams(params);
     next.set("mail", id);
     setSelectedId(id);
+    readOnOpen(id);
     setParams(next, { replace: true, state: location.state });
   };
   const openRow = [...(shown?.rows ?? []), ...moreRows].find((row) => row.id === openId);
   const openIndex = openId ? ids.indexOf(openId) : -1;
+  const focusSearch = () => searchRef.current?.querySelector("input")?.focus();
   const clearFilters = () => {
     const next = new URLSearchParams(params);
-    for (const name of ["filter", "category", "view", "mail"]) next.delete(name);
+    for (const name of ["q", "filter", "category", "view", "mail"]) next.delete(name);
     setParams(next);
   };
 
@@ -375,17 +407,20 @@ export function InboxPage({
     enabled: !paused && !openId && !composing && !help,
     select: setSelectedId,
     open: openMessage,
-    focusSearch: () => searchRef.current?.querySelector("input")?.focus(),
+    focusSearch,
     compose: accounts.length > 0 ? () => setComposing(true) : undefined,
-    archive: filtered ? undefined : archive,
+    archive,
     help: () => setHelp(true),
   });
   // Warm the cache so the first messages and the selected one open instantly.
   useEffect(() => {
     for (const id of ids.slice(0, 3)) prefetchInboxMessage(id);
   }, [ids]);
+  // Debounced so holding j or k does not fetch every row passed over.
   useEffect(() => {
-    if (selectedId) prefetchInboxMessage(selectedId);
+    if (!selectedId) return;
+    const timer = setTimeout(() => prefetchInboxMessage(selectedId), PREFETCH_DELAY_MS);
+    return () => clearTimeout(timer);
   }, [selectedId]);
   // Back from a message lands on its row.
   const wasOpen = useRef(false);
@@ -499,19 +534,29 @@ export function InboxPage({
                 </DropdownMenuRadioItem>
               ))}
               <DropdownMenuSeparator />
-              {(["primary", "promotions", "social", "updates"] as const).map((name) => (
-                <DropdownMenuRadioItem key={name} value={name} closeOnClick>
-                  {filterLabels()[name]}
-                </DropdownMenuRadioItem>
-              ))}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>
+                  <Trans>Gmail tabs</Trans>
+                </DropdownMenuLabel>
+                {(["primary", "promotions", "social", "updates"] as const).map((name) => (
+                  <DropdownMenuRadioItem key={name} value={name} closeOnClick>
+                    {filterLabels()[name]}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuGroup>
               {triage ? (
                 <>
                   <DropdownMenuSeparator />
-                  {InboxViewCategorySchema.options.map((name) => (
-                    <DropdownMenuRadioItem key={name} value={name} closeOnClick>
-                      {categoryLabels()[name]}
-                    </DropdownMenuRadioItem>
-                  ))}
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>
+                      <Trans>Categories</Trans>
+                    </DropdownMenuLabel>
+                    {InboxViewCategorySchema.options.map((name) => (
+                      <DropdownMenuRadioItem key={name} value={name} closeOnClick>
+                        {categoryLabels()[name]}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuGroup>
                 </>
               ) : null}
             </DropdownMenuRadioGroup>
@@ -599,8 +644,8 @@ export function InboxPage({
                 <p>
                   <Trans>No results for "{query}"</Trans>
                 </p>
-                <Button variant="outline" size="sm" onClick={() => setParam("q", "")}>
-                  <Trans>Clear search</Trans>
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  <Trans>Clear</Trans>
                 </Button>
               </>
             ) : filter || category || view === "important" ? (
@@ -609,7 +654,7 @@ export function InboxPage({
                   <Trans>No mail matches this filter</Trans>
                 </p>
                 <Button variant="outline" size="sm" onClick={clearFilters}>
-                  <Trans>Clear filter</Trans>
+                  <Trans>Clear</Trans>
                 </Button>
               </>
             ) : (
@@ -641,33 +686,45 @@ export function InboxPage({
               }
             />
           ) : null}
+          {resultsView ? (
+            <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {more.token && fresh
+                  ? plural(rows.length, { one: "#+ result", other: "#+ results" })
+                  : plural(rows.length, { one: "# result", other: "# results" })}
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <Trans>Clear</Trans>
+              </Button>
+            </div>
+          ) : null}
           <InboxGroup
             title={<Trans>Needs reply</Trans>}
             hideAttention
             rows={groups.needsReply}
             onOpen={openMessage}
             onMark={triage ? mark : undefined}
-            onArchive={filtered ? undefined : archive}
+            onArchive={archive}
             onRead={setRead}
             selectedId={selectedId}
             today={false}
           />
           <InboxGroup
-            title={<Trans>Today</Trans>}
+            title={resultsView ? undefined : <Trans>Today</Trans>}
             rows={groups.today}
             onOpen={openMessage}
             onMark={triage ? mark : undefined}
-            onArchive={filtered ? undefined : archive}
+            onArchive={archive}
             onRead={setRead}
             selectedId={selectedId}
             today
           />
           <InboxGroup
-            title={<Trans>Earlier</Trans>}
+            title={resultsView ? undefined : <Trans>Earlier</Trans>}
             rows={groups.earlier}
             onOpen={openMessage}
             onMark={triage ? mark : undefined}
-            onArchive={filtered ? undefined : archive}
+            onArchive={archive}
             onRead={setRead}
             selectedId={selectedId}
             today={false}
@@ -675,7 +732,22 @@ export function InboxPage({
           {filtered && fresh && more.token ? (
             <div className="grid place-items-center pb-2">
               <Button variant="outline" size="sm" disabled={more.busy} onClick={loadMore}>
-                <Trans>Load more</Trans>
+                {more.busy ? <Trans>Loading…</Trans> : <Trans>Load more</Trans>}
+              </Button>
+            </div>
+          ) : filtered && fresh && rows.length > 0 ? (
+            <p className="pb-2 text-center text-xs text-muted-foreground">
+              <Trans>No more results</Trans>
+            </p>
+          ) : !resultsView && rows.length > 0 ? (
+            <div className="grid place-items-center pb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={focusSearch}
+              >
+                <Trans>Search older mail</Trans>
               </Button>
             </div>
           ) : null}
@@ -690,7 +762,7 @@ export function InboxPage({
         onNavigate={goToMessage}
         unread={openRow?.unread}
         onArchive={
-          openRow && !filtered
+          openRow
             ? () => {
                 const next = archive(openRow.id);
                 if (next) goToMessage(next);
@@ -707,16 +779,24 @@ export function InboxPage({
       >
         {status ? (
           <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border bg-card py-1 ps-3 pe-1 text-sm text-card-foreground shadow-md">
-            {status.mark === "noise" ? (
+            {status.kind === "archived" ? (
+              <Trans>Archived</Trans>
+            ) : status.mark === "noise" ? (
               <Trans>Marked noise</Trans>
             ) : (
               <Trans>Marked important</Trans>
             )}
-            {status.kind === "marked" ? (
-              <Button variant="ghost" size="sm" onClick={() => mark(status.messageId, null)}>
-                <Trans>Undo</Trans>
-              </Button>
-            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                status.kind === "archived"
+                  ? unarchive(status.messageId)
+                  : mark(status.messageId, null)
+              }
+            >
+              <Trans>Undo</Trans>
+            </Button>
           </div>
         ) : null}
       </div>
