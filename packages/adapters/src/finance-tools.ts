@@ -214,13 +214,13 @@ const clipStrings = (value: unknown): unknown =>
 
 async function show(deps: FinanceToolDeps, card: FinanceCard) {
   // A card is a preview; the tool result already holds the data.
-  let clipped = clipStrings(card) as FinanceCard & { rows?: unknown[] };
+  let clipped = clipStrings(card) as FinanceCard;
   while (
-    Array.isArray(clipped.rows) &&
+    "rows" in clipped &&
     clipped.rows.length > 0 &&
     JSON.stringify(clipped).length > MAX_CARD_CHARS
   ) {
-    clipped = { ...clipped, rows: clipped.rows.slice(0, -1) };
+    clipped = { ...clipped, rows: clipped.rows.slice(0, -1) } as FinanceCard;
   }
   await deps.publish?.([{ kind: "finance", card: clipped }]).catch(() => undefined);
 }
