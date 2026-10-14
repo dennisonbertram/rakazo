@@ -7,8 +7,6 @@ export * from "./auto-review-factory.js";
 export * from "./background-job-handlers.js";
 export * from "./billing-emulator.js";
 export * from "./blockscout-crypto-call-tool.js";
-export * from "./blockscout-crypto-source.js";
-export * from "./blockscout-crypto-sync.js";
 export * from "./bot-avatar.js";
 export * from "./bot-messages.js";
 export {
@@ -124,6 +122,8 @@ export * from "./private-endpoint.js";
 export * from "./realtime.js";
 export * from "./release-watch.js";
 export * from "./remote-mcp.js";
+export * from "./rpc-crypto-source.js";
+export * from "./rpc-crypto-sync.js";
 export * from "./run-secret.js";
 export * from "./sandbox-factory.js";
 export * from "./sandbox-provider-env.js";

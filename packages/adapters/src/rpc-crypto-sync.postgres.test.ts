@@ -2,19 +2,24 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@rakazo/db";
 import { createDb } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { CRYPTO_TOKEN_LIST } from "./crypto-token-list.js";
+import type { FakeWorld } from "./rpc-crypto-fake-fetch.js";
 import {
-  ERR_PLAN,
-  fakeBlockscout,
-  holding,
+  fakeRpc,
   OWNER_1,
   OWNER_2,
   SAFE_WALLET,
-  TOKEN_DAI,
-  TOKEN_USDC,
+  TOKEN_UNLISTED,
   WALLET_A,
   WALLET_B,
-} from "./blockscout-crypto-fake-tools.js";
-import { syncCryptoHoldings } from "./blockscout-crypto-sync.js";
+} from "./rpc-crypto-fake-fetch.js";
+import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
+
+const LISTED = CRYPTO_TOKEN_LIST[1]?.[0]?.[0] as string;
+const PRICES = {
+  "coingecko:ethereum": { price: 2000, confidence: 0.99 },
+  [`ethereum:${LISTED}`]: { price: 1, confidence: 0.99 },
+};
 
 const databaseUrl = process.env.DATABASE_URL;
 const describePostgres =
@@ -28,10 +33,10 @@ describePostgres("crypto sync (PostgreSQL)", () => {
   const otherUserId = `cry-other-${suffix}`;
   let prisma: PrismaClient;
   let close: () => Promise<void>;
-  let fake = fakeBlockscout();
+  let fake = fakeRpc();
   const sync = (opts: { force?: boolean; user?: string; walletIds?: string[] } = {}) =>
     syncCryptoHoldings(
-      { prisma, callToolFor: async () => fake.callTool, callGapMs: 0, retryDelayMs: 0 },
+      { prisma, fetch: fake.fetch, callGapMs: 0, retryDelayMs: 0 },
       { spaceId, userId: opts.user ?? userId },
       opts,
     );
@@ -80,36 +85,60 @@ describePostgres("crypto sync (PostgreSQL)", () => {
     await close();
   });
 
-  it("is not_connected without a Blockscout server", async () => {
+  it("is not_connected without a server row", async () => {
     expect(await sync()).toMatchObject({ ok: false, error: "not_connected" });
   });
 
-  it("stores priced and unpriced holdings, replaces the snapshot, keeps a failing chain, and throttles", async () => {
+  it("stores priced and unpriced holdings, replaces the snapshot, keeps a failing chain with a named message, and throttles", async () => {
     const server = await addServer(userId);
     await addWallet(userId, WALLET_A);
-    fake = fakeBlockscout({
-      chains: {
-        1: {
-          [WALLET_A]: {
-            coinBalance: "1500000000000000000",
-            exchangeRate: "2000",
-            tokenPages: [
-              [holding(TOKEN_USDC, "2500000")],
-              [holding(TOKEN_DAI, "7", { decimals: "18", exchange_rate: null })],
-            ],
-          },
-        },
-        8453: { [WALLET_A]: { coinBalance: "1000000000000000000", exchangeRate: "2000" } },
+    // A stored holding for an unlisted token is read again; its low-confidence price leaves it unpriced (a 18-decimals listed token is priced).
+    await prisma.financeCryptoHolding.create({
+      data: {
+        spaceId,
+        userId,
+        walletId: (
+          await prisma.financeWallet.findFirstOrThrow({
+            where: { spaceId, userId, address: WALLET_A },
+          })
+        ).id,
+        chainId: 1,
+        tokenAddress: TOKEN_UNLISTED,
+        symbol: "UNL",
+        name: "Unlisted",
+        decimals: 18,
+        rawBalance: "1",
+        usdPrice: null,
+        usdValueCents: null,
+        syncedAt: new Date(0),
       },
     });
+    const world: FakeWorld = {
+      prices: { ...PRICES, [`ethereum:${TOKEN_UNLISTED}`]: { price: 5, confidence: 0.5 } },
+      chains: {
+        1: {
+          balances: { [WALLET_A]: 1_500_000_000_000_000_000n },
+          tokens: {
+            [LISTED]: { [WALLET_A]: 2_500_000_000_000_000_000n },
+            [TOKEN_UNLISTED]: { [WALLET_A]: 7n },
+          },
+        },
+        8453: { balances: { [WALLET_A]: 1_000_000_000_000_000_000n } },
+      },
+    };
+    fake = fakeRpc(world);
     expect(await sync()).toEqual({ ok: true, outcome: "synced", failedChains: [] });
     let held = await rows();
-    expect(held.map((r) => [r.chainId, r.tokenAddress, r.usdValueCents])).toEqual([
-      [1, "", 300000n],
-      [1, TOKEN_USDC, 250n],
-      [1, TOKEN_DAI, null],
-      [8453, "", 200000n],
-    ]);
+    expect(held.map((r) => [r.chainId, r.tokenAddress, r.usdValueCents])).toEqual(
+      [
+        [1, "", 300000n],
+        [1, LISTED, 250n],
+        [1, TOKEN_UNLISTED, null],
+        [8453, "", 200000n],
+      ].sort(
+        (a, b) => (a[0] as number) - (b[0] as number) || String(a[1]).localeCompare(String(b[1])),
+      ),
+    );
     expect(
       (await prisma.financeSyncState.findUniqueOrThrow({ where: { mcpServerId: server.id } }))
         .lastSyncedAt,
@@ -119,10 +148,13 @@ describePostgres("crypto sync (PostgreSQL)", () => {
     expect(await sync()).toMatchObject({ outcome: "skipped" });
     expect(fake.calls).toHaveLength(calls);
 
-    // Ethereum drops USDC and DAI; Base fails and must keep its old row.
-    fake = fakeBlockscout({
-      failChains: [8453],
-      chains: { 1: { [WALLET_A]: { coinBalance: "1000000000000000000", exchangeRate: "2000" } } },
+    // Ethereum drops its tokens; Base fails and must keep its old row.
+    fake = fakeRpc({
+      prices: PRICES,
+      chains: {
+        1: { balances: { [WALLET_A]: 1_000_000_000_000_000_000n } },
+        8453: { alwaysStatus: 503 },
+      },
     });
     expect(await sync({ force: true })).toEqual({
       ok: true,
@@ -137,56 +169,38 @@ describePostgres("crypto sync (PostgreSQL)", () => {
     const state = await prisma.financeSyncState.findUniqueOrThrow({
       where: { mcpServerId: server.id },
     });
-    expect(state.lastError).toBe("Base: Blockscout rate limit reached, try again shortly");
+    expect(state.lastError).toBe("Base: the RPC endpoint is not responding");
   });
 
-  it("shows a chain on a Free plan as needing a paid plan, keeps its rows, and skips it until forced", async () => {
-    const owner = `${userId}-plan`;
+  it("fails and keeps rows when prices cannot be read", async () => {
+    const owner = `${userId}-price`;
     await prisma.user.create({
       data: { id: owner, name: owner, email: `${owner}@rakazo.test`, emailVerified: false },
     });
     const server = await addServer(owner);
     await addWallet(owner, WALLET_A);
-    const ok = {
-      chains: {
-        1: { [WALLET_A]: { coinBalance: "1000000000000000000", exchangeRate: "2000" } },
-        8453: { [WALLET_A]: { coinBalance: "1000000000000000000", exchangeRate: "2000" } },
-      },
-    };
-    fake = fakeBlockscout(ok);
+    const chains = { 1: { balances: { [WALLET_A]: 1_000_000_000_000_000_000n } } };
+    fake = fakeRpc({ prices: PRICES, chains });
     await sync({ user: owner });
-    expect(await rows(owner)).toHaveLength(2);
-
-    fake = fakeBlockscout({ ...ok, chainErrors: { 8453: ERR_PLAN, 137: ERR_PLAN } });
-    expect(await sync({ user: owner, force: true })).toMatchObject({
-      ok: true,
-      failedChains: [137, 8453].sort((a, b) => a - b),
+    fake = fakeRpc({ chains, priceStatus: 503 });
+    expect(await sync({ user: owner, force: true })).toEqual({
+      ok: false,
+      error: "failed",
+      message: "Prices: the price service is not responding",
     });
+    expect(await rows(owner)).toHaveLength(1);
     expect(
       (await prisma.financeSyncState.findUniqueOrThrow({ where: { mcpServerId: server.id } }))
         .lastError,
-    ).toBe("Base and Polygon need a paid Blockscout plan, or your credits ran out");
-    expect(await rows(owner)).toHaveLength(2);
-
-    // Not forced: the refused chains are not called again.
-    await prisma.$executeRaw`UPDATE finance_sync_states SET "lastSyncedAt" = now() - interval '20 minutes', "lastErrorAt" = now() - interval '20 minutes' WHERE "mcpServerId" = ${server.id}`;
-    fake = fakeBlockscout(ok);
-    await sync({ user: owner });
-    expect(new Set(fake.calls.map((c) => Number(c.args.chain_id)))).toEqual(
-      new Set([1, 42161, 10]),
-    );
+    ).toBe("Prices: the price service is not responding");
   });
 
   it("records a Safe's owners and threshold without changing the user's type, and never touches an exchange", async () => {
     const safe = await addWallet(userId, SAFE_WALLET, "contract");
     const exchange = await addWallet(userId, WALLET_B, "exchange");
-    fake = fakeBlockscout({
-      chains: {
-        1: {
-          [SAFE_WALLET]: { isContract: true, implementations: [{ name: "SafeL2" }] },
-          [WALLET_B]: { isContract: true, implementations: [{ name: "SafeL2" }] },
-        },
-      },
+    fake = fakeRpc({
+      prices: PRICES,
+      chains: { 1: { contracts: [SAFE_WALLET, WALLET_B] } },
       safe: { owners: [OWNER_1, OWNER_2], threshold: 2 },
     });
     await sync({ force: true });
@@ -204,8 +218,9 @@ describePostgres("crypto sync (PostgreSQL)", () => {
   it("never reads or writes another user's wallets", async () => {
     await addServer(otherUserId);
     const theirs = await addWallet(otherUserId, WALLET_A);
-    fake = fakeBlockscout({
-      chains: { 1: { [WALLET_A]: { coinBalance: "5", exchangeRate: "1" } } },
+    fake = fakeRpc({
+      prices: PRICES,
+      chains: { 1: { balances: { [WALLET_A]: 5n } } },
     });
     const mine = await rows();
     await sync({ force: true, user: otherUserId, walletIds: [theirs.id] });
