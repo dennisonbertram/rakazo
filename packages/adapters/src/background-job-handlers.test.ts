@@ -9,6 +9,7 @@ import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
 import { describe, expect, it, vi } from "vitest";
 import { createBackgroundJobHandlers } from "./background-job-handlers.js";
+import { syncCryptoHoldings } from "./blockscout-crypto-sync.js";
 import { createRunExecutor } from "./executor.js";
 import { syncFinanceForUser } from "./finance-sync.js";
 import { compactHistory } from "./history-compaction.js";
@@ -17,6 +18,9 @@ import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-d
 import type { EncryptedSecretStore } from "./secrets.js";
 
 vi.mock("./history-compaction.js", () => ({ compactHistory: vi.fn(async () => undefined) }));
+vi.mock("./blockscout-crypto-sync.js", () => ({
+  syncCryptoHoldings: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock("./finance-sync.js", () => ({ syncFinanceForUser: vi.fn(async () => ({})) }));
 vi.mock("./inbox-triage.js", () => ({ runInboxTriage: vi.fn(async () => undefined) }));
 vi.mock("./messaging-delivery.js", () => ({
@@ -46,6 +50,15 @@ describe("createBackgroundJobHandlers", () => {
     await createBackgroundJobHandlers({ ...base, financeCallToolFor })["finance.sync"](payload);
     expect(syncFinanceForUser).toHaveBeenCalledWith(
       { prisma: base.prisma, callToolFor: financeCallToolFor },
+      { spaceId: "space-1", userId: "user-1" },
+    );
+    expect(syncCryptoHoldings).not.toHaveBeenCalled();
+    const cryptoCallToolFor = vi.fn();
+    await createBackgroundJobHandlers({ ...base, financeCallToolFor, cryptoCallToolFor })[
+      "finance.sync"
+    ](payload);
+    expect(syncCryptoHoldings).toHaveBeenCalledWith(
+      { prisma: base.prisma, callToolFor: cryptoCallToolFor },
       { spaceId: "space-1", userId: "user-1" },
     );
   });
