@@ -427,11 +427,13 @@ describe("run tool selection", () => {
       "mail_grep",
       "mail_modify",
       "mail_search",
+      "mail_send",
     ]);
     expect(mailNames(offered(true, ["mail_grep", "inbox_overview", "mail_draft"]))).toEqual([
       "mail_get",
       "mail_modify",
       "mail_search",
+      "mail_send",
     ]);
   });
 
