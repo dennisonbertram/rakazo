@@ -207,7 +207,8 @@ export interface ConnectionAuthProvider {
     context: AdapterContext,
   ): Promise<{ authorizationUrl: string | null; state: string }>;
   complete(
-    request: { state: string; code?: string; redirectUrl?: string },
+    /** `provider` is the pending Connection's provider, for connectors whose providers need different grants. */
+    request: { state: string; code?: string; redirectUrl?: string; provider?: string },
     context: AdapterContext,
   ): Promise<{ connectionRef: string; secretId?: string }>;
   revoke(connectionRef: string, context: AdapterContext): Promise<void>;

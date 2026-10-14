@@ -997,10 +997,10 @@ export interface ConnectorProxyRequest {
   app: string;
   /** Connection.providerRef. */
   accountRef: string;
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /** Absolute https URL including the query string. */
   url: string;
-  /** JSON body for POST and PUT. */
+  /** JSON body for POST, PUT and PATCH. */
   body?: unknown;
 }
 

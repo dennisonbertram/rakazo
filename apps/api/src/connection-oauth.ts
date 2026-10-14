@@ -37,6 +37,7 @@ export async function completeNativeOAuth(options: {
       {
         state,
         code: options.code,
+        provider: pending.provider,
         ...(typeof redirectUrl === "string" ? { redirectUrl } : {}),
       },
       options.context,
