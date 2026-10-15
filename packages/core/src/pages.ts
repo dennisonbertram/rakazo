@@ -20,7 +20,8 @@ export function parsePageChart(raw: string): { chart: PageChart } | { error: str
 }
 
 const FENCE_OPEN = new RegExp(`^\`\`\`${PAGE_CHART_FENCE}[ \\t]*$`);
-const FENCE_CLOSE = /^```[ \t]*$/;
+const FENCE_CLOSE = /^`{3,}[ \t]*$/;
+const CODE_FENCE_OPEN = /^(`{3,}|~{3,})/;
 
 /**
  * Split a page into Markdown runs and chart fences, in document order. An unclosed chart
@@ -39,6 +40,15 @@ export function splitPage(content: string): PageSegment[] {
     const line = lines[i] ?? "";
     if (!FENCE_OPEN.test(line)) {
       text.push(line);
+      const open = CODE_FENCE_OPEN.exec(line)?.[1];
+      if (open) {
+        // Another code fence: its lines are plain Markdown until a matching closer.
+        const closer = new RegExp(`^${open[0]}{${open.length},}[ \\t]*$`);
+        while (++i < lines.length) {
+          text.push(lines[i] ?? "");
+          if (closer.test(lines[i] ?? "")) break;
+        }
+      }
       continue;
     }
     const end = lines.findIndex((candidate, j) => j > i && FENCE_CLOSE.test(candidate));

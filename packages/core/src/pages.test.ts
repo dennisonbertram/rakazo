@@ -31,4 +31,20 @@ describe("splitPage", () => {
       { kind: "markdown", text: "```ts\nconst a = 1;\n```" },
     ]);
   });
+
+  it("keeps a chart example inside a longer or tilde fence as markdown", () => {
+    const example = '```chart\n{"name":"x","spec":{},"data":[]}\n```';
+    for (const page of [
+      `\`\`\`\`md\n${example}\n\`\`\`\``,
+      `~~~\n${example}\n~~~`,
+      `> ${example.split("\n").join("\n> ")}`,
+    ]) {
+      expect(splitPage(page)).toEqual([{ kind: "markdown", text: page }]);
+    }
+  });
+
+  it("still finds a real chart after a longer fence closes", () => {
+    const page = `\`\`\`\`md\nexample\n\`\`\`\`\n\n${pageChartFence(chart)}`;
+    expect(splitPage(page).map((s) => s.kind)).toEqual(["markdown", "chart"]);
+  });
 });

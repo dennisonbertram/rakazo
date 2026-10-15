@@ -2,6 +2,7 @@ import type { BotPage, PageAuthor, PageChart } from "@rakazo/contracts";
 import { BOT_PAGE_MAX_CHARS, BOT_PAGE_MAX_CHARTS } from "@rakazo/contracts";
 import { splitPage } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+import { getLogger } from "@rakazo/logging";
 import type { PlotSpec } from "./plot-tool.js";
 import { renderPlotSpecToSvg } from "./plot-tool.js";
 
@@ -181,14 +182,22 @@ export async function saveBotPage(deps: PageDeps, input: PageSaveInput): Promise
     select: { id: true },
   });
   if (thread) {
-    await deps.events.append({
-      spaceId: input.spaceId,
-      threadId: thread.id,
-      botId: input.botId,
-      type: "page.updated",
-      runId: input.sourceRunId,
-      payload: { revision: saved.revision, updatedBy: input.updatedBy },
-    });
+    // The saved page is the source of truth; a missed event only delays a client refresh.
+    await deps.events
+      .append({
+        spaceId: input.spaceId,
+        threadId: thread.id,
+        botId: input.botId,
+        type: "page.updated",
+        runId: input.sourceRunId,
+        payload: { revision: saved.revision, updatedBy: input.updatedBy },
+      })
+      .catch((error) => {
+        getLogger().warn("page.updated append failed", {
+          error: error instanceof Error ? error.message : String(error),
+          botId: input.botId,
+        });
+      });
   }
   return { ok: true, page: toBotPage(saved) };
 }
