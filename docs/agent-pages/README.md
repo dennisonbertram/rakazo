@@ -81,7 +81,8 @@ last snapshot and the fallback. To keep that change small, v1 code must:
 
 - read chart rows through one function on each surface (web hook, server SVG renderer),
   so swapping in live rows is a single change;
-- keep chart fence parsing in one shared function used by the API, tools, and renderers.
+- keep chart fence parsing in one shared function (`splitPage` / `parsePageChart` in
+  `packages/core/src/pages.ts`) used by the API, tools, and renderers.
 
 Only tools marked `readOnly` may be sources, and the same owner and scope checks that
 apply to the bot's runs apply to chart refreshes.
