@@ -1466,6 +1466,7 @@ function Thread({ sessionEpoch }: { sessionEpoch: number }) {
                 }
                 commitSnap(applyMobileThreadEvent(snapRef.current, event));
               }
+              if (event.type === "page.updated") setHasPage(true);
               if (event.type === "bot.updated") {
                 void refreshMentionBots();
               }
