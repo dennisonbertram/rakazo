@@ -2,7 +2,7 @@ import type { RealtimeFanout } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import type { Prisma, PrismaClient } from "./client.js";
 import type { FinalizeRunInput, FinalizeRunResult } from "./events.js";
-import { appendEventInTransaction, notifyRealtime } from "./events.js";
+import { appendEventInTransaction, discardAnsweredSteering, notifyRealtime } from "./events.js";
 import {
   assertRunCanWriteHistory,
   createThreadMessageInTransaction,
@@ -212,6 +212,7 @@ async function finalizeRunOnce(
         data: { runId: null },
       });
     } else {
+      await discardAnsweredSteering(tx, input);
       const { sourceMessage } = await tx.run.findUniqueOrThrow({
         where: { id: input.runId },
         select: { sourceMessage: { select: { seq: true } } },

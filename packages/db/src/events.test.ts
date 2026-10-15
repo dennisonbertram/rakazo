@@ -100,7 +100,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: { updateMany: vi.fn(async () => ({ count: 1 })) },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
       event: { create: createEvent, deleteMany: vi.fn(async () => ({ count: 0 })) },
@@ -152,7 +152,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "task-reply" })),
@@ -220,7 +220,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "task-reply" })),
@@ -300,7 +300,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "task-reply" })),
@@ -2843,7 +2843,15 @@ describe("claimSteering", () => {
   it("claims pending messages for the fenced run in message order", async () => {
     const tx = {
       $queryRaw: vi.fn(),
-      run: { findFirst: vi.fn().mockResolvedValue({ id: "run-1" }) },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({ id: "run-1", spaceId: "space-1" }),
+        findUnique: vi.fn().mockResolvedValue({ status: "running", startedAt: null }),
+      },
+      thread: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ nextMessageSeq: 7 }),
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 1 }),
+      },
+      event: { create: vi.fn() },
       steeringMessage: {
         findMany: vi.fn().mockResolvedValue([
           {
@@ -2911,6 +2919,12 @@ describe("claimSteering", () => {
         where: expect.objectContaining({ leaseOwner: "worker-1", leaseFence: 2 }),
       }),
     );
+    expect(tx.event.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: "run.steering.claimed",
+        payload: { steeringIds: ["steer-1", "steer-2"], nextMessageSeq: 7 },
+      }),
+    });
     expect(tx.steeringMessage.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["steer-1", "steer-2"] }, claimedAt: null },
       data: { runId: "run-1", claimedAt: expect.any(Date) },
