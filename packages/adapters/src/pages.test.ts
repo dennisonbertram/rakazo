@@ -208,4 +208,28 @@ describe("page tools", () => {
     expect(await t.save("one", 0)).toMatchObject({ ok: true, page: { revision: 1 } });
     expect(await t.save("two", 1)).toMatchObject({ ok: true, page: { revision: 2 } });
   });
+
+  it("renders ordered categories in domain order and ISO dates in time order", async () => {
+    const months = ["Jan", "Feb", "Mar", "Apr"];
+    const rows = months.map((month, i) => ({ month, signups: i + 1 }));
+    const marks = [{ type: "line", options: { x: "month", y: "signups" } }];
+    const ticks = (svg: string) => [...svg.matchAll(/>(Jan|Feb|Mar|Apr)</g)].map((m) => m[1]);
+    const ordered = await renderPageChartSvg({
+      name: "c",
+      spec: { x: { domain: months }, marks },
+      data: rows,
+    });
+    expect(ticks(ordered)).toEqual(months);
+    const dated = await renderPageChartSvg({
+      name: "c",
+      spec: { x: { type: "utc" }, marks: [{ type: "line", options: { x: "d", y: "v" } }] },
+      data: [
+        { d: "2026-02-01", v: 2 },
+        { d: "2026-01-01", v: 1 },
+        { d: "2026-03-01", v: 3 },
+      ],
+    });
+    expect(dated).toContain("<svg");
+    expect(dated).not.toContain("could not be rendered");
+  });
 });
