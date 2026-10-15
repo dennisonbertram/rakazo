@@ -6,7 +6,7 @@ import type { NodeViewProps } from "@tiptap/react";
 import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor } from "@tiptap/react";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { resolveRemotePage } from "../../lib/page-sync";
+import { isNewerRemote, resolveRemotePage } from "../../lib/page-sync";
 import { rpc } from "../../lib/rpc";
 import { ChartCanvas } from "./message-cards";
 import { PageChartNode, usePageChartRows } from "./page-chart-extension";
@@ -17,9 +17,23 @@ const SAVE_DELAY_MS = 800;
 function ChartView({ node, deleteNode, editor }: NodeViewProps) {
   const chart = node.attrs.chart as PageChart;
   const rows = usePageChartRows(chart);
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setWidth(Math.floor(el.clientWidth));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   return (
     <NodeViewWrapper className="group relative my-3 rounded-lg border border-border p-3">
-      <ChartCanvas spec={chart.spec} data={rows} width={520} />
+      <div ref={ref}>
+        {width > 0 ? <ChartCanvas spec={chart.spec} data={rows} width={width} /> : null}
+      </div>
       {editor.isEditable ? (
         <Button
           variant="ghost"
@@ -172,14 +186,16 @@ export function BotPagePanel({
     if (!remote || !editor) return;
     seenRevision.current = Math.max(seenRevision.current, remote.revision);
     // A save in flight decides what to do with newer revisions when it returns.
-    if (saving.current || remote.revision <= revision.current) return;
+    if (saving.current) return;
+    if (!isNewerRemote({ loadedRevision: revision.current, remoteRevision: remote.revision }))
+      return;
     if (resolveRemotePage({ dirty: editor.getMarkdown() !== baseline.current }) === "offer") {
       stale.current = true;
       setOfferReload(true);
       return;
     }
     void fetchPage().catch(() => undefined);
-  }, [remote, editor, fetchPage]);
+  }, [remote, editor, fetchPage, loaded]);
 
   if (!loaded)
     return error ? (

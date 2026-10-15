@@ -2,7 +2,7 @@
 
 import { Editor } from "@tiptap/react";
 import { expect, it } from "vitest";
-import { resolveRemotePage } from "../../lib/page-sync";
+import { isNewerRemote, resolveRemotePage } from "../../lib/page-sync";
 import { PAGE_EXTENSIONS } from "./page-extensions";
 
 function roundTrip(content: string) {
@@ -71,4 +71,10 @@ it("drops a pasted chart that does not parse and keeps one that does", () => {
   });
   expect(editor.getMarkdown().trim()).toBe(fence);
   editor.destroy();
+});
+
+it("ignores remote revisions before the first load and at or below the loaded one", () => {
+  expect(isNewerRemote({ loadedRevision: 0, remoteRevision: 1 })).toBe(false);
+  expect(isNewerRemote({ loadedRevision: 1, remoteRevision: 1 })).toBe(false);
+  expect(isNewerRemote({ loadedRevision: 1, remoteRevision: 2 })).toBe(true);
 });
