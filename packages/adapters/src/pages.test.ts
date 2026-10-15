@@ -201,4 +201,11 @@ describe("page tools", () => {
       error: expect.stringContaining("Invalid chart block"),
     });
   });
+
+  it("keeps the saved page when the event append fails", async () => {
+    const t = setup();
+    t.events.append.mockRejectedValueOnce(new Error("events down"));
+    expect(await t.save("one", 0)).toMatchObject({ ok: true, page: { revision: 1 } });
+    expect(await t.save("two", 1)).toMatchObject({ ok: true, page: { revision: 2 } });
+  });
 });
