@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 
-import { Markdown } from "@tiptap/markdown";
 import { Editor } from "@tiptap/react";
-import { StarterKit } from "@tiptap/starter-kit";
 import { expect, it } from "vitest";
 import { resolveRemotePage } from "../../lib/page-sync";
-import { PageChartNode } from "./page-chart-extension";
+import { PAGE_EXTENSIONS } from "./page-extensions";
 
 function roundTrip(content: string) {
   const editor = new Editor({
-    extensions: [StarterKit, Markdown, PageChartNode],
+    extensions: PAGE_EXTENSIONS,
     content,
     contentType: "markdown",
   });
@@ -38,4 +36,39 @@ it("keeps a chart fence that does not parse", () => {
 it("reloads a remote update only when nothing is unsaved", () => {
   expect(resolveRemotePage({ dirty: false })).toBe("reload");
   expect(resolveRemotePage({ dirty: true })).toBe("offer");
+});
+
+it.each([
+  ["table", "| a   | b   |\n| --- | --- |\n| 1   | 2   |"],
+  ["task list", "- [ ] todo\n- [x] done"],
+  ["blockquote", "> quoted\n> more"],
+  ["code block", "```ts\nconst a = 1;\n```"],
+  ["link", "See [docs](https://example.com/a)."],
+  ["image", "![alt](https://example.com/a.png)"],
+  ["rule", "one\n\n---\n\ntwo"],
+  ["nested list", "- a\n  - b\n    - c\n- d"],
+])("keeps a %s", (_name, page) => {
+  expect(roundTrip(page).trim()).toBe(page);
+});
+
+it("keeps a chart fence inside a quote as a quote", () => {
+  const page = `> ${"```chart"}\n> {"x":1}\n> ${"```"}`;
+  const editor = new Editor({
+    extensions: PAGE_EXTENSIONS,
+    content: page,
+    contentType: "markdown",
+  });
+  expect(JSON.stringify(editor.getJSON())).not.toContain("pageChart");
+  editor.destroy();
+});
+
+it("drops a pasted chart that does not parse and keeps one that does", () => {
+  const editor = new Editor({ extensions: PAGE_EXTENSIONS, content: "x", contentType: "markdown" });
+  editor.commands.setContent(`<div data-page-chart="nope"></div><p>y</p>`, { contentType: "html" });
+  expect(JSON.stringify(editor.getJSON())).not.toContain("pageChart");
+  editor.commands.setContent(`<div data-page-chart='${JSON.stringify(chart)}'></div>`, {
+    contentType: "html",
+  });
+  expect(editor.getMarkdown().trim()).toBe(fence);
+  editor.destroy();
 });

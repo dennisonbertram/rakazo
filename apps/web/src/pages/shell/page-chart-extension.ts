@@ -22,19 +22,37 @@ export const PageChartNode = Node.create({
   atom: true,
   selectable: true,
   addAttributes() {
-    return { chart: { default: null } };
+    return {
+      chart: {
+        default: null,
+        parseHTML: (element) => {
+          const result = parsePageChart(element.getAttribute("data-page-chart") ?? "");
+          return "chart" in result ? result.chart : null;
+        },
+        renderHTML: (attributes) => ({ "data-page-chart": JSON.stringify(attributes.chart) }),
+      },
+    };
   },
   parseHTML() {
-    return [{ tag: "div[data-page-chart]" }];
+    // A chart that does not parse is dropped rather than pasted as a null chart.
+    return [
+      {
+        tag: "div[data-page-chart]",
+        getAttrs: (element) =>
+          "chart" in parsePageChart(element.getAttribute("data-page-chart") ?? "") ? null : false,
+      },
+    ];
   },
-  renderHTML() {
-    return ["div", { "data-page-chart": "" }];
+  renderHTML({ HTMLAttributes }) {
+    return ["div", HTMLAttributes];
   },
   markdownTokenizer: {
     name: "pageChart",
     level: "block",
     start: (src: string) => src.indexOf(`\`\`\`${PAGE_CHART_FENCE}`),
-    tokenize: (src: string) => {
+    tokenize: (src: string, _tokens: unknown, lexer: unknown) => {
+      // Fences nested in quotes or list items stay code blocks, like the server reads them.
+      if ((lexer as { state?: { top?: boolean } }).state?.top === false) return undefined;
       const match = FENCE.exec(src);
       return match ? { type: "pageChart", raw: match[0], text: match[1] ?? "" } : undefined;
     },
