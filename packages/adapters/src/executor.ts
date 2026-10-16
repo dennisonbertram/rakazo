@@ -5461,6 +5461,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   mailAccounts,
                   connectors: deps.connectors,
                   driveAccounts,
+                  deniedConnectionIds: [...deniedIds],
                 },
                 context,
                 args,
