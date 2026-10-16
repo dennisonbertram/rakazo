@@ -6363,54 +6363,6 @@ export function createRouter(deps: RouterDeps) {
         return { ok: true as const };
       }),
     },
-    dataRoom: {
-      folders: authed.dataRoom.folders.handler(({ context }) => dataRoom.folders(context.actor)),
-      folderCreate: authed.dataRoom.folderCreate.handler(({ context, input }) =>
-        dataRoom.createFolder(context.actor, input),
-      ),
-      folderRename: authed.dataRoom.folderRename.handler(({ context, input }) =>
-        dataRoom.renameFolder(context.actor, input),
-      ),
-      folderMove: authed.dataRoom.folderMove.handler(({ context, input }) =>
-        dataRoom.moveFolder(context.actor, input),
-      ),
-      folderDelete: authed.dataRoom.folderDelete.handler(({ context, input }) =>
-        dataRoom.deleteFolder(context.actor, input.id),
-      ),
-      items: {
-        list: authed.dataRoom.items.list.handler(({ context, input }) =>
-          dataRoom.items(context.actor, input),
-        ),
-      },
-      item: authed.dataRoom.item.handler(({ context, input }) =>
-        dataRoom.item(context.actor, input.id),
-      ),
-      itemRename: authed.dataRoom.itemRename.handler(({ context, input }) =>
-        dataRoom.renameItem(context.actor, input),
-      ),
-      itemMove: authed.dataRoom.itemMove.handler(({ context, input }) =>
-        dataRoom.moveItem(context.actor, input),
-      ),
-      itemDelete: authed.dataRoom.itemDelete.handler(({ context, input }) =>
-        dataRoom.deleteItem(context.actor, input.id),
-      ),
-      importEmail: authed.dataRoom.importEmail.handler(({ context, input }) =>
-        dataRoom.importEmail(context.actor, input, context.signal),
-      ),
-      driveList: authed.dataRoom.driveList.handler(({ context, input }) =>
-        dataRoom.driveList(context.actor, input, context.signal),
-      ),
-      importDrive: authed.dataRoom.importDrive.handler(({ context, input }) =>
-        dataRoom.importDrive(context.actor, input, context.signal),
-      ),
-      search: authed.dataRoom.search.handler(({ context, input }) =>
-        dataRoom.search(context.actor, input),
-      ),
-      consent: authed.dataRoom.consent.handler(({ context }) => dataRoom.consent(context.actor)),
-      consentGrant: authed.dataRoom.consentGrant.handler(({ context, input }) =>
-        dataRoom.consentGrant(context.actor, input),
-      ),
-    },
     finance: {
       agent: authed.finance.agent.handler(({ context }) =>
         financeAgent(financeDeps, context.actor).catch((error: unknown) => {
