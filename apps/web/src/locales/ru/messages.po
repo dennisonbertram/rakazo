@@ -231,6 +231,10 @@ msgstr ""
 msgid "{hours}h ago"
 msgstr "{hours} ч назад"
 
+#: src/components/data-room/ImportFromEmail.tsx
+msgid "{imported, plural, one {Imported # file} other {Imported # files}}"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "{inboxUnread, plural, one {# unread} other {# unread}}"
 msgstr ""
@@ -684,6 +688,10 @@ msgstr "Разрешено один раз"
 #: src/pages/Auth.tsx
 msgid "Already have an account?"
 msgstr "У вас уже есть аккаунт?"
+
+#: src/components/data-room/ImportFromEmail.tsx
+msgid "Already in the Data room"
+msgstr ""
 
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Always act"
@@ -1737,6 +1745,10 @@ msgstr ""
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Executor"
 msgstr "Подключить Executor"
+
+#: src/components/data-room/ImportFromEmail.tsx
+msgid "Connect Gmail"
+msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Connect mail"
@@ -3243,6 +3255,10 @@ msgstr ""
 msgid "From {0}"
 msgstr ""
 
+#: src/components/data-room/Preview.tsx
+msgid "From email"
+msgstr ""
+
 #: src/pages/WindowChrome.tsx
 msgid "Fullscreen"
 msgstr "Полноэкранный"
@@ -3424,8 +3440,16 @@ msgstr "игнорировать"
 msgid "Image upload area"
 msgstr "Область загрузки изображения"
 
+#: src/components/data-room/ImportFromEmail.tsx
+msgid "Import"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Import an OpenAPI description"
+msgstr ""
+
+#: src/components/data-room/ImportFromEmail.tsx
+msgid "Import from email"
 msgstr ""
 
 #: src/pages/Inbox.tsx
@@ -3669,6 +3693,7 @@ msgstr ""
 msgid "Load earlier messages"
 msgstr "Загрузить более ранние сообщения"
 
+#: src/components/data-room/ImportFromEmail.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/DataRoom.tsx
 #: src/pages/Inbox.tsx
@@ -4275,6 +4300,10 @@ msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "No credentials saved for this bot."
+msgstr ""
+
+#: src/components/data-room/ImportFromEmail.tsx
+msgid "No files found"
 msgstr ""
 
 #: src/components/data-room/ItemDialogs.tsx
@@ -5551,6 +5580,7 @@ msgstr ""
 msgid "Search integrations.sh"
 msgstr "Поиск integrations.sh"
 
+#: src/components/data-room/ImportFromEmail.tsx
 #: src/pages/Inbox.tsx
 msgid "Search mail"
 msgstr ""

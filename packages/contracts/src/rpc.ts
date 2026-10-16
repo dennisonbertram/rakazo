@@ -25,6 +25,8 @@ import { BotSecretMetadata, BotSecretPutInput, StoredBotSecretName } from "./bot
 import { ContactListInputSchema, ContactSaveInputSchema, ContactSchema } from "./contacts.js";
 import {
   DataRoomApiFolderSchema,
+  DataRoomApiImportEmailInputSchema,
+  DataRoomApiImportEmailOutputSchema,
   DataRoomApiItemListInputSchema,
   DataRoomApiItemListOutputSchema,
   DataRoomApiItemSchema,
@@ -1139,6 +1141,9 @@ export const appContract = {
     itemRename: oc.input(z.object({ id: Id, name: DataRoomApiName })).output(DataRoomApiItemSchema),
     itemMove: oc.input(z.object({ id: Id, folderId: Id.nullable() })).output(DataRoomApiItemSchema),
     itemDelete: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    importEmail: oc
+      .input(DataRoomApiImportEmailInputSchema)
+      .output(DataRoomApiImportEmailOutputSchema),
     search: oc.input(DataRoomApiSearchInputSchema).output(DataRoomApiSearchOutputSchema),
     consent: oc.output(DataRoomConsentStatusSchema),
     consentGrant: oc.input(DataRoomConsentGrantInputSchema).output(DataRoomConsentStatusSchema),
