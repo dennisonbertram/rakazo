@@ -1,0 +1,544 @@
+import { createHash, randomUUID } from "node:crypto";
+import {
+  legalDataRoomGate,
+  legalToolFromTool,
+  legalToolsAllowed,
+  selectBuiltinToolsForRun,
+} from "@rakazo/adapters";
+import type { Actor } from "@rakazo/contracts";
+import { LEGAL_AGENT_BUILTIN_TOOLS, legalAgentSpawnKey } from "@rakazo/contracts";
+import type { PrismaClient } from "@rakazo/db";
+import { createDataRoomRepos, createDb, createRepos } from "@rakazo/db";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { legalOverview, legalScanNow, legalUpdateDeadline } from "../../../apps/api/src/legal.ts";
+import { ensureLegalAgent, ensureLegalRoutine } from "../../../apps/api/src/legal-agent.ts";
+
+const databaseAvailable = process.env.VERIFY_DATABASE === "1" && Boolean(process.env.DATABASE_URL);
+
+describe.skipIf(!databaseAvailable)("legal tools (PostgreSQL)", () => {
+  const run = randomUUID().slice(0, 8);
+  let prisma: PrismaClient;
+  let close: () => Promise<void>;
+  let a: Actor;
+  let b: Actor;
+  let consent = true;
+  const extra: Actor[] = [];
+
+  const deps = (actor: Actor) => ({
+    prisma,
+    scope: { spaceId: actor.spaceId, userId: actor.userId },
+    allowed: async () => consent,
+  });
+  const legal = (actor: Actor, name: string, args: Record<string, unknown>) =>
+    legalToolFromTool(name, deps(actor), args) as Promise<any>;
+  let dataRoomCalls = 0;
+  /** The Legal wrapper around a (stubbed) Data room tool; the tools themselves are tested with the Data room. */
+  const room = (actor: Actor, name: string, result: Record<string, unknown>) =>
+    legalDataRoomGate(deps(actor), name, async () => {
+      dataRoomCalls++;
+      return result;
+    }) as Promise<any>;
+
+  async function makeActor(tag: string): Promise<Actor> {
+    const userId = `lg-user-${tag}-${run}`;
+    const orgId = `lg-org-${tag}-${run}`;
+    const spaceId = `lg-space-${tag}-${run}`;
+    await prisma.user.create({
+      data: { id: userId, name: tag, email: `${userId}@rakazo.test`, emailVerified: false },
+    });
+    await prisma.organization.create({
+      data: { id: orgId, name: tag, slug: orgId, createdAt: new Date() },
+    });
+    await prisma.space.create({
+      data: { id: spaceId, organizationId: orgId, name: tag, isDefault: true },
+    });
+    await prisma.member.create({
+      data: {
+        id: `${userId}-m`,
+        organizationId: orgId,
+        userId,
+        role: "owner",
+        createdAt: new Date(),
+      },
+    });
+    return { userId, spaceId, email: `${userId}@rakazo.test`, isDeploymentOwner: false };
+  }
+
+  let counter = 0;
+  /** A ready Data Room item with extracted text, as the pipeline leaves it. */
+  async function addItem(actor: Actor, name: string, text: string) {
+    const repo = createDataRoomRepos(prisma);
+    const { item } = await repo.createItem(actor, {
+      source: "upload",
+      sha256: createHash("sha256").update(`${run}-${counter++}`).digest("hex"),
+      name,
+      mimeType: "text/plain",
+      size: text.length,
+      docType: "contract",
+      parties: ["Acme Inc"],
+    });
+    await prisma.dataRoomItemText.create({
+      data: { itemId: item.id, spaceId: actor.spaceId, userId: actor.userId, text },
+    });
+    await repo.replaceChunks(actor, item.id, [
+      { ordinal: 0, text, contentHash: createHash("sha256").update(text).digest("hex") },
+    ]);
+    return prisma.dataRoomItem.update({
+      where: { id: item.id },
+      data: { status: "ready", revision: { increment: 1 } },
+    });
+  }
+
+  beforeAll(async () => {
+    const db = createDb(process.env.DATABASE_URL as string);
+    prisma = db.prisma;
+    close = async () => {
+      await prisma.$disconnect();
+      await db.pool.end();
+    };
+    a = await makeActor("a");
+    b = await makeActor("b");
+  });
+
+  afterAll(async () => {
+    if (!prisma) return;
+    for (const actor of [a, b, ...extra]) {
+      await prisma.space.deleteMany({ where: { id: actor.spaceId } });
+      await prisma.organization.deleteMany({
+        where: { slug: actor.userId.replace("user", "org") },
+      });
+      await prisma.user.deleteMany({ where: { id: actor.userId } });
+    }
+    await close();
+  });
+
+  it("lists unreviewed documents, drops analyzed ones, and lists them again after a revision bump", async () => {
+    const item = await addItem(a, "msa.txt", "Master services agreement between Acme Inc and Us.");
+    const first = await legal(a, "legal_unreviewed_documents", {});
+    expect(first.documents.map((d: any) => d.id)).toEqual([item.id]);
+    expect(first.documents[0]).toMatchObject({ docType: "contract", parties: ["Acme Inc"] });
+
+    const saved = await legal(a, "legal_upsert_contract", {
+      dataRoomItemId: item.id,
+      revision: item.revision,
+      title: "Acme MSA",
+      contractType: "MSA",
+      status: "active",
+      counterparties: ["Acme Inc"],
+      expirationDate: "2027-03-31",
+      autoRenews: true,
+      renewalNoticeDays: 30,
+      valueCents: "1250000",
+      currency: "usd",
+    });
+    expect(saved.contract).toMatchObject({
+      analyzedRevision: item.revision,
+      valueCents: "1250000",
+      currency: "USD",
+      expirationDate: "2027-03-31",
+    });
+    // The tool derives the renewal and notice dates, so the agent never does date arithmetic.
+    expect(saved.derivedDeadlines.map((d: any) => [d.kind, d.dueDate]).sort()).toEqual([
+      ["notice", "2027-03-01"],
+      ["renewal", "2027-03-31"],
+    ]);
+    expect((await legal(a, "legal_unreviewed_documents", {})).documents).toEqual([]);
+
+    await prisma.dataRoomItem.update({
+      where: { id: item.id },
+      data: { revision: { increment: 1 } },
+    });
+    expect(
+      (await legal(a, "legal_unreviewed_documents", {})).documents.map((d: any) => d.id),
+    ).toEqual([item.id]);
+
+    // A document the agent found is not legal stops being offered and is never listed.
+    const photo = await addItem(a, "photo.txt", "Team photo caption");
+    await legal(a, "legal_upsert_contract", {
+      dataRoomItemId: photo.id,
+      revision: photo.revision,
+      notLegal: true,
+    });
+    const left = await legal(a, "legal_unreviewed_documents", {});
+    expect(left.documents.map((d: any) => d.id)).not.toContain(photo.id);
+    const contracts = await legal(a, "legal_query", { view: "contracts" });
+    expect(contracts.contracts.map((c: any) => c.title)).toEqual(["Acme MSA"]);
+  });
+
+  it("creates deadlines without duplicating them, and updates their status", async () => {
+    const [contract] = (await legal(a, "legal_query", { view: "contracts" })).contracts;
+    const args = {
+      contractId: contract.id,
+      title: "Pay annual fee",
+      dueDate: "2027-01-15",
+      kind: "payment",
+      sourceQuote: "Fees are due on January 15.",
+    };
+    const one = await legal(a, "legal_upsert_deadline", args);
+    const two = await legal(a, "legal_upsert_deadline", { ...args, notes: "second pass" });
+    expect(two.deadline.id).toBe(one.deadline.id);
+    expect(two.deadline.notes).toBe("second pass");
+
+    const moved = await legal(a, "legal_upsert_deadline", {
+      id: one.deadline.id,
+      title: "Pay annual fee",
+      dueDate: "2027-01-20",
+      kind: "payment",
+      status: "done",
+    });
+    expect(moved.deadline).toMatchObject({ dueDate: "2027-01-20", status: "done" });
+    const open = await legal(a, "legal_query", { view: "deadlines" });
+    expect(open.deadlines.map((d: any) => d.id)).not.toContain(one.deadline.id);
+
+    expect(
+      await legal(a, "legal_upsert_deadline", { ...args, dueDate: "2027-02-30" }),
+    ).toHaveProperty("error");
+  });
+
+  it("upserts nodes by kind and normalized label, and keeps one edge per relation", async () => {
+    const n1 = await legal(a, "legal_upsert_node", { kind: "company", label: "Acme, Inc." });
+    const n2 = await legal(a, "legal_upsert_node", { kind: "company", label: "ACME Inc" });
+    expect(n2.node.id).toBe(n1.node.id);
+    const other = await legal(a, "legal_upsert_node", { kind: "company", label: "Us LLC" });
+    const e1 = await legal(a, "legal_link", {
+      fromId: other.node.id,
+      toId: n1.node.id,
+      relation: "Party To",
+      sourceQuote: "between Acme and Us",
+    });
+    const e2 = await legal(a, "legal_link", {
+      fromId: other.node.id,
+      toId: n1.node.id,
+      relation: "party_to",
+    });
+    expect(e2.edge.id).toBe(e1.edge.id);
+    expect(await prisma.legalEdge.count({ where: { fromId: other.node.id } })).toBe(1);
+    const hood = await legal(a, "legal_query", { view: "node", nodeId: n1.node.id });
+    expect(hood.neighbors.map((n: any) => n.label)).toEqual(["Us LLC"]);
+  });
+
+  it("shows nothing of user A to user B and refuses A's ids", async () => {
+    const [contract] = (await legal(a, "legal_query", { view: "contracts" })).contracts;
+    const node = await prisma.legalNode.findFirstOrThrow({ where: { userId: a.userId } });
+    const item = await prisma.dataRoomItem.findFirstOrThrow({ where: { userId: a.userId } });
+    expect((await legal(b, "legal_query", { view: "contracts" })).contracts).toEqual([]);
+    expect((await legal(b, "legal_query", { view: "deadlines" })).deadlines).toEqual([]);
+    expect(await legal(b, "legal_query", { view: "node", nodeId: node.id })).toHaveProperty(
+      "error",
+    );
+    expect((await legal(b, "legal_unreviewed_documents", {})).documents).toEqual([]);
+    expect(
+      await legal(b, "legal_upsert_contract", {
+        dataRoomItemId: item.id,
+        revision: item.revision,
+        title: "x",
+        contractType: "x",
+        status: "active",
+      }),
+    ).toHaveProperty("error");
+    expect(
+      await legal(b, "legal_upsert_deadline", {
+        contractId: contract.id,
+        title: "x",
+        dueDate: "2027-01-01",
+        kind: "other",
+      }),
+    ).toHaveProperty("error");
+    const mine = await legal(b, "legal_upsert_node", { kind: "company", label: "B Corp" });
+    expect(
+      await legal(b, "legal_link", { fromId: mine.node.id, toId: node.id, relation: "owns" }),
+    ).toHaveProperty("error");
+    // B reading A's id gets no revision back, so nothing about A's item leaks through the wrapper.
+    expect(await room(b, "read_data_room_item", { id: item.id })).not.toHaveProperty("revision");
+  });
+
+  it("searches and reads the Data Room with consent, and refuses without it", async () => {
+    const item = await prisma.dataRoomItem.findFirstOrThrow({
+      where: { userId: a.userId, name: "msa.txt" },
+    });
+    consent = true;
+    const read = await room(a, "read_data_room_item", { id: item.id, text: "Master" });
+    expect(read).toMatchObject({ text: "Master", revision: item.revision });
+
+    consent = false;
+    dataRoomCalls = 0;
+    for (const name of ["search_data_room", "read_data_room_item"]) {
+      const refused = await room(a, name, { id: item.id, text: "Master" });
+      expect(refused.consentRequired).toBe(true);
+      expect(JSON.stringify(refused)).not.toContain("Master");
+    }
+    expect(dataRoomCalls).toBe(0);
+    const refusedList = await legal(a, "legal_unreviewed_documents", {});
+    expect(refusedList.consentRequired).toBe(true);
+    for (const args of [
+      { view: "contracts" },
+      { view: "deadlines" },
+      { view: "node", label: "Acme" },
+    ]) {
+      const refusedQuery = await legal(a, "legal_query", args);
+      expect(refusedQuery.consentRequired).toBe(true);
+      expect(JSON.stringify(refusedQuery)).not.toContain("Acme MSA");
+    }
+    consent = true;
+  });
+
+  it("offers the legal and Data Room tools only to the owner's Legal agent", () => {
+    const base = {
+      hasProvider: true,
+      groupId: null,
+      runUserId: "u",
+      botUserId: "u",
+      trigger: "routine",
+      messagingChannelRun: false,
+    };
+    expect(legalToolsAllowed({ ...base, botSpawnKey: legalAgentSpawnKey("u") })).toBe(true);
+    expect(legalToolsAllowed({ ...base, botSpawnKey: null })).toBe(false);
+    expect(
+      legalToolsAllowed({ ...base, botSpawnKey: legalAgentSpawnKey("u"), trigger: "webhook" }),
+    ).toBe(false);
+    const offered = (legalEnabled: boolean, dataRoomEnabled: boolean) =>
+      selectBuiltinToolsForRun({
+        graphicalToolsAllowed: false,
+        groupId: null,
+        trigger: "routine",
+        semanticMemoryEnabled: false,
+        messagingChannelRun: false,
+        legalEnabled,
+        dataRoomEnabled,
+      }).map((tool) => tool.name);
+    const roomTools = ["search_data_room", "read_data_room_item"];
+    expect(offered(true, true)).toEqual(expect.arrayContaining([...roomTools, "legal_link"]));
+    // The Data room tools keep their owner-only gate: being a Legal run does not bypass it.
+    expect(offered(true, false).filter((n) => roomTools.includes(n))).toEqual([]);
+    expect(offered(true, false)).toContain("legal_link");
+    expect(offered(false, true)).toEqual(expect.arrayContaining(roomTools));
+    expect(offered(false, true).filter((n) => n.startsWith("legal_"))).toEqual([]);
+    // The Legal allowlist reads the Data room but does not add to it.
+    expect(LEGAL_AGENT_BUILTIN_TOOLS).toEqual(expect.arrayContaining(roomTools));
+    expect(LEGAL_AGENT_BUILTIN_TOOLS).not.toContain("add_to_data_room");
+  });
+
+  it("creates one Legal agent on the Muse model with one daily routine, and queues one scan at a time", async () => {
+    const queued: string[] = [];
+    const api = {
+      prisma,
+      repos: createRepos(prisma),
+      jobs: { enqueue: async (job: { name: string }) => void queued.push(job.name) } as never,
+      resolveAi: async () => {
+        throw new Error("unused");
+      },
+    };
+    const bot = await ensureLegalAgent(api, a);
+    const again = await ensureLegalAgent(api, a);
+    expect(again.id).toBe(bot.id);
+    expect(bot).toMatchObject({ modelProvider: "openrouter", modelId: "meta/muse-spark-1.2" });
+    expect(await prisma.routine.count({ where: { botId: bot.id } })).toBe(1);
+
+    const first = await legalScanNow(api, a);
+    const second = await legalScanNow(api, a);
+    expect(second.runId).toBe(first.runId);
+    expect(await prisma.run.count({ where: { botId: bot.id } })).toBe(1);
+
+    const overview = await legalOverview(api, a);
+    expect(overview.agent.botId).toBe(bot.id);
+    expect(overview.contracts[0]).toMatchObject({ title: "Acme MSA", valueCents: "1250000" });
+    expect(overview.counts.openDeadlines).toBeGreaterThan(0);
+    const deadline = overview.deadlines[0]!;
+    const done = await legalUpdateDeadline(api, a, { id: deadline.id, status: "done" });
+    expect(done.status).toBe("done");
+    await expect(
+      legalUpdateDeadline(api, b, { id: deadline.id, status: "open" }),
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("reports the model the agent will really use, and whether it is the preferred one", async () => {
+    const api = (model: { provider: string; id: string } | null) => ({
+      prisma,
+      repos: createRepos(prisma),
+      jobs: { enqueue: async () => {} } as never,
+      resolveAi: async () => ({ model }) as never,
+    });
+    expect(
+      (await legalOverview(api({ provider: "openrouter", id: "meta/muse-spark-1.2" }), a)).model,
+    ).toEqual({ provider: "openrouter", id: "meta/muse-spark-1.2", isPreferred: true });
+    expect(
+      (await legalOverview(api({ provider: "openrouter", id: "openai/gpt-6-luna" }), a)).model,
+    ).toEqual({ provider: "openrouter", id: "openai/gpt-6-luna", isPreferred: false });
+    expect((await legalOverview(api(null), a)).model).toBeNull();
+  });
+
+  it("starts the Legal agent at xhigh, fills empty model fields on an old agent, and never starts a run", async () => {
+    const c = await makeActor("c");
+    extra.push(c);
+    const api = {
+      prisma,
+      repos: createRepos(prisma),
+      jobs: { enqueue: async () => {} } as never,
+      resolveAi: async () => ({ model: null }) as never,
+    };
+    const bot = await ensureLegalAgent(api, c);
+    expect(bot.thinkingLevel).toBe("xhigh");
+    expect(await prisma.run.count({ where: { botId: bot.id } })).toBe(0);
+
+    // An older agent with empty fields gets them; one the user changed keeps its choice.
+    await prisma.bot.update({
+      where: { id: bot.id },
+      data: { modelProvider: null, modelId: null, thinkingLevel: null },
+    });
+    expect(await ensureLegalAgent(api, c)).toMatchObject({
+      modelId: "meta/muse-spark-1.2",
+      thinkingLevel: "xhigh",
+    });
+    await prisma.bot.update({
+      where: { id: bot.id },
+      data: { modelProvider: "anthropic", modelId: "x", thinkingLevel: "low" },
+    });
+    await ensureLegalAgent(api, c);
+    expect(await prisma.bot.findUniqueOrThrow({ where: { id: bot.id } })).toMatchObject({
+      modelProvider: "anthropic",
+      modelId: "x",
+      thinkingLevel: "low",
+    });
+
+    // Two racing calls still leave one routine.
+    await prisma.routine.deleteMany({ where: { botId: bot.id } });
+    const [r1, r2] = await Promise.all([
+      ensureLegalRoutine(api, c, bot.id),
+      ensureLegalRoutine(api, c, bot.id),
+    ]);
+    expect(r1.id).toBe(r2.id);
+    expect(await prisma.routine.count({ where: { botId: bot.id } })).toBe(1);
+  });
+
+  it("creates the Legal agent when the overview is read first, so the model is known", async () => {
+    const c = await makeActor("e");
+    extra.push(c);
+    const api = {
+      prisma,
+      repos: createRepos(prisma),
+      jobs: { enqueue: async () => {} } as never,
+      resolveAi: async () =>
+        ({ model: { provider: "openrouter", id: "meta/muse-spark-1.2" } }) as never,
+    };
+    const overview = await legalOverview(api, c);
+    expect(overview.agent.botId).not.toBeNull();
+    expect(overview.model).toMatchObject({ isPreferred: true });
+  });
+
+  it("stores the revision the agent read, so a document that changed meanwhile stays unreviewed", async () => {
+    const item = await addItem(a, "nda.txt", "Mutual NDA between Acme Inc and Us.");
+    await legal(a, "legal_upsert_contract", {
+      dataRoomItemId: item.id,
+      revision: item.revision - 1,
+      title: "Acme NDA",
+      contractType: "NDA",
+      status: "active",
+    });
+    expect(
+      (await legal(a, "legal_unreviewed_documents", {})).documents.map((d: any) => d.id),
+    ).toContain(item.id);
+    const read = await room(a, "read_data_room_item", { id: item.id, text: "x" });
+    await legal(a, "legal_upsert_contract", {
+      dataRoomItemId: item.id,
+      revision: read.revision,
+      title: "Acme NDA",
+      contractType: "NDA",
+      status: "active",
+    });
+    expect(
+      (await legal(a, "legal_unreviewed_documents", {})).documents.map((d: any) => d.id),
+    ).not.toContain(item.id);
+    expect(
+      await legal(a, "legal_upsert_contract", { dataRoomItemId: item.id, title: "x" }),
+    ).toHaveProperty("error");
+  });
+
+  it("re-derives deadlines: closes ones that no longer apply, never touches hand-made or user-closed ones", async () => {
+    const item = await addItem(a, "lease.txt", "Office lease.");
+    const base = {
+      dataRoomItemId: item.id,
+      revision: item.revision,
+      title: "Office lease",
+      contractType: "lease",
+      status: "active",
+      expirationDate: "2028-06-30",
+      autoRenews: false,
+      renewalNoticeDays: 90,
+      renewalQuote: "Either party may give 90 days written notice of non-renewal.",
+    };
+    const first = await legal(a, "legal_upsert_contract", base);
+    const contractId = first.contract.id;
+    expect(first.derivedDeadlines).toHaveLength(2);
+    expect(first.derivedDeadlines.map((d: any) => d.title).sort()).toEqual([
+      "Expires",
+      "Renewal notice deadline",
+    ]);
+    for (const d of first.derivedDeadlines)
+      expect(d.sourceQuote).toContain("90 days written notice");
+    const manual = await legal(a, "legal_upsert_deadline", {
+      contractId,
+      title: "Insurance certificate",
+      dueDate: "2028-01-10",
+      kind: "compliance",
+    });
+    const noticeRow = first.derivedDeadlines.find((d: any) => d.kind === "notice");
+    await prisma.legalDeadline.update({ where: { id: noticeRow.id }, data: { status: "done" } });
+
+    // A new title replaces the derived expiry deadline instead of duplicating it.
+    const renamed = await legal(a, "legal_upsert_contract", { ...base, title: "HQ lease" });
+    const open = (await legal(a, "legal_query", { view: "deadlines", contractId })).deadlines;
+    expect(open.map((d: any) => d.title).sort()).toEqual(["Expires", "Insurance certificate"]);
+    expect(renamed.derivedDeadlines.length).toBeGreaterThan(0);
+    expect(
+      (await prisma.legalDeadline.findUniqueOrThrow({ where: { id: noticeRow.id } })).status,
+    ).toBe("done");
+
+    // Terminating the contract dismisses what is derived and still open; the hand-made one stays.
+    await legal(a, "legal_upsert_contract", { ...base, title: "HQ lease", status: "terminated" });
+    const left = (await legal(a, "legal_query", { view: "deadlines", contractId })).deadlines;
+    expect(left.map((d: any) => d.id)).toEqual([manual.deadline.id]);
+  });
+
+  it("refuses to link evidence from another user's document", async () => {
+    const mine = await legal(a, "legal_upsert_node", { kind: "company", label: "Evidence Co" });
+    const other = await legal(a, "legal_upsert_node", { kind: "company", label: "Evidence Two" });
+    const foreign = await addItem(b, "secret.txt", "B's document");
+    expect(
+      await legal(a, "legal_link", {
+        fromId: mine.node.id,
+        toId: other.node.id,
+        relation: "owns",
+        dataRoomItemId: foreign.id,
+      }),
+    ).toHaveProperty("error");
+    expect(
+      await legal(a, "legal_upsert_deadline", {
+        title: "x",
+        dueDate: "2027-01-01",
+        kind: "other",
+        dataRoomItemId: foreign.id,
+      }),
+    ).toHaveProperty("error");
+  });
+
+  it("queues one scan run when two requests arrive together", async () => {
+    const c = await makeActor("d");
+    extra.push(c);
+    const api = {
+      prisma,
+      repos: createRepos(prisma),
+      jobs: { enqueue: async () => {} } as never,
+      resolveAi: async () => ({ model: null }) as never,
+    };
+    const runs = await Promise.all([
+      legalScanNow(api, c),
+      legalScanNow(api, c),
+      legalScanNow(api, c),
+    ]);
+    expect(new Set(runs.map((r) => r.runId)).size).toBe(1);
+    expect(await prisma.run.count({ where: { botId: runs[0]!.botId } })).toBe(1);
+    expect(await prisma.routine.count({ where: { botId: runs[0]!.botId } })).toBe(1);
+  });
+});

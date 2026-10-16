@@ -101,6 +101,7 @@ export * from "./integration-provider-settings.js";
 export * from "./jev-auto-review.js";
 export * from "./job-reconciler.js";
 export * from "./keyless-http-web.js";
+export * from "./legal-tools.js";
 export * from "./mail-approval-recovery.js";
 export * from "./mail-compose.js";
 export * from "./mail-sync.js";

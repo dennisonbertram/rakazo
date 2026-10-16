@@ -182,6 +182,13 @@ import {
   IntegrationProviderConfigSchema,
   IntegrationSetupStateSchema,
 } from "./integration-settings.js";
+import {
+  LegalDeadlineSchema,
+  LegalGraphSchema,
+  LegalOverviewSchema,
+  LegalScanNowOutputSchema,
+  LegalUpdateDeadlineInputSchema,
+} from "./legal.js";
 import { McpOauthClientSchema } from "./mcp.js";
 import {
   BotPageGetInputSchema,
@@ -1145,6 +1152,18 @@ export const appContract = {
       .input(DataRoomApiImportDriveInputSchema)
       .output(DataRoomApiImportDriveOutputSchema),
     search: oc.input(DataRoomApiSearchInputSchema).output(DataRoomApiSearchOutputSchema),
+    consent: oc.output(DataRoomConsentStatusSchema),
+    consentGrant: oc.input(DataRoomConsentGrantInputSchema).output(DataRoomConsentStatusSchema),
+  },
+  legal: {
+    /** Idempotent: creates the Legal agent and its daily scan routine; returns the bot to open in the side panel. */
+    agent: oc.output(BotSchema),
+    overview: oc.output(LegalOverviewSchema),
+    graph: oc.output(LegalGraphSchema),
+    updateDeadline: oc.input(LegalUpdateDeadlineInputSchema).output(LegalDeadlineSchema),
+    /** Queues one scan run in the Legal agent's thread (returns the active run if one is already going). */
+    scanNow: oc.output(LegalScanNowOutputSchema),
+    /** Data Room consent for the Legal agent's own model; same shapes as dataRoom.consent. */
     consent: oc.output(DataRoomConsentStatusSchema),
     consentGrant: oc.input(DataRoomConsentGrantInputSchema).output(DataRoomConsentStatusSchema),
   },
