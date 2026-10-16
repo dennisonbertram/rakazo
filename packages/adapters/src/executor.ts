@@ -54,6 +54,10 @@ import {
   isCartaAgentSpawnKey,
   isFinanceAgentSpawnKey,
   isInboxAgentSpawnKey,
+  isLegalAgentSpawnKey,
+  LEGAL_AGENT_BUILTIN_TOOLS,
+  LEGAL_AGENT_MODEL,
+  LEGAL_MODEL_REQUIRED_MESSAGE,
   OPENAI_COMPATIBLE_PROVIDER_ID,
 } from "@rakazo/contracts";
 import type { ActionApprovalRule, ToolCallStreak } from "@rakazo/core";
@@ -253,6 +257,13 @@ import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
 import { CONTACT_TOOL_NAMES, contactToolFromTool, contactToolsAllowed } from "./contact-tools.js";
 import { formatCurrentTimeInstruction } from "./current-time.js";
+import { resolveDataRoomAi } from "./data-room-models.js";
+import {
+  DATA_ROOM_GUIDANCE,
+  DATA_ROOM_TOOL_NAMES,
+  dataRoomToolFromTool,
+  dataRoomToolsAllowed,
+} from "./data-room-tools.js";
 import { resolveDeploymentModel } from "./deployment-model.js";
 import {
   DRIVE_TOOL_NAMES,
@@ -283,6 +294,13 @@ import {
   CATALOG_EXECUTE,
   uniquifyInstalledToolName,
 } from "./lazy-tool-catalog.js";
+import {
+  LEGAL_GATED_TOOL_NAMES,
+  LEGAL_TOOL_NAMES,
+  legalDataRoomGate,
+  legalToolFromTool,
+  legalToolsAllowed,
+} from "./legal-tools.js";
 import {
   MAIL_TOOL_NAMES,
   mailToolFromTool,
@@ -450,11 +468,15 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "finance_transactions",
   "finance_recurring",
   "finance_crypto",
+  "legal_unreviewed_documents",
+  "legal_query",
   "contacts_list",
   "calendar_list_events",
   "calendar_get_event",
   "drive_search",
   "drive_read",
+  "search_data_room",
+  "read_data_room_item",
   "browser_snapshot",
   "list_secrets",
   "cloud_agent_status",
@@ -3006,6 +3028,79 @@ export function isTerminalModelSetupError(error: unknown): boolean {
   );
 }
 
+/** The model a run for this scope would use: the bot override, else the space default, else the deployment. */
+async function resolveRunModel(
+  deps: ExecutorDeps,
+  scope: { userId: string; spaceId: string; botId?: string },
+): Promise<AgentRunRequest["model"]> {
+  const override = scope.botId
+    ? await deps.prisma.bot.findFirst({
+        where: {
+          id: scope.botId,
+          userId: scope.userId,
+          spaceId: scope.spaceId,
+        },
+        select: { modelProvider: true, modelId: true, thinkingLevel: true },
+      })
+    : null;
+  const hasOverride = Boolean(override?.modelProvider && override.modelId);
+  const [overrideCredential, defaultCredential, settings] = await Promise.all([
+    hasOverride
+      ? findModelCredential(deps.prisma, scope, override!.modelProvider!, override!.modelId)
+      : Promise.resolve(null),
+    findDefaultModelCredential(deps.prisma, scope),
+    deps.prisma.deploymentSettings.findUnique({
+      where: { id: "default" },
+    }),
+  ]);
+  const selected = selectConfiguredModel({
+    override,
+    overrideCredential,
+    defaultCredential,
+    settings,
+    deployment: deps.deploymentModelConfigured ? resolveDeploymentModel() : null,
+  });
+  const { credential, thinkingLevel } = selected;
+  let { provider, id } = selected;
+  if (!provider || !id) {
+    const runtimeFallback = runtimeFallbackModel(deps.runtime);
+    provider ??= runtimeFallback?.provider;
+    id ??= runtimeFallback?.id ?? null;
+  }
+  if (!provider || !id) throw new Error(MISSING_MODEL_MESSAGE);
+  // The key is resolved for the provider that won above, not before it is known.
+  const resolved = await resolveModelKey(
+    deps,
+    scope.userId,
+    scope.spaceId,
+    credential,
+    provider,
+    id,
+  );
+  return {
+    provider,
+    id,
+    apiKey: resolved.oauth ? undefined : resolved.apiKey,
+    ...cloudflareRunFields(resolved),
+    baseUrl: resolved.baseUrl,
+    cacheCapabilities: resolved.cacheCapabilities,
+    contextWindow: resolved.contextWindow,
+
+    reasoning: resolved.reasoning,
+    maxTokens: resolved.maxTokens,
+    acceptsImages: resolved.acceptsImages,
+    maxImagesPerPrompt: resolved.maxImagesPerPrompt,
+    thinkingLevel: thinkingLevel ?? resolved.thinkingLevel ?? null,
+    oauth: resolved.oauth
+      ? {
+          credential: resolved.oauth,
+          persist: resolved.persistOAuth,
+          retire: resolved.retireOAuth,
+        }
+      : undefined,
+  };
+}
+
 export function createRunExecutor(deps: ExecutorDeps) {
   const contextStrategy = deps.contextStrategy ?? DEFAULT_CONTEXT_STRATEGY;
   const web = deps.web ?? createWebProvider();
@@ -3074,78 +3169,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
   return {
     resolveConnectedModel,
     contextStrategy,
-    async resolveModel(scope: {
-      userId: string;
-      spaceId: string;
-      botId?: string;
-    }): Promise<AgentRunRequest["model"]> {
-      const override = scope.botId
-        ? await deps.prisma.bot.findFirst({
-            where: {
-              id: scope.botId,
-              userId: scope.userId,
-              spaceId: scope.spaceId,
-            },
-            select: { modelProvider: true, modelId: true, thinkingLevel: true },
-          })
-        : null;
-      const hasOverride = Boolean(override?.modelProvider && override.modelId);
-      const [overrideCredential, defaultCredential, settings] = await Promise.all([
-        hasOverride
-          ? findModelCredential(deps.prisma, scope, override!.modelProvider!, override!.modelId)
-          : Promise.resolve(null),
-        findDefaultModelCredential(deps.prisma, scope),
-        deps.prisma.deploymentSettings.findUnique({
-          where: { id: "default" },
-        }),
-      ]);
-      const selected = selectConfiguredModel({
-        override,
-        overrideCredential,
-        defaultCredential,
-        settings,
-        deployment: deps.deploymentModelConfigured ? resolveDeploymentModel() : null,
-      });
-      const { credential, thinkingLevel } = selected;
-      let { provider, id } = selected;
-      if (!provider || !id) {
-        const runtimeFallback = runtimeFallbackModel(deps.runtime);
-        provider ??= runtimeFallback?.provider;
-        id ??= runtimeFallback?.id ?? null;
-      }
-      if (!provider || !id) throw new Error(MISSING_MODEL_MESSAGE);
-      // The key is resolved for the provider that won above, not before it is known.
-      const resolved = await resolveModelKey(
-        deps,
-        scope.userId,
-        scope.spaceId,
-        credential,
-        provider,
-        id,
-      );
-      return {
-        provider,
-        id,
-        apiKey: resolved.oauth ? undefined : resolved.apiKey,
-        ...cloudflareRunFields(resolved),
-        baseUrl: resolved.baseUrl,
-        cacheCapabilities: resolved.cacheCapabilities,
-        contextWindow: resolved.contextWindow,
-
-        reasoning: resolved.reasoning,
-        maxTokens: resolved.maxTokens,
-        acceptsImages: resolved.acceptsImages,
-        maxImagesPerPrompt: resolved.maxImagesPerPrompt,
-        thinkingLevel: thinkingLevel ?? resolved.thinkingLevel ?? null,
-        oauth: resolved.oauth
-          ? {
-              credential: resolved.oauth,
-              persist: resolved.persistOAuth,
-              retire: resolved.retireOAuth,
-            }
-          : undefined,
-      };
-    },
+    resolveModel: (scope: { userId: string; spaceId: string; botId?: string }) =>
+      resolveRunModel(deps, scope),
 
     async wakeRoutine(routineId: string, scheduledFor: string) {
       const scheduledAt = new Date(scheduledFor);
@@ -3525,10 +3550,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // finance tools.
         const cartaAgent = isCartaAgentSpawnKey(bot.spawnKey);
         const financeOnly = isFinanceAgentSpawnKey(bot.spawnKey) || cartaAgent;
+        // The Legal agent works from the Data Room, mail and Drive through its own tools only: no
+        // Composio, MCP or other connector tools, and a fixed list of built-ins (read-only mail).
+        const legalOnly = isLegalAgentSpawnKey(bot.spawnKey);
         // Connections limited to chosen agents stay out of this run unless the bot was granted access.
         const deniedIds = deniedConnectionIds(storedConnections);
         const composioRows =
-          mailOnly || financeOnly
+          mailOnly || financeOnly || legalOnly
             ? []
             : storedConnections.filter(
                 (connection) =>
@@ -3546,7 +3574,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
         const connectedComposio = mergeConnectedPlugins(composioRows, liveSlugs);
         const connectedPlugins =
-          mailOnly || financeOnly
+          mailOnly || financeOnly || legalOnly
             ? []
             : selectRunConnections(
                 storedConnections.filter((row) => !deniedIds.has(row.id)),
@@ -3585,7 +3613,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
 
         const discoveredPromise =
-          deps.connector && !mailOnly
+          deps.connector && !mailOnly && !legalOnly
             ? deps.connector
                 .discoverTools(context, financeOnly ? ["mcp"] : undefined)
                 .then((tools) =>
@@ -3803,6 +3831,47 @@ export function createRunExecutor(deps: ExecutorDeps) {
           return;
         }
         runSecrets.push(...resolved.redact);
+        // Data Room consent for the model this run actually uses. Read on every use, so a revoked
+        // consent applies at once.
+        const legalRunAi = () =>
+          resolveDataRoomAi(
+            {
+              prisma: deps.prisma,
+              resolveModel: async () => ({
+                provider: runModelProvider,
+                id: runModelId,
+                baseUrl: resolved.baseUrl,
+                apiKey: resolved.apiKey,
+              }),
+            },
+            { spaceId: run.spaceId, userId: bot.userId },
+          );
+        if (
+          legalOnly &&
+          (runModelProvider !== LEGAL_AGENT_MODEL.provider || runModelId !== LEGAL_AGENT_MODEL.id)
+        ) {
+          // Fixed rule, for quality: the Legal agent runs on Muse Spark 1.2 and nothing else. A run
+          // that resolved to another model (no OpenRouter key, so the default took over) ends here.
+          await publishMessage(deps, run, "bot", [
+            { kind: "text", text: LEGAL_MODEL_REQUIRED_MESSAGE },
+          ]).catch((error) => getLogger().error("legal model notice", error));
+          await failRunBeforeModel(LEGAL_MODEL_REQUIRED_MESSAGE);
+          return;
+        }
+        if (legalOnly) {
+          // The Legal agent's history and tools carry document content, so the model that receives
+          // them must be one the user allowed. Without that consent the run ends before any model call.
+          const ai = await legalRunAi();
+          if (!ai.allowed) {
+            const who = ai.recipients[0]?.name ?? runModelProvider;
+            const message = `Data Room consent is required for ${who} before the Legal agent can run. Allow it on the Legal page.`;
+            await publishMessage(deps, run, "bot", [{ kind: "text", text: message }]).catch(
+              (error) => getLogger().error("legal consent notice", error),
+            );
+            await failRunBeforeModel(message);
+            return;
+          }
+        }
         // A pin stays as it was created. Unpinned runs still record the model they
         // used; modelPinned is what keeps that record from becoming the next choice.
         if (!run.modelPinned) {
@@ -3952,6 +4021,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botUserId: bot.userId,
             messagingChannelRun,
           }) && (await driveAccounts().catch(() => [])).length > 0;
+        // Owner-only, like mail and Drive. Consent is checked by the add tool itself, so a
+        // person who has not accepted the Data room still gets the tools and a clear "off" answer.
+        const dataRoomEnabled =
+          Boolean(deps.artifacts) &&
+          dataRoomToolsAllowed({
+            hasProvider: true,
+            groupId: thread.groupId,
+            runUserId: run.userId,
+            botUserId: bot.userId,
+            messagingChannelRun,
+          });
         const financeEnabled =
           financeToolsAllowed({
             hasProvider: true,
@@ -3966,6 +4046,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
             spaceId: run.spaceId,
             userId: bot.userId,
           }).catch(() => false));
+        const legalEnabled = legalToolsAllowed({
+          hasProvider: true,
+          groupId: thread.groupId,
+          runUserId: run.userId,
+          botUserId: bot.userId,
+          botSpawnKey: bot.spawnKey,
+          trigger: run.trigger,
+          messagingChannelRun,
+        });
         const contactsEnabled = contactToolsAllowed({
           hasProvider: true,
           groupId: thread.groupId,
@@ -3975,6 +4064,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trigger: run.trigger,
           messagingChannelRun,
         });
+        const legalToolSet: ReadonlySet<string> = new Set(LEGAL_AGENT_BUILTIN_TOOLS);
         const builtins = [
           ...selectBuiltinToolsForRun({
             ticketBoardEnabled: deps.ticketBoardEnabled,
@@ -3988,7 +4078,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             mailEnabled,
             calendarEnabled,
             driveEnabled,
+            dataRoomEnabled,
             financeEnabled,
+            legalEnabled,
             contactsEnabled,
             messagingChannelRun,
             cartaAgent,
@@ -3999,7 +4091,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ...(hasMessagingIdentity && !cartaAgent && !isBackgroundRunTrigger(run.trigger)
             ? agentConnectionTools.filter((tool) => !disabledBuiltinTools.has(tool.name))
             : []),
-        ];
+        ].filter((tool) => !legalOnly || legalToolSet.has(tool.name));
         const exposedConnectorTools = discovered.filter(
           (tool) => !builtinAgentTools.some((builtin) => builtin.name === tool.name),
         );
@@ -5419,6 +5511,46 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ),
             );
           }
+          if (DATA_ROOM_TOOL_NAMES.has(name) && deps.artifacts && dataRoomEnabled) {
+            const artifacts = deps.artifacts;
+            const callDataRoom = () =>
+              dataRoomToolFromTool(
+                name,
+                {
+                  prisma: deps.prisma,
+                  artifacts,
+                  jobs: deps.jobs,
+                  resolveAi: (scope) =>
+                    resolveDataRoomAi(
+                      { prisma: deps.prisma, resolveModel: (s) => resolveRunModel(deps, s) },
+                      scope,
+                    ),
+                  scope: { spaceId: run.spaceId, userId: bot.userId },
+                  mail: deps.mail,
+                  mailAccounts,
+                  connectors: deps.connectors,
+                  driveAccounts,
+                  deniedConnectionIds: [...deniedIds],
+                },
+                context,
+                args,
+              );
+            // The Legal agent's documents go to its own model, so its Data room reads need the
+            // consent for that model on every call, and the result carries the item revision.
+            return finish(
+              legalOnly
+                ? await legalDataRoomGate(
+                    {
+                      prisma: deps.prisma,
+                      scope: { spaceId: run.spaceId, userId: bot.userId },
+                      allowed: async () => (await legalRunAi()).allowed,
+                    },
+                    name,
+                    callDataRoom,
+                  )
+                : await callDataRoom(),
+            );
+          }
           if (FINANCE_TOOL_NAMES.has(name) && financeEnabled) {
             return finish(
               await financeToolFromTool(
@@ -5431,6 +5563,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 args,
               ),
             );
+          }
+          if (LEGAL_TOOL_NAMES.has(name) && legalEnabled) {
+            // Consent is for the model this run uses; it is read on every call so revoking it applies at once.
+            const allowed = async () => (await legalRunAi()).allowed;
+            const toolDeps = {
+              prisma: deps.prisma,
+              scope: { spaceId: run.spaceId, userId: bot.userId },
+              allowed,
+            };
+            return finish(await legalToolFromTool(name, toolDeps, args));
           }
           if (CONTACT_TOOL_NAMES.has(name) && contactsEnabled) {
             return finish(
@@ -6588,13 +6730,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         const pluginLine = mailOnly
           ? undefined
-          : financeOnly
-            ? financeEnabled
-              ? "Start with finance_overview, finance_breakdown, finance_transactions and finance_recurring: they read the synced finance data in one call and match the Finance page. Use the Mercury and Brex tools only for details the sync does not have."
+          : legalOnly
+            ? legalEnabled
+              ? "Start with legal_unreviewed_documents, read each with read_data_room_item, and record what you find with the legal_* tools. Use mail_search and drive_search for legal documents that are not in the Data Room yet."
               : undefined
-            : connectedPlugins.length > 0
-              ? `Connected plugins: ${connectedPlugins.map((row) => `${row.displayName} (${row.connectorId}:${row.provider})`).join(", ")}. Prefer those plugin tools over the computer browser or web search when reading app data (repos, releases, mail, calendar, and similar).`
-              : "No plugins are connected yet.";
+            : financeOnly
+              ? financeEnabled
+                ? "Start with finance_overview, finance_breakdown, finance_transactions and finance_recurring: they read the synced finance data in one call and match the Finance page. Use the Mercury and Brex tools only for details the sync does not have."
+                : undefined
+              : connectedPlugins.length > 0
+                ? `Connected plugins: ${connectedPlugins.map((row) => `${row.displayName} (${row.connectorId}:${row.provider})`).join(", ")}. Prefer those plugin tools over the computer browser or web search when reading app data (repos, releases, mail, calendar, and similar).`
+                : "No plugins are connected yet.";
         const taughtSkillIndex = savedSkills.slice(0, 20);
         const taughtSkillsLine =
           taughtSkillIndex.length > 0
@@ -6738,7 +6884,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
 
         let fallbackModels: { provider: string; modelId: string }[] = [];
-        if (!scripted) {
+        // Backup models would receive the Legal agent's history under a consent given for another
+        // recipient, so the Legal agent has none.
+        if (!scripted && !legalOnly) {
           try {
             fallbackModels = await deps.prisma.spaceBackupModel.findMany({
               where: { userId: run.userId, spaceId: run.spaceId },
@@ -6800,6 +6948,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 botDirectory,
                 pluginLine,
                 mailSearchGuidance: mailSkill.guidance,
+                dataRoomEnabled: dataRoomEnabled && !legalOnly,
                 agentSkillsLine,
                 taughtSkillsLine,
                 replyGuidance: runReplyGuidance(run.trigger),
@@ -7754,8 +7903,12 @@ export function selectBuiltinToolsForRun(options: {
   calendarEnabled?: boolean;
   /** The run's requester owns the bot and has a connected native Google Drive. */
   driveEnabled?: boolean;
+  /** The run's requester owns the bot, so the Data room tools are offered. */
+  dataRoomEnabled?: boolean;
   /** The run's requester owns the bot and has a connected finance source. */
   financeEnabled?: boolean;
+  /** The run belongs to the owner's Legal agent: the Legal and Data Room tools are offered. */
+  legalEnabled?: boolean;
   /** The Carta agent on a run its owner started. */
   contactsEnabled?: boolean;
   messagingChannelRun: boolean;
@@ -7792,7 +7945,9 @@ export function selectBuiltinToolsForRun(options: {
     (tool) =>
       !disabled.has(tool.name) &&
       (options.driveEnabled || !DRIVE_TOOL_NAMES.has(tool.name)) &&
+      (options.dataRoomEnabled || !DATA_ROOM_TOOL_NAMES.has(tool.name)) &&
       (options.financeEnabled || !FINANCE_TOOL_NAMES.has(tool.name)) &&
+      (options.legalEnabled || !LEGAL_GATED_TOOL_NAMES.has(tool.name)) &&
       (options.contactsEnabled || !CONTACT_TOOL_NAMES.has(tool.name)) &&
       !(options.cartaAgent && CARTA_BLOCKED_DELEGATION_TOOLS.has(tool.name)) &&
       (options.ticketBoardEnabled ||
@@ -8092,6 +8247,8 @@ export function userTurnInstructions(parts: {
   botDirectory: string | undefined;
   pluginLine: string | undefined;
   mailSearchGuidance?: string | undefined;
+  /** add_to_data_room is offered in this run. */
+  dataRoomEnabled?: boolean;
   agentSkillsLine: string | undefined;
   taughtSkillsLine: string | undefined;
   replyGuidance: string;
@@ -8133,6 +8290,9 @@ export function userTurnInstructions(parts: {
     ),
     parts.pluginLine,
     parts.mailSearchGuidance,
+    parts.dataRoomEnabled
+      ? offeredBuiltinClause(parts.disabledBuiltinTools, "add_to_data_room", DATA_ROOM_GUIDANCE)
+      : undefined,
     parts.agentSkillsLine,
     parts.taughtSkillsLine,
     offeredBuiltinClause(

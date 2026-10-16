@@ -650,6 +650,12 @@ export interface BackgroundJobPayloads {
   "inbox.triage": { userId: string; spaceId: string };
   /** Syncs a user's finance accounts and transactions from their Mercury and Brex servers; one queued job per user and space. */
   "finance.sync": { userId: string; spaceId: string };
+  /** Removes a deleted Data room item's blob. Idempotent: a missing blob is success. */
+  "dataroom.blob.delete": { spaceId: string; storageKey: string };
+  /** Pipeline steps for one Data room item, in order; each queues the next. */
+  "dataroom.ingest": { spaceId: string; userId: string; itemId: string };
+  "dataroom.classify": { spaceId: string; userId: string; itemId: string };
+  "dataroom.index": { spaceId: string; userId: string; itemId: string };
 }
 
 export type BackgroundJobName = keyof BackgroundJobPayloads;
@@ -1007,8 +1013,14 @@ export interface ConnectorProxyRequest {
   body?: unknown;
   /** Media type of a raw string `body` (a Drive media upload). Omit for JSON. */
   contentType?: string;
-  /** "text" returns the response body as the exact string, unparsed (empty stays ""). Default: JSON when the response is JSON. */
-  responseType?: "text";
+  /**
+   * "text" returns the response body as the exact string, unparsed (empty stays ""). "bytes" returns a
+   * `Uint8Array` and needs `maxBytes`; only the native Google connector supports it, and a body over
+   * `maxBytes` answers 413. Default: JSON when the response is JSON.
+   */
+  responseType?: "text" | "bytes";
+  /** Cap for `responseType: "bytes"`. */
+  maxBytes?: number;
 }
 
 /**
@@ -1032,6 +1044,8 @@ export interface ConnectorProxyResponse {
   status: number;
   data: unknown;
   retryAfterMs?: number;
+  /** The upstream Content-Type, set for `responseType: "bytes"`. */
+  contentType?: string;
 }
 
 export interface WebSearchCapabilities {

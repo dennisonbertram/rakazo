@@ -117,6 +117,7 @@ import {
   PieChart,
   Plus,
   Reply,
+  Scale,
   Search,
   Settings,
   Smile,
@@ -211,6 +212,7 @@ import { publishComputerCommand } from "../lib/computer-workspace";
 import { desktopBridge } from "../lib/desktop";
 import { findFinanceAgent } from "../lib/finance-agent";
 import { findInboxAgent } from "../lib/inbox-agent";
+import { findLegalAgent } from "../lib/legal-agent";
 import { localTimezone } from "../lib/local-timezone";
 import { copyableMessageText } from "../lib/message-text";
 import { messageProviderLabel } from "../lib/messaging";
@@ -276,10 +278,12 @@ import { workingActivity } from "../lib/working-activity";
 import { ActivityList } from "./ActivityList";
 import type { ContextMenuPosition } from "./BotContextMenu";
 import { CapTablePage } from "./CapTable";
+import { DataRoomPage } from "./DataRoom";
 import { FinancePage } from "./Finance";
 import { CreateGroupForm, GroupSettings, memberName } from "./GroupPanel";
 import { HostComputerPrompt } from "./HostComputerPrompt";
 import { InboxPage } from "./Inbox";
+import { LegalPage } from "./Legal";
 import { ResizableSidePanel } from "./ResizableSidePanel";
 import type { RoutineDraftState } from "./RoutineEditor";
 import {
@@ -504,6 +508,9 @@ export function ShellPage() {
   const [financeAgentOpen, setFinanceAgentOpen] = useState(false);
   const [creatingFinanceAgent, setCreatingFinanceAgent] = useState(false);
   const [financeAgentError, setFinanceAgentError] = useState("");
+  const [legalAgentOpen, setLegalAgentOpen] = useState(false);
+  const [creatingLegalAgent, setCreatingLegalAgent] = useState(false);
+  const [legalAgentError, setLegalAgentError] = useState("");
   // The Carta agent panel is open on every visit to Cap Table and can be collapsed.
   const [cartaAgentOpen, setCartaAgentOpen] = useState(true);
   const [creatingCartaAgent, setCreatingCartaAgent] = useState(false);
@@ -885,26 +892,34 @@ export function ShellPage() {
   const inboxMode = useMatch("/app/inbox") != null;
   const integrationsMode = useMatch("/app/integrations/*") != null;
   const financeMode = useMatch("/app/finance/*") != null;
-  // Inbox, Finance and Integrations are pages of their own: no bot route. Inbox and Finance
-  // keep their agent in a side panel.
+  const dataRoomMode = useMatch("/app/data-room") != null;
+  const legalMode = useMatch("/app/legal") != null;
   const capTableMode = useMatch("/app/cap-table/*") != null;
-  const pageMode = inboxMode || financeMode || capTableMode || integrationsMode;
+  // Inbox, Finance, Legal, Data room, Cap Table and Integrations are pages of their own: no bot
+  // route. Inbox, Finance, Legal and Cap Table keep their agent in a side panel.
+  const pageMode =
+    inboxMode || financeMode || legalMode || capTableMode || integrationsMode || dataRoomMode;
   useEffect(() => {
     if (!financeMode) setFinanceAgentOpen(false);
   }, [financeMode]);
   useEffect(() => {
+    if (!legalMode) setLegalAgentOpen(false);
+  }, [legalMode]);
+  useEffect(() => {
     if (!capTableMode) setCartaAgentOpen(true);
   }, [capTableMode]);
   const active =
-    inGroup || integrationsMode
+    inGroup || integrationsMode || dataRoomMode
       ? undefined
       : inboxMode
         ? findInboxAgent(bots, userId)
         : financeMode
           ? findFinanceAgent(bots, userId)
-          : capTableMode
-            ? findCartaAgent(bots, userId)
-            : (bots.find((b) => b.id === botId) ?? bots[0]);
+          : legalMode
+            ? findLegalAgent(bots, userId)
+            : capTableMode
+              ? findCartaAgent(bots, userId)
+              : (bots.find((b) => b.id === botId) ?? bots[0]);
   const [botPins, setBotPins] = useBotPins(active?.id, pinsSeq);
   const inboxAgentHidden = inboxAgentCollapsed || (!active && !showEmptyInboxAgent);
   const computerBot =
@@ -2551,6 +2566,24 @@ export function ShellPage() {
     }
   }
 
+  async function createLegalAgent() {
+    setCreatingLegalAgent(true);
+    setLegalAgentError("");
+    try {
+      await rpc.legal.agent();
+      await refreshBots();
+    } catch (error) {
+      setLegalAgentError(errorText(error, t`Could not create the Legal agent`));
+    } finally {
+      setCreatingLegalAgent(false);
+    }
+  }
+
+  function askLegalAgent() {
+    setLegalAgentOpen(true);
+    if (!active && !creatingLegalAgent) void createLegalAgent();
+  }
+
   async function createCartaAgent() {
     setCreatingCartaAgent(true);
     setCartaAgentError("");
@@ -2607,19 +2640,31 @@ export function ShellPage() {
           creating: creatingFinanceAgent,
           error: financeAgentError,
         }
-      : capTableMode
+      : legalMode
         ? {
-            name: "carta-agent",
-            testId: "carta-agent-panel",
-            open: cartaAgentOpen,
-            collapse: () => setCartaAgentOpen(false),
-            collapseLabel: t`Collapse Carta agent`,
-            create: createCartaAgent,
-            createLabel: t`Create Carta agent`,
-            creating: creatingCartaAgent,
-            error: cartaAgentError,
+            name: "legal-agent",
+            testId: "legal-agent-panel",
+            open: legalAgentOpen,
+            collapse: () => setLegalAgentOpen(false),
+            collapseLabel: t`Collapse Legal agent`,
+            create: createLegalAgent,
+            createLabel: t`Create Legal agent`,
+            creating: creatingLegalAgent,
+            error: legalAgentError,
           }
-        : null;
+        : capTableMode
+          ? {
+              name: "carta-agent",
+              testId: "carta-agent-panel",
+              open: cartaAgentOpen,
+              collapse: () => setCartaAgentOpen(false),
+              collapseLabel: t`Collapse Carta agent`,
+              create: createCartaAgent,
+              createLabel: t`Create Carta agent`,
+              creating: creatingCartaAgent,
+              error: cartaAgentError,
+            }
+          : null;
 
   function setBotsSidebarCollapsedPref(collapsed: boolean) {
     setBotsSidebarCollapsed(collapsed);
@@ -3325,6 +3370,26 @@ export function ShellPage() {
           onOpen={() => {
             setMobileSidebarOpen(false);
             navigate("/app/finance");
+          }}
+        />
+        <SidebarPageLink
+          testId="sidebar-legal"
+          current={legalMode}
+          icon={<Scale size={15} strokeWidth={1.8} aria-hidden="true" />}
+          label={<Trans>Legal</Trans>}
+          onOpen={() => {
+            setMobileSidebarOpen(false);
+            navigate("/app/legal");
+          }}
+        />
+        <SidebarPageLink
+          testId="sidebar-data-room"
+          current={dataRoomMode}
+          icon={<FolderOpen size={15} strokeWidth={1.8} aria-hidden="true" />}
+          label={<Trans>Data room</Trans>}
+          onOpen={() => {
+            setMobileSidebarOpen(false);
+            navigate("/app/data-room");
           }}
         />
         <SidebarPageLink
@@ -4099,8 +4164,12 @@ export function ShellPage() {
               <IntegrationsPage activeBotId={activeBotId.current} />
             </Suspense>
           </ErrorBoundary>
+        ) : dataRoomMode ? (
+          <DataRoomPage />
         ) : financeMode ? (
           <FinancePage onAskAgent={financeAgentOpen ? undefined : askFinanceAgent} />
+        ) : legalMode ? (
+          <LegalPage onAskAgent={legalAgentOpen ? undefined : askLegalAgent} />
         ) : capTableMode ? (
           <CapTablePage
             onShowAgent={cartaAgentOpen ? undefined : () => setCartaAgentOpen(true)}
@@ -5685,6 +5754,29 @@ const Transcript = memo(function Transcript({
                       onReply={onReply}
                       showToolActivity={showToolActivity}
                     />
+                    {peerReceipt || message.id.startsWith("progress:") ? null : (
+                      <time
+                        dateTime={message.createdAt}
+                        data-testid="message-hover-time"
+                        className={cn(
+                          "pointer-events-none absolute end-0 z-10 whitespace-nowrap text-xs tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100 group-has-[[aria-expanded=true]]/message:opacity-100 [@media(hover:none)]:transition-none",
+                          // Bot speaker header shares the line; otherwise the time sits just above the bubble.
+                          message.role === "bot" && memberName?.(message.botId)
+                            ? "top-0 flex h-[22px] items-center"
+                            : "bottom-full pb-0.5",
+                          // Touch has no hover margin: drop the revealed time in-flow under the bubble.
+                          "[@media(hover:none)]:hidden [@media(hover:none)]:group-hover/message:static [@media(hover:none)]:group-focus-within/message:static [@media(hover:none)]:group-has-[[aria-expanded=true]]/message:static",
+                          "[@media(hover:none)]:group-hover/message:block [@media(hover:none)]:group-focus-within/message:block [@media(hover:none)]:group-has-[[aria-expanded=true]]/message:block",
+                          "[@media(hover:none)]:group-hover/message:mt-1 [@media(hover:none)]:group-focus-within/message:mt-1 [@media(hover:none)]:group-has-[[aria-expanded=true]]/message:mt-1",
+                          "[@media(hover:none)]:group-hover/message:h-auto [@media(hover:none)]:group-focus-within/message:h-auto [@media(hover:none)]:group-has-[[aria-expanded=true]]/message:h-auto",
+                          message.role === "user"
+                            ? "[@media(hover:none)]:group-hover/message:text-end [@media(hover:none)]:group-focus-within/message:text-end [@media(hover:none)]:group-has-[[aria-expanded=true]]/message:text-end"
+                            : "[@media(hover:none)]:group-hover/message:text-start [@media(hover:none)]:group-focus-within/message:text-start [@media(hover:none)]:group-has-[[aria-expanded=true]]/message:text-start",
+                        )}
+                      >
+                        {formatMessageTime(message.createdAt, i18n.locale || "en")}
+                      </time>
+                    )}
                     {peerReceipt ? null : (
                       <MessageHoverActions
                         message={message}

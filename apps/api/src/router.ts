@@ -114,6 +114,7 @@ import {
   resolveBotUploadPath,
   resolveBotWorkspaceCwd,
   resolveBotWorkspacePath,
+  resolveDataRoomAi,
   revokeScreenControl,
   routineRunModelPin,
   sanitizeComposioError,
@@ -165,6 +166,7 @@ import {
   isCartaEndpoint,
   isFinanceAgentSpawnKey,
   isInboxAgentSpawnKey,
+  isLegalAgentSpawnKey,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   parseTicketRef,
   usableModelId,
@@ -267,6 +269,7 @@ import {
   toComputerStatus,
 } from "./computer-status.js";
 import { completeNativeOAuth, connectionError } from "./connection-oauth.js";
+import { createDataRoomService } from "./data-room.js";
 import {
   type FinanceCryptoDeps,
   financeAccountDetail,
@@ -329,6 +332,15 @@ import {
 } from "./inbox-compose.js";
 import { inboxArchive, inboxMarkRead, inboxUnarchive } from "./inbox-modify.js";
 import { searchIntegrationCatalog } from "./integration-catalog.js";
+import {
+  legalAgent,
+  legalConsent,
+  legalConsentGrant,
+  legalGraph,
+  legalOverview,
+  legalScanNow,
+  legalUpdateDeadline,
+} from "./legal.js";
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
 import {
   dismissMcpServerApprovals,
@@ -920,6 +932,22 @@ export function createRouter(deps: RouterDeps) {
     crypto: deps.financeCrypto,
     parseStatement: deps.parseStatement,
   };
+  const legalDeps = {
+    prisma: deps.prisma,
+    jobs: deps.jobs,
+    repos,
+    // The Legal agent's own model decides who receives Data Room text, not the space default.
+    resolveAi: (actor: Actor, botId: string) =>
+      resolveDataRoomAi(
+        {
+          prisma: deps.prisma,
+          resolveModel: deps.resolveModel
+            ? (scope) => deps.resolveModel!({ ...scope, botId })
+            : undefined,
+        },
+        actor,
+      ),
+  };
   const codexCatalog = deps.codexCatalog ?? new CodexCatalogCache();
   const favicons = deps.favicons ?? createFaviconResolver();
   const refreshExpiredCredential =
@@ -936,6 +964,15 @@ export function createRouter(deps: RouterDeps) {
     dataDir: deps.dataDir,
   });
   const agentSkills = createAgentSkillsService(deps.prisma);
+  const dataRoom = createDataRoomService({
+    prisma: deps.prisma,
+    artifacts: deps.artifacts,
+    jobs: deps.jobs,
+    mail: deps.mail,
+    connectors: deps.connectors,
+    resolveAi: (scope) =>
+      resolveDataRoomAi({ prisma: deps.prisma, resolveModel: deps.resolveModel }, scope),
+  });
 
   const authed = os.use(async ({ context, next }) => {
     if (!context.actor) throw new ORPCError("UNAUTHORIZED");
@@ -1266,6 +1303,12 @@ export function createRouter(deps: RouterDeps) {
       }),
     },
     models: {
+      embeddingModel: authed.models.embeddingModel.handler(({ context }) =>
+        dataRoom.embeddingModel(context.actor),
+      ),
+      setEmbeddingModel: authed.models.setEmbeddingModel.handler(({ context, input }) =>
+        dataRoom.setEmbeddingModel(context.actor, input),
+      ),
       list: authed.models.list.handler(async ({ context }) => {
         const auth = await modelCredentialAuthKindsForSpace(
           deps.prisma,
@@ -1742,6 +1785,7 @@ export function createRouter(deps: RouterDeps) {
         if (
           isInboxAgentSpawnKey(input.spawnKey) ||
           isFinanceAgentSpawnKey(input.spawnKey) ||
+          isLegalAgentSpawnKey(input.spawnKey) ||
           isCartaAgentSpawnKey(input.spawnKey)
         ) {
           throw new ORPCError("BAD_REQUEST", { message: "Reserved spawn key" });
@@ -6217,6 +6261,79 @@ export function createRouter(deps: RouterDeps) {
         });
         return loadAutoReviewSettings(deps, context.actor);
       }),
+    },
+    dataRoom: {
+      folders: authed.dataRoom.folders.handler(({ context }) => dataRoom.folders(context.actor)),
+      folderCreate: authed.dataRoom.folderCreate.handler(({ context, input }) =>
+        dataRoom.createFolder(context.actor, input),
+      ),
+      folderRename: authed.dataRoom.folderRename.handler(({ context, input }) =>
+        dataRoom.renameFolder(context.actor, input),
+      ),
+      folderMove: authed.dataRoom.folderMove.handler(({ context, input }) =>
+        dataRoom.moveFolder(context.actor, input),
+      ),
+      folderDelete: authed.dataRoom.folderDelete.handler(({ context, input }) =>
+        dataRoom.deleteFolder(context.actor, input.id),
+      ),
+      items: {
+        list: authed.dataRoom.items.list.handler(({ context, input }) =>
+          dataRoom.items(context.actor, input),
+        ),
+      },
+      item: authed.dataRoom.item.handler(({ context, input }) =>
+        dataRoom.item(context.actor, input.id),
+      ),
+      itemRename: authed.dataRoom.itemRename.handler(({ context, input }) =>
+        dataRoom.renameItem(context.actor, input),
+      ),
+      itemMove: authed.dataRoom.itemMove.handler(({ context, input }) =>
+        dataRoom.moveItem(context.actor, input),
+      ),
+      itemDelete: authed.dataRoom.itemDelete.handler(({ context, input }) =>
+        dataRoom.deleteItem(context.actor, input.id),
+      ),
+      importEmail: authed.dataRoom.importEmail.handler(({ context, input }) =>
+        dataRoom.importEmail(context.actor, input, context.signal),
+      ),
+      driveList: authed.dataRoom.driveList.handler(({ context, input }) =>
+        dataRoom.driveList(context.actor, input, context.signal),
+      ),
+      importDrive: authed.dataRoom.importDrive.handler(({ context, input }) =>
+        dataRoom.importDrive(context.actor, input, context.signal),
+      ),
+      search: authed.dataRoom.search.handler(({ context, input }) =>
+        dataRoom.search(context.actor, input),
+      ),
+      consent: authed.dataRoom.consent.handler(({ context }) => dataRoom.consent(context.actor)),
+      consentGrant: authed.dataRoom.consentGrant.handler(({ context, input }) =>
+        dataRoom.consentGrant(context.actor, input),
+      ),
+    },
+    legal: {
+      agent: authed.legal.agent.handler(({ context }) =>
+        legalAgent(legalDeps, context.actor).catch((error: unknown) => {
+          throw mapSpaceLifecycleError(error);
+        }),
+      ),
+      overview: authed.legal.overview.handler(({ context }) =>
+        legalOverview(legalDeps, context.actor),
+      ),
+      graph: authed.legal.graph.handler(({ context }) => legalGraph(legalDeps, context.actor)),
+      updateDeadline: authed.legal.updateDeadline.handler(({ context, input }) =>
+        legalUpdateDeadline(legalDeps, context.actor, input),
+      ),
+      scanNow: authed.legal.scanNow.handler(({ context }) =>
+        legalScanNow(legalDeps, context.actor).catch((error: unknown) => {
+          throw mapSpaceLifecycleError(error);
+        }),
+      ),
+      consent: authed.legal.consent.handler(({ context }) =>
+        legalConsent(legalDeps, context.actor),
+      ),
+      consentGrant: authed.legal.consentGrant.handler(({ context, input }) =>
+        legalConsentGrant(legalDeps, context.actor, input),
+      ),
     },
     carta: {
       agent: authed.carta.agent.handler(({ context }) =>
