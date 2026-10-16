@@ -155,12 +155,15 @@ import type {
 } from "@rakazo/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
+  actorScope,
   appContract,
   BotSecretAuth,
   ComputerCommandSchema,
   foldComputerCommands,
   GOOGLE_DESKTOP_REDIRECT_URI,
   IntegrationProviderIdSchema,
+  isCartaAgentSpawnKey,
+  isCartaEndpoint,
   isFinanceAgentSpawnKey,
   isInboxAgentSpawnKey,
   OPENAI_COMPATIBLE_PROVIDER_ID,
@@ -191,6 +194,7 @@ import {
   CannotDeleteSpaceAsNonOwnerError,
   CannotRenameSpaceAsNonOwnerError,
   ComputerLimitError,
+  ContactEmailTakenError,
   claimEmptySpaceDeletionForMember,
   createExternalConversationRepos,
   createGroupRepos,
@@ -198,6 +202,7 @@ import {
   createSpaceForMember,
   createThreadMessageInTransaction,
   defaultModelCredentialCandidates,
+  deleteContact,
   deleteEmptySpaceForMember,
   deleteUnreferencedCredentialSecret,
   ensureBoard,
@@ -213,6 +218,7 @@ import {
   issueMessagingLinkCode,
   isUniqueViolation,
   listBoards,
+  listContacts,
   listSpaceBackupModels,
   listTicketComments,
   lockOwnedGroup,
@@ -231,6 +237,7 @@ import {
   SpaceLimitError,
   SpaceNotEmptyError,
   SpaceNotFoundError,
+  saveContact,
   selectSpaceModelPreference,
   selectSpaceVoicePreference,
   toBoardDto,
@@ -254,6 +261,7 @@ import {
 } from "./artifacts.js";
 import type { BillingService } from "./billing.js";
 import { botProfileLabelsChanged, commitBotUpdate } from "./bot-update.js";
+import { assignToExistingCartaAgent, ensureCartaAgent } from "./carta-agent.js";
 import {
   executionBlocksUserTakeover,
   resolveBusyBotName,
@@ -753,6 +761,14 @@ function mapSpaceLifecycleError(error: unknown): unknown {
     return new ORPCError("BAD_REQUEST", { message: error.message });
   }
   return error;
+}
+
+function contactNotFound(error: unknown): never {
+  if (error instanceof IsolationError) throw new ORPCError("NOT_FOUND", { message: error.message });
+  if (error instanceof ContactEmailTakenError) {
+    throw new ORPCError("CONFLICT", { message: error.message });
+  }
+  throw error;
 }
 
 const BOT_SECRET_INPUT_ERRORS = [
@@ -1740,7 +1756,11 @@ export function createRouter(deps: RouterDeps) {
       }),
       create: authed.bots.create.handler(async ({ context, input }) => {
         // inbox.agent is the only way to create an Inbox agent; reserve its key prefix.
-        if (isInboxAgentSpawnKey(input.spawnKey) || isFinanceAgentSpawnKey(input.spawnKey)) {
+        if (
+          isInboxAgentSpawnKey(input.spawnKey) ||
+          isFinanceAgentSpawnKey(input.spawnKey) ||
+          isCartaAgentSpawnKey(input.spawnKey)
+        ) {
           throw new ORPCError("BAD_REQUEST", { message: "Reserved spawn key" });
         }
         let bot: Bot;
@@ -4382,6 +4402,9 @@ export function createRouter(deps: RouterDeps) {
               },
             });
           });
+          // An existing Carta agent gets a newly added Carta server, with read tools only.
+          if (isCartaEndpoint(row.endpoint))
+            await assignToExistingCartaAgent(deps.prisma, context.actor);
           return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
         update: authed.mcp.servers.update.handler(async ({ context, input }) => {
@@ -4525,7 +4548,11 @@ export function createRouter(deps: RouterDeps) {
                   return updated;
                 }),
             );
-            if (row) return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
+            if (row) {
+              if (isCartaEndpoint(row.endpoint))
+                await assignToExistingCartaAgent(deps.prisma, context.actor);
+              return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
+            }
           }
           throw new ORPCError("CONFLICT", { message: "MCP credentials changed; retry" });
         }),
@@ -6255,6 +6282,27 @@ export function createRouter(deps: RouterDeps) {
       consentGrant: authed.dataRoom.consentGrant.handler(({ context, input }) =>
         dataRoom.consentGrant(context.actor, input),
       ),
+    },
+    carta: {
+      agent: authed.carta.agent.handler(({ context }) =>
+        ensureCartaAgent({ prisma: deps.prisma, repos }, context.actor).catch((error: unknown) => {
+          throw mapSpaceLifecycleError(error);
+        }),
+      ),
+    },
+    contacts: {
+      list: authed.contacts.list.handler(({ context, input }) =>
+        listContacts(deps.prisma, actorScope(context.actor), input),
+      ),
+      save: authed.contacts.save.handler(({ context, input }) =>
+        saveContact(deps.prisma, actorScope(context.actor), input).catch(contactNotFound),
+      ),
+      delete: authed.contacts.delete.handler(async ({ context, input }) => {
+        await deleteContact(deps.prisma, actorScope(context.actor), input.id).catch(
+          contactNotFound,
+        );
+        return { ok: true as const };
+      }),
     },
     finance: {
       agent: authed.finance.agent.handler(({ context }) =>

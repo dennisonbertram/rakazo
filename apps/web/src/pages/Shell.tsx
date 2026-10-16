@@ -115,6 +115,7 @@ import {
   PanelRightClose,
   Paperclip,
   Pencil,
+  PieChart,
   Plus,
   Reply,
   Search,
@@ -200,6 +201,7 @@ import {
   shouldNotifyBrowser,
 } from "../lib/browser-notifications";
 import { startCall, useCallSession } from "../lib/call-session";
+import { findCartaAgent } from "../lib/carta-agent";
 import { stepComposerHistory } from "../lib/composer-history";
 import {
   embeddableScreenUrl,
@@ -275,6 +277,7 @@ import { workingActivity } from "../lib/working-activity";
 import { ActivityList } from "./ActivityList";
 import type { ContextMenuPosition } from "./BotContextMenu";
 import { DataRoomPage } from "./DataRoom";
+import { CapTablePage } from "./CapTable";
 import { FinancePage } from "./Finance";
 import { CreateGroupForm, GroupSettings, memberName } from "./GroupPanel";
 import { HostComputerPrompt } from "./HostComputerPrompt";
@@ -503,6 +506,10 @@ export function ShellPage() {
   const [financeAgentOpen, setFinanceAgentOpen] = useState(false);
   const [creatingFinanceAgent, setCreatingFinanceAgent] = useState(false);
   const [financeAgentError, setFinanceAgentError] = useState("");
+  // The Carta agent panel is open on every visit to Cap Table and can be collapsed.
+  const [cartaAgentOpen, setCartaAgentOpen] = useState(true);
+  const [creatingCartaAgent, setCreatingCartaAgent] = useState(false);
+  const [cartaAgentError, setCartaAgentError] = useState("");
   useEffect(() => {
     setInboxAgentCollapsed(
       readInboxAgentCollapsed(userId) || !window.matchMedia("(min-width: 768px)").matches,
@@ -881,12 +888,16 @@ export function ShellPage() {
   const integrationsMode = useMatch("/app/integrations/*") != null;
   const financeMode = useMatch("/app/finance/*") != null;
   const dataRoomMode = useMatch("/app/data-room") != null;
-  // Inbox, Finance, Data room and Integrations are pages of their own: no bot route. Inbox and
-  // Finance keep their agent in a side panel.
-  const pageMode = inboxMode || financeMode || integrationsMode || dataRoomMode;
+  const capTableMode = useMatch("/app/cap-table/*") != null;
+  // Inbox, Finance, Cap Table, Data room and Integrations are pages of their own: no bot route.
+  // Inbox, Finance and Cap Table keep their agent in a side panel.
+  const pageMode = inboxMode || financeMode || capTableMode || integrationsMode || dataRoomMode;
   useEffect(() => {
     if (!financeMode) setFinanceAgentOpen(false);
   }, [financeMode]);
+  useEffect(() => {
+    if (!capTableMode) setCartaAgentOpen(true);
+  }, [capTableMode]);
   const active =
     inGroup || integrationsMode || dataRoomMode
       ? undefined
@@ -894,7 +905,9 @@ export function ShellPage() {
         ? findInboxAgent(bots, userId)
         : financeMode
           ? findFinanceAgent(bots, userId)
-          : (bots.find((b) => b.id === botId) ?? bots[0]);
+          : capTableMode
+            ? findCartaAgent(bots, userId)
+            : (bots.find((b) => b.id === botId) ?? bots[0]);
   const [botPins, setBotPins] = useBotPins(active?.id, pinsSeq);
   const inboxAgentHidden = inboxAgentCollapsed || (!active && !showEmptyInboxAgent);
   const computerBot =
@@ -2541,6 +2554,19 @@ export function ShellPage() {
     }
   }
 
+  async function createCartaAgent() {
+    setCreatingCartaAgent(true);
+    setCartaAgentError("");
+    try {
+      await rpc.carta.agent();
+      await refreshBots();
+    } catch (error) {
+      setCartaAgentError(errorText(error, t`Could not create the Carta agent`));
+    } finally {
+      setCreatingCartaAgent(false);
+    }
+  }
+
   function askFinanceAgent() {
     setFinanceAgentOpen(true);
     if (!active && !creatingFinanceAgent) void createFinanceAgent();
@@ -2584,7 +2610,19 @@ export function ShellPage() {
           creating: creatingFinanceAgent,
           error: financeAgentError,
         }
-      : null;
+      : capTableMode
+        ? {
+            name: "carta-agent",
+            testId: "carta-agent-panel",
+            open: cartaAgentOpen,
+            collapse: () => setCartaAgentOpen(false),
+            collapseLabel: t`Collapse Carta agent`,
+            create: createCartaAgent,
+            createLabel: t`Create Carta agent`,
+            creating: creatingCartaAgent,
+            error: cartaAgentError,
+          }
+        : null;
 
   function setBotsSidebarCollapsedPref(collapsed: boolean) {
     setBotsSidebarCollapsed(collapsed);
@@ -3290,6 +3328,16 @@ export function ShellPage() {
           onOpen={() => {
             setMobileSidebarOpen(false);
             navigate("/app/finance");
+          }}
+        />
+        <SidebarPageLink
+          testId="sidebar-cap-table"
+          current={capTableMode}
+          icon={<PieChart size={15} strokeWidth={1.8} aria-hidden="true" />}
+          label={<Trans>Cap Table</Trans>}
+          onOpen={() => {
+            setMobileSidebarOpen(false);
+            navigate("/app/cap-table");
           }}
         />
         <SidebarPageLink
@@ -4068,6 +4116,11 @@ export function ShellPage() {
           <DataRoomPage />
         ) : financeMode ? (
           <FinancePage onAskAgent={financeAgentOpen ? undefined : askFinanceAgent} />
+        ) : capTableMode ? (
+          <CapTablePage
+            onShowAgent={cartaAgentOpen ? undefined : () => setCartaAgentOpen(true)}
+            onConnectCarta={() => navigate("/app/integrations?q=carta")}
+          />
         ) : inboxMode ? (
           <InboxPage
             paused={false}
