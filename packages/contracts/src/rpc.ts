@@ -1175,6 +1175,36 @@ export const appContract = {
     save: oc.input(ContactSaveInputSchema).output(ContactSchema),
     delete: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
   },
+  dataRoom: {
+    folders: oc.output(z.array(DataRoomApiFolderSchema)),
+    folderCreate: oc
+      .input(z.object({ name: DataRoomApiName, parentId: Id.nullable().optional() }))
+      .output(DataRoomApiFolderSchema),
+    folderRename: oc
+      .input(z.object({ id: Id, name: DataRoomApiName }))
+      .output(DataRoomApiFolderSchema),
+    folderMove: oc
+      .input(z.object({ id: Id, parentId: Id.nullable() }))
+      .output(DataRoomApiFolderSchema),
+    folderDelete: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    items: {
+      list: oc.input(DataRoomApiItemListInputSchema).output(DataRoomApiItemListOutputSchema),
+    },
+    item: oc.input(z.object({ id: Id })).output(DataRoomApiItemSchema),
+    itemRename: oc.input(z.object({ id: Id, name: DataRoomApiName })).output(DataRoomApiItemSchema),
+    itemMove: oc.input(z.object({ id: Id, folderId: Id.nullable() })).output(DataRoomApiItemSchema),
+    itemDelete: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    importEmail: oc
+      .input(DataRoomApiImportEmailInputSchema)
+      .output(DataRoomApiImportEmailOutputSchema),
+    driveList: oc.input(DataRoomApiDriveListInputSchema).output(DataRoomApiDriveListOutputSchema),
+    importDrive: oc
+      .input(DataRoomApiImportDriveInputSchema)
+      .output(DataRoomApiImportDriveOutputSchema),
+    search: oc.input(DataRoomApiSearchInputSchema).output(DataRoomApiSearchOutputSchema),
+    consent: oc.output(DataRoomConsentStatusSchema),
+    consentGrant: oc.input(DataRoomConsentGrantInputSchema).output(DataRoomConsentStatusSchema),
+  },
   finance: {
     agent: oc.output(BotSchema),
     overview: oc.output(FinanceOverviewSchema),

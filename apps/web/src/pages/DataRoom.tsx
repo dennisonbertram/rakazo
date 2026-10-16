@@ -5,6 +5,7 @@ import { Button, Dialog, DialogContent, Skeleton, Toggle } from "@rakazo/ui-web"
 import { LayoutGrid, List, Plus, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ConsentNotice } from "../components/data-room/ConsentNotice";
 import { FilterBar } from "../components/data-room/FilterBar";
 import { FolderTree } from "../components/data-room/FolderTree";
 import { folderNodes } from "../components/data-room/folders";
@@ -161,6 +162,22 @@ export function DataRoomPage() {
     setPinned(previewOpen && !narrow ? (list.rows[0]?.item ?? null) : null);
   }, [list.loading, list.key, list.rows, queryKey, resultIds, pinned, previewOpen, narrow]);
 
+  // A reload of the same query can drop the pinned item (moved or deleted elsewhere). If it can no
+  // longer be read, close its preview.
+  const wasLoading = useRef(false);
+  useEffect(() => {
+    const finished = wasLoading.current && !list.loading;
+    wasLoading.current = list.loading;
+    if (!finished || list.key !== queryKey || !pinned || resultIds.split(",").includes(pinned.id)) {
+      return;
+    }
+    const id = pinned.id;
+    rpc.dataRoom.item({ id }).catch(() => {
+      setPinned((current) => (current?.id === id ? null : current));
+      setHovered((current) => (current?.id === id ? null : current));
+    });
+  }, [list.loading, list.key, queryKey, resultIds, pinned]);
+
   const fresh = (item: DataRoomApiItem | null) =>
     item ? (list.rows.find((row) => row.item.id === item.id)?.item ?? item) : null;
   const shown = previewOpen ? fresh(hovered ?? pinned) : null;
@@ -262,6 +279,7 @@ export function DataRoomPage() {
           </>
         )}
       </div>
+      <ConsentNotice onAllowed={list.reload} />
       {empty ? (
         <div className="grid flex-1 place-items-center p-6">
           <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
