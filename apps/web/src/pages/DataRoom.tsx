@@ -5,6 +5,7 @@ import { Button, Dialog, DialogContent, Skeleton, Toggle } from "@rakazo/ui-web"
 import { LayoutGrid, List, Plus, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ConsentNotice } from "../components/data-room/ConsentNotice";
 import { FilterBar } from "../components/data-room/FilterBar";
 import { FolderTree } from "../components/data-room/FolderTree";
 import { folderNodes } from "../components/data-room/folders";
@@ -278,6 +279,7 @@ export function DataRoomPage() {
         </div>
       ) : (
         <>
+          <ConsentNotice onAllowed={list.reload} />
           <FilterBar
             query={queryInput}
             onQuery={setQueryInput}

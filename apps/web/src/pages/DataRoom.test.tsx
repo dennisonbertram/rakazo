@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { ORPCError } from "@orpc/client";
-import type { DataRoomApiItem } from "@rakazo/contracts";
+import type { DataRoomApiItem, DataRoomConsentStatus } from "@rakazo/contracts";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -24,6 +24,8 @@ const rpcMock = vi.hoisted(() => ({
   list: vi.fn(),
   search: vi.fn(),
   item: vi.fn(),
+  consent: vi.fn(),
+  consentGrant: vi.fn(),
 }));
 vi.mock("../lib/rpc", () => ({
   rpc: {
@@ -32,6 +34,8 @@ vi.mock("../lib/rpc", () => ({
       items: { list: rpcMock.list },
       search: rpcMock.search,
       item: rpcMock.item,
+      consent: rpcMock.consent,
+      consentGrant: rpcMock.consentGrant,
     },
   },
   withSpaceHeaders: () => new Headers(),
@@ -64,6 +68,15 @@ const item = (name: string): DataRoomApiItem => ({
   createdAt: "2026-10-01T00:00:00.000Z",
 });
 
+const consent = (over: Partial<DataRoomConsentStatus> = {}): DataRoomConsentStatus => ({
+  key: "k1",
+  version: "v1",
+  allowed: false,
+  disclosure: "Your documents are sent to the providers below.",
+  recipients: [{ name: "Acme AI", detail: "Reads documents" }],
+  ...over,
+});
+
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
@@ -73,6 +86,7 @@ beforeEach(() => {
   rpcMock.list.mockResolvedValue({ items: [item("b.txt"), item("a.txt")], nextCursor: null });
   rpcMock.search.mockResolvedValue({ results: [], nextCursor: null });
   rpcMock.item.mockResolvedValue(item("b.txt"));
+  rpcMock.consent.mockResolvedValue(consent({ allowed: true }));
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -417,4 +431,63 @@ it("reads the first page again when a status poll changes the value the list is 
     await vi.advanceTimersByTimeAsync(3_100);
   });
   expect(rpcMock.list.mock.calls.length).toBe(calls + 1);
+});
+
+const allowButton = () =>
+  [...container.querySelectorAll("button")].find((b) => b.textContent === "Allow");
+
+it("shows the consent notice when the Data room is not allowed", async () => {
+  rpcMock.consent.mockResolvedValue(consent());
+  await renderPage();
+  expect(container.textContent).toContain("Your documents are sent to the providers below.");
+  expect(container.textContent).toContain("Acme AI");
+  expect(container.textContent).toContain("Reads documents");
+  expect(allowButton()).toBeDefined();
+});
+
+it("grants consent with the shown key and version, then hides the notice and reloads", async () => {
+  rpcMock.consent.mockResolvedValue(consent());
+  rpcMock.consentGrant.mockResolvedValue(consent({ allowed: true }));
+  await renderPage();
+  const calls = rpcMock.list.mock.calls.length;
+  await act(async () => allowButton()?.click());
+  await settle();
+  expect(rpcMock.consentGrant).toHaveBeenCalledWith({ key: "k1", version: "v1" });
+  expect(allowButton()).toBeUndefined();
+  expect(rpcMock.list.mock.calls.length).toBeGreaterThan(calls);
+});
+
+it("fetches consent again on a conflict and keeps the notice with the new providers", async () => {
+  rpcMock.consent.mockResolvedValueOnce(consent());
+  rpcMock.consentGrant.mockRejectedValue(new ORPCError("CONFLICT", { message: "changed" }));
+  await renderPage();
+  rpcMock.consent.mockResolvedValue(
+    consent({ key: "k2", recipients: [{ name: "Other AI", detail: "" }] }),
+  );
+  await act(async () => allowButton()?.click());
+  await settle();
+  expect(rpcMock.consent).toHaveBeenCalledTimes(2);
+  expect(container.textContent).toContain("Other AI");
+  expect(allowButton()).toBeDefined();
+});
+
+it("shows the error and keeps the notice when granting fails", async () => {
+  rpcMock.consent.mockResolvedValue(consent());
+  rpcMock.consentGrant.mockRejectedValue(new ORPCError("BAD_REQUEST", { message: "Nope" }));
+  await renderPage();
+  await act(async () => allowButton()?.click());
+  await settle();
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("Nope");
+  expect(allowButton()).toBeDefined();
+});
+
+it("hides the consent notice when allowed or when there are no providers", async () => {
+  await renderPage();
+  expect(allowButton()).toBeUndefined();
+  act(() => root.unmount());
+  root = createRoot(container);
+  rpcMock.consent.mockResolvedValue(consent({ recipients: [] }));
+  await renderPage();
+  expect(allowButton()).toBeUndefined();
+  expect(container.textContent).not.toContain("sent to");
 });

@@ -28,3 +28,19 @@ type Story = StoryObj;
 
 export const WithItems: Story = { beforeEach: () => load(items) };
 export const Empty: Story = { beforeEach: () => load([]) };
+export const NeedsConsent: Story = {
+  beforeEach: () => {
+    load(items);
+    mockRpc({
+      "dataRoom.consent": {
+        key: "k",
+        version: "v",
+        allowed: false,
+        disclosure:
+          "The full text of your documents and, for images, the page images are sent to the providers below to read, file and search them.",
+        recipients: [{ name: "Acme AI", detail: "Reads and files documents" }],
+      },
+      "dataRoom.consentGrant": null,
+    });
+  },
+};

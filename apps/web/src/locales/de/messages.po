@@ -634,6 +634,7 @@ msgid "All time"
 msgstr ""
 
 #: src/components/AiDataSharing.tsx
+#: src/components/data-room/ConsentNotice.tsx
 msgid "Allow"
 msgstr ""
 
