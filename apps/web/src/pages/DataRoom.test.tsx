@@ -491,3 +491,15 @@ it("hides the consent notice when allowed or when there are no providers", async
   expect(allowButton()).toBeUndefined();
   expect(container.textContent).not.toContain("sent to");
 });
+
+it("asks for consent on the empty page too, and Allow grants it", async () => {
+  rpcMock.list.mockResolvedValue({ items: [], nextCursor: null });
+  rpcMock.consent.mockResolvedValue(consent());
+  rpcMock.consentGrant.mockResolvedValue(consent({ allowed: true }));
+  await renderPage();
+  expect(container.textContent).toContain("Drop files here");
+  expect(allowButton()).toBeDefined();
+  await act(async () => allowButton()?.click());
+  await settle();
+  expect(rpcMock.consentGrant).toHaveBeenCalledWith({ key: "k1", version: "v1" });
+});

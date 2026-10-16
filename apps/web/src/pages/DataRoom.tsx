@@ -265,6 +265,7 @@ export function DataRoomPage() {
           </>
         )}
       </div>
+      <ConsentNotice onAllowed={list.reload} />
       {empty ? (
         <div className="grid flex-1 place-items-center p-6">
           <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border-2 border-dashed border-border px-6 py-12 text-center">
@@ -279,7 +280,6 @@ export function DataRoomPage() {
         </div>
       ) : (
         <>
-          <ConsentNotice onAllowed={list.reload} />
           <FilterBar
             query={queryInput}
             onQuery={setQueryInput}
