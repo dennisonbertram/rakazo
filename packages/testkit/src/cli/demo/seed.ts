@@ -7,9 +7,12 @@ import {
   DEMO_COMPANY,
   DEMO_CONTACTS,
   DEMO_DOCUMENTS,
+  DEMO_EMPTY_SPACE,
   DEMO_GROUP,
   DEMO_USER_NAME,
+  DEMO_WALLET,
   demoFinance,
+  demoStatementCsv,
   MOCK_NOTE,
 } from "./data.js";
 
@@ -143,6 +146,21 @@ export async function seedDemo(options: DemoSeedOptions): Promise<string[]> {
       throw new Error(`Finance seed did not sync: ${JSON.stringify(result)}`);
     await session.rpc("finance/agent");
     done.push("Mercury and Brex (canned tools), Finance agent");
+    // A bank with no integration: last month's statement, uploaded and imported as a user would.
+    const statement = demoStatementCsv();
+    const reviewed = await session.rpc<{ id: string }>("finance/statementUpload", {
+      fileName: statement.fileName,
+      contentBase64: Buffer.from(statement.body).toString("base64"),
+    });
+    await session.rpc("finance/statementConfirm", { id: reviewed.id });
+    done.push("1 imported bank statement");
+    // A treasury wallet, read through the API's offline crypto fake (no real chain is called).
+    await session.rpc("finance/walletAdd", {
+      addressOrEns: DEMO_WALLET.address,
+      label: DEMO_WALLET.label,
+      type: "personal",
+    });
+    done.push("1 crypto wallet (offline fake balances)");
   } finally {
     await prisma.$disconnect();
     await pool.end();
@@ -182,5 +200,9 @@ export async function seedDemo(options: DemoSeedOptions): Promise<string[]> {
   }
   await session.rpc("groups/create", { name: DEMO_GROUP.name, botIds });
   done.push(`${DEMO_BOTS.length} extra bots, 1 group chat (${MOCK_NOTE})`);
+
+  // A second, empty space: what a founder sees before connecting anything (switch to it to test).
+  await session.rpc("spaces/create", { name: DEMO_EMPTY_SPACE });
+  done.push(`empty space "${DEMO_EMPTY_SPACE}"`);
   return done;
 }
