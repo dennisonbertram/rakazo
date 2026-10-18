@@ -3,15 +3,14 @@ import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@rakazo/ui-web"
 import { Eye, EyeOff } from "lucide-react";
 import { setHideAmounts, useHideAmounts } from "../lib/hide-amounts-preference";
 
-const helper = (hidden: boolean) =>
-  hidden
-    ? t`Amounts are hidden: money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts.`
-    : t`Hides money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts.`;
+/** The scope in one sentence, shared by the tooltip and the menu row. */
+export const hideMoneyTooltip = (hidden: boolean) =>
+  `${hidden ? `${t`Money is hidden.`} ` : ""}${t`Hides dollar amounts and what is computed from them, such as runway and burn charts. Ownership percentages and share counts stay visible.`}`;
 
-/** Icon button for page headers. Pressed while amounts are hidden. */
+/** Button for page headers. Pressed while money is hidden. The text collapses to the icon below 640px. */
 export function HideAmountsButton() {
   const hidden = useHideAmounts();
-  const label = hidden ? t`Show amounts` : t`Hide amounts`;
+  const label = hidden ? t`Show money` : t`Hide money`;
   return (
     <Tooltip>
       <TooltipTrigger
@@ -19,8 +18,8 @@ export function HideAmountsButton() {
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
-            className="pointer-coarse:size-10"
+            size="sm"
+            className="max-sm:w-7 max-sm:px-0 pointer-coarse:h-10 max-sm:pointer-coarse:w-10"
             aria-label={label}
             aria-pressed={hidden}
             data-testid="hide-amounts-toggle"
@@ -29,10 +28,12 @@ export function HideAmountsButton() {
         }
       >
         {hidden ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+        {/* min-w fits the longer label ("Money hidden") so the header does not shift when toggled. */}
+        <span className="sr-only sm:not-sr-only sm:min-w-[12ch] sm:text-start">
+          {hidden ? t`Money hidden` : t`Hide money`}
+        </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {label}. {helper(hidden)}
-      </TooltipContent>
+      <TooltipContent>{hideMoneyTooltip(hidden)}</TooltipContent>
     </Tooltip>
   );
 }
@@ -57,12 +58,12 @@ export function HideAmountsMenuItem({ onDone }: { onDone?: () => void }) {
         <Eye className="text-muted-foreground" strokeWidth={1.75} />
       )}
       <span className="flex min-w-0 flex-col items-start text-start">
-        <span>{hidden ? t`Show amounts` : t`Hide amounts`}</span>
+        <span>{hidden ? t`Show money` : t`Hide money`}</span>
         {/* The menu is narrow; the header button's tooltip carries the full caveats. */}
         <span className="text-xs text-muted-foreground">
           {hidden
-            ? t`Money amounts are hidden in finance, chat and email.`
-            : t`Hides money amounts in finance, chat and email.`}
+            ? t`Dollar amounts and what is computed from them are hidden.`
+            : t`Hides dollar amounts and what is computed from them.`}
         </span>
       </span>
     </Button>

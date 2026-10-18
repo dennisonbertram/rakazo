@@ -30,8 +30,13 @@ it("does not draw a finance chart while amounts are hidden, so its shape shows n
       />,
     ),
   );
-  expect(el.querySelector("svg")).toBeNull();
-  expect(el.textContent).toContain("Chart hidden while amounts are hidden");
+  expect(el.querySelector("svg[role=img]")).toBeNull();
+  expect(el.textContent).toContain("Hidden");
+  const show = [...el.querySelectorAll("button")].find((b) => b.textContent === "Show money");
+  expect(show).toBeDefined();
+  await act(async () => show?.click());
+  expect(el.querySelector("[data-testid=chart-hidden]")).toBeNull();
+  await act(async () => setHideAmounts(true));
   await act(async () => setHideAmounts(false));
   expect(el.querySelector("[data-testid=chart-hidden]")).toBeNull();
   act(() => root.unmount());

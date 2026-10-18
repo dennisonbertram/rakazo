@@ -621,14 +621,8 @@ it("hides dollar amounts but keeps shares and ownership in place while amounts a
   for (const shown of ["10,000,000", "1,000,000", "10.00%", "70.00%"])
     expect(text).toContain(shown);
   expect(text).toContain("Example Ventures");
-  // The ownership bar's segments do not keep their proportions either.
-  const segments = [...container.querySelectorAll<HTMLElement>(".h-3 > div")].map(
-    (el) => el.style.width,
-  );
-  expect(segments.length).toBeGreaterThan(1);
-  expect(new Set(segments).size).toBe(1);
   await click(
-    button("Show amounts") ??
+    button("Show money") ??
       (document.querySelector("[data-testid=hide-amounts-toggle]") as HTMLElement),
   );
   expect(container.textContent).toContain("250,000");
@@ -806,7 +800,7 @@ it("shows a holder's Carta email and offers Save as contact instead of Add email
   expect(document.body.textContent).toContain("Save Priya Holder as a contact");
 });
 
-it("draws the ownership bar with equal segments while amounts are hidden", async () => {
+it("draws the ownership bar at the real split whether or not amounts are hidden", async () => {
   rpcMock.capTable.mockResolvedValue({ snapshot, syncing: false });
   await show();
   const widths = () =>
@@ -815,5 +809,5 @@ it("draws the ownership bar with equal segments while amounts are hidden", async
     );
   expect(widths()).toEqual(["70%", "30%"]);
   await act(async () => setHideAmounts(true));
-  expect(widths()).toEqual(["50%", "50%"]);
+  expect(widths()).toEqual(["70%", "30%"]);
 });

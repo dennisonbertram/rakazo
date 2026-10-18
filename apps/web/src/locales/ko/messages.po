@@ -959,10 +959,6 @@ msgstr ""
 msgid "Amount raised"
 msgstr ""
 
-#: src/components/HideAmountsToggle.tsx
-msgid "Amounts are hidden: money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
-msgstr ""
-
 #: src/lib/model-connection-preflight.ts
 msgid "An API key is stored for this provider, not a subscription sign-in."
 msgstr "이 서비스에는 구독 로그인이 아니라 API 키가 저장되어 있습니다."
@@ -1698,7 +1694,6 @@ msgstr ""
 msgid "Chart failed to render: {error}"
 msgstr "차트를 표시하지 못했습니다: {error}"
 
-#: src/components/finance/charts.tsx
 #: src/pages/shell/message-cards.tsx
 msgid "Chart hidden while amounts are hidden"
 msgstr ""
@@ -3330,6 +3325,10 @@ msgstr ""
 msgid "Documents"
 msgstr ""
 
+#: src/components/HideAmountsToggle.tsx
+msgid "Dollar amounts and what is computed from them are hidden."
+msgstr ""
+
 #: src/components/finance/CountCryptoButton.tsx
 msgid "Don't count crypto"
 msgstr ""
@@ -4054,12 +4053,16 @@ msgstr "샘플 듣기"
 msgid "Hi, this is how I'll sound when I read replies out loud."
 msgstr "안녕하세요. 답변을 소리 내어 읽을 때 이런 목소리로 들립니다."
 
+#: src/components/finance/charts.tsx
+msgid "Hidden"
+msgstr ""
+
 #: src/components/data-room/Preview.tsx
 msgid "Hidden while amounts are hidden"
 msgstr ""
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hide amounts"
+msgid "Hide money"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -4075,11 +4078,11 @@ msgid "Hide transcript"
 msgstr "대화 기록 숨기기"
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hides money amounts in finance, chat and email."
+msgid "Hides dollar amounts and what is computed from them, such as runway and burn charts. Ownership percentages and share counts stay visible."
 msgstr ""
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hides money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
+msgid "Hides dollar amounts and what is computed from them."
 msgstr ""
 
 #: src/lib/ticket-priority.ts
@@ -4956,7 +4959,11 @@ msgid "Models list OK. {modelCount, plural, one {# model} other {# models}} avai
 msgstr "모델 목록이 정상입니다. {modelCount, plural, one {모델 #개} other {모델 #개}}를 사용할 수 있습니다. 채팅은 테스트하지 않았습니다."
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Money amounts are hidden in finance, chat and email."
+msgid "Money hidden"
+msgstr ""
+
+#: src/components/HideAmountsToggle.tsx
+msgid "Money is hidden."
 msgstr ""
 
 #: src/lib/billing.ts
@@ -7267,10 +7274,6 @@ msgstr "셸"
 msgid "Show all {total}"
 msgstr ""
 
-#: src/components/HideAmountsToggle.tsx
-msgid "Show amounts"
-msgstr ""
-
 #: src/pages/Shell.tsx
 msgid "Show computer"
 msgstr ""
@@ -7287,6 +7290,11 @@ msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Show list"
+msgstr ""
+
+#: src/components/finance/charts.tsx
+#: src/components/HideAmountsToggle.tsx
+msgid "Show money"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx

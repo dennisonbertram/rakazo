@@ -1,5 +1,6 @@
 import type { CashPoint } from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { setHideAmounts } from "../../lib/hide-amounts-preference";
 import { BurnBars, Chart, LineChart, MonthBars, StackBar } from "./charts";
 
 const meta = {
@@ -36,6 +37,18 @@ export const ChartFrame: Story = {
   render: () => (
     <Chart height={80} label="Frame">
       {(width) => <rect x={0} y={0} width={width} height={80} className="fill-muted" />}
+    </Chart>
+  ),
+};
+
+export const ChartHidden: Story = {
+  beforeEach: () => {
+    setHideAmounts(true);
+    return () => setHideAmounts(false);
+  },
+  render: () => (
+    <Chart height={160} label="Hidden frame">
+      {() => null}
     </Chart>
   ),
 };

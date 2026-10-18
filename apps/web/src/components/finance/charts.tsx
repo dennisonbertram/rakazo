@@ -1,5 +1,7 @@
 import { Trans } from "@lingui/react/macro";
 import type { CashPoint } from "@rakazo/contracts";
+import { Button } from "@rakazo/ui-web";
+import { EyeOff } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   axisMoney,
@@ -9,7 +11,7 @@ import {
   monthAxisLabels,
   weekdayShort,
 } from "../../lib/finance-format";
-import { useHideAmounts } from "../../lib/hide-amounts-preference";
+import { setHideAmounts, useHideAmounts } from "../../lib/hide-amounts-preference";
 
 /** Gridline step and top value (in cents) so about three to four lines cover `max`. */
 export function niceScale(max: number): { step: number; top: number } {
@@ -67,10 +69,20 @@ export function Chart({
     return (
       <div
         data-testid="chart-hidden"
-        className="grid w-full place-items-center rounded-md bg-muted text-[13px] text-muted-foreground"
+        className="flex w-full flex-col items-center justify-center gap-2 rounded-md bg-muted text-[13px] text-muted-foreground"
         style={{ height }}
       >
-        {height >= 40 ? <Trans>Chart hidden while amounts are hidden</Trans> : null}
+        {height >= 40 ? (
+          <>
+            <span className="flex items-center gap-1.5">
+              <EyeOff className="size-4" aria-hidden="true" />
+              <Trans>Hidden</Trans>
+            </span>
+            <Button type="button" variant="outline" size="sm" onClick={() => setHideAmounts(false)}>
+              <Trans>Show money</Trans>
+            </Button>
+          </>
+        ) : null}
       </div>
     );
   return (

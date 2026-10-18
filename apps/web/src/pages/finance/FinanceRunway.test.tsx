@@ -20,6 +20,7 @@ vi.mock("@lingui/react/macro", () => ({
 const rpcMock = vi.hoisted(() => ({ runway: vi.fn(), setPreferences: vi.fn() }));
 vi.mock("../../lib/rpc", () => ({ rpc: { finance: rpcMock } }));
 
+import { setHideAmounts } from "../../lib/hide-amounts-preference";
 import { FinanceRunwayPage } from "./FinanceBurn";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -58,6 +59,7 @@ beforeEach(() => {
   root = createRoot(container);
 });
 afterEach(() => {
+  setHideAmounts(false);
   act(() => root.unmount());
   container.remove();
   vi.resetAllMocks();
@@ -118,4 +120,14 @@ it("says a raise is already in cash but not counted as burn, instead of 'Exclude
   await show();
   expect(container.textContent).toContain("FinancingIn cash, not counted as burn");
   expect(container.textContent).not.toContain("Excluded");
+});
+
+it("masks runway months, dollars and the run-out date while amounts are hidden", async () => {
+  rpcMock.runway.mockResolvedValue(runway());
+  setHideAmounts(true);
+  await show();
+  const page = container.textContent ?? "";
+  expect(page).not.toMatch(/\$[\d,]+|\d+\.\d\s*mo/);
+  expect(page).not.toMatch(/Until [A-Z][a-z]+ \d{4}/);
+  expect(page).toContain("•••");
 });

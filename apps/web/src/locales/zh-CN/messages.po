@@ -959,10 +959,6 @@ msgstr ""
 msgid "Amount raised"
 msgstr ""
 
-#: src/components/HideAmountsToggle.tsx
-msgid "Amounts are hidden: money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
-msgstr ""
-
 #: src/lib/model-connection-preflight.ts
 msgid "An API key is stored for this provider, not a subscription sign-in."
 msgstr "此提供方存储的是 API 密钥，不是订阅登录。"
@@ -1698,7 +1694,6 @@ msgstr ""
 msgid "Chart failed to render: {error}"
 msgstr "图表渲染失败：{error}"
 
-#: src/components/finance/charts.tsx
 #: src/pages/shell/message-cards.tsx
 msgid "Chart hidden while amounts are hidden"
 msgstr ""
@@ -3330,6 +3325,10 @@ msgstr ""
 msgid "Documents"
 msgstr ""
 
+#: src/components/HideAmountsToggle.tsx
+msgid "Dollar amounts and what is computed from them are hidden."
+msgstr ""
+
 #: src/components/finance/CountCryptoButton.tsx
 msgid "Don't count crypto"
 msgstr ""
@@ -4054,12 +4053,16 @@ msgstr "试听"
 msgid "Hi, this is how I'll sound when I read replies out loud."
 msgstr "你好，这是我朗读回复时的声音。"
 
+#: src/components/finance/charts.tsx
+msgid "Hidden"
+msgstr ""
+
 #: src/components/data-room/Preview.tsx
 msgid "Hidden while amounts are hidden"
 msgstr ""
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hide amounts"
+msgid "Hide money"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -4075,11 +4078,11 @@ msgid "Hide transcript"
 msgstr "隐藏文字记录"
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hides money amounts in finance, chat and email."
+msgid "Hides dollar amounts and what is computed from them, such as runway and burn charts. Ownership percentages and share counts stay visible."
 msgstr ""
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hides money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
+msgid "Hides dollar amounts and what is computed from them."
 msgstr ""
 
 #: src/lib/ticket-priority.ts
@@ -4956,7 +4959,11 @@ msgid "Models list OK. {modelCount, plural, one {# model} other {# models}} avai
 msgstr "模型列表正常。{modelCount, plural, one {# 个模型} other {# 个模型}}可用。未测试聊天。"
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Money amounts are hidden in finance, chat and email."
+msgid "Money hidden"
+msgstr ""
+
+#: src/components/HideAmountsToggle.tsx
+msgid "Money is hidden."
 msgstr ""
 
 #: src/lib/billing.ts
@@ -7267,10 +7274,6 @@ msgstr "Shell"
 msgid "Show all {total}"
 msgstr ""
 
-#: src/components/HideAmountsToggle.tsx
-msgid "Show amounts"
-msgstr ""
-
 #: src/pages/Shell.tsx
 msgid "Show computer"
 msgstr ""
@@ -7287,6 +7290,11 @@ msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Show list"
+msgstr ""
+
+#: src/components/finance/charts.tsx
+#: src/components/HideAmountsToggle.tsx
+msgid "Show money"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx

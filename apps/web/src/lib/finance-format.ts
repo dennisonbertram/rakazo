@@ -232,12 +232,9 @@ export const usdFigure = (value: number | null, digits = 0, locale?: string) =>
 export const percentFigure = (value: number | null, digits = 2) =>
   value == null ? "—" : `${value.toFixed(digits)}%`;
 
-/**
- * Runway in months (`4.2`), undefined when unknown. A length of time, not money, so it stays
- * visible while amounts are hidden, as it does in bot replies and artifacts.
- */
+/** Runway in months (`4.2`), undefined when unknown. Masked while amounts are hidden, since months give away the run-out date. */
 export const runwayText = (months: number | null | undefined, digits = 1): string | undefined =>
-  months == null ? undefined : months.toFixed(digits);
+  months == null ? undefined : getHideAmounts() ? MASK : months.toFixed(digits);
 
 /** Money written as text (a contract value, an exchange balance). Masked while amounts are hidden. */
 export const hiddenOr = (text: string): string => (getHideAmounts() ? MASK : text);

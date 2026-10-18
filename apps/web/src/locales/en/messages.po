@@ -959,10 +959,6 @@ msgstr "Amount"
 msgid "Amount raised"
 msgstr "Amount raised"
 
-#: src/components/HideAmountsToggle.tsx
-msgid "Amounts are hidden: money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
-msgstr "Amounts are hidden: money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
-
 #: src/lib/model-connection-preflight.ts
 msgid "An API key is stored for this provider, not a subscription sign-in."
 msgstr "An API key is stored for this provider, not a subscription sign-in."
@@ -1698,7 +1694,6 @@ msgstr "Charges since {0}"
 msgid "Chart failed to render: {error}"
 msgstr "Chart failed to render: {error}"
 
-#: src/components/finance/charts.tsx
 #: src/pages/shell/message-cards.tsx
 msgid "Chart hidden while amounts are hidden"
 msgstr "Chart hidden while amounts are hidden"
@@ -3330,6 +3325,10 @@ msgstr "Document date"
 msgid "Documents"
 msgstr "Documents"
 
+#: src/components/HideAmountsToggle.tsx
+msgid "Dollar amounts and what is computed from them are hidden."
+msgstr "Dollar amounts and what is computed from them are hidden."
+
 #: src/components/finance/CountCryptoButton.tsx
 msgid "Don't count crypto"
 msgstr "Don't count crypto"
@@ -4054,13 +4053,17 @@ msgstr "Hear a sample"
 msgid "Hi, this is how I'll sound when I read replies out loud."
 msgstr "Hi, this is how I'll sound when I read replies out loud."
 
+#: src/components/finance/charts.tsx
+msgid "Hidden"
+msgstr "Hidden"
+
 #: src/components/data-room/Preview.tsx
 msgid "Hidden while amounts are hidden"
 msgstr "Hidden while amounts are hidden"
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hide amounts"
-msgstr "Hide amounts"
+msgid "Hide money"
+msgstr "Hide money"
 
 #: src/pages/Auth.tsx
 msgid "Hide password"
@@ -4075,12 +4078,12 @@ msgid "Hide transcript"
 msgstr "Hide transcript"
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hides money amounts in finance, chat and email."
-msgstr "Hides money amounts in finance, chat and email."
+msgid "Hides dollar amounts and what is computed from them, such as runway and burn charts. Ownership percentages and share counts stay visible."
+msgstr "Hides dollar amounts and what is computed from them, such as runway and burn charts. Ownership percentages and share counts stay visible."
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Hides money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
-msgstr "Hides money amounts, share counts and percentages on screen and in chat text. Small plain numbers may still show. A reply you write keeps the original amounts."
+msgid "Hides dollar amounts and what is computed from them."
+msgstr "Hides dollar amounts and what is computed from them."
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4956,8 +4959,12 @@ msgid "Models list OK. {modelCount, plural, one {# model} other {# models}} avai
 msgstr "Models list OK. {modelCount, plural, one {# model} other {# models}} available. Chat was not tested."
 
 #: src/components/HideAmountsToggle.tsx
-msgid "Money amounts are hidden in finance, chat and email."
-msgstr "Money amounts are hidden in finance, chat and email."
+msgid "Money hidden"
+msgstr "Money hidden"
+
+#: src/components/HideAmountsToggle.tsx
+msgid "Money is hidden."
+msgstr "Money is hidden."
 
 #: src/lib/billing.ts
 msgid "month"
@@ -7267,10 +7274,6 @@ msgstr "Shell"
 msgid "Show all {total}"
 msgstr "Show all {total}"
 
-#: src/components/HideAmountsToggle.tsx
-msgid "Show amounts"
-msgstr "Show amounts"
-
 #: src/pages/Shell.tsx
 msgid "Show computer"
 msgstr "Show computer"
@@ -7288,6 +7291,11 @@ msgstr "Show less"
 #: src/pages/Artifacts.tsx
 msgid "Show list"
 msgstr "Show list"
+
+#: src/components/finance/charts.tsx
+#: src/components/HideAmountsToggle.tsx
+msgid "Show money"
+msgstr "Show money"
 
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/MailApprovalCard.tsx

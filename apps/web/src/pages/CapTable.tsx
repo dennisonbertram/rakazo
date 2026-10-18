@@ -177,23 +177,16 @@ const SEGMENT_COLORS = [
 const segmentColor = (i: number) => SEGMENT_COLORS[i % SEGMENT_COLORS.length];
 
 export function OwnershipBar({ classes }: { classes: Snapshot["shareClasses"] }) {
-  // While amounts are hidden, equal segments keep the bar from showing who owns how much.
-  const hidden = useHideAmounts();
   if (classes.length === 0) return null;
   return (
     <div className="mb-5">
-      {/* With amounts hidden the segments are equal, so their widths give away no split. */}
       <div
         className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-muted"
         aria-hidden="true"
         data-testid="ownership-bar"
       >
         {classes.map((c, i) => (
-          <div
-            key={c.name}
-            className={segmentColor(i)}
-            style={{ width: hidden ? `${100 / classes.length}%` : `${c.percent}%` }}
-          />
+          <div key={c.name} className={segmentColor(i)} style={{ width: `${c.percent}%` }} />
         ))}
       </div>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

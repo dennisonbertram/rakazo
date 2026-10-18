@@ -81,10 +81,13 @@ it("masks token quantities and amount-derived text", async () => {
   expect(tokenAmount("1500000000000000000", 18)).toBe("1.5");
 });
 
-it("keeps runway, share counts and ownership visible, since they are not money", async () => {
+it("masks runway but keeps share counts and ownership visible", async () => {
   const { percentFigure, runwayText, shareCount } = await import("./finance-format");
   setHideAmounts(true);
+  expect(runwayText(8.94)).toBe("•••");
+  setHideAmounts(false);
   expect(runwayText(8.94)).toBe("8.9");
+  setHideAmounts(true);
   expect(shareCount(4_000_000, "en")).toBe("4,000,000");
   expect(percentFigure(40)).toBe("40.00%");
   expect(money(41_200_000)).toBe("$•••");

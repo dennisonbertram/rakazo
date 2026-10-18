@@ -290,6 +290,6 @@ it("masks every dollar amount on the overview card while amounts are hidden", as
   const text = view.textContent ?? "";
   for (const real of ["10,000", "2,000", "1,234", "1,235"]) expect(text).not.toContain(real);
   expect([...view.querySelectorAll("dd")].map((dd) => dd.textContent)).toContain("$•••");
-  // Runway is a length of time, not money, so it stays readable.
-  expect(text).toContain("5.0 mo");
+  // Runway months give away the run-out date, so they are masked too.
+  expect(text).not.toContain("5.0 mo");
 });

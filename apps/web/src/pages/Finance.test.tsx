@@ -51,6 +51,7 @@ vi.mock("../components/finance/StatementImport", () => ({
 }));
 
 import { hereCrumb, shortSpaceName, trailFor, WithEndings } from "../components/finance/ui";
+import { setHideAmounts } from "../lib/hide-amounts-preference";
 import { cryptoSubtitle, FinancePage, UpcomingRow } from "./Finance";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -199,6 +200,7 @@ beforeEach(() => {
   rpcMock.statements.mockResolvedValue({ statements: [], reminders: [] });
 });
 afterEach(() => {
+  setHideAmounts(false);
   act(() => root.unmount());
   container.remove();
   vi.resetAllMocks();
@@ -1418,4 +1420,15 @@ it("shows the Crypto card loading, not $0, while a wallet's first sync runs", as
   const card = container.querySelector('a[href="/app/finance/crypto"]');
   expect(card?.textContent).not.toContain("$0");
   expect(card?.querySelector('[aria-label="Loading"]')).not.toBeNull();
+});
+
+it("shows no dollar amount, runway months or run-out date on the overview while amounts are hidden", async () => {
+  rpcMock.overview.mockResolvedValue(connectedOverview());
+  rpcMock.exchanges.mockResolvedValue([]);
+  setHideAmounts(true);
+  await show("/app/finance");
+  await flush();
+  const page = container.textContent ?? "";
+  expect(page).not.toMatch(/\$[\d,]+|\d+\.\d\s*mo/);
+  expect(page).not.toMatch(/Until [A-Z][a-z]+ \d{4}/);
 });
