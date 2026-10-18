@@ -1,0 +1,80 @@
+{
+  "mode": "judge",
+  "images": [],
+  "results": [
+    {
+      "model": "meta/muse-wonder",
+      "ok": true,
+      "seconds": 38,
+      "costUsd": 0.086384,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 4,
+            "simplicity": 5,
+            "consistency": 5,
+            "usability": 4,
+            "visual": 4,
+            "effort": 4
+          },
+          "B": {
+            "criteria": 5,
+            "simplicity": 2,
+            "consistency": 3,
+            "usability": 4,
+            "visual": 5,
+            "effort": 2
+          },
+          "C": {
+            "criteria": 3,
+            "simplicity": 4,
+            "consistency": 4,
+            "usability": 3,
+            "visual": 4,
+            "effort": 3
+          }
+        },
+        "winner": "A",
+        "graft": "From B: when Google Drive is unavailable, show its entry disabled with the reason 'Not set up on this server' instead of silently omitting it, adapted to A's existing secondary-button layout.",
+        "defense": "A satisfies the acceptance criteria with the least disruption: a filled Add files beside secondary imports, a New folder control exactly where the folder tree disappears, inline Try again inside the row at both widths, no Drive dead end, one fixed grid for zero column shift, and a date column that follows the sort field. Its weaker points are the icon-only New folder control and plain-text status, but they remain understandable and use existing Button, Tip, and grid patterns. B meets the criteria slightly more completely and looks cleaner, yet buys that with a new LocationBar, breadcrumb truncation behaviour at 375px, relocated view controls, removal of Hide amounts despite VIS-05 owning that decision, eight touched files, and extensive selector churn in a large page; that risk is disproportionate to the gain. C weakens two core requirements: New folder is hidden behind a menu rather than being a visible control, and the most frequent action, adding files, becomes two clicks instead of one direct Add files action. It also requires lifting dialog and file-input state, whereas A preserves the existing one-click flow and design system."
+      }
+    },
+    {
+      "model": "google/gemini-4-argon",
+      "ok": true,
+      "seconds": 41,
+      "costUsd": 0.037398,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 5,
+            "simplicity": 5,
+            "consistency": 5,
+            "usability": 4,
+            "visual": 4,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 4,
+            "simplicity": 2,
+            "consistency": 3,
+            "usability": 2,
+            "visual": 3,
+            "effort": 2
+          },
+          "C": {
+            "criteria": 3,
+            "simplicity": 3,
+            "consistency": 4,
+            "usability": 3,
+            "visual": 4,
+            "effort": 3
+          }
+        },
+        "winner": "A",
+        "graft": "From Proposal B, render the Status column value ('Reading', 'Failed') using the existing `ui/badge.tsx` component so status pills are visually distinct from the plain-text Type column.",
+        "defense": "Proposal A is the clear winner because it satisfies all six acceptance criteria with surgical, low-risk changes that respect component boundaries and adjacent tickets. It promotes '+ Add files' to the single filled primary button while keeping import actions visually secondary (outline) and hiding unconfigured connectors via `connections.catalog({})` so users never hit the dead-end page. Placing the 'New folder' icon button directly beside the `<800px` folder picker in `FilterBar` puts folder creation right where mobile/tablet users already manage folders, and unifying `ItemRows` onto a single fixed grid with a dedicated Status column and sort-synced Date column eliminates the layout shift and sort mismatch cleanly.\n\nAgainst Proposal B: B over-engineers the page by adding a third horizontal chrome tier (`LocationBar`) and removing `HideAmountsToggle` (which trespasses on VIS-05). Worse, B replaces the `<800px` folder picker dropdown with a breadcrumb bar while the folder tree is hidden below 800px—meaning tablet and mobile users can only walk up ancestor segments and lose the ability to navigate into subfolders or sibling folders.\n\nAgainst Proposal C: C replaces the explicit '+ Add files' primary action required by Criterion 2 with a '+ New' dropdown menu. This degrades the most frequent action in the data room (uploading files) from one click to two, buries 'New folder' inside a menu at 768px/375px rather than exposing a visible control (weakening Criterion 1), and requires lifting dialog and hidden file-input state out of the import components."
+      }
+    }
+  ]
+}
