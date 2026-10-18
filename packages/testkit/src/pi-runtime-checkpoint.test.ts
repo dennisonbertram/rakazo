@@ -170,8 +170,7 @@ describe("paused turn context", () => {
       await model.close();
     }
   });
-  // Enabled with "run schedule tools sequentially within a turn" (#1472).
-  it.skip("keeps a sequential tail unstarted until the paused interaction resumes", async () => {
+  it("keeps a sequential tail unstarted until the paused interaction resumes", async () => {
     const executed = vi.fn(async () => ({ ok: true }));
     let capture: (() => string) | undefined;
     const model = await startModelEmulator({
