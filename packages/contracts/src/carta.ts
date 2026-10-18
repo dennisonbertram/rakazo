@@ -50,15 +50,30 @@ const Usd = z.number().nonnegative();
 const Percent = z.number().min(0).max(100);
 const Label = z.string().trim().min(1).max(200);
 
+const Valuation409a = z.object({
+  pricePerShareUsd: Usd,
+  date: z.string().date(),
+  expiresOn: z.string().date().nullable().default(null),
+});
+
 /** What the Carta agent saves with cap_table_update. Figures come from Carta; nothing is estimated. */
-export const CapTableSnapshotInputSchema = z.object({
+const CapTableSnapshotObjectSchema = z.object({
   companyName: Label,
   /** The date Carta's figures are as of. */
   asOf: z.string().date(),
   fullyDilutedShares: Shares,
   amountRaisedUsd: Usd.nullable().default(null),
   optionPoolAvailable: Shares.nullable().default(null),
-  latest409a: z.object({ pricePerShareUsd: Usd, date: z.string().date() }).nullable().default(null),
+  latest409a: z
+    .object({
+      pricePerShareUsd: Usd,
+      date: z.string().date(),
+      expiresOn: z.string().date().nullable().optional(),
+    })
+    .nullable()
+    .default(null),
+  /** Every 409A valuation Carta shows, newest first. */
+  valuations409a: z.array(Valuation409a).max(50).default([]),
   shareClasses: z.array(z.object({ name: Label, shares: Shares, percent: Percent })).max(50),
   holders: z
     .array(
@@ -75,9 +90,16 @@ export const CapTableSnapshotInputSchema = z.object({
     )
     .max(500),
 });
+/** latest409a falls back to the newest entry of valuations409a. */
+export const CapTableSnapshotInputSchema = CapTableSnapshotObjectSchema.transform((snapshot) => {
+  const newest = snapshot.valuations409a[0];
+  return snapshot.latest409a || !newest ? snapshot : { ...snapshot, latest409a: newest };
+});
 export type CapTableSnapshotInput = z.input<typeof CapTableSnapshotInputSchema>;
 
-export const CapTableSnapshotSchema = CapTableSnapshotInputSchema.extend({ updatedAt: IsoDate });
+export const CapTableSnapshotSchema = CapTableSnapshotObjectSchema.extend({
+  updatedAt: IsoDate,
+});
 export type CapTableSnapshot = z.infer<typeof CapTableSnapshotSchema>;
 
 /** The Cap Table page's data: the latest snapshot, and whether the Carta agent is working on one. */

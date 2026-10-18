@@ -455,6 +455,10 @@ msgstr "3 mo"
 msgid "3-mo avg, after revenue"
 msgstr "3-mo avg, after revenue"
 
+#: src/pages/CapTable.tsx
+msgid "409A history"
+msgstr "409A history"
+
 #: src/pages/shell/message-cards.tsx
 msgid "A bit of everything"
 msgstr "A bit of everything"
@@ -3461,6 +3465,14 @@ msgstr "Expected"
 #: src/pages/legal/LegalContracts.tsx
 msgid "Expired"
 msgstr "Expired"
+
+#: src/pages/CapTable.tsx
+msgid "Expired {date}"
+msgstr "Expired {date}"
+
+#: src/pages/CapTable.tsx
+msgid "Expires {date}"
+msgstr "Expires {date}"
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Export"

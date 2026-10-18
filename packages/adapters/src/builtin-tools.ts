@@ -1116,8 +1116,30 @@ export const builtinAgentTools: ConnectorTool[] = [
         optionPoolAvailable: { type: ["number", "null"] },
         latest409a: {
           type: ["object", "null"],
-          properties: { pricePerShareUsd: { type: "number" }, date: { type: "string" } },
+          description: "The newest 409A. Optional when valuations409a is given.",
+          properties: {
+            pricePerShareUsd: { type: "number" },
+            date: { type: "string" },
+            expiresOn: { type: ["string", "null"] },
+          },
           required: ["pricePerShareUsd", "date"],
+        },
+        valuations409a: {
+          type: "array",
+          description:
+            "Every 409A valuation Carta shows, newest first. Leave empty when Carta shows none.",
+          items: {
+            type: "object",
+            properties: {
+              pricePerShareUsd: { type: "number" },
+              date: { type: "string" },
+              expiresOn: {
+                type: ["string", "null"],
+                description: "Only if Carta gives an expiry.",
+              },
+            },
+            required: ["pricePerShareUsd", "date"],
+          },
         },
         shareClasses: {
           type: "array",

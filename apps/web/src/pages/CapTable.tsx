@@ -21,6 +21,7 @@ import {
   TabsTrigger,
   Textarea,
 } from "@rakazo/ui-web";
+import { cn } from "@rakazo/ui-web/lib/utils";
 import { PieChart, Plus, RefreshCw } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -29,7 +30,7 @@ import { HideAmountsButton } from "../components/HideAmountsToggle";
 import { CustomConnectionDialog } from "../components/integrations/CustomConnectionDialog";
 import { useIntegrations } from "../components/integrations/useIntegrations";
 import { hasConnectedCarta } from "../lib/carta-agent";
-import { percentFigure, shareCount, usdFigure } from "../lib/finance-format";
+import { percentFigure, shareCount, shortDay, usdFigure } from "../lib/finance-format";
 import { useHideAmounts } from "../lib/hide-amounts-preference";
 import { FIRST_PARTY_MCP } from "../lib/integrations";
 import { formatRelativeTime } from "../lib/relative-time";
@@ -107,11 +108,81 @@ function joinRows(snapshot: Snapshot | null, contacts: Contact[]): Row[] {
   return rows;
 }
 
-function Figure({ title, value }: { title: string; value: string }) {
+function Figure({
+  title,
+  value,
+  note,
+  expiry,
+}: {
+  title: string;
+  value: string;
+  note?: string | null;
+  expiry?: { text: string; className?: string } | null;
+}) {
   return (
     <Card size="sm" className="px-3.5">
       <h2 className="text-xs font-semibold text-muted-foreground">{title}</h2>
       <div className="mt-1 text-[22px] font-semibold leading-tight tabular-nums">{value}</div>
+      {note ? <div className="text-xs text-muted-foreground">{note}</div> : null}
+      {expiry ? (
+        <div className={cn("text-xs text-muted-foreground", expiry.className)}>{expiry.text}</div>
+      ) : null}
+    </Card>
+  );
+}
+
+const DAY_MS = 86_400_000;
+type Valuation = { date: string; expiresOn?: string | null };
+
+/** The expiry Carta gives, else 12 months after the valuation, which only shows once it is that old. */
+function expiryOf({ date, expiresOn }: Valuation, now: Date): string | null {
+  if (expiresOn) return expiresOn;
+  const due = new Date(`${date}T00:00:00Z`);
+  due.setUTCFullYear(due.getUTCFullYear() + 1);
+  return due <= now ? due.toISOString().slice(0, 10) : null;
+}
+
+/** "Expires Mar 10" or "Expired Mar 10", in the warning or destructive colour when it is near or past. */
+function expiryLabel(valuation: Valuation, now = new Date()) {
+  const day = expiryOf(valuation, now);
+  if (!day) return null;
+  const left = new Date(`${day}T00:00:00Z`).getTime() - now.getTime();
+  const date = shortDay(day, now, i18n.locale || "en");
+  return left <= 0
+    ? { text: t`Expired ${date}`, className: "text-destructive" }
+    : {
+        text: t`Expires ${date}`,
+        className: left <= 60 * DAY_MS ? "text-warning" : undefined,
+      };
+}
+
+function History({ valuations }: { valuations: Snapshot["valuations409a"] }) {
+  useHideAmounts();
+  if (valuations.length < 2) return null;
+  const now = new Date();
+  return (
+    <Card size="sm" className="mb-4 px-3.5">
+      <h2 className="text-xs font-semibold text-muted-foreground">
+        <Trans>409A history</Trans>
+      </h2>
+      <ul className="mt-1 divide-y divide-border text-sm tabular-nums">
+        {valuations.map((v) => {
+          const expiry = expiryLabel(v, now);
+          return (
+            <li key={v.date} className="flex items-baseline justify-between gap-3 py-1">
+              <span>{shortDay(v.date, now, i18n.locale || "en")}</span>
+              <span className="flex items-baseline gap-3">
+                {expiry ? (
+                  <span className={cn("text-xs text-muted-foreground", expiry.className)}>
+                    {expiry.text}
+                  </span>
+                ) : null}
+                <span>{usd(v.pricePerShareUsd, 2)}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }
@@ -119,19 +190,28 @@ function Figure({ title, value }: { title: string; value: string }) {
 function Summary({ snapshot }: { snapshot: Snapshot | null }) {
   useHideAmounts();
   const a = snapshot?.latest409a;
+  const expiry = a ? expiryLabel(a) : null;
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 @2xl:grid-cols-4">
-      {snapshot ? (
-        <>
-          <Figure title={t`Fully diluted shares`} value={num(snapshot.fullyDilutedShares)} />
-          <Figure title={t`Option pool available`} value={num(snapshot.optionPoolAvailable)} />
-          <Figure title={t`Latest 409A`} value={a ? usd(a.pricePerShareUsd, 2) : DASH} />
-          <Figure title={t`Amount raised`} value={usd(snapshot.amountRaisedUsd)} />
-        </>
-      ) : (
-        [0, 1, 2, 3].map((n) => <Skeleton key={n} className="h-[76px] w-full rounded-xl" />)
-      )}
-    </div>
+    <>
+      <div className="mb-4 grid grid-cols-2 gap-3 @2xl:grid-cols-4">
+        {snapshot ? (
+          <>
+            <Figure title={t`Fully diluted shares`} value={num(snapshot.fullyDilutedShares)} />
+            <Figure title={t`Option pool available`} value={num(snapshot.optionPoolAvailable)} />
+            <Figure
+              title={t`Latest 409A`}
+              value={a ? usd(a.pricePerShareUsd, 2) : DASH}
+              note={a ? shortDay(a.date, new Date(), i18n.locale || "en") : null}
+              expiry={expiry}
+            />
+            <Figure title={t`Amount raised`} value={usd(snapshot.amountRaisedUsd)} />
+          </>
+        ) : (
+          [0, 1, 2, 3].map((n) => <Skeleton key={n} className="h-[76px] w-full rounded-xl" />)
+        )}
+      </div>
+      {snapshot ? <History valuations={snapshot.valuations409a} /> : null}
+    </>
   );
 }
 
@@ -145,7 +225,10 @@ function OwnershipBar({ classes }: { classes: Snapshot["shareClasses"] }) {
           <div
             key={c.name}
             className="bg-foreground"
-            style={{ width: `${c.percent}%`, opacity: Math.max(0.15, 1 - i * 0.22) }}
+            style={{
+              width: `${c.percent}%`,
+              opacity: Math.max(0.15, 1 - i * 0.22),
+            }}
           />
         ))}
       </div>

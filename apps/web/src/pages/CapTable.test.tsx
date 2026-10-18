@@ -28,7 +28,11 @@ const rpcMock = vi.hoisted(() => ({
 }));
 vi.mock("../lib/rpc", () => ({
   rpc: {
-    contacts: { list: rpcMock.list, save: rpcMock.save, delete: rpcMock.remove },
+    contacts: {
+      list: rpcMock.list,
+      save: rpcMock.save,
+      delete: rpcMock.remove,
+    },
     mcp: { servers: { list: rpcMock.servers } },
     carta: { capTable: rpcMock.capTable, refresh: rpcMock.refresh },
   },
@@ -68,7 +72,11 @@ const contact = (id: string, name: string, kind: Contact["kind"]): Contact => ({
   createdAt: "2026-10-15T00:00:00.000Z",
   updatedAt: "2026-10-15T00:00:00.000Z",
 });
-const cartaServer = { id: "s1", enabled: true, endpoint: "https://mcp.app.carta.com/mcp" };
+const cartaServer = {
+  id: "s1",
+  enabled: true,
+  endpoint: "https://mcp.app.carta.com/mcp",
+};
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -188,6 +196,7 @@ const snapshot = {
   amountRaisedUsd: null,
   optionPoolAvailable: 500_000,
   latest409a: { pricePerShareUsd: 1.25, date: "2026-09-01" },
+  valuations409a: [],
   shareClasses: [
     { name: "Common", shares: 7_000_000, percent: 70 },
     { name: "Series Seed Preferred", shares: 3_000_000, percent: 30 },
@@ -586,4 +595,59 @@ it("hides shares, ownership, 409A and amounts while amounts are hidden, and flip
       (document.querySelector("[data-testid=hide-amounts-toggle]") as HTMLElement),
   );
   expect(container.textContent).toContain("10,000,000");
+});
+
+const valuation = (date: string, pricePerShareUsd: number, expiresOn: string | null = null) => ({
+  date,
+  pricePerShareUsd,
+  expiresOn,
+});
+const withValuations = (valuations409a: ReturnType<typeof valuation>[]) => ({
+  snapshot: {
+    ...snapshot,
+    latest409a: valuations409a[0] ?? null,
+    valuations409a,
+  },
+  syncing: false,
+});
+const dayOffset = (days: number) =>
+  new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+it("shows the 409A date and a plain expiry without a warning color", async () => {
+  rpcMock.capTable.mockResolvedValue(
+    withValuations([valuation("2026-09-01", 1.25, dayOffset(200))]),
+  );
+  await show();
+  expect(container.textContent).toContain("Sep 1");
+  expect(container.textContent).toMatch(/Expires /);
+  expect(container.querySelector(".text-warning, .text-destructive")).toBeNull();
+  expect(container.textContent).not.toContain("409A history");
+});
+
+it("warns within 60 days of expiry", async () => {
+  rpcMock.capTable.mockResolvedValue(
+    withValuations([valuation("2026-09-01", 1.25, dayOffset(30))]),
+  );
+  await show();
+  expect(container.querySelector(".text-warning")?.textContent).toMatch(/^Expires /);
+});
+
+it("marks a 409A expired when it is over a year old, even without an expiry from Carta", async () => {
+  rpcMock.capTable.mockResolvedValue(withValuations([valuation("2024-01-15", 1.25)]));
+  await show();
+  expect(container.querySelector(".text-destructive")?.textContent).toMatch(/^Expired /);
+});
+
+it("lists 409A history from two valuations, and masks prices but not dates while hidden", async () => {
+  rpcMock.capTable.mockResolvedValue(
+    withValuations([valuation("2026-09-01", 1.25), valuation("2025-08-01", 0.8)]),
+  );
+  await show();
+  expect(container.textContent).toContain("409A history");
+  expect(container.textContent).toContain("0.80");
+  setHideAmounts(true);
+  await flush();
+  expect(container.textContent).toContain("Aug 1");
+  expect(container.textContent).not.toContain("0.80");
+  expect(container.textContent).not.toContain("1.25");
 });

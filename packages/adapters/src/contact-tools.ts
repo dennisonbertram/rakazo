@@ -47,7 +47,7 @@ export function selectContactTools<T extends { name: string }>(
 }
 
 export type ContactToolDeps = {
-  prisma: Pick<PrismaClient, "contact" | "capTableSnapshot">;
+  prisma: Pick<PrismaClient, "contact" | "capTableSnapshot" | "legalDeadline">;
   /** From the run (the bot owner), never from model input. */
   scope: { spaceId: string; userId: string };
 };

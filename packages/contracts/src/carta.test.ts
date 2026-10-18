@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CARTA_MCP_ENDPOINT,
+  CapTableSnapshotInputSchema,
   cartaAgentSpawnKey,
   isCartaAgentSpawnKey,
   isCartaEndpoint,
@@ -24,5 +25,41 @@ describe("carta agent spawn key", () => {
     expect(isCartaAgentSpawnKey(cartaAgentSpawnKey("u1"))).toBe(true);
     expect(isCartaAgentSpawnKey("finance-agent:u1")).toBe(false);
     expect(isCartaAgentSpawnKey(null)).toBe(false);
+  });
+});
+
+describe("cap table snapshot 409A", () => {
+  const base = {
+    companyName: "Example Co",
+    asOf: "2026-01-31",
+    fullyDilutedShares: 1000,
+    shareClasses: [],
+    holders: [],
+  };
+  it("parses an old snapshot with no valuations", () => {
+    const old = CapTableSnapshotInputSchema.parse({
+      ...base,
+      latest409a: { pricePerShareUsd: 1.5, date: "2025-06-01" },
+    });
+    expect(old.valuations409a).toEqual([]);
+    expect(old.latest409a).toEqual({
+      pricePerShareUsd: 1.5,
+      date: "2025-06-01",
+    });
+  });
+  it("derives latest409a from the newest valuation", () => {
+    const next = CapTableSnapshotInputSchema.parse({
+      ...base,
+      valuations409a: [
+        { pricePerShareUsd: 2, date: "2026-01-01", expiresOn: "2027-01-01" },
+        { pricePerShareUsd: 1, date: "2025-01-01" },
+      ],
+    });
+    expect(next.latest409a).toEqual({
+      pricePerShareUsd: 2,
+      date: "2026-01-01",
+      expiresOn: "2027-01-01",
+    });
+    expect(next.valuations409a[1]?.expiresOn).toBeNull();
   });
 });

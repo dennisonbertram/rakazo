@@ -19,7 +19,11 @@ const contacts = [
   contact("c2", "Bo Sample", "auditor", "Sample & Co"),
   contact("c3", "Cy Placeholder", "investor", null),
 ];
-const cartaServer = { id: "srv_c", enabled: true, endpoint: "https://mcp.app.carta.com/mcp" };
+const cartaServer = {
+  id: "srv_c",
+  enabled: true,
+  endpoint: "https://mcp.app.carta.com/mcp",
+};
 
 const snapshot = {
   companyName: "Example Co",
@@ -28,6 +32,7 @@ const snapshot = {
   amountRaisedUsd: null,
   optionPoolAvailable: 500_000,
   latest409a: { pricePerShareUsd: 1.25, date: "2026-09-01" },
+  valuations409a: [],
   shareClasses: [
     { name: "Common", shares: 6_000_000, percent: 60 },
     { name: "Options", shares: 1_000_000, percent: 10 },
@@ -124,6 +129,33 @@ export const WithSnapshot: Story = {
     }),
 };
 
+const day = (offset: number) =>
+  new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
+/** Two valuations, the newest expiring within 60 days. */
+export const With409aHistory: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "contacts.list": contacts,
+      "mcp.servers.list": [cartaServer],
+      "carta.capTable": {
+        snapshot: {
+          ...snapshot,
+          latest409a: {
+            pricePerShareUsd: 1.25,
+            date: day(-335),
+            expiresOn: day(30),
+          },
+          valuations409a: [
+            { pricePerShareUsd: 1.25, date: day(-335), expiresOn: day(30) },
+            { pricePerShareUsd: 0.8, date: day(-700), expiresOn: day(-335) },
+          ],
+        },
+        syncing: false,
+      },
+    }),
+};
+
 export const ReadingCarta: Story = {
   beforeEach: () =>
     mockRpc({
@@ -145,5 +177,8 @@ export const CartaNeedsSignIn: Story = {
 export const NoAuditors: Story = {
   parameters: { initialEntries: ["/app/cap-table?kind=auditor"] },
   beforeEach: () =>
-    mockRpc({ "contacts.list": [contacts[0], contacts[2]], "mcp.servers.list": [cartaServer] }),
+    mockRpc({
+      "contacts.list": [contacts[0], contacts[2]],
+      "mcp.servers.list": [cartaServer],
+    }),
 };
