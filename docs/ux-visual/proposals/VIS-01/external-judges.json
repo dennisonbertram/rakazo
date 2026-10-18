@@ -1,0 +1,80 @@
+{
+  "mode": "judge",
+  "images": [],
+  "results": [
+    {
+      "model": "meta/muse-wonder",
+      "ok": true,
+      "seconds": 33,
+      "costUsd": 0.066236,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 5,
+            "simplicity": 5,
+            "consistency": 5,
+            "usability": 4,
+            "visual": 4,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 4,
+            "simplicity": 2,
+            "consistency": 3,
+            "usability": 3,
+            "visual": 3,
+            "effort": 1
+          },
+          "C": {
+            "criteria": 5,
+            "simplicity": 3,
+            "consistency": 4,
+            "usability": 5,
+            "visual": 4,
+            "effort": 3
+          }
+        },
+        "winner": "A",
+        "graft": "From C: add scrim plus Escape-to-close with focus return for the below-1280 overlay panel, without adopting its 480px sheet width or never-restore rule.",
+        "defense": "A fully solves the arithmetic for the tablet founder: at 768 the sidebar becomes the existing drawer, main returns to 768px with a full-width composer, and the panel overlays at 384px; at 1440 the 480px MIN_CHAT_WIDTH caps the panel at 644px, leaving exactly 480px for chat, with stored widths already clamped through min(maxWidth, preferred). It reuses existing drawer, overlay, shadow, and Tailwind breakpoint patterns in about 20 class swaps across three files. B's budget is mathematically elegant and would dock both at 1116px, but rewriting the 8,622-line Shell around a ResizeObserver hook, attribute-driven classes, and surprising auto-collapse of the sidebar is disproportionate risk and can flash or strand the user's navigation. C shares A's sound breakpoints, but expands this fix into a new sheet pattern: a 480px sheet covers 62% of a 768px screen, never restoring an open panel breaks restoredPanelKey expectations, and its focus work overlaps VIS-03. The graft captures C's main usability gain—clear dismissal of the overlay—while keeping A's smaller overlay, restore behavior, and low-risk scope."
+      }
+    },
+    {
+      "model": "google/gemini-4-argon",
+      "ok": true,
+      "seconds": 59,
+      "costUsd": 0.05282,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 5,
+            "simplicity": 5,
+            "consistency": 5,
+            "usability": 4,
+            "visual": 5,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 4,
+            "simplicity": 2,
+            "consistency": 2,
+            "usability": 3,
+            "visual": 3,
+            "effort": 2
+          },
+          "C": {
+            "criteria": 5,
+            "simplicity": 4,
+            "consistency": 4,
+            "usability": 4,
+            "visual": 4,
+            "effort": 3
+          }
+        },
+        "winner": "A",
+        "graft": "From C, graft the load-time clamp on restoredPanelKey below 1280px (so an overlay panel is never restored open on page reload to cover the main workspace) and the pressed state on header panel-toggle buttons so a first-time user can clearly see how to toggle and dismiss the overlay panel.",
+        "defense": "Proposal A solves the exact arithmetic root cause with maximum surgical precision and minimal risk in an 8,622-line Shell.tsx. By moving the sidebar dock breakpoint from md (768px) to lg (1024px) via a single shared DOCKED_SIDEBAR_QUERY constant, moving the right panel dock breakpoint from md (768px) to xl (1280px) with max-xl:shadow-xl, raising MIN_CHAT_WIDTH from 320px to 480px, and stacking the Models overlay below 900px, Proposal A satisfies every acceptance criterion using the app's existing drawer and overlay patterns. For a naive first-time founder on a 768px tablet or small laptop, the main workspace immediately gets the full 768px width (up from a crushed 132px) without introducing unfamiliar layout mechanics.\n\nAgainst Proposal B: Proposal B over-engineers a CSS breakpoint problem into a JavaScript ResizeObserver hook (useShellLayout) and custom data-attribute selectors across Shell.tsx. Worse for usability, B's dynamic width budget auto-collapses the left navigation sidebar when the user opens a right panel around 1000px, which is disorienting for a first-time founder whose primary navigation suddenly disappears, and introduces state-persistence hazards and resize layout thrashing.\n\nAgainst Proposal C: Proposal C shares A's exact breakpoint foundation but widens the overlay panel from 384px to 480px (obscuring 62% of a 768px tablet screen), adds a modal scrim that blocks referencing or scrolling the main column alongside the panel on 1024px-1279px laptops, and adds custom Escape/focus handling that collides with the VIS-03 keyboard lane. Taking A as the foundation and grafting only C's on-load restoration clamp (below 1280px) and header toggle pressed state delivers the best usability and visual clarity at a fraction of the risk."
+      }
+    }
+  ]
+}
