@@ -319,6 +319,7 @@ import {
   transcriptUserJustSent,
 } from "../lib/transcript-scroll";
 import { speaker } from "../lib/tts";
+import { useRovingTabindex } from "../lib/useRovingTabindex";
 import { errorText } from "../lib/user-error";
 import type { WorkingActivity } from "../lib/working-activity";
 import { type ToolAction, workingActivity } from "../lib/working-activity";
@@ -488,6 +489,9 @@ function readCollapsedRosterParents(userId: string | null | undefined): Set<stri
 
 export function ShellPage() {
   const { t } = useLingui();
+  // The sidebar's pages, spaces and chats are one tab stop; arrow keys move between them.
+  const [sidebarListEl, setSidebarListEl] = useState<HTMLDivElement | null>(null);
+  useRovingTabindex(sidebarListEl);
   const { botId, groupId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -3710,7 +3714,10 @@ export function ShellPage() {
             </InputGroupAddon>
           ) : null}
         </InputGroup>
-        <div className="rk-scroll rk-scroll-fade-bottom flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-2.5">
+        <div
+          ref={setSidebarListEl}
+          className="rk-scroll rk-scroll-fade-bottom flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-2.5"
+        >
           {/* While searching, matching pages are listed with the results instead. */}
           {showSpaceSearch ? null : (
             // Inside the scroll area, so on a short screen the chats are never squeezed out.
@@ -3853,8 +3860,9 @@ export function ShellPage() {
                         {group.title ? (
                           <button
                             type="button"
+                            data-roving
                             aria-current={group.current ? "true" : undefined}
-                            className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1 text-[11px] font-semibold tracking-wider uppercase ${group.current ? "text-foreground" : "text-muted-foreground/60"} hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring ${hasSpaceActions ? "col-start-1 row-start-1 w-full pe-8" : "flex-1"}`}
+                            className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1 text-[11px] font-semibold tracking-wider uppercase ${group.current ? "text-foreground" : "text-muted-foreground/60"} hover:text-foreground ${hasSpaceActions ? "col-start-1 row-start-1 w-full pe-8" : "flex-1"}`}
                             onClick={() => {
                               if (group.emptySpaceId) {
                                 openSpaceChat(group.emptySpaceId, "/onboarding");
@@ -3943,6 +3951,8 @@ export function ShellPage() {
                                 : undefined
                             }
                             aria-label={t`Actions for ${group.spaceName}`}
+                            data-roving-action
+                            tabIndex={-1}
                             onClick={(event) => {
                               const rect = event.currentTarget.getBoundingClientRect();
                               spaceMenuAnchor.current = event.currentTarget;
@@ -4029,6 +4039,7 @@ export function ShellPage() {
                             ) : null}
                             <button
                               type="button"
+                              data-roving
                               draggable={item.kind === "bot"}
                               data-roster-bot-id={item.kind === "bot" ? item.chat.id : undefined}
                               data-roster-unread={item.chat.unread ? "true" : undefined}
@@ -4239,6 +4250,8 @@ export function ShellPage() {
                                 variant="ghost"
                                 size="icon"
                                 data-testid="roster-row-actions"
+                                data-roving-action
+                                tabIndex={-1}
                                 aria-label={t`Actions for ${item.chat.name}`}
                                 aria-haspopup="menu"
                                 onClick={(event) => {
@@ -4250,7 +4263,7 @@ export function ShellPage() {
                                     position: { x: rect.left, y: rect.bottom },
                                   });
                                 }}
-                                className={`absolute end-2 top-1.5 size-7 rounded-lg text-muted-foreground opacity-0 hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 pointer-coarse:hidden ${
+                                className={`absolute end-2 top-1.5 size-7 rounded-lg text-muted-foreground opacity-0 hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-focus-within/row:opacity-100 group-hover/row:opacity-100 pointer-coarse:hidden ${
                                   botMenu?.id === item.chat.id ? "opacity-100" : ""
                                 }`}
                               >
@@ -6269,10 +6282,17 @@ export const Transcript = memo(function Transcript({
     [],
   );
 
+  // The message actions are one tab stop (last message first); arrows move between messages.
+  const [transcriptEl, setTranscriptEl] = useState<HTMLDivElement | null>(null);
+  useRovingTabindex(transcriptEl, "last");
+
   return (
     <div className="@container relative flex min-h-0 flex-1">
       <div
-        ref={scrollRef}
+        ref={(node) => {
+          scrollRef.current = node;
+          setTranscriptEl(node);
+        }}
         data-testid="transcript"
         onPointerDown={(event) => {
           lastScrollTop.current = event.currentTarget.scrollTop;
@@ -7414,7 +7434,7 @@ export const Composer = memo(function Composer({
         ref={composerBarRef}
         data-testid="composer-bar"
         data-expanded={expanded}
-        className={`grid grid-cols-[auto_minmax(0,1fr)_auto] content-end items-center rounded-[26px] border border-border bg-background pe-2.5 ps-3 transition-colors focus-within:border-ring ${
+        className={`grid grid-cols-[auto_minmax(0,1fr)_auto] content-end items-center rounded-[26px] border border-border bg-background pe-2.5 ps-3 transition-colors focus-within:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring ${
           expanded ? "gap-x-2 gap-y-2 pb-[9px] pt-3" : "gap-x-3.5 py-[9px]"
         }`}
       >
@@ -7506,6 +7526,7 @@ export const Composer = memo(function Composer({
           ))}
           <textarea
             ref={textareaRef}
+            data-skip-target
             value={draft}
             onChange={(event) => updateDraft(event.target.value)}
             onPaste={handlePaste}
@@ -7828,6 +7849,9 @@ function MessageHoverActions({
 
   const iconButtonClass =
     "grid h-7 w-7 place-items-center text-muted-foreground transition-colors hover:text-foreground";
+  // The first button is the message's tab stop (data-roving); the others are reached with ArrowRight.
+  const reactable = canReactToThreadMessage(message);
+  const action = { "data-roving-action": "", tabIndex: -1 } as const;
 
   return (
     <MessageHoverMetadata
@@ -7839,6 +7863,7 @@ function MessageHoverActions({
         {canReactToThreadMessage(message) ? (
           <Popover open={reactionsOpen} onOpenChange={setReactionsOpen}>
             <PopoverTrigger
+              data-roving=""
               aria-label={t`React`}
               className={cn(
                 iconButtonClass,
@@ -7872,6 +7897,7 @@ function MessageHoverActions({
         <button
           type="button"
           aria-label={t`Reply`}
+          {...(reactable ? action : { "data-roving": "" })}
           onClick={() => onReply(message)}
           className={cn(
             iconButtonClass,
@@ -7882,6 +7908,7 @@ function MessageHoverActions({
         </button>
         <DropdownMenu open={moreOpen} onOpenChange={setMoreOpen}>
           <DropdownMenuTrigger
+            {...action}
             aria-label={t`More`}
             className={cn(
               iconButtonClass,

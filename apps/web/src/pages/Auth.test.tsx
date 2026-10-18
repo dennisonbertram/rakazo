@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { authClient } from "../lib/auth";
 import type { AuthCapabilities } from "../lib/auth-capabilities";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
-import { AuthPage } from "./Auth";
+import { AuthFrame, AuthPage } from "./Auth";
 
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({
@@ -188,4 +188,33 @@ it("names the address after a reset request and can send it again", async () => 
   const again = [...host.querySelectorAll("button")].find((b) => b.textContent === "Send again")!;
   await act(async () => again.click());
   expect(authClient.requestPasswordReset).toHaveBeenCalledTimes(2);
+});
+
+it("moves focus to the error alert when one appears, and again when its text changes", async () => {
+  function Failing() {
+    const [error, setError] = useState("");
+    return (
+      <AuthFrame title="Sign in" onSubmit={(event) => event.preventDefault()}>
+        <button type="button" id="fail" onClick={() => setError((prev) => `${prev}x`)}>
+          fail
+        </button>
+        {error ? <p role="alert">Bad {error}</p> : null}
+      </AuthFrame>
+    );
+  }
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(<Failing />));
+  const button = container.querySelector<HTMLButtonElement>("#fail")!;
+  button.focus();
+  await act(async () => button.click());
+  const alert = container.querySelector('[role="alert"]');
+  expect(alert).not.toBeNull();
+  expect(document.activeElement).toBe(alert);
+  button.focus();
+  await act(async () => button.click());
+  expect(document.activeElement).toBe(container.querySelector('[role="alert"]'));
+  await act(async () => root.unmount());
+  container.remove();
 });

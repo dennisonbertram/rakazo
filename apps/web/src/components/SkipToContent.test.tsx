@@ -34,3 +34,22 @@ it("moves keyboard focus past the sidebar to the page, without changing the URL"
   expect(window.location.href).toBe(before);
   act(() => root.unmount());
 });
+
+it("focuses the element marked data-skip-target (the composer) when the page has one", async () => {
+  const el = document.createElement("div");
+  document.body.append(el);
+  const root = createRoot(el);
+  await act(async () =>
+    root.render(
+      <>
+        <SkipToContent />
+        <main id={MAIN_CONTENT_ID} tabIndex={-1}>
+          <textarea id="composer" data-skip-target />
+        </main>
+      </>,
+    ),
+  );
+  await act(async () => el.querySelector("a")?.click());
+  expect(document.activeElement?.id).toBe("composer");
+  act(() => root.unmount());
+});

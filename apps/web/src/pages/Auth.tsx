@@ -437,9 +437,30 @@ export function AuthFrame({
   onSubmit: (event: React.FormEvent) => void;
   children: React.ReactNode;
 }) {
+  // After a failed submit the focused button may have been disabled or replaced, so focus would
+  // drop to <body>. Move it to the error alert as soon as one appears.
+  const [form, setForm] = useState<HTMLFormElement | null>(null);
+  useEffect(() => {
+    if (!form) return;
+    const observer = new MutationObserver((records) => {
+      // An alert that was added, or whose text changed.
+      const alert = form.querySelector<HTMLElement>('[role="alert"]');
+      if (!alert) return;
+      const touched = records.some(
+        (record) =>
+          alert.contains(record.target) ||
+          Array.from(record.addedNodes).some((node) => node.contains(alert)),
+      );
+      if (!touched) return;
+      alert.tabIndex = -1;
+      alert.focus();
+    });
+    observer.observe(form, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [form]);
   return (
     <div className="flex min-h-full items-center justify-center bg-background px-6 py-16 text-foreground">
-      <form onSubmit={onSubmit} className="flex w-[460px] flex-col items-center">
+      <form ref={setForm} onSubmit={onSubmit} className="flex w-[460px] flex-col items-center">
         <div className="flex h-[74px] w-[74px] items-center justify-center gap-[11px] rounded-full bg-muted">
           <span className="h-5 w-[9px] rounded-full bg-primary" />
           <span className="h-5 w-[9px] rounded-full bg-primary" />

@@ -103,7 +103,9 @@ export function SidebarPages({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={t`Page options`}
-              className="absolute end-4 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground opacity-0 pointer-coarse:opacity-100 hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100 data-[popup-open]:opacity-100"
+              data-roving-action
+              tabIndex={-1}
+              className="absolute end-4 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground opacity-0 pointer-coarse:opacity-100 hover:bg-accent focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 data-[popup-open]:opacity-100"
             >
               <Ellipsis size={15} strokeWidth={1.8} aria-hidden="true" />
             </DropdownMenuTrigger>

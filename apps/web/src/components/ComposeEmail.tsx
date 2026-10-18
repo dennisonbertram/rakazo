@@ -134,7 +134,7 @@ function RecipientSummary({ entries, onOpen }: { entries: string[]; onOpen: () =
     <button
       type="button"
       onFocus={onOpen}
-      className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-sm text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-sm text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="truncate" dir="auto">
         {recipients.map((recipient, index) => (
@@ -772,7 +772,7 @@ export function ComposeEmail({
                   type="button"
                   disabled={sending}
                   aria-label={t`Remove ${file.filename}`}
-                  className="inline-flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none pointer-coarse:size-8"
+                  className="inline-flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none pointer-coarse:size-8"
                   onClick={() => setForwarded(forwarded.filter((other) => other.id !== file.id))}
                 >
                   <X aria-hidden="true" className="size-3" />
@@ -794,7 +794,7 @@ export function ComposeEmail({
                   type="button"
                   disabled={sending}
                   aria-label={t`Remove ${file.name}`}
-                  className="inline-flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none pointer-coarse:size-8"
+                  className="inline-flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none pointer-coarse:size-8"
                   onClick={() => setFiles(files.filter((_, i) => i !== index))}
                 >
                   <X aria-hidden="true" className="size-3" />

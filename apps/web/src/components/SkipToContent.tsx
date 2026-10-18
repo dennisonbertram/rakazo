@@ -11,11 +11,15 @@ export function SkipToContent() {
   return (
     <a
       href={`#${MAIN_CONTENT_ID}`}
-      className="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-[60] focus:rounded-lg focus:border focus:border-border focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      className="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-[60] focus:rounded-lg focus:border focus:border-border focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground"
       onClick={(event) => {
         // Focus only: changing the URL hash would scroll the page or trip hash-based anchors.
         event.preventDefault();
-        document.getElementById(MAIN_CONTENT_ID)?.focus();
+        // A page can mark its primary control (the chat composer) with `data-skip-target`.
+        (
+          document.querySelector<HTMLElement>("[data-skip-target]") ??
+          document.getElementById(MAIN_CONTENT_ID)
+        )?.focus();
       }}
     >
       <Trans>Skip to content</Trans>

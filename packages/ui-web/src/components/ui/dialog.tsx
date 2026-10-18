@@ -5,7 +5,7 @@ import { Button } from "@rakazo/ui-web/components/ui/button";
 
 import { cn } from "@rakazo/ui-web/lib/utils";
 import { XIcon } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -44,11 +44,19 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
 }) {
+  // A dialog mounted already open (no Trigger) has nothing for Base UI to return focus to, so
+  // remember the control that had focus when the content first rendered.
+  const [opener] = React.useState(() =>
+    typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null),
+  );
+  const returnFocus = () =>
+    opener && opener !== document.body && opener.isConnected ? opener : true;
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        finalFocus={returnFocus}
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className,

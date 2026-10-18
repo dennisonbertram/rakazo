@@ -46,7 +46,7 @@ function Option({
       type="button"
       disabled={disabled || connected}
       onClick={onClick}
-      className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-3 text-start transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-default disabled:opacity-70 disabled:hover:bg-card"
+      className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-3 text-start transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default disabled:opacity-70 disabled:hover:bg-card"
     >
       {icon}
       <span className="min-w-0 flex-1">

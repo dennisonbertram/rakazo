@@ -20,6 +20,7 @@ export function SidebarPageLink({
     <button
       type="button"
       data-testid={testId}
+      data-roving
       aria-current={current ? "page" : undefined}
       onClick={onOpen}
       className={`mx-2.5 mb-1 flex items-center gap-3 rounded-xl px-2.5 py-2 text-start hover:bg-sidebar-accent ${

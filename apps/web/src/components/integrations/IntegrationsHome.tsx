@@ -88,7 +88,10 @@ function CardHead({
       <AppLogo name={name} logo={logo} />
       <div className="min-w-0">
         {to ? (
-          <Link to={to} className="block truncate font-semibold after:absolute after:inset-0">
+          <Link
+            to={to}
+            className="block truncate font-semibold after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring"
+          >
             {name}
           </Link>
         ) : (

@@ -74,7 +74,7 @@ export function RecipientField({
               disabled={disabled}
               aria-label={t`Remove ${recipient.address}`}
               aria-describedby={recipient.valid ? undefined : reason}
-              className="inline-flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none pointer-coarse:size-8"
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none pointer-coarse:size-8"
               onClick={(event) => {
                 event.stopPropagation();
                 onChange(entries.filter((other) => other !== entry));

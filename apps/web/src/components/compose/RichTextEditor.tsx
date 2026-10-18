@@ -322,7 +322,7 @@ export function LinkButton({
             placeholder="https://"
             autoComplete="off"
             spellCheck={false}
-            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => setUrl(event.target.value)}
             onKeyDown={(event) => {
               // Submitting moves focus into the editor mid-keypress, which would add a line break.
