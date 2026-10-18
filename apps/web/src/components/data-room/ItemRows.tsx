@@ -1,14 +1,14 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { DataRoomApiFolder, DataRoomApiItem } from "@rakazo/contracts";
-import { Button, cn, Spinner } from "@rakazo/ui-web";
+import { Badge, Button, cn, Spinner } from "@rakazo/ui-web";
 import { FileImage, FileSpreadsheet, FileText, Folder } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { splitSnippet } from "../../lib/data-room";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../../lib/hide-amounts-preference";
 import { dateText, isSettled, statusLabel, typeLabel } from "./format";
 import { type ItemAction, ItemMenu } from "./ItemMenu";
-import type { Row } from "./use-data-room-list";
+import type { Row, SortField } from "./use-data-room-list";
 
 /** What the list tells the page about pointer, keyboard and menu use. */
 export type RowInteraction = {
@@ -85,68 +85,71 @@ const fileIcon = ({ mimeType, name }: DataRoomApiItem) =>
       ? FileSpreadsheet
       : FileText;
 
-/** True when some row has a type, document date or party, so those columns are worth their width. */
-export const hasFacets = (rows: Row[]) =>
-  rows.some(({ item: { facets } }) => facets.docType || facets.docDate || facets.parties.length);
-
-// One grid template for the header and every row. Name never goes below 200px and takes the rest;
-// as the list pane narrows, Parties goes first, then Type and Date, which then go under the name.
-// The menu stays.
+// One grid template for the header and every row, whatever the rows hold, so no column moves when a
+// file settles. Name never goes below 200px and takes the rest; as the list pane narrows, Parties
+// goes first, then Type, Date and Status, which then go under the name. The menu stays.
 const ROW_GRID =
   "grid items-center gap-2.5 px-4 md:px-7 @min-[800px]/bd:px-2 grid-cols-[minmax(200px,1fr)_28px] " +
-  // Type is wide enough for "Investor document", and Parties fits beside an open preview.
-  "@min-[500px]/list:grid-cols-[minmax(200px,1fr)_110px_90px_28px] " +
-  "@min-[590px]/list:grid-cols-[minmax(180px,1fr)_120px_90px_110px_28px] " +
+  // Every tier fits its list width, Status included (Name takes what is left). Type is wide enough
+  // for most names, and Parties fits beside an open preview.
+  "@min-[500px]/list:grid-cols-[minmax(116px,1fr)_100px_90px_72px_28px] " +
+  "@min-[640px]/list:grid-cols-[minmax(150px,1fr)_110px_90px_90px_72px_28px] " +
   // With room to spare, Type and Parties widen first, so "Acme Servo Supply (Mock)" fits.
-  "@min-[820px]/list:grid-cols-[minmax(240px,1fr)_120px_100px_200px_28px]";
-/** Without facets the name takes every column but the menu. */
-const PLAIN_GRID =
-  "grid items-center gap-2.5 px-4 md:px-7 @min-[800px]/bd:px-2 grid-cols-[minmax(0,1fr)_28px]";
-/** As PLAIN_GRID, with a fixed status column so "Failed" lines up whatever the name's length. */
-const STATUS_GRID =
-  "grid items-center gap-2.5 px-4 md:px-7 @min-[800px]/bd:px-2 grid-cols-[minmax(0,1fr)_72px_28px]";
-const hasStatus = (rows: Row[]) => rows.some(({ item }) => statusLabel(item.status));
-const plainGrid = (status: boolean) => (status ? STATUS_GRID : PLAIN_GRID);
+  "@min-[820px]/list:grid-cols-[minmax(200px,1fr)_120px_100px_180px_72px_28px]";
+/** The Date column follows the sort: when the file was added, or the date on the document. */
+const dateOf = (item: DataRoomApiItem, field: SortField | undefined) =>
+  dateText(field === "date" ? item.facets.docDate : item.createdAt);
 const DATE_CELL = "hidden @min-[500px]/list:block";
 const TYPE_CELL = "hidden @min-[500px]/list:block";
-const PARTIES_CELL = "hidden @min-[590px]/list:block";
+const PARTIES_CELL = "hidden @min-[640px]/list:block";
+const STATUS_CELL = "hidden @min-[500px]/list:block";
 /** Parties wrap to a second line (as long names do) rather than lose the end of a name. */
 const PARTIES_VALUE =
-  "hidden min-w-0 break-words text-muted-foreground @min-[590px]/list:line-clamp-2";
+  "hidden min-w-0 break-words text-muted-foreground @min-[640px]/list:line-clamp-2";
 const CELL = "min-w-0 truncate text-muted-foreground";
 
-function TableHead({ facets, status }: { facets: boolean; status: boolean }) {
+function TableHead({ sortField }: { sortField: SortField | undefined }) {
   return (
     <div
       aria-hidden="true"
       data-testid="data-room-head"
-      className={cn(
-        facets ? ROW_GRID : plainGrid(status),
-        "sticky top-0 z-10 bg-background py-2 text-xs text-muted-foreground",
-      )}
+      className={cn(ROW_GRID, "sticky top-0 z-10 bg-background py-2 text-xs text-muted-foreground")}
     >
       <span>
         <Trans>Name</Trans>
       </span>
-      {facets ? (
-        <>
-          <span className={TYPE_CELL}>
-            <Trans>Type</Trans>
-          </span>
-          <span className={DATE_CELL}>
-            <Trans>Date</Trans>
-          </span>
-          <span className={PARTIES_CELL}>
-            <Trans>Parties</Trans>
-          </span>
-        </>
-      ) : status ? (
-        <span>
-          <Trans>Status</Trans>
-        </span>
-      ) : null}
+      <span className={TYPE_CELL}>
+        <Trans>Type</Trans>
+      </span>
+      <span className={cn(DATE_CELL, "truncate")}>
+        {sortField === "date" ? <Trans>Document date</Trans> : <Trans>Added</Trans>}
+      </span>
+      <span className={PARTIES_CELL}>
+        <Trans>Parties</Trans>
+      </span>
+      <span className={STATUS_CELL}>
+        <Trans>Status</Trans>
+      </span>
       <span />
     </div>
+  );
+}
+
+/** Reads a failed file again, in the row itself. It never opens the preview. */
+function RetryButton({ item, o }: { item: DataRoomApiItem; o: RowInteraction }) {
+  return (
+    <Button
+      variant="outline"
+      size="xs"
+      className="mt-1 self-start"
+      onClick={(event) => {
+        event.stopPropagation();
+        o.onAction("retry", item);
+      }}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      <Trans>Try again</Trans>
+    </Button>
   );
 }
 
@@ -154,15 +157,13 @@ function ItemRow({
   item,
   snippets,
   o,
-  facets,
-  status,
+  sortField,
 }: {
   item: DataRoomApiItem;
   /** Search only: the text that matched, under the row. */
   snippets: string[];
   o: RowInteraction;
-  facets: boolean;
-  status: boolean;
+  sortField: SortField | undefined;
 }) {
   const label = statusLabel(item.status);
   const folder = item.folderId === (o.openFolderId ?? null) ? "" : o.folderPath(item.folderId);
@@ -171,7 +172,7 @@ function ItemRow({
       aria-current={o.shownId === item.id}
       {...rowProps(item, o)}
       className={cn(
-        facets ? ROW_GRID : plainGrid(status),
+        ROW_GRID,
         "cursor-pointer border-b border-border py-1.5 text-sm outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
         // Clearly stronger than the hover tint, so the chosen row stays obvious.
         o.shownId === item.id && "bg-sidebar-accent hover:bg-sidebar-accent",
@@ -195,19 +196,17 @@ function ItemRow({
           {folder ? (
             <span className="truncate text-xs font-normal text-muted-foreground">{folder}</span>
           ) : null}
-          {/* Where the Type and Date columns are hidden (a phone), they go under the name. */}
-          {facets ? (
-            <span
-              data-testid="data-room-subline"
-              className={cn(
-                "truncate text-xs font-normal text-muted-foreground @min-[500px]/list:hidden",
-                item.status === "failed" && "text-destructive",
-              )}
-            >
-              {label || <TypeAndDate item={item} />}
-            </span>
-          ) : item.status === "failed" && !item.error ? (
-            // Shown at every width: without facets there is no Type column to say why.
+          {/* Where the Type, Date and Status columns are hidden (a phone), they go under the name. */}
+          <span
+            data-testid="data-room-subline"
+            className={cn(
+              "truncate text-xs font-normal text-muted-foreground @min-[500px]/list:hidden",
+              item.status === "failed" && "text-destructive",
+            )}
+          >
+            {label || <TypeAndDate item={item} sortField={sortField} />}
+          </span>
+          {item.status === "failed" && !item.error ? (
             <span
               data-testid="data-room-failed-reason"
               className="text-xs font-normal text-destructive"
@@ -221,41 +220,29 @@ function ItemRow({
               {item.error}
             </span>
           ) : null}
+          {item.status === "failed" ? <RetryButton item={item} o={o} /> : null}
         </span>
       </span>
-      {!facets && status ? (
-        <span
-          data-testid="data-room-status"
-          className={cn(CELL, item.status === "failed" && "text-destructive")}
-          title={item.status === "failed" ? (item.error ?? undefined) : undefined}
-        >
-          {label}
-        </span>
-      ) : null}
-      {facets ? (
-        <>
-          <span
-            className={cn(TYPE_CELL, CELL, item.status === "failed" && "text-destructive")}
-            title={
-              item.status === "failed"
-                ? (item.error ?? undefined)
-                : typeLabel(item.facets.docType) || undefined
-            }
-          >
-            {label ||
-              typeLabel(item.facets.docType) ||
-              (isSettled(item.status) ? <NotTagged /> : null)}
-          </span>
-          <span className={cn(DATE_CELL, CELL)}>{dateText(item.facets.docDate)}</span>
-          <span
-            data-testid="data-room-parties"
-            className={PARTIES_VALUE}
-            title={item.facets.parties.join(", ")}
-          >
-            {item.facets.parties.join(", ")}
-          </span>
-        </>
-      ) : null}
+      <span className={cn(TYPE_CELL, CELL)} title={typeLabel(item.facets.docType) || undefined}>
+        {typeLabel(item.facets.docType) || (isSettled(item.status) ? <NotTagged /> : null)}
+      </span>
+      <span className={cn(DATE_CELL, CELL)}>{dateOf(item, sortField)}</span>
+      <span
+        data-testid="data-room-parties"
+        className={PARTIES_VALUE}
+        title={item.facets.parties.join(", ")}
+      >
+        {item.facets.parties.join(", ")}
+      </span>
+      <span
+        data-testid="data-room-status"
+        className={STATUS_CELL}
+        title={item.status === "failed" ? (item.error ?? undefined) : undefined}
+      >
+        {label ? (
+          <Badge variant={item.status === "failed" ? "destructive" : "secondary"}>{label}</Badge>
+        ) : null}
+      </span>
       <span>
         <ItemMenu item={item} onAction={o.onAction} canRetry={item.status === "failed"} />
       </span>
@@ -288,7 +275,7 @@ export function SubfolderList({
   onAction,
   contents,
   tiles = false,
-  rowClass = PLAIN_GRID,
+  rowClass = ROW_GRID,
 }: {
   folders: DataRoomApiFolder[];
   onOpen: (id: string) => void;
@@ -362,34 +349,36 @@ export function ListView({
   rows,
   o,
   lead,
+  sortField,
 }: {
   rows: Row[];
   o: RowInteraction;
   lead?: (rowClass: string) => ReactNode;
+  /** The field the list is sorted by; the Date column shows it. Without one: when added. */
+  sortField?: SortField;
 }) {
-  const facets = hasFacets(rows);
-  const status = hasStatus(rows);
   return (
     <div>
-      <TableHead facets={facets} status={status} />
-      {lead?.(facets ? ROW_GRID : plainGrid(status))}
+      <TableHead sortField={sortField} />
+      {lead?.(ROW_GRID)}
       <ul aria-label={t`Items`} data-rows>
         {rows.map(({ item, snippets }) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            snippets={snippets}
-            o={o}
-            facets={facets}
-            status={status}
-          />
+          <ItemRow key={item.id} item={item} snippets={snippets} o={o} sortField={sortField} />
         ))}
       </ul>
     </div>
   );
 }
 
-export function GridView({ rows, o }: { rows: Row[]; o: RowInteraction }) {
+export function GridView({
+  rows,
+  o,
+  sortField,
+}: {
+  rows: Row[];
+  o: RowInteraction;
+  sortField?: SortField;
+}) {
   return (
     <ul aria-label={t`Items`} data-rows className={TILE_GRID}>
       {rows.map(({ item }) => (
@@ -428,10 +417,11 @@ export function GridView({ rows, o }: { rows: Row[]; o: RowInteraction }) {
             ) : (
               <>
                 <span>{typeLabel(item.facets.docType) || <NotTagged />}</span>
-                <span>{dateText(item.facets.docDate)}</span>
+                <span>{dateOf(item, sortField)}</span>
               </>
             )}
           </span>
+          {item.status === "failed" ? <RetryButton item={item} o={o} /> : null}
         </li>
       ))}
     </ul>
@@ -448,9 +438,15 @@ function NotTagged() {
 }
 
 /** "Invoice · Oct 3, 2026", for the line under a name where the columns do not fit. */
-function TypeAndDate({ item }: { item: DataRoomApiItem }) {
+function TypeAndDate({
+  item,
+  sortField,
+}: {
+  item: DataRoomApiItem;
+  sortField: SortField | undefined;
+}) {
   const type = typeLabel(item.facets.docType);
-  const date = dateText(item.facets.docDate);
+  const date = dateOf(item, sortField);
   if (!type && isSettled(item.status)) return <NotTagged />;
   return <>{[type, date].filter(Boolean).join(" · ")}</>;
 }

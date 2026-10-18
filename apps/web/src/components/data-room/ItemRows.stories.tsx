@@ -29,7 +29,7 @@ export default meta;
 type Story = StoryObj;
 
 export const List: Story = { render: () => <ListView rows={rows} o={o} /> };
-/** Nothing classified yet: the facet columns give their width to the name. */
+/** Nothing classified yet: every column keeps its place, so nothing shifts when tags arrive. */
 export const ListWithoutFacets: Story = {
   render: () => (
     <ListView
@@ -40,6 +40,10 @@ export const ListWithoutFacets: Story = {
       o={o}
     />
   ),
+};
+/** Sorted by document date: the Date column is headed "Document date" and shows that date. */
+export const ListByDocumentDate: Story = {
+  render: () => <ListView rows={rows} o={o} sortField="date" />,
 };
 export const Grid: Story = { render: () => <GridView rows={rows} o={o} /> };
 /** Search results: the same rows, with the text that matched under each. */

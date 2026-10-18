@@ -23,6 +23,7 @@ const item = (id: string, folderId: string | null) =>
     status: "ready",
     mimeType: "application/pdf",
     source: "upload",
+    createdAt: "2026-03-04T00:00:00.000Z",
     facets: { docType: null, docDate: null, parties: [] },
   }) as unknown as DataRoomApiItem;
 
@@ -58,25 +59,93 @@ it("names each row's folder in All items, and not inside that folder", () => {
     snippets: [],
   }));
   act(() => root.render(<ListView rows={rows} o={o()} />));
-  expect(names()).toEqual(["lease.pdfLegal", "loose.pdf"]);
+  expect(names()).toEqual(["lease.pdfLegalNot tagged", "loose.pdfNot tagged"]);
   act(() => root.render(<ListView rows={rows.slice(0, 1)} o={o("f-legal")} />));
-  expect(names()).toEqual(["lease.pdf"]);
+  expect(names()).toEqual(["lease.pdfNot tagged"]);
 });
 
-it("puts the status in its own column, so every row has the cell and only the failed one fills it", () => {
+it("puts the status in its own column as a badge, and never in the Type cell", () => {
   const rows = [
     { ...item("junk", null), status: "failed" },
+    { ...item("busy", null), status: "processing" },
     item("a-much-longer-file-name", null),
   ].map((i) => ({ item: i as DataRoomApiItem, snippets: [] }));
   act(() => root.render(<ListView rows={rows} o={o()} />));
   const cells = Array.from(container.querySelectorAll('[data-testid="data-room-status"]'));
-  expect(cells.map((cell) => cell.textContent)).toEqual(["Failed", ""]);
+  expect(cells.map((cell) => cell.textContent)).toEqual(["Failed", "Reading", ""]);
+  expect(cells[0]?.querySelector("[data-slot=badge]")).not.toBeNull();
+  // The Type and Date cells (truncated text) never hold a status word.
+  for (const row of container.querySelectorAll("[data-row]")) {
+    const text = Array.from(row.children)
+      .filter((c) => c.className.includes("truncate"))
+      .map((c) => c.textContent)
+      .join("|");
+    expect(text).not.toMatch(/Reading|Failed/);
+  }
   // The failed row also says why under its name, so phones (no Status column) still explain it.
-  expect(names()).toEqual([
-    "junk.pdfCould not read this file. Delete it and upload it again.",
-    "a-much-longer-file-name.pdf",
-  ]);
+  expect(names()[0]).toContain("Could not read this file. Delete it and upload it again.");
   expect(container.querySelectorAll('[data-testid="data-room-failed-reason"]')).toHaveLength(1);
+});
+
+it("uses one grid for the header and every row, whether or not any row has tags or a status", () => {
+  const plain = [item("plain", null)].map((i) => ({ item: i, snippets: [] }));
+  const mixed = [
+    { ...item("busy", null), status: "processing" },
+    tagged("deck", "investor", null),
+  ].map((i) => ({ item: i as DataRoomApiItem, snippets: [] }));
+  const grids = (rows: typeof plain) => {
+    act(() => root.render(<ListView rows={rows} o={o()} />));
+    return [
+      container.querySelector('[data-testid="data-room-head"]')?.className,
+      ...Array.from(container.querySelectorAll("[data-row]")).map((r) => r.className),
+    ].map((c) => c?.match(/grid-cols-\S+/g)?.join(" "));
+  };
+  const before = grids(plain);
+  const after = grids(mixed);
+  expect(new Set([...before, ...after]).size).toBe(1);
+});
+
+it("has an inline Try again on a failed row that retries once and does not open the preview", () => {
+  const onAction = vi.fn();
+  const onToggle = vi.fn();
+  const rows = [{ ...item("junk", null), status: "failed" }, item("fine", null)].map((i) => ({
+    item: i as DataRoomApiItem,
+    snippets: [],
+  }));
+  for (const View of [ListView, GridView]) {
+    onAction.mockClear();
+    act(() => root.render(<View rows={rows} o={{ ...o(), onAction, onToggle }} />));
+    const retry = Array.from(container.querySelectorAll("button")).filter(
+      (b) => b.textContent === "Try again",
+    );
+    expect(retry).toHaveLength(1);
+    expect(retry[0]?.closest("[data-item-id]")?.getAttribute("data-item-id")).toBe("junk");
+    act(() => retry[0]?.click());
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onAction).toHaveBeenCalledWith("retry", expect.objectContaining({ id: "junk" }));
+    expect(onToggle).not.toHaveBeenCalled();
+  }
+});
+
+it("follows the sort in the Date column: Added by default, Document date when sorted by it", () => {
+  const rows = [
+    {
+      ...tagged("deck", "investor", "2025-12-21T00:00:00.000Z"),
+      createdAt: "2026-03-04T00:00:00.000Z",
+    },
+  ].map((i) => ({ item: i, snippets: [] }));
+  const header = () => container.querySelector('[data-testid="data-room-head"]')?.textContent;
+  const dateCell = () =>
+    container.querySelector("[data-row]")?.querySelectorAll(":scope > span")[2]?.textContent;
+  act(() => root.render(<ListView rows={rows} o={o()} />));
+  expect(header()).toContain("Added");
+  expect(header()).not.toContain("Document date");
+  expect(dateCell()).toBe("Mar 4, 2026");
+  act(() => root.render(<ListView rows={rows} o={o()} sortField="createdAt" />));
+  expect(dateCell()).toBe("Mar 4, 2026");
+  act(() => root.render(<ListView rows={rows} o={o()} sortField="date" />));
+  expect(header()).toContain("Document date");
+  expect(dateCell()).toBe("Dec 21, 2025");
 });
 
 it("says in the row why a file failed, not only in a tooltip", () => {
@@ -123,7 +192,7 @@ it("keeps a renamed file's type while search re-indexes it, and names a failure 
   expect(container.textContent).toContain("Roadmap");
   expect(container.textContent).not.toContain("Reading");
   // The phone-only line under the name, for where the Type column is hidden.
-  expect(names()[1]).toBe("scan.pdfFailed");
+  expect(names()[1]).toContain("scan.pdfFailed");
 });
 
 const tagged = (id: string, docType: string | null, docDate: string | null) =>
@@ -137,7 +206,7 @@ it("puts the type and date under the name for a phone, and says when a file is n
     tagged("deck", "presentation", "2025-12-21T00:00:00.000Z"),
     tagged("sheet", null, null),
   ].map((i) => ({ item: i, snippets: [] }));
-  act(() => root.render(<ListView rows={rows} o={o()} />));
+  act(() => root.render(<ListView rows={rows} o={o()} sortField="date" />));
   const lines = Array.from(container.querySelectorAll('[data-testid="data-room-subline"]')).map(
     (line) => line.textContent,
   );
@@ -162,7 +231,7 @@ it("gives a tile's type and date a line each, and marks an untagged tile", () =>
     tagged("deck", "presentation", "2025-12-21T00:00:00.000Z"),
     tagged("sheet", null, null),
   ].map((i) => ({ item: i, snippets: [] }));
-  act(() => root.render(<GridView rows={rows} o={o()} />));
+  act(() => root.render(<GridView rows={rows} o={o()} sortField="date" />));
   const tiles = Array.from(container.querySelectorAll("[data-item-id]"));
   const lines = (tile: Element) =>
     Array.from(tile.querySelectorAll('[data-testid="data-room-tile-meta"] > span')).map(

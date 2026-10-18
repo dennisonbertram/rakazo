@@ -36,7 +36,7 @@ const rpcMock = vi.hoisted(() => ({
 }));
 vi.mock("../lib/rpc", () => ({
   rpc: {
-    connections: { list: rpcMock.connections },
+    connections: { list: rpcMock.connections, catalog: async () => [] },
     dataRoom: {
       folders: rpcMock.folders,
       items: { list: rpcMock.list },
@@ -637,7 +637,7 @@ it("says a failed file could not be read, with its reason and a Delete button", 
   expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain("junk.pdf");
 });
 
-it("keeps the Type, Party and Date filters but hides their columns while no item has them", async () => {
+it("keeps the Type, Party and Date filters while no item has them, and keeps the same columns", async () => {
   const bare = (name: string) => ({
     ...item(name),
     facets: { ...item(name).facets, docType: null },
@@ -652,7 +652,10 @@ it("keeps the Type, Party and Date filters but hides their columns while no item
   expect(labels()).toContain("Filter by Document date");
   // One source filters nothing, and a source with no files would only lead to "No results".
   expect(labels()).not.toContain("Filter by Source");
-  expect(container.querySelector('[data-testid="data-room-head"]')?.textContent).toBe("Name");
+  // The columns never come and go with the rows (VIS-12): the header is the same either way.
+  const head = () => container.querySelector('[data-testid="data-room-head"]')?.textContent;
+  const bareHead = head();
+  expect(bareHead).toBe("NameTypeAddedPartiesStatus");
 
   rpcMock.list.mockResolvedValue({
     items: [item("a.txt"), { ...bare("m.txt"), source: "gmail" }],
@@ -664,7 +667,7 @@ it("keeps the Type, Party and Date filters but hides their columns while no item
   await settle();
   expect(labels()).toContain("Filter by Type");
   expect(labels()).toContain("Filter by Source");
-  expect(container.querySelector('[data-testid="data-room-head"]')?.textContent).toContain("Type");
+  expect(head()).toBe(bareHead);
 });
 
 it("offers to clear filters when they leave no results, keeping the folder", async () => {
