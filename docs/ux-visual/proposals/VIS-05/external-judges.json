@@ -1,0 +1,83 @@
+{
+  "mode": "judge",
+  "images": [
+    "finance-hidden.png",
+    "captable-hidden.png"
+  ],
+  "results": [
+    {
+      "model": "meta/muse-wonder",
+      "ok": true,
+      "seconds": 26,
+      "costUsd": 0.062196,
+      "result": {
+        "scores": {
+          "Proposal A": {
+            "criteria": 4,
+            "simplicity": 5,
+            "consistency": 4,
+            "usability": 3,
+            "visual": 3,
+            "effort": 5
+          },
+          "Proposal B": {
+            "criteria": 5,
+            "simplicity": 1,
+            "consistency": 3,
+            "usability": 2,
+            "visual": 2,
+            "effort": 1
+          },
+          "Proposal C": {
+            "criteria": 5,
+            "simplicity": 4,
+            "consistency": 4,
+            "usability": 5,
+            "visual": 4,
+            "effort": 4
+          }
+        },
+        "winner": "Proposal C",
+        "graft": "From Proposal A: put its corrected one-sentence scope tooltip verbatim on C's pill — money and everything computed from it is hidden; ownership percentages, share counts and event dates stay visible — so the visible state is also self-explaining.",
+        "defense": "C wins for the screen-sharing, first-time-founder persona: the screenshots' core danger is not just the leaks (Runway '24.2 mo' beside 'Until •••', cap-table bar forced 50/50 against an 85/15 legend) but that the only state signal is a small eye-off icon a founder cannot verify at a glance before sharing. C fixes all three leaks exactly as A does (true bar widths from the same percent data, runway months masked in the shared finance-format module, chart placeholder with a Show action) and fully meets criterion 4 with a visible 'Hide money' / 'Money hidden' pill using the existing secondary Button, collapsing to an aria-labelled icon below 640px. Against A: A is cheaper (0.5 day) and admirably scoped, but by its own admission criterion 4 is only partly met — hover-only tooltip state recreates the original ambiguity, so the criteria-weighted saving is not worth it. Against B: B meets criterion 5 most strongly on paper, but its premise is undercut by the re-scope (a shared hook and formatter already exist), and it pays 3–5 days across ~40 files for a 3-state scope nobody asked for (a Hick's-law burden on a naive founder), a permanent banner row, and a <Masked> component that cannot wrap the string-returning formatters, tooltips, titles and aria-labels where leaks actually live — high regression risk to fix four known spots. C's one real risk, header crowding at 1280px and on mobile, is bounded: reserve the pill slot in both states to avoid layout shift and verify the 375px icon collapse in its tests."
+      }
+    },
+    {
+      "model": "google/gemini-4-argon",
+      "ok": true,
+      "seconds": 51,
+      "costUsd": 0.048922,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 4,
+            "simplicity": 5,
+            "consistency": 4,
+            "usability": 3,
+            "visual": 4,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 5,
+            "simplicity": 2,
+            "consistency": 4,
+            "usability": 2,
+            "visual": 2,
+            "effort": 1
+          },
+          "C": {
+            "criteria": 5,
+            "simplicity": 5,
+            "consistency": 5,
+            "usability": 5,
+            "visual": 4,
+            "effort": 5
+          }
+        },
+        "winner": "C",
+        "graft": "Adopt Proposal A's explicit scope tooltip copy on the toggle button ('Hides dollar amounts, runway, and financial charts. Ownership percentages and share counts stay visible.') and keep identical button padding in both on/off states to prevent header layout shift.",
+        "defense": "Proposal C solves all five acceptance criteria and directly fixes the brief's 'unlabeled eye icon' usability issue within the same small 4-file footprint as Proposal A. For a first-time founder about to screen-share, a visible 'Hide money' / 'Money hidden' pill (collapsing to an icon only on narrow mobile viewports) makes the privacy control immediately discoverable and its active state unmistakable without relying on hover tooltips, while 'Show money' in the chart placeholder makes recovery self-explanatory. Proposal A correctly diagnoses the codebase and fixes the 50/50 cap-table bar contradiction and the '24.2 mo' runway leak, but leaves the header control as an unlabeled mystery-meat icon and self-admittedly only partly meets Criterion 4. Proposal B is over-engineered: migrating ~40 files to a <Masked> component over 3-5 days breaks string-only formatting contexts (titles, aria-labels, table helpers), introduces a shell banner that shifts page layout, and replaces a simple privacy toggle with a 3-state scope picker that violates Hick's Law during live screen-sharing."
+      }
+    }
+  ]
+}
