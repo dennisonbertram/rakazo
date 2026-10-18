@@ -33,6 +33,7 @@ import { hasConnectedCarta } from "../lib/carta-agent";
 import { percentFigure, shareCount, shortDay, usdFigure } from "../lib/finance-format";
 import { useHideAmounts } from "../lib/hide-amounts-preference";
 import { FIRST_PARTY_MCP } from "../lib/integrations";
+import { daysBetween, todayIso } from "../lib/legal-format";
 import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
@@ -131,7 +132,6 @@ function Figure({
   );
 }
 
-const DAY_MS = 86_400_000;
 type Valuation = { date: string; expiresOn?: string | null };
 
 /** The expiry Carta gives, else 12 months after the valuation. */
@@ -145,13 +145,13 @@ function expiryOf({ date, expiresOn }: Valuation): string {
 /** "Expires Mar 10" or "Expired Mar 10", in the warning or destructive colour when it is near or past. */
 function expiryLabel(valuation: Valuation, now = new Date()) {
   const day = expiryOf(valuation);
-  const left = new Date(`${day}T00:00:00Z`).getTime() - now.getTime();
+  const left = daysBetween(todayIso(now), day);
   const date = shortDay(day, now, i18n.locale || "en");
-  return left <= 0
+  return left < 0
     ? { text: t`Expired ${date}`, className: "text-destructive" }
     : {
         text: t`Expires ${date}`,
-        className: left <= 60 * DAY_MS ? "text-warning" : undefined,
+        className: left <= 60 ? "text-warning" : undefined,
       };
 }
 

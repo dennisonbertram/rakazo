@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getCapTableSnapshot, saveCapTableSnapshot } from "./cap-table.js";
 import type { PrismaClient } from "./client.js";
 import { createDb } from "./client.js";
@@ -96,11 +96,17 @@ describePostgres("cap table snapshot (PostgreSQL)", () => {
   });
 
   describe("409A expiry deadline", () => {
+    const TITLE = "409A valuation expires";
+    beforeEach(async () => {
+      await prisma.legalDeadline.deleteMany({ where: { spaceId: mine.spaceId } });
+    });
     const deadlines = (who: { spaceId: string; userId: string }) =>
       prisma.legalDeadline.findMany({
-        where: { ...who, title: "409A valuation expires" },
+        where: { ...who, title: TITLE },
         orderBy: { dueDate: "asc" },
       });
+    const summary = async (who: { spaceId: string; userId: string }) =>
+      (await deadlines(who)).map((r) => [r.dueDate.toISOString().slice(0, 10), r.status]);
     const with409a = (date: string, expiresOn?: string) => ({
       ...input,
       latest409a: { pricePerShareUsd: 1.5, date, expiresOn },
@@ -110,7 +116,6 @@ describePostgres("cap table snapshot (PostgreSQL)", () => {
       await saveCapTableSnapshot(prisma, mine, with409a("2025-03-10"));
       await saveCapTableSnapshot(prisma, mine, with409a("2025-03-10"));
       const [first] = await deadlines(mine);
-      expect(await deadlines(mine)).toHaveLength(1);
       expect(first).toMatchObject({
         kind: "compliance",
         derived: true,
@@ -118,14 +123,60 @@ describePostgres("cap table snapshot (PostgreSQL)", () => {
         contractId: null,
         sourceQuote: "From Carta: 409A dated 2025-03-10",
       });
-      expect(first?.dueDate.toISOString().slice(0, 10)).toBe("2026-03-10");
+      expect(await summary(mine)).toEqual([["2026-03-10", "open"]]);
 
       await saveCapTableSnapshot(prisma, mine, with409a("2026-02-01", "2027-01-15"));
-      const rows = await deadlines(mine);
-      expect(rows.map((r) => [r.dueDate.toISOString().slice(0, 10), r.status])).toEqual([
+      expect(await summary(mine)).toEqual([
         ["2026-03-10", "dismissed"],
         ["2027-01-15", "open"],
       ]);
+    });
+
+    it("keeps the newer deadline when an older snapshot is saved afterwards", async () => {
+      await saveCapTableSnapshot(prisma, mine, with409a("2025-03-10"));
+      await saveCapTableSnapshot(prisma, mine, with409a("2026-02-01", "2027-01-15"));
+      await saveCapTableSnapshot(prisma, mine, with409a("2025-03-10"));
+      expect((await summary(mine)).at(-1)).toEqual(["2027-01-15", "open"]);
+    });
+
+    it("uses the newest date across valuations409a", async () => {
+      await saveCapTableSnapshot(prisma, mine, {
+        ...input,
+        valuations409a: [
+          { pricePerShareUsd: 2, date: "2026-02-01", expiresOn: "2027-02-01" },
+          { pricePerShareUsd: 1, date: "2025-02-01" },
+        ],
+      });
+      expect((await summary(mine)).at(-1)).toEqual(["2027-02-01", "open"]);
+    });
+
+    it("never changes a deadline the user or the Legal agent made", async () => {
+      const theirs = await prisma.legalDeadline.create({
+        data: {
+          ...mine,
+          title: TITLE,
+          kind: "compliance",
+          dueDate: new Date("2026-03-10T00:00:00Z"),
+          derived: false,
+          sourceQuote: "From the report",
+        },
+      });
+      await saveCapTableSnapshot(prisma, mine, with409a("2025-03-10"));
+      await saveCapTableSnapshot(prisma, mine, with409a("2026-02-01", "2027-01-15"));
+      const after = await prisma.legalDeadline.findUniqueOrThrow({ where: { id: theirs.id } });
+      expect(after).toMatchObject({
+        status: "open",
+        derived: false,
+        sourceQuote: "From the report",
+      });
+      expect((await deadlines(mine)).filter((r) => r.derived)).toHaveLength(2);
+    });
+
+    it("leaves exactly one open Carta deadline after concurrent saves", async () => {
+      await Promise.all(
+        [1, 2, 3, 4].map(() => saveCapTableSnapshot(prisma, mine, with409a("2025-05-05"))),
+      );
+      expect(await summary(mine)).toEqual([["2026-05-05", "open"]]);
     });
 
     it("never writes another user's or space's deadline", async () => {

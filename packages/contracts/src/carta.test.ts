@@ -62,4 +62,12 @@ describe("cap table snapshot 409A", () => {
     });
     expect(next.valuations409a[1]?.expiresOn).toBeNull();
   });
+  it("keeps Carta's expiry from the matching valuation when latest409a lacks one", () => {
+    const parsed = CapTableSnapshotInputSchema.parse({
+      ...base,
+      latest409a: { pricePerShareUsd: 2, date: "2026-01-01" },
+      valuations409a: [{ pricePerShareUsd: 2, date: "2026-01-01", expiresOn: "2026-12-01" }],
+    });
+    expect(parsed.latest409a?.expiresOn).toBe("2026-12-01");
+  });
 });

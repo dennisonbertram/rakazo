@@ -658,3 +658,12 @@ it("lists 409A history from two valuations, and masks prices but not dates while
   expect(container.textContent).not.toContain("0.80");
   expect(container.textContent).not.toContain("1.25");
 });
+
+it("still says Expires on the evening of the expiry day in the viewer's time zone", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 5, 10, 22, 30));
+  rpcMock.capTable.mockResolvedValue(withValuations([valuation("2025-06-10", 1.25, "2026-06-10")]));
+  await show();
+  expect(container.textContent).toMatch(/Expires /);
+  expect(container.textContent).not.toMatch(/Expired /);
+});

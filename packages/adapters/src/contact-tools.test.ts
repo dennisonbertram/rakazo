@@ -97,7 +97,8 @@ describe("contact tools", () => {
 
   it("cap_table_update validates, then saves for the run's owner", async () => {
     const upsert = vi.fn(async () => ({}));
-    const prisma = { capTableSnapshot: { upsert } } as never;
+    const tx = { $executeRaw: vi.fn(), capTableSnapshot: { upsert } };
+    const prisma = { $transaction: (run: (t: typeof tx) => unknown) => run(tx) } as never;
     const bad = await contactToolFromTool(
       "cap_table_update",
       { prisma, scope },

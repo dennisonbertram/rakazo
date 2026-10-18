@@ -90,10 +90,17 @@ const CapTableSnapshotObjectSchema = z.object({
     )
     .max(500),
 });
-/** latest409a falls back to the newest entry of valuations409a. */
+/**
+ * latest409a falls back to the newest entry of valuations409a, and takes the expiry of the entry
+ * with the same date when it has none of its own.
+ */
 export const CapTableSnapshotInputSchema = CapTableSnapshotObjectSchema.transform((snapshot) => {
-  const newest = snapshot.valuations409a[0];
-  return snapshot.latest409a || !newest ? snapshot : { ...snapshot, latest409a: newest };
+  const latest = snapshot.latest409a ?? snapshot.valuations409a[0];
+  if (!latest || latest.expiresOn) return { ...snapshot, latest409a: latest ?? null };
+  const expiresOn = snapshot.valuations409a.find(
+    (v) => v.date === latest.date && v.expiresOn,
+  )?.expiresOn;
+  return { ...snapshot, latest409a: expiresOn ? { ...latest, expiresOn } : latest };
 });
 export type CapTableSnapshotInput = z.input<typeof CapTableSnapshotInputSchema>;
 
