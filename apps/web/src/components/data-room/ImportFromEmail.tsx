@@ -15,6 +15,7 @@ import { Mail } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { syncErrorText } from "../../lib/inbox-sync-error";
+import { appPath } from "../../lib/integrations";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { failedText, importedText, sizeText } from "./format";
@@ -23,7 +24,8 @@ import { DriveImportButton } from "./ImportFromDrive";
 const SEARCH_DEBOUNCE_MS = 300;
 /** The most attachments one import call accepts. */
 const MAX_PICKS = 20;
-const GMAIL_PAGE = "/app/integrations/app/google/gmail";
+const GMAIL = { connectorId: "google", slug: "gmail" };
+const BACK_HERE = "/app/data-room";
 
 type Attachment = InboxMessage["attachments"][number];
 type Picks = Map<string, { messageId: string; attachmentId: string }>;
@@ -215,7 +217,10 @@ function EmailPicker({
             <p className="p-3 text-sm text-destructive">
               {syncErrorText(mailProblem) || t`Couldn't load mail`}{" "}
               {mailProblem.reconnectAccounts.length > 0 ? (
-                <Link to={GMAIL_PAGE} className="underline underline-offset-2">
+                <Link
+                  to={appPath(GMAIL, { next: BACK_HERE })}
+                  className="underline underline-offset-2"
+                >
                   <Trans>Reconnect</Trans>
                 </Link>
               ) : null}
@@ -312,7 +317,11 @@ export function ImportSources({
         variant="outline"
         size={compact ? "icon" : "default"}
         aria-label={compact ? label : undefined}
-        onClick={() => (connected.gmail ? setOpen(true) : navigate(GMAIL_PAGE))}
+        onClick={() =>
+          connected.gmail
+            ? setOpen(true)
+            : navigate(appPath(GMAIL, { connect: true, next: BACK_HERE }))
+        }
       >
         <Mail aria-hidden="true" />
         {compact ? null : label}

@@ -39,7 +39,7 @@ let root: ReturnType<typeof createRoot>;
 const onDone = vi.fn();
 
 function Where() {
-  return <span data-testid="where">{useLocation().pathname}</span>;
+  return <span data-testid="where">{useLocation().pathname + useLocation().search}</span>;
 }
 
 beforeEach(() => {
@@ -88,7 +88,7 @@ it("offers Connect Gmail, which opens the Gmail page, when no account is connect
   expect(button("Import from email")).toBeUndefined();
   await click(button("Connect Gmail"));
   expect(document.querySelector('[data-testid="where"]')?.textContent).toBe(
-    "/app/integrations/app/google/gmail",
+    "/app/integrations/app/google/gmail?connect=1&next=%2Fapp%2Fdata-room",
   );
 });
 
@@ -145,7 +145,9 @@ it("shows a mail error instead of an empty list, with a reconnect link", async (
   expect(document.body.textContent).toContain("Gmail needs to be reconnected.");
   expect(document.body.textContent).not.toContain("No files found");
   expect(
-    document.body.querySelector('a[href="/app/integrations/app/google/gmail"]'),
+    document.body.querySelector(
+      'a[href="/app/integrations/app/google/gmail?next=%2Fapp%2Fdata-room"]',
+    ),
   ).not.toBeNull();
 });
 

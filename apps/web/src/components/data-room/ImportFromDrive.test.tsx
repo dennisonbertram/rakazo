@@ -37,7 +37,7 @@ let root: ReturnType<typeof createRoot>;
 const onDone = vi.fn();
 
 function Where() {
-  return <span data-testid="where">{useLocation().pathname}</span>;
+  return <span data-testid="where">{useLocation().pathname + useLocation().search}</span>;
 }
 
 const file = (id: string, name: string, extra = {}) => ({
@@ -100,7 +100,7 @@ it("offers Connect Google Drive, which opens the Drive page, when no account is 
   expect(button("Import from Google Drive")).toBeUndefined();
   await click(button("Connect Google Drive"));
   expect(document.querySelector('[data-testid="where"]')?.textContent).toBe(
-    "/app/integrations/app/google/googledrive",
+    "/app/integrations/app/google/googledrive?connect=1&next=%2Fapp%2Fdata-room",
   );
 });
 

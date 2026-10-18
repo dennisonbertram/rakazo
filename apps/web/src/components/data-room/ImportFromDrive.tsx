@@ -14,6 +14,7 @@ import {
 import { ArrowLeft, Folder, HardDrive } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { appPath } from "../../lib/integrations";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { failedText, importedText, sizeText } from "./format";
@@ -244,7 +245,14 @@ export function DriveImportButton({
         size={compact ? "icon" : "default"}
         aria-label={compact ? label : undefined}
         onClick={() =>
-          connected ? setOpen(true) : navigate("/app/integrations/app/google/googledrive")
+          connected
+            ? setOpen(true)
+            : navigate(
+                appPath(
+                  { connectorId: "google", slug: "googledrive" },
+                  { connect: true, next: "/app/data-room" },
+                ),
+              )
         }
       >
         <HardDrive aria-hidden="true" />

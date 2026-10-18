@@ -30,6 +30,7 @@ const rpcMock = vi.hoisted(() => ({
   item: vi.fn(),
   connections: vi.fn(),
   consent: vi.fn(),
+  consentGrant: vi.fn(),
   itemDelete: vi.fn(),
 }));
 vi.mock("../lib/rpc", () => ({
@@ -41,6 +42,7 @@ vi.mock("../lib/rpc", () => ({
       search: rpcMock.search,
       item: rpcMock.item,
       consent: rpcMock.consent,
+      consentGrant: rpcMock.consentGrant,
       itemDelete: rpcMock.itemDelete,
     },
     legal: { itemLinks: async () => ({ contractTitle: null, deadlines: 0 }) },
@@ -855,4 +857,24 @@ it("shows the next item after deleting the previewed one, so the preview stays o
   await settle();
   expect(rpcMock.itemDelete).toHaveBeenCalledWith({ id: "id-a.txt" });
   expect(heading()?.textContent).toBe("b.txt");
+});
+
+it("asks for consent on the empty page, so a new person can turn the Data room on", async () => {
+  const status = {
+    key: "k",
+    version: "v",
+    allowed: false,
+    disclosure: "",
+    recipients: [{ name: "Model" }],
+  };
+  rpcMock.list.mockResolvedValue({ items: [], nextCursor: null });
+  rpcMock.consent.mockResolvedValue(status);
+  rpcMock.consentGrant.mockResolvedValue({ ...status, allowed: true });
+  await renderPage();
+  expect(container.textContent).toContain("Drop files here");
+  const allow = Array.from(container.querySelectorAll("button")).find(
+    (b) => b.textContent === "Allow",
+  );
+  await act(async () => allow?.click());
+  expect(rpcMock.consentGrant).toHaveBeenCalledWith({ key: "k", version: "v" });
 });
