@@ -1,0 +1,82 @@
+{
+  "mode": "judge",
+  "images": [
+    "1440x900-model-picker-provider.png"
+  ],
+  "results": [
+    {
+      "model": "meta/muse-wonder",
+      "ok": true,
+      "seconds": 31,
+      "costUsd": 0.075772,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 3,
+            "simplicity": 3,
+            "consistency": 4,
+            "usability": 3,
+            "visual": 3,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 5,
+            "simplicity": 5,
+            "consistency": 4,
+            "usability": 4,
+            "visual": 5,
+            "effort": 3
+          },
+          "C": {
+            "criteria": 3,
+            "simplicity": 2,
+            "consistency": 3,
+            "usability": 3,
+            "visual": 4,
+            "effort": 1
+          }
+        },
+        "winner": "B",
+        "graft": "From C: use the Low/Medium/High segmented Toggle for Thinking effort when a model has three or fewer levels, retaining the select for models with more levels.",
+        "defense": "B is the only proposal meeting all six criteria in every state: its single max-w-xl column has one scroller by construction, removes the 60% empty pane by narrowing the modal to 720px, hides providers and counts behind 'Your own key', preserves one primary action with labelled outline Disconnect, scrolls the current model into view, uses only 'provider' with explained Thinking effort, and labels Composio Recommended. It reuses existing state and JSX blocks in about 150 lines; its main cost is rewriting provider-click e2e tests for a NativeSelect, acceptable for the target persona. A is safer and only about 80 lines, but admittedly fails criterion 5 once opened, retaining two scrollers, the wide two-pane layout, empty detail pane, and small-width squeeze, so the core problem merely moves behind a disclosure. C follows polished technical-tool conventions, but exposes four provider rows by default rather than a single own-key disclosure, is aimed at users unlike first-time founders, and carries the highest risk: roughly 350 lines, per-row credential state replacing the current single apiKey/provider state, a new Command popover, a hard-coded popular-provider list to maintain, and special handling where Anthropic/OpenAI use subscription sign-in."
+      }
+    },
+    {
+      "model": "google/gemini-4-argon",
+      "ok": true,
+      "seconds": 33,
+      "costUsd": 0.031286,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 4,
+            "simplicity": 4,
+            "consistency": 3,
+            "usability": 3,
+            "visual": 2,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 5,
+            "simplicity": 5,
+            "consistency": 5,
+            "usability": 5,
+            "visual": 5,
+            "effort": 4
+          },
+          "C": {
+            "criteria": 3,
+            "simplicity": 2,
+            "consistency": 3,
+            "usability": 3,
+            "visual": 4,
+            "effort": 2
+          }
+        },
+        "winner": "B",
+        "graft": "From C, place Backup models alongside Search model inside the collapsed Advanced disclosure so a first-time founder with no connected key does not see an unactionable 'Connect a provider to add backups' block on the default screen.",
+        "defense": "Proposal B is the only option that solves the root structural problem while meeting every acceptance criterion in all states. For a non-technical founder whose workspace already has a working model, the 33-provider master-detail catalog is the wrong primary architecture. B replaces the two-pane layout with a clean, single-column settings flow (Active model card, collapsed 'Use my own key' disclosure with a grouped provider select, and Advanced settings) that fits naturally inside the Settings shell and guarantees at most one scroller at 1440x900 even when the disclosure is expanded—all while reusing existing state logic.\n\nWhy not A: Wrapping a two-pane master-detail browser inside a <details> accordion is a visual and structural band-aid. Whenever the disclosure is opened (including by default for any user who has connected a key or needs a model), the two nested scrollers and 60% empty right pane immediately return, failing Criterion 5 in open states.\n\nWhy not C: Zed, Cursor, and Raycast are developer tools, not products for non-technical founders. Exposing four 'Not set' API key rows directly on the default view violates Criterion 1 (which requires hiding providers behind a single 'Use my own key' disclosure) and creates false setup anxiety for founders who never need an API key. It also carries high engineering risk by refactoring single-provider staging state into per-row state and hardcoding featured vendors."
+      }
+    }
+  ]
+}
