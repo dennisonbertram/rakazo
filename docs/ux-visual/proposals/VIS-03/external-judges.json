@@ -1,0 +1,80 @@
+{
+  "mode": "judge",
+  "images": [],
+  "results": [
+    {
+      "model": "meta/muse-wonder",
+      "ok": true,
+      "seconds": 17,
+      "costUsd": 0.048336,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 2,
+            "simplicity": 5,
+            "consistency": 4,
+            "usability": 3,
+            "visual": 4,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 5,
+            "simplicity": 2,
+            "consistency": 4,
+            "usability": 4,
+            "visual": 4,
+            "effort": 1
+          },
+          "C": {
+            "criteria": 4,
+            "simplicity": 4,
+            "consistency": 5,
+            "usability": 5,
+            "visual": 4,
+            "effort": 4
+          }
+        },
+        "winner": "C",
+        "graft": "From B, graft only the scoped message-action pattern: make the Shell message toolbar (~line 6325) one tab stop with arrow-key navigation inside, removing the 41 transcript action stops without adopting B's full feed restructure.",
+        "defense": "C wins because it meets the binding acceptance path A explicitly misses and B meets only at disproportionate risk. Against A: A admits criterion 2 is NOT met, leaves 28 sidebar stops, and makes row actions reachable only via the undiscoverable ContextMenu/Shift+F10 route; C adds a ~60-line useRovingTabindex hook, data-roving on existing rows/links/headers, tabIndex=-1 actions opened by ArrowRight/ContextMenu/Shift+F10, and :focus-within visibility, so the sidebar becomes one stop per group in 2-3 days. Against B: B meets all criteria on paper, but requires extracting an 8000+ line Shell.tsx shared with VIS-01/02/04, new tree/feed ARIA, F6 (browser-conflicting), j/k shortcuts, and app-wide form work overlapping VIS-06 - 1-2 weeks with streaming, drag-reorder, and screen-reader regression risk. C reuses A's proven core (skip link to [data-skip-target] composer/main, single full-strength --ring 2px outline at 4-5:1, dialog finalFocus, Auth error summary) plus established GitHub/Linear conventions, achieving criteria 1-4 and 6 and the Auth case of 5 without markup rewrites or new interaction vocabulary."
+      }
+    },
+    {
+      "model": "google/gemini-4-argon",
+      "ok": true,
+      "seconds": 41,
+      "costUsd": 0.034458,
+      "result": {
+        "scores": {
+          "A": {
+            "criteria": 3,
+            "simplicity": 5,
+            "consistency": 4,
+            "usability": 2,
+            "visual": 4,
+            "effort": 5
+          },
+          "B": {
+            "criteria": 5,
+            "simplicity": 2,
+            "consistency": 4,
+            "usability": 4,
+            "visual": 4,
+            "effort": 1
+          },
+          "C": {
+            "criteria": 5,
+            "simplicity": 4,
+            "consistency": 5,
+            "usability": 5,
+            "visual": 5,
+            "effort": 4
+          }
+        },
+        "winner": "C",
+        "graft": "From Proposal B, adopt the message-action `role=\"toolbar\"` collapse in `Shell.tsx` (~6325) using C's `useRovingTabindex` hook and `:focus-within` visibility so the 41 hover-only transcript action stops do not trap keyboard users between the start of `main` and the composer.",
+        "defense": "Proposal C is the only option that satisfies every acceptance criterion without risking a multi-week rewrite of `Shell.tsx`. It fixes the 2:1 focus ring contrast across all controls using the existing `--ring` token at full opacity plus a global `:focus-visible` fallback, lands the skip link directly in the chat composer (`[data-skip-target]`) or `main`, restores dialog focus via `finalFocus` (with a named fallback if the opener unmounts, as in `CapTable.tsx`), and collapses the 41 sidebar stops into roving tabindex groups via a lightweight 60-line `[data-roving]` hook where row actions reveal on `:focus-within` and open with `ArrowRight` (crucial for Mac keyboards that lack a ContextMenu key). Proposal A fails Criteria 1 and 2 outright by leaving 28 tab stops in the sidebar with no arrow-key roving and hiding row actions behind `Shift+F10`/ContextMenu without visual affordance. Proposal B meets the criteria but over-engineers the shell: extracting a new `SidebarNav` (`role=\"tree\"`), `Feed` (`role=\"feed\"`), and `FocusRegions` (`F6`, which conflicts with native browser pane cycling) out of an 8,000-line `Shell.tsx` creates severe merge conflicts with VIS-01/02/04, overlaps VIS-06 on global form errors, and risks breaking drag-and-drop reordering and streaming scroll anchoring."
+      }
+    }
+  ]
+}
