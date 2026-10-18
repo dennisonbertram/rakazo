@@ -134,18 +134,17 @@ function Figure({
 const DAY_MS = 86_400_000;
 type Valuation = { date: string; expiresOn?: string | null };
 
-/** The expiry Carta gives, else 12 months after the valuation, which only shows once it is that old. */
-function expiryOf({ date, expiresOn }: Valuation, now: Date): string | null {
+/** The expiry Carta gives, else 12 months after the valuation. */
+function expiryOf({ date, expiresOn }: Valuation): string {
   if (expiresOn) return expiresOn;
   const due = new Date(`${date}T00:00:00Z`);
   due.setUTCFullYear(due.getUTCFullYear() + 1);
-  return due <= now ? due.toISOString().slice(0, 10) : null;
+  return due.toISOString().slice(0, 10);
 }
 
 /** "Expires Mar 10" or "Expired Mar 10", in the warning or destructive colour when it is near or past. */
 function expiryLabel(valuation: Valuation, now = new Date()) {
-  const day = expiryOf(valuation, now);
-  if (!day) return null;
+  const day = expiryOf(valuation);
   const left = new Date(`${day}T00:00:00Z`).getTime() - now.getTime();
   const date = shortDay(day, now, i18n.locale || "en");
   return left <= 0

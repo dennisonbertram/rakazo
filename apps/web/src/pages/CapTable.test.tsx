@@ -624,6 +624,13 @@ it("shows the 409A date and a plain expiry without a warning color", async () =>
   expect(container.textContent).not.toContain("409A history");
 });
 
+it("shows Expires 12 months after the valuation when Carta gives no expiry", async () => {
+  rpcMock.capTable.mockResolvedValue(withValuations([valuation(dayOffset(-30), 1.25)]));
+  await show();
+  expect(container.textContent).toMatch(/Expires /);
+  expect(container.querySelector(".text-warning, .text-destructive")).toBeNull();
+});
+
 it("warns within 60 days of expiry", async () => {
   rpcMock.capTable.mockResolvedValue(
     withValuations([valuation("2026-09-01", 1.25, dayOffset(30))]),
