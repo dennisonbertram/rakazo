@@ -35,6 +35,7 @@ const conn = (id: string, status: string, extra: Row = {}): Row => ({
   status,
   allAgents: true,
   agentBotId: null,
+  privateByDefault: false,
   createdAt: new Date("2026-10-01T00:00:00Z"),
   ...extra,
 });
@@ -70,6 +71,7 @@ function harness(connections: Row[], bots: Row[], access: Row[] = []) {
       }),
     },
     $executeRaw: vi.fn(async () => 0),
+    $queryRaw: vi.fn(async () => []),
     bot: {
       findMany: vi.fn(async ({ where }: { where: Row }) => {
         const { archivedAt: _archived, ...scope } = where;
@@ -285,31 +287,39 @@ describe("connections.access and setAccess", () => {
     ]);
   });
 
-  it("does not let setAccess grant other bots on an exclusive agent connection", async () => {
-    const h = harness(
+  const agentHarness = () =>
+    harness(
       [conn("a", "connected", { allAgents: false, agentBotId: "agent" })],
       [
-        bot("agent", "u1", {
-          spawnKey: integrationAgentSpawnKey("a"),
-          archivedAt: null,
-        }),
+        bot("agent", "u1", { spawnKey: integrationAgentSpawnKey("a"), archivedAt: null }),
         bot("other"),
       ],
       [{ connectionId: "a", botId: "agent", userId: "u1", spaceId: "s1" }],
     );
 
+  it("lets setAccess grant chosen bots on an agent connection, keeping the owner", async () => {
+    const h = agentHarness();
     const result = await h.call("connections/setAccess", {
       connectionId: "a",
       allAgents: false,
       botIds: ["agent", "other"],
     });
+    expect(result.status).toBeLessThan(400);
+    expect(h.access.map((row) => row.botId).sort()).toEqual(["agent", "other"]);
+  });
 
+  it("rejects a selection that leaves out the owning agent", async () => {
+    const h = agentHarness();
+    const result = await h.call("connections/setAccess", {
+      connectionId: "a",
+      allAgents: false,
+      botIds: ["other"],
+    });
     expect(result.status).toBeGreaterThanOrEqual(400);
-    expect(h.connections[0]).toMatchObject({ allAgents: false, agentBotId: "agent" });
     expect(h.access).toEqual([{ connectionId: "a", botId: "agent", userId: "u1", spaceId: "s1" }]);
   });
 
-  it("gives a new account the ordinary app setting without inheriting a linked sibling", async () => {
+  it("starts a new account private and copies no sibling's access", async () => {
     const h = harness(
       [
         conn("a", "connected", { allAgents: false }),
@@ -327,11 +337,10 @@ describe("connections.access and setAccess", () => {
       displayName: "Second",
     });
     const created = h.connections.at(-1) as Row;
-    expect(created.allAgents).toBe(false);
+    expect(created).toMatchObject({ allAgents: false, privateByDefault: true });
     expect(h.access.map((r) => [r.connectionId, r.botId])).toEqual([
       ["a", "b1"],
       ["linked", "linked-agent"],
-      [created.id, "b1"],
     ]);
   });
 });
