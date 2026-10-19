@@ -2,6 +2,7 @@ import {
   type AdapterContext,
   type ConnectorProxyRequest,
   type ConnectorProxyResponse,
+  MAIL_REQUEST_ABORTED,
   type MailAccount,
   type MailAddress,
   type MailAttachment,
@@ -159,10 +160,7 @@ export class GmailMailProvider implements MailProvider {
     const wanted = ids;
     const results: Array<MailMessageSummary | undefined> = [];
     const done = new Set<number>();
-    const cached =
-      request.useCache === false && request.reuseCachedWithinMs === undefined
-        ? new Map()
-        : await this.readCache(account, wanted, request.reuseCachedWithinMs);
+    const cached = request.useCache === false ? new Map() : await this.readCache(account, wanted);
     wanted.forEach((id, index) => {
       const hit = cached.get(id);
       if (!hit) return;
@@ -190,10 +188,14 @@ export class GmailMailProvider implements MailProvider {
             continue;
           }
           stopped = true;
-          // Out of retries or out of time: report what is left instead of failing the page.
+          // Out of retries or out of time: report what is left instead of failing the page. Only a
+          // rate limit or our own abort counts; any other error, even after the deadline, is real.
           const partial =
             error instanceof MailProviderError &&
-            (error.kind === "rate_limited" || (error.kind !== "auth" && context.signal.aborted));
+            (error.kind === "rate_limited" ||
+              (error.kind === "unavailable" &&
+                error.message === MAIL_REQUEST_ABORTED &&
+                context.signal.aborted));
           if (!partial) throw error;
         }
       }
@@ -221,7 +223,6 @@ export class GmailMailProvider implements MailProvider {
   private async readCache(
     account: MailAccount,
     ids: string[],
-    freshMs?: number,
   ): Promise<Map<string, MailMessageSummary>> {
     const cache = this.deps.prisma?.cachedMailMessage;
     const hits = new Map<string, MailMessageSummary>();
@@ -233,7 +234,6 @@ export class GmailMailProvider implements MailProvider {
           spaceId: account.spaceId,
           userId: account.userId,
           providerMessageId: { in: ids },
-          ...(freshMs === undefined ? {} : { seenAt: { gte: new Date(Date.now() - freshMs) } }),
         },
       });
       for (const row of rows) {
@@ -730,7 +730,7 @@ export class GmailMailProvider implements MailProvider {
       if (!(cause instanceof GoogleApiError)) throw cause;
       if (cause.response) throw mapStatus(cause.response, method);
       if (cause.kind === "aborted")
-        throw new MailProviderError("unavailable", "Mail request aborted");
+        throw new MailProviderError("unavailable", MAIL_REQUEST_ABORTED);
       throw new MailProviderError("unavailable", "Mail request failed", undefined, cause.detail);
     }
   }

@@ -6,7 +6,7 @@ import type {
   MailMessageSummary,
   MailProvider,
 } from "@rakazo/adapter-kit";
-import { inboxTriageJob, MailProviderError } from "@rakazo/adapter-kit";
+import { inboxTriageJob, MAIL_REQUEST_ABORTED, MailProviderError } from "@rakazo/adapter-kit";
 import type { PrismaClient } from "@rakazo/db";
 import { Prisma } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -15,13 +15,14 @@ const WINDOW_MS = 14 * 86_400_000;
 const PAGE_SIZE = 100;
 /** Most messages kept from one list; Gmail pages are 100, so this is two pages. */
 const MAX_MESSAGES = 200;
+/** Incremental syncs fetch a few messages. */
 const DEADLINE_MS = 90_000;
 /**
- * A window list reuses mail stored by an earlier, interrupted run this recently instead of fetching
- * it again, so repeated runs converge. ponytail: labels changed in this span stay stale until the
- * message changes again; a stored first cursor would close that gap.
+ * Listing the whole window again hydrates up to 400 messages. Gmail requests are paced to about
+ * four a second, which takes roughly 100 seconds, so this leaves margin. It stays under the
+ * 5-minute stale claim.
  */
-const RESUME_REUSE_MS = 10 * 60_000;
+const RELIST_DEADLINE_MS = 240_000;
 const TEXT_CAP = 500;
 const UPSERT_CHUNK = 200;
 /** Most changes applied one by one; more than this is cheaper to take from the window lists. */
@@ -39,7 +40,7 @@ export interface MailSyncDeps {
   jobs: JobPublisher;
   /** Clock for the 14-day window; defaults to the system clock. */
   now?: () => Date;
-  /** Provider deadline; defaults to 90 seconds, which is shorter than the 2-minute stale claim. */
+  /** Caps every provider call of a sync. Without it an incremental sync gets 90 seconds and a full window re-list 240, both shorter than the 5-minute stale claim. */
   deadlineMs?: number;
 }
 
@@ -90,7 +91,7 @@ export async function syncMailbox(
       AND c."spaceId" = ${spaceId} AND c."userId" = ${userId} AND c.status = 'connected'
       AND (s."lastSyncedAt" IS NULL OR s."lastSyncedAt" < ${DB_NOW} - interval '60 seconds')
       AND (s."backoffUntil" IS NULL OR s."backoffUntil" < ${DB_NOW})
-      AND (s."syncStartedAt" IS NULL OR s."syncStartedAt" < ${DB_NOW} - interval '2 minutes')
+      AND (s."syncStartedAt" IS NULL OR s."syncStartedAt" < ${DB_NOW} - interval '5 minutes')
     RETURNING s."connectionId", s."changeCursor"`;
   if (claimed.length === 0) return "skipped";
   const previousCursor = claimed[0]?.changeCursor ?? null;
@@ -136,7 +137,28 @@ export async function syncMailbox(
   const now = (deps.now ?? (() => new Date()))();
   const windowStart = new Date(now.getTime() - WINDOW_MS);
   const after = windowStart.toISOString().slice(0, 10);
-  const deadline = AbortSignal.timeout(deps.deadlineMs ?? DEADLINE_MS);
+  // An injected deadline caps every kind of sync (the inbox overview waits 8 seconds).
+  const deadlineController = new AbortController();
+  const deadline = deadlineController.signal;
+  const startDeadline = (ms: number) => {
+    const timer = setTimeout(() => deadlineController.abort(), ms);
+    timer.unref();
+    return timer;
+  };
+  let deadlineTimer = startDeadline(deps.deadlineMs ?? DEADLINE_MS);
+  /** Listing the window again takes longer than an incremental sync, so it gets more time. */
+  const lengthenDeadline = () => {
+    if (deps.deadlineMs !== undefined) return;
+    clearTimeout(deadlineTimer);
+    deadlineTimer = startDeadline(RELIST_DEADLINE_MS - (Date.now() - started));
+  };
+  /** Our own deadline ended the request; the caller leaving and every other error are not this. */
+  const ranOutOfTime = (error: unknown) =>
+    deadline.aborted &&
+    !context.signal.aborted &&
+    error instanceof MailProviderError &&
+    error.kind === "unavailable" &&
+    error.message === MAIL_REQUEST_ABORTED;
   const timed: AdapterContext = { ...context, signal: AbortSignal.any([context.signal, deadline]) };
 
   const merged = new Map<
@@ -194,7 +216,15 @@ export async function syncMailbox(
           where: { connectionId: account.id, spaceId, userId, inInbox: true },
         })) >= MAX_MESSAGES
       ) {
-        inbox = await listWindow(deps.mail, account, timed, "in:inbox", after, windowStart);
+        inbox = await listWindow(
+          deps.mail,
+          account,
+          timed,
+          "in:inbox",
+          after,
+          windowStart,
+          ranOutOfTime,
+        );
         partial = partial || inbox.partial;
         for (const message of inbox.messages)
           merged.set(message.id, {
@@ -212,13 +242,30 @@ export async function syncMailbox(
       // Taken before the lists, so mail that arrives while they run is replayed next time.
       // Deletions the changes already name are not lost when the window is listed instead.
       if (changes) deletedIds.push(...changes.deletedIds);
+      lengthenDeadline();
       nextCursor = await deps.mail.getCursor(account, timed);
-      inbox = await listWindow(deps.mail, account, timed, "in:inbox", after, windowStart);
+      inbox = await listWindow(
+        deps.mail,
+        account,
+        timed,
+        "in:inbox",
+        after,
+        windowStart,
+        ranOutOfTime,
+      );
       // Out of time: keep what loaded and list sent mail on a later run.
       const sent: Listed =
         inbox.partial || timed.signal.aborted
           ? { messages: [], capped: false, partial: true }
-          : await listWindow(deps.mail, account, timed, "in:sent", after, windowStart);
+          : await listWindow(
+              deps.mail,
+              account,
+              timed,
+              "in:sent",
+              after,
+              windowStart,
+              ranOutOfTime,
+            );
       partial = inbox.partial || sent.partial;
       for (const [listed, flag] of [
         [inbox, "inInbox"],
@@ -233,9 +280,12 @@ export async function syncMailbox(
     }
   } catch (error) {
     // Running out of our own time is an incomplete sync, not a provider failure: store what loaded.
-    if (!deadline.aborted || context.signal.aborted) return fail(error);
+    // Any other error, even one that arrives after the deadline, is a failure.
+    if (!ranOutOfTime(error)) return fail(error);
     partial = true;
   }
+  // The caller left, wherever that landed (a hydrate returns a partial page instead of throwing).
+  if (context.signal.aborted) return fail(undefined);
 
   try {
     const outcome = await prisma.$transaction(
@@ -367,27 +417,31 @@ async function listWindow(
   query: string,
   after: string,
   windowStart: Date,
+  ranOutOfTime: (error: unknown) => boolean,
 ): Promise<Listed> {
   const messages: MailMessageSummary[] = [];
   let pageToken: string | undefined;
   let partial = false;
   do {
-    const page = await mail.listMessages(
-      account,
-      {
-        query,
-        after,
-        pageSize: PAGE_SIZE,
-        pageToken,
-        useCache: false,
-        reuseCachedWithinMs: RESUME_REUSE_MS,
-      },
-      context,
-    );
+    let page: Awaited<ReturnType<MailProvider["listMessages"]>>;
+    try {
+      page = await mail.listMessages(
+        account,
+        { query, after, pageSize: PAGE_SIZE, pageToken, useCache: false },
+        context,
+      );
+    } catch (error) {
+      // Out of time: keep the pages already fetched and finish on a later run.
+      if (!ranOutOfTime(error)) throw error;
+      partial = true;
+      break;
+    }
     messages.push(...page.messages);
     partial = (page.unhydratedIds?.length ?? 0) > 0;
     pageToken = page.nextPageToken;
   } while (pageToken && !partial && !context.signal.aborted && messages.length < MAX_MESSAGES);
+  // Stopped by the deadline with pages left, which the provider cannot report as unhydrated.
+  if (pageToken && context.signal.aborted && messages.length < MAX_MESSAGES) partial = true;
 
   const capped = messages.length > MAX_MESSAGES || (messages.length >= MAX_MESSAGES && !!pageToken);
   const inWindow = messages
