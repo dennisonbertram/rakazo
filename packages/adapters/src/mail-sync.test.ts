@@ -69,16 +69,15 @@ describe("syncMailbox provider failures", () => {
     });
   });
 
-  it("records a provider outage that is not the sync deadline", async () => {
-    const { run, lastUpdate } = setup(async () => {
-      throw new MailProviderError("unavailable", "Mail request failed");
+  it("still records a failure when only the sync deadline expired", async () => {
+    const { run, lastUpdate } = setup(async (_account, _request, context) => {
+      await new Promise<void>((resolve) =>
+        context.signal.addEventListener("abort", () => resolve(), { once: true }),
+      );
+      throw new MailProviderError("unavailable", "Mail request aborted");
     });
-    expect(await run(new AbortController().signal, { deadlineMs: 60_000 })).toBe("failed");
-    expect(lastUpdate()).toContain('"lastErrorAt" = ?');
-    expect(sink.events.find((e) => e.message === "mail sync failed")).toMatchObject({
-      reason: "unavailable",
-      errorMessage: "Mail request failed",
-    });
+    expect(await run(new AbortController().signal, { deadlineMs: 20 })).toBe("failed");
+    expect(lastUpdate()).toContain('"lastErrorAt" =');
   });
 
   it("does not record a failure when the caller went away, and frees the claim", async () => {

@@ -16,12 +16,6 @@ const PAGE_SIZE = 100;
 /** Most messages kept from one list; Gmail pages are 100, so this is two pages. */
 const MAX_MESSAGES = 200;
 const DEADLINE_MS = 90_000;
-/**
- * A window list reuses mail stored by an earlier, interrupted run this recently instead of fetching
- * it again, so repeated runs converge. ponytail: labels changed in this span stay stale until the
- * message changes again; a stored first cursor would close that gap.
- */
-const RESUME_REUSE_MS = 10 * 60_000;
 const TEXT_CAP = 500;
 const UPSERT_CHUNK = 200;
 /** Most changes applied one by one; more than this is cheaper to take from the window lists. */
@@ -124,11 +118,7 @@ export async function syncMailbox(
       durationMs: Date.now() - started,
       reason: error instanceof MailProviderError ? error.kind : "error",
       ...(error instanceof MailProviderError && error.detail ? { detail: error.detail } : {}),
-      ...(error instanceof MailProviderError
-        ? error.kind === "unavailable" && !error.detail
-          ? { errorMessage: error.message }
-          : {}
-        : { errorName: errorName(error) }),
+      ...(error instanceof MailProviderError ? {} : { errorName: errorName(error) }),
     });
     return "failed";
   };
@@ -136,8 +126,10 @@ export async function syncMailbox(
   const now = (deps.now ?? (() => new Date()))();
   const windowStart = new Date(now.getTime() - WINDOW_MS);
   const after = windowStart.toISOString().slice(0, 10);
-  const deadline = AbortSignal.timeout(deps.deadlineMs ?? DEADLINE_MS);
-  const timed: AdapterContext = { ...context, signal: AbortSignal.any([context.signal, deadline]) };
+  const timed: AdapterContext = {
+    ...context,
+    signal: AbortSignal.any([context.signal, AbortSignal.timeout(deps.deadlineMs ?? DEADLINE_MS)]),
+  };
 
   const merged = new Map<
     string,
@@ -214,11 +206,7 @@ export async function syncMailbox(
       if (changes) deletedIds.push(...changes.deletedIds);
       nextCursor = await deps.mail.getCursor(account, timed);
       inbox = await listWindow(deps.mail, account, timed, "in:inbox", after, windowStart);
-      // Out of time: keep what loaded and list sent mail on a later run.
-      const sent: Listed =
-        inbox.partial || timed.signal.aborted
-          ? { messages: [], capped: false, partial: true }
-          : await listWindow(deps.mail, account, timed, "in:sent", after, windowStart);
+      const sent = await listWindow(deps.mail, account, timed, "in:sent", after, windowStart);
       partial = inbox.partial || sent.partial;
       for (const [listed, flag] of [
         [inbox, "inInbox"],
@@ -232,9 +220,7 @@ export async function syncMailbox(
       }
     }
   } catch (error) {
-    // Running out of our own time is an incomplete sync, not a provider failure: store what loaded.
-    if (!deadline.aborted || context.signal.aborted) return fail(error);
-    partial = true;
+    return fail(error);
   }
 
   try {
@@ -374,20 +360,13 @@ async function listWindow(
   do {
     const page = await mail.listMessages(
       account,
-      {
-        query,
-        after,
-        pageSize: PAGE_SIZE,
-        pageToken,
-        useCache: false,
-        reuseCachedWithinMs: RESUME_REUSE_MS,
-      },
+      { query, after, pageSize: PAGE_SIZE, pageToken, useCache: false },
       context,
     );
     messages.push(...page.messages);
     partial = (page.unhydratedIds?.length ?? 0) > 0;
     pageToken = page.nextPageToken;
-  } while (pageToken && !partial && !context.signal.aborted && messages.length < MAX_MESSAGES);
+  } while (pageToken && !partial && messages.length < MAX_MESSAGES);
 
   const capped = messages.length > MAX_MESSAGES || (messages.length >= MAX_MESSAGES && !!pageToken);
   const inWindow = messages
