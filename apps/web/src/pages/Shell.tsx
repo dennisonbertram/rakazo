@@ -184,12 +184,14 @@ import { EmailCards } from "../components/EmailCards";
 import { ErrorBoundary, lazyOverlay, SectionLoadFailed } from "../components/ErrorBoundary";
 import { FinanceCardGroup } from "../components/FinanceCards";
 import { HideAmountsMenuItem } from "../components/HideAmountsToggle";
+import { AgentAvatar } from "../components/integrations/AgentAvatar";
 import { MailApprovalCard } from "../components/MailApprovalCard";
 import { MessageHoverMetadata } from "../components/MessageHoverMetadata";
 import { PageAgentIntro, pageAgentKind } from "../components/PageAgentIntro";
 import { RailTip, SidebarPageLink } from "../components/SidebarPageLink";
 import { SidebarPages } from "../components/SidebarPages";
 import { MAIN_CONTENT_ID, SkipToContent } from "../components/SkipToContent";
+import { glanceBadge, runwayGlance, UrgentMark } from "../components/sidebar-glance";
 import {
   LIVE_TOOL_STEP_WINDOW,
   StandaloneToolActivity,
@@ -202,6 +204,7 @@ import { TeachCaptureOverlay } from "../components/teach/TeachCaptureOverlay";
 import { TeachComputerOverlayControl } from "../components/teach/TeachComputerOverlay";
 import { TeachRecordingChrome, TeachStopButton } from "../components/teach/TeachRecordingChrome";
 import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
+import { clearAgentAppCache, useAgentApp } from "../lib/agent-app";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { authClient } from "../lib/auth";
 import { takeInitialBootstrap } from "../lib/bootstrap";
@@ -321,6 +324,7 @@ import {
   transcriptUserJustSent,
 } from "../lib/transcript-scroll";
 import { speaker } from "../lib/tts";
+import { useSidebarGlance } from "../lib/use-sidebar-glance";
 import { errorText } from "../lib/user-error";
 import type { WorkingActivity } from "../lib/working-activity";
 import { type ToolAction, workingActivity } from "../lib/working-activity";
@@ -707,6 +711,11 @@ export function ShellPage() {
   useEffect(refreshInboxUnread, [refreshInboxUnread]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { pathname } = useLocation();
+  const { counts: unseen, glance } = useSidebarGlance(
+    pathname,
+    snapshot ? { botId: snapshot.botId ?? null, threadId: snapshot.threadId } : null,
+  );
+  const hideAmounts = useHideAmounts();
   const [missingPath, setMissingPath] = useState<string | null>(null);
   const missingPathRef = useRef<string | null>(null);
   const markMissing = useCallback((path: string) => {
@@ -833,6 +842,11 @@ export function ShellPage() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [initialBotsLoaded, setInitialBotsLoaded] = useState(false);
   const [bootstrapMe, setBootstrapMe] = useState<Me | null>();
+  const activeSpaceId = bootstrapMe?.spaceId;
+  const agentAppFor = useAgentApp(
+    userId,
+    spaces.length > 0 ? spaces.map((space) => space.id) : activeSpaceId ? [activeSpaceId] : [],
+  );
   const [keepComputerRecovery, setKeepComputerRecovery] = useState(false);
   const recoveryHoldTimer = useRef<number | undefined>(undefined);
   const showComputerRecoveryHint =
@@ -3725,22 +3739,12 @@ export function ShellPage() {
                   setMobileSidebarOpen(false);
                   navigate("/app/inbox");
                 }}
-                badgeLabel={
-                  inboxUnread > 0
-                    ? plural(inboxUnread, { one: "# unread", other: "# unread" })
-                    : undefined
-                }
-                badge={
-                  inboxUnread > 0 ? (
-                    <span
-                      role="img"
-                      aria-label={plural(inboxUnread, { one: "# unread", other: "# unread" })}
-                      className="ms-auto text-[11.5px] text-muted-foreground tabular-nums"
-                    >
-                      {inboxUnread}
-                    </span>
-                  ) : null
-                }
+                {...glanceBadge({
+                  unseen: unseen.inbox ?? 0,
+                  value: inboxUnread > 0 ? String(inboxUnread) : undefined,
+                  valueLabel: plural(inboxUnread, { one: "# unread", other: "# unread" }),
+                  rail,
+                })}
               />
               <SidebarPageLink
                 testId="sidebar-finance"
@@ -3752,6 +3756,11 @@ export function ShellPage() {
                   setMobileSidebarOpen(false);
                   navigate("/app/finance");
                 }}
+                {...glanceBadge({
+                  unseen: unseen.finance ?? 0,
+                  rail,
+                  value: runwayGlance(glance.financeRunwayMonths, hideAmounts),
+                })}
               />
               <SidebarPageLink
                 testId="sidebar-legal"
@@ -3763,6 +3772,11 @@ export function ShellPage() {
                   setMobileSidebarOpen(false);
                   navigate("/app/legal");
                 }}
+                {...glanceBadge({
+                  unseen: unseen.legal ?? 0,
+                  rail,
+                  value: glance.legalDueSoon > 0 ? String(glance.legalDueSoon) : undefined,
+                })}
               />
               <SidebarPageLink
                 testId="sidebar-cap-table"
@@ -3774,6 +3788,7 @@ export function ShellPage() {
                   setMobileSidebarOpen(false);
                   navigate("/app/cap-table");
                 }}
+                {...glanceBadge({ unseen: unseen["cap-table"] ?? 0, rail })}
               />
               <SidebarPageLink
                 testId="sidebar-data-room"
@@ -3785,6 +3800,11 @@ export function ShellPage() {
                   setMobileSidebarOpen(false);
                   navigate("/app/data-room");
                 }}
+                {...glanceBadge({
+                  unseen: unseen["data-room"] ?? 0,
+                  rail,
+                  value: glance.dataRoomWaiting > 0 ? String(glance.dataRoomWaiting) : undefined,
+                })}
               />
               <SidebarPageLink
                 testId="sidebar-artifacts"
@@ -3797,6 +3817,7 @@ export function ShellPage() {
                   setMobileSidebarOpen(false);
                   navigate("/app/artifacts");
                 }}
+                {...glanceBadge({ unseen: unseen.artifacts ?? 0, rail })}
               />
               <SidebarPages rail={rail} onOpen={() => setMobileSidebarOpen(false)} />
             </div>
@@ -4180,7 +4201,8 @@ export function ShellPage() {
                                 }
                               >
                                 {item.kind === "bot" ? (
-                                  <BotAvatar
+                                  <AgentAvatar
+                                    app={agentAppFor(item.chat.id, item.chat.spaceId)}
                                     color={item.chat.color}
                                     identity={item.chat.id}
                                     size={36}
@@ -4226,6 +4248,10 @@ export function ShellPage() {
                                         ) : null}
                                       </div>
                                       <div className="flex shrink-0 items-center gap-1.5 group-hover/row:pointer-fine:opacity-0">
+                                        {item.kind === "bot" &&
+                                        glance.urgentBotIds.includes(item.chat.id) ? (
+                                          <UrgentMark />
+                                        ) : null}
                                         {!compact ? (
                                           <span className="text-[12px] leading-[18px] text-muted-foreground tabular-nums">
                                             {formatRosterTime(item.chat.updatedAt)}
@@ -4476,6 +4502,7 @@ export function ShellPage() {
                 className="w-full justify-start font-normal"
                 onClick={() =>
                   void authClient.signOut().then(() => {
+                    clearAgentAppCache();
                     clearSpaceSelection();
                     navigate("/");
                   })
