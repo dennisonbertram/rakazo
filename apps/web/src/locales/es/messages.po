@@ -293,6 +293,10 @@ msgstr "{commandVariable} está reservada y no puede usarse como variable de com
 msgid "{count, plural, one {# bank account} other {# bank accounts}}"
 msgstr ""
 
+#: src/components/MailThreadCard.tsx
+msgid "{count, plural, one {# message} other {# messages}}"
+msgstr ""
+
 #: src/components/finance/ui.tsx
 msgid "{count, plural, one {# transaction} other {# transactions}}"
 msgstr ""
@@ -738,6 +742,10 @@ msgstr ""
 
 #: src/pages/CapTable.tsx
 msgid "Add email"
+msgstr ""
+
+#: src/pages/ModelSettingsOverlay.tsx
+msgid "Add email attachments to the Data room"
 msgstr ""
 
 #. placeholder {0}: prefill.name
@@ -1228,6 +1236,10 @@ msgstr ""
 
 #: src/components/FinanceCards.tsx
 msgid "Ask about this"
+msgstr ""
+
+#: src/components/inbox/InboxMessageDialog.tsx
+msgid "Ask agent"
 msgstr ""
 
 #. placeholder {0}: rule.matchValue
@@ -2992,6 +3004,10 @@ msgstr ""
 msgid "Could not save the page."
 msgstr ""
 
+#: src/pages/ModelSettingsOverlay.tsx
+msgid "Could not save the setting"
+msgstr ""
+
 #: src/pages/shell/message-cards.tsx
 msgid "Could not save this choice"
 msgstr "No se pudo guardar esta opción"
@@ -3783,6 +3799,10 @@ msgstr "Este correo no está autorizado para registrarse"
 
 #: src/components/inbox/InboxMessageDialog.tsx
 msgid "Email not found"
+msgstr ""
+
+#: src/components/MailThreadCard.tsx
+msgid "Email thread"
 msgstr ""
 
 #: src/lib/user-error.ts

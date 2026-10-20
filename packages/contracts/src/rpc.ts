@@ -419,6 +419,11 @@ export const appContract = {
     setEmbeddingModel: oc
       .input(z.object({ modelId: z.string().trim().max(200).nullable() }))
       .output(z.object({ modelId: z.string().nullable() })),
+    /** Whether new mail attachments are filed into the Data room automatically. */
+    autoFileEmail: oc.output(z.object({ enabled: z.boolean() })),
+    setAutoFileEmail: oc
+      .input(z.object({ enabled: z.boolean() }))
+      .output(z.object({ enabled: z.boolean() })),
     setBackups: oc.input(ModelBackupListSchema).output(z.object({ ok: z.literal(true) })),
     connect: oc.input(ModelConnectInputSchema).output(ModelCredentialSchema),
     probeOpenAiCompatible: oc
@@ -1317,6 +1322,8 @@ export const appContract = {
   },
   inbox: {
     agent: oc.output(BotSchema),
+    /** Idempotent per mail conversation: opens the agent made for the message's thread, with the thread as context. */
+    askAgent: oc.input(z.object({ messageId: Id })).output(BotSchema),
     list: oc.input(InboxListInputSchema).output(InboxListOutputSchema),
     refresh: oc.input(InboxRefreshInputSchema).output(InboxRefreshOutputSchema),
     get: oc.input(z.object({ messageId: Id })).output(InboxMessageSchema),
