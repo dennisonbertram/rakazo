@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   AdapterContext,
   AdapterDescriptor,
@@ -9,7 +10,8 @@ import type {
   MessagingSendResult,
   MessagingSurface,
 } from "@rakazo/adapter-kit";
-import { type MessagingPlatform, providerOfThreadId } from "./chat-sdk-surface.js";
+import type { MessagingPlatform } from "./chat-sdk-surface.js";
+import { providerOfThreadId } from "./chat-sdk-surface.js";
 
 export interface TeamChatEmulatorInbound {
   handle?: string;
@@ -50,6 +52,8 @@ export class MessagingTeamChatEmulator implements MessagingSurface {
   private readonly capabilities: MessagingCapabilities;
   private sink: ((event: MessagingInboundEvent) => Promise<void>) | undefined;
   private handleCounter = 0;
+  /** Inbound handles are claimed durably, so two emulators on one database must not repeat them. */
+  private readonly inboundNonce = randomUUID().slice(0, 8);
   private inboundCounter = 0;
 
   constructor(options: MessagingTeamChatEmulatorOptions = {}) {
@@ -181,7 +185,9 @@ export class MessagingTeamChatEmulator implements MessagingSurface {
   /** Public handle allocator for test helpers that record outbound sends. */
   allocateHandle(prefix: string): string {
     this.handleCounter += 1;
-    return `${prefix}-${this.handleCounter}`;
+    return prefix === "inbound"
+      ? `${prefix}-${this.inboundNonce}-${this.handleCounter}`
+      : `${prefix}-${this.handleCounter}`;
   }
 
   /** Shared outbound witness used by compatibility helpers and the full surface. */
