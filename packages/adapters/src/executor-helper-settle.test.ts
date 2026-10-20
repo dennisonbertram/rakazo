@@ -43,8 +43,7 @@ const history = [
   },
 ];
 
-async function continueRun(events: unknown[], fail = false) {
-  const trigger: string = "user";
+async function continueRun(events: unknown[], fail = false, trigger = "user") {
   const storedPhase = null;
   const run: Record<string, unknown> = {
     id: "run-1",
@@ -192,7 +191,7 @@ async function continueRun(events: unknown[], fail = false) {
     (event) =>
       event.type === "thread.subagent" && (event.payload as { status?: string }).status === "failed",
   );
-  return { run, finalizeRun, pauseRunForInput, helperSaves, prisma };
+  return { run, finalizeRun, pauseRunForInput, helperSaves, prisma, append };
 }
 
 const helper = {
@@ -230,5 +229,26 @@ describe("helper settlement", () => {
     savedEvents.length = 0;
     const { helperSaves } = await continueRun([helper], true);
     expect(helperSaves).toHaveLength(1);
+  });
+});
+
+describe("routine progress", () => {
+  const progress = [
+    { type: "text" as const, text: "Checking for changes." },
+    { type: "progress" as const, text: "Reading the releases", activity: true },
+  ];
+  const progressEvents = (append: { mock: { calls: unknown[][] } }) =>
+    append.mock.calls.filter(([event]) => (event as { type?: string }).type === "thread.progress");
+
+  it("publishes no live narration for a routine run, which may finish silently", async () => {
+    savedEvents.length = 0;
+    const { append } = await continueRun(progress, false, "routine");
+    expect(progressEvents(append)).toEqual([]);
+  });
+
+  it("still publishes live progress for a chat run", async () => {
+    savedEvents.length = 0;
+    const { append } = await continueRun(progress);
+    expect(progressEvents(append).length).toBeGreaterThan(0);
   });
 });
