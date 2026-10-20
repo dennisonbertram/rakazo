@@ -3,8 +3,11 @@ import type {
   ConnectionCatalogItem,
   InboxCategory,
   InboxPriority,
+  MailSignals,
   SandboxKind,
 } from "@rakazo/contracts";
+
+export type { MailSignals } from "@rakazo/contracts";
 
 export interface AdapterContext {
   operationId: string;
@@ -30,6 +33,11 @@ export interface AdapterContext {
   connectedAppAgentConnectionId?: string;
   /** @deprecated Prefer connectedConnections so providers with the same app slug cannot collide. */
   connectedProviders?: string[];
+  /**
+   * Called before a provider request waits to try again, so a tool can tell the user it is
+   * retrying. `rate_limited` is a 429 or quota answer; `retry` is a timeout or server error.
+   */
+  onRetry?: (retry: { reason: "rate_limited" | "retry"; attempt: number }) => void;
 }
 
 export interface ConnectedConnector {
@@ -193,8 +201,17 @@ export interface AgentToolExecutionResult {
   details: unknown;
 }
 
+/** A step a tool reports while it runs. `summary` is the finished one-line result of the call. */
+export interface ToolProgress {
+  text: string;
+  failed?: true;
+  summary?: string;
+}
+
 /** Hooks for a tool call that can report output before it returns. */
 export interface AgentToolExecutionObserver {
+  /** One line about what the tool is doing now. Shown to the owner only; never sent as a notification. */
+  onProgress?: (progress: ToolProgress) => void;
   /**
    * A shell command has already produced output and is still running.
    * Resolves with the final redacted result when the process exits.
@@ -668,6 +685,8 @@ export interface BackgroundJobPayloads {
   "notifications.deliver": Record<string, never>;
   /** Deletes expired notifications and deliveries; run daily by the worker's cron. */
   "notifications.retention": Record<string, never>;
+  /** Deletes messaging outbox rows and inbound claims older than 7 days; run daily by cron. */
+  "messaging.retention": Record<string, never>;
   /** Reconcile durable remote-agent intent; scope is loaded from the database. */
   "cloud_agent.poll": { agentId: string };
   /** Deletes a saved mail search (and its rows) once it has expired. */
@@ -682,6 +701,8 @@ export interface BackgroundJobPayloads {
   "dataroom.ingest": { spaceId: string; userId: string; itemId: string };
   "dataroom.classify": { spaceId: string; userId: string; itemId: string };
   "dataroom.index": { spaceId: string; userId: string; itemId: string };
+  /** Makes the small preview image of one PDF or image; outside the pipeline, queued when a list first shows the item. */
+  "dataroom.thumbnail": { spaceId: string; userId: string; itemId: string };
   /**
    * A planned Drive folder import: creates the Data room folders, then queues one
    * `dataroom.drive.file` job per file. Safe to run again after a partial failure.
@@ -838,12 +859,51 @@ export interface MessagingPlatformDescriptor {
 export interface MessagingSendRequest {
   threadId: string;
   body: string;
-  /** Stable key so retries of the same logical send can be deduped upstream. */
+  /**
+   * Stable and unique per outbox row (its id), never a business key that is reused across
+   * cycles, so a retry of this send can be recognized and a different send cannot.
+   */
   idempotencyKey?: string;
 }
 
 export interface MessagingSendResult {
   handle: string;
+}
+
+/** One direct iMessage conversation on the deployment's own line. */
+export interface IMessageConversation {
+  /** Opaque provider-prefixed thread id; pass it to read or send. */
+  threadId: string;
+  /** The other person's E.164 number or email. */
+  handle: string;
+  displayName?: string;
+  /** ISO time of the newest message. */
+  lastMessageAt: string;
+  snippet: string;
+}
+
+export interface IMessageHistoryMessage {
+  id: string;
+  direction: "inbound" | "outbound";
+  /** ISO time. */
+  at: string;
+  /** Message text, untrusted. Attachments appear as `[attachment: <mime type>]`, never as links. */
+  text: string;
+}
+
+/** Read access to the history of a deployment's own iMessage line. Direct iMessage chats only. */
+export interface IMessageHistory {
+  /** Newest conversations first. */
+  listConversations(
+    options: { limit: number },
+    context: AdapterContext,
+  ): Promise<IMessageConversation[]>;
+  /** Newest page first; `cursor` is the previous page's `nextCursor`. */
+  readConversation(
+    threadId: string,
+    options: { limit: number; cursor?: string },
+    context: AdapterContext,
+  ): Promise<{ handle: string; messages: IMessageHistoryMessage[]; nextCursor?: string }>;
 }
 
 /** Provider-neutral inbound message after platform webhook parsing. */
@@ -977,6 +1037,8 @@ export interface MailMessageSummary {
   snippet: string;
   unread: boolean;
   labelIds: string[];
+  /** Classifier facts. Absent on cache hits and from providers that cannot supply them. */
+  signals?: MailSignals;
 }
 
 /** A Gmail label. `id` is what `MailMessageSummary.labelIds` and `modifyMessage` use. */

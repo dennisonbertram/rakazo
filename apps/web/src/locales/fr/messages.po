@@ -102,6 +102,11 @@ msgstr ""
 msgid "{0, plural, one {Last full month} other {Last # full months}}"
 msgstr ""
 
+#. placeholder {0}: files.length
+#: src/components/data-room/AutoSortDialog.tsx
+msgid "{0, plural, one {Reviewing # file} other {Reviewing # files}}"
+msgstr ""
+
 #. placeholder {0}: filteredRecent.length
 #: src/pages/ActivityList.tsx
 msgid "{0, plural, one {Show # finished run} other {Show # finished runs}}"
@@ -512,6 +517,7 @@ msgid "* So far"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
+#: src/components/data-room/AutoSortDialog.tsx
 #: src/components/finance/StatementReminderBanner.tsx
 msgid "+{more} more"
 msgstr ""
@@ -795,6 +801,10 @@ msgstr ""
 msgid "Adding a contact"
 msgstr ""
 
+#: src/components/integrations/IMessageSection.tsx
+msgid "Address"
+msgstr ""
+
 #: src/components/finance/AddAccountDialog.tsx
 #: src/components/finance/WalletDialog.tsx
 msgid "Address or ENS"
@@ -1005,6 +1015,7 @@ msgstr "Toujours autorisé"
 
 #: src/components/data-room/Preview.tsx
 #: src/components/finance/ui.tsx
+#: src/pages/CapTable.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Amount"
@@ -1049,6 +1060,10 @@ msgstr "Répondu : {answer}"
 
 #: src/pages/Paywall.tsx
 msgid "Any model, with your own key"
+msgstr ""
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Anyone who can reach this address can talk to your Mac's server. Use a private network or a tunnel."
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
@@ -1158,7 +1173,7 @@ msgstr ""
 msgid "Artifacts"
 msgstr "Artefacts"
 
-#: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 msgid "Ascending"
 msgstr ""
 
@@ -1608,6 +1623,7 @@ msgstr "Impossible d'atteindre le serveur."
 #: src/components/integrations/ConnectAppDialog.tsx
 #: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
 #: src/components/MailApprovalCard.tsx
@@ -1775,6 +1791,7 @@ msgid "Chart hidden while amounts are hidden"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/SpaceSearch.tsx
 msgid "Chat"
@@ -1790,6 +1807,14 @@ msgstr "Applications de discussion, canaux de groupe et connexions d'agent."
 
 #: src/pages/Shell.tsx
 msgid "Chat settings"
+msgstr ""
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Chat with your agents over iMessage"
+msgstr ""
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Chat with your agents over iMessage from your Mac"
 msgstr ""
 
 #: src/pages/SpaceSearch.tsx
@@ -1918,6 +1943,7 @@ msgstr ""
 msgid "Clear filter {label}"
 msgstr ""
 
+#: src/pages/CapTable.tsx
 #: src/pages/DataRoom.tsx
 msgid "Clear filters"
 msgstr ""
@@ -1926,7 +1952,7 @@ msgstr ""
 msgid "Clear formatting"
 msgstr ""
 
-#: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 #: src/pages/Shell.tsx
 msgid "Clear search"
 msgstr ""
@@ -2200,6 +2226,7 @@ msgstr "Confirmez que l'URL est accessible depuis cette session du navigateur, p
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/ExchangeConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
@@ -2295,6 +2322,7 @@ msgid "Connect Treg"
 msgstr "Connecter Treg"
 
 #: src/components/finance/AddAccountDialog.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/parts.tsx
@@ -2392,12 +2420,14 @@ msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Copied"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/Shell.tsx
@@ -2651,6 +2681,10 @@ msgstr "Impossible de charger les intégrations"
 msgid "Could not load model settings"
 msgstr "Impossible de charger les paramètres du modèle"
 
+#: src/components/SheetPreview.tsx
+msgid "Could not load more rows."
+msgstr ""
+
 #: src/pages/RoutineRunHistory.tsx
 msgid "Could not load run history"
 msgstr "Impossible de charger l’historique des exécutions"
@@ -2685,6 +2719,7 @@ msgid "Could not load this chat."
 msgstr "Impossible de charger cette conversation."
 
 #: src/components/ArtifactFileCard.tsx
+#: src/components/SheetPreview.tsx
 msgid "Could not load this file."
 msgstr "Impossible de charger ce fichier."
 
@@ -3293,7 +3328,7 @@ msgstr "Refuser"
 msgid "Deployment default"
 msgstr "Défaut du déploiement"
 
-#: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 msgid "Descending"
 msgstr ""
 
@@ -3582,6 +3617,7 @@ msgstr ""
 msgid "Earlier"
 msgstr ""
 
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Edit"
@@ -3857,6 +3893,7 @@ msgid "Filter"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 msgid "Filter by {label}"
 msgstr ""
 
@@ -3887,6 +3924,7 @@ msgstr "Filtres"
 msgid "Finance"
 msgstr ""
 
+#: src/components/finance/charts.tsx
 #: src/components/finance/ui.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Financing"
@@ -4015,6 +4053,7 @@ msgstr ""
 msgid "Fullscreen"
 msgstr "Plein écran"
 
+#: src/components/cap-table/OwnershipDonut.tsx
 #: src/pages/CapTable.tsx
 msgid "Fully diluted shares"
 msgstr ""
@@ -4296,6 +4335,18 @@ msgstr ""
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Image upload area"
 msgstr "Zone de téléchargement d'image"
+
+#: src/components/NotificationSettings.tsx
+msgid "iMessage"
+msgstr ""
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "iMessage (BlueBubbles)"
+msgstr ""
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "iMessage (Photon)"
+msgstr ""
 
 #: src/components/data-room/ImportFromDrive.tsx
 #: src/components/data-room/ImportFromEmail.tsx
@@ -4654,6 +4705,7 @@ msgstr "Incident Linear"
 msgid "Link"
 msgstr ""
 
+#: src/components/integrations/IMessageSection.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Link a chat app"
 msgstr "Connecter une application de discussion"
@@ -4694,6 +4746,7 @@ msgstr "Charger les messages précédents"
 
 #: src/components/data-room/ImportFromDrive.tsx
 #: src/components/data-room/ImportFromEmail.tsx
+#: src/components/SheetPreview.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/DataRoom.tsx
 #: src/pages/Inbox.tsx
@@ -5215,6 +5268,7 @@ msgstr ""
 msgid "Mute"
 msgstr "Couper le micro"
 
+#: src/components/cap-table/OwnershipDonut.tsx
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/FolderDocuments.tsx
 #: src/components/data-room/ItemDialogs.tsx
@@ -5457,6 +5511,10 @@ msgstr ""
 msgid "No bots match"
 msgstr "Aucun bot ne correspond"
 
+#: src/components/data-room/AutoSortDialog.tsx
+msgid "No change"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "No chat apps linked yet."
 msgstr "Aucune application de discussion connectée pour le moment."
@@ -5510,6 +5568,7 @@ msgstr ""
 msgid "No mail matches this filter"
 msgstr ""
 
+#: src/pages/CapTable.tsx
 #: src/pages/KnowledgeSection.tsx
 msgid "No matches"
 msgstr ""
@@ -6037,6 +6096,7 @@ msgstr "Clé API de l'organisation"
 msgid "Original message unavailable"
 msgstr "Message d’origine indisponible"
 
+#: src/components/cap-table/OwnershipDonut.tsx
 #: src/components/finance/ui.tsx
 #: src/components/legal/LegalGraph.tsx
 #: src/pages/CapTable.tsx
@@ -6062,6 +6122,7 @@ msgstr ""
 msgid "Other model…"
 msgstr "Autre modèle…"
 
+#: src/components/finance/charts.tsx
 #: src/components/finance/ui.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Out"
@@ -6083,6 +6144,7 @@ msgstr ""
 msgid "Owner"
 msgstr ""
 
+#: src/components/cap-table/OwnershipDonut.tsx
 #: src/pages/CapTable.tsx
 msgid "Ownership"
 msgstr ""
@@ -6298,6 +6360,7 @@ msgstr ""
 msgid "Preview {0}"
 msgstr "Aperçu de {0}"
 
+#: src/components/SheetPreview.tsx
 #: src/pages/Artifacts.tsx
 msgid "Preview isn't available for this file type — download it to view it."
 msgstr "L'aperçu n'est pas disponible pour ce type de fichier — téléchargez-le pour le consulter."
@@ -6327,9 +6390,14 @@ msgstr ""
 msgid "Private workspace with its own bots and groups."
 msgstr "Espace de travail privé avec ses propres bots et groupes."
 
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Project ID"
 msgstr "ID du projet"
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Project secret"
+msgstr ""
 
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Projected cash"
@@ -6711,6 +6779,7 @@ msgid "Remove attachments?"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 msgid "Remove filter {label}"
 msgstr ""
 
@@ -6818,6 +6887,10 @@ msgstr ""
 msgid "Reopen"
 msgstr "Rouvrir"
 
+#: src/components/integrations/IMessageSection.tsx
+msgid "Replace"
+msgstr ""
+
 #: src/components/integrations/FinanceSection.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Replace API key"
@@ -6896,6 +6969,10 @@ msgstr "Réinitialisation en cours…"
 msgid "Resize panel"
 msgstr "Redimensionner le panneau"
 
+#: src/components/integrations/IMessageSection.tsx
+msgid "Restart required"
+msgstr ""
+
 #: src/components/DesktopUpdates.tsx
 msgid "Restart to update"
 msgstr "Redémarrez pour mettre à jour"
@@ -6942,6 +7019,7 @@ msgstr "Réessayer l'écran"
 msgid "Return to Rakazo"
 msgstr "Retour à Rakazo"
 
+#: src/components/finance/charts.tsx
 #: src/components/finance/ui.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Revenue"
@@ -7054,6 +7132,7 @@ msgstr ""
 #: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/AlchemyConnectDialog.tsx
 #: src/components/integrations/BlockscoutConnectDialog.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
 #: src/pages/CapTable.tsx
@@ -7101,6 +7180,7 @@ msgid "Save the workspace and install current software."
 msgstr "Enregistrer l’espace de travail et installer les logiciels actuels."
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/ExternalConversationSettings.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -7179,6 +7259,7 @@ msgstr ""
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/pages/CapTable.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/bot-picker.tsx
@@ -7290,6 +7371,7 @@ msgstr ""
 msgid "Searching…"
 msgstr "Recherche en cours…"
 
+#: src/pages/CapTable.tsx
 #: src/pages/Inbox.tsx
 msgid "Security"
 msgstr ""
@@ -7402,12 +7484,21 @@ msgstr "Le point de terminaison Serenity est obligatoire."
 msgid "Server integrations"
 msgstr "Intégrations du serveur"
 
+#: src/components/integrations/IMessageSection.tsx
+msgid "Server password"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Server URL"
 msgstr "URL du serveur"
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Set by server"
+msgstr ""
 
 #: src/pages/Legal.tsx
 msgid "Set the Legal agent back to Muse Spark 1.2 to start. It then reads your Data room for contracts and deadlines."
@@ -7462,8 +7553,13 @@ msgstr ""
 msgid "Shareholders"
 msgstr ""
 
+#: src/components/cap-table/OwnershipDonut.tsx
 #: src/pages/CapTable.tsx
 msgid "Shares"
+msgstr ""
+
+#: src/components/SheetPreview.tsx
+msgid "Sheets"
 msgstr ""
 
 #: src/components/computer/TerminalApp.tsx
@@ -7692,9 +7788,8 @@ msgstr "Mise à jour logicielle"
 msgid "Something went wrong. Try again."
 msgstr "Un problème est survenu. Réessayez."
 
-#. placeholder {0}: labels[field]
-#: src/components/data-room/FilterBar.tsx
-msgid "Sort: {0}"
+#: src/components/ListControls.tsx
+msgid "Sort: {fieldLabel}"
 msgstr ""
 
 #: src/pages/Inbox.tsx
@@ -7845,6 +7940,10 @@ msgstr ""
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Steps"
 msgstr "Étapes"
+
+#: src/pages/Shell.tsx
+msgid "Still waiting on {service}"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Stop"
@@ -8013,6 +8112,10 @@ msgstr "Tester"
 msgid "Test API key"
 msgstr "Tester la clé API"
 
+#: src/components/integrations/IMessageSection.tsx
+msgid "Test connection"
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "Test run"
 msgstr "Exécution de test"
@@ -8021,6 +8124,7 @@ msgstr "Exécution de test"
 msgid "Test sign-in"
 msgstr "Tester la connexion"
 
+#: src/components/integrations/IMessageSection.tsx
 #: src/components/ModelConnectionPreflightNotice.tsx
 msgid "Testing…"
 msgstr "Test en cours…"
@@ -8274,6 +8378,10 @@ msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "This server needs an OAuth client ID."
+msgstr ""
+
+#: src/components/SheetPreview.tsx
+msgid "This sheet is empty."
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -8859,6 +8967,18 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 msgid "Webhook"
 msgstr "Webhook"
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Webhook signing secret"
+msgstr ""
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Webhook token"
+msgstr ""
+
+#: src/components/integrations/IMessageSection.tsx
+msgid "Webhook URL"
+msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Website login"

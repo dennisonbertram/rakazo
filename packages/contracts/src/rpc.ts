@@ -118,6 +118,8 @@ import {
   SpaceMemoryConfigSchema,
   SpaceNavigationSchema,
   SpaceSchema,
+  SpreadsheetPreviewInputSchema,
+  SpreadsheetPreviewSchema,
   TaughtSkillSchema,
   TeachRecordingEventSchema,
   ThinkingLevelSchema,
@@ -209,6 +211,11 @@ import {
   LegalUpdateDeadlineInputSchema,
 } from "./legal.js";
 import { McpOauthClientSchema } from "./mcp.js";
+import {
+  MessagingSetupSaveSchema,
+  MessagingSetupStateSchema,
+  MessagingSetupTestResultSchema,
+} from "./messaging-setup.js";
 import {
   NotificationKindSchema,
   NotificationSchema,
@@ -303,7 +310,11 @@ const EffectiveAccessSchema = z.record(
 
 /** "browser" is the client's own permission; "push" is the phone. A missing key means on. */
 const NotificationChannelsSchema = z
-  .object({ push: z.boolean().optional(), browser: z.boolean().optional() })
+  .object({
+    push: z.boolean().optional(),
+    browser: z.boolean().optional(),
+    imessage: z.boolean().optional(),
+  })
   .strict();
 export const NotificationPreferencesSchema = z.object({
   finish: z.boolean(),
@@ -312,6 +323,8 @@ export const NotificationPreferencesSchema = z.object({
   channels: NotificationChannelsSchema,
   /** The user has at least one registered phone push endpoint. */
   hasPhone: z.boolean(),
+  /** The user has a linked, verified iMessage identity. */
+  hasImessage: z.boolean(),
 });
 
 export type NotificationPreferences = z.infer<typeof NotificationPreferencesSchema>;
@@ -1019,6 +1032,13 @@ export const appContract = {
     ),
   },
   /** External messaging surface: link state, group channels, agent connections. */
+  messagingSetup: {
+    get: oc.output(MessagingSetupStateSchema),
+    save: oc.input(MessagingSetupSaveSchema).output(z.object({ ok: z.literal(true) })),
+    test: oc
+      .input(z.object({ provider: z.enum(["bluebubbles", "photon"]) }))
+      .output(MessagingSetupTestResultSchema),
+  },
   messaging: {
     status: oc.output(MessagingStatusSchema),
     link: {
@@ -1101,6 +1121,10 @@ export const appContract = {
     get: oc.input(threadTarget.and(z.object({ artifactId: Id }))).output(ArtifactWithContentSchema),
     getById: oc.input(z.object({ artifactId: Id })).output(ArtifactWithContentSchema),
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  files: {
+    /** One page of a spreadsheet (.xlsx, .xlsm, .csv, .tsv) from an artifact or a Data room item. */
+    spreadsheetPreview: oc.input(SpreadsheetPreviewInputSchema).output(SpreadsheetPreviewSchema),
   },
   usage: {
     list: oc.output(z.array(UsageRecordSchema)),

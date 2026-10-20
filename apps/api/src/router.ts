@@ -34,6 +34,7 @@ import type {
   IntegrationProviderSettings,
   McpConnector,
   MemoryProviderResolver,
+  MessagingSettings,
   PiOAuthLogins,
   RemoteConnectorDependencies,
   TicketChangeNotifier,
@@ -191,7 +192,9 @@ import {
   expandSkillReferencesInPrompt,
   hasMixedOneShotSchedule,
   isOneShotRoutineCrons,
+  MESSAGING_PHOTON_BLOCKED_MESSAGE,
   matchFeaturedConnectorId,
+  messagingProviderBlocksBot,
   nextCronDateAcrossStrict,
   splitPage,
   withAppDirectory,
@@ -239,6 +242,7 @@ import {
   isRecordNotFound,
   issueMessagingLinkCode,
   isUniqueViolation,
+  linkedImessageIdentities,
   listBoards,
   listContacts,
   listNotifications,
@@ -435,6 +439,7 @@ import {
   readServerUpdateStatus,
   UpdaterProxyError,
 } from "./server-update.js";
+import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
 import {
   isBackgroundRun,
@@ -859,6 +864,7 @@ export interface RouterDeps {
     provider: string,
   ) => void;
   integrationSettings?: IntegrationProviderSettings;
+  messagingSettings?: MessagingSettings;
   composio?: ComposioProvider;
   mcpOAuth?: McpOAuthBroker;
   /** Replaces the network for Box calls; tests point it at the Box emulator. */
@@ -5318,6 +5324,38 @@ export function createRouter(deps: RouterDeps) {
         return { ok: true as const };
       }),
     },
+    messagingSetup: {
+      get: authed.messagingSetup.get.handler(async ({ context }) => {
+        const canConfigure = context.actor.isDeploymentOwner;
+        return {
+          canConfigure,
+          providers:
+            canConfigure && deps.messagingSettings
+              ? await deps.messagingSettings.state(deps.messaging?.providers ?? [])
+              : [],
+        };
+      }),
+      save: authed.messagingSetup.save.handler(async ({ context, input }) => {
+        if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+        if (!deps.messagingSettings) throw new ORPCError("NOT_IMPLEMENTED");
+        try {
+          await deps.messagingSettings.save(
+            input,
+            connectionContext(context.actor, "messagingSetup.save", context.signal),
+          );
+        } catch (error) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: error instanceof Error ? error.message : "Could not save these settings",
+          });
+        }
+        return { ok: true as const };
+      }),
+      test: authed.messagingSetup.test.handler(async ({ context, input }) => {
+        if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+        if (!deps.messagingSettings) throw new ORPCError("NOT_IMPLEMENTED");
+        return deps.messagingSettings.test(input.provider);
+      }),
+    },
     connections: {
       catalog: authed.connections.catalog.handler(async ({ context, input }) => {
         const adapterContext = connectionContext(
@@ -6484,9 +6522,18 @@ export function createRouter(deps: RouterDeps) {
               userId: context.actor.userId,
               archivedAt: null,
             },
-            select: { id: true },
+            select: { id: true, spawnKey: true },
           });
           if (!bot) throw new ORPCError("NOT_FOUND");
+          // A code works on any mounted provider, so refuse only when every
+          // provider this deployment has would block the bot.
+          const providers = deps.messaging?.providers ?? [];
+          if (
+            providers.length > 0 &&
+            providers.every((provider) => messagingProviderBlocksBot(provider, bot.spawnKey))
+          ) {
+            throw new ORPCError("BAD_REQUEST", { message: MESSAGING_PHOTON_BLOCKED_MESSAGE });
+          }
           // One chat identity per bot: delivery mirrors a bot's replies to
           // exactly one conversation.
           const linked = await deps.prisma.messagingIdentity.findUnique({
@@ -6522,9 +6569,12 @@ export function createRouter(deps: RouterDeps) {
               userId: context.actor.userId,
               archivedAt: null,
             },
-            select: { id: true },
+            select: { id: true, spawnKey: true },
           });
           if (!bot) throw new ORPCError("NOT_FOUND");
+          if (messagingProviderBlocksBot(identity.provider, bot.spawnKey)) {
+            throw new ORPCError("BAD_REQUEST", { message: MESSAGING_PHOTON_BLOCKED_MESSAGE });
+          }
           try {
             const updated = await deps.prisma.messagingIdentity.update({
               where: { id: identity.id },
@@ -7293,6 +7343,11 @@ export function createRouter(deps: RouterDeps) {
         return deleteArtifactFamily(deps, context.actor, { familyId: input.artifactId });
       }),
     },
+    files: {
+      spreadsheetPreview: authed.files.spreadsheetPreview.handler(({ context, input }) =>
+        spreadsheetPreview(deps, context.actor, input),
+      ),
+    },
     usage: {
       list: authed.usage.list.handler(async ({ context }) => {
         const rows = await deps.prisma.usageRecord.findMany({
@@ -7425,20 +7480,26 @@ export function createRouter(deps: RouterDeps) {
       }),
       preferences: authed.notifications.preferences.handler(async ({ context }) => {
         const { actor } = context;
-        const [preferences, endpoints] = await Promise.all([
+        const [preferences, endpoints, imessage] = await Promise.all([
           getNotificationPreferences(deps.prisma, actor),
           listPushEndpoints(deps.prisma, actor.userId),
+          linkedImessageIdentities(deps.prisma, actor),
         ]);
-        return { ...preferences, hasPhone: endpoints.length > 0 };
+        return { ...preferences, hasPhone: endpoints.length > 0, hasImessage: imessage.length > 0 };
       }),
       updatePreferences: authed.notifications.updatePreferences.handler(
         async ({ context, input }) => {
           const { actor } = context;
-          const [preferences, endpoints] = await Promise.all([
+          const [preferences, endpoints, imessage] = await Promise.all([
             updateNotificationPreferences(deps.prisma, actor, input),
             listPushEndpoints(deps.prisma, actor.userId),
+            linkedImessageIdentities(deps.prisma, actor),
           ]);
-          return { ...preferences, hasPhone: endpoints.length > 0 };
+          return {
+            ...preferences,
+            hasPhone: endpoints.length > 0,
+            hasImessage: imessage.length > 0,
+          };
         },
       ),
       unregisterPush: authed.notifications.unregisterPush.handler(async ({ context }) => {

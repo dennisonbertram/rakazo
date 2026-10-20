@@ -391,7 +391,7 @@ import { GroupIntro } from "./shell/GroupIntro";
 import { MentionIcon } from "./shell/mention-icon";
 import {
   AppConnectCard,
-  ArtifactImage,
+  ArtifactImageGrid,
   ChartBlockView,
   ChoiceCard,
   McpApprovalCard,
@@ -4828,7 +4828,10 @@ export function ShellPage() {
         {integrationsMode ? (
           <ErrorBoundary fallback={<SectionLoadFailed />}>
             <Suspense fallback={null}>
-              <IntegrationsPage activeBotId={activeBotId.current} />
+              <IntegrationsPage
+                activeBotId={activeBotId.current}
+                onOpenMessaging={() => setMessagingSettingsOpen(true)}
+              />
             </Suspense>
           </ErrorBoundary>
         ) : dataRoomMode ? (
@@ -6229,6 +6232,7 @@ export const Transcript = memo(function Transcript({
             : workingBotName
               ? t`${workingBotName} is working`
               : t`Bots are working`;
+  const waitingLabel = (service: string) => t`Still waiting on ${service}`;
   function toolActionLabel(action: ToolAction | undefined): string | undefined {
     switch (action) {
       case "contact-add":
@@ -6827,7 +6831,17 @@ export const Transcript = memo(function Transcript({
                 block.kind === "progress" && !isToolActivityBlock(block) && Boolean(block.text),
             ),
         ) ? (
-          <ActiveBotGlyph bots={workingBots} label={workingLabel} startedAt={workingStartedAt} />
+          <ActiveBotGlyph
+            bots={workingBots}
+            label={workingLabel}
+            startedAt={workingStartedAt}
+            detail={activity?.kind === "tool" ? activity.detail : undefined}
+            waitingLabel={
+              activity?.kind === "tool" && activity.service
+                ? waitingLabel(activity.service)
+                : undefined
+            }
+          />
         ) : null}
         {!running && failedNote != null ? (
           <p data-testid="transcript-failed-note" className="py-2 text-xs text-destructive">
@@ -8789,16 +8803,19 @@ const MessageView = memo(function MessageView({
           );
         }
         if (block.kind === "image") {
+          // A run of images is drawn once, at its first block.
+          if (message.blocks[i - 1]?.kind === "image") return null;
+          const images = [];
+          for (const next of message.blocks.slice(i)) {
+            if (next.kind !== "image") break;
+            images.push(next);
+          }
           return (
             <div
               key={i}
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
-              <ArtifactImage
-                target={artifactTarget}
-                artifactId={block.artifactId}
-                name={block.name}
-              />
+              <ArtifactImageGrid target={artifactTarget} images={images} />
             </div>
           );
         }

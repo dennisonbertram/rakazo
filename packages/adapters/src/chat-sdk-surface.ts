@@ -3,6 +3,7 @@ import { createMemoryState } from "@chat-adapter/state-memory";
 import type {
   AdapterContext,
   AdapterDescriptor,
+  IMessageHistory,
   MessagingCapabilities,
   MessagingInboundEvent,
   MessagingInboundMessage,
@@ -14,6 +15,7 @@ import type {
 } from "@rakazo/adapter-kit";
 import type { Adapter, Message, Thread } from "chat";
 import { Chat } from "chat";
+import { sendIdempotency } from "./bluebubbles-adapter.js";
 
 /** Per-webhook drain of Chat SDK waitUntil work + inbound sink failures. */
 const webhookDrain = new AsyncLocalStorage<{
@@ -39,6 +41,8 @@ export interface MessagingPlatform {
   peekStatus?: (payload: unknown) => MessagingOutboundStatus | null;
   /** Group roster addresses from the raw inbound payload, excluding our line. */
   participants?: (raw: unknown) => string[];
+  /** Read access to the line's conversations; only the iMessage providers offer it. */
+  history?: IMessageHistory;
   /** Group display name from the raw inbound payload. */
   channelName?: (raw: unknown) => string | null;
   /** User-facing transport carried by the raw message when it differs from the provider. */
@@ -120,6 +124,10 @@ export class ChatSdkMessagingSurface implements MessagingSurface {
     }));
   }
 
+  history(provider: string): IMessageHistory | undefined {
+    return this.byProvider.get(provider)?.history;
+  }
+
   onInbound(sink: (event: MessagingInboundEvent) => Promise<void>): void {
     this.sink = sink;
   }
@@ -135,7 +143,12 @@ export class ChatSdkMessagingSurface implements MessagingSurface {
     _context: AdapterContext,
   ): Promise<MessagingSendResult> {
     await this.ensureInitialized();
-    const sent = await this.chat.thread(request.threadId).post(request.body);
+    // The adapter derives per-chunk send ids from the outbox key, so a retry of
+    // a half-sent reply does not repeat the chunks that already went out.
+    const post = () => this.chat.thread(request.threadId).post(request.body);
+    const sent = await (request.idempotencyKey
+      ? sendIdempotency.run(request.idempotencyKey, post)
+      : post());
     const handle = "id" in sent && typeof sent.id === "string" ? sent.id : "";
     return { handle };
   }

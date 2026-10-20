@@ -64,6 +64,13 @@ export interface AppEnv {
   sendblueApiSecret: string | undefined;
   sendblueSigningSecret: string | undefined;
   sendbluePhoneNumber: string | undefined;
+  bluebubblesUrl: string | undefined;
+  bluebubblesPassword: string | undefined;
+  bluebubblesWebhookToken: string | undefined;
+  photonProjectId: string | undefined;
+  photonProjectSecret: string | undefined;
+  photonWebhookSecret: string | undefined;
+  photonImessageAddress: string | undefined;
   smtpUrl: string | undefined;
   emailFrom: string | undefined;
   /** Billing turns on only when all three are set; self-hosted installs leave them unset. */
@@ -206,6 +213,13 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     sendblueApiSecret: optional(source.SENDBLUE_API_SECRET),
     sendblueSigningSecret: optional(source.SENDBLUE_SIGNING_SECRET),
     sendbluePhoneNumber: optional(source.SENDBLUE_PHONE_NUMBER),
+    bluebubblesUrl: optional(source.BLUEBUBBLES_URL),
+    bluebubblesPassword: optional(source.BLUEBUBBLES_PASSWORD),
+    bluebubblesWebhookToken: optional(source.BLUEBUBBLES_WEBHOOK_TOKEN),
+    photonProjectId: optional(source.PHOTON_PROJECT_ID),
+    photonProjectSecret: optional(source.PHOTON_PROJECT_SECRET),
+    photonWebhookSecret: optional(source.PHOTON_WEBHOOK_SECRET),
+    photonImessageAddress: optional(source.PHOTON_IMESSAGE_ADDRESS),
     smtpUrl: optional(source.SMTP_URL),
     emailFrom: optional(source.EMAIL_FROM),
     stripeSecretKey: optional(source.STRIPE_SECRET_KEY),

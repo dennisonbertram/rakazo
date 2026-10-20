@@ -29,6 +29,7 @@ const payloadSchemas = {
   "messaging.deliver": z.object({ runId: z.string().min(1).optional() }),
   "notifications.deliver": z.object({}),
   "notifications.retention": z.object({}),
+  "messaging.retention": z.object({}),
   "cloud_agent.poll": z.object({ agentId: z.string().min(1) }),
   "mail.search.expire": z.object({ searchId: z.string().min(1) }),
   "inbox.triage": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
@@ -37,6 +38,7 @@ const payloadSchemas = {
   "dataroom.ingest": dataRoomStepPayload,
   "dataroom.classify": dataRoomStepPayload,
   "dataroom.index": dataRoomStepPayload,
+  "dataroom.thumbnail": dataRoomStepPayload,
   "dataroom.drive.import": z.object({
     spaceId: z.string().min(1),
     userId: z.string().min(1),
@@ -289,7 +291,7 @@ export const DATA_ROOM_JOB_ATTEMPTS = 3;
 
 /** One queued job per item and step: a double enqueue replaces the first. */
 export function dataRoomStepJob(
-  name: "dataroom.ingest" | "dataroom.classify" | "dataroom.index",
+  name: "dataroom.ingest" | "dataroom.classify" | "dataroom.index" | "dataroom.thumbnail",
   scope: { spaceId: string; userId: string },
   itemId: string,
 ): BackgroundJob {

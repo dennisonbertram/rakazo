@@ -1,7 +1,13 @@
 import type { JobPublisher, MessagingInboundMessage } from "@rakazo/adapter-kit";
 import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
-import { parseMessagingCommand, sanitizeMessagingLabel } from "@rakazo/core";
+import {
+  MESSAGING_PHOTON_BLOCKED_MESSAGE,
+  messagingProviderBlocksBot,
+  messagingProviderRestrictsAgents,
+  parseMessagingCommand,
+  sanitizeMessagingLabel,
+} from "@rakazo/core";
 import type {
   MessagingIdentityRequest,
   Prisma,
@@ -11,9 +17,12 @@ import type {
   ThreadEvents,
 } from "@rakazo/db";
 import {
+  claimInboundMessage,
   createThreadMessage,
+  messagingInboundKey,
   normalizeMessagingLinkCode,
   redeemMessagingLinkCode,
+  releaseInboundMessage,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import {
@@ -67,11 +76,23 @@ type IdentityRow = {
  */
 export function createMessagingInboundHandler(deps: MessagingInboundDeps) {
   return async (event: MessagingInboundMessage): Promise<void> => {
-    if (!event.isDirect) {
-      await handleChannelEvent(deps, event);
-      return;
+    // Claim the provider message durably before any side effect. Replays (a
+    // poll, a restart, another replica, a vendor retry after we answered) would
+    // otherwise re-run the counter reset, owner commands (YES answers the
+    // NEWEST pending item, which may be a different one by now) and link-code
+    // redemption. A failed attempt gives the claim back so the retry runs.
+    const key = messagingInboundKey(event.provider, event.handle);
+    if (!(await claimInboundMessage(deps.prisma, key))) return;
+    try {
+      if (!event.isDirect) {
+        await handleChannelEvent(deps, event);
+        return;
+      }
+      await handleDirectEvent(deps, event);
+    } catch (error) {
+      await releaseInboundMessage(deps.prisma, key).catch(() => undefined);
+      throw error;
     }
-    await handleDirectEvent(deps, event);
   };
 }
 
@@ -310,6 +331,35 @@ async function tryRedeemLinkCode(
 ): Promise<boolean> {
   const code = normalizeMessagingLinkCode(event.content);
   if (!code) return false;
+  if (messagingProviderRestrictsAgents(event.provider)) {
+    // Look before redeeming, so a refused code stays usable on another app.
+    const row = await deps.prisma.messagingLinkCode.findUnique({
+      where: { code },
+      select: { botId: true },
+    });
+    const bot = row
+      ? await deps.prisma.bot.findUnique({
+          where: { id: row.botId },
+          select: { spawnKey: true },
+        })
+      : null;
+    if (bot && messagingProviderBlocksBot(event.provider, bot.spawnKey)) {
+      // An unlinked sender has no identity to reply to, so only a linked one hears why.
+      const linked = await deps.prisma.messagingIdentity.findUnique({
+        where: { provider_address: { provider: event.provider, address: event.from } },
+        select: { id: true },
+      });
+      if (linked) {
+        await enqueueConfirmation(
+          deps,
+          linked,
+          `link-blocked:${event.handle}`,
+          MESSAGING_PHOTON_BLOCKED_MESSAGE,
+        );
+      }
+      return true;
+    }
+  }
   const redeemed = await redeemMessagingLinkCode(deps.prisma, {
     code,
     provider: event.provider,
