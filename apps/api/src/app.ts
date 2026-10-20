@@ -32,6 +32,7 @@ import {
   createBackgroundJobHandlers,
   createBlueBubblesPollState,
   createCloudAgentConnection,
+  createCompanyImportEngine,
   createConnectorStack,
   createDevinCallTool,
   createFinanceCallToolFor,
@@ -580,6 +581,12 @@ export async function createApp(
     shutdownSignal: shutdown.signal,
   });
 
+  const companyImport = createCompanyImportEngine({
+    prisma,
+    jobs,
+    realtime,
+    resolveModel: executor.resolveModel,
+  });
   const jobHandlers = createBackgroundJobHandlers({
     executor,
     prisma,
@@ -611,6 +618,7 @@ export async function createApp(
     mailWritesDisabled: env.mailWritesDisabled,
     gmailPush,
     ...(meetingSources ? { meetingSources } : {}),
+    companyImport,
   });
   if (inMemoryJobs) {
     await inMemoryJobs.start(jobHandlers);
@@ -624,6 +632,7 @@ export async function createApp(
         reconcileCloudAgents: () => reconcileCloudAgents({ prisma, jobs, cloudAgent }),
         reconcileComputerUpdates: () => reconcileComputerUpdates({ prisma, jobs }),
         reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
+        reconcileCompanyImports: () => companyImport.recoveryJob(),
       })
     : undefined;
   reconciler?.start();
@@ -644,6 +653,7 @@ export async function createApp(
     ticketChanges,
     boardEvents,
     notificationEvents,
+    companyImport,
     auth,
     jobs,
     sandbox,
