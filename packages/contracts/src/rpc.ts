@@ -1482,6 +1482,8 @@ export const appContract = {
     },
   },
   company: {
+    /** Idempotent: creates the Company agent; returns the bot to open in the side panel. */
+    agent: oc.output(BotSchema),
     privacy: oc.output(CompanyPrivacySchema),
     sourceControl: oc.input(CompanySourceControlSchema).output(z.object({ ok: z.literal(true) })),
     excludePerson: oc.input(z.object({ entityId: Id })).output(z.object({ ok: z.literal(true) })),
@@ -1497,6 +1499,8 @@ export const appContract = {
     editEvent: oc.input(CompanyEventEditInputSchema).output(z.object({ ok: z.literal(true) })),
   },
   companyImport: {
+    /** Idempotent: creates the Company importer; returns the bot to open in the side panel. */
+    agent: oc.output(BotSchema),
     catalog: oc.output(CompanyImportCatalogSchema),
     session: oc
       .input(CompanyImportSessionInputSchema)
