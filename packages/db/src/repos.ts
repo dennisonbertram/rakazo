@@ -7,6 +7,7 @@ import {
   userVisibleMessages,
 } from "@rakazo/core";
 import type { PrismaClient } from "./client.js";
+import { Prisma } from "./client.js";
 import type { ComputerMode } from "./computers.js";
 import { ensureComputerRecord, parseComputerMode } from "./computers.js";
 import { createThreadMessageInTransaction } from "./messages.js";
@@ -26,6 +27,59 @@ import { withTransactionRetry } from "./transaction-retry.js";
 
 /** Newest messages loaded for sidebar preview; enough to skip a short peer-run tail. */
 const SIDEBAR_PREVIEW_MESSAGE_WINDOW = 16;
+
+/** Scalar columns the sidebar preview and its older-page fallback both read. */
+interface SidebarPreviewMessage {
+  id: string;
+  threadId: string;
+  seq: number;
+  role: string;
+  blocks: Prisma.JsonValue;
+  botId: string | null;
+  replyToMessageId: string | null;
+  replyQuote: string | null;
+  runId: string | null;
+  clientNonce: string | null;
+  createdAt: Date;
+}
+
+/**
+ * One indexed read of the newest preview window per thread. A nested `take` on
+ * `bot.findMany` is applied in memory and would load every message.
+ */
+async function withSidebarPreviewMessages<T extends { thread: { id: string } | null }>(
+  prisma: PrismaClient,
+  bots: T[],
+) {
+  const threadIds = bots.flatMap((bot) => (bot.thread ? [bot.thread.id] : []));
+  const loaded =
+    threadIds.length === 0
+      ? []
+      : await prisma.$queryRaw<SidebarPreviewMessage[]>(Prisma.sql`
+          SELECT m.id, m."threadId", m.seq, m.role, m.blocks, m."botId",
+            m."replyToMessageId", m."replyQuote", m."runId", m."clientNonce", m."createdAt"
+          FROM unnest(${threadIds}::text[]) AS t(id)
+          CROSS JOIN LATERAL (
+            SELECT id, "threadId", seq, role, blocks, "botId", "replyToMessageId", "replyQuote",
+              "runId", "clientNonce", "createdAt"
+            FROM messages
+            WHERE "threadId" = t.id
+            ORDER BY seq DESC
+            LIMIT ${SIDEBAR_PREVIEW_MESSAGE_WINDOW}
+          ) m
+          ORDER BY m."threadId", m.seq DESC
+        `);
+  const byThread = new Map<string, SidebarPreviewMessage[]>();
+  for (const row of loaded) {
+    const list = byThread.get(row.threadId);
+    if (list) list.push(row);
+    else byThread.set(row.threadId, [row]);
+  }
+  return bots.map((bot) => ({
+    ...bot,
+    thread: bot.thread ? { ...bot.thread, messages: byThread.get(bot.thread.id) ?? [] } : null,
+  }));
+}
 
 function isSpawnKeyConflict(error: unknown): boolean {
   if (!isUniqueViolation(error)) return false;
@@ -305,24 +359,26 @@ export function createRepos(prisma: PrismaClient) {
     },
 
     async listBots(actor: Actor, options: { archived?: boolean } = {}): Promise<Bot[]> {
-      const bots = await prisma.bot.findMany({
-        where: {
-          spaceId: actor.spaceId,
-          userId: actor.userId,
-          archivedAt: options.archived ? { not: null } : null,
-        },
-        include: {
-          thread: {
-            include: {
-              messages: { orderBy: { seq: "desc" }, take: SIDEBAR_PREVIEW_MESSAGE_WINDOW },
-              runs: latestBotRunSelection,
-            },
+      const bots = await withSidebarPreviewMessages(
+        prisma,
+        await prisma.bot.findMany({
+          where: {
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+            archivedAt: options.archived ? { not: null } : null,
           },
-          runs: activeRunSelection,
-          computer: { select: { scope: true } },
-        },
-        orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
-      });
+          include: {
+            thread: {
+              include: {
+                runs: latestBotRunSelection,
+              },
+            },
+            runs: activeRunSelection,
+            computer: { select: { scope: true } },
+          },
+          orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
+        }),
+      );
       const candidateRunIds = [
         ...new Set(
           bots.flatMap((bot) =>
