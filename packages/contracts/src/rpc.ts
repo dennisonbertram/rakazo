@@ -36,6 +36,8 @@ import {
 import {
   CompanyImportActionInputSchema,
   CompanyImportCatalogSchema,
+  CompanyImportChannelsInputSchema,
+  CompanyImportChannelsSchema,
   CompanyImportConsentInputSchema,
   CompanyImportCreateInputSchema,
   CompanyImportEventSchema,
@@ -1502,6 +1504,7 @@ export const appContract = {
     /** Idempotent: creates the Company importer; returns the bot to open in the side panel. */
     agent: oc.output(BotSchema),
     catalog: oc.output(CompanyImportCatalogSchema),
+    channels: oc.input(CompanyImportChannelsInputSchema).output(CompanyImportChannelsSchema),
     session: oc
       .input(CompanyImportSessionInputSchema)
       .output(CompanyImportSessionSchema.nullable()),

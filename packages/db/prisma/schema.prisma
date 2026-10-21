@@ -3529,6 +3529,7 @@ model CompanyImportSource {
   sourceKey           String
   sourceKind          String
   connectionId        String?
+  mcpServerId         String?
   scope               Json               @default("{}")
   plan                Json               @default("{}")
   cursor              Json?
