@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   addScratchpadItemFromTool,
   consumeApprovedPost,
+  removeScratchpadItemFromTool,
   updateScratchpadItemFromUser,
 } from "./scratchpad-tools.js";
 
@@ -87,7 +88,7 @@ describePostgres("scratchpad store (PostgreSQL)", () => {
       spaceId,
       userId,
       botId,
-      text: " Concurrent post ",
+      text: "Concurrent post",
       scheduledFor: scheduledFor.toISOString(),
       target: "account-concurrent",
     };
@@ -119,6 +120,55 @@ describePostgres("scratchpad store (PostgreSQL)", () => {
     });
     expect(unconsumedCopy).toHaveLength(1);
     expect(unconsumedCopy[0]?.id).not.toBe(consumed.item?.id);
+  });
+
+  it("requires exact approved post text before consuming and preserves gated work from agents", async () => {
+    const scheduledFor = new Date(Date.now() + 60 * 60_000);
+    const item = await post("Exact post", scheduledFor, "account-whitespace");
+    const base = {
+      spaceId,
+      userId,
+      botId,
+      scheduledFor: scheduledFor.toISOString(),
+      target: "account-whitespace",
+    };
+    const whitespaceOnlyMismatch = await consumeApprovedPost(
+      { prisma },
+      {
+        ...base,
+        text: "  Exact post ",
+        effectKey: effectKey("whitespace-mismatch"),
+      },
+    );
+    const afterMismatch = await prisma.scratchpadItem.findFirst({
+      where: { id: item.id, spaceId, userId, botId },
+    });
+    const exactText = await consumeApprovedPost(
+      { prisma },
+      {
+        ...base,
+        text: "Exact post",
+        effectKey: effectKey("exact-text"),
+      },
+    );
+    const afterExact = await prisma.scratchpadItem.findFirst({
+      where: { id: item.id, spaceId, userId, botId },
+    });
+    expect(whitespaceOnlyMismatch.count).toBe(0);
+    expect(afterMismatch).toMatchObject({ proof: null });
+    expect(exactText.count).toBe(1);
+    expect(afterExact).toMatchObject({ proof: effectKey("exact-text") });
+
+    const protectedItem = await post("Protected post", scheduledFor, "account-protected");
+    const removal = await removeScratchpadItemFromTool(
+      { prisma },
+      { spaceId, userId, botId, itemId: protectedItem.id },
+    );
+    const survivingItem = await prisma.scratchpadItem.findFirst({
+      where: { id: protectedItem.id, spaceId, userId, botId },
+    });
+    expect(removal).toMatchObject({ error: expect.any(String) });
+    expect(survivingItem).not.toBeNull();
   });
 
   it("makes a stale founder approval lose its guarded update", async () => {

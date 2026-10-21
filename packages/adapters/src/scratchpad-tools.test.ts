@@ -12,6 +12,7 @@ import {
   listScratchpadItemsFromTool,
   mapScratchpadItem,
   removeScratchpadItemFromTool,
+  removeScratchpadItemFromUser,
   updateScratchpadItemFromTool,
   updateScratchpadItemFromUser,
 } from "./scratchpad-tools.js";
@@ -798,7 +799,7 @@ describe("scratchpad tools store", () => {
     const prisma = prismaWith({ findFirst, updateMany });
     const input = {
       ...scope,
-      text: "  Exact post ",
+      text: "Exact post",
       scheduledFor: "2026-08-25T13:00:00+00:00",
       target: "account-1",
       effectKey,
@@ -916,12 +917,120 @@ describe("scratchpad tools store", () => {
   });
 
   it("keeps remove and list wrapper scoped", async () => {
-    const prisma = prismaWith();
+    const prisma = prismaWith({
+      findFirst: vi.fn(async () => row({ category: null })),
+    });
     await removeScratchpadItemFromTool({ prisma: prisma as never }, { ...scope, itemId: "item-1" });
     expect(prisma.scratchpadItem.deleteMany).toHaveBeenCalledWith({
-      where: { ...scope, id: "item-1" },
+      where: { ...scope, id: "item-1", updatedAt: now, category: null },
     });
     const result = await listScratchpadItemsFromTool({ prisma: prisma as never }, scope);
     expect(result.items).toEqual([]);
+  });
+
+  it("does not allow an agent to remove any gated category", async () => {
+    const gatedRows = [
+      row({
+        category: "public_post",
+        status: "open",
+        proof: effectKey,
+        approvedAt: now,
+        approvedBy: "user",
+      }),
+      row({
+        category: "create_account",
+        status: "parked",
+        proof: "https://example.test/signup",
+        approvedAt: now,
+        approvedBy: "user",
+      }),
+      row({
+        category: "outbound_email",
+        status: "done",
+        proof: "gmail:item-1",
+        approvedAt: now,
+        approvedBy: "user",
+      }),
+    ];
+    for (const candidate of gatedRows) {
+      const prisma = prismaWith({ findFirst: vi.fn(async () => candidate) });
+      await expect(
+        removeScratchpadItemFromTool(
+          { prisma: prisma as never },
+          { ...scope, itemId: candidate.id },
+        ),
+      ).resolves.toMatchObject({ error: expect.any(String) });
+      expect(prisma.scratchpadItem.deleteMany).not.toHaveBeenCalled();
+    }
+  });
+
+  it("allows a founder to discard gated work with a scoped version and category guard", async () => {
+    const candidate = row({
+      status: "done",
+      proof: "https://social.example/post/1",
+      approvedAt: now,
+      approvedBy: "user",
+    });
+    const deleteMany = vi.fn(async () => ({ count: 1 }));
+    const prisma = prismaWith({
+      findFirst: vi.fn(async () => candidate),
+      deleteMany,
+    });
+    await expect(
+      removeScratchpadItemFromUser({ prisma: prisma as never }, { ...scope, itemId: candidate.id }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: {
+        ...scope,
+        id: candidate.id,
+        updatedAt: candidate.updatedAt,
+        category: "public_post",
+      },
+    });
+  });
+
+  it("allows agent removal of plain, research, and draft items with a scoped guard", async () => {
+    for (const category of [null, "research", "draft"]) {
+      const candidate = row({ category, status: "done" });
+      const deleteMany = vi.fn(async () => ({ count: 1 }));
+      const prisma = prismaWith({
+        findFirst: vi.fn(async () => candidate),
+        deleteMany,
+      });
+      await expect(
+        removeScratchpadItemFromTool(
+          { prisma: prisma as never },
+          { ...scope, itemId: candidate.id },
+        ),
+      ).resolves.toMatchObject({ ok: true });
+      expect(deleteMany).toHaveBeenCalledWith({
+        where: {
+          ...scope,
+          id: candidate.id,
+          updatedAt: candidate.updatedAt,
+          category,
+        },
+      });
+    }
+  });
+
+  it("returns the changed retry error when guarded removal matches no row", async () => {
+    const candidate = row({ category: null });
+    const deleteMany = vi.fn(async () => ({ count: 0 }));
+    const prisma = prismaWith({
+      findFirst: vi.fn(async () => candidate),
+      deleteMany,
+    });
+    await expect(
+      removeScratchpadItemFromTool({ prisma: prisma as never }, { ...scope, itemId: candidate.id }),
+    ).resolves.toEqual({ error: "Scratchpad item changed; retry." });
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: {
+        ...scope,
+        id: candidate.id,
+        updatedAt: candidate.updatedAt,
+        category: null,
+      },
+    });
   });
 });

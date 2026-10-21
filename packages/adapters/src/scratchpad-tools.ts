@@ -576,11 +576,24 @@ export async function completeScratchpadItemFromTool(
   return updateScratchpadItemFromTool(deps, { ...input, status: "done" });
 }
 
-async function removeScratchpadItem(deps: ScratchpadToolDeps, input: Scope & { itemId: string }) {
+async function removeScratchpadItem(
+  deps: ScratchpadToolDeps,
+  input: Scope & { itemId: string },
+  founder: boolean,
+) {
   const existing = await scopedItem(deps.prisma, input);
   if (!existing) return { error: "Scratchpad item not found." };
+  const category = categoryValue(existing.category);
+  if (!founder && isGated(category)) {
+    return { error: "Only the founder can remove gated items." };
+  }
   const result = await deps.prisma.scratchpadItem.deleteMany({
-    where: { ...scopeOf(input), id: existing.id },
+    where: {
+      ...scopeOf(input),
+      id: existing.id,
+      updatedAt: existing.updatedAt,
+      category,
+    },
   });
   if (result.count !== 1) return { error: "Scratchpad item changed; retry." };
   return { ok: true as const, itemId: existing.id, title: existing.title };
@@ -590,14 +603,14 @@ export function removeScratchpadItemFromTool(
   deps: ScratchpadToolDeps,
   input: Scope & { itemId: string },
 ) {
-  return removeScratchpadItem(deps, input);
+  return removeScratchpadItem(deps, input, false);
 }
 
 export function removeScratchpadItemFromUser(
   deps: ScratchpadToolDeps,
   input: Scope & { itemId: string },
 ) {
-  return removeScratchpadItem(deps, input);
+  return removeScratchpadItem(deps, input, true);
 }
 
 export async function listScratchpadItemsFromTool(
@@ -684,12 +697,12 @@ export async function consumeApprovedPost(
   if (typeof input.text !== "string" || typeof input.target !== "string") {
     return { count: 0 };
   }
-  const text = input.text.trim();
+  const text = input.text;
   const scheduledFor = parseAbsoluteDateTime(input.scheduledFor);
   const target = input.target;
   const now = input.now?.() ?? new Date();
   if (
-    !text ||
+    !text.trim() ||
     text.length > NOTES_MAX ||
     target.length === 0 ||
     target.length > TARGET_MAX ||
