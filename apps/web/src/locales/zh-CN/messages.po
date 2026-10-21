@@ -5101,7 +5101,7 @@ msgid "just now"
 msgstr "刚刚"
 
 #: src/components/tour/FirstRunTour.tsx
-msgid "Keep contracts here, and see who owns what in Cap table."
+msgid "Keep contracts here, and see who owns what in Investors."
 msgstr ""
 
 #: src/pages/DataRoom.tsx
