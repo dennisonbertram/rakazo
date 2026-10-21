@@ -7460,9 +7460,6 @@
                                                   ],
                                                   "additionalProperties": false
                                                 },
-                                                "share": {
-                                                  "type": "boolean"
-                                                },
                                                 "consent": {
                                                   "type": "object",
                                                   "properties": {
@@ -8490,13 +8487,6 @@
                                                 },
                                                 "ownerOrigin": {
                                                   "type": "boolean"
-                                                },
-                                                "externalOrigin": {
-                                                  "type": "boolean"
-                                                },
-                                                "externalOriginName": {
-                                                  "type": "string",
-                                                  "maxLength": 200
                                                 }
                                               },
                                               "required": [
@@ -11531,25 +11521,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcBotsCreateOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -11591,9 +11562,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -11973,25 +11941,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcBotsDuplicateOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -12033,9 +11982,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -12415,25 +12361,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcBotsGetOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -12475,9 +12402,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -12846,25 +12770,6 @@
                               "type": "string"
                             }
                           },
-                          "audience": {
-                            "default": "internal",
-                            "type": "string",
-                            "enum": [
-                              "internal",
-                              "external"
-                            ]
-                          },
-                          "externalMessageTargets": {
-                            "default": [],
-                            "type": "array",
-                            "items": {
-                              "$ref": "#/components/schemas/RpcBotsListOutputSchema0"
-                            }
-                          },
-                          "externalComputerTools": {
-                            "default": false,
-                            "type": "boolean"
-                          },
                           "webhookConfigured": {
                             "type": "boolean"
                           },
@@ -12906,9 +12811,6 @@
                           "teamChatAmbientEnabled",
                           "teamChatRules",
                           "disabledBuiltinTools",
-                          "audience",
-                          "externalMessageTargets",
-                          "externalComputerTools",
                           "webhookConfigured",
                           "spawnKey"
                         ],
@@ -13278,25 +13180,6 @@
                               "type": "string"
                             }
                           },
-                          "audience": {
-                            "default": "internal",
-                            "type": "string",
-                            "enum": [
-                              "internal",
-                              "external"
-                            ]
-                          },
-                          "externalMessageTargets": {
-                            "default": [],
-                            "type": "array",
-                            "items": {
-                              "$ref": "#/components/schemas/RpcBotsListArchivedOutputSchema0"
-                            }
-                          },
-                          "externalComputerTools": {
-                            "default": false,
-                            "type": "boolean"
-                          },
                           "webhookConfigured": {
                             "type": "boolean"
                           },
@@ -13338,9 +13221,6 @@
                           "teamChatAmbientEnabled",
                           "teamChatRules",
                           "disabledBuiltinTools",
-                          "audience",
-                          "externalMessageTargets",
-                          "externalComputerTools",
                           "webhookConfigured",
                           "spawnKey"
                         ],
@@ -14382,25 +14262,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcBotsSetComputerOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -14442,9 +14303,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -14621,17 +14479,8 @@
                       "disabledBuiltinTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema17"
                       },
-                      "audience": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
-                      },
-                      "externalMessageTargets": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema20"
-                      },
-                      "externalComputerTools": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema21"
-                      },
                       "runsOn": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema22"
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
                       }
                     },
                     "required": [
@@ -14888,25 +14737,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcBotsUpdateOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -14948,9 +14778,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -16177,25 +16004,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcCartaAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -16237,9 +16045,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -24153,25 +23958,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcDataRoomAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -24213,9 +23999,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -24544,8 +24327,7 @@
                           "type": "string",
                           "enum": [
                             "ai_unavailable",
-                            "ai_failed",
-                            "ai_rejected"
+                            "ai_failed"
                           ]
                         },
                         "operations": {
@@ -31092,25 +30874,6 @@
                                     "type": "string"
                                   }
                                 },
-                                "audience": {
-                                  "default": "internal",
-                                  "type": "string",
-                                  "enum": [
-                                    "internal",
-                                    "external"
-                                  ]
-                                },
-                                "externalMessageTargets": {
-                                  "default": [],
-                                  "type": "array",
-                                  "items": {
-                                    "$ref": "#/components/schemas/RpcDevinAgentOutputSchema0"
-                                  }
-                                },
-                                "externalComputerTools": {
-                                  "default": false,
-                                  "type": "boolean"
-                                },
                                 "webhookConfigured": {
                                   "type": "boolean"
                                 },
@@ -31152,9 +30915,6 @@
                                 "teamChatAmbientEnabled",
                                 "teamChatRules",
                                 "disabledBuiltinTools",
-                                "audience",
-                                "externalMessageTargets",
-                                "externalComputerTools",
                                 "webhookConfigured",
                                 "spawnKey"
                               ],
@@ -32464,9 +32224,6 @@
                                           ],
                                           "additionalProperties": false
                                         },
-                                        "share": {
-                                          "type": "boolean"
-                                        },
                                         "consent": {
                                           "type": "object",
                                           "properties": {
@@ -33494,13 +33251,6 @@
                                         },
                                         "ownerOrigin": {
                                           "type": "boolean"
-                                        },
-                                        "externalOrigin": {
-                                          "type": "boolean"
-                                        },
-                                        "externalOriginName": {
-                                          "type": "string",
-                                          "maxLength": 200
                                         }
                                       },
                                       "required": [
@@ -35095,25 +34845,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcFinanceAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -35155,9 +34886,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -35858,11 +35586,6 @@
                             ],
                             "additionalProperties": false
                           }
-                        },
-                        "excludedNonUsdCount": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
                         },
                         "recent": {
                           "type": "array",
@@ -39454,11 +39177,6 @@
                             "variable": {
                               "type": "boolean"
                             },
-                            "windowMonths": {
-                              "type": "integer",
-                              "minimum": -9007199254740991,
-                              "maximum": 9007199254740991
-                            },
                             "chargeCount": {
                               "type": "integer",
                               "minimum": -9007199254740991,
@@ -42410,9 +42128,6 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
-                        "monthlyUsual": {
-                          "type": "boolean"
-                        },
                         "changePct": {
                           "type": [
                             "number",
@@ -44506,9 +44221,6 @@
                                           ],
                                           "additionalProperties": false
                                         },
-                                        "share": {
-                                          "type": "boolean"
-                                        },
                                         "consent": {
                                           "type": "object",
                                           "properties": {
@@ -45536,13 +45248,6 @@
                                         },
                                         "ownerOrigin": {
                                           "type": "boolean"
-                                        },
-                                        "externalOrigin": {
-                                          "type": "boolean"
-                                        },
-                                        "externalOriginName": {
-                                          "type": "string",
-                                          "maxLength": 200
                                         }
                                       },
                                       "required": [
@@ -47594,25 +47299,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcInboxAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -47654,9 +47340,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -48389,25 +48072,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcInboxAskAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -48449,9 +48113,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -53813,435 +53474,6 @@
         ]
       }
     },
-    "/rpc/investors/agent": {
-      "post": {
-        "operationId": "rpc_investors_agent",
-        "parameters": [
-          {
-            "name": "Origin",
-            "in": "header",
-            "required": false,
-            "description": "Native clients send rakazo://; include the application origin for origin checks.",
-            "schema": {
-              "type": "string",
-              "example": "rakazo://"
-            }
-          },
-          {
-            "name": "x-rakazo-space-id",
-            "in": "header",
-            "required": false,
-            "description": "Optional selected space identifier.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "json": {
-                    "description": "This procedure has no input."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful RPC response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "json"
-                  ],
-                  "properties": {
-                    "json": {
-                      "$schema": "https://json-schema.org/draft/2020-12/schema",
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
-                        },
-                        "spaceId": {
-                          "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "title": {
-                          "type": "string"
-                        },
-                        "description": {
-                          "type": "string"
-                        },
-                        "instructions": {
-                          "type": "string"
-                        },
-                        "color": {
-                          "type": "string"
-                        },
-                        "notifyOnFinish": {
-                          "type": "boolean"
-                        },
-                        "pinned": {
-                          "type": "boolean"
-                        },
-                        "sectionId": {
-                          "anyOf": [
-                            {
-                              "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "position": {
-                          "anyOf": [
-                            {
-                              "type": "integer",
-                              "minimum": -9007199254740991,
-                              "maximum": 9007199254740991
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "archivedAt": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "unread": {
-                          "type": "boolean"
-                        },
-                        "parentBotId": {
-                          "anyOf": [
-                            {
-                              "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "memoryScope": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "isolated",
-                                "shared"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "threadId": {
-                          "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
-                        },
-                        "preview": {
-                          "type": "string"
-                        },
-                        "status": {
-                          "type": "string"
-                        },
-                        "runPhase": {
-                          "default": null,
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "computer_wait",
-                                    "computer_start",
-                                    "connecting",
-                                    "model_wait",
-                                    "thinking",
-                                    "retrying"
-                                  ]
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "at": {
-                                  "type": "string"
-                                },
-                                "since": {
-                                  "type": "string"
-                                },
-                                "count": {
-                                  "type": "integer",
-                                  "exclusiveMinimum": 0,
-                                  "maximum": 9007199254740991
-                                }
-                              },
-                              "required": [
-                                "kind",
-                                "at"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "runErrorId": {
-                          "default": null,
-                          "anyOf": [
-                            {
-                              "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "computerMode": {
-                          "type": "string",
-                          "enum": [
-                            "team",
-                            "dedicated"
-                          ]
-                        },
-                        "runsOn": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "docker",
-                                "this-mac"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "updatedAt": {
-                          "type": "string"
-                        },
-                        "createdAt": {
-                          "type": "string"
-                        },
-                        "voiceId": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "autoSpeak": {
-                          "type": "boolean"
-                        },
-                        "modelProvider": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "modelId": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "thinkingLevel": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "off",
-                                "minimal",
-                                "low",
-                                "medium",
-                                "high",
-                                "xhigh",
-                                "max"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "teamChatAmbientEnabled": {
-                          "type": "boolean"
-                        },
-                        "teamChatRules": {
-                          "type": "string"
-                        },
-                        "disabledBuiltinTools": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
-                        "webhookConfigured": {
-                          "type": "boolean"
-                        },
-                        "spawnKey": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "spaceId",
-                        "name",
-                        "title",
-                        "description",
-                        "instructions",
-                        "color",
-                        "notifyOnFinish",
-                        "pinned",
-                        "sectionId",
-                        "archivedAt",
-                        "unread",
-                        "parentBotId",
-                        "memoryScope",
-                        "threadId",
-                        "preview",
-                        "status",
-                        "runPhase",
-                        "runErrorId",
-                        "computerMode",
-                        "updatedAt",
-                        "createdAt",
-                        "voiceId",
-                        "autoSpeak",
-                        "modelProvider",
-                        "modelId",
-                        "thinkingLevel",
-                        "teamChatAmbientEnabled",
-                        "teamChatRules",
-                        "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
-                        "webhookConfigured",
-                        "spawnKey"
-                      ],
-                      "additionalProperties": false
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Http400"
-          },
-          "401": {
-            "$ref": "#/components/responses/Http401"
-          },
-          "402": {
-            "$ref": "#/components/responses/Http402"
-          },
-          "403": {
-            "$ref": "#/components/responses/Http403"
-          },
-          "404": {
-            "$ref": "#/components/responses/Http404"
-          },
-          "405": {
-            "$ref": "#/components/responses/Http405"
-          },
-          "406": {
-            "$ref": "#/components/responses/Http406"
-          },
-          "408": {
-            "$ref": "#/components/responses/Http408"
-          },
-          "409": {
-            "$ref": "#/components/responses/Http409"
-          },
-          "410": {
-            "$ref": "#/components/responses/Http410"
-          },
-          "412": {
-            "$ref": "#/components/responses/Http412"
-          },
-          "413": {
-            "$ref": "#/components/responses/Http413"
-          },
-          "415": {
-            "$ref": "#/components/responses/Http415"
-          },
-          "422": {
-            "$ref": "#/components/responses/Http422"
-          },
-          "428": {
-            "$ref": "#/components/responses/Http428"
-          },
-          "429": {
-            "$ref": "#/components/responses/Http429"
-          },
-          "499": {
-            "$ref": "#/components/responses/Http499"
-          },
-          "500": {
-            "$ref": "#/components/responses/Http500"
-          },
-          "501": {
-            "$ref": "#/components/responses/Http501"
-          },
-          "502": {
-            "$ref": "#/components/responses/Http502"
-          },
-          "503": {
-            "$ref": "#/components/responses/Http503"
-          },
-          "504": {
-            "$ref": "#/components/responses/Http504"
-          },
-          "default": {
-            "$ref": "#/components/responses/OtherORPCError"
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/rpc/legal/agent": {
       "post": {
         "operationId": "rpc_legal_agent",
@@ -54521,25 +53753,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcLegalAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -54581,9 +53794,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -55877,6 +55087,20 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "modelBlocker": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "own_key",
+                                "model_changed"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -55884,7 +55108,8 @@
                         "deadlines",
                         "counts",
                         "agent",
-                        "model"
+                        "model",
+                        "modelBlocker"
                       ],
                       "additionalProperties": false
                     }
@@ -68654,16 +67879,10 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
-                        "devinConnected": {
-                          "type": "boolean"
-                        },
                         "dataRoomWaiting": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
-                        },
-                        "hasTickets": {
-                          "type": "boolean"
                         },
                         "botKinds": {
                           "type": "object",
@@ -68686,9 +67905,7 @@
                         "financeRunwayMonths",
                         "legalDueSoon",
                         "devinNeedsYou",
-                        "devinConnected",
                         "dataRoomWaiting",
-                        "hasTickets",
                         "botKinds"
                       ],
                       "additionalProperties": false
@@ -80696,25 +79913,6 @@
                                       "type": "string"
                                     }
                                   },
-                                  "audience": {
-                                    "default": "internal",
-                                    "type": "string",
-                                    "enum": [
-                                      "internal",
-                                      "external"
-                                    ]
-                                  },
-                                  "externalMessageTargets": {
-                                    "default": [],
-                                    "type": "array",
-                                    "items": {
-                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
-                                    }
-                                  },
-                                  "externalComputerTools": {
-                                    "default": false,
-                                    "type": "boolean"
-                                  },
                                   "webhookConfigured": {
                                     "type": "boolean"
                                   },
@@ -80756,9 +79954,6 @@
                                   "teamChatAmbientEnabled",
                                   "teamChatRules",
                                   "disabledBuiltinTools",
-                                  "audience",
-                                  "externalMessageTargets",
-                                  "externalComputerTools",
                                   "webhookConfigured",
                                   "spawnKey"
                                 ],
@@ -82397,9 +81592,6 @@
                                           ],
                                           "additionalProperties": false
                                         },
-                                        "share": {
-                                          "type": "boolean"
-                                        },
                                         "consent": {
                                           "type": "object",
                                           "properties": {
@@ -83427,13 +82619,6 @@
                                         },
                                         "ownerOrigin": {
                                           "type": "boolean"
-                                        },
-                                        "externalOrigin": {
-                                          "type": "boolean"
-                                        },
-                                        "externalOriginName": {
-                                          "type": "string",
-                                          "maxLength": 200
                                         }
                                       },
                                       "required": [
@@ -84548,9 +83733,6 @@
                                           ],
                                           "additionalProperties": false
                                         },
-                                        "share": {
-                                          "type": "boolean"
-                                        },
                                         "consent": {
                                           "type": "object",
                                           "properties": {
@@ -85578,13 +84760,6 @@
                                         },
                                         "ownerOrigin": {
                                           "type": "boolean"
-                                        },
-                                        "externalOrigin": {
-                                          "type": "boolean"
-                                        },
-                                        "externalOriginName": {
-                                          "type": "string",
-                                          "maxLength": 200
                                         }
                                       },
                                       "required": [
@@ -90359,25 +89534,6 @@
                             "type": "string"
                           }
                         },
-                        "audience": {
-                          "default": "internal",
-                          "type": "string",
-                          "enum": [
-                            "internal",
-                            "external"
-                          ]
-                        },
-                        "externalMessageTargets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/RpcVoiceAgentOutputSchema0"
-                          }
-                        },
-                        "externalComputerTools": {
-                          "default": false,
-                          "type": "boolean"
-                        },
                         "webhookConfigured": {
                           "type": "boolean"
                         },
@@ -90419,9 +89575,6 @@
                         "teamChatAmbientEnabled",
                         "teamChatRules",
                         "disabledBuiltinTools",
-                        "audience",
-                        "externalMessageTargets",
-                        "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
                       ],
@@ -92692,25 +91845,6 @@
               "type": "string"
             }
           },
-          "audience": {
-            "default": "internal",
-            "type": "string",
-            "enum": [
-              "internal",
-              "external"
-            ]
-          },
-          "externalMessageTargets": {
-            "default": [],
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
-            }
-          },
-          "externalComputerTools": {
-            "default": false,
-            "type": "boolean"
-          },
           "webhookConfigured": {
             "type": "boolean"
           },
@@ -92752,9 +91886,6 @@
           "teamChatAmbientEnabled",
           "teamChatRules",
           "disabledBuiltinTools",
-          "audience",
-          "externalMessageTargets",
-          "externalComputerTools",
           "webhookConfigured",
           "spawnKey"
         ],
@@ -93728,23 +92859,6 @@
         "maxLength": 64
       },
       "RpcBotsUpdateInputSchema19": {
-        "type": "string",
-        "enum": [
-          "internal",
-          "external"
-        ]
-      },
-      "RpcBotsUpdateInputSchema20": {
-        "maxItems": 200,
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
-        }
-      },
-      "RpcBotsUpdateInputSchema21": {
-        "type": "boolean"
-      },
-      "RpcBotsUpdateInputSchema22": {
         "anyOf": [
           {
             "type": "string",
@@ -95728,10 +94842,6 @@
         "type": "string",
         "minLength": 1
       },
-      "RpcInvestorsAgentOutputSchema0": {
-        "type": "string",
-        "minLength": 1
-      },
       "RpcLegalAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
@@ -96864,28 +95974,13 @@
         "type": "string",
         "minLength": 1
       },
-      "RpcScratchpadCreateOutputSchema1": {
-        "type": "string",
-        "format": "date-time",
-        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-      },
       "RpcScratchpadListOutputSchema0": {
         "type": "string",
         "minLength": 1
       },
-      "RpcScratchpadListOutputSchema1": {
-        "type": "string",
-        "format": "date-time",
-        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-      },
       "RpcScratchpadUpdateOutputSchema0": {
         "type": "string",
         "minLength": 1
-      },
-      "RpcScratchpadUpdateOutputSchema1": {
-        "type": "string",
-        "format": "date-time",
-        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
       },
       "RpcSearchQueryOutputSchema0": {
         "type": "object",
@@ -96925,9 +96020,6 @@
           },
           "url": {
             "$ref": "#/components/schemas/RpcSearchQueryOutputSchema13"
-          },
-          "createdAt": {
-            "$ref": "#/components/schemas/RpcSearchQueryOutputSchema14"
           }
         },
         "required": [
@@ -96984,9 +96076,6 @@
         "$ref": "#/components/schemas/RpcSearchQueryOutputSchema3"
       },
       "RpcSearchQueryOutputSchema13": {
-        "type": "string"
-      },
-      "RpcSearchQueryOutputSchema14": {
         "type": "string"
       },
       "RpcSidebarAutoGroupOutputSchema0": {
@@ -98424,6 +97513,21 @@
       "RpcVoiceAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcScratchpadCreateOutputSchema1": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+      },
+      "RpcScratchpadListOutputSchema1": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+      },
+      "RpcScratchpadUpdateOutputSchema1": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
       }
     },
     "responses": {

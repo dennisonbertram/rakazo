@@ -4976,6 +4976,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish(created);
           }
           if (name === "scratchpad_update") {
+            if (Object.hasOwn(args, "category") || Object.hasOwn(args, "channel")) {
+              return finish({
+                error: "category and channel can only be set when an item is created.",
+              });
+            }
             const updated = await updateScratchpadItemFromTool(deps, {
               spaceId: run.spaceId,
               botId: bot.id,

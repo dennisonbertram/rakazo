@@ -1697,6 +1697,7 @@ export const builtinAgentTools: ConnectorTool[] = [
         scheduledFor: { type: "string", description: "Absolute ISO datetime with timezone." },
       },
       required: ["title"],
+      additionalProperties: false,
     },
   },
   {
@@ -1714,6 +1715,7 @@ export const builtinAgentTools: ConnectorTool[] = [
         proof: { type: "string", maxLength: 2_000 },
       },
       required: ["itemId"],
+      additionalProperties: false,
     },
   },
   {
@@ -1726,6 +1728,7 @@ export const builtinAgentTools: ConnectorTool[] = [
         proof: { type: "string", maxLength: 2_000 },
       },
       required: ["itemId"],
+      additionalProperties: false,
     },
   },
   {

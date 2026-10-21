@@ -23,6 +23,16 @@ const NOTES_MAX = 4_000;
 const TARGET_MAX = 200;
 const PROOF_MAX = 2_000;
 const EFFECT_KEY = /^[^:\s]{1,200}:[^:\s]{1,200}:[a-f0-9]{64}(?::[1-9]\d*)?$/;
+const CONSUME_APPROVED_POST_INPUT_KEYS = new Set([
+  "spaceId",
+  "userId",
+  "botId",
+  "text",
+  "scheduledFor",
+  "target",
+  "effectKey",
+  "now",
+]);
 
 export type ScratchpadToolDeps = {
   prisma: PrismaClient;
@@ -118,16 +128,12 @@ function isHttpUrl(value: unknown): value is string {
   }
 }
 
-function isEmailProof(value: unknown, itemId: string): value is string {
-  return typeof value === "string" && value === `gmail:${itemId}`;
+function isZernioProof(value: unknown): value is string {
+  return typeof value === "string" && /^zernio:\S+$/.test(value);
 }
 
-function isDurableProof(value: unknown): value is string {
-  return (
-    isHttpUrl(value) ||
-    (typeof value === "string" && /^zernio:\S+$/.test(value)) ||
-    (typeof value === "string" && /^gmail:\S+$/.test(value))
-  );
+function isEmailProof(value: unknown, itemId: string): value is string {
+  return typeof value === "string" && value === `gmail:${itemId}`;
 }
 
 function isValidActorProof(
@@ -136,11 +142,24 @@ function isValidActorProof(
   itemId: string,
   founder: boolean,
 ): boolean {
-  if ((category === "public_post" || category === "create_account") && isHttpUrl(proof)) {
-    return true;
-  }
+  if (category === "public_post") return isZernioProof(proof) || isHttpUrl(proof);
+  if (category === "create_account") return isHttpUrl(proof);
   if (founder && category === "outbound_email" && isEmailProof(proof, itemId)) return true;
   return false;
+}
+
+function canReplaceActorProof(
+  category: ScratchpadCategory | null,
+  previousProof: string | null,
+  nextProof: string,
+  itemId: string,
+  founder: boolean,
+): boolean {
+  if (!isValidActorProof(category, nextProof, itemId, founder)) return false;
+  if (previousProof === null) return true;
+  if (category !== "public_post") return false;
+  if (isEffectKey(previousProof)) return isZernioProof(nextProof) || isHttpUrl(nextProof);
+  return isZernioProof(previousProof) && isHttpUrl(nextProof);
 }
 
 function updatedAtAfter(existing: ScratchpadRow, now: Date): Date {
@@ -330,12 +349,18 @@ async function updateScratchpadItem(
   const itemId = input.itemId.trim();
   if (!itemId) return { error: "itemId is required." };
 
-  const raw = input as FounderScratchpadUpdateInput & { category?: unknown; channel?: unknown };
-  if (raw.category !== undefined || raw.channel !== undefined) {
+  if ("category" in input || "channel" in input) {
     return { error: "category and channel can only be set when the item is created." };
   }
   if (input.status !== undefined && !isScratchpadStatus(input.status)) {
     return { error: "status must be open, parked, or done." };
+  }
+  const requestVersion = renderedVersion(input.updatedAt);
+  if (input.updatedAt !== undefined && !requestVersion) {
+    return { error: "updatedAt must be an absolute ISO datetime." };
+  }
+  if (founder && input.reapprove && !requestVersion) {
+    return { error: "Re-approve requires the current rendered version." };
   }
 
   const existing = await scopedItem(deps.prisma, { ...input, itemId });
@@ -372,11 +397,11 @@ async function updateScratchpadItem(
     if (typeof input.proof !== "string" || input.proof.length > PROOF_MAX) {
       return { error: `proof must be at most ${PROOF_MAX} characters.` };
     }
-    if (input.proof !== (existing.proof ?? null)) {
+    const existingProof = existing.proof ?? null;
+    if (input.proof !== existingProof) {
       if (
-        !isValidActorProof(category, input.proof, existing.id, founder) ||
-        (existing.proof !== null && isDurableProof(existing.proof)) ||
-        (existing.proof !== null && existing.proof !== input.proof)
+        input.status === "parked" ||
+        !canReplaceActorProof(category, existingProof, input.proof, existing.id, founder)
       ) {
         return { error: "proof must be valid and cannot replace existing proof." };
       }
@@ -386,12 +411,19 @@ async function updateScratchpadItem(
   if (input.status !== undefined) data.status = input.status;
 
   const contentWasEdited = contentEdit(data);
+  if (founder && gated && (input.reapprove || (input.status === "open" && !contentWasEdited))) {
+    if (!requestVersion) {
+      return { error: "Approval requires the current rendered version." };
+    }
+    if (requestVersion.getTime() !== existing.updatedAt.getTime()) {
+      return { conflict: true as const };
+    }
+  }
   if (founder && input.reapprove) {
     if (
       !gated ||
       !isEffectKey(existing.proof) ||
       (existing.status !== "parked" && existing.status !== "open") ||
-      !renderedVersion(input.updatedAt) ||
       contentWasEdited ||
       (input.status !== undefined && input.status !== "open") ||
       input.proof !== undefined
@@ -410,7 +442,7 @@ async function updateScratchpadItem(
       },
       deps.now?.() ?? new Date(),
       true,
-      renderedVersion(input.updatedAt) ?? undefined,
+      requestVersion ?? undefined,
     );
   }
 
@@ -427,7 +459,7 @@ async function updateScratchpadItem(
       existing.status !== "parked" ||
       existing.approvedAt !== null ||
       isEffectKey(existing.proof) ||
-      !renderedVersion(input.updatedAt) ||
+      !requestVersion ||
       contentWasEdited ||
       data.proof !== undefined
     ) {
@@ -444,7 +476,7 @@ async function updateScratchpadItem(
       },
       deps.now?.() ?? new Date(),
       true,
-      renderedVersion(input.updatedAt) ?? undefined,
+      requestVersion ?? undefined,
     );
   }
 
@@ -481,7 +513,13 @@ async function updateScratchpadItem(
     data.approvedAt = null;
     data.approvedBy = null;
   }
-  if (gated && !founder && existing.status === "done" && input.status === "open") {
+  if (
+    gated &&
+    !founder &&
+    existing.status === "done" &&
+    input.status !== undefined &&
+    input.status !== "done"
+  ) {
     return { error: "Completed gated items cannot be reopened by an agent." };
   }
   if (Object.keys(data).length === 0) {
@@ -594,6 +632,7 @@ export async function hasApprovedOpenPost(deps: ScratchpadToolDeps, scope: Scope
         category: "public_post",
         status: "open",
         approvedAt: { not: null },
+        proof: null,
       },
     }),
   );
@@ -634,6 +673,14 @@ export async function consumeApprovedPost(
   deps: ScratchpadToolDeps,
   input: ConsumeApprovedPostInput,
 ): Promise<{ count: 0 } | { count: 1; item: ReturnType<typeof mapScratchpadItem> }> {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Object.keys(input).some((key) => !CONSUME_APPROVED_POST_INPUT_KEYS.has(key)) ||
+    (input.now !== undefined && typeof input.now !== "function")
+  ) {
+    return { count: 0 };
+  }
   if (typeof input.text !== "string" || typeof input.target !== "string") {
     return { count: 0 };
   }

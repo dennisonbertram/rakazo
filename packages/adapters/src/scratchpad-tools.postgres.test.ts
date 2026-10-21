@@ -108,10 +108,12 @@ describePostgres("scratchpad store (PostgreSQL)", () => {
     const replayArgs = { ...base, text: "Exact post", target: "account-replay" };
     const consumed = await consumeApprovedPost({ prisma }, { ...replayArgs, effectKey: sameKey });
     expect(consumed.count).toBe(1);
+    if (consumed.count !== 1) return;
     const replay = await consumeApprovedPost({ prisma }, { ...replayArgs, effectKey: sameKey });
-    expect(replay).toMatchObject({ count: 1, item: { id: consumed.item?.id } });
-    expect([first.id, second.id]).toContain(consumed.item?.id);
-    expect(replay.item?.id).toBe(consumed.item?.id);
+    expect(replay.count).toBe(1);
+    if (replay.count !== 1) return;
+    expect(replay.item.id).toBe(consumed.item.id);
+    expect([first.id, second.id]).toContain(consumed.item.id);
     const unconsumedCopy = await prisma.scratchpadItem.findMany({
       where: { spaceId, userId, botId, target: "account-replay", proof: null },
     });

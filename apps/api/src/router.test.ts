@@ -4839,6 +4839,36 @@ describe("GTM scratchpad RPC", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
+  it("returns CONFLICT when a previously rendered approval version is already open", async () => {
+    const current = {
+      id: "item-1",
+      ...scopeForTest(),
+      title: "Post",
+      status: "open",
+      notes: "Exact post",
+      category: "public_post",
+      channel: "x",
+      target: "account-1",
+      scheduledFor: null,
+      proof: null,
+      approvedAt: new Date("2026-08-25T12:00:01.000Z"),
+      approvedBy: "user",
+      createdAt: new Date("2026-08-25T11:00:00.000Z"),
+      updatedAt: new Date("2026-08-25T12:00:01.000Z"),
+    };
+    const findFirst = vi.fn(async () => current);
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const client = scratchpadClient({ findFirst, updateMany });
+    await expect(
+      client.scratchpad.update({
+        itemId: current.id,
+        status: "open",
+        updatedAt: "2026-08-25T12:00:00.000Z",
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT", message: "Changed, review again" });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
   it("rejects category mutation from raw panel RPC arguments", async () => {
     const client = scratchpadClient({});
     await expect(

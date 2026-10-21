@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { builtinAgentTools } from "./builtin-tools.js";
 import {
   addScratchpadItemFromTool,
   clearPostStamp,
@@ -289,14 +290,25 @@ describe("scratchpad tools store", () => {
           },
         ),
       ).resolves.toMatchObject({ error: expect.any(String) });
+      await expect(
+        updateScratchpadItemFromTool(
+          { prisma: done as never },
+          {
+            ...scope,
+            itemId: "item-1",
+            status: "parked",
+          },
+        ),
+      ).resolves.toMatchObject({ error: expect.any(String) });
     }
   });
 
   it("re-parks without clearing proof, while clearing approval fields", async () => {
     const approved = row({ status: "open", proof: effectKey, approvedAt: now, approvedBy: "user" });
+    const updateMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
     const prisma = prismaWith({
       findFirst: vi.fn(async () => approved),
-      updateMany: vi.fn(async () => ({ count: 1 })),
+      updateMany,
     });
     await updateScratchpadItemFromTool(
       { prisma: prisma as never },
@@ -304,10 +316,11 @@ describe("scratchpad tools store", () => {
         ...scope,
         itemId: approved.id,
         status: "parked",
+        proof: effectKey,
         notes: "Check the queue",
       },
     );
-    expect(prisma.scratchpadItem.updateMany).toHaveBeenCalledWith(
+    expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: "parked",
@@ -317,7 +330,7 @@ describe("scratchpad tools store", () => {
         }),
       }),
     );
-    expect(prisma.scratchpadItem.updateMany.mock.calls[0]?.[0]).not.toMatchObject({
+    expect(updateMany.mock.calls[0]?.[0]).not.toMatchObject({
       data: expect.objectContaining({ proof: null }),
     });
   });
@@ -424,6 +437,62 @@ describe("scratchpad tools store", () => {
     ).resolves.toMatchObject({ error: expect.any(String) });
   });
 
+  it("allows public-post proof to progress from null or effect stamp through Zernio to URL", async () => {
+    for (const [oldProof, proof] of [
+      [undefined, "zernio:post-1"],
+      [null, "https://social.example/post/1"],
+      [effectKey, "zernio:post-1"],
+      [effectKey, "https://social.example/post/1"],
+      ["zernio:post-1", "https://social.example/post/1"],
+    ] as const) {
+      const existing = row({ proof: oldProof, status: "open", approvedAt: now });
+      const prisma = prismaWith({
+        findFirst: vi.fn(async () => existing),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+      });
+      await expect(
+        updateScratchpadItemFromTool(
+          { prisma: prisma as never },
+          { ...scope, itemId: existing.id, proof },
+        ),
+      ).resolves.toMatchObject({ item: { proof } });
+    }
+  });
+
+  it("rejects proof downgrade, clear, arbitrary stamps, and repark with changed proof", async () => {
+    const rejected = [
+      { oldProof: null, proof: effectKey },
+      { oldProof: "zernio:post-1", proof: effectKey },
+      { oldProof: "https://social.example/post/1", proof: "https://social.example/post/2" },
+      { oldProof: "zernio:post-1", proof: null },
+    ] as const;
+    for (const { oldProof, proof } of rejected) {
+      const existing = row({ proof: oldProof, status: "open", approvedAt: now });
+      const prisma = prismaWith({ findFirst: vi.fn(async () => existing) });
+      await expect(
+        updateScratchpadItemFromTool({ prisma: prisma as never }, {
+          ...scope,
+          itemId: existing.id,
+          proof,
+        } as never),
+      ).resolves.toMatchObject({ error: expect.any(String) });
+    }
+
+    const approved = row({ proof: effectKey, status: "open", approvedAt: now, approvedBy: "user" });
+    const repark = prismaWith({ findFirst: vi.fn(async () => approved) });
+    await expect(
+      updateScratchpadItemFromTool(
+        { prisma: repark as never },
+        {
+          ...scope,
+          itemId: approved.id,
+          status: "parked",
+          proof: "zernio:post-1",
+        },
+      ),
+    ).resolves.toMatchObject({ error: expect.any(String) });
+  });
+
   it("approves only the rendered parked version, invalidates approval after founder edits, and limits reapproval to stamps", async () => {
     const parked = row();
     const stale = prismaWith({
@@ -441,14 +510,31 @@ describe("scratchpad tools store", () => {
         },
       ),
     ).resolves.toMatchObject({ conflict: true });
-    expect(stale.scratchpadItem.updateMany).toHaveBeenCalledWith(
+    expect(stale.scratchpadItem.updateMany).not.toHaveBeenCalled();
+
+    const raced = prismaWith({
+      findFirst: vi.fn(async () => parked),
+      updateMany: vi.fn(async () => ({ count: 0 })),
+    });
+    await expect(
+      updateScratchpadItemFromUser(
+        { prisma: raced as never },
+        {
+          ...scope,
+          itemId: parked.id,
+          status: "open",
+          updatedAt: parked.updatedAt.toISOString(),
+        },
+      ),
+    ).resolves.toMatchObject({ conflict: true });
+    expect(raced.scratchpadItem.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           ...scope,
           id: parked.id,
           status: "parked",
           approvedAt: null,
-          updatedAt: new Date("2026-08-25T11:59:00.000Z"),
+          updatedAt: parked.updatedAt,
         }),
       }),
     );
@@ -624,6 +710,30 @@ describe("scratchpad tools store", () => {
     ).resolves.toMatchObject({ item: expect.any(Object) });
   });
 
+  it("returns a conflict when approval uses a version made stale by an already-applied approval", async () => {
+    const current = row({
+      status: "open",
+      approvedAt: new Date(now.getTime() + 1_000),
+      approvedBy: "user",
+      updatedAt: new Date(now.getTime() + 1_000),
+    });
+    const prisma = prismaWith({
+      findFirst: vi.fn(async () => current),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    });
+    await expect(
+      updateScratchpadItemFromUser(
+        { prisma: prisma as never },
+        {
+          ...scope,
+          itemId: current.id,
+          status: "open",
+          updatedAt: now.toISOString(),
+        },
+      ),
+    ).resolves.toEqual({ conflict: true });
+  });
+
   it("serializes non-done goal creation and blocks a second goal even when parked", async () => {
     const prisma = prismaWith({
       findFirst: vi.fn(async () => row({ category: "goal", status: "parked" })),
@@ -660,9 +770,20 @@ describe("scratchpad tools store", () => {
             category,
             status: "open",
             approvedAt: { not: null },
+            ...(category === "public_post" ? { proof: null } : {}),
           }),
         }),
       );
+    }
+  });
+
+  it("closes the built-in scratchpad schemas to unknown properties", () => {
+    for (const name of ["scratchpad_add", "scratchpad_update", "scratchpad_complete"]) {
+      const tool = builtinAgentTools.find((candidate) => candidate.name === name);
+      expect(tool?.inputSchema).toMatchObject({
+        type: "object",
+        additionalProperties: false,
+      });
     }
   });
 
@@ -748,6 +869,24 @@ describe("scratchpad tools store", () => {
         ),
       ).resolves.toEqual({ count: 0 });
     }
+    const candidate = row({ status: "open", approvedAt: now, proof: null });
+    const unknownOverride = prismaWith({
+      findFirst: vi.fn(async () => candidate),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    });
+    await expect(
+      consumeApprovedPost({ prisma: unknownOverride as never }, {
+        ...scope,
+        text: "copy",
+        scheduledFor: "2026-08-25T13:00:00Z",
+        target: "account-1",
+        effectKey,
+        now: () => now,
+        publishNow: true,
+      } as never),
+    ).resolves.toEqual({ count: 0 });
+    expect(unknownOverride.$transaction).not.toHaveBeenCalled();
+
     const findMany = vi.fn(async () => [
       row({
         id: "later",
