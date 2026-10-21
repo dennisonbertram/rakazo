@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
 import type * as Db from "@rakazo/db";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -98,6 +98,12 @@ function setup(options: Partial<AuthEnv> = {}) {
   });
 }
 
+/** Signs a stored session token the way the session cookie and `set-auth-token` do. */
+function signedBearer(token: string) {
+  if (token.includes(".")) return token;
+  return `${token}.${createHmac("sha256", secret).update(token).digest("base64")}`;
+}
+
 async function request(path: string, body?: unknown, bearer?: string) {
   const response = await auth.handler(
     new Request(`${origin}/api/auth${path}`, {
@@ -106,7 +112,7 @@ async function request(path: string, body?: unknown, bearer?: string) {
         origin,
         "content-type": "application/json",
         ...(cookies ? { cookie: cookies } : {}),
-        ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
+        ...(bearer ? { authorization: `Bearer ${signedBearer(bearer)}` } : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }),
