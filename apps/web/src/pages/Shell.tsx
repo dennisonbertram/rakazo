@@ -290,6 +290,7 @@ import { workingActivity } from "../lib/working-activity";
 import { ActivityList } from "./ActivityList";
 import type { ContextMenuPosition } from "./BotContextMenu";
 import { CompanyPage } from "./Company";
+import { CompanyImportPage } from "./CompanyImport";
 import { ContactsPage } from "./Contacts";
 import { DataRoomPage } from "./DataRoom";
 import { DevinPage } from "./Devin";
@@ -5604,7 +5605,14 @@ export function ShellPage() {
               }}
             />
           ) : companyMode ? (
-            <CompanyPage />
+            pathname === "/app/company/import" ? (
+              <CompanyImportPage
+                onOpenSettings={() => openSettings("models")}
+                settingsOpen={settingsOpen}
+              />
+            ) : (
+              <CompanyPage />
+            )
           ) : legalMode ? (
             <LegalPage
               onAskAgent={legalAgentOpen ? undefined : askLegalAgent}
