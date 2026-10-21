@@ -2010,7 +2010,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: bot.id,
           type: "run.started",
           runId,
-          payload: { trigger: run.trigger, routineId: run.routineId },
+          payload: { trigger: run.trigger, routineId: run.routineId, userId: run.userId },
         });
 
         const discoveredPromise =

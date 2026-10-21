@@ -2,11 +2,40 @@ type AskSnapshot = {
   messages: readonly {
     id: string;
     runId?: string | null;
-    blocks: readonly { kind: string; status?: string }[];
+    blocks: readonly { kind: string; status?: string; input?: string; credential?: unknown }[];
   }[];
-  run?: { id: string; status: string } | null;
-  activeRuns?: readonly { id: string; status: string }[];
+  run?: { id: string; status: string; userId?: string } | null;
+  activeRuns?: readonly { id: string; status: string; userId?: string }[];
 };
+
+/**
+ * A login or credential request is saved for the run's user, so only they fill it in. These are
+ * the unanswered ones the given viewer must see without fields or buttons; with no known viewer
+ * or run user, none is theirs.
+ */
+export function ownerOnlyCredentialAskMessageIds(
+  snapshot: AskSnapshot | null,
+  userId?: string,
+): Set<string> {
+  const ownerOnly = new Set<string>();
+  if (!snapshot) return ownerOnly;
+  const runs = snapshot.activeRuns ?? (snapshot.run ? [snapshot.run] : []);
+  const owned = new Set(runs.filter((run) => userId && run.userId === userId).map((run) => run.id));
+  for (const message of snapshot.messages) {
+    if (message.runId && owned.has(message.runId)) continue;
+    if (
+      message.blocks.some(
+        (block) =>
+          block.kind === "ask" &&
+          block.input === "secret" &&
+          Boolean(block.credential) &&
+          block.status !== "answered",
+      )
+    )
+      ownerOnly.add(message.id);
+  }
+  return ownerOnly;
+}
 
 export function latestAnswerableAskMessageId(snapshot: AskSnapshot | null): string | null {
   if (!snapshot) return null;

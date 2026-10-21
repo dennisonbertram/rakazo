@@ -151,6 +151,7 @@ export const Transcript = memo(function Transcript({
   olderCursor,
   loadingOlder,
   answerableAskMessageId,
+  ownerOnlyAskMessageIds,
   running,
   workingBots,
   workingActivity: activity,
@@ -194,6 +195,8 @@ export const Transcript = memo(function Transcript({
   olderCursor: number | null;
   loadingOlder: boolean;
   answerableAskMessageId: string | null;
+  /** Credential requests this viewer sees without fields, because another user's run asked. */
+  ownerOnlyAskMessageIds?: ReadonlySet<string>;
   running: boolean;
   workingBots: GroupAvatarMember[];
   workingActivity?: WorkingActivity;
@@ -858,6 +861,7 @@ export const Transcript = memo(function Transcript({
                       artifactTarget={artifactTarget}
                       message={message}
                       canAnswer={message.id === answerableAskMessageId}
+                      ownerOnly={ownerOnlyAskMessageIds?.has(message.id) ?? false}
                       onOpenBot={onOpenBot}
                       onOpenPeerMessages={onOpenPeerMessages}
                       onAnswer={onAnswer}
@@ -1444,6 +1448,7 @@ function SpeakerHeader({
 const MessageView = memo(function MessageView({
   artifactTarget,
   canAnswer,
+  ownerOnly,
   message,
   onAnswer,
   onOpenBot,
@@ -1465,6 +1470,7 @@ const MessageView = memo(function MessageView({
 }: {
   artifactTarget: ArtifactTarget;
   canAnswer: boolean;
+  ownerOnly: boolean;
   message: ThreadMessage;
   onAnswer: (
     message: ThreadMessage,
@@ -1928,6 +1934,7 @@ const MessageView = memo(function MessageView({
                 requestedAt={message.createdAt}
                 // A held message is answered without a waiting run, so it stays answerable.
                 canAnswer={canAnswer || block.share === true}
+                ownerOnly={ownerOnly}
                 onAnswer={(text, username) => onAnswer(message, text, username)}
               />
             </div>

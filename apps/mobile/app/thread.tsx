@@ -30,6 +30,7 @@ import {
   isStoredMessage,
   isThreadSnapshotEvent,
   latestAnswerableAskMessageId,
+  ownerOnlyCredentialAskMessageIds,
   messageProviderLabel,
   newClientId,
   newMessagesAfter,
@@ -279,7 +280,9 @@ function speakableMessageText(message: MobileMessage): string {
 export default function ThreadRoute() {
   const generation = useSyncExternalStore(subscribeSessionGeneration, currentSessionGeneration);
   const ready = useSyncExternalStore(subscribeSessionGeneration, currentReadySessionGeneration);
-  const [owner, setOwner] = useState<{ key: string; generation: number } | null>(null);
+  const [owner, setOwner] = useState<{ key: string; generation: number; userId: string } | null>(
+    null,
+  );
   useEffect(() => {
     if (generation !== ready) return;
     const apiBase = currentApiBase();
@@ -296,7 +299,11 @@ export default function ThreadRoute() {
             generation === currentSessionGeneration() &&
             apiBase === currentApiBase()
           )
-            setOwner({ key: JSON.stringify([apiBase, scope.userId]), generation });
+            setOwner({
+              key: JSON.stringify([apiBase, scope.userId]),
+              generation,
+              userId: scope.userId,
+            });
         })
         .catch((error) => {
           if (!cancelled && !notified) Alert.alert(t("Could not continue"), errorText(error));
@@ -364,7 +371,7 @@ export default function ThreadRoute() {
       <>
         {owner?.generation !== generation ? <ActivityIndicator color={tokens.foreground} /> : null}
         <View style={{ flex: 1, display: owner?.generation === generation ? "flex" : "none" }}>
-          {owner ? <Thread key={owner.key} sessionEpoch={ready} /> : null}
+          {owner ? <Thread key={owner.key} sessionEpoch={ready} userId={owner.userId} /> : null}
         </View>
       </>
     );
@@ -462,7 +469,7 @@ function createThreadHeaderStyles() {
   });
 }
 
-function Thread({ sessionEpoch }: { sessionEpoch: number }) {
+function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string }) {
   const colorScheme = useResolvedAppearance();
   const tokens = mobileTokens();
   const styles = useThemedStyles(createThreadHeaderStyles);
@@ -2027,6 +2034,11 @@ function Thread({ sessionEpoch }: { sessionEpoch: number }) {
   }
 
   const answerableAskMessageId = latestAnswerableAskMessageId(snap);
+  // A login or credential is saved for the run's user, so others see the card without fields.
+  const ownerOnlyAskIds = useMemo(
+    () => ownerOnlyCredentialAskMessageIds(snap, userId),
+    [snap, userId],
+  );
   const [dismissedRuns, setDismissedRuns] = useState<ReadonlySet<string>>(
     () => new Set(dismissedRunErrorIds),
   );
@@ -2269,7 +2281,9 @@ function Thread({ sessionEpoch }: { sessionEpoch: number }) {
           members={snap?.members}
           readOnly={readOnly}
           onCall={onCall}
-          canAnswer={!readOnly && message.id === answerableAskMessageId}
+          canAnswer={
+            !readOnly && message.id === answerableAskMessageId && !ownerOnlyAskIds.has(message.id)
+          }
           highlighted={highlightedMessageId === message.id}
           separator={separatorIds.has(message.id)}
           unreadDivider={unreadMessageId === message.id}
@@ -2303,6 +2317,7 @@ function Thread({ sessionEpoch }: { sessionEpoch: number }) {
       readOnly,
       onCall,
       answerableAskMessageId,
+      ownerOnlyAskIds,
       highlightedMessageId,
       separatorIds,
       unreadMessageId,

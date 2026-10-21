@@ -1279,6 +1279,8 @@ export type MessagingAgentConnection = z.infer<typeof MessagingAgentConnectionSc
 
 export const RunSchema = z.object({
   id: Id,
+  /** The user the run acts for; clients use it to show a credential request only to them. */
+  userId: Id.optional(),
   botId: Id,
   threadId: Id,
   taskId: Id,

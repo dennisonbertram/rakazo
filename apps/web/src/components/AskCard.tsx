@@ -101,11 +101,14 @@ const SETTLE_MS = 1000;
 export function AskCard({
   block,
   canAnswer,
+  ownerOnly = false,
   requestedAt,
   onAnswer,
 }: {
   block: AskBlock;
   canAnswer: boolean;
+  /** A login or credential is saved for the run's user, so others see the card without fields. */
+  ownerOnly?: boolean;
   /** When the card was posted, shown beside its result so similar cards can be told apart. */
   requestedAt?: string;
   onAnswer: (text: string, username?: string) => Promise<void>;
@@ -304,7 +307,7 @@ export function AskCard({
         <div className="mt-3.5 text-[13.5px] font-medium text-muted-foreground">
           <Trans>No longer active</Trans>
         </div>
-      ) : askActions?.length ? (
+      ) : ownerOnly && secretInput && block.credential ? null : askActions?.length ? (
         <div className="mt-3.5 space-y-1.5">
           {[...askActions]
             .sort(

@@ -613,6 +613,7 @@ function messagesWithLiveEvents(
 
 function mapRun(run: {
   id: string;
+  userId?: string;
   botId: string;
   threadId: string;
   taskId: string;
@@ -629,6 +630,7 @@ function mapRun(run: {
 }) {
   return {
     id: run.id,
+    ...(run.userId ? { userId: run.userId } : {}),
     botId: run.botId,
     threadId: run.threadId,
     taskId: run.taskId,
