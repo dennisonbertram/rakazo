@@ -2005,6 +2005,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
                 spaceId: run.spaceId,
+                userId: run.userId,
                 botId: bot.id,
               }),
           messagingChannelRun ||
@@ -4954,6 +4955,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (name === "scratchpad_list") {
             return listScratchpadItemsFromTool(deps, {
               spaceId: run.spaceId,
+              userId: run.userId,
               botId: bot.id,
               includeDone: Boolean(args.includeDone),
             });
@@ -4966,6 +4968,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               title: String(args.title ?? ""),
               status: args.status ? String(args.status) : undefined,
               notes: args.notes !== undefined ? String(args.notes) : undefined,
+              category: args.category !== undefined ? String(args.category) : undefined,
+              channel: args.channel !== undefined ? String(args.channel) : undefined,
+              target: args.target !== undefined ? String(args.target) : undefined,
+              scheduledFor: args.scheduledFor !== undefined ? String(args.scheduledFor) : undefined,
             });
             return finish(created);
           }
@@ -4978,6 +4984,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               title: args.title !== undefined ? String(args.title) : undefined,
               status: args.status !== undefined ? String(args.status) : undefined,
               notes: args.notes !== undefined ? String(args.notes) : undefined,
+              target: args.target !== undefined ? String(args.target) : undefined,
+              scheduledFor: args.scheduledFor !== undefined ? String(args.scheduledFor) : undefined,
+              proof: args.proof !== undefined ? String(args.proof) : undefined,
             });
             return finish(updated);
           }
@@ -4987,6 +4996,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               botId: bot.id,
               userId: run.userId,
               itemId: String(args.itemId ?? ""),
+              proof: args.proof !== undefined ? String(args.proof) : undefined,
             });
             return finish(completed);
           }
