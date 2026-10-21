@@ -6,7 +6,7 @@ import {
   secretRefMatches,
   taughtSkillPromptForRoutine,
 } from "@rakazo/adapters";
-import { formatUntrustedDeliveryPayload } from "@rakazo/core";
+import { formatUntrustedDeliveryPayload, inboundRoutineBlock } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 
@@ -297,8 +297,8 @@ export async function deliverWebhookEvent(
   const promptText =
     input.routines.length > 0
       ? [
-          ...input.routines.map(
-            (routine, index) => `Run routine "${routine.name}":\n${routinePrompts[index]}`,
+          ...input.routines.map((routine, index) =>
+            inboundRoutineBlock({ name: routine.name, prompt: routinePrompts[index]! }),
           ),
           "",
           input.source === "github"

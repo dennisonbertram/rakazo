@@ -11,6 +11,7 @@ import type {
   AgentToolExecutionObserver,
   ArtifactStore,
   AutoReviewProvider,
+  AutoReviewRequest,
   BrowserProvider,
   ComputerRef,
   ConnectorCall,
@@ -122,6 +123,7 @@ import {
   formatSkillsCatalogInstruction,
   GTM_PAGE_INSTRUCTIONS,
   humanizeToolName,
+  inboundRoutinePrompts,
   inferAttachmentMimeType,
   isBackgroundRunTrigger,
   isCallClientNonce,
@@ -134,6 +136,7 @@ import {
   messagingChannelPrivacyBlock,
   messagingDmSurfaceNote,
   newRunUnattended,
+  newSiteOutcome,
   nextCronDateAcross,
   nextFence,
   outboundSiteGate,
@@ -149,6 +152,7 @@ import {
   resolveActionApprovalDetail,
   resolveBotAddress,
   sandboxCommandTimeoutMs,
+  siteAlwaysAllowed,
   toolRequiresApproval,
   toolRequiresExplicitApproval,
   toolResultTaintsRun,
@@ -613,6 +617,7 @@ import {
   userProgressClientNonce,
 } from "./user-progress.js";
 import { VOICE_WORKSPACE_TOOL_NAMES, voiceAgentToolFromTool } from "./voice-agent-tools.js";
+import { watchWakeInstruction } from "./watch-probe.js";
 import { createWebProvider } from "./web-provider-factory.js";
 import { webFetchFromTool, webSearchFromTool } from "./web-tools.js";
 
@@ -3518,22 +3523,39 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const searchResultUrls = new Set<string>();
         // Only a run the owner started live and that carries no outside content names sites itself.
         const ownerStartedRun = !run.unattended && !run.externalTaint && !externalTaint();
-        let trustedSitesPromise: Promise<Set<string>> | undefined;
-        const loadTrustedSites = () => {
-          trustedSitesPromise ??= (async () => {
-            const sites = new Set<string>();
+        // The owner's own words for this run: the message they sent, or the instructions of the
+        // routine that started it. Never a bot, channel or webhook message, or a tool result.
+        // These name the sites a run is given, and are all Auto Review sees of a new site's run.
+        let ownerWordsPromise: Promise<string> | undefined;
+        const loadOwnerWords = () => {
+          ownerWordsPromise ??= (async () => {
             if (ownerStartedRun && run.sourceMessageId) {
               const source = await deps.prisma.message.findUnique({
                 where: { id: run.sourceMessageId },
                 select: { role: true, blocks: true },
               });
-              if (source?.role === "user") {
-                for (const block of (source.blocks ?? []) as MessageBlock[]) {
-                  if (block.kind !== "text") continue;
-                  for (const site of sitesInText(block.text)) sites.add(site);
-                }
-              }
+              if (source?.role !== "user") return "";
+              return ((source.blocks ?? []) as MessageBlock[])
+                .flatMap((block) => (block.kind === "text" ? [block.text] : []))
+                .join("\n");
             }
+            // Saved when the routine fired, so a later edit cannot change what this run judges.
+            if (run.trigger === "routine") return watchWakeInstruction(task.prompt);
+            if (run.trigger === "webhook") {
+              const routines = await deps.prisma.routine.findMany({
+                where: { botId: bot.id, spaceId: run.spaceId, userId: run.userId },
+                select: { name: true, prompt: true },
+              });
+              return inboundRoutinePrompts(task.prompt, routines).join("\n\n");
+            }
+            return "";
+          })();
+          return ownerWordsPromise;
+        };
+        let trustedSitesPromise: Promise<Set<string>> | undefined;
+        const loadTrustedSites = () => {
+          trustedSitesPromise ??= (async () => {
+            const sites = sitesInText(await loadOwnerWords());
             const rows = await deps.prisma.externalEffect.findMany({
               where: { runId, kind: "web_fetch", status: { in: PASSED_EFFECT_STATUSES } },
               select: { request: true },
@@ -3546,6 +3568,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return sites;
           })();
           return trustedSitesPromise;
+        };
+        const routineNamesNewSite = async (prompt: string) => {
+          const trusted = await loadTrustedSites();
+          const rules = await loadApprovalRules();
+          return [...sitesInText(prompt)].some(
+            (site) => !trusted.has(site) && !siteAlwaysAllowed(rules, site),
+          );
         };
         let trustedConnectorsPromise: Promise<Set<string>> | undefined;
         const loadTrustedConnectors = () => {
@@ -4153,16 +4182,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const siteGate =
             fetchUrl && fetchSite
               ? outboundSiteGate({
-                  trigger: run.trigger,
                   site: fetchSite,
                   trusted:
                     searchResultUrls.has(fetchUrl) || (await loadTrustedSites()).has(fetchSite),
                   rules: approvalRules.filter((rule) => !rule.botId || rule.botId === bot.id),
                 })
               : "allow";
-          // Nobody is there to answer a card on a webhook run.
-          if (siteGate === "deny")
-            return { error: `Fetching ${fetchSite} needs approval, and a webhook run cannot ask.` };
           // Once outside content is in the run, injected text could choose a connector read's
           // arguments, so a read on a connector this run had not used yet is treated as a write.
           const connectorReadGated =
@@ -4240,9 +4265,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
             userTimezone,
             watchedAppName(),
           );
+          // A routine's prompt counts as the owner's words when it runs, so the sites it names are
+          // ones its runs may fetch. Once outside content entered this run, a routine naming a
+          // site this run was not given needs a person: a reviewer would judge it on this run's
+          // context, and passing it would trust the site for every later run.
+          const scheduleNamesNewSite =
+            name === "schedule_create" &&
+            (!ownerStartedRun || (await isOutsideContentSeen())) &&
+            (await routineNamesNewSite(String(args.prompt ?? "")));
           const requiresApprovalByDefault =
             requiresUnattendedApproval ||
-            siteGate === "ask" ||
+            siteGate === "new" ||
             connectorReadGated ||
             scheduleCard !== undefined ||
             toolRequiresApproval(name, viaConnector, declaredReadOnly);
@@ -4268,6 +4301,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const externalTaintedCall = runTainted && !externalTaintAllowsTool(name, policyArgs);
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
+            scheduleNamesNewSite ||
             // An unattended run has no judge and nobody to ask later: a read on a connector it had
             // not used before outside content arrived is held for the owner like a write.
             (connectorReadGated && run.unattended === true) ||
@@ -4319,7 +4353,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   autoReviewEnabled: autoReviewPref,
                   checkerConfigured,
                   unattended: run.unattended,
-                  newDestination: siteGate === "ask",
+                  newDestination: siteGate === "new",
                 });
           // A check-in only reads and reports: a call that would ask fails at once, with no card and no pause.
           if (
@@ -4378,17 +4412,31 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const runAutoReview = async () => {
             if (!injectedReview && !checker) return;
             try {
-              const reviewRequest = {
-                toolName: name,
-                connectorKind,
-                args: redactToolArgsForReview(args, runSecrets),
-                userTask: redactSecrets(task.prompt, runSecrets),
-                botDescription: redactSecrets(
-                  `${bot.name}: ${bot.title}\n${bot.description}`,
-                  runSecrets,
-                ),
-                matchingRules: approvalResolved.matchingRules,
-              };
+              const botDescription = redactSecrets(
+                `${bot.name}: ${bot.title}\n${bot.description}`,
+                runSecrets,
+              );
+              // A new site is judged on the full URL and the owner's own words only: the task
+              // prompt of a webhook or bot-started run carries text someone else wrote.
+              const reviewRequest: AutoReviewRequest =
+                siteGate === "new" && fetchUrl
+                  ? {
+                      toolName: name,
+                      connectorKind,
+                      args: { url: redactSecrets(fetchUrl, runSecrets) },
+                      userTask: redactSecrets(await loadOwnerWords(), runSecrets),
+                      botDescription,
+                      matchingRules: approvalResolved.matchingRules,
+                      newSite: true,
+                    }
+                  : {
+                      toolName: name,
+                      connectorKind,
+                      args: redactToolArgsForReview(args, runSecrets),
+                      userTask: redactSecrets(task.prompt, runSecrets),
+                      botDescription,
+                      matchingRules: approvalResolved.matchingRules,
+                    };
               const reviewContext: AdapterContext = {
                 operationId: `auto-review:${runId}`,
                 traceId: `auto-review:${runId}`,
@@ -4527,6 +4575,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
             gateDecision = "ask";
           }
           if (context.signal.aborted) return pauseForApproval();
+          // A new site that Auto Review did not pass needs a person; a webhook run has none.
+          if (
+            siteGate === "new" &&
+            newSiteOutcome({ trigger: run.trigger, decision: gateDecision }) === "deny"
+          ) {
+            if (applied) {
+              await deps.prisma.externalEffect.updateMany({
+                where: { id: applied.effect.id, status: "intended" },
+                data: { status: "denied" },
+              });
+            }
+            return { error: `Fetching ${fetchSite} needs approval, and a webhook run cannot ask.` };
+          }
 
           const needsApproval = gateDecision === "ask";
           // One plain line on the card, only for a background, tainted or rule-caused ask.
@@ -4966,7 +5027,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           // Past the gate: this destination is now one the run was given. A search result's exact
           // URL trusts only that URL, never the rest of its site.
-          if (fetchSite && siteGate === "ask") (await loadTrustedSites()).add(fetchSite);
+          if (fetchSite && siteGate === "new") (await loadTrustedSites()).add(fetchSite);
           if (viaConnector) (await loadTrustedConnectors()).add(connectorTrust);
           const persistEffectResult = (result: unknown) =>
             applied

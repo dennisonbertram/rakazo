@@ -505,18 +505,28 @@ export function connectorReadRequiresApproval(input: {
 
 /**
  * web_fetch sends its whole URL, query string included, to the site it names, so a site this run
- * was not given is a new destination that injected text could have picked. Trusted sites (named by
- * the owner, approved earlier in the run, or the exact URL of a search result) and sites with an
- * always-allow rule go through. Anything else needs a person, and a webhook run, which has nobody
- * to ask, is refused.
+ * was not given is a new destination that injected text could have picked. Trusted sites (named in
+ * the owner's own words, approved earlier in the run, or the exact URL of a search result) and
+ * sites with an always-allow rule go through. Anything else is new: planActionGate decides who
+ * judges it, and newSiteOutcome what happens when nobody passed it.
  */
 export function outboundSiteGate(input: {
-  trigger: string;
   site: string;
   trusted: boolean;
   rules: ActionApprovalRule[];
-}): "allow" | "ask" | "deny" {
-  if (input.trusted || siteAlwaysAllowed(input.rules, input.site)) return "allow";
+}): "allow" | "new" {
+  return input.trusted || siteAlwaysAllowed(input.rules, input.site) ? "allow" : "new";
+}
+
+/**
+ * A new site that Auto Review did not pass needs a person. A webhook run has nobody to ask, so
+ * there it is refused.
+ */
+export function newSiteOutcome(input: {
+  trigger: string;
+  decision: "ask" | "allow";
+}): "ask" | "allow" | "deny" {
+  if (input.decision === "allow") return "allow";
   return input.trigger === "webhook" ? "deny" : "ask";
 }
 
@@ -709,10 +719,17 @@ export function planActionGate(input: {
 }): "ask" | "allow" | "judge" | "block" {
   const { resolved } = input;
   if (resolved.decision === "block") return "block";
-  // A new site always needs a person: a reviewer reading the same injected text is no check, and
-  // a rule for the whole tool is not a choice of sites. Only a site rule allows one (see
-  // outboundSiteGate), and that makes it no longer new.
-  if (input.newDestination) return "ask";
+  // A rule for the whole tool is not a choice of sites, so it never allows a new one; only a site
+  // rule does, and that makes the site no longer new. A rule that asks still asks. Auto Review may
+  // pass a new site, judging only the owner's own words and the full URL: it never sees tool
+  // results or inbound messages, so text injected there cannot argue for the site. Without Auto
+  // Review, and in an unattended run, which never plans a judge, a person decides.
+  if (input.newDestination) {
+    if (resolved.decision === "ask" && resolved.source === "require_approval") return "ask";
+    return !input.unattended && input.autoReviewEnabled && input.checkerConfigured
+      ? "judge"
+      : "ask";
+  }
   const judgeable =
     !input.unattended &&
     input.consequential &&
