@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 270 of 270
-- Web and shared components: 704
+- Web and shared component files with stories: 271 of 271
+- Web and shared components: 705
 - Mobile components: 138 in 95 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -304,6 +304,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BoardPage, TicketDialog | [apps/web/src/pages/Board.tsx](../../apps/web/src/pages/Board.tsx) | [Board.stories.tsx](../../apps/web/src/pages/Board.stories.tsx) | web |
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
 | CompanyPage | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
+| CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |
 | CompanyFactDetail | [apps/web/src/pages/CompanyFactDetail.tsx](../../apps/web/src/pages/CompanyFactDetail.tsx) | [CompanyFactDetail.stories.tsx](../../apps/web/src/pages/CompanyFactDetail.stories.tsx) | web |
 | CompanyHistory | [apps/web/src/pages/CompanyHistory.tsx](../../apps/web/src/pages/CompanyHistory.tsx) | [CompanyHistory.stories.tsx](../../apps/web/src/pages/CompanyHistory.stories.tsx) | web |
 | CompanyImportPage | [apps/web/src/pages/CompanyImport.tsx](../../apps/web/src/pages/CompanyImport.tsx) | [CompanyImport.stories.tsx](../../apps/web/src/pages/CompanyImport.stories.tsx) | web |
