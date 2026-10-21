@@ -28,6 +28,24 @@ export const MemoryScopeSchema = z.enum(["isolated", "shared"]);
 export type MemoryScopeValue = z.infer<typeof MemoryScopeSchema>;
 
 export const AvatarStyleSchema = z.enum(["robot", "organic"]);
+
+/** True for an IANA timezone this runtime can format in, such as "Pacific/Auckland". */
+export function isValidTimeZone(value: string): boolean {
+  // Intl also accepts fixed offsets, which are not IANA timezone names.
+  if (/^[+-]/.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const TimeZoneSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine(isValidTimeZone, { message: "Unknown timezone" });
 export type AvatarStyle = z.infer<typeof AvatarStyleSchema>;
 export const DEFAULT_AVATAR_STYLE: AvatarStyle = "organic";
 
@@ -511,7 +529,7 @@ export const CreateRoutineInput = z
     taughtSkillId: Id.nullable().default(null),
     crons: z.array(z.string().min(1)).default([]),
     /** Defaults to the user's stored time zone, then UTC. */
-    timezone: z.string().optional(),
+    timezone: TimeZoneSchema.optional(),
     notify: z.boolean().default(true),
     active: z.boolean().default(false),
     webhookEnabled: z.boolean().default(false),

@@ -188,6 +188,7 @@ import {
   UpdateAgentSkillInput,
   UpdateBotInput,
   UpdateExternalConversationPolicyInput,
+  TimeZoneSchema,
   UpdateGroupInput,
   UsageRecordSchema,
   VoiceCatalogEntrySchema,
@@ -877,7 +878,7 @@ export const appContract = {
             /** A saved taught skill on this bot; null returns the routine to its own prompt. */
             taughtSkillId: Id.nullable().optional(),
             crons: z.array(z.string().min(1)).optional(),
-            timezone: z.string().optional(),
+            timezone: TimeZoneSchema.optional(),
             active: z.boolean().optional(),
             notify: z.boolean().optional(),
             webhookEnabled: z.boolean().optional(),
