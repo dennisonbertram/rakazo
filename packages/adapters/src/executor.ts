@@ -56,6 +56,7 @@ import {
   externalBotMayUseBuiltin,
   HistoryReadInputSchema,
   HistorySearchInputSchema,
+  INVESTORS_AGENT_BUILTIN_TOOLS,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
   isAttachmentImageMimeType,
@@ -64,13 +65,12 @@ import {
   isFinanceAgentSpawnKey,
   isInboxAgentSpawnKey,
   isIntegrationAgentSpawnKey,
+  isInvestorsAgentSpawnKey,
   isLegalAgentSpawnKey,
   isMailAgentSpawnKey,
   isVoiceAgentSpawnKey,
   LEGAL_AGENT_BUILTIN_TOOLS,
-  LEGAL_AGENT_MODEL,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
-  LEGAL_MODEL_REQUIRED_MESSAGE,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   RunPhaseSchema,
   VOICE_AGENT_BUILTIN_TOOLS,
@@ -1743,6 +1743,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const legalOnly = isLegalAgentSpawnKey(bot.spawnKey);
         // The Data room agent gets a fixed list of built-ins and no connector tools.
         const dataRoomAgent = isDataRoomAgentSpawnKey(bot.spawnKey);
+        // The Investors agent gets a fixed list of built-ins and no connector tools (no MCP, no Composio).
+        const investorsAgent = isInvestorsAgentSpawnKey(bot.spawnKey);
         // Connections limited to chosen agents stay out of this run unless the bot was granted access.
         // An external bot reaches a connection only through an explicit access row.
         const deniedIds = deniedConnectionIds(
@@ -1822,7 +1824,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
 
         const discoveredPromise =
-          deps.connector && !mailOnly && !legalOnly && !dataRoomAgent && !voiceAgent
+          deps.connector &&
+          !mailOnly &&
+          !legalOnly &&
+          !dataRoomAgent &&
+          !investorsAgent &&
+          !voiceAgent
             ? (async () => {
                 if (appAgentIdentity) {
                   const current = await deps.prisma.connection.findFirst({
@@ -2171,22 +2178,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
             { kind: "text", text: MEETING_CONSENT_REQUIRED_MESSAGE },
           ]).catch((error) => getLogger().error("meeting consent notice", error));
           await failRunBeforeModel(MEETING_CONSENT_REQUIRED_MESSAGE);
-          return;
-        }
-        if (
-          legalOnly &&
-          (runModelProvider !== LEGAL_AGENT_MODEL.provider || runModelId !== LEGAL_AGENT_MODEL.id)
-        ) {
-          // Fixed rule, for quality: the Legal agent runs on Muse Spark 1.2 and nothing else. A run
-          // that resolved to another model (no OpenRouter key, so the default took over) ends here.
-          // The web chat shows the run's error above the composer, so no bot message repeats it
-          // there. A linked messaging chat (DM or group) only receives stored bot messages, so it gets one.
-          if (run.trigger === "messaging") {
-            await publishMessage(deps, run, "bot", [
-              { kind: "text", text: LEGAL_MODEL_REQUIRED_MESSAGE },
-            ]).catch((error) => getLogger().error("legal model notice", error));
-          }
-          await failRunBeforeModel(LEGAL_MODEL_REQUIRED_MESSAGE);
           return;
         }
         if (legalOnly) {
@@ -2680,6 +2671,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
         const legalToolSet: ReadonlySet<string> = new Set(LEGAL_AGENT_BUILTIN_TOOLS);
         const dataRoomAgentToolSet: ReadonlySet<string> = new Set(DATA_ROOM_AGENT_BUILTIN_TOOLS);
+        const investorsToolSet: ReadonlySet<string> = new Set(INVESTORS_AGENT_BUILTIN_TOOLS);
         const builtins = [
           ...selectBuiltinToolsForRun({
             ticketBoardEnabled:
@@ -2729,6 +2721,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           (tool) =>
             (!legalOnly || legalToolSet.has(tool.name)) &&
             (!dataRoomAgent || dataRoomAgentToolSet.has(tool.name)) &&
+            (!investorsAgent || investorsToolSet.has(tool.name)) &&
             (!meetingAgent || meetingAgentToolSet.has(tool.name)) &&
             // pi-runtime runs run_subagent itself, before the executor's approval gate.
             ((!meetingTaint && externalChain === undefined) ||
@@ -3089,6 +3082,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ) => {
           if (voiceAgent && !offeredToolNames.has(name)) {
             return { error: `Tool ${name} is not available to Elio.` };
+          }
+          // The Investors agent has a fixed list; a name outside it never reaches a connector.
+          if (investorsAgent && !offeredToolNames.has(name)) {
+            return { error: `Tool ${name} is not available to this bot.` };
           }
           context.signal.throwIfAborted();
           if (handedOff) {
@@ -7954,12 +7951,12 @@ export function directoryDescription(peer: {
   spawnKey: string | null;
 }): string {
   if (isIntegrationAgentSpawnKey(peer.spawnKey) || isCartaAgentSpawnKey(peer.spawnKey)) {
-    return `${peer.description} Message it with message_bot whenever the user asks about this account, even if they did not name it; it answers you, and you pass its answer on. Do not write a reply to the user until its answer arrives: after messaging it, end your turn without text, and when its answer comes in, give the user the answer yourself. Do not tell the user to ask it themselves. If its answer says it could not do something, give the user that reason and any link in it; never reply only that the request could not be completed.`;
+    return `${peer.description} Message it with message_bot whenever the user asks about this account, even if they did not name it; it answers you, and you pass its answer on. Do not write a reply to the user until its answer arrives: after messaging it, end your turn without text, and when its answer comes in, give the user the answer yourself. Do not tell the user to ask it themselves. If its answer says it could not do something, give the user that reason and end your reply with the link in its answer, or [Open Integrations](/app/integrations) when it has none; never reply only that the request could not be completed.`;
   }
   if (!isFinanceAgentSpawnKey(peer.spawnKey)) {
     return peer.description;
   }
-  return `${peer.description} Message it with message_bot whenever the user asks about cash, runway, burn or spending, even if they did not name it. It answers with the figures from the Finance page. Do not write a reply to the user until its answer arrives: after messaging it, end your turn without text. When its answer comes in, quote the figures in your reply yourself and end with [Open Finance](/app/finance) for the detail. Never estimate a figure yourself; if it cannot answer, say so and link Finance. If the user asks to pay or change something, message the Mercury or Brex agent instead, and give the user its reason and any link in it.`.trim();
+  return `${peer.description} Message it with message_bot whenever the user asks about cash, runway, burn or spending, even if they did not name it. It answers with the figures from the Finance page. Do not write a reply to the user until its answer arrives: after messaging it, end your turn without text. When its answer comes in, quote the figures in your reply yourself and end with [Open Finance](/app/finance) for the detail. Never estimate a figure yourself; if it cannot answer, or no accounts are connected yet, say so and still end with [Open Finance](/app/finance). If the user asks to pay or change something, message the Mercury or Brex agent instead, and give the user its reason and end your reply with its link, or [Open Integrations](/app/integrations) when it has none.`.trim();
 }
 
 export const PLAIN_CAPABILITY_GUIDANCE =
