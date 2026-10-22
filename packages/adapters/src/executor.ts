@@ -190,12 +190,15 @@ import {
   isUniqueViolation,
   listApprovalRules,
   loadRunHistoryMessages,
+  loadRunTurnCheckpoint,
   parseComputerMode,
   readHistory,
   recordUsage,
+  RUN_TURN_CHECKPOINT_KIND,
   retireModelCredential,
   runAsSystem,
   SpaceLimitError,
+  saveRunTurnCheckpoint,
   searchHistory,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -515,6 +518,7 @@ import {
   serializeModelSecret,
   withModelCredentialLock,
 } from "./pi-oauth.js";
+import { namedAgentTools } from "./pi-runtime.js";
 import { pinsToolFromTool } from "./pins.js";
 import type { PlotSpec } from "./plot-tool.js";
 import {
@@ -617,6 +621,7 @@ import {
 } from "./ticket-tools.js";
 import { advanceToolCallLoopGuard, loopGuardStopText } from "./tool-loop.js";
 import { textContentArg } from "./tool-text.js";
+import { restoreTurnCheckpoint, unresolvedTurnCheckpointCalls } from "./turn-checkpoint.js";
 import { UI_ARTIFACT_GUIDANCE, uiArtifactFileName } from "./ui-artifact-tool.js";
 import { parseUiBlocks, UI_BLOCKS_GUIDANCE } from "./ui-blocks-tool.js";
 import {
@@ -3451,6 +3456,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let unchangedVisualStreak: UnchangedVisualStreak = { count: 0 };
         let terminalCheckpointComplete = false;
         let approvalPausePending = false;
+        const pendingTurnCheckpoints = new Map<string, () => string>();
+        const persistTurnCheckpoint = async (executionId?: string) => {
+          const capture = executionId ? pendingTurnCheckpoints.get(executionId) : undefined;
+          if (capture) {
+            const saved = JSON.parse(capture());
+            saved.effectOccurrences = effectOccurrences;
+            await saveRunTurnCheckpoint(deps.prisma, run, workerId, fence, JSON.stringify(saved));
+          }
+        };
         // An unattended run asked for the owner; it ends with a short note instead of pausing.
         let unattendedNeedsOwner = false;
         /** The one consent card of this run attempt, shared by parallel mail calls. */
@@ -3545,10 +3559,26 @@ export function createRunExecutor(deps: ExecutorDeps) {
         };
 
         const mutatingEffectOccurrences = new Map<string, number>();
+        const effectOccurrences: Array<{
+          executionId: string;
+          fingerprint: string;
+          occurrence: number;
+        }> = [];
+        let restoredPendingEffect: (typeof effectOccurrences)[number] | undefined;
         const consumedEffectIds = new Set<string>();
-        const nextMutatingEffectOccurrence = (toolName: string, args: Record<string, unknown>) => {
+        const nextMutatingEffectOccurrence = (
+          toolName: string,
+          args: Record<string, unknown>,
+          executionId: string,
+        ) => {
           const fingerprint = toolEffectIdempotencyKey(runId, toolName, args);
+          const previous = restoredPendingEffect;
+          if (previous?.executionId === executionId) {
+            restoredPendingEffect = undefined;
+            if (previous.fingerprint === fingerprint) return previous.occurrence;
+          }
           const occurrence = mutatingEffectOccurrences.get(fingerprint) ?? 0;
+          effectOccurrences.push({ executionId, fingerprint, occurrence });
           mutatingEffectOccurrences.set(fingerprint, occurrence + 1);
           return occurrence;
         };
@@ -3673,7 +3703,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Whether outside content has entered this run through a tool result or a steering message.
         // A run that began with outside content is already marked by externalTaint; a later attempt
         // did not see the earlier attempt's tool results, so it counts as marked.
-        let outsideContentSeen = false;
+        let turnCheckpoint: string | undefined;
+        let checkpointLoadError: Error | undefined;
+        try {
+          turnCheckpoint = await loadRunTurnCheckpoint(deps.prisma, run);
+        } catch (error) {
+          checkpointLoadError =
+            error instanceof Error ? error : new Error("Unsupported turn checkpoint");
+        }
+        // A restored transcript holds earlier tool results this worker did not see.
+        let outsideContentSeen = Boolean(turnCheckpoint) || Boolean(checkpointLoadError);
         let earlierAttemptPromise: Promise<boolean> | undefined;
         const isOutsideContentSeen = async () => {
           if (outsideContentSeen) return true;
@@ -4472,7 +4511,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const occurrence =
             name === "request_secret"
               ? 0
-              : nextMutatingEffectOccurrence(replayEffectToolName, args);
+              : nextMutatingEffectOccurrence(replayEffectToolName, args, executionId);
           const effectKey =
             usesApprovalKey && occurrence === 0
               ? approvalEffectKey(runId, replayEffectToolName, args)
@@ -4763,6 +4802,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return pauseForApproval();
             }
             await workspaceCheckpoint.flush();
+            await persistTurnCheckpoint(executionId);
             await settleRunningHelpers();
             const paused = await deps.events.pauseRunForInput({
               spaceId: run.spaceId,
@@ -7037,6 +7077,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return pauseForSecret();
             }
             await workspaceCheckpoint.flush();
+            await persistTurnCheckpoint(executionId);
             await settleRunningHelpers();
             const paused = await deps.events.pauseRunForInput({
               spaceId: run.spaceId,
@@ -7634,11 +7675,78 @@ export function createRunExecutor(deps: ExecutorDeps) {
               parsePlaybook(invokedSkill.playbook),
             )}\n\n${taskPrompt}`
           : taskPrompt;
-        const approvalContinuation = buildApprovalContinuation(
-          approvedEffects,
-          (request) => redactSecrets(JSON.stringify(request), runSecrets),
-          { exposedToolNames: new Set(tools.map((tool) => tool.name)) },
-        );
+        if (turnCheckpoint) {
+          try {
+            const saved = restoreTurnCheckpoint(turnCheckpoint, {
+              provider: runModelProvider,
+              id: runModelId,
+            });
+            const unresolved = new Set(unresolvedTurnCheckpointCalls(saved.messages));
+            const namedTools = namedAgentTools(tools);
+            const available = new Set(namedTools.map((tool) => tool.name));
+            if (
+              saved.messages.some(
+                (message) =>
+                  message.role === "assistant" &&
+                  message.content.some(
+                    (call) =>
+                      call.type === "toolCall" &&
+                      unresolved.has(call) &&
+                      (saved.executionMode === "sequential" ||
+                        call.id === saved.pendingToolCallId) &&
+                      !available.has(call.name),
+                  ),
+              )
+            ) {
+              turnCheckpoint = undefined;
+            } else if (saved.effectOccurrences) {
+              effectOccurrences.push(...saved.effectOccurrences);
+              const pendingExecutionId = JSON.stringify([
+                "pi-tool",
+                "main",
+                saved.pendingToolCallId,
+              ]);
+              // Provider IDs can repeat in later responses. Only the restored
+              // pending call may consume its saved assignment, exactly once.
+              restoredPendingEffect = saved.effectOccurrences.findLast(
+                (entry) => entry.executionId === pendingExecutionId,
+              );
+              for (const { fingerprint, occurrence } of saved.effectOccurrences) {
+                mutatingEffectOccurrences.set(
+                  fingerprint,
+                  Math.max(mutatingEffectOccurrences.get(fingerprint) ?? 0, occurrence + 1),
+                );
+              }
+            } else {
+              // Older snapshots have no executor assignments. Retained completed
+              // calls still reserve their occurrences before pending calls run.
+              for (const message of saved.messages) {
+                if (message.role !== "assistant") continue;
+                for (const call of message.content) {
+                  if (call.type !== "toolCall" || unresolved.has(call)) continue;
+                  const tool = namedTools.find((tool) => tool.name === call.name)?.tool;
+                  if (tool && tool.name !== "request_secret" && tool.name !== "connect_app")
+                    nextMutatingEffectOccurrence(
+                      tool.name,
+                      call.arguments,
+                      JSON.stringify(["pi-tool", "main", call.id]),
+                    );
+                }
+              }
+            }
+          } catch {
+            // Incompatible transcripts use the existing canonical approval replay.
+            // Decryption happens earlier and must still fail closed.
+            turnCheckpoint = undefined;
+          }
+        }
+        const approvalContinuation = turnCheckpoint
+          ? undefined
+          : buildApprovalContinuation(
+              approvedEffects,
+              (request) => redactSecrets(JSON.stringify(request), runSecrets),
+              { exposedToolNames: new Set(tools.map((tool) => tool.name)) },
+            );
         const replyContext = await loadReplyContext(deps.prisma, thread.id, run.sourceMessageId);
         const prompt = [
           replyContext,
@@ -7783,6 +7891,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
 
         try {
+          if (checkpointLoadError) throw checkpointLoadError;
           let modelRetrying = false;
           const runtimeEvents = deps.runtime.run(
             {
@@ -7995,6 +8104,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 };
               },
               resumeFromCheckpoint: takeoverResume?.checkpoint,
+              turnCheckpoint,
+              onCheckpoint: async (capture, executionId) => {
+                pendingTurnCheckpoints.set(executionId, capture);
+              },
+              resumeToolResult: {
+                content: [{ type: "text", text: takeoverResume?.promptNote ?? taskPrompt }],
+              },
               script,
               allowSilentEmpty: allowSilentEmptyRun,
               delegated: () => delegatedRequest && run.trigger !== "bot_message",
@@ -8009,8 +8125,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       runSecrets.push(...values),
                     );
                   },
-              onToolCompleted: (completion) =>
-                appendToolCompletionAudit(
+              onToolCompleted: (completion) => {
+                if (restoredPendingEffect?.executionId === completion.executionId)
+                  restoredPendingEffect = undefined;
+                if (!completion.paused) pendingTurnCheckpoints.delete(completion.executionId);
+                return appendToolCompletionAudit(
                   deps,
                   {
                     spaceId: run.spaceId,
@@ -8020,7 +8139,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   },
                   completion,
                   runSecrets,
-                ),
+                );
+              },
               // An owner's private message must not steer an Elio peer run: it stays unclaimed and
               // the owner run that starts when this one finishes answers it.
               claimSteering:
@@ -8186,6 +8306,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 label: redactSecrets(action.label, runSecrets),
               }));
               await workspaceCheckpoint.flush();
+              await persistTurnCheckpoint(event.executionId);
               await settleRunningHelpers();
               const paused = await deps.events.pauseRunForInput({
                 spaceId: run.spaceId,
@@ -8263,6 +8384,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               if (!(await holdComputerExecutionLeaseForTakeover(deps.prisma, computerLease))) {
                 throw new Error("Computer lease expired before takeover");
               }
+              await persistTurnCheckpoint(event.executionId);
               await settleRunningHelpers();
               const paused = await deps.events.pauseRunForTakeover({
                 spaceId: run.spaceId,
@@ -10680,9 +10802,12 @@ export async function recordEffect(
   legacyIdempotencyKey?: string,
   consumedIds?: Set<string>,
 ) {
+  if (kind === RUN_TURN_CHECKPOINT_KIND) throw new Error("Unsupported tool effect kind");
   const existing = await deps.prisma.externalEffect.findUnique({
     where: { idempotencyKey },
   });
+  if (existing?.kind === RUN_TURN_CHECKPOINT_KIND || existing?.status === RUN_TURN_CHECKPOINT_KIND)
+    throw new Error("Unsupported tool effect kind");
   if (existing && (existing.runId !== run.id || existing.spaceId !== run.spaceId)) {
     throw new Error("Stored tool execution does not belong to this run.");
   }

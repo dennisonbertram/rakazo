@@ -1,0 +1,65 @@
+import { describe, expect, it, vi } from "vitest";
+import { cancelRunsInTransaction } from "./cancel-runs.js";
+import type { PrismaClient } from "./client.js";
+import { loadRunTurnCheckpoint, saveRunTurnCheckpoint } from "./run-turn-checkpoint.js";
+
+const run = { id: "fixture-run", spaceId: "fixture-space" };
+function fixture() {
+  let stored: unknown;
+  const upsert = vi.fn(async ({ create, update }) => {
+    stored = stored ? update.result : create.result;
+    return {};
+  });
+  const locked = vi.fn(async () => ({ count: 1 }));
+  const client = {
+    $transaction: async (action: (tx: unknown) => Promise<unknown>) => action(client),
+    run: { updateMany: locked, findMany: async () => [] },
+    secret: { deleteMany: vi.fn() },
+    externalEffect: {
+      upsert,
+      findMany: async () => (stored ? [{ result: stored }] : []),
+      deleteMany: vi.fn(async () => {
+        stored = undefined;
+        return { count: 1 };
+      }),
+    },
+    attempt: { updateMany: vi.fn() },
+    task: { updateMany: vi.fn() },
+  };
+  return { client: client as unknown as PrismaClient, upsert, locked, stored: () => stored };
+}
+
+describe("run turn checkpoint", () => {
+  it("stores only the latest payload", async () => {
+    const state = fixture();
+    await saveRunTurnCheckpoint(
+      state.client,
+      run,
+      "fixture-worker",
+      1,
+      "unique-checkpoint-payload",
+    );
+    expect(await loadRunTurnCheckpoint(state.client, run)).toBe("unique-checkpoint-payload");
+    await saveRunTurnCheckpoint(state.client, run, "fixture-worker", 1, "replacement");
+    expect(await loadRunTurnCheckpoint(state.client, run)).toBe("replacement");
+    expect(state.upsert.mock.calls[0]![0].where).toEqual(state.upsert.mock.calls[1]![0].where);
+  });
+  it("rejects stale writers before storing content", async () => {
+    const state = fixture();
+    state.locked.mockResolvedValue({ count: 0 });
+    await expect(
+      saveRunTurnCheckpoint(state.client, run, "fixture-worker", 1, "fixture"),
+    ).rejects.toThrow("lease expired");
+    expect(state.upsert).not.toHaveBeenCalled();
+  });
+  it("clears content in the same transaction as cancellation", async () => {
+    const state = fixture();
+    await saveRunTurnCheckpoint(state.client, run, "fixture-worker", 1, "fixture");
+    await cancelRunsInTransaction(
+      state.client,
+      [{ id: run.id, taskId: "fixture-task" }],
+      new Date(0),
+    );
+    expect(await loadRunTurnCheckpoint(state.client, run)).toBeUndefined();
+  });
+});

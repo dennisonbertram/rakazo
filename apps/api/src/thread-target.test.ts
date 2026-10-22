@@ -52,6 +52,7 @@ describe("threadHead", () => {
 describe("queued run supersession", () => {
   it("only cancels queued runs started by user messages or reactions", async () => {
     const tx = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       run: {
         findMany: vi
           .fn()
@@ -1167,6 +1168,7 @@ describe("sendThreadMessage", () => {
       blocks: [{ kind: "ask", text: "Which city should I use?", status: "pending" }],
     };
     const tx = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
       thread: {
         update: vi.fn(async ({ data }: { data: { nextMessageSeq?: unknown } }) =>
@@ -1339,6 +1341,7 @@ describe("sendThreadMessage", () => {
       blocks: [{ kind: "ask", text: "Which city should I use?", status: "pending" }],
     };
     const tx = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "group-1" }]),
       thread: {
         update: vi.fn(async ({ data }: { data: { nextMessageSeq?: unknown } }) =>
@@ -3354,6 +3357,7 @@ describe("stopThreadRuns", () => {
     });
     let nextEventSeq = 0;
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
@@ -3496,6 +3500,7 @@ describe("stopThreadRuns", () => {
       yield { type: "exit", code: 0 };
     });
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: {
         update: vi.fn().mockResolvedValue({ nextEventSeq: 5 }),
@@ -3642,7 +3647,7 @@ describe("stopThreadRuns", () => {
         ]),
         update: messageUpdate,
       },
-      externalEffect: { updateMany: effectUpdate },
+      externalEffect: { updateMany: effectUpdate, deleteMany: vi.fn(async () => ({ count: 0 })) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: { findMany: vi.fn().mockResolvedValue([]) },
       computerExecutionLease: { findMany: vi.fn().mockResolvedValue([]) },
@@ -3696,6 +3701,7 @@ describe("stopThreadRuns", () => {
     const writes: string[] = [];
     const created: Array<Record<string, unknown>> = [];
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
@@ -3790,6 +3796,7 @@ describe("stopThreadRuns", () => {
 
   it("emits no event and skips the wake when nothing was running", async () => {
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: { update: vi.fn() },
       run: {

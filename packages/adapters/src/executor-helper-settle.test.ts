@@ -44,7 +44,7 @@ const history = [
 ];
 
 async function continueRun(events: unknown[], fail = false) {
-  const trigger = "user";
+  const trigger: string = "user";
   const storedPhase = null;
   const run: Record<string, unknown> = {
     id: "run-1",
