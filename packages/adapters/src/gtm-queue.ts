@@ -56,8 +56,9 @@ function normalizedPost(value: unknown): { id: string; post: QueuePost | null } 
     return null;
   const content = (post.content as string | null | undefined) ?? "";
   if (content.length > 20_000) return null;
-  if (post.scheduledFor === undefined || post.scheduledFor === null)
-    return { id: post._id, post: null };
+  if (post.scheduledFor === undefined || post.scheduledFor === null) {
+    return status.data === "scheduled" ? null : { id: post._id, post: null };
+  }
   const scheduled = IsoDateTimeSchema.safeParse(post.scheduledFor);
   if (!scheduled.success || !Number.isFinite(Date.parse(scheduled.data))) return null;
   if (!Array.isArray(post.platforms) || post.platforms.length > 50) return null;

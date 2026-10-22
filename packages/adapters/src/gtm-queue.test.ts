@@ -131,6 +131,50 @@ describe("Zernio queue REST adapter", () => {
     expect(result.posts[99]?.id).toBe("post-100");
   });
 
+  it.each([undefined, null])(
+    "rejects scheduled posts with date %s without losing prior pages",
+    async (scheduledFor) => {
+      for (const priorCount of [0, 100]) {
+        const fetch = vi.fn(async (input: string | URL | Request) => {
+          const pageNumber = Number(new URL(String(input)).searchParams.get("page"));
+          const posts =
+            priorCount > 0 && pageNumber === 1
+              ? Array.from({ length: priorCount }, (_, index) => post(`post-${index + 1}`))
+              : [post("missing-date", { scheduledFor })];
+          return new Response(
+            JSON.stringify(page(pageNumber, posts, priorCount + 1, priorCount ? 2 : 1)),
+            { status: 200 },
+          );
+        });
+        const adapter = createZernioQueueAdapter(network(fetch as typeof globalThis.fetch));
+        const result = await adapter.listPosts(scope);
+        expect(result).toMatchObject({ status: "unavailable", complete: false });
+        expect(result.posts.map((item) => item.id)).toEqual(
+          Array.from({ length: priorCount }, (_, index) => `post-${index + 1}`),
+        );
+      }
+    },
+  );
+
+  it.each([undefined, null])(
+    "skips legitimately unscheduled drafts with date %s",
+    async (scheduledFor) => {
+      const fetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify(page(1, [post("draft", { status: "draft", scheduledFor })], 1, 1)),
+            { status: 200 },
+          ),
+      );
+      const adapter = createZernioQueueAdapter(network(fetch as typeof globalThis.fetch));
+      await expect(adapter.listPosts(scope)).resolves.toEqual({
+        status: "ready",
+        complete: true,
+        posts: [],
+      });
+    },
+  );
+
   it("fails closed on malformed, inconsistent, duplicated or invalid queue data", async () => {
     for (const body of [
       page(1, [post("missing-count")], 2, 1),
