@@ -44,12 +44,12 @@ describe("contact tools", () => {
     expect(capTableToolsAllowed({ ...base, trigger: "bot_message" })).toBe(false);
   });
 
-  it("the Investors agent passes the cap table gate but its fixed list has no cap_table_update", () => {
+  it("the Investors agent passes the cap table gate and its fixed list has cap_table_update", () => {
     const investors = { ...base, botSpawnKey: investorsAgentSpawnKey("u") };
     expect(capTableToolsAllowed(investors)).toBe(true);
     expect(capTableToolsAllowed({ ...investors, trigger: "bot_message" })).toBe(false);
     expect(INVESTORS_AGENT_BUILTIN_TOOLS).toContain("cap_table_read");
-    expect(INVESTORS_AGENT_BUILTIN_TOOLS).not.toContain("cap_table_update");
+    expect(INVESTORS_AGENT_BUILTIN_TOOLS).toContain("cap_table_update");
     expect(INVESTORS_AGENT_BUILTIN_TOOLS).toEqual(
       expect.arrayContaining(["contacts_list", "contacts_add", "contacts_save"]),
     );
@@ -191,6 +191,32 @@ describe("contact tools", () => {
     );
   });
 
+  it("cap_table_update writes as the sheet for the Investors agent and refuses a table of another source", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const prisma = { capTableSnapshot: { updateMany } } as never;
+    const args = {
+      companyName: "Example Co",
+      asOf: "2026-01-31",
+      fullyDilutedShares: 1000,
+      source: "carta",
+      sourceRef: { driveFileId: "file-1", name: "Cap table" },
+      shareClasses: [],
+      holders: [{ name: "Ada Fund", security: "Common", shares: 1000 }],
+    };
+    expect(
+      await contactToolFromTool("cap_table_update", { prisma, scope, writer: "sheet" }, args),
+    ).toEqual({ ok: true });
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ ...scope, source: "sheet" }) }),
+    );
+    const empty = await contactToolFromTool(
+      "cap_table_update",
+      { prisma, scope, writer: "sheet" },
+      { ...args, holders: [] },
+    );
+    expect(empty).toEqual({ error: expect.stringContaining("nothing was changed") });
+  });
+
   it("cap_table_update says so when another source owns the table", async () => {
     const prisma = {
       capTableSnapshot: {
@@ -244,5 +270,30 @@ describe("contact tools", () => {
     const saved = await contactToolFromTool("contacts_save", { prisma, scope }, args);
     expect(saved).toEqual({ contact: expect.objectContaining({ name: "Ada Capital" }) });
     expect(upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("fundraising_read", () => {
+  const offered = (flags: { fundraisingEnabled?: boolean; capTableEnabled?: boolean }) =>
+    selectBuiltinToolsForRun({
+      graphicalToolsAllowed: false,
+      pageBrowserAllowed: false,
+      groupId: null,
+      trigger: "message",
+      semanticMemoryEnabled: false,
+      messagingChannelRun: false,
+      ...flags,
+    }).map((tool) => tool.name);
+
+  it("is offered only with its own gate, which the cap table gate does not open", () => {
+    expect(offered({})).not.toContain("fundraising_read");
+    expect(offered({ capTableEnabled: true })).not.toContain("fundraising_read");
+    expect(offered({ fundraisingEnabled: true })).toContain("fundraising_read");
+  });
+
+  it("is in the Investors agent's fixed list and in no other agent's", () => {
+    expect(INVESTORS_AGENT_BUILTIN_TOOLS).toContain("fundraising_read");
+    for (const tools of [LEGAL_AGENT_BUILTIN_TOOLS, DATA_ROOM_AGENT_BUILTIN_TOOLS])
+      expect(tools).not.toContain("fundraising_read");
   });
 });

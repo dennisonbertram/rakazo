@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 254 of 254
-- Web and shared components: 676
+- Web and shared component files with stories: 259 of 259
+- Web and shared components: 687
 - Mobile components: 138 in 95 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -200,6 +200,13 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SpaceName, AskAgentButton, WithEndings, HereLink, DetailHead, CompanyMenu, NotFoundNotice, ErrorNotice, DetailPage, Section, Kpi, BreakdownRows, Chevron, TransactionRow, VendorGroupRows, TransactionTable, TransactionsSection, Chip, PeriodTabs, Legend, BurnLegend, Kv, KvRow, ValueLink | [apps/web/src/components/finance/ui.tsx](../../apps/web/src/components/finance/ui.tsx) | [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx) | web |
 | WalletDialog | [apps/web/src/components/finance/WalletDialog.tsx](../../apps/web/src/components/finance/WalletDialog.tsx) | [WalletDialog.stories.tsx](../../apps/web/src/components/finance/WalletDialog.stories.tsx) | web |
 
+## Web components/fundraising
+
+| Component | File | Story file | Surface |
+| --- | --- | --- | --- |
+| ProspectRow, Pipeline | [apps/web/src/components/fundraising/Pipeline.tsx](../../apps/web/src/components/fundraising/Pipeline.tsx) | [Pipeline.stories.tsx](../../apps/web/src/components/fundraising/Pipeline.stories.tsx) | web |
+| RoundDialog, Segment, Figure, RoundCard | [apps/web/src/components/fundraising/RoundCard.tsx](../../apps/web/src/components/fundraising/RoundCard.tsx) | [RoundCard.stories.tsx](../../apps/web/src/components/fundraising/RoundCard.stories.tsx) | web |
+
 ## Web components/inbox
 
 | Component | File | Story file | Surface |
@@ -245,6 +252,12 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | IntegrationTile, StatusBadge, AgentStack, AgentToggleList, CardHead, SectionTitle, SourceBadge | [apps/web/src/components/integrations/parts.tsx](../../apps/web/src/components/integrations/parts.tsx) | [parts.stories.tsx](../../apps/web/src/components/integrations/parts.stories.tsx) | web |
 | SignInStep | [apps/web/src/components/integrations/SignInStep.tsx](../../apps/web/src/components/integrations/SignInStep.tsx) | [SignInStep.stories.tsx](../../apps/web/src/components/integrations/SignInStep.stories.tsx) | web |
 | StoredMeetingsList | [apps/web/src/components/integrations/StoredMeetingsList.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.tsx) | [StoredMeetingsList.stories.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.stories.tsx) | web |
+
+## Web components/investors
+
+| Component | File | Story file | Surface |
+| --- | --- | --- | --- |
+| ActionItems | [apps/web/src/components/investors/ActionItems.tsx](../../apps/web/src/components/investors/ActionItems.tsx) | [ActionItems.stories.tsx](../../apps/web/src/components/investors/ActionItems.stories.tsx) | web |
 
 ## Web components/legal
 
@@ -301,12 +314,14 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | FinanceNotFound | [apps/web/src/pages/finance/FinanceNotFound.tsx](../../apps/web/src/pages/finance/FinanceNotFound.tsx) | [FinanceNotFound.stories.tsx](../../apps/web/src/pages/finance/FinanceNotFound.stories.tsx) | web |
 | FinanceSpendPage, FinanceCategoryPage, FinanceRecurringPage, FinanceVendorPage | [apps/web/src/pages/finance/FinanceSpend.tsx](../../apps/web/src/pages/finance/FinanceSpend.tsx) | [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx) | web |
 | ReceiptIcon, ReceiptThumb, CheckReceipt, FinanceTransactionPage, FinanceReceiptPage | [apps/web/src/pages/finance/FinanceTransaction.tsx](../../apps/web/src/pages/finance/FinanceTransaction.tsx) | [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |
+| FundraisingPage | [apps/web/src/pages/Fundraising.tsx](../../apps/web/src/pages/Fundraising.tsx) | [Fundraising.stories.tsx](../../apps/web/src/pages/Fundraising.stories.tsx) | web |
 | GoogleOAuthCallbackPage | [apps/web/src/pages/GoogleOAuthCallback.tsx](../../apps/web/src/pages/GoogleOAuthCallback.tsx) | [GoogleOAuthCallback.stories.tsx](../../apps/web/src/pages/GoogleOAuthCallback.stories.tsx) | web |
 | MemberPicker, CreateGroupForm, GroupSettings | [apps/web/src/pages/GroupPanel.tsx](../../apps/web/src/pages/GroupPanel.tsx) | [GroupPanel.stories.tsx](../../apps/web/src/pages/GroupPanel.stories.tsx) | web |
 | InboxPage, InboxListPage | [apps/web/src/pages/Inbox.tsx](../../apps/web/src/pages/Inbox.tsx) | [Inbox.stories.tsx](../../apps/web/src/pages/Inbox.stories.tsx) | web |
 | IntegrationsPage | [apps/web/src/pages/Integrations.tsx](../../apps/web/src/pages/Integrations.tsx) | [Integrations.stories.tsx](../../apps/web/src/pages/Integrations.stories.tsx) | web |
 | IntegrationSetupPage | [apps/web/src/pages/IntegrationSetup.tsx](../../apps/web/src/pages/IntegrationSetup.tsx) | [IntegrationSetup.stories.tsx](../../apps/web/src/pages/IntegrationSetup.stories.tsx) | web |
-| Figure, Summary, ConnectCartaDialog, ContactRow, InvestorsPage | [apps/web/src/pages/Investors.tsx](../../apps/web/src/pages/Investors.tsx) | [Investors.stories.tsx](../../apps/web/src/pages/Investors.stories.tsx) | web |
+| Figure, Summary, ConnectCartaDialog, UpdateRow, UpdatesSection, ContactRow, InvestorsPage | [apps/web/src/pages/Investors.tsx](../../apps/web/src/pages/Investors.tsx) | [Investors.stories.tsx](../../apps/web/src/pages/Investors.stories.tsx) | web |
+| UpdateEditor | [apps/web/src/pages/investors/UpdateEditor.tsx](../../apps/web/src/pages/investors/UpdateEditor.tsx) | [UpdateEditor.stories.tsx](../../apps/web/src/pages/investors/UpdateEditor.stories.tsx) | web |
 | KnowledgeSection, SpaceMemorySection, MemoryDocumentList | [apps/web/src/pages/KnowledgeSection.tsx](../../apps/web/src/pages/KnowledgeSection.tsx) | [KnowledgeSection.stories.tsx](../../apps/web/src/pages/KnowledgeSection.stories.tsx) | web |
 | LegalPage, Legal, GraphTab, LegalSkeleton | [apps/web/src/pages/Legal.tsx](../../apps/web/src/pages/Legal.tsx) | [Legal.stories.tsx](../../apps/web/src/pages/Legal.stories.tsx) | web |
 | NextDeadline, Title, Status, LegalContracts | [apps/web/src/pages/legal/LegalContracts.tsx](../../apps/web/src/pages/legal/LegalContracts.tsx) | [LegalContracts.stories.tsx](../../apps/web/src/pages/legal/LegalContracts.stories.tsx) | web |

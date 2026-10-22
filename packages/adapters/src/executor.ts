@@ -332,6 +332,11 @@ import {
   financeToolsAllowed,
   hasFinanceSource,
 } from "./finance-tools.js";
+import {
+  FUNDRAISING_TOOL_NAMES,
+  fundraisingToolFromTool,
+  fundraisingToolsAllowed,
+} from "./fundraising-tools.js";
 import { handoffToGroupBot, loadGroupContext } from "./group-handoff.js";
 import {
   COMPACTION_BATCH_SIZE,
@@ -353,6 +358,11 @@ import {
   resolveIMessageTarget,
 } from "./imessage-tools.js";
 import { triageStatus } from "./inbox-triage.js";
+import {
+  INVESTOR_UPDATE_TOOL_NAMES,
+  investorUpdateToolFromTool,
+  investorUpdateToolsAllowed,
+} from "./investor-tools.js";
 import {
   assertConnectorToolArgs,
   CATALOG_EXECUTE,
@@ -592,6 +602,7 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "legal_query",
   "contacts_list",
   "cap_table_read",
+  "fundraising_read",
   "calendar_list_events",
   "calendar_get_event",
   "drive_search",
@@ -2005,6 +2016,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
                 spaceId: run.spaceId,
+                userId: run.userId,
                 botId: bot.id,
               }),
           messagingChannelRun ||
@@ -2670,6 +2682,28 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trigger: run.trigger,
           messagingChannelRun,
         });
+        // The Investors agent may overwrite the cap table only on the routine sheet read, so text in a
+        // document or email cannot steer a chat turn into writing it.
+        const capTableWriteBlocked =
+          isInvestorsAgentSpawnKey(bot.spawnKey) && run.trigger !== "routine";
+        const investorsEnabled = investorUpdateToolsAllowed({
+          hasProvider: true,
+          groupId: thread.groupId,
+          runUserId: run.userId,
+          botUserId: bot.userId,
+          botSpawnKey: bot.spawnKey,
+          trigger: run.trigger,
+          messagingChannelRun,
+        });
+        const fundraisingEnabled = fundraisingToolsAllowed({
+          hasProvider: true,
+          groupId: thread.groupId,
+          runUserId: run.userId,
+          botUserId: bot.userId,
+          botSpawnKey: bot.spawnKey,
+          trigger: run.trigger,
+          messagingChannelRun,
+        });
         const legalToolSet: ReadonlySet<string> = new Set(LEGAL_AGENT_BUILTIN_TOOLS);
         const dataRoomAgentToolSet: ReadonlySet<string> = new Set(DATA_ROOM_AGENT_BUILTIN_TOOLS);
         const investorsToolSet: ReadonlySet<string> = new Set(INVESTORS_AGENT_BUILTIN_TOOLS);
@@ -2693,6 +2727,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             legalEnabled,
             contactsEnabled,
             capTableEnabled,
+            investorsEnabled,
+            fundraisingEnabled,
             meetingsEnabled,
             messagingChannelRun,
             cartaAgent,
@@ -2723,6 +2759,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (!legalOnly || legalToolSet.has(tool.name)) &&
             (!dataRoomAgent || dataRoomAgentToolSet.has(tool.name)) &&
             (!investorsAgent || investorsToolSet.has(tool.name)) &&
+            !(capTableWriteBlocked && tool.name === "cap_table_update") &&
             (!meetingAgent || meetingAgentToolSet.has(tool.name)) &&
             // pi-runtime runs run_subagent itself, before the executor's approval gate.
             ((!meetingTaint && externalChain === undefined) ||
@@ -4854,7 +4891,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (
             (CONTACT_ONLY_TOOL_NAMES.has(name) && contactsEnabled) ||
-            (CAP_TABLE_TOOL_NAMES.has(name) && capTableEnabled)
+            (CAP_TABLE_TOOL_NAMES.has(name) &&
+              capTableEnabled &&
+              !(capTableWriteBlocked && name === "cap_table_update"))
           ) {
             return finish(
               await contactToolFromTool(
@@ -4863,9 +4902,29 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   prisma: deps.prisma,
                   scope: { spaceId: run.spaceId, userId: bot.userId },
                   botId: bot.id,
+                  writer: isInvestorsAgentSpawnKey(bot.spawnKey) ? "sheet" : "carta",
                 },
                 args,
               ),
+            );
+          }
+          if (INVESTOR_UPDATE_TOOL_NAMES.has(name) && investorsEnabled) {
+            return finish(
+              await investorUpdateToolFromTool(
+                {
+                  prisma: deps.prisma,
+                  scope: { spaceId: run.spaceId, userId: bot.userId },
+                },
+                args,
+              ),
+            );
+          }
+          if (FUNDRAISING_TOOL_NAMES.has(name) && fundraisingEnabled) {
+            return finish(
+              await fundraisingToolFromTool(name, {
+                prisma: deps.prisma,
+                scope: { spaceId: run.spaceId, userId: bot.userId },
+              }),
             );
           }
           if (DRIVE_TOOL_NAMES.has(name) && deps.connectors && driveEnabled) {
@@ -4954,6 +5013,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (name === "scratchpad_list") {
             return listScratchpadItemsFromTool(deps, {
               spaceId: run.spaceId,
+              userId: run.userId,
               botId: bot.id,
               includeDone: Boolean(args.includeDone),
             });
@@ -4966,10 +5026,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
               title: String(args.title ?? ""),
               status: args.status ? String(args.status) : undefined,
               notes: args.notes !== undefined ? String(args.notes) : undefined,
+              category: args.category !== undefined ? String(args.category) : undefined,
+              channel: args.channel !== undefined ? String(args.channel) : undefined,
+              target: args.target !== undefined ? String(args.target) : undefined,
+              scheduledFor: args.scheduledFor !== undefined ? String(args.scheduledFor) : undefined,
             });
             return finish(created);
           }
           if (name === "scratchpad_update") {
+            if (Object.hasOwn(args, "category") || Object.hasOwn(args, "channel")) {
+              return finish({
+                error: "category and channel can only be set when an item is created.",
+              });
+            }
             const updated = await updateScratchpadItemFromTool(deps, {
               spaceId: run.spaceId,
               botId: bot.id,
@@ -4978,6 +5047,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               title: args.title !== undefined ? String(args.title) : undefined,
               status: args.status !== undefined ? String(args.status) : undefined,
               notes: args.notes !== undefined ? String(args.notes) : undefined,
+              target: args.target !== undefined ? String(args.target) : undefined,
+              scheduledFor: args.scheduledFor !== undefined ? String(args.scheduledFor) : undefined,
+              proof: args.proof !== undefined ? String(args.proof) : undefined,
             });
             return finish(updated);
           }
@@ -4987,6 +5059,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               botId: bot.id,
               userId: run.userId,
               itemId: String(args.itemId ?? ""),
+              proof: args.proof !== undefined ? String(args.proof) : undefined,
             });
             return finish(completed);
           }
@@ -7542,6 +7615,10 @@ export function selectBuiltinToolsForRun(options: {
   contactsEnabled?: boolean;
   /** The Carta agent on a run its owner started: the Cap Table tools are offered. */
   capTableEnabled?: boolean;
+  /** The Investors agent on a run its owner started: investor_update_draft is offered. */
+  investorsEnabled?: boolean;
+  /** The Investors agent on a run its owner started: the Fundraising read tool is offered. */
+  fundraisingEnabled?: boolean;
   /** A meeting-source agent on an owner-initiated run with AI data sharing allowed. */
   meetingsEnabled?: boolean;
   messagingChannelRun: boolean;
@@ -7573,6 +7650,7 @@ export function selectBuiltinToolsForRun(options: {
       financeEnabled: false,
       contactsEnabled: false,
       capTableEnabled: false,
+      investorsEnabled: false,
     };
   const disabled = disabledBuiltinToolSet(options.disabledBuiltinTools);
   return selectCalendarTools(
@@ -7608,6 +7686,8 @@ export function selectBuiltinToolsForRun(options: {
       (options.legalEnabled || !LEGAL_GATED_TOOL_NAMES.has(tool.name)) &&
       (options.contactsEnabled || !CONTACT_ONLY_TOOL_NAMES.has(tool.name)) &&
       (options.capTableEnabled || !CAP_TABLE_TOOL_NAMES.has(tool.name)) &&
+      (options.investorsEnabled || !INVESTOR_UPDATE_TOOL_NAMES.has(tool.name)) &&
+      (options.fundraisingEnabled || !FUNDRAISING_TOOL_NAMES.has(tool.name)) &&
       (options.meetingsEnabled || !MEETING_TOOL_NAMES.has(tool.name)) &&
       (options.dataRoomEnabled || !DATA_ROOM_TOOL_NAMES.has(tool.name)) &&
       !(
