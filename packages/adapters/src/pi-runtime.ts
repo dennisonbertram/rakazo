@@ -602,7 +602,7 @@ export class PiAgentRuntime implements AgentRuntime {
         const providerFailure =
           !budgetExceeded && terminalMessage ? providerFailureText(terminalMessage) : undefined;
         const error = agent.state.errorMessage || providerFailure;
-        if (error && !budgetExceeded) {
+        if (error && !budgetExceeded && (!host.pausePending || signal.aborted)) {
           throw new Error(sanitizeProviderError(activeStreamTarget.model.provider, error));
         }
         if (!budgetExceeded && terminalMessage && !messageHasToolCall(terminalMessage)) {
@@ -1321,6 +1321,9 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         failure = error;
         throw error;
       } finally {
+        // Pi only terminates a parallel batch when every result terminates.
+        // A single paused call must stop the turn before another model request.
+        if (host.pausePending) host.abortTurn?.();
         endToolCall(host);
         const completion: AgentToolCompletion = {
           name: tool.name,
