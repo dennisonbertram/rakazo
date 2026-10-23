@@ -24,7 +24,7 @@ import { secureFetch, validateUrl, withEndpointOriginFallback } from "./mcp-tran
 import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { persistPreparedSecret } from "./secret-persistence.js";
-import { deleteSecretBestEffort } from "./secret-store-factory.js";
+import { deleteSecretBestEffort, holdSecretNotifications } from "./secret-store-factory.js";
 
 type OAuthState = {
   tokens?: OAuthTokens;
@@ -1066,8 +1066,12 @@ export class McpOAuthBroker {
       {
         ...(endpoint
           ? {
+              // The refresh writes its secret inside the lock transaction, so the change
+              // notification waits for that pooled connection to come back.
               refresh: (held: string) =>
-                this.refreshGrant(server.id, endpoint, context, held, options.onPersisted),
+                holdSecretNotifications(() =>
+                  this.refreshGrant(server.id, endpoint, context, held, options.onPersisted),
+                ),
             }
           : {}),
         ...options,
