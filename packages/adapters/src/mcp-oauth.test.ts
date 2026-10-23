@@ -692,6 +692,61 @@ describe("MCP OAuth", () => {
     expect(onAuthorization).toHaveBeenCalledWith(authorizationUrl);
   });
 
+  describe("offline_access", () => {
+    const authorize = async (
+      scope: string | undefined,
+      scopesSupported: string[] | undefined,
+      scopeOverride?: string,
+    ) => {
+      const provider = new StoredMcpOAuthProvider(
+        "server-1",
+        {
+          oauth: {
+            ...(scopeOverride ? { scopeOverride } : {}),
+            discoveryState: {
+              authorizationServerUrl: "https://auth.example.test",
+              authorizationServerMetadata: {
+                issuer: "https://auth.example.test",
+                authorization_endpoint: "https://auth.example.test/authorize",
+                token_endpoint: "https://auth.example.test/token",
+                response_types_supported: ["code"],
+                ...(scopesSupported ? { scopes_supported: scopesSupported } : {}),
+              },
+            },
+          },
+        },
+        async () => undefined,
+        { onAuthorization: () => undefined },
+      );
+      const url = new URL("https://auth.example.test/authorize");
+      if (scope) url.searchParams.set("scope", scope);
+      await provider.redirectToAuthorization(url);
+      return provider.authorizationUrl?.searchParams;
+    };
+
+    it("is requested with the published scopes when the authorization server offers it", async () => {
+      const params = await authorize("mail.read", ["mail.read", "offline_access"]);
+      expect(params?.get("scope")).toBe("mail.read offline_access");
+      expect(params?.has("prompt")).toBe(false);
+    });
+
+    it("is not repeated, and not added when the server does not offer it", async () => {
+      expect((await authorize("offline_access mail.read", ["offline_access"]))?.get("scope")).toBe(
+        "offline_access mail.read",
+      );
+      expect((await authorize("mail.read", ["mail.read"]))?.get("scope")).toBe("mail.read");
+    });
+
+    it("leaves a request with no scope alone", async () => {
+      expect((await authorize(undefined, ["offline_access"]))?.has("scope")).toBe(false);
+    });
+
+    it("leaves a scope the user typed in exactly as typed", async () => {
+      const params = await authorize("mail.read", ["mail.read", "offline_access"], "mail.send");
+      expect(params?.get("scope")).toBe("mail.send");
+    });
+  });
+
   it("clears stale tokens when runtime authorization URL validation fails", async () => {
     const persisted: { oauth?: { tokens?: unknown } }[] = [];
     const provider = new StoredMcpOAuthProvider(

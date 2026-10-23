@@ -234,6 +234,32 @@ function canonicalResource(resource: string | undefined): URL | undefined {
   }
 }
 
+/** The OpenID Connect scope that asks the authorization server for a refresh token. */
+const OFFLINE_ACCESS = "offline_access";
+
+/**
+ * The SDK requests the scopes the resource publishes (RFC 9728). `offline_access`
+ * is an authorization-server scope, so it never appears there, yet servers such as
+ * OpenIddict and Entra issue a refresh token only when it is requested. Without it
+ * the connection lapses with the first access token and asks for a reconnect.
+ * Those servers issue the refresh token without `prompt=consent`, which would
+ * force a consent screen on every reconnect.
+ */
+
+function requestOfflineAccess(
+  authorizationUrl: URL,
+  discovery: OAuthDiscoveryState | undefined,
+): void {
+  // Without a requested scope the server applies its defaults; `offline_access`
+  // alone would narrow the grant to no API scope at all.
+  const scope = authorizationUrl.searchParams.get("scope");
+  if (!scope) return;
+  if (!discovery?.authorizationServerMetadata?.scopes_supported?.includes(OFFLINE_ACCESS)) return;
+  const scopes = scope.split(/\s+/);
+  if (scopes.includes(OFFLINE_ACCESS)) return;
+  authorizationUrl.searchParams.set("scope", [...scopes, OFFLINE_ACCESS].join(" "));
+}
+
 function applyGrant(oauth: OAuthState, grant: TokenGrant): void {
   if (grant.tokens) oauth.tokens = grant.tokens;
   else delete oauth.tokens;
@@ -390,6 +416,7 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     // the token request carries no scope, so rewriting the authorization URL is enough.
     const override = this.material.oauth?.scopeOverride;
     if (override) authorizationUrl.searchParams.set("scope", override);
+    else requestOfflineAccess(authorizationUrl, this.material.oauth?.discoveryState);
     this.authorizationUrl = authorizationUrl;
     if (this.options.onAuthorization) {
       this.options.onAuthorization(authorizationUrl);
