@@ -142,8 +142,8 @@ import {
   messagingDmSurfaceNote,
   newRunUnattended,
   newSiteOutcome,
-  nextCronDateAcross,
   nextFence,
+  nextRoutineRunDateAcross,
   outboundSiteGate,
   ownsLine,
   PrivateFragments,
@@ -1324,9 +1324,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
       // pauses rather than crash-looping the wakeup job.
       const nextRunAt = isOneShotRoutineCrons(routine.crons)
         ? null
-        : nextCronDateAcross(
+        : nextRoutineRunDateAcross(
             routine.crons,
-            new Date(Math.max(Date.now(), scheduledAt.getTime())),
+            scheduledAt,
+            new Date(Date.now()),
             routine.timezone,
           );
       const previousLastRunAt = routine.lastRunAt;
