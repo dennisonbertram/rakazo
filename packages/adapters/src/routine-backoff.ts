@@ -80,13 +80,15 @@ export async function clearRoutineBackoff(
   routineId: string,
   now = new Date(),
 ): Promise<void> {
-  // Most completions have nothing to clear; skip the locked write for them.
-  const held = await deps.prisma.routine
-    .count({ where: { id: routineId, accountFailures: { gt: 0 } } })
-    .catch((error: unknown) => {
-      getLogger().error("routine.backoff_clear", error);
-      return 0;
-    });
+  // Most completions have nothing to clear; skip the locked write for them. A failed read
+  // here must never turn a completed run into a failed one.
+  let held = 0;
+  try {
+    held = await deps.prisma.routine.count({ where: { id: routineId, accountFailures: { gt: 0 } } });
+  } catch (error) {
+    getLogger().error("routine.backoff_clear", error);
+    return;
+  }
   if (held === 0) return;
   await updateSchedule(deps, routineId, "routine.backoff_clear", (routine) => {
     if (routine.accountFailures === 0) return null;

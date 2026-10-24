@@ -544,6 +544,8 @@ import {
   clearRoutineBackoff,
   isModelAccountRefusal,
 } from "./routine-backoff.js";
+import { routineTimerNonce } from "./routine-coalescing.js";
+import { lateRoutineRunInstruction } from "./routine-lateness.js";
 import { notifyThreadEvent } from "./run-notification.js";
 import {
   commitConsumedRunSecret,
@@ -1450,6 +1452,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             trigger: "routine",
             unattended: newRunUnattended({ trigger: "routine" }),
             routineId: routine.id,
+            // Names the occurrence this run is for, so a late start can say so.
+            clientNonce: routineTimerNonce(routine.id, scheduledAt.toISOString()),
             ...routineRunModelPin(currentModel),
           },
         });
@@ -1729,6 +1733,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
       ) {
         assertTransition(current.status as RunStatus, "running");
       }
+      // Resumed attempts keep the first start, so lateness reflects when the run began.
+      const executionStartedAt = current.startedAt ?? new Date();
       const started = await deps.prisma.run.updateMany({
         where: {
           id: runId,
@@ -1736,7 +1742,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           leaseOwner: workerId,
           leaseFence: fence,
         },
-        data: { status: "running", startedAt: current.startedAt ?? new Date() },
+        data: { status: "running", startedAt: executionStartedAt },
       });
       if (started.count !== 1) return;
       const leaseTarget = await deps.prisma.bot.findUniqueOrThrow({
@@ -7982,6 +7988,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
               { exposedToolNames: new Set(tools.map((tool) => tool.name)) },
             );
         const replyContext = await loadReplyContext(deps.prisma, thread.id, run.sourceMessageId);
+        let lateRoutineNote: string | undefined;
+        if (run.trigger === "routine" && run.routineId && run.clientNonce) {
+          try {
+            const routine = await deps.prisma.routine.findUnique({
+              where: { id: run.routineId },
+              select: { crons: true, timezone: true },
+            });
+            if (routine)
+              lateRoutineNote = lateRoutineRunInstruction(run, routine, executionStartedAt);
+          } catch {
+            // Lateness is optional context; a lookup failure must not prevent a run.
+          }
+        }
         const prompt = [
           replyContext,
           basePrompt,
@@ -7991,6 +8010,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           voiceCall && !callEndRun ? voiceCallInstruction(disabledBuiltinTools) : undefined,
           // Per-turn, not in the system prompt: the timestamp changes every call and would break the cacheable prefix.
           formatCurrentTimeInstruction(new Date(), userTimezone),
+          lateRoutineNote,
         ]
           .filter(Boolean)
           .join("\n\n");
