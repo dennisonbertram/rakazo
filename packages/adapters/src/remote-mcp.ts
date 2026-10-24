@@ -167,8 +167,7 @@ async function inspectSafeRemoteUrl(
   if (url.protocol === "http:" && isLocalMcpHost(hostname)) {
     return { url, addresses: literal ?? [] };
   }
-  if (privateHost && literal) return { url, addresses: literal };
-  const addresses = await resolve(hostname);
+  const addresses = literal ?? (await resolve(hostname));
   assertAllowedAddresses(addresses, policy);
   if (url.protocol === "http:" && addresses.some((entry) => !isPrivateAddress(entry.address))) {
     throw new Error("Connector URL must use HTTPS");
