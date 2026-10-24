@@ -7,6 +7,7 @@ import {
   approvalRoutesMatch,
   approvedCatalogReplay,
   approvedPaymentResult,
+  approvedEffectOccurrence,
   approvedReplayArgs,
   boundDirectApprovalDetails,
   boundDirectApprovalRequest,
@@ -80,6 +81,17 @@ describe("approved effect replay", () => {
     expect(queue.assertDrained).toThrow();
     expect(queue.take("destination.write")).toEqual({ sequence: 2 });
     expect(queue.assertDrained).not.toThrow();
+  });
+
+  it("reads the occurrence an approved row's key encodes", () => {
+    const base = approvalEffectKey("run", "destination.write", { sequence: 1 });
+    expect(approvedEffectOccurrence(base, base)).toBe(0);
+    expect(approvedEffectOccurrence(`${base}:2`, base)).toBe(2);
+    expect(approvedEffectOccurrence(`${base}:0`, base)).toBeUndefined();
+    expect(approvedEffectOccurrence(`${base}:x`, base)).toBeUndefined();
+    expect(
+      approvedEffectOccurrence(approvalEffectKey("run", "destination.write", {}), base),
+    ).toBeUndefined();
   });
 
   it("does not consume a later tool before the next approved request", () => {

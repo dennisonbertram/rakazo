@@ -1,5 +1,6 @@
 import type { ConnectorTool } from "@rakazo/adapter-kit";
 import { closeApprovalAsks, latestAnswerableAskMessageId, threadRunError } from "@rakazo/core";
+import { APPROVED_ACTION_NOT_RUN_ERROR } from "@rakazo/contracts";
 import { approvalEffectKey } from "@rakazo/core/node/approval-effect-key";
 import { describe, expect, it } from "vitest";
 import {
@@ -64,7 +65,7 @@ describe("executor approval replay", () => {
 
     const queue = createApprovedEffectReplayQueue(effects);
     expect(queue.take("destination.write")).toEqual({ sequence: 1 });
-    expect(queue.assertDrained).toThrow("Approved tool requests were not fully replayed");
+    expect(queue.assertDrained).toThrow(APPROVED_ACTION_NOT_RUN_ERROR);
     expect(queue.take("destination.write")).toEqual({ sequence: 2 });
     expect(queue.take("destination.write")).toBeUndefined();
     expect(queue.assertDrained).not.toThrow();
