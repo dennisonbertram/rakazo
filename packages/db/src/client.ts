@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import type { PoolClient } from "pg";
 import { Pool } from "pg";
 import { PrismaClient } from "./generated/prisma/client.js";
+import { withTextSanitization } from "./text-sanitization.js";
 
 export type Db = PrismaClient;
 
@@ -43,7 +44,8 @@ export function createDb(
 ): { prisma: PrismaClient; pool: Pool } {
   const pool = createPool(connectionString, options);
   const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({ adapter });
+  // Text is cleaned for Postgres before any query sees it.
+  const prisma = withTextSanitization(new PrismaClient({ adapter }));
   return { prisma, pool };
 }
 
