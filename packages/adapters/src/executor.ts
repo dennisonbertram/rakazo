@@ -269,6 +269,7 @@ import {
   forgetBotSecret,
   listBotSecrets,
   loadBotCommandEnvironment,
+  loadLoginPasswordRedactions,
   normalizeSecretDestination,
   requestWithBotSecret,
   resolveLoginFill,
@@ -1631,6 +1632,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           agentSkills,
           agentSecretRows,
           initialBotCommandEnvironment,
+          savedLoginPasswordRedactions,
         ] = await Promise.all([
           deps.prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } }),
           loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId),
@@ -1685,6 +1687,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           voiceAgent
             ? Promise.resolve({})
             : loadBotCommandEnvironment(deps.prisma, deps.secretStore, run),
+          loadLoginPasswordRedactions(deps.prisma, deps.secretStore, run),
         ]);
         const voiceWorkspaceReadAllowed =
           voiceAgent &&
@@ -1859,6 +1862,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         runSecrets.push(...Object.values(agentEnvironment));
         // Encoded forms too: read_file redacts with these values before any shell command runs.
         runSecrets.push(...commandCredentialRedactions(initialBotCommandEnvironment));
+        // A login filled in an earlier run may still be on its page, and anything this run reads
+        // or is given may contain it, so every run hides its saved passwords before the model runs.
+        runSecrets.push(...savedLoginPasswordRedactions);
         const agentEnvironmentInstruction = restrictedContext
           ? undefined
           : formatAgentEnvironmentInstruction({
@@ -3458,8 +3464,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
             visualActionKey,
           );
           unchangedVisualStreak = guard.streak;
+          // A browser window's title is the page title, which can echo a signed-in username.
+          const activeWindow = observation.activeWindow;
           const result = observationToolResult(
-            observation,
+            activeWindow?.title
+              ? {
+                  ...observation,
+                  activeWindow: {
+                    ...activeWindow,
+                    title: redactSecrets(activeWindow.title, runSecrets),
+                  },
+                }
+              : observation,
             note,
             lastComputerFrameId,
             visualActionKey ? { unchangedVisualCount: guard.streak.count } : undefined,
@@ -5186,7 +5202,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               path: requestedPath,
               entries: entries.map((entry) => ({
                 ...entry,
-                path: displayBotWorkspacePath(computerMode, bot.id, requestedPath, entry.path),
+                // A file name can carry a value an earlier command or page wrote.
+                path: redactSecrets(
+                  displayBotWorkspacePath(computerMode, bot.id, requestedPath, entry.path),
+                  runSecrets,
+                ),
               })),
             };
           }
@@ -5338,7 +5358,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               }
               return finish({ ok: true, path: outPath, attached });
             } catch (error) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message = redactSecrets(
+                error instanceof Error ? error.message : String(error),
+                runSecrets,
+              );
               getLogger().error(`render_plot failed for bot ${bot.id}: ${message}`);
               return finish({
                 error: message,
