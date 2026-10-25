@@ -61,7 +61,9 @@ Every place that creates a `Run` sets the flag:
 
 The implementer lists every `run.create` call site in the PR and shows which row it uses. A unit test fails if a new `run.create` site does not set the flag (a grep-style test over the source is acceptable).
 
-**Untrusted input stays marked (Must).** Runs whose prompt carries outside content (webhook payloads, watch diffs, inbound messaging) set the existing external-taint path for the whole run, so every call outside the taint-free list asks (`EXTERNAL_TAINT_FREE_TOOLS`, `packages/adapters/src/executor.ts:8322`). In particular `web_fetch` and `web_search` cannot carry private data out of a tainted run without a card. Fencing the content in the prompt is not enough on its own.
+**Untrusted input stays marked (Must).** Runs whose prompt carries outside content (webhook payloads, watch diffs, inbound messaging) are marked tainted for their whole length: `Run.externalTaint Boolean` (**New**, default `false`), set at creation and copied to every run created from a tainted run (handoff, sub-agent, bot message, resume). Approving a card never clears it. In a tainted run every call asks except a short list of tools that only write inside Praci or to the owner (`EXTERNAL_TAINT_SAFE_TOOLS`, **New**, replacing `EXTERNAL_TAINT_FREE_TOOLS` at `packages/adapters/src/executor.ts:8322`): `ask_user`, `skill_read`, `notify_user`, `scratchpad_list`, non-gated `scratchpad_add`/`update`/`complete`, `create_ui_artifact`, `page_write`, `pins_write`, `attach_file`, `recall_memory`, and (phase 5) `tool_run`. In particular `web_fetch` and `web_search` cannot carry private data out of a tainted run without a card. Fencing the content in the prompt is not enough on its own.
+
+**Existing rows (Must).** Backfill `Run.unattended` from the trigger (false for `user`, `follow_up`, `reaction`, `call_end`, `skill`; true otherwise), because a paused run is requeued on the same row (`packages/db/src/run-pauses.ts:482`).
 
 **What may run unattended (Must).** In an unattended run a tool call runs without asking only if it is (a) a connector tool that `connectorToolRequiresApproval` classifies as read-only, or (b) in `UNATTENDED_SAFE_BUILTIN_TOOLS` (`action-approval.ts:59-85`), after an audit. Everything else, including `write_file`, `shell`, `computer_act`, `browser_act`, `open_path`, `launch_app` and any `secret_request` whose method is not `GET` or `HEAD`, raises a normal approval card. The user chose this ("ask first" for files and shell in background runs).
 
@@ -108,7 +110,7 @@ Rules:
 
 **Should:** cards raised by a background run also link from the chat that started the work (walk APPROVALS-C3 found the card only in the acting bot's chat), and Activity shows "Needs approval" for them.
 
-**Migration (Must).** No data migration of rules. Release note: "Scheduled routines now ask before they send, edit files or run commands." Existing routines that relied on silent writes will raise a card on their next run.
+**Migration (Must).** Rules are kept, except that a target with both an Ask and an Allow rule (possible today, the old unique key included the effect: `schema.prisma:195`) keeps only the Ask rule before the new index is created. Release note: "Scheduled routines now ask before they send, edit files or run commands." Existing routines that relied on silent writes will raise a card on their next run.
 
 **Mobile:** shows and answers the same cards (exists). The table is web and Electron only in v1; mobile shows a read-only summary (Later).
 
@@ -189,7 +191,7 @@ The user asked for apps that are safe and that agents can run as tools for repea
 **Share an artifact by link (Must).**
 - The Artifacts toolbar gains "Share". It opens the existing `CopyLinkDialog`: view-only, expires in 30 days, the link is shown once, and "Stop sharing" sits in the same dialog with a confirm.
 - Storage follows the investor portal (`packages/db/src/investor-portal.ts`): `ArtifactShare` (**New**: id, spaceId, artifactId (the exact version), tokenHash, createdBy, expiresAt, revokedAt, lastOpenedAt).
-- A public page `/s/:token` in the web app (like the investor portal, `apps/web/src/App.tsx:75-80`) loads the shared version from a public API endpoint. Supported formats in v1, each with its existing renderer:
+- A public page in the web app loads the shared version from a public API endpoint. The token travels in the URL fragment (`/s#<token>`), as the investor portal does (`apps/web/src/pages/portal/PortalOpen.tsx:9`), so it is never sent in a request line or a referrer; the page's HTML response also sends `Referrer-Policy: no-referrer`. Supported formats in v1, each with its existing renderer:
   - HTML: inside a sandboxed iframe (`sandbox="allow-scripts"` without `allow-same-origin`) with the CSP of `SandboxedHtmlViewer.tsx` (`default-src 'none'`).
   - UI artifact dashboards (`UI_ARTIFACT_MIME_TYPE`): `UiArtifactView`, as in `ArtifactPreview.tsx:33`.
   - Images and PDF: shown as in the preview.
@@ -198,7 +200,7 @@ The user asked for apps that are safe and that agents can run as tools for repea
 - The link stays on the version that was shared. A new version reaches viewers only when the owner presses "Update link". "Restore this version" sits next to the version select.
 - Deleting an artifact revokes its links (one clause in the delete dialog).
 - Sharing is a human action in the UI. The bot has no share tool.
-- Rate limit on `/s/:token`; unknown, expired and revoked tokens return the same 404.
+- Rate limit on the public endpoint; unknown, expired and revoked tokens return the same 404.
 - **Mobile:** artifacts preview exists; Share is Later on mobile.
 
 **Later:** per-app data stores, edit links, passwords, view counts, viewer actions that wake a bot.
