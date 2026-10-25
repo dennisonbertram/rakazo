@@ -47,6 +47,10 @@ export function completedRunBlocks(
   );
 }
 
+// The thread lock is shared with snapshot reads that may hold it for up to 15s. Prisma's 5s
+// default counts that wait, and expiring would fail a run whose work already finished.
+const FINALIZE_TRANSACTION_OPTIONS = { maxWait: 5_000, timeout: 20_000 };
+
 async function finalizeRunOnce(
   prisma: PrismaClient,
   input: FinalizeRunInput,
@@ -225,5 +229,5 @@ async function finalizeRunOnce(
     const continuationRunId = await createPendingSteeringRun(tx, input);
     await tx.bot.update({ where: { id: input.botId }, data: { updatedAt: now } });
     return { threadId: lastEvent.threadId, seq: lastEvent.seq, continuationRunId };
-  });
+  }, FINALIZE_TRANSACTION_OPTIONS);
 }
