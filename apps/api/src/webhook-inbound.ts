@@ -294,6 +294,11 @@ export async function deliverWebhookEvent(
         ].join("\n")
       : input.prompt;
 
+  const displayText =
+    input.routines.length > 0
+      ? `Routine: ${input.routines.map((routine) => routine.name).join(", ")}`
+      : promptText;
+
   const clientNonce = input.idempotencyKey
     ? inboundDeliveryClientNonce(input.source, target.bot.id, input.idempotencyKey)
     : undefined;
@@ -304,7 +309,8 @@ export async function deliverWebhookEvent(
     threadId: target.threadId,
     botId: target.bot.id,
     userId: target.bot.userId,
-    blocks: [{ kind: "text", text: promptText }],
+    // Chat shows only the routine names; the model-only wrapper stays in `prompt`.
+    blocks: [{ kind: "text", text: displayText }],
     prompt: promptText,
     trigger: "webhook",
     clientNonce,

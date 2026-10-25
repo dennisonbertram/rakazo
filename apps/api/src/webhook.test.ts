@@ -344,6 +344,30 @@ describe("inbound webhook HTTP route", () => {
     );
   });
 
+  it("shows only the routine name in the chat, not the model-only prompt", async () => {
+    const deps = createDeps({
+      routines: [
+        {
+          id: "routine-1",
+          name: "Billing events",
+          prompt: "Summarize",
+          modelProvider: null,
+          modelId: null,
+          thinkingLevel: null,
+        },
+      ],
+    });
+    const res = await mount(deps).request("/api/v1/bots/bot-1/webhook", {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}`, "content-type": "application/json" },
+      body: JSON.stringify({ event: "ping" }),
+    });
+    expect(res.status).toBe(200);
+    const sent = deps.sendUserMessage.mock.calls[0]?.[0];
+    expect(sent.blocks).toEqual([{ kind: "text", text: "Routine: Billing events" }]);
+    expect(sent.prompt).toContain("<untrusted_delivery_payload>");
+  });
+
   it("keeps the bot model when matching routines chose different models", async () => {
     const deps = createDeps({
       routines: [
