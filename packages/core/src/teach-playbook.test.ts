@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPlaybookFromRecording,
+  formatSkillRunPrompt,
   promptInvokesSkill,
   sanitizeTeachRecordingEvent,
 } from "./teach-playbook.js";
@@ -41,6 +42,19 @@ describe("buildPlaybookFromRecording", () => {
     expect(playbook.whenToUse).toContain("Export weekly CRM list");
     expect(playbook.approvalBoundaries.length).toBeGreaterThan(0);
     expect(playbook.failureHandling.length).toBeGreaterThan(0);
+  });
+
+  it("does not echo a protected typed value through the final snapshot summary", () => {
+    const playbook = buildPlaybookFromRecording(
+      "Sign in",
+      [
+        { at: "2026-01-01T00:00:00.000Z", kind: "clipboard", text: "fakepass123", sensitive: true },
+        { at: "2026-01-01T00:00:01.000Z", kind: "key", key: "f", sensitive: true },
+      ].map((event) => sanitizeTeachRecordingEvent(event as never)),
+      [{ at: "2026-01-01T00:00:02.000Z", summary: "Login - fakepass123" }],
+    );
+    expect(JSON.stringify(playbook)).not.toContain("fakepass123");
+    expect(formatSkillRunPrompt("Sign in", playbook)).not.toContain("fakepass123");
   });
 
   it("fills approval and failure fields when the demo lacked them", () => {

@@ -181,6 +181,12 @@ export function buildPlaybookFromRecording(
   flushPendingInput();
   flushDrag();
 
+  // The typed value is dropped when a protected event is recorded, so a snapshot summary (a
+  // window title) that echoes it cannot be scrubbed by value. Drop the summary instead.
+  const finalSummary = events.some((event) => event.sensitive)
+    ? undefined
+    : snapshots.at(-1)?.summary;
+
   if (steps.length === 0) {
     steps.push("Repeat the demonstrated workflow using the same navigation pattern.");
   }
@@ -189,8 +195,8 @@ export function buildPlaybookFromRecording(
     whenToUse: goal.trim() || "When the user asks to repeat the demonstrated task.",
     inputs: goal.trim() ? [goal.trim()] : [],
     steps,
-    howToCheck: snapshots.at(-1)?.summary
-      ? `The final screen should match: ${snapshots.at(-1)?.summary}.`
+    howToCheck: finalSummary
+      ? `The final screen should match: ${finalSummary}.`
       : "Confirm the outcome matches the user's goal before reporting success.",
     whatToReturn: "A short summary of what was completed and where outputs were saved.",
     approvalBoundaries: DEFAULT_APPROVAL,
