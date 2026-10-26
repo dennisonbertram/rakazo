@@ -65,6 +65,7 @@ type ScratchpadRow = {
   dueAt?: Date | null;
   waitingOn?: string | null;
   resolvedReason?: string | null;
+  mailMessageId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -102,6 +103,7 @@ export function mapScratchpadItem(row: ScratchpadRow) {
     dueAt: row.dueAt?.toISOString() ?? null,
     waitingOn: row.waitingOn ?? null,
     resolvedReason: row.resolvedReason ?? null,
+    mailMessageId: row.mailMessageId ?? null,
   };
 }
 
