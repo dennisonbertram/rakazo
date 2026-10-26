@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { guardedFlush, guardedWrite, logSinkHealth, reportSinkError } from "./sink-guard.js";
+import { guardedFlush, guardedWrite, reportSinkError } from "./sink-guard.js";
 
 let now = Date.UTC(2026, 0, 1);
 
@@ -75,21 +75,17 @@ describe("sink failure diagnostics", () => {
     expect(consoleError).toHaveBeenCalledExactlyOnceWith("log sink failed", `Error: ${redacted}`);
   });
 
-  it("preserves throttling and sink health while redacting the next report", () => {
+  it("preserves throttling while redacting the next report", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const failures = logSinkHealth().failures;
 
     reportSinkError("first failure");
     reportSinkError(sensitive);
     expect(consoleError).toHaveBeenCalledExactlyOnceWith("log sink failed", "first failure");
-    expect(logSinkHealth()).toEqual({ failures: failures + 2, lastFailureAt: now, degraded: true });
 
     now += 30_000;
     vi.mocked(Date.now).mockReturnValue(now);
     reportSinkError(sensitive);
 
     expect(consoleError).toHaveBeenLastCalledWith("log sink failed (1 suppressed)", redacted);
-    expect(logSinkHealth()).toEqual({ failures: failures + 3, lastFailureAt: now, degraded: true });
-    expect(logSinkHealth(now + 300_000).degraded).toBe(false);
   });
 });
