@@ -119,6 +119,7 @@ const HELPER_SERVICES = ["postgres", "data-init", "seaweedfs", "seaweedfs-init"]
 
 const GENERATED_SECRETS: Record<string, number> = {
   POSTGRES_PASSWORD: 16,
+  POSTGRES_APP_PASSWORD: 16,
   BETTER_AUTH_SECRET: 32,
   ENCRYPTION_KEY: 32,
   SCREEN_PROXY_SECRET: 32,
@@ -150,6 +151,17 @@ export function renderStackEnv(template: string, randomHex: (bytes: number) => s
   return rendered.join("\n");
 }
 
+// Secrets a later version added. A stack created before then gets them appended,
+// so an update keeps starting (Compose requires them) without touching other lines.
+const ADDED_SECRETS = ["POSTGRES_APP_PASSWORD"];
+
+/** Lines to append so an existing `.env` has every added secret, or "" when it already does. */
+export function missingStackSecrets(env: string, randomHex: (bytes: number) => string): string {
+  return ADDED_SECRETS.filter((name) => !new RegExp(`^${name}=\\S`, "m").test(env))
+    .map((name) => `${name}=${randomHex(GENERATED_SECRETS[name]!)}\n`)
+    .join("");
+}
+
 /** Keeps an existing regular `.env`, but replaces a final symlink instead of trusting its target. */
 export async function ensureStackEnv(
   dir: string,
@@ -162,7 +174,10 @@ export async function ensureStackEnv(
     if (!info.isSymbolicLink()) {
       // Fill generated credentials an earlier version left empty (the object store needs them).
       const existing = await readFile(destination, "utf8");
-      const repaired = renderStackEnv(existing, randomHex);
+      const filled = renderStackEnv(existing, randomHex);
+      const missing = missingStackSecrets(filled, randomHex);
+      const separator = missing && filled !== "" && !filled.endsWith("\n") ? "\n" : "";
+      const repaired = `${filled}${separator}${missing}`;
       if (repaired !== existing) await writePrivateFile(destination, repaired);
       return "kept";
     }

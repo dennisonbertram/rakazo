@@ -5,7 +5,7 @@ import type {
   JobWorkerHost,
 } from "@rakazo/adapter-kit";
 import { dispatchBackgroundJob } from "@rakazo/adapter-kit";
-import { isTooManyDatabaseConnections } from "@rakazo/db";
+import { isTooManyDatabaseConnections, runAsSystem } from "@rakazo/db";
 import { runCorrelatedJob, unwrapJobPayload, wrapJobPayload } from "@rakazo/logging";
 import type { CronItem, Runner, WorkerUtils } from "graphile-worker";
 import { makeWorkerUtils, parseCronItems, run } from "graphile-worker";
@@ -82,6 +82,31 @@ export class GraphileJobPublisher implements JobPublisher {
     )
       return undefined;
     return "unsafe_dedupe";
+  }
+}
+
+/**
+ * Job payloads carry only ids. Dispatch starts as system rather than inheriting
+ * whichever request enqueued the job (the in-memory queue's timers would otherwise
+ * keep its tenant); each handler then narrows to the tenant of the row it acts for
+ * (see createBackgroundJobHandlers).
+ */
+function dispatchJob(handlers: BackgroundJobHandlers, name: string, payload: unknown) {
+  return runAsSystem(`background job ${name}`, () =>
+    dispatchBackgroundJob(handlers, name, payload),
+  );
+}
+
+/**
+ * Install or upgrade graphile-worker's schema. Runs as the migration role during
+ * `pnpm db:migrate`, so the runtime role only needs grants on that schema.
+ */
+export async function migrateJobQueue(connectionString: string): Promise<void> {
+  const utils = await makeWorkerUtils({ connectionString });
+  try {
+    await utils.migrate();
+  } finally {
+    await utils.release();
   }
 }
 
@@ -162,7 +187,7 @@ export class GraphileJobWorkerHost implements JobWorkerHost {
             name,
             payload: unpacked.payload,
             correlation: unpacked.correlation,
-            run: () => dispatchBackgroundJob(handlers, name, unpacked.payload),
+            run: () => dispatchJob(handlers, name, unpacked.payload),
           });
         },
       ]),
@@ -390,7 +415,7 @@ export class InMemoryJobQueue implements JobPublisher, JobWorkerHost {
       name: job.name,
       payload: unpacked.payload,
       correlation: unpacked.correlation,
-      run: () => dispatchBackgroundJob(handlers, job.name, unpacked.payload),
+      run: () => dispatchJob(handlers, job.name, unpacked.payload),
     }).catch(() => {
       this.failures.set(job.name, (this.failures.get(job.name) ?? 0) + 1);
     });

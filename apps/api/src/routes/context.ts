@@ -37,6 +37,7 @@ import type { Auth } from "@rakazo/auth";
 import type { Actor } from "@rakazo/contracts";
 import { appContract } from "@rakazo/contracts";
 import type { BoardEvents, NotificationEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
+import { runAsTenant } from "@rakazo/db";
 import type { BillingService } from "../billing.js";
 import type { CompanyImportPage } from "../company-import-page.js";
 import type { createDataRoomService } from "../data-room.js";
@@ -172,6 +173,32 @@ type RouteContextParts = {
   authed: RouteAuthed;
 };
 
+/**
+ * Runs an authenticated procedure with row-level security scoped to the actor's
+ * Space. A streamed result is read after the procedure returns, so each step of
+ * its iterator re-enters the same scope.
+ */
+export async function asTenant<T extends { output: unknown }>(
+  actor: Actor,
+  next: () => T | PromiseLike<T>,
+): Promise<T> {
+  const result = await runAsTenant(actor, next);
+  const output = result.output;
+  if (!output || typeof output !== "object" || !(Symbol.asyncIterator in output)) return result;
+  const iterator = output as AsyncIterator<unknown> & AsyncIterable<unknown>;
+  const scoped: AsyncIterableIterator<unknown> = {
+    next: (...args) => runAsTenant(actor, () => iterator.next(...args)),
+    return: (value) =>
+      runAsTenant(actor, () => iterator.return?.(value) ?? { done: true as const, value }),
+    throw: (error) =>
+      runAsTenant(actor, () => (iterator.throw ? iterator.throw(error) : Promise.reject(error))),
+    [Symbol.asyncIterator]() {
+      return scoped;
+    },
+  };
+  return { ...result, output: scoped };
+}
+
 function createRouteContextParts(): RouteContextParts {
   const os = implement(appContract).$context<{
     actor: Actor | null;
@@ -182,8 +209,9 @@ function createRouteContextParts(): RouteContextParts {
     stillAuthorized?: () => Promise<boolean>;
   }>();
   const authed = os.use(async ({ context, next }) => {
-    if (!context.actor) throw new ORPCError("UNAUTHORIZED");
-    return next({ context: { ...context, actor: context.actor } });
+    const actor = context.actor;
+    if (!actor) throw new ORPCError("UNAUTHORIZED");
+    return asTenant(actor, () => next({ context: { ...context, actor } }));
   });
 
   return { os, authed };

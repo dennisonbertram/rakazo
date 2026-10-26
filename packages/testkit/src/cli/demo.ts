@@ -65,7 +65,9 @@ const OUTBOX = path.join(DIR, "outbox.log");
 const STATE = path.join(DIR, "state.json");
 const WEB_ORIGIN = `http://127.0.0.1:${WEB_PORT}`;
 const API_URL = `http://127.0.0.1:${API_PORT}`;
-const DATABASE_URL = `postgres://rakazo_demo:rakazo_demo@127.0.0.1:${PG_PORT}/rakazo_demo`;
+/** The owner login: migrations and seeding. The API runs as the runtime login, so the demo enforces row-level security. */
+const MIGRATION_URL = `postgres://rakazo_demo:rakazo_demo@127.0.0.1:${PG_PORT}/rakazo_demo`;
+const DATABASE_URL = `postgres://rakazo_app:rakazo_demo_app@127.0.0.1:${PG_PORT}/rakazo_demo`;
 /** DEMO_SANDBOX_PROVIDER=docker also starts the sandbox supervisor, on its own port per slot. */
 const USE_DOCKER_SANDBOX = process.env.DEMO_SANDBOX_PROVIDER === "docker";
 const SUPERVISOR_PORT = 7100 + SLOT;
@@ -133,6 +135,7 @@ function stackEnv(): NodeJS.ProcessEnv {
     NODE_ENV: "development",
     DEMO_SLOT: String(SLOT),
     DATABASE_URL,
+    DATABASE_MIGRATION_URL: MIGRATION_URL,
     REALTIME_DATABASE_URL: DATABASE_URL,
     WAKEUP_DRIVER: "memory",
     // DEMO_SANDBOX_PROVIDER=docker gives bots a real computer in the demo.
@@ -318,7 +321,7 @@ async function up() {
     const run = (command: string, args: string[], cwd = ROOT) =>
       execFileSync(command, args, { cwd, env, stdio: "inherit" });
     run("pnpm", ["--filter", "@rakazo/db", "generate"]);
-    run("pnpm", ["--filter", "@rakazo/db", "exec", "prisma", "migrate", "deploy"]);
+    run("pnpm", ["db:migrate"]);
 
     const require = createRequire(import.meta.url);
     if (USE_DOCKER_SANDBOX) {
@@ -358,7 +361,7 @@ async function up() {
     const done = await seedDemo({
       apiUrl: API_URL,
       webOrigin: WEB_ORIGIN,
-      databaseUrl: DATABASE_URL,
+      databaseUrl: MIGRATION_URL,
       encryptionKey: env.ENCRYPTION_KEY as string,
       email,
       password,
