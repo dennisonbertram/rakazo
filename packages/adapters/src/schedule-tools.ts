@@ -452,13 +452,14 @@ export async function createWatchFromTool(
       deps.prisma,
       deps.connector,
       { spaceId: input.spaceId, userId: input.userId, botId: input.botId },
-      { toolName: wanted.watch.toolName },
+      { toolName: wanted.watch.toolName, arguments: wanted.watch.arguments },
       AbortSignal.timeout(15_000),
       `watch-create:${input.botId}`,
     );
     if (!found.ok) return { error: found.message };
     watch = {
       ...wanted.watch,
+      toolName: found.tool.name,
       connectorId: found.route.connectorId,
       ...(found.route.connectionId ? { connectionId: found.route.connectionId } : {}),
       ...(found.route.resourceId ? { resourceId: found.route.resourceId } : {}),

@@ -22,6 +22,32 @@ class FakeConnector implements ConnectorProvider {
   executed: string[] = [];
   /** Runs after discovery and before the provider call, to change state mid-check. */
   beforeExecute?: () => Promise<void>;
+  /** Offer only the catalog's execute wrapper, as a connector with many tools does. */
+  catalog = false;
+  async resolveCall(call: ConnectorCall, context: AdapterContext) {
+    const ids = new Set((context.connectedConnections ?? []).map((row) => row.id));
+    const tool = this.tools.find(
+      (candidate) => candidate.name === call.args.id && ids.has(candidate.connectionId),
+    );
+    if (!tool) throw new Error("Tool is unknown or not authorized for this bot");
+    // The real catalog checks the arguments against the tool's schema.
+    if (typeof (call.args.arguments as { account?: unknown }).account === "number")
+      throw new Error("Tool arguments are invalid");
+    const { connectionId, ...rest } = tool;
+    const resolved = {
+      ...rest,
+      route: { connectorId: "composio", toolName: tool.name, connectionId },
+    };
+    return {
+      tool: resolved,
+      call: {
+        ...call,
+        tool: tool.name,
+        args: call.args.arguments as Record<string, unknown>,
+        route: resolved.route,
+      },
+    };
+  }
   describe() {
     return {
       id: "composio",
@@ -32,6 +58,18 @@ class FakeConnector implements ConnectorProvider {
   }
   async discoverTools(context: AdapterContext, only?: readonly string[]) {
     const ids = new Set((context.connectedConnections ?? []).map((row) => row.id));
+    if (this.catalog) {
+      return ids.size === 0
+        ? []
+        : [
+            {
+              name: "fake_execute_tool",
+              description: "Run a tool by id.",
+              inputSchema: { type: "object" },
+              route: { connectorId: "composio", toolName: "__catalog_execute" },
+            },
+          ];
+    }
     return this.tools
       .filter((tool) => ids.has(tool.connectionId) && (!only || only.includes("composio")))
       .map(({ connectionId, ...tool }) => ({
@@ -282,5 +320,27 @@ describePostgres("connected-app watches (PostgreSQL)", () => {
       "Late paused: this connected account is no longer available to this bot",
     );
     await prisma.connection.update({ where: { id: connectionId }, data: { status: "connected" } });
+  });
+
+  it("watches a tool behind the lazy catalog and still refuses a write there", async () => {
+    fake.catalog = true;
+    fake.tools = [read("list_accounts"), { ...read("create_payment"), readOnly: undefined }];
+    fake.value = { balance: 1 };
+    expect(await create("Catalog write", "create_payment")).toHaveProperty("error");
+    expect(await create("Catalog arguments", "list_accounts", { account: 5 })).toHaveProperty(
+      "error",
+    );
+    const created = await create("Catalog", "list_accounts", { account: "main" });
+    expect(created).toMatchObject({
+      ok: true,
+      watch: { toolName: "list_accounts", connectionId },
+    });
+    const routine = await routineNamed("Catalog");
+    await tick(); // baseline
+    fake.value = { balance: 2 };
+    expect(await tick()).toMatchObject({ woke: 1 });
+    expect(await runs(routine.id)).toHaveLength(1);
+    expect(fake.executed.at(-1)).toBe("list_accounts");
+    fake.catalog = false;
   });
 });

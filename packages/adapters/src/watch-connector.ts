@@ -19,7 +19,11 @@ import {
 import type { PrismaClient } from "@rakazo/db";
 import { CHANGED_TO_WRITE_MESSAGE } from "./composio-connector.js";
 import { connectionDenial } from "./connection-denial.js";
-import { assertConnectorToolArgs, isLazyCatalogControlRoute } from "./lazy-tool-catalog.js";
+import {
+  assertConnectorToolArgs,
+  CATALOG_EXECUTE,
+  isLazyCatalogControlRoute,
+} from "./lazy-tool-catalog.js";
 import { isMeetingSourceAgent } from "./meeting-tools.js";
 
 /**
@@ -54,7 +58,7 @@ export async function resolveWatchTool(
   prisma: Db,
   connector: ConnectorProvider,
   scope: Scope,
-  spec: { toolName: string } & Partial<
+  spec: { toolName: string; arguments?: Record<string, unknown> } & Partial<
     Pick<ConnectorWatchSpec, "connectorId" | "connectionId" | "resourceId">
   >,
   signal: AbortSignal,
@@ -134,17 +138,53 @@ export async function resolveWatchTool(
       .map((row) => row.provider),
     ...(spec.resourceId ? { mcpServerIds: [spec.resourceId] } : {}),
   };
-  const tool = (
-    await connector.discoverTools(context, spec.connectorId ? [spec.connectorId] : undefined)
-  ).find(
-    (candidate: ConnectorTool) =>
+  const discovered = await connector.discoverTools(
+    context,
+    spec.connectorId ? [spec.connectorId] : undefined,
+  );
+  const sameRoute = (candidate: ConnectorTool) =>
+    !spec.connectorId ||
+    (candidate.route?.connectorId === spec.connectorId &&
+      candidate.route.connectionId === spec.connectionId &&
+      candidate.route.resourceId === spec.resourceId);
+  let tool = discovered.find(
+    (candidate) =>
       candidate.name === spec.toolName &&
       !isLazyCatalogControlRoute(candidate.route) &&
-      (!spec.connectorId ||
-        (candidate.route?.connectorId === spec.connectorId &&
-          candidate.route.connectionId === spec.connectionId &&
-          candidate.route.resourceId === spec.resourceId)),
+      sameRoute(candidate),
   );
+  let args: Record<string, unknown> | undefined;
+  if (!tool && connector.resolveCall) {
+    // A connector with many tools offers a lazy catalog: the same lookup the executor makes for
+    // a call to its "execute" wrapper, which names the one underlying tool and checks the arguments.
+    for (const wrapper of discovered) {
+      if (!wrapper.route || wrapper.route.toolName !== CATALOG_EXECUTE) continue;
+      if (!isLazyCatalogControlRoute(wrapper.route)) continue;
+      if (spec.connectorId && wrapper.route.connectorId !== spec.connectorId) continue;
+      try {
+        const resolved = await connector.resolveCall(
+          {
+            tool: wrapper.name,
+            args: { id: spec.toolName, arguments: spec.arguments ?? {} },
+            executionId: operationId,
+            route: wrapper.route,
+          },
+          context,
+        );
+        if (
+          resolved &&
+          sameRoute(resolved.tool) &&
+          !isLazyCatalogControlRoute(resolved.tool.route)
+        ) {
+          tool = resolved.tool;
+          args = resolved.call.args;
+          break;
+        }
+      } catch {
+        // Not this wrapper's tool, or its arguments do not fit.
+      }
+    }
+  }
   if (!tool?.route) return denied("The tool is no longer available.");
   // The executor hides a tool of an agent's own connection from other bots unless it is declared a read.
   const route = tool.route;
@@ -159,6 +199,13 @@ export async function resolveWatchTool(
   ) {
     return denied("The tool is no longer available.");
   }
+  if (!args && spec.arguments) {
+    try {
+      assertConnectorToolArgs(tool.inputSchema, spec.arguments);
+    } catch {
+      return denied("The tool's arguments are not valid.");
+    }
+  }
   // The executor's own gate: a declared write, or a name that is not a plain read, asks first.
   if (toolRequiresApproval(tool.name, true, tool.readOnly)) {
     return denied("The tool is no longer a read-only tool.");
@@ -167,6 +214,8 @@ export async function resolveWatchTool(
     ok: true as const,
     bot,
     tool,
+    /** The arguments the connector accepted for a catalog tool; a direct tool's are checked by the caller. */
+    args,
     route: tool.route,
     context,
     availableIds: connections
@@ -210,11 +259,6 @@ export async function probeConnectorWatch(
       `watch:${scope.routineId}`,
     );
     if (!resolved.ok) return resolved;
-    try {
-      assertConnectorToolArgs(resolved.tool.inputSchema, spec.arguments);
-    } catch {
-      return denied("The tool's arguments are no longer valid.");
-    }
     const declaredReadOnly = resolved.tool.readOnly;
     let refusal: string | null = null;
     const check = async () => {
@@ -231,8 +275,8 @@ export async function probeConnectorWatch(
     const early = await check();
     if (early) return denied(early);
     const call: ConnectorCall = {
-      tool: spec.toolName,
-      args: spec.arguments,
+      tool: resolved.tool.name,
+      args: resolved.args ?? spec.arguments,
       executionId: `watch:${scope.routineId}:${Date.now()}`,
       // The classification the gate used: a connector refuses to dispatch a tool that is a write now.
       route:
