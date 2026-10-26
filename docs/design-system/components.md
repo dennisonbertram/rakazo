@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 295 of 295
-- Web and shared components: 768
+- Web and shared component files with stories: 296 of 296
+- Web and shared components: 770
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -334,6 +334,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | CompanyRefresh | [apps/web/src/pages/CompanyRefresh.tsx](../../apps/web/src/pages/CompanyRefresh.tsx) | [CompanyRefresh.stories.tsx](../../apps/web/src/pages/CompanyRefresh.stories.tsx) | web |
 | CompanyReview, ReviewItem, CandidateSubjects | [apps/web/src/pages/CompanyReview.tsx](../../apps/web/src/pages/CompanyReview.tsx) | [CompanyReview.stories.tsx](../../apps/web/src/pages/CompanyReview.stories.tsx) | web |
 | ConnectedCallbackPage | [apps/web/src/pages/ConnectedCallback.tsx](../../apps/web/src/pages/ConnectedCallback.tsx) | [ConnectedCallback.stories.tsx](../../apps/web/src/pages/ConnectedCallback.stories.tsx) | web |
+| Section, ContactDetailPage | [apps/web/src/pages/ContactDetail.tsx](../../apps/web/src/pages/ContactDetail.tsx) | [ContactDetail.stories.tsx](../../apps/web/src/pages/ContactDetail.stories.tsx) | web |
 | ContactsPage | [apps/web/src/pages/Contacts.tsx](../../apps/web/src/pages/Contacts.tsx) | [Contacts.stories.tsx](../../apps/web/src/pages/Contacts.stories.tsx) | web |
 | FileInputButton, DataRoomPage | [apps/web/src/pages/DataRoom.tsx](../../apps/web/src/pages/DataRoom.tsx) | [DataRoom.stories.tsx](../../apps/web/src/pages/DataRoom.stories.tsx) | web |
 | DevinPage, Devin, DevinSkeleton | [apps/web/src/pages/Devin.tsx](../../apps/web/src/pages/Devin.tsx) | [Devin.stories.tsx](../../apps/web/src/pages/Devin.stories.tsx) | web |

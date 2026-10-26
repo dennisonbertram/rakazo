@@ -819,8 +819,10 @@ export const Transcript = memo(function Transcript({
                     : // A narrow transcript (the Inbox agent panel) has no gutter beside the bubbles, so the
                       // hover time above and the actions below need room of their own.
                       `group/message relative hover:z-20 @max-md:[@media(hover:hover)]:pt-4 @max-sm:[@media(hover:hover)]:pb-5 ${
-                        // A full-width row has no gutter, so touch reserves a line under it for the rail.
-                        (fullWidth || mailCard) && !cardOnly ? "[@media(hover:none)]:pb-11" : ""
+                        // A full-width row has no gutter, so it reserves room under it for the rail (and the hover time).
+                        fullWidth || mailCard
+                          ? `[@media(hover:hover)]:pb-14${cardOnly ? "" : " [@media(hover:none)]:pb-11"}`
+                          : ""
                       }`
                 }
               >
@@ -1887,6 +1889,10 @@ const MessageView = memo(function MessageView({
                   answer={block.answer}
                   canAnswer={canAnswer}
                   botName={botToolControls?.editableBotName(message.botId)}
+                  canSend={botToolControls?.canSend(message.botId) ?? false}
+                  onSendDraft={
+                    botToolControls ? () => botToolControls.sendDraft(message) : undefined
+                  }
                   onAnswer={(text, username, mail) => onAnswer(message, text, username, mail)}
                   onOpenComposer={
                     botToolControls

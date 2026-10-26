@@ -4,6 +4,7 @@ import { createDb } from "./client.js";
 import {
   addContactIfNew,
   ContactEmailTakenError,
+  contactDetail,
   deleteContact,
   listContacts,
   saveContact,
@@ -277,5 +278,104 @@ describePostgres("contacts (PostgreSQL)", () => {
     await expect(
       saveContact(prisma, mine, { ...base, name: "Thief", roundId: foreign.id }),
     ).rejects.toBeInstanceOf(IsolationError);
+  });
+
+  it("contactDetail joins mail, meetings, documents and SAFEs by stored keys within the owner", async () => {
+    const contact = await saveContact(prisma, mine, {
+      name: "Detail Person",
+      email: "Detail@Example.test",
+    });
+    const stranger = await saveContact(prisma, mine, { name: "Stranger", email: "s@example.test" });
+    const conn = (who: typeof mine) =>
+      prisma.connection.create({
+        data: { ...who, provider: "gmail", displayName: "mail", status: "active" },
+      });
+    const connection = await conn(mine);
+    const otherSpaceConnection = await conn(otherSpace);
+    const mail = (
+      who: typeof mine,
+      connectionId: string,
+      id: string,
+      threadId: string,
+      at: number,
+      fields: { fromAddress: string; toAddresses?: string[]; ccAddresses?: string[] },
+    ) =>
+      prisma.cachedMailMessage.create({
+        data: {
+          ...who,
+          connectionId,
+          providerMessageId: id,
+          threadId,
+          toAddresses: [],
+          ccAddresses: [],
+          subject: id,
+          snippet: "",
+          receivedAt: new Date(at),
+          unread: false,
+          seenAt: new Date(at),
+          ...fields,
+        },
+      });
+    await mail(mine, connection.id, "old", "t1", 1000, { fromAddress: "detail@example.test" });
+    await mail(mine, connection.id, "new", "t1", 3000, {
+      fromAddress: "me@example.test",
+      toAddresses: ["DETAIL@example.test"],
+    });
+    await mail(mine, connection.id, "cc", "t2", 2000, {
+      fromAddress: "z@example.test",
+      ccAddresses: ["detail@example.test"],
+    });
+    await mail(mine, connection.id, "unrelated", "t3", 4000, { fromAddress: "z@example.test" });
+    await mail(otherSpace, otherSpaceConnection.id, "foreign", "t4", 5000, {
+      fromAddress: "detail@example.test",
+    });
+    const meeting = (who: typeof mine, externalId: string, attendees: object[]) =>
+      prisma.meeting.create({
+        data: {
+          ...who,
+          provider: "granola",
+          externalId,
+          title: externalId,
+          startedAt: new Date(1000),
+          sourceUpdatedAt: new Date(1000),
+          attendees,
+        },
+      });
+    await meeting(mine, "with-contact", [{ email: "detail@example.test" }]);
+    await meeting(mine, "without", [{ email: "x@example.test" }]);
+    await meeting(otherSpace, "foreign", [{ email: "detail@example.test" }]);
+    const item = (who: typeof mine, name: string) =>
+      prisma.dataRoomItem.create({
+        data: {
+          ...who,
+          source: "upload",
+          sha256: `${name}-${suffix}`,
+          name,
+          mimeType: "application/pdf",
+          size: 1,
+          status: "ready",
+        },
+      });
+    const shared = await item(mine, "shared.pdf");
+    await item(mine, "unshared.pdf");
+    await prisma.investorShare.create({
+      data: { ...mine, contactId: contact.id, dataRoomItemId: shared.id },
+    });
+    await prisma.safe.create({
+      data: { ...mine, contactId: contact.id, investorName: "Detail Person", amountCents: 5000n },
+    });
+
+    const detail = await contactDetail(prisma, mine, contact.id);
+    expect(detail.contact.id).toBe(contact.id);
+    expect(detail.mail.map((m) => m.subject)).toEqual(["new", "cc"]);
+    expect(detail.meetings.map((m) => m.title)).toEqual(["with-contact"]);
+    expect(detail.documents.map((d) => d.name)).toEqual(["shared.pdf"]);
+    expect(detail.safes.map((safe) => safe.amountCents)).toEqual([5000]);
+    const empty = await contactDetail(prisma, mine, stranger.id);
+    expect([empty.mail, empty.meetings, empty.documents, empty.safes]).toEqual([[], [], [], []]);
+
+    for (const who of [sameSpace, otherSpace])
+      await expect(contactDetail(prisma, who, contact.id)).rejects.toBeInstanceOf(IsolationError);
+    await expect(contactDetail(prisma, mine, "missing")).rejects.toBeInstanceOf(IsolationError);
   });
 });

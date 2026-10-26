@@ -85,7 +85,13 @@ const reply = (kind: "reply" | "replyAll" | "forward"): ComposeSeed => ({
 // Roots still mounted when a test ends would fire their autosave timers during a later test.
 const mounted: Array<ReturnType<typeof createRoot>> = [];
 
-async function open(seed: ComposeSeed, onClose = () => {}, draft?: string, spaceId?: string) {
+async function open(
+  seed: ComposeSeed,
+  onClose = () => {},
+  draft?: string,
+  spaceId?: string,
+  onSent?: () => void,
+) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   prefill.mockResolvedValue({
     connectionId: "c1",
@@ -109,6 +115,7 @@ async function open(seed: ComposeSeed, onClose = () => {}, draft?: string, space
         draft={draft}
         spaceId={spaceId}
         onClose={onClose}
+        onSent={onSent}
       />,
     ),
   );
@@ -255,9 +262,11 @@ it("holds a send for the undo window, and Undo reopens the message untouched", a
   vi.useFakeTimers();
   try {
     const onClose = vi.fn();
-    await open(reply("reply"), onClose);
+    const onSent = vi.fn();
+    await open(reply("reply"), onClose, undefined, undefined, onSent);
     await act(async () => button("Send").click());
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSent).toHaveBeenCalledTimes(1);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(UNDO_SEND_MS - 100);
     });

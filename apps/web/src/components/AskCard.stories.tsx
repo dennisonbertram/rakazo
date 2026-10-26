@@ -148,6 +148,35 @@ export const ApprovalWithReason: Story = {
   },
 };
 
+/** A connected-app tool: friendly title, with the exact tool id behind the chevron. */
+export const ApprovalWithToolId: Story = {
+  args: {
+    block: ask({
+      text: "Review before Carta: Discover",
+      approvalEffectId: "effect_demo",
+      toolId: "mcp__integration-5f783c95__discover",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always", label: "Always allow this tool" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
+export const ApprovalAlwaysAllowed: Story = {
+  args: {
+    block: ask({
+      text: "Review before Carta: Discover",
+      approvalEffectId: "effect_demo",
+      toolId: "mcp__integration-5f783c95__discover",
+      actions: approvalActions,
+      status: "answered",
+      answer: "always",
+    }),
+  },
+};
+
 export const ApprovalAllowed: Story = {
   args: {
     block: ask({

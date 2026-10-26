@@ -283,6 +283,7 @@ import { workingActivity } from "../lib/working-activity";
 import type { ContextMenuPosition } from "./BotContextMenu";
 import { CompanyPage } from "./Company";
 import { CompanyImportPage } from "./CompanyImport";
+import { ContactDetailPage } from "./ContactDetail";
 import { ContactsPage } from "./Contacts";
 import { DataRoomPage } from "./DataRoom";
 import { DevinPage } from "./Devin";
@@ -548,7 +549,7 @@ function findContacts(query: string): Promise<SearchLink[]> {
         )
         .slice(0, 5)
         .map((c) => ({
-          id: c.name,
+          id: c.id,
           label: c.name,
           // The field that matched, so a hit on "halcyon" shows why; else the usual second line.
           detail:
@@ -1152,7 +1153,8 @@ export function ShellPage() {
   const investorsMode = useMatch("/app/investors/*") != null;
   const investorUpdateMatch = useMatch("/app/investors/updates/:id");
   const fundraisingMode = useMatch("/app/fundraising") != null;
-  const contactsMode = useMatch("/app/contacts") != null;
+  const contactMatch = useMatch("/app/contacts/:contactId");
+  const contactsMode = useMatch("/app/contacts") != null || contactMatch != null;
   // Inbox, Finance, Legal, Data room, Investors and Integrations are pages of their own: no bot
   // route. Inbox, Finance, Legal and Investors keep their agent in a side panel.
   const pageMode =
@@ -2382,7 +2384,7 @@ export function ShellPage() {
           heading: t`Contacts`,
           icon: <BookUser size={16} strokeWidth={1.75} />,
           entries: contacts.map((c) => ({
-            id: `/app/contacts?q=${encodeURIComponent(c.id)}`,
+            id: `/app/contacts/${encodeURIComponent(c.id)}`,
             label: c.label,
             detail: c.detail,
           })),
@@ -2997,6 +2999,28 @@ export function ShellPage() {
         });
       },
       editableBotName: (botId) => botsRef.current.find((bot) => bot.id === botId)?.name,
+      canSend: (botId) => {
+        const bot = botsRef.current.find((item) => item.id === botId);
+        return Boolean(bot) && !bot?.disabledBuiltinTools.includes("mail_send");
+      },
+      sendDraft: async (message) => {
+        const botId = activeBotId.current;
+        const groupId = activeGroupId.current;
+        if (!botId && !groupId) return;
+        const result = await rpc.threads.sendDraft({
+          ...(groupId ? { groupId } : { botId: botId! }),
+          runId: message.runId ?? "",
+          messageId: message.id,
+        });
+        if (result.status !== "sent" && result.status !== "unknown") {
+          throw new Error(t`Could not submit this answer`);
+        }
+        if (groupId && activeGroupId.current === groupId) {
+          await refreshGroupThreadRef.current(groupId);
+        } else if (botId && activeBotId.current === botId) {
+          await refreshThreadRef.current(botId);
+        }
+      },
       disableTool: async (botId, tool) => {
         const bot = botsRef.current.find((item) => item.id === botId);
         if (!bot) return;
@@ -4995,6 +5019,8 @@ export function ShellPage() {
                   : undefined
               }
             />
+          ) : contactMatch?.params.contactId ? (
+            <ContactDetailPage id={contactMatch.params.contactId} spaceName={pageSpaceName} />
           ) : contactsMode ? (
             <ContactsPage spaceName={pageSpaceName} onAskAgent={askChief} />
           ) : artifactsMode ? (

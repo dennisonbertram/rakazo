@@ -13,17 +13,20 @@ export const MAIL_APPROVAL_STALE_MS = 2 * 60_000;
  * What the agent reads when it resumes. The claim records the cautious one, since nothing is known
  * yet (and a crash must not leave it believing the mail went out); the real outcome replaces it.
  */
-export function mailApprovalAgentNote(send: boolean, outcome?: Outcome): string {
+export function mailApprovalAgentNote(send: boolean, outcome?: Outcome, edited = true): string {
   const what = send ? "email" : "draft";
+  const did = edited
+    ? `edited this ${what} on the approval card`
+    : `used the approval card for this ${what}`;
   if (outcome === "sent" || outcome === "saved") {
     return send
-      ? "The user edited this email and sent it themselves from the approval card. Do not send it again."
+      ? `The user ${edited ? "edited this email and sent it" : "sent this email"} themselves from the approval card. Do not send it again.`
       : "The user edited this email and saved it as a draft themselves from the approval card. Do not save it again.";
   }
   if (outcome === "failed") {
-    return `The user edited this ${what} on the approval card, but their ${send ? "send" : "save"} failed and nothing was ${send ? "sent" : "saved"}. Do not tell them it was ${send ? "sent" : "saved"}. Tell them in your next message that it failed and that the card keeps the draft to open in the composer.`;
+    return `The user ${did}, but their ${send ? "send" : "save"} failed and nothing was ${send ? "sent" : "saved"}. Do not tell them it was ${send ? "sent" : "saved"}. Tell them in your next message that it failed and that the card keeps the draft to open in the composer.`;
   }
-  return `The user edited this ${what} on the approval card and the outcome of their ${send ? "send" : "save"} is ${outcome === "unknown" ? "unknown" : "not known yet"}. Do not ${send ? "send" : "save"} it again; they should check ${send ? "Sent" : "Drafts"}.`;
+  return `The user ${did} and the outcome of their ${send ? "send" : "save"} is ${outcome === "unknown" ? "unknown" : "not known yet"}. Do not ${send ? "send" : "save"} it again; they should check ${send ? "Sent" : "Drafts"}.`;
 }
 
 /** How an approved mail_send or mail_draft call ended, from its tool result, for its card. */
@@ -72,9 +75,11 @@ export async function reconcileMailApprovals(deps: {
       kind: { in: ["mail_draft", "mail_send"] },
       status: "denied",
       updatedAt: { lte: cutoff },
-      OR: [true, false].map((send) => ({
-        result: { path: ["note"], equals: mailApprovalAgentNote(send) },
-      })),
+      OR: [
+        mailApprovalAgentNote(true),
+        mailApprovalAgentNote(true, undefined, false),
+        mailApprovalAgentNote(false),
+      ].map((note) => ({ result: { path: ["note"], equals: note } })),
     },
     orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
     take: deps.batchSize,
@@ -90,7 +95,10 @@ export async function reconcileMailApprovals(deps: {
   for (const effect of effects) {
     const claimNote = (effect.result as { note: string }).note;
     try {
-      const send = effect.kind === "mail_send";
+      // A draft approval the person sent now carries the send note.
+      const send =
+        claimNote === mailApprovalAgentNote(true) ||
+        claimNote === mailApprovalAgentNote(true, undefined, false);
       const row = await deps.prisma.composeSend.findUnique({
         where: {
           spaceId_userId_clientId: {
