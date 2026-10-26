@@ -59,6 +59,7 @@ import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-d
 import { deliverDueNotifications } from "./notification-outbox.js";
 import { renderPdfPages } from "./pdf-render.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
+import { describeTeachSteps } from "./teach-steps.js";
 import { expireTaughtSkillTeaching } from "./teaching-session.js";
 import { renderThumbnail } from "./thumbnail-render.js";
 import { runWatchProbeTick } from "./watch-probe.js";
@@ -167,7 +168,22 @@ export function createBackgroundJobHandlers(deps: {
       }
     },
     "skill.teaching-expire": async (payload) => {
-      await expireTaughtSkillTeaching(deps, payload.skillId);
+      await expireTaughtSkillTeaching(
+        {
+          ...deps,
+          secrets: deps.secretStore,
+          describeSteps: (input) =>
+            describeTeachSteps(
+              {
+                prisma: deps.prisma,
+                runtime: deps.runtime,
+                resolveModel: deps.executor.resolveModel,
+              },
+              input,
+            ),
+        },
+        payload.skillId,
+      );
     },
     "notifications.deliver": async () => {
       await deliverDueNotifications({

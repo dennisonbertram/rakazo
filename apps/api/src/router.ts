@@ -121,6 +121,7 @@ import {
   stopMailWatch,
   storeBotSecret,
   takeoverLeaseMs,
+  taughtSkillPromptForRoutine,
   toComputerRef,
   touchRunningComputer,
   UNAVAILABLE_MODEL_FOR_AUTH_MESSAGE,
@@ -152,6 +153,7 @@ import {
   BotSecretAuth,
   botAudienceEditable,
   ComputerCommandSchema,
+  encodeLoginSecret,
   FIRST_BOT_SPAWN_KEY,
   foldComputerCommands,
   GOOGLE_DESKTOP_REDIRECT_URI,
@@ -1437,6 +1439,21 @@ export function createRouter(deps: RouterDeps) {
     sandbox: deps.sandbox,
     home: deps.home,
     dataDir: deps.dataDir,
+    secrets: deps.secrets,
+    describeSteps: deps.describeTeachSteps,
+    putLogin: async (actor, botId, login) => {
+      try {
+        await storeBotSecret({
+          prisma: deps.prisma,
+          secretStore: deps.secrets,
+          scope: botSecretScope(actor, botId),
+          destination: { name: login.name, origin: login.site, auth: { type: "login" } },
+          plaintext: encodeLoginSecret({ username: login.username, password: login.password }),
+        });
+      } catch (error) {
+        throw mapBotSecretStoreError(error);
+      }
+    },
   });
   const agentSkills = createAgentSkillsService(deps.prisma, {
     resolveHostname: deps.remoteConnectors?.resolveHostname,
@@ -3670,6 +3687,10 @@ export function createRouter(deps: RouterDeps) {
           sensitive && typeof input.payload.skillId === "string" && input.payload.skillId
             ? input.payload.skillId
             : undefined;
+        const field =
+          typeof input.payload.field === "string" && input.payload.field
+            ? input.payload.field.slice(0, 120)
+            : undefined;
         const mapped = {
           ...(input.kind === "key"
             ? { kind: "key" as const, key: String(input.payload.key ?? ""), sensitive }
@@ -3698,6 +3719,7 @@ export function createRouter(deps: RouterDeps) {
                     sensitive,
                   }),
           ...(skillId ? { skillId } : {}),
+          ...(field ? { field } : {}),
         };
         const outcome = await taughtSkills.recordInput(context.actor, bot.id, mapped);
         if (outcome === "stale") return { ok: true as const };
@@ -3833,6 +3855,8 @@ export function createRouter(deps: RouterDeps) {
           { path: storedPath, content },
           computerContext(context.actor, bot.id, "upload"),
         );
+        // Noting the path for a recording must never fail the upload.
+        await taughtSkills.recordFile(context.actor, bot.id, input.path).catch(() => undefined);
         return { ok: true as const };
       }),
       commands: authed.computer.commands.handler(async ({ context, input }) => {
@@ -4149,6 +4173,9 @@ export function createRouter(deps: RouterDeps) {
         }
         const bot = await repos.getBot(context.actor, input.botId);
         await assertRoutineModel(deps, context.actor, input);
+        if (input.taughtSkillId) {
+          await assertRoutineTaughtSkill(deps, context.actor, input.botId, input.taughtSkillId);
+        }
         if (input.watch) {
           await assertWatchLimits(deps.prisma, context.actor.spaceId, input.botId);
         }
@@ -4174,6 +4201,7 @@ export function createRouter(deps: RouterDeps) {
             userId: context.actor.userId,
             name: input.name,
             prompt: input.prompt,
+            taughtSkillId: input.taughtSkillId,
             crons: input.crons,
             timezone,
             notify: input.notify,
@@ -4189,7 +4217,7 @@ export function createRouter(deps: RouterDeps) {
             watch: input.watch ?? undefined,
             nextRunAt,
           },
-          include: { watchState: true },
+          include: routineInclude,
         });
         if (input.watch) {
           await syncWatchState(deps.prisma, {
@@ -4271,6 +4299,18 @@ export function createRouter(deps: RouterDeps) {
               message: "This routine is managed by the check-in setting.",
             });
           }
+        }
+        if (input.taughtSkillId) {
+          await assertRoutineTaughtSkill(deps, context.actor, existing.botId, input.taughtSkillId);
+        }
+        const nextTaughtSkillId =
+          input.taughtSkillId === undefined ? existing.taughtSkillId : input.taughtSkillId;
+        if (
+          !existing.managedKind &&
+          !nextTaughtSkillId &&
+          !(input.prompt ?? existing.prompt).trim()
+        ) {
+          throw new ORPCError("BAD_REQUEST", { message: "Add an instruction" });
         }
         const watch = input.watch === undefined ? existing.watch : input.watch;
         const watchChanged =
@@ -4356,6 +4396,7 @@ export function createRouter(deps: RouterDeps) {
             data: {
               name: input.name,
               prompt: input.prompt,
+              ...(input.taughtSkillId === undefined ? {} : { taughtSkillId: input.taughtSkillId }),
               crons: input.crons,
               timezone: input.timezone,
               active: input.active,
@@ -4368,7 +4409,7 @@ export function createRouter(deps: RouterDeps) {
               ...(touchesModel ? { modelProvider, modelId, thinkingLevel } : {}),
               nextRunAt,
             },
-            include: { watchState: true },
+            include: routineInclude,
           })
           .catch(async (error: unknown) => {
             if (isRecordNotFound(error)) {
@@ -4464,7 +4505,7 @@ export function createRouter(deps: RouterDeps) {
         }
         const skillRecords = await agentSkills.listWithContent(context.actor);
         // The saved prompt can still open with its schedule; a test does the work once, now.
-        const prompt = `${expandSkillReferencesInPrompt(routine.prompt, skillRecords)}\n\nThis is a test run: do the work above now and post the result here. Ignore any timing in it, and do not create or change schedules.`;
+        const prompt = `${expandSkillReferencesInPrompt((await taughtSkillPromptForRoutine(deps.prisma, routine)) ?? routine.prompt, skillRecords)}\n\nThis is a test run: do the work above now and post the result here. Ignore any timing in it, and do not create or change schedules.`;
         let run: { id: string };
         try {
           // Task + run must commit together so a nonce collision cannot leave an orphan queued Task.
@@ -4820,6 +4861,24 @@ export function createRouter(deps: RouterDeps) {
       ),
       remove: authed.skills.remove.handler(async ({ context, input }) =>
         taughtSkills.remove(context.actor, input.skillId),
+      ),
+    },
+    taughtSkills: {
+      list: authed.taughtSkills.list.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        return taughtSkills.listSaved(context.actor, input.botId);
+      }),
+      delete: authed.taughtSkills.delete.handler(async ({ context, input }) =>
+        taughtSkills.remove(context.actor, input.skillId),
+      ),
+      saveLogin: authed.taughtSkills.saveLogin.handler(async ({ context, input }) =>
+        taughtSkills.saveLogin(context.actor, input),
+      ),
+      skipLogin: authed.taughtSkills.skipLogin.handler(async ({ context, input }) =>
+        taughtSkills.skipLogin(context.actor, input),
+      ),
+      cancel: authed.taughtSkills.cancel.handler(async ({ context, input }) =>
+        taughtSkills.cancel(context.actor, input.skillId),
       ),
     },
     agentSkills: {
@@ -9594,6 +9653,28 @@ async function assertRoutineModel(
   if (message) throw new ORPCError("BAD_REQUEST", { message });
 }
 
+const routineInclude = {
+  watchState: true,
+  taughtSkill: { select: { id: true, name: true } },
+} as const;
+
+/** A routine runs a saved taught skill of the same user on the same bot, nothing else. */
+async function assertRoutineTaughtSkill(
+  deps: RouterDeps,
+  actor: Actor,
+  botId: string,
+  skillId: string,
+) {
+  const skill = await deps.prisma.taughtSkill.findFirst({
+    where: { id: skillId, spaceId: actor.spaceId, userId: actor.userId, botId },
+    select: { status: true },
+  });
+  if (!skill) throw new IsolationError();
+  if (skill.status !== "saved") {
+    throw new ORPCError("BAD_REQUEST", { message: "Save the skill first" });
+  }
+}
+
 function mapRoutine(row: {
   id: string;
   botId: string;
@@ -9614,6 +9695,7 @@ function mapRoutine(row: {
   quiet: boolean;
   watch: unknown;
   managedKind: string | null;
+  taughtSkill?: { id: string; name: string } | null;
   watchState?: {
     lastCheckedAt: Date | null;
     lastChangedAt: Date | null;
@@ -9642,6 +9724,7 @@ function mapRoutine(row: {
     quiet: row.quiet,
     watch: watch.success ? watch.data : null,
     managedKind: row.managedKind === "check_in" ? "check_in" : null,
+    taughtSkill: row.taughtSkill ?? null,
     status: {
       lastRunAt: row.lastRunAt?.toISOString() ?? null,
       nextRunAt: row.nextRunAt?.toISOString() ?? null,
@@ -9656,7 +9739,7 @@ function mapRoutine(row: {
 async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
   const rows = await deps.prisma.routine.findMany({
     where: { botId, spaceId: actor.spaceId },
-    include: { watchState: true },
+    include: routineInclude,
   });
   return rows.map(mapRoutine);
 }

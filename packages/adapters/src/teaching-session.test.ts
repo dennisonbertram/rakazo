@@ -537,6 +537,101 @@ describe("recordTeachingInputEvent", () => {
   });
 });
 
+describe("password detection without Protected input", () => {
+  const actor = { spaceId: "workspace-1", userId: "user-1" } as never;
+
+  it("never stores keys typed into a field labelled Password, in the recording or playbook", async () => {
+    const { deps, current, tx } = recordingDeps(skillRow());
+    const bot = { id: "bot-1", thread: { id: "thread-1" }, computer: null };
+    tx.bot.findUnique = vi.fn(async () => bot);
+    deps.prisma.bot.findUnique = vi.fn().mockResolvedValue(bot);
+    for (const key of ["h", "u", "n", "t", "e", "r", "2"]) {
+      await recordTeachingInputEvent(deps as never, actor, "bot-1", {
+        kind: "key",
+        key,
+        field: "Password",
+      });
+    }
+    await completeTeachingSession(deps as never, actor, "skill-1", "stopped");
+    expect(JSON.stringify(current().recording)).not.toContain("hunter2");
+    expect(
+      current().recording.events.every((event: { sensitive?: boolean }) => event.sensitive),
+    ).toBe(true);
+    expect((current().playbook as { steps: string[] }).steps).toEqual(['Type "[redacted input]".']);
+  });
+});
+
+describe("whole desktop events", () => {
+  it("stores a written file as its path, a command without its token, and no content", async () => {
+    const { deps, current } = recordingDeps(skillRow());
+    await appendRecordingEvent(deps as never, "skill-1", {
+      at: "2026-01-01T00:00:00.000Z",
+      kind: "file",
+      path: "shared/report.csv",
+      text: "a,b,c",
+    });
+    await appendRecordingEvent(deps as never, "skill-1", {
+      at: "2026-01-01T00:00:01.000Z",
+      kind: "command",
+      command: "deploy --token=abc123 --env prod",
+    });
+    const stored = JSON.stringify(current().recording.events);
+    expect(stored).toContain("shared/report.csv");
+    expect(stored).not.toContain("a,b,c");
+    expect(stored).not.toContain("abc123");
+  });
+});
+
+describe("plain steps at Stop", () => {
+  const actor = { spaceId: "workspace-1", userId: "user-1" } as never;
+  async function stopWith(describeSteps: unknown) {
+    const { deps, current, tx } = recordingDeps(skillRow());
+    const bot = { id: "bot-1", thread: { id: "thread-1" }, computer: null };
+    tx.bot.findUnique = vi.fn(async () => bot);
+    deps.prisma.bot.findUnique = vi.fn().mockResolvedValue(bot);
+    await appendRecordingEvent(deps as never, "skill-1", {
+      at: "2026-01-01T00:00:00.000Z",
+      kind: "pointer",
+      x: 10,
+      y: 20,
+      type: "click",
+    });
+    await appendRecordingEvent(deps as never, "skill-1", {
+      at: "2026-01-01T00:00:01.000Z",
+      kind: "key",
+      key: "Enter",
+    });
+    await completeTeachingSession({ ...deps, describeSteps } as never, actor, "skill-1", "stopped");
+    return (current().playbook as { steps: string[] }).steps;
+  }
+
+  it("uses the model's steps, and the model sees only sanitized coordinate steps", async () => {
+    const describeSteps = vi.fn(async () => ["Click Export in the CRM toolbar.", "Press Enter."]);
+    expect(await stopWith(describeSteps)).toEqual([
+      "Click Export in the CRM toolbar.",
+      "Press Enter.",
+    ]);
+    expect(describeSteps).toHaveBeenCalledWith({
+      scope: { userId: "user-1", spaceId: "workspace-1", botId: "bot-1" },
+      goal: "Export the list",
+      steps: ["Click left button at (10, 20).", "Press key: Enter."],
+    });
+  });
+
+  it("keeps the coordinate steps when the model fails or returns nothing", async () => {
+    const coordinates = ["Click left button at (10, 20).", "Press key: Enter."];
+    expect(await stopWith(vi.fn(async () => null))).toEqual(coordinates);
+    expect(
+      await stopWith(
+        vi.fn(async () => {
+          throw new Error("model down");
+        }),
+      ),
+    ).toEqual(coordinates);
+    expect(await stopWith(undefined)).toEqual(coordinates);
+  });
+});
+
 describe("applyTeachingDesktopInput", () => {
   const computer = {
     homeKey: "bot-1",

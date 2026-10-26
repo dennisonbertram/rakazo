@@ -575,6 +575,7 @@ import {
   takeoverContinuePlan,
 } from "./takeover-resume.js";
 import { TASK_CATALOG_GUIDANCE, taskCatalogFromTool } from "./task-catalog.js";
+import { taughtSkillPromptForRoutine } from "./taught-skill-prompt.js";
 import { getActiveTeachingSession, parsePlaybook } from "./teaching-session.js";
 import {
   attachWorkspaceFileToThread,
@@ -1272,7 +1273,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const isCheckIn = routine.managedKind === CHECK_IN_MANAGED_KIND;
       // The managed check-in always runs the built-in instruction, whatever text was stored.
       const routinePrompt = expandSkillReferencesInPrompt(
-        isCheckIn ? checkInInstruction() : routine.prompt,
+        isCheckIn
+          ? checkInInstruction()
+          : ((await taughtSkillPromptForRoutine(deps.prisma, routine)) ?? routine.prompt),
         skillRecords,
       );
       let gtmItemId: string | undefined;
@@ -7238,6 +7241,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const invokedSkill = voiceAgent
           ? undefined
           : savedSkills.find((skill) => promptInvokesSkill(taskPrompt, skill.name || skill.goal));
+        if (invokedSkill) {
+          await deps.prisma.taughtSkill.update({
+            where: { id: invokedSkill.id },
+            data: { lastRunAt: new Date() },
+          });
+        }
         const basePrompt = invokedSkill
           ? `${formatSkillRunPrompt(
               invokedSkill.name || invokedSkill.goal.slice(0, 80),
