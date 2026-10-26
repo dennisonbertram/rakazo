@@ -360,10 +360,10 @@ export function GeneralSettingsPanels({
 export function PrivacySettingsPanels() {
   return (
     <div className="space-y-5">
-      <AiDataSharingSection />
       <section className="rounded-xl border border-border px-4 py-4">
         <ApprovalRulesSettings />
       </section>
+      <AiDataSharingSection />
     </div>
   );
 }
