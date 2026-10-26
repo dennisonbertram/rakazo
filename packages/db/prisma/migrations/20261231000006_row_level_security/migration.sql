@@ -57,7 +57,7 @@ BEGIN
     -- fork: bots, pages and notifications
     'bot_connection_access', 'bot_skill_settings', 'bot_pages', 'bot_pins', 'teach_held_values',
     'scratchpad_approvals', 'routine_watch_states', 'notifications', 'artifact_shares',
-    'account_exports', 'model_oauth_states', 'sidebar_pages', 'space_backup_models',
+    'account_exports', 'model_oauth_states', 'sidebar_pages',
     -- fork: mail
     'mail_messages', 'mail_searches', 'mail_sender_stats', 'mail_sender_decisions',
     'mail_action_logs', 'inbox_todos', 'inbox_sender_feedback', 'compose_sends',

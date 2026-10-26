@@ -125,7 +125,6 @@ import {
   requireMembership,
   rowSecurityWarning,
   runAsSystem,
-  runAsTenant,
 } from "@rakazo/db";
 import type { Logger } from "@rakazo/logging";
 import {
@@ -167,6 +166,7 @@ import {
 } from "./messaging-inbound.js";
 import { mountMessagingWebhookRoutes } from "./messaging-webhook.js";
 import { mountApiRequestBodyLimits } from "./request-body-limit.js";
+import { mountSystemRoutes, mountTenantRoutes } from "./route-scope.js";
 import { createRouter } from "./router.js";
 import { mountScreenTarget } from "./screen-proxy.js";
 import { isDeferredReservationLost, TeamChatBridge } from "./team-chat-bridge.js";
@@ -863,22 +863,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     });
   }
   app.use(PORTAL_PATH, portalNoStore);
-  // Account and session tables, signup bootstrap and account deletion span tenants;
-  // webhooks and public links authenticate a bot, provider or token, then resolve the
-  // tenant from it. Nothing here has a signed-in Space to scope to.
-  for (const [path, reason] of [
-    ["/api/auth/*", "authentication"],
-    ["/api/v1/bots/*", "bot webhook"],
-    ["/api/v1/messaging/*", "messaging webhook"],
-    ["/api/v1/phone/*", "messaging webhook"],
-    ["/api/v1/billing/*", "billing webhook"],
-    ["/api/v1/mail/*", "mail push webhook"],
-    ["/api/internal/screen-target", "screen proxy capability check"],
-    ["/api/share/*", "public artifact share link"],
-    [PORTAL_PATH, "investor portal link"],
-  ] as const) {
-    app.use(path, (_c, next) => runAsSystem(reason, next));
-  }
+  // Webhooks, public links and sign-in run outside any one Space; see route-scope.ts.
+  mountSystemRoutes(app);
   app.get("/api/auth/capabilities", (c) => {
     return c.json({
       sso: env.oidc
@@ -930,19 +916,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     return session;
   };
   const sessionActor = async (request: Request) => (await cachedSession(request))?.actor ?? null;
-  // Routes the signed-in user calls outside RPC run scoped to their Space.
-  for (const path of [
-    "/api/inbox/*",
-    "/api/contacts/*",
-    "/api/data-room/*",
-    "/api/account/*",
-    "/api/voice/*",
-  ]) {
-    app.use(path, async (c, next) => {
-      const actor = await sessionActor(c.req.raw);
-      return actor ? runAsTenant(actor, next) : next();
-    });
-  }
+  mountTenantRoutes(app, sessionActor);
   app.use("/rpc/*", async (c, next) => {
     const session = await cachedSession(c.req.raw);
     const actor = session?.actor ?? null;
