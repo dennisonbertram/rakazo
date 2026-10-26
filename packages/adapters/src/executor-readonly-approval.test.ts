@@ -77,7 +77,9 @@ vi.mock("./inbox-triage.js", async (importOriginal) => ({
       : { ready: {}, blocked: null },
 }));
 
-const notices = vi.hoisted(() => ({ sent: [] as { title: string; body: string }[] }));
+const notices = vi.hoisted(() => ({
+  sent: [] as { kind?: string; title: string; body: string }[],
+}));
 vi.mock("./run-notification.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   notifyThreadEvent: async (_p: unknown, _e: unknown, _r: unknown, message: never) => {
@@ -156,6 +158,7 @@ function fixture({
   catalog = false,
   readOnly = true,
   rules = [] as ActionApprovalRule[],
+  askText,
   autoReview = false,
   trigger = "user",
   unattended = trigger === "webhook",
@@ -249,6 +252,8 @@ function fixture({
   catalog?: boolean;
   readOnly?: boolean;
   rules?: ActionApprovalRule[];
+  /** The runtime ends its turn with an ask_user question. */
+  askText?: string;
   autoReview?: boolean;
   trigger?: string;
   /** Stored run mode; defaults to unattended for webhook runs only. */
@@ -588,6 +593,16 @@ function fixture({
       await afterCall?.(results.length - 1);
       if (isApprovalPausedResult(result)) return;
     }
+    if (askText) {
+      yield {
+        type: "ask" as const,
+        text: askText,
+        actions: [
+          { id: "choice-1", label: "A" },
+          { id: "choice-2", label: "B" },
+        ],
+      };
+    }
     yield { type: "done" as const, text: "Done" };
   });
   const executor = createRunExecutor({
@@ -666,6 +681,7 @@ function fixture({
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return {
     rules,
+    finalizeRun,
     events: { append: appendEvent },
     offeredTools,
     claimSteeringCalls: () => claimSteeringSpy.mock.calls.map(([input]) => input),
@@ -2740,7 +2756,7 @@ describe("Mercury agent writes, offline end to end", () => {
     expect(mercury.sendMoneyRequests).toHaveLength(0);
     f.effects[0]!.status = "denied";
     await f.run();
-    expect(f.results.at(-1)).toMatchObject({ error: expect.stringContaining("denied") });
+    expect(f.results.at(-1)).toMatchObject({ error: expect.stringContaining("declined") });
     expect(mercury.sendMoneyRequests).toHaveLength(0);
   });
 
@@ -3783,6 +3799,7 @@ describe("runs that began with an external bot", () => {
   const askBlock = (f: ReturnType<typeof fixture>) =>
     (f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: unknown[] }])[0].blocks[0] as {
       detail?: string;
+      approvalReason?: string;
       actions: { id: string }[];
     };
 
@@ -3797,7 +3814,9 @@ describe("runs that began with an external bot", () => {
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     const card = askBlock(f);
-    expect(card.detail).toContain(EXTERNAL_REQUEST_REASON);
+    // Shown once, on the reason line, not again in the detail.
+    expect(card.approvalReason).toBe(EXTERNAL_REQUEST_REASON);
+    expect(card.detail ?? "").not.toContain(EXTERNAL_REQUEST_REASON);
     expect(card.actions.map((action) => action.id)).not.toContain("always");
     expect(JSON.stringify(card.actions)).not.toMatch(/always/i);
   });
@@ -3926,8 +3945,13 @@ describe("runs that began with an external bot", () => {
   });
 
   it("finishes a read-only effect that a marked run's gate recorded, so a retry returns it", async () => {
-    const f = fixture({ name: "schedule_runs", builtin: true, history: [{ blocks: [marked] }] });
-    f.setCalls([{ args: {}, executionId: "c1" }]);
+    const f = fixture({
+      name: "mail_search",
+      builtin: true,
+      mail: { listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]) },
+      history: [{ blocks: [marked] }],
+    });
+    f.setCalls([{ args: { queries: ["from:investor"] }, executionId: "c1" }]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     f.effects[0]!.status = "approved";
@@ -3935,7 +3959,7 @@ describe("runs that began with an external bot", () => {
     expect(f.effects).toHaveLength(1);
     expect(f.effects[0]!.status).toBe("completed");
     // The model retries the same call (a lost response): it gets the stored result, not "uncertain".
-    f.setCalls([{ args: {}, executionId: "c2" }]);
+    f.setCalls([{ args: { queries: ["from:investor"] }, executionId: "c2" }]);
     await f.run();
     expect(JSON.stringify(f.results.at(-1))).not.toMatch(/uncertain/i);
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
@@ -4073,6 +4097,50 @@ describe("unattended runs and block rules", () => {
       expect(decisions(f)).toEqual([expect.objectContaining({ tool: "shell", decision: "block" })]);
     },
   );
+
+  it("an unattended read_history that is not on the safe list asks on a card", async () => {
+    const f = fixture({ name: "read_history", builtin: true, unattended: true });
+    f.setCalls([{ args: {}, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(f.effects).toHaveLength(1);
+  });
+
+  it("an Ask rule on read_file asks in an attended run", async () => {
+    const f = fixture({
+      name: "read_file",
+      builtin: true,
+      unattended: false,
+      rules: [
+        {
+          effect: "require_approval",
+          matchKind: "tool",
+          matchValue: "read_file",
+        } as ActionApprovalRule,
+      ],
+    });
+    f.setCalls([{ args: { path: "a.txt" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("refuses run_subagent in a run with stored outside content, and under a Block rule", async () => {
+    const tainted = fixture({ name: "recall_memory", builtin: true, externalTaint: true });
+    await tainted.run();
+    await expect(tainted.request()!.subagentDenial!()).resolves.toEqual(expect.any(String));
+
+    const blocked = fixture({
+      name: "recall_memory",
+      builtin: true,
+      rules: [blockRule("run_subagent")],
+    });
+    await blocked.run();
+    await expect(blocked.request()!.subagentDenial!()).resolves.toBe(BLOCKED_ACTION_MESSAGE);
+
+    const clean = fixture({ name: "recall_memory", builtin: true });
+    await clean.run();
+    await expect(clean.request()!.subagentDenial!()).resolves.toBeUndefined();
+  });
 
   it("a block rule beats a mandatory ask", async () => {
     const f = fixture({
@@ -4297,7 +4365,8 @@ describe("unattended runs and block rules", () => {
     expect(reviewMock).not.toHaveBeenCalled();
   });
 
-  it("request_secret in an unattended run returns an error instead of pausing", async () => {
+  it("request_secret in an unattended run notifies the owner once and ends the run", async () => {
+    notices.sent.length = 0;
     const f = fixture({
       name: "request_secret",
       builtin: true,
@@ -4307,6 +4376,39 @@ describe("unattended runs and block rules", () => {
     f.setCalls([{ args: { label: "Key" }, executionId: "c1" }]);
     await f.run();
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
-    expect(f.results[0]).toEqual({ error: expect.stringContaining("not here") });
+    expect(isApprovalPausedResult(f.results[0])).toBe(false);
+    expect(f.results[0]).toMatchObject({ terminate: true, details: { unattended: "ended" } });
+    expect(notices.sent.filter((n) => n.kind === "help")).toHaveLength(1);
+    expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+  });
+
+  it("ask_user in an unattended run notifies the owner and ends instead of pausing", async () => {
+    notices.sent.length = 0;
+    const f = fixture({
+      name: "recall_memory",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      askText: "Which account?",
+    });
+    f.setCalls([]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    const help = notices.sent.filter((n) => n.kind === "help");
+    expect(help).toHaveLength(1);
+    expect(help[0]!.body).toBe("Which account?");
+    expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+  });
+
+  it("ask_user in an attended run still pauses on a card", async () => {
+    const f = fixture({
+      name: "recall_memory",
+      builtin: true,
+      unattended: false,
+      askText: "Which account?",
+    });
+    f.setCalls([]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 });

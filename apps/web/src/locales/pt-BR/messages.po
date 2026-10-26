@@ -887,10 +887,6 @@ msgstr ""
 msgid "Action"
 msgstr ""
 
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Action confirmations"
-msgstr "Confirmações de ação"
-
 #: src/components/investors/ActionItems.tsx
 msgid "Action items"
 msgstr ""
@@ -1260,31 +1256,18 @@ msgid "All time"
 msgstr ""
 
 #: src/components/AiDataSharing.tsx
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
 #: src/components/AskCard.tsx
 #: src/pages/shell/composer-error.tsx
 msgid "Allow"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} actions without asking"
-msgstr "Permitir ações {0} sem perguntar"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} connector without asking"
-msgstr "Permitir conector {0} sem perguntar"
 
 #. placeholder {0}: source.label
 #. placeholder {1}: current?.recipient?.name ?? "model"
 #: src/pages/CompanyImport.tsx
 msgid "Allow {0} to {1}"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} without asking"
-msgstr "Permitir {0} sem perguntar"
 
 #: src/pages/Shell.tsx
 msgid "Allow access on the page to ask"
@@ -1312,10 +1295,6 @@ msgstr ""
 msgid "Allow changes in {service}?"
 msgstr ""
 
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow email actions without asking"
-msgstr "Permitir ações de e-mail sem perguntar"
-
 #: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "Permitir uma vez"
@@ -1323,10 +1302,6 @@ msgstr "Permitir uma vez"
 #: src/components/integrations/SignInStep.tsx
 msgid "Allow pop-ups for this site, or open the sign-in page directly."
 msgstr ""
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow purchase actions without asking"
-msgstr "Permitir ações de compra sem perguntar"
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Allow writing"
@@ -1521,6 +1496,11 @@ msgstr ""
 msgid "Approval boundaries"
 msgstr "Limites de aprovação"
 
+#: src/components/ApprovalRulesSettings.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "Approvals"
+msgstr ""
+
 #: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -1647,6 +1627,8 @@ msgstr ""
 msgid "Artifacts"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
 #: src/components/AskBotButton.tsx
 msgid "Ask"
 msgstr ""
@@ -1679,37 +1661,6 @@ msgstr ""
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Ask agent about {name}"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0}"
-msgstr "Perguntar antes de {0}"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0} actions"
-msgstr "Perguntar antes das ações do {0}"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0} connector"
-msgstr "Pergunte antes do conector {0}"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before email actions"
-msgstr "Perguntar antes das ações de e-mail"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before purchase actions"
-msgstr "Perguntar antes das ações de compra"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before purchases"
-msgstr "Perguntar antes de comprar"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before sending external email"
-msgstr "Perguntar antes de enviar e-mail externo"
 
 #: src/components/tour/FirstRunTour.tsx
 msgid "Ask Chief"
@@ -1943,6 +1894,10 @@ msgstr ""
 msgid "Back to sign in"
 msgstr "Voltar para o login"
 
+#: src/components/ApprovalRulesSettings.tsx
+msgid "Background runs always ask before they send, change or run anything."
+msgstr ""
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Backup models"
 msgstr "Modelos de backup"
@@ -2021,6 +1976,11 @@ msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Bills"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
+msgid "Block"
 msgstr ""
 
 #: src/lib/ticket-status.ts
@@ -2204,6 +2164,10 @@ msgstr ""
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/Gtm.tsx
 msgid "Calendar"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Calendar changes"
 msgstr ""
 
 #: src/pages/shell/composer.tsx
@@ -3232,6 +3196,10 @@ msgstr "Conectado {0}."
 msgid "Connected and using {0}."
 msgstr "Conectado e usando {0}."
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Connected apps (write)"
+msgstr ""
+
 #: src/pages/CompanyRefresh.tsx
 msgid "Connected Data Room sources require manual re-import."
 msgstr ""
@@ -3644,6 +3612,10 @@ msgstr ""
 msgid "Could not load approval rules"
 msgstr "Não foi possível carregar as regras de aprovação"
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Could not load approvals"
+msgstr ""
+
 #: src/pages/Artifacts.tsx
 msgid "Could not load artifacts."
 msgstr ""
@@ -3923,6 +3895,10 @@ msgstr ""
 #: src/pages/shell/bot-panel.tsx
 msgid "Could not save"
 msgstr "Não foi possível salvar"
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Could not save approvals"
+msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Could not save backup models"
@@ -4493,6 +4469,10 @@ msgstr ""
 msgid "Delete chart"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Delete data"
+msgstr ""
+
 #: src/components/sidebar-folders/FolderHeader.tsx
 msgid "Delete folder"
 msgstr ""
@@ -5009,6 +4989,10 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 msgid "Edit contact"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Edit files and run commands"
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -7072,6 +7056,10 @@ msgstr ""
 msgid "Message from {peer}"
 msgstr "Mensagem de {peer}"
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Message people outside Praci"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Message the board"
 msgstr ""
@@ -7233,6 +7221,10 @@ msgstr ""
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "More {0} actions"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "More actions"
 msgstr ""
 
 #. placeholder {0}: attachment.filename
@@ -10009,6 +10001,10 @@ msgstr ""
 msgid "SAFEs, if converted at cap"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Same as all bots"
+msgstr ""
+
 #: src/pages/CompanyReview.tsx
 msgid "Same person?"
 msgstr ""
@@ -10446,6 +10442,10 @@ msgstr ""
 #: src/components/AccountAccess.tsx
 msgid "Send deletion code"
 msgstr "Enviar código de exclusão"
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Send email"
+msgstr ""
 
 #: src/components/AiDataSharing.tsx
 msgid "Send files and contracts"
@@ -11074,6 +11074,10 @@ msgstr "Modelo de fala"
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Spend"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Spend money"
 msgstr ""
 
 #: src/lib/slash-skills.ts
@@ -12444,6 +12448,14 @@ msgstr ""
 
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Use Protected input for passwords."
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Use saved credentials"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Use the computer"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx

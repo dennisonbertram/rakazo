@@ -5,6 +5,7 @@ import {
   gtmAgentSpawnKey,
   ZERNIO_READ_TOOLS,
 } from "@rakazo/contracts";
+import { BLOCKED_ACTION_MESSAGE } from "@rakazo/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import { createRunExecutor } from "./executor.js";
@@ -89,6 +90,7 @@ type FixtureOptions = {
   consumedPost?: boolean;
   parkedPost?: boolean;
   autoReview?: boolean;
+  blockGtmPost?: boolean;
   failEffectCreateOnce?: boolean;
   executeAgain?: boolean;
   tools?: ConnectorTool[];
@@ -452,7 +454,11 @@ function gtmFixture(options: FixtureOptions = {}) {
     computer: { updateMany: vi.fn(async () => ({ count: 1 })) },
     connection: { findMany: vi.fn(async () => []) },
     actionApprovalRule: {
-      findMany: vi.fn(async () => (options.autoReview ? [{ pattern: "*", policy: "allow" }] : [])),
+      findMany: vi.fn(async () =>
+        options.blockGtmPost
+          ? [{ effect: "block", matchKind: "tool", matchValue: "gtm_post", botId: null }]
+          : [],
+      ),
     },
     actionAutoReviewPreference: {
       findUnique: vi.fn(async () => ({ enabled: options.autoReview === true })),
@@ -757,6 +763,27 @@ describe("GTM executor gates", () => {
     expect(f.approval.create).not.toHaveBeenCalled();
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
     expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it("refuses an approved post when a Block rule covers gtm_post", async () => {
+    zernioCreatePost.mockClear();
+    const f = gtmFixture({
+      approvedPost: true,
+      apiKeyReady: true,
+      blockGtmPost: true,
+      execute: {
+        name: "gtm_post",
+        args: {
+          content: "Approved post",
+          scheduledFor: "2030-01-02T03:04:05.000Z",
+          accountId: "account-1",
+        },
+      },
+    });
+    await f.executor.continueRun(f.run.id, "worker-1");
+    expect(f.directResult()).toEqual({ error: BLOCKED_ACTION_MESSAGE });
+    expect(zernioCreatePost).not.toHaveBeenCalled();
+    expect(f.prisma.externalEffect.create).not.toHaveBeenCalled();
   });
 
   it("refuses a mismatched post before effect creation or network dispatch despite allow policy", async () => {

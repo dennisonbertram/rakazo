@@ -1879,6 +1879,7 @@ const MessageView = memo(function MessageView({
               <div key={i} className={gap}>
                 <MailApprovalCard
                   mail={block.mail}
+                  reason={block.approvalReason}
                   accounts={mailAccounts.accounts}
                   accountsStatus={mailAccounts.status}
                   onRetryAccounts={mailAccounts.retry}

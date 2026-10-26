@@ -887,10 +887,6 @@ msgstr ""
 msgid "Action"
 msgstr ""
 
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Action confirmations"
-msgstr "操作确认"
-
 #: src/components/investors/ActionItems.tsx
 msgid "Action items"
 msgstr ""
@@ -1260,31 +1256,18 @@ msgid "All time"
 msgstr ""
 
 #: src/components/AiDataSharing.tsx
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
 #: src/components/AskCard.tsx
 #: src/pages/shell/composer-error.tsx
 msgid "Allow"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} actions without asking"
-msgstr "允许 {0} 操作，无需询问"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} connector without asking"
-msgstr "允许 {0} 连接器，无需询问"
 
 #. placeholder {0}: source.label
 #. placeholder {1}: current?.recipient?.name ?? "model"
 #: src/pages/CompanyImport.tsx
 msgid "Allow {0} to {1}"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} without asking"
-msgstr "允许 {0}，无需询问"
 
 #: src/pages/Shell.tsx
 msgid "Allow access on the page to ask"
@@ -1312,10 +1295,6 @@ msgstr ""
 msgid "Allow changes in {service}?"
 msgstr ""
 
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow email actions without asking"
-msgstr "允许邮件操作，无需询问"
-
 #: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "允许一次"
@@ -1323,10 +1302,6 @@ msgstr "允许一次"
 #: src/components/integrations/SignInStep.tsx
 msgid "Allow pop-ups for this site, or open the sign-in page directly."
 msgstr ""
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow purchase actions without asking"
-msgstr "允许购买操作，无需询问"
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Allow writing"
@@ -1521,6 +1496,11 @@ msgstr ""
 msgid "Approval boundaries"
 msgstr "审批边界"
 
+#: src/components/ApprovalRulesSettings.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "Approvals"
+msgstr ""
+
 #: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -1647,6 +1627,8 @@ msgstr ""
 msgid "Artifacts"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
 #: src/components/AskBotButton.tsx
 msgid "Ask"
 msgstr ""
@@ -1679,37 +1661,6 @@ msgstr ""
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Ask agent about {name}"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0}"
-msgstr "{0} 前询问"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0} actions"
-msgstr "{0} 操作前询问"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0} connector"
-msgstr "{0} 连接器前询问"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before email actions"
-msgstr "邮件操作前询问"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before purchase actions"
-msgstr "购买操作前询问"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before purchases"
-msgstr "购买前询问"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before sending external email"
-msgstr "发送外部邮件前询问"
 
 #: src/components/tour/FirstRunTour.tsx
 msgid "Ask Chief"
@@ -1943,6 +1894,10 @@ msgstr ""
 msgid "Back to sign in"
 msgstr "返回登录"
 
+#: src/components/ApprovalRulesSettings.tsx
+msgid "Background runs always ask before they send, change or run anything."
+msgstr ""
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Backup models"
 msgstr "备用模型"
@@ -2021,6 +1976,11 @@ msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Bills"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
+msgid "Block"
 msgstr ""
 
 #: src/lib/ticket-status.ts
@@ -2204,6 +2164,10 @@ msgstr ""
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/Gtm.tsx
 msgid "Calendar"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Calendar changes"
 msgstr ""
 
 #: src/pages/shell/composer.tsx
@@ -3232,6 +3196,10 @@ msgstr "已连接 {0}。"
 msgid "Connected and using {0}."
 msgstr "已连接并使用 {0}。"
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Connected apps (write)"
+msgstr ""
+
 #: src/pages/CompanyRefresh.tsx
 msgid "Connected Data Room sources require manual re-import."
 msgstr ""
@@ -3644,6 +3612,10 @@ msgstr ""
 msgid "Could not load approval rules"
 msgstr "无法加载审批规则"
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Could not load approvals"
+msgstr ""
+
 #: src/pages/Artifacts.tsx
 msgid "Could not load artifacts."
 msgstr ""
@@ -3923,6 +3895,10 @@ msgstr "无法运行例行任务"
 #: src/pages/shell/bot-panel.tsx
 msgid "Could not save"
 msgstr "无法保存"
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Could not save approvals"
+msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Could not save backup models"
@@ -4493,6 +4469,10 @@ msgstr ""
 msgid "Delete chart"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Delete data"
+msgstr ""
+
 #: src/components/sidebar-folders/FolderHeader.tsx
 msgid "Delete folder"
 msgstr ""
@@ -5009,6 +4989,10 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 msgid "Edit contact"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Edit files and run commands"
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -7072,6 +7056,10 @@ msgstr ""
 msgid "Message from {peer}"
 msgstr "来自 {peer} 的消息"
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Message people outside Praci"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Message the board"
 msgstr ""
@@ -7233,6 +7221,10 @@ msgstr ""
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "More {0} actions"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "More actions"
 msgstr ""
 
 #. placeholder {0}: attachment.filename
@@ -10009,6 +10001,10 @@ msgstr ""
 msgid "SAFEs, if converted at cap"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Same as all bots"
+msgstr ""
+
 #: src/pages/CompanyReview.tsx
 msgid "Same person?"
 msgstr ""
@@ -10446,6 +10442,10 @@ msgstr ""
 #: src/components/AccountAccess.tsx
 msgid "Send deletion code"
 msgstr "发送删除验证码"
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Send email"
+msgstr ""
 
 #: src/components/AiDataSharing.tsx
 msgid "Send files and contracts"
@@ -11074,6 +11074,10 @@ msgstr "语音模型"
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Spend"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Spend money"
 msgstr ""
 
 #: src/lib/slash-skills.ts
@@ -12444,6 +12448,14 @@ msgstr ""
 
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Use Protected input for passwords."
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Use saved credentials"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Use the computer"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
