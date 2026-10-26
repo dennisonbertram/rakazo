@@ -146,10 +146,6 @@ export async function commitSpaceRename(input: {
 }
 
 /**
- * The space the app is showing comes first, so the chats at the top of the sidebar belong to the
- * company on screen (Finance switches spaces too); the others keep their order below it.
- */
-/**
  * The rows listed under a fold header, nested one level. A closed fold still shows the open
  * thread's row (when it belongs to the fold and `showActive` allows it), like the collapsed Pages
  * group showing the current page.
@@ -164,6 +160,10 @@ export function foldRows<
     .map((row) => ({ ...row, depth: row.depth + 1 }));
 }
 
+/**
+ * The space the app is showing comes first, so the chats at the top of the sidebar belong to the
+ * company on screen (Finance switches spaces too); the others keep their order below it.
+ */
 export function activeSpaceFirst<T extends { id: string }>(
   spaces: readonly T[],
   activeId: string | null | undefined,
