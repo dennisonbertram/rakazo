@@ -461,6 +461,7 @@ import {
 } from "./inbox.js";
 import { inboxActionsList, inboxActionsUndo } from "./inbox-actions.js";
 import { ensureInboxAgent } from "./inbox-agent.js";
+import { inboxReviewAttachment } from "./inbox-attachment-review.js";
 import { inboxCleanupArchive, inboxCleanupForget, inboxCleanupList } from "./inbox-cleanup.js";
 import {
   accountOut,
@@ -8362,6 +8363,9 @@ export function createRouter(deps: RouterDeps) {
             throw mapSpaceLifecycleError(error);
           },
         ),
+      ),
+      reviewAttachment: authed.inbox.reviewAttachment.handler(({ context, input }) =>
+        inboxReviewAttachment(deps, context.actor, input, context.signal),
       ),
       list: authed.inbox.list.handler(({ context, input }) =>
         inboxList(deps, context.actor, input, context.signal),
