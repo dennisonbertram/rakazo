@@ -22,11 +22,12 @@ import { StillLoading } from "../components/ShellSkeleton";
 import { DATA_ROOM_PATH } from "../lib/data-room";
 import { fullDay } from "../lib/finance-format";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
-import { daysBetween, todayIso } from "../lib/legal-format";
+import { daysBetween, isDueSoon, todayIso } from "../lib/legal-format";
 import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { NOTIFICATIONS_CHANGED_EVENT } from "../lib/use-sidebar-glance";
 import { errorText, KEY_REJECTED_PATTERN, runErrorText } from "../lib/user-error";
+import { DueSoonChip } from "./legal/DueSoonChip";
 import { LegalContracts } from "./legal/LegalContracts";
 import { LegalDeadlines } from "./legal/LegalDeadlines";
 
@@ -118,13 +119,20 @@ function Legal({
   const [params, setParams] = useSearchParams();
   const asked = params.get("view");
   const view: View = VIEWS.includes(asked as View) ? (asked as View) : "contracts";
-  // A link with due=overdue opens Deadlines on just the overdue ones.
-  const onlyOverdue = view === "deadlines" && params.get("due") === "overdue";
   const setView = (next: View) =>
     setParams(next === "contracts" ? {} : { view: next }, { replace: true });
   // Grouping similar contracts is on unless the URL says group=off.
   const grouped = params.get("group") !== "off";
-  const setGrouped = (on: boolean) => setParams(on ? {} : { group: "off" }, { replace: true });
+  const setGrouped = (on: boolean) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (on) next.delete("group");
+        else next.set("group", "off");
+        return next;
+      },
+      { replace: true },
+    );
   const [scanError, setScanError] = useState("");
   // The failed run whose notice the user closed; the next failed run shows its own.
   const [dismissedRun, setDismissedRun] = useState<string | null>(null);
@@ -497,6 +505,10 @@ function Legal({
         </>
       ) : (
         <>
+          {/* The sidebar badge's count; hidden while the Deadlines list already shows exactly those. */}
+          {view === "deadlines" && params.get("due") === "soon" ? null : (
+            <DueSoonChip count={data.deadlines.filter((d) => isDueSoon(d.dueDate)).length} />
+          )}
           <Tabs value={view} onValueChange={(next) => setView(next as View)} className="mb-3">
             <TabsList className="max-w-full justify-start rounded-full" aria-label={t`View`}>
               <TabsTrigger value="contracts" className="rounded-full px-3">
@@ -524,21 +536,24 @@ function Legal({
           </Tabs>
           {resultLine}
           {uncheckedLine}
-          {view === "contracts" &&
-          groupLegalContracts(data.contracts).some((row) => row.kind === "group") ? (
-            <div className="mb-2 flex justify-end">
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-pressed={grouped}
-                onClick={() => setGrouped(!grouped)}
-              >
-                <Trans>Group similar</Trans>
-              </Button>
-            </div>
-          ) : null}
           {view === "contracts" ? (
-            <LegalContracts contracts={data.contracts} selfName={selfName} grouped={grouped} />
+            <LegalContracts
+              contracts={data.contracts}
+              selfName={selfName}
+              grouped={grouped}
+              actions={
+                groupLegalContracts(data.contracts).some((row) => row.kind === "group") ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-pressed={grouped}
+                    onClick={() => setGrouped(!grouped)}
+                  >
+                    <Trans>Group similar</Trans>
+                  </Button>
+                ) : null
+              }
+            />
           ) : null}
           {view === "deadlines" ? (
             <div className="mb-2 flex justify-end">
@@ -557,8 +572,6 @@ function Legal({
             <LegalDeadlines
               deadlines={data.deadlines}
               onChanged={overview.reload}
-              onlyOverdue={onlyOverdue}
-              onShowAll={() => setView("deadlines")}
               // The agent cannot read documents until the page's Allow, so no question goes to it before.
               onAsk={
                 onAskAbout && !consentMissing

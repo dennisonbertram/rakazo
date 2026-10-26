@@ -1,8 +1,8 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { LegalContract, LegalContractStatus } from "@rakazo/contracts";
-import { groupLegalContracts } from "@rakazo/contracts";
 import {
+  Button,
   ContactAvatarGroup,
   cn,
   Table,
@@ -14,13 +14,22 @@ import {
   TableRow,
 } from "@rakazo/ui-web";
 import { ChevronRight } from "lucide-react";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { PickFilter, SearchField, SortControl } from "../../components/ListControls";
 import { DATA_ROOM_PATH } from "../../lib/data-room";
 import { fullDay, hiddenOr } from "../../lib/finance-format";
 import { useHideAmounts } from "../../lib/hide-amounts-preference";
 import { contractValue, daysBetween, todayIso } from "../../lib/legal-format";
+import { useListParams } from "../../lib/list-params";
+import type { ContractSort } from "./contract-list";
+import {
+  CONTRACT_SORTS,
+  CONTRACT_STATUSES,
+  contractRows,
+  DEFAULT_CONTRACT_SORT,
+} from "./contract-list";
 
 const statusName = (status: LegalContractStatus): string =>
   ({
@@ -154,17 +163,86 @@ export function LegalContracts({
   contracts: all,
   selfName,
   grouped = false,
+  actions,
 }: {
   contracts: LegalContract[];
   /** The company itself: every contract is with it, so it is left out of Parties. */
   selfName?: string;
   grouped?: boolean;
+  /** Extra controls at the end of the toolbar (the page's Group similar button). */
+  actions?: ReactNode;
 }) {
   const contracts = all.map((contract) => withoutSelf(contract, selfName));
-  const rows = groupLegalContracts(contracts).flatMap((row) =>
-    grouped || row.kind === "single"
-      ? [row]
-      : row.contracts.map((contract) => ({ kind: "single" as const, contract })),
+  // Search, filters and sort live in the URL: ?q=, type, party, status, sort, dir.
+  const list = useListParams(CONTRACT_SORTS, DEFAULT_CONTRACT_SORT);
+  const filters = {
+    q: list.param("q"),
+    type: list.param("type"),
+    party: list.param("party"),
+    status: list.param("status"),
+  };
+  const filtered = Object.values(filters).some(Boolean);
+  const rows = contractRows(contracts, filters, list.sort, grouped, todayIso());
+  const unique = (values: string[]): [string, string][] =>
+    [...new Set(values)].sort((a, b) => a.localeCompare(b)).map((v) => [v, v]);
+  const statusNames: Record<(typeof CONTRACT_STATUSES)[number], string> = {
+    active: t`Active`,
+    expiring: t`Expiring soon`,
+    expired: t`Expired`,
+  };
+  const sortNames: Record<ContractSort, string> = {
+    name: t`Contract`,
+    term: t`Term`,
+    value: t`Value`,
+    deadline: t`Next deadline`,
+  };
+  const sortHead = (field: ContractSort) => ({
+    sortDirection: list.sort.field === field ? list.sort.dir : null,
+    onSort: () => list.toggleSort(field),
+  });
+  const toolbar = (
+    <div className="mb-2 flex flex-wrap items-center gap-2">
+      <SearchField
+        name="contracts-search"
+        value={filters.q ?? ""}
+        onChange={(value) => list.setParam("q", value)}
+        placeholder={t`Search contracts`}
+        label={t`Search contracts`}
+        className="w-56"
+      />
+      <PickFilter
+        label={t`Type`}
+        value={filters.type}
+        options={unique(contracts.map((c) => c.contractType))}
+        onChange={(value) => list.setParam("type", value)}
+      />
+      <PickFilter
+        label={t`Party`}
+        value={filters.party}
+        options={unique(contracts.flatMap((c) => c.counterparties))}
+        onChange={(value) => list.setParam("party", value)}
+      />
+      <PickFilter
+        label={t`Status`}
+        value={filters.status}
+        options={CONTRACT_STATUSES.map((status) => [status, statusNames[status]])}
+        onChange={(value) => list.setParam("status", value)}
+      />
+      <span className="ms-auto flex items-center gap-1">
+        {/* Wide, the column headers sort; narrow, the cards have none. */}
+        <span className="flex items-center gap-1 @6xl:hidden">
+          <SortControl
+            fields={CONTRACT_SORTS.map((field) => [field, sortNames[field]])}
+            field={list.sort.field}
+            fieldLabel={sortNames[list.sort.field]}
+            direction={list.sort.dir}
+            onField={(field) => list.setSort({ field, dir: "asc" })}
+            onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+          />
+        </span>
+        {actions}
+      </span>
+    </div>
   );
   const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
   const toggle = (key: string) =>
@@ -249,8 +327,28 @@ export function LegalContracts({
       </TableCell>
     </TableRow>
   );
+  if (rows.length === 0 && filtered) {
+    return (
+      <>
+        {toolbar}
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            <Trans>No matches</Trans>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => list.clear("q", "type", "party", "status")}
+          >
+            <Trans>Clear filters</Trans>
+          </Button>
+        </div>
+      </>
+    );
+  }
   return (
     <>
+      {toolbar}
       <ul aria-label={t`Contracts`} className="flex flex-col @6xl:hidden">
         {rows.flatMap((row) => {
           if (row.kind === "single") return [card(row.contract)];
@@ -282,22 +380,22 @@ export function LegalContracts({
 
         <TableHeader>
           <TableHeadRow>
-            <TableHead>
+            <TableHead {...sortHead("name")}>
               <Trans>Contract</Trans>
             </TableHead>
             <TableHead>
               <Trans>Parties</Trans>
             </TableHead>
-            <TableHead>
+            <TableHead {...sortHead("term")}>
               <Trans>Term</Trans>
             </TableHead>
             <TableHead>
               <Trans>Renewal</Trans>
             </TableHead>
-            <TableHead className="whitespace-nowrap text-end pe-3">
+            <TableHead className="whitespace-nowrap text-end pe-3" {...sortHead("value")}>
               <Trans>Value</Trans>
             </TableHead>
-            <TableHead className="whitespace-nowrap ps-4">
+            <TableHead className="whitespace-nowrap ps-4" {...sortHead("deadline")}>
               <Trans>Next deadline</Trans>
             </TableHead>
           </TableHeadRow>

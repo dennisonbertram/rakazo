@@ -84,6 +84,7 @@ import { clearAgentAppCache } from "../../lib/agent-app";
 import { authClient } from "../../lib/auth";
 import { desktopBridge } from "../../lib/desktop";
 import { maskCurrencyWhenHidden } from "../../lib/hide-amounts-preference";
+import { LEGAL_DUE_SOON_PATH } from "../../lib/legal-format";
 import { isUnclaimedFileDrag } from "../../lib/pending-attachments";
 import type { Panel } from "../../lib/right-panel-state";
 import {
@@ -881,6 +882,10 @@ export function SpaceSidebar({
                       one: "# overdue or due in the next 7 days",
                       other: "# overdue or due in the next 7 days",
                     }),
+                    onValueClick: () => {
+                      setMobileSidebarOpen(false);
+                      navigate(LEGAL_DUE_SOON_PATH);
+                    },
                   })}
                 />
               )}
