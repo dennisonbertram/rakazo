@@ -8787,6 +8787,14 @@ msgid "Paused: no access"
 msgstr "Paused: no access"
 
 #: src/pages/RoutineEditor.tsx
+msgid "Paused: the app could not be checked"
+msgstr "Paused: the app could not be checked"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: the app result changes too often"
+msgstr "Paused: the app result changes too often"
+
+#: src/pages/RoutineEditor.tsx
 msgid "Paused: the page changes too often"
 msgstr "Paused: the page changes too often"
 
@@ -9666,6 +9674,10 @@ msgstr "Remove {secretName}? This bot will no longer be able to use it."
 #: src/components/integrations/AppDetail.tsx
 msgid "Remove account"
 msgstr "Remove account"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Remove app watch"
+msgstr "Remove app watch"
 
 #: src/components/ComposeEmail.tsx
 msgid "Remove attachments?"
@@ -11484,6 +11496,10 @@ msgstr "Stop speaking"
 msgid "Stop teaching"
 msgstr "Stop teaching"
 
+#: src/components/inbox/InboxRow.tsx
+msgid "Stop tracking"
+msgstr "Stop tracking"
+
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Stopped"
 msgstr "Stopped"
@@ -12231,6 +12247,15 @@ msgstr "Total incl. crypto"
 msgid "Tour"
 msgstr "Tour"
 
+#: src/components/inbox/InboxRow.tsx
+msgid "Track"
+msgstr "Track"
+
+#. placeholder {0}: maskCurrencyWhenHidden(status.subject)
+#: src/pages/Inbox.tsx
+msgid "Tracking \"{0}\""
+msgstr "Tracking \"{0}\""
+
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Transactions"
@@ -12954,6 +12979,10 @@ msgstr "Wallet balances and history"
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Wallets"
 msgstr "Wallets"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Watch a connected app"
+msgstr "Watch a connected app"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Watch a page"
