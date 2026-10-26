@@ -110,7 +110,9 @@ export function ContactDetailPage({ id, spaceName }: { id: string; spaceName?: s
           className="max-sm:[&_[data-page-header-meta]]:hidden"
           title={
             <span className="flex min-w-0 items-center gap-3">
-              {contact ? <ContactAvatar name={contact.name} size="lg" /> : null}
+              {contact ? (
+                <ContactAvatar name={contact.name} src={contact.photoUrl} size="lg" />
+              ) : null}
               <span className="truncate">{contact?.name ?? ""}</span>
             </span>
           }
