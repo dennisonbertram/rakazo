@@ -1039,6 +1039,20 @@ describe("the external chain mark", () => {
     );
   });
 
+  it("taints the receiving run when the message is of external origin", async () => {
+    const h = deps({
+      bots,
+      sender: { audience: "external", externalMessageTargets: ["bot-chief"] },
+    });
+    await messageBot(h.deps, run, { id: "bot-sender", name: "Support" }, {
+      bot_id: "bot-chief",
+      message: "x",
+    });
+    expect(h.tx.run.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ externalTaint: true }) }),
+    );
+  });
+
   it("is not written for an internal sender with no marked chain", async () => {
     const h = deps({ bots });
     await messageBot(h.deps, run, sender, { bot_id: "bot-chief", message: "x" });

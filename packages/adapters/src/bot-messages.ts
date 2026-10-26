@@ -439,7 +439,8 @@ export async function messageBot(
             status: "queued",
             trigger: "bot_message",
             unattended: mode.unattended,
-            externalTaint: mode.externalTaint,
+            // The message itself may come from outside even when the sender run is clean.
+            externalTaint: mode.externalTaint || externalOrigin,
             sourceMessageId: inbound.id,
           },
           select: { id: true },
