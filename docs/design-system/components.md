@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 291 of 291
-- Web and shared components: 752
+- Web and shared components: 754
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -298,10 +298,10 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
-| SkillDraftCard | [apps/web/src/components/teach/SkillDraftCard.tsx](../../apps/web/src/components/teach/SkillDraftCard.tsx) | [SkillDraftCard.stories.tsx](../../apps/web/src/components/teach/SkillDraftCard.stories.tsx) | web |
+| LoginPromptRow, SkillDraftCard | [apps/web/src/components/teach/SkillDraftCard.tsx](../../apps/web/src/components/teach/SkillDraftCard.tsx) | [SkillDraftCard.stories.tsx](../../apps/web/src/components/teach/SkillDraftCard.stories.tsx) | web |
 | TeachCaptureOverlay | [apps/web/src/components/teach/TeachCaptureOverlay.tsx](../../apps/web/src/components/teach/TeachCaptureOverlay.tsx) | [TeachCaptureOverlay.stories.tsx](../../apps/web/src/components/teach/TeachCaptureOverlay.stories.tsx) | web |
 | TeachComputerOverlayControl | [apps/web/src/components/teach/TeachComputerOverlay.tsx](../../apps/web/src/components/teach/TeachComputerOverlay.tsx) | [TeachComputerOverlay.stories.tsx](../../apps/web/src/components/teach/TeachComputerOverlay.stories.tsx) | web |
-| TeachRecordingChrome, ProtectedTeachInput, TeachStopButton | [apps/web/src/components/teach/TeachRecordingChrome.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.tsx) | [TeachRecordingChrome.stories.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.stories.tsx) | web |
+| TeachRecordingChrome, ProtectedTeachInput, TeachStopButton, TeachCancelButton | [apps/web/src/components/teach/TeachRecordingChrome.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.tsx) | [TeachRecordingChrome.stories.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.stories.tsx) | web |
 
 ## Web components/tour
 
