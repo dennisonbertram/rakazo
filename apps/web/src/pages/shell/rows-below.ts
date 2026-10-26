@@ -33,9 +33,7 @@ export function rowsBelow(
   const scroller = scrollingList(scrollers);
   if (!scroller || scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1)
     return 0;
-  // A list that ends on a whole row (see endOnWholeRow) keeps the bar in the margin below it.
-  const barBelow = (Number.parseFloat(scroller.style.marginBottom) || 0) >= moreBarHeight();
-  const edge = scroller.getBoundingClientRect().bottom - (barBelow ? 0 : moreBarHeight());
+  const edge = scroller.getBoundingClientRect().bottom - moreBarHeight();
   let count = 0;
   for (const row of scroller.querySelectorAll<HTMLElement>(rowSelector)) {
     if (row.getBoundingClientRect().bottom > edge + 0.5) count += 1;
