@@ -343,4 +343,41 @@ describePostgres("connected-app watches (PostgreSQL)", () => {
     expect(fake.executed.at(-1)).toBe("list_accounts");
     fake.catalog = false;
   });
+
+  it("refuses a built-in name and a false readOnlyHint, and pauses when the hint flips", async () => {
+    // A bot may have five watches; clear the earlier tests'.
+    await prisma.routine.deleteMany({ where: { spaceId } });
+    fake.tools = [
+      { ...read("shell"), readOnly: false },
+      { ...read("list_hinted"), readOnlyHint: false },
+      { ...read("list_flip"), readOnlyHint: true },
+    ];
+    expect(await create("Shell", "shell")).toHaveProperty("error");
+    expect(await create("Hinted", "list_hinted")).toHaveProperty("error");
+    expect(await create("Flip", "list_flip")).toHaveProperty("ok", true);
+    const routine = await routineNamed("Flip");
+    await tick(); // baseline
+    const before = fake.executed.length;
+    fake.tools = [{ ...read("list_flip"), readOnlyHint: false }];
+    expect(await tick()).toMatchObject({ paused: 1 });
+    expect(fake.executed).toHaveLength(before);
+    expect(
+      (await prisma.notification.findMany({ where: { routineId: routine.id } }))[0]?.title,
+    ).toBe("Flip paused: the tool is no longer a read-only tool");
+  });
+
+  it("ignores Composio's per-execution log id when comparing results", async () => {
+    fake.tools = [read("list_accounts")];
+    fake.value = { data: { balance: 5 }, logId: "log_1" };
+    await create("Logged", "list_accounts", { account: "x" });
+    const routine = await routineNamed("Logged");
+    await tick(); // baseline
+    fake.value = { data: { balance: 5 }, logId: "log_2" };
+    expect(await tick()).toMatchObject({ woke: 0 });
+    fake.value = { data: { balance: 6 }, logId: "log_3" };
+    expect(await tick()).toMatchObject({ woke: 1 });
+    const [run] = await runs(routine.id);
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: run!.taskId } });
+    expect(task.prompt).not.toContain("log_");
+  });
 });

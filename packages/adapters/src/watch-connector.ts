@@ -10,13 +10,15 @@ import {
   botCanReachConnection,
   botUsesConnectorTools,
   connectionAccessFilter,
+  connectorToolRequiresApproval,
   connectionRowsForAudience,
   deniedConnectionIds,
   stableJsonText,
-  toolRequiresApproval,
+  toolRequiresExplicitApproval,
   withInboxAgentStandIn,
 } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
+import { builtinAgentTools } from "./builtin-tools.js";
 import { CHANGED_TO_WRITE_MESSAGE } from "./composio-connector.js";
 import { connectionDenial } from "./connection-denial.js";
 import {
@@ -48,6 +50,27 @@ const denied = (message: string): { ok: false } & ConnectorWatchFailure => ({
   kind: "access",
   message,
 });
+
+const BUILTIN_TOOL_NAMES = new Set(builtinAgentTools.map((tool) => tool.name));
+
+/**
+ * Whether a connector tool may be watched: a plain read by the connector-specific rule, never a
+ * built-in name, and never one the connector declares a write (readOnly or readOnlyHint false).
+ * For watches only, a camelCase read name (getAccounts, listTransactions) counts like get_accounts;
+ * the shared approval classifier used by chat and background runs is not changed.
+ */
+export function watchToolIsRead(tool: {
+  name: string;
+  readOnly?: boolean;
+  readOnlyHint?: boolean;
+}): boolean {
+  if (BUILTIN_TOOL_NAMES.has(tool.name) || toolRequiresExplicitApproval(tool.name)) return false;
+  if (tool.readOnly === false || tool.readOnlyHint === false) return false;
+  return !connectorToolRequiresApproval(
+    tool.name.replace(/([a-z0-9])([A-Z])/g, "$1_$2"),
+    tool.readOnly,
+  );
+}
 
 /**
  * The tool a spec points at, only if the bot may use it now and it is a plain read. Without a
@@ -207,7 +230,7 @@ export async function resolveWatchTool(
     }
   }
   // The executor's own gate: a declared write, or a name that is not a plain read, asks first.
-  if (toolRequiresApproval(tool.name, true, tool.readOnly)) {
+  if (!watchToolIsRead(tool)) {
     return denied("The tool is no longer a read-only tool.");
   }
   return {
@@ -302,6 +325,10 @@ export async function probeConnectorWatch(
       } catch {
         // Plain text stays text.
       }
+    }
+    // Composio wraps the data with the id of this execution's log, which differs on every call.
+    if (data && typeof data === "object" && "logId" in data && "data" in data) {
+      data = (data as { data: unknown }).data;
     }
     const text = typeof data === "string" ? data : stableJsonText(data);
     return { ok: true, text: text.slice(0, WATCH_RESULT_MAX_CHARS) };
