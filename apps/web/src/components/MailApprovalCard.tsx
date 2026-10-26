@@ -14,8 +14,9 @@ import {
   NativeSelectOption,
   Textarea,
 } from "@rakazo/ui-web";
-import { ChevronDown, ChevronsUpDown, Mail, MoreHorizontal } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronsUpDown, Mail, MoreHorizontal } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { gmailFolderUrl } from "../lib/gmail-link";
 import { holdCommit } from "../lib/outbox";
 import { parseRecipient, splitEntries } from "../lib/recipients";
 import { errorText } from "../lib/user-error";
@@ -131,6 +132,7 @@ export function MailApprovalCard({
   const interactive = !answered && canAnswer;
   const busy = pendingAction !== null;
   const draft = mail.tool === "mail_draft";
+  const gmailUrl = answered ? gmailFolderUrl(mail) : null;
   // A send of a saved draft: the agent named only the draft, so there is nothing to edit or show.
   const savedDraftSend = !draft && Boolean(mail.locked);
   const shown = answered ? initial : fields;
@@ -349,6 +351,17 @@ export function MailApprovalCard({
                 className="size-4 shrink-0 text-muted-foreground"
               />
             </button>
+            {gmailUrl ? (
+              <a
+                href={gmailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t`Open in Gmail`}
+                className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <ArrowUpRight aria-hidden="true" className="size-4" />
+              </a>
+            ) : null}
           </>
         ) : (
           <>

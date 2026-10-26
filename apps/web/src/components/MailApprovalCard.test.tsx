@@ -395,6 +395,29 @@ it("Save draft and Discard stay immediate", async () => {
   expect(onAnswer).toHaveBeenCalledWith("allow", undefined, undefined);
 });
 
+const openLink = () =>
+  host.querySelector('a[aria-label="Open in Gmail"]') as HTMLAnchorElement | null;
+
+it("links a sent mail to the account's Gmail Sent folder in a new tab", async () => {
+  await render({ mail: { ...mail, outcome: "sent" }, status: "answered", answer: "allow" });
+  const link = openLink();
+  expect(link?.href).toBe("https://mail.google.com/mail/u/me%40example.test/#sent");
+  expect(link?.target).toBe("_blank");
+  expect(link?.rel).toBe("noopener noreferrer");
+});
+
+it("links a saved draft to Gmail Drafts", async () => {
+  await render({ mail: { ...draftMail, outcome: "saved" }, status: "answered", answer: "allow" });
+  expect(openLink()?.href).toBe("https://mail.google.com/mail/u/me%40example.test/#drafts");
+});
+
+it("has no Gmail link on a pending or unsent card", async () => {
+  await render();
+  expect(openLink()).toBeNull();
+  await render({ mail: { ...mail, outcome: "failed" }, status: "answered", answer: "allow" });
+  expect(openLink()).toBeNull();
+});
+
 it("folds a finished card to its header and opens it with the chevron", async () => {
   await render({ status: "answered", answer: "allow", mail: { ...mail, subject: "Monday" } });
   expect(header()).toBe("Mail Sending… · jana@example.testMonday");
