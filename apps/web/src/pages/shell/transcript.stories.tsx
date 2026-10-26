@@ -281,3 +281,35 @@ export const MailApproval: Story = {
     </div>
   ),
 };
+
+/** Hovering a wide mail approval keeps the actions under it, clear of the next message. */
+export const MailApprovalThenMessage: Story = {
+  render: () => (
+    <div className="h-[420px] w-[760px]">
+      <Transcript
+        {...baseProps}
+        messages={[
+          {
+            ...message(1, "bot", ""),
+            blocks: [
+              {
+                kind: "ask",
+                text: "Send this email?",
+                mail: {
+                  tool: "mail_send",
+                  to: ["sam@example.test"],
+                  cc: [],
+                  bcc: [],
+                  subject: "Sample update",
+                  body: "Hi Sam, here is the sample update.",
+                },
+              },
+            ],
+          },
+          message(2, "user", "Thanks, that looks right."),
+        ]}
+        lastReadSeq={2}
+      />
+    </div>
+  ),
+};
