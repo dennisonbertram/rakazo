@@ -609,6 +609,7 @@ import {
 import { advanceToolCallLoopGuard, loopGuardStopText } from "./tool-loop.js";
 import { textContentArg } from "./tool-text.js";
 import { UI_ARTIFACT_GUIDANCE, uiArtifactFileName } from "./ui-artifact-tool.js";
+import { parseUiBlocks, UI_BLOCKS_GUIDANCE } from "./ui-blocks-tool.js";
 import {
   botMessageOutcomeFromMidTurn,
   clampUserProgressMessage,
@@ -634,6 +635,7 @@ const NO_FRAGMENT_TOOLS = new Set([
   "skill_read",
   "show_image",
   "render_plot",
+  "render_ui",
 ]);
 
 /** Returned to a check-in run whose call would need approval. */
@@ -5483,6 +5485,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
             }
           }
+          if (name === "render_ui") {
+            const parsed = parseUiBlocks(args);
+            if (!parsed.ok) return finish({ error: "Invalid UI blocks", problems: parsed.problems });
+            await publishMessage(
+              deps,
+              run,
+              "bot",
+              parsed.blocks.map((block) => ({ kind: "ui" as const, block })),
+            );
+            return finish({ ok: true });
+          }
           if (name === "shell") {
             const command = String(args.command ?? args.cmd ?? "");
             const refusal = protectedComputerLifecycleRefusal(command);
@@ -9667,6 +9680,7 @@ export function userTurnInstructions(parts: {
     parts.taughtSkillsLine,
     offeredBuiltinClause(parts.disabledBuiltinTools, "read_spreadsheet", SPREADSHEET_GUIDANCE),
     offeredBuiltinClause(parts.disabledBuiltinTools, "create_ui_artifact", UI_ARTIFACT_GUIDANCE),
+    offeredBuiltinClause(parts.disabledBuiltinTools, "render_ui", UI_BLOCKS_GUIDANCE),
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "show_image",

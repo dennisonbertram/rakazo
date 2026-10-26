@@ -94,6 +94,7 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   // Write only inside Rakazo (the owner's own notifications, pages, pins and files).
   "notify_user",
   "create_ui_artifact",
+  "render_ui",
   "attach_file",
   "page_write",
   "pins_write",
@@ -233,6 +234,7 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "scratchpad_update",
   "scratchpad_complete",
   "create_ui_artifact",
+  "render_ui",
   "page_write",
   "pins_write",
   "attach_file",
@@ -471,6 +473,7 @@ const OWN_STATE_RESULT_TOOLS = new Set([
   "recall_memory",
   "remember",
   "render_plot",
+  "render_ui",
   "request_secret",
   "save_memory",
   "save_shared_memory",
