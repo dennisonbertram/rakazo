@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CreateRoutineInput, ScratchpadItemSchema } from "./domain.js";
-import { CheckInSetInput, WatchSpecSchema } from "./routines.js";
+import { CheckInSetInput, connectorToolLabel, WatchSpecSchema } from "./routines.js";
 
 describe("WatchSpecSchema", () => {
   const ok = { kind: "page", url: "https://example.com/pricing", intervalMinutes: 60 };
@@ -75,4 +75,9 @@ describe("routine and scratchpad shapes", () => {
     expect(CheckInSetInput.safeParse({ botId: "b", cadence: "every_4h" }).success).toBe(true);
     expect(CheckInSetInput.safeParse({ botId: "b", cadence: "hourly" }).success).toBe(false);
   });
+});
+
+it("words a tool name, splitting camelCase too", () => {
+  expect(connectorToolLabel("mcp__finance-mercury__getAccounts")).toBe("get accounts");
+  expect(connectorToolLabel("mcp__x__list_transactions")).toBe("list transactions");
 });

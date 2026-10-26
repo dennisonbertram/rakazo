@@ -43,7 +43,11 @@ export type ConnectorWatchSpec = z.infer<typeof ConnectorWatchSpecSchema>;
 /** The tool without its app prefix, in words: "mcp__mercury__get_accounts" gives "get accounts". */
 export function connectorToolLabel(toolName: string): string {
   const last = toolName.split("__").pop() ?? toolName;
-  return last.replace(/[_-]+/g, " ").trim().toLowerCase();
+  return last
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 export const WatchSpecSchema = z.discriminatedUnion("kind", [
