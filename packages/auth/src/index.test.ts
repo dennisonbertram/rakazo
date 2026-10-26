@@ -5,6 +5,7 @@ import {
   buildTrustedOrigins,
   createAuth,
   isBlockedAuthPath,
+  passkeyRpId,
   passwordResetEmail,
   resolveSignupPolicy,
 } from "./index.js";
@@ -40,6 +41,36 @@ describe("auth policy", () => {
     ]) {
       expect(isBlockedAuthPath(path), path).toBe(false);
     }
+  });
+
+  it("derives the passkey rpID from the web origin, using localhost for loopback", () => {
+    expect(passkeyRpId("https://app.example.com")).toBe("app.example.com");
+    expect(passkeyRpId("http://127.0.0.1:5273")).toBe("localhost");
+    expect(passkeyRpId("http://localhost:5273")).toBe("localhost");
+  });
+
+  it("adds passkey routes unless SSO is mandatory", () => {
+    const env = {
+      secret: "test-secret-that-is-long-enough-for-better-auth",
+      baseURL: "http://localhost:3200",
+      webOrigin: "http://localhost:5273",
+      signupsEnabled: undefined,
+      signupAllowlist: undefined,
+    };
+    expect(createAuth({} as never, env).api).toHaveProperty("listPasskeys");
+    const sso = createAuth({} as never, {
+      ...env,
+      passwordAuth: false,
+      oidc: {
+        name: "Example",
+        issuer: "https://idp.example.com",
+        clientId: "c",
+        clientSecret: "s",
+        scopes: [],
+        allowSignupBypass: false,
+      },
+    });
+    expect(sso.api).not.toHaveProperty("listPasskeys");
   });
 
   it("disables organization deletion inside Better Auth as well", async () => {

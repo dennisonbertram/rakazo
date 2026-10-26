@@ -875,6 +875,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       resetUrl:
         env.passwordAuth !== false && email ? new URL("/reset-password", env.webOrigin).href : null,
       billing: Boolean(billing),
+      passkey: env.passwordAuth !== false,
     } satisfies AuthCapabilities);
   });
   if (localEmailEmulator && env.nodeEnv === "development") {

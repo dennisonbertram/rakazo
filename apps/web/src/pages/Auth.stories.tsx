@@ -52,6 +52,11 @@ export const SignIn: Story = {
   beforeEach: () => capabilities(json(passwordOnly)),
 };
 
+export const SignInWithPasskey: Story = {
+  render: () => <AuthPage mode="in" />,
+  beforeEach: () => capabilities(json({ ...passwordOnly, passkey: true })),
+};
+
 export const SignUp: Story = {
   render: () => <AuthPage mode="up" />,
   beforeEach: () => capabilities(json(passwordOnly)),
