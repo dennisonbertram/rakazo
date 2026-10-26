@@ -4940,6 +4940,7 @@ export function ShellPage() {
                 <button
                   type="button"
                   data-testid="computer-routines-button"
+                  data-tour="routines"
                   title={noComputerScreen ? t`Routines` : t`Computer and routines`}
                   aria-label={noComputerScreen ? t`Routines` : t`Computer and routines`}
                   onClick={() => {

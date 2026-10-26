@@ -2397,10 +2397,6 @@ msgstr ""
 msgid "Change password"
 msgstr "Cambiar contraseña"
 
-#: src/components/tour/FirstRunTour.tsx
-msgid "Change settings, export your data or retake this tour from here."
-msgstr ""
-
 #: src/pages/Investors.tsx
 msgid "Change source"
 msgstr ""
@@ -4714,6 +4710,7 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/finance/StatementReviewCard.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/shell/BotSkillsSection.tsx
@@ -4729,6 +4726,7 @@ msgid "Discard this import?"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Discarded"
 msgstr ""
@@ -5914,6 +5912,10 @@ msgstr "Cuelga y luego ingresa el código en pantalla."
 msgid "Has attachment"
 msgstr ""
 
+#: src/components/tour/FirstRunTour.tsx
+msgid "Have a bot run on a schedule, or watch a page and tell you only when it changes. Background runs only read; they ask before they send or change anything."
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "header"
 msgstr "Encabezado"
@@ -6847,6 +6849,10 @@ msgstr "Bajo"
 #: src/lib/model-catalog.ts
 msgid "Low"
 msgstr "Bajo"
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Lowercase letters, numbers, - and _."
+msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Lowercase letters, numbers, hyphens and underscores, starting with a letter."
@@ -10078,6 +10084,7 @@ msgstr ""
 msgid "Routine"
 msgstr "Rutina"
 
+#: src/components/tour/FirstRunTour.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
@@ -10781,6 +10788,10 @@ msgstr ""
 #: src/pages/shell/space-sidebar.tsx
 msgid "Settings"
 msgstr "Configuración"
+
+#: src/components/tour/FirstRunTour.tsx
+msgid "Settings has Approvals, where you choose what bots may do on their own: Allow, Ask or Block. Export your data or retake this tour here."
+msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/ModelSettingsOverlay.tsx
