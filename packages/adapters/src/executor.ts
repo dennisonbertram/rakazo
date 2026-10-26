@@ -341,6 +341,7 @@ import {
   unchangedVisualStreakAfterPageBrowser,
 } from "./computer-tools.js";
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
+import { connectionDenial as connectionRowsDenial } from "./connection-denial.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
 import {
   CAP_TABLE_TOOL_NAMES,
@@ -4094,12 +4095,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (name === "schedule_create" && typeof args.prompt === "string") {
             args = { ...args, prompt: keepForcedSkill(args.prompt, task.prompt) };
           }
+          const watchedAppName = () => {
+            const route = connectorTools.get(String(args.tool ?? ""))?.route;
+            return (
+              route?.serverName ??
+              context.connectedConnections.find((row) => row.id === route?.connectionId)
+                ?.displayName
+            );
+          };
           const scheduleCard = await scheduleApproval(
             deps,
             scheduleScope,
             name,
             args,
             userTimezone,
+            watchedAppName(),
           );
           const requiresApprovalByDefault =
             requiresUnattendedApproval ||
@@ -6045,6 +6055,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 name: String(args.name ?? ""),
                 instruction: String(args.instruction ?? ""),
                 url: args.url,
+                tool: args.tool,
+                arguments: args.arguments,
                 intervalMinutes: args.intervalMinutes,
               }),
             );
@@ -7096,60 +7108,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
             // here and again from the connector right before the provider call, after its setup.
             const connectionDenial = async (): Promise<string | null> => {
               if (!appAgentIdentity && dispatchRoute?.connectorId) {
-                const availableIds = context.connectedConnections
-                  .filter((connection) => connection.connectorId === dispatchRoute.connectorId)
-                  .map((connection) => connection.id);
-                if (availableIds.length > 0) {
-                  const currentConnections = await deps.prisma.connection.findMany({
-                    where: {
-                      id: { in: availableIds },
-                      spaceId: run.spaceId,
-                      userId: run.userId,
-                      connectorId: dispatchRoute.connectorId,
-                    },
-                    select: {
-                      id: true,
-                      connectorId: true,
-                      provider: true,
-                      status: true,
-                      allAgents: true,
-                      agentBotId: true,
-                      privateByDefault: true,
-                      botAccess: {
-                        where: { botId: bot.id, spaceId: run.spaceId, userId: run.userId },
-                        select: { botId: true },
-                      },
-                    },
-                  });
-                  const deniedCurrentIds = deniedConnectionIds(
-                    connectionRowsForAudience(currentConnections, bot.audience),
-                  );
-                  if (dispatchRoute.connectionId) {
-                    const current = currentConnections.find(
-                      (connection) => connection.id === dispatchRoute.connectionId,
-                    );
-                    if (
-                      current?.status !== "connected" ||
-                      deniedCurrentIds.has(current.id) ||
-                      (declaredReadOnly !== true && current.agentBotId !== null)
-                    ) {
-                      return "This connected account is no longer available to this bot.";
-                    }
-                  } else {
-                    const connected = currentConnections.filter(
-                      (connection) => connection.status === "connected",
-                    );
-                    if (
-                      currentConnections.length !== availableIds.length ||
-                      connected.length !== currentConnections.length ||
-                      deniedCurrentIds.size > 0 ||
-                      (declaredReadOnly !== true &&
-                        connected.some((connection) => connection.agentBotId !== null))
-                    ) {
-                      return "This connected account is no longer available to this bot.";
-                    }
-                  }
-                }
+                const denied = await connectionRowsDenial(deps.prisma, {
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  bot,
+                  route: dispatchRoute,
+                  availableIds: context.connectedConnections
+                    .filter((connection) => connection.connectorId === dispatchRoute.connectorId)
+                    .map((connection) => connection.id),
+                  declaredReadOnly,
+                });
+                if (denied) return denied;
               }
               if (appAgentIdentity) {
                 const current = await deps.prisma.connection.findFirst({

@@ -134,6 +134,7 @@ import { MarkdownMemoryStore } from "@rakazo/memory";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { mountAccountExportDownload } from "./account-export.js";
+import { mountArtifactShare, prismaShareStore } from "./artifact-share.js";
 import { createBillingService } from "./billing.js";
 import { mountBillingRoutes } from "./billing-webhook.js";
 import { createCompanyImportPage } from "./company-import-page.js";
@@ -143,7 +144,6 @@ import type { AppEnv } from "./env.js";
 import { loadEnv } from "./env.js";
 import type { GtmQueueReader } from "./gtm.js";
 import { healthRoutes } from "./health.js";
-import { mountArtifactShare, prismaShareStore } from "./artifact-share.js";
 import { mountInboxAttachment } from "./inbox-attachment.js";
 import {
   mountInvestorPortal,
@@ -651,6 +651,7 @@ export async function createApp(
     notificationEvents,
     financeCallToolFor: financeCallToolOverride ?? createFinanceCallToolFor(prisma, mcp),
     artifacts,
+    connector: stack.connector,
     connectors: stack.connector,
     boxAccessToken: boxAccessToken(mcpOAuth),
     notificationChannels: [
@@ -680,7 +681,14 @@ export async function createApp(
         reconcileCompanyImports: () => companyImport.recoveryJob(),
         reconcileTeachHeldValues: () => deleteExpiredTeachData(prisma),
         // Graphile mode runs watch.probe from RECURRING_JOBS in apps/worker; memory mode has no cron.
-        runWatchProbes: () => runWatchProbeTick({ prisma, jobs, events, notificationEvents }),
+        runWatchProbes: () =>
+          runWatchProbeTick({
+            prisma,
+            jobs,
+            events,
+            notificationEvents,
+            connector: stack.connector,
+          }),
       })
     : undefined;
   reconciler?.start();

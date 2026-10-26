@@ -196,6 +196,25 @@ export const ListRows: Story = {
         onStop={() => undefined}
       />
       <RoutineListRow
+        routine={{
+          ...watchRoutine,
+          id: "r8",
+          name: "Bank balance",
+          watch: {
+            kind: "connector",
+            connectorId: "mcp",
+            resourceId: "server_1",
+            toolName: "mcp__bank__get_accounts",
+            arguments: {},
+            appName: "Bank",
+            intervalMinutes: 60,
+          },
+        }}
+        running={false}
+        onOpen={() => undefined}
+        onStop={() => undefined}
+      />
+      <RoutineListRow
         routine={checkInRoutine}
         running={false}
         onOpen={() => undefined}

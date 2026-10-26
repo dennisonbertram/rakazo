@@ -19,6 +19,33 @@ describe("WatchSpecSchema", () => {
   });
 });
 
+describe("connector watch", () => {
+  const connector = {
+    kind: "connector",
+    connectorId: "composio",
+    connectionId: "conn_1",
+    toolName: "mcp__mercury__get_accounts",
+    arguments: { account: "main" },
+    appName: "Mercury",
+    intervalMinutes: 60,
+  };
+  it("is part of WatchSpecSchema but never accepted when a routine is created", () => {
+    expect(WatchSpecSchema.safeParse(connector).success).toBe(true);
+    expect(
+      CreateRoutineInput.safeParse({ botId: "b", name: "n", prompt: "p", watch: connector })
+        .success,
+    ).toBe(false);
+  });
+  it("rejects a tool name that is not plain, and oversized arguments", () => {
+    expect(
+      WatchSpecSchema.safeParse({ ...connector, toolName: "get accounts; drop" }).success,
+    ).toBe(false);
+    expect(
+      WatchSpecSchema.safeParse({ ...connector, arguments: { q: "x".repeat(5000) } }).success,
+    ).toBe(false);
+  });
+});
+
 describe("routine and scratchpad shapes", () => {
   it("a watch alone is a valid trigger for a new routine", () => {
     const base = { botId: "b1", name: "n", prompt: "p" };

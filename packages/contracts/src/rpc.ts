@@ -879,7 +879,7 @@ export const appContract = {
             /** ISO datetime to arm a never-run one-shot. */
             runAt: IsoDate.optional(),
             quiet: z.boolean().optional(),
-            /** Null removes the watch. */
+            /** Null removes the watch. A connected-app watch is accepted only unchanged (the editor sends it back). */
             watch: WatchSpecSchema.nullable().optional(),
           })
           .superRefine((value, ctx) => {

@@ -1,5 +1,6 @@
-import type { JobPublisher } from "@rakazo/adapter-kit";
+import type { ConnectorProvider, JobPublisher } from "@rakazo/adapter-kit";
 import { runContinueJob } from "@rakazo/adapter-kit";
+import { connectorToolLabel } from "@rakazo/contracts";
 import {
   expandSkillReferencesInPrompt,
   formatUntrustedDeliveryPayload,
@@ -13,6 +14,7 @@ import { getLogger } from "@rakazo/logging";
 import { routineRunModelPin } from "./model-selection.js";
 import { listAgentSkillRecords } from "./skill-tools.js";
 import { taughtSkillPromptForRoutine } from "./taught-skill-prompt.js";
+import { probeConnectorWatch } from "./watch-connector.js";
 import type { ResolveHostname } from "./web-ssrf.js";
 import { fetchSafeWebText } from "./web-ssrf.js";
 
@@ -25,6 +27,9 @@ const ACTIVE_RUN_STATUSES = ["queued", "leased", "running", "waiting_input", "wa
 export type ProbeResult =
   | { ok: true; text: string }
   | { ok: false; kind: "transient" | "access"; message: string };
+
+/** A watch pause the owner is told about: the probe's access failure, with the cause in plain words. */
+type ProbeFailure = Extract<ProbeResult, { ok: false }>;
 
 export type ProbeDeps = {
   fetch?: typeof globalThis.fetch;
@@ -65,6 +70,8 @@ export async function probePage(url: string, deps: ProbeDeps = {}): Promise<Prob
 export type WatchProbeDeps = ProbeDeps & {
   prisma: PrismaClient;
   jobs: JobPublisher;
+  /** Needed for connected-app watches; without it they pause. */
+  connector?: ConnectorProvider;
   events?: ThreadEvents;
   notificationEvents?: NotificationEvents;
   now?: () => Date;
@@ -72,14 +79,22 @@ export type WatchProbeDeps = ProbeDeps & {
 
 type Wake = {
   routine: { id: string; spaceId: string; botId: string; userId: string };
+  /** The address of a page watch, or "App tool" of a connected-app watch. */
   url: string;
   diff: string;
+  connector?: boolean;
 };
 
 /** The prompt of a watch wake: the routine's own instruction, then the change fenced as untrusted data. */
-export function watchWakePrompt(instruction: string, url: string, diff: string): string {
-  return `${instruction}\n\nThe watched page changed (${url}). Changes since you last saw it:\n\n${formatUntrustedDeliveryPayload(
-    "[Page Changes]",
+export function watchWakePrompt(
+  instruction: string,
+  url: string,
+  diff: string,
+  connector = false,
+): string {
+  const what = connector ? "result of the watched app" : "watched page";
+  return `${instruction}\n\nThe ${what} changed (${url}). Changes since you last saw it:\n\n${formatUntrustedDeliveryPayload(
+    connector ? "[App Changes]" : "[Page Changes]",
     { diff: diff.split("\n") },
   )}`;
 }
@@ -129,6 +144,7 @@ export async function createWatchWakeRun(db: WakeDb, wake: Wake) {
     ),
     wake.url,
     wake.diff,
+    wake.connector,
   );
   const task = await db.task.create({
     data: {
@@ -193,6 +209,7 @@ async function notifyPaused(
   claim: { routineId: string; spaceId: string; botId: string; userId: string },
   reason: string,
   now: Date,
+  detail?: string,
 ) {
   const routine = await deps.prisma.routine.findUnique({
     where: { id: claim.routineId },
@@ -205,7 +222,7 @@ async function notifyPaused(
     botId: claim.botId,
     routineId: claim.routineId,
     surface: "routines",
-    title: `${name} paused: ${PAUSE_REASON[reason] ?? "it needs a look"}`,
+    title: `${name} paused: ${detail ?? PAUSE_REASON[reason] ?? "it needs a look"}`,
     importance: "attention",
     dedupeKey: `watch-paused:${claim.routineId}:${now.toISOString()}`,
     skipRateLimits: true,
@@ -225,6 +242,17 @@ async function notifyPaused(
   }
 }
 
+/** Why a connected-app watch paused, in words for the notification title. */
+function connectorPauseDetail(
+  result: { outcome: string; pausedReason?: string | null },
+  probe: ProbeResult,
+): string {
+  if (result.outcome === "noisy") return PAUSE_REASON.noisy as string;
+  return !probe.ok && probe.kind === "access"
+    ? probe.message.replace(/\.$/, "").replace(/^[A-Z]/, (letter) => letter.toLowerCase())
+    : "the app could not be checked";
+}
+
 /**
  * One tick of the page-watch probe: claim the due watches, fetch each, record the result, and
  * for each real change queue one run. No model is called here.
@@ -238,7 +266,27 @@ export async function runWatchProbeTick(deps: WatchProbeDeps) {
     while (next < claims.length) {
       const claim = claims[next++] as (typeof claims)[number];
       try {
-        const probe = await probePage(claim.watch.url, deps);
+        const watch = claim.watch;
+        const connectorMissing: ProbeFailure = {
+          ok: false,
+          kind: "access",
+          message: "Connected apps are not available here.",
+        };
+        const probe =
+          watch.kind === "connector"
+            ? deps.connector
+              ? await probeConnectorWatch(
+                  { prisma: deps.prisma, connector: deps.connector, signal: deps.signal },
+                  {
+                    routineId: claim.routineId,
+                    spaceId: claim.spaceId,
+                    userId: claim.userId,
+                    botId: claim.botId,
+                  },
+                  watch,
+                )
+              : connectorMissing
+            : await probePage(watch.url, deps);
         const wakeInFlight =
           (await deps.prisma.run.count({
             where: {
@@ -254,7 +302,11 @@ export async function runWatchProbeTick(deps: WatchProbeDeps) {
             botId: claim.botId,
             userId: claim.userId,
           },
-          url: claim.watch.url,
+          url:
+            watch.kind === "connector"
+              ? `${watch.appName}, ${connectorToolLabel(watch.toolName)}`
+              : watch.url,
+          connector: watch.kind === "connector",
         };
         const result = await recordWatchCheck(
           deps.prisma,
@@ -280,6 +332,7 @@ export async function runWatchProbeTick(deps: WatchProbeDeps) {
             claim,
             result.outcome === "noisy" ? "noisy" : (result.pausedReason ?? "errors"),
             now,
+            watch.kind === "connector" ? connectorPauseDetail(result, probe) : undefined,
           );
         }
       } catch (error) {

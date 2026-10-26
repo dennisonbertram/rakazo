@@ -1,7 +1,12 @@
-import type { JobPublisher } from "@rakazo/adapter-kit";
+import type { ConnectorProvider, JobPublisher } from "@rakazo/adapter-kit";
 import { routineJobKey, routineWakeupJob } from "@rakazo/adapter-kit";
-import type { WatchSpec } from "@rakazo/contracts";
-import { WatchSpecSchema } from "@rakazo/contracts";
+import type { ConnectorWatchSpec, PageWatchSpec, WatchSpec } from "@rakazo/contracts";
+import {
+  ConnectorWatchSpecSchema,
+  connectorToolLabel,
+  PageWatchSpecSchema,
+  WatchSpecSchema,
+} from "@rakazo/contracts";
 import {
   cronFromPreset,
   extractForcedSkillName,
@@ -16,6 +21,7 @@ import {
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { resumeWatch, syncWatchState, watchLimitError } from "@rakazo/db";
 import { OWNER_INITIATED_TRIGGERS } from "./mail-tools.js";
+import { connectorAppLabel, resolveWatchTool } from "./watch-connector.js";
 
 export { isOneShotRoutineCron, ONCE_ROUTINE_CRON };
 
@@ -319,7 +325,11 @@ function watchTarget(url: string): string {
 
 /** What a watch does in plain words, e.g. "Checks example.com/pricing every hour and tells you only when it changes". */
 export function describeWatch(watch: WatchSpec): string {
-  return `Checks ${watchTarget(watch.url)} ${WATCH_EVERY[watch.intervalMinutes]} and tells you only when it changes`;
+  const target =
+    watch.kind === "connector"
+      ? `${watch.appName} ${connectorToolLabel(watch.toolName)}`
+      : watchTarget(watch.url);
+  return `Checks ${target} ${WATCH_EVERY[watch.intervalMinutes]} and tells you only when it changes`;
 }
 
 function describeRoutine(row: {
@@ -353,26 +363,64 @@ function watchFields(row: {
   };
 }
 
+const WATCH_ARGS_ERROR =
+  "url must be an http or https address and intervalMinutes one of 15, 60 or 1440.";
+
+function watchInterval(value: unknown) {
+  return isScheduleValueProvided(value) ? Number(value) : 60;
+}
+
 function parseWatchArgs(input: { url?: unknown; intervalMinutes?: unknown }) {
-  const interval = isScheduleValueProvided(input.intervalMinutes)
-    ? Number(input.intervalMinutes)
-    : 60;
-  const parsed = WatchSpecSchema.safeParse({
+  const parsed = PageWatchSpecSchema.safeParse({
     kind: "page",
     url: String(input.url ?? "").trim(),
-    intervalMinutes: interval,
+    intervalMinutes: watchInterval(input.intervalMinutes),
+  });
+  return parsed.success
+    ? { ok: true as const, watch: parsed.data }
+    : { ok: false as const, error: WATCH_ARGS_ERROR };
+}
+
+/** The watch_create input for a connected app: a tool name and its fixed arguments, no url. */
+function connectorArgs(input: { tool?: unknown; arguments?: unknown }) {
+  const toolName = typeof input.tool === "string" ? input.tool.trim() : "";
+  if (!toolName) return undefined;
+  const args = input.arguments ?? {};
+  return typeof args === "object" && args !== null && !Array.isArray(args)
+    ? { toolName, arguments: args as Record<string, unknown> }
+    : { toolName, arguments: null };
+}
+
+/** The spec a connected-app watch_create describes, before the tool is looked up. */
+function parseConnectorWatchArgs(
+  input: {
+    tool?: unknown;
+    arguments?: unknown;
+    intervalMinutes?: unknown;
+  },
+  appName?: string,
+) {
+  const named = connectorArgs(input);
+  const parsed = ConnectorWatchSpecSchema.safeParse({
+    kind: "connector",
+    connectorId: "pending",
+    toolName: named?.toolName,
+    arguments: named?.arguments,
+    appName: connectorAppLabel(named?.toolName ?? "", appName),
+    intervalMinutes: watchInterval(input.intervalMinutes),
   });
   return parsed.success
     ? { ok: true as const, watch: parsed.data }
     : {
         ok: false as const,
-        error: "url must be an http or https address and intervalMinutes one of 15, 60 or 1440.",
+        error:
+          "tool must be one tool name you were offered, arguments an object of at most 4 KB, and intervalMinutes one of 15, 60 or 1440.",
       };
 }
 
 /** Persist a quiet routine that checks a page and wakes the bot only when it changes. */
 export async function createWatchFromTool(
-  deps: ScheduleToolDeps,
+  deps: ScheduleToolDeps & { connector?: ConnectorProvider },
   input: {
     spaceId: string;
     botId: string;
@@ -380,7 +428,10 @@ export async function createWatchFromTool(
     threadId: string;
     name: string;
     instruction: string;
-    url: unknown;
+    url?: unknown;
+    /** A connected app's read-only tool to watch instead of a page, with its fixed arguments. */
+    tool?: unknown;
+    arguments?: unknown;
     intervalMinutes?: unknown;
   },
 ) {
@@ -388,8 +439,42 @@ export async function createWatchFromTool(
   const prompt = input.instruction.trim();
   if (!name) return { error: "name is required." };
   if (!prompt) return { error: "instruction is required." };
-  const spec = parseWatchArgs(input);
-  if (!spec.ok) return { error: spec.error };
+  const wanted = input.tool === undefined ? undefined : parseConnectorWatchArgs(input);
+  if (wanted && !wanted.ok) return { error: wanted.error };
+  const page = wanted ? undefined : parseWatchArgs(input);
+  if (page && !page.ok) return { error: page.error };
+  let watch: WatchSpec = wanted?.ok ? wanted.watch : (page as { watch: PageWatchSpec }).watch;
+  if (wanted?.ok) {
+    // The same lookup and authorization every later check makes: a tool this bot may use now,
+    // on a connection it may use, that is a plain read. The spec is built from what it finds.
+    if (!deps.connector) return { error: "Connected apps are not available here." };
+    const found = await resolveWatchTool(
+      deps.prisma,
+      deps.connector,
+      { spaceId: input.spaceId, userId: input.userId, botId: input.botId },
+      { toolName: wanted.watch.toolName },
+      AbortSignal.timeout(15_000),
+      `watch-create:${input.botId}`,
+    );
+    if (!found.ok) return { error: found.message };
+    watch = {
+      ...wanted.watch,
+      connectorId: found.route.connectorId,
+      ...(found.route.connectionId ? { connectionId: found.route.connectionId } : {}),
+      ...(found.route.resourceId ? { resourceId: found.route.resourceId } : {}),
+      appName: connectorAppLabel(found.tool.name, found.route.serverName ?? found.appDisplayName),
+    } satisfies ConnectorWatchSpec;
+    // Look it up again by the stored identity, so a tool that cannot be found that way never becomes a watch.
+    const again = await resolveWatchTool(
+      deps.prisma,
+      deps.connector,
+      { spaceId: input.spaceId, userId: input.userId, botId: input.botId },
+      watch,
+      AbortSignal.timeout(15_000),
+      `watch-create:${input.botId}`,
+    );
+    if (!again.ok) return { error: again.message };
+  }
   const limit = await watchLimitError(deps.prisma, input);
   if (limit) return { error: limit };
 
@@ -407,13 +492,13 @@ export async function createWatchFromTool(
       notify: true,
       active: true,
       quiet: true,
-      watch: spec.watch,
+      watch,
     },
   });
   await syncWatchState(deps.prisma, {
     routineId: row.id,
     spaceId: row.spaceId,
-    watch: spec.watch,
+    watch,
     watchChanged: true,
     now: new Date(),
   });
@@ -432,8 +517,8 @@ export async function createWatchFromTool(
     ok: true as const,
     routineId: row.id,
     name: row.name,
-    watch: spec.watch,
-    schedule: describeWatch(spec.watch),
+    watch,
+    schedule: describeWatch(watch),
   };
 }
 
@@ -613,6 +698,9 @@ export async function updateScheduleFromTool(
   if (input.watch && typeof input.watch === "object") {
     const current = WatchSpecSchema.safeParse(existing.watch);
     if (!current.success) return { error: "This schedule does not watch a page." };
+    if (current.data.kind !== "page") {
+      return { error: "A connected-app watch cannot be edited. Cancel it and create a new one." };
+    }
     const patch = compactScheduleInput(input.watch as Record<string, unknown>);
     const spec = parseWatchArgs({
       url: patch.url ?? current.data.url,
@@ -790,15 +878,24 @@ export async function scheduleApproval(
   toolName: string,
   args: Record<string, unknown>,
   userTimezone: string | null,
+  /** The name of the connected app that offers args.tool, for a connected-app watch_create. */
+  watchedAppName?: string,
 ): Promise<ScheduleApproval | undefined> {
   if (toolName === "watch_create") {
-    const spec = parseWatchArgs(args);
+    const connector =
+      args.tool === undefined ? undefined : parseConnectorWatchArgs(args, watchedAppName);
+    const spec = connector ?? parseWatchArgs(args);
     if (!spec.ok || !String(args.name ?? "").trim() || !String(args.instruction ?? "").trim()) {
       return undefined;
     }
     return {
       summary: describeWatch(spec.watch),
-      detail: `instruction: ${String(args.instruction).trim()}`,
+      detail: [
+        `instruction: ${String(args.instruction).trim()}`,
+        ...(spec.watch.kind === "connector"
+          ? [`tool: ${spec.watch.toolName}`, `arguments: ${JSON.stringify(spec.watch.arguments)}`]
+          : []),
+      ].join("\n"),
     };
   }
   if (toolName !== "schedule_create" && toolName !== "schedule_update") return undefined;
@@ -832,8 +929,13 @@ export async function scheduleApproval(
   const name = create ? String(args.name ?? "").trim() : (existing?.name ?? "");
   const crons = resolved?.ok ? [resolved.cron] : (existing?.crons ?? []);
   const currentWatch = WatchSpecSchema.safeParse(existing?.watch);
+  // The tool refuses to edit a connected-app watch, without any effect.
+  if (currentWatch.success && currentWatch.data.kind !== "page" && args.watch) return undefined;
   const nextWatch =
-    currentWatch.success && args.watch && typeof args.watch === "object"
+    currentWatch.success &&
+    currentWatch.data.kind === "page" &&
+    args.watch &&
+    typeof args.watch === "object"
       ? parseWatchArgs({
           url: (args.watch as Record<string, unknown>).url ?? currentWatch.data.url,
           intervalMinutes:

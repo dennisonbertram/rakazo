@@ -348,3 +348,20 @@ it("describes a watch, a check-in and a pause in the row", () => {
   expect(routineStatusLine(schedule, "en", now)).toBe("Last ran 8:00 AM · Next Tue 8:00 AM");
   expect(routineStatusLine(baseRoutine, "en", now)).toBeNull();
 });
+
+it("describes a connected-app watch by its app, not a page", () => {
+  const appWatch = {
+    ...baseRoutine,
+    watch: {
+      kind: "connector",
+      connectorId: "mcp",
+      toolName: "mcp__bank__get_accounts",
+      arguments: {},
+      appName: "Bank",
+      intervalMinutes: 60,
+    },
+    status: { ...baseRoutine.status, pausedReason: "errors" },
+  } as Routine;
+  expect(routineTriggerSummary(appWatch)).toBe("Watches Bank");
+  expect(routineStatusLine(appWatch)).toBe("Paused: the app could not be checked");
+});
