@@ -441,6 +441,10 @@ msgstr "{commandVariable} ist reserviert und kann nicht als Befehlsvariable verw
 msgid "{count, plural, one {# bank account} other {# bank accounts}}"
 msgstr ""
 
+#: src/components/data-room/FailedChip.tsx
+msgid "{count, plural, one {# failed} other {# failed}}"
+msgstr ""
+
 #: src/components/MailThreadCard.tsx
 msgid "{count, plural, one {# message} other {# messages}}"
 msgstr ""

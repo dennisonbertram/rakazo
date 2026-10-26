@@ -441,6 +441,10 @@ msgstr "{commandVariable} is reserved and cannot be used as a command variable. 
 msgid "{count, plural, one {# bank account} other {# bank accounts}}"
 msgstr "{count, plural, one {# bank account} other {# bank accounts}}"
 
+#: src/components/data-room/FailedChip.tsx
+msgid "{count, plural, one {# failed} other {# failed}}"
+msgstr "{count, plural, one {# failed} other {# failed}}"
+
 #: src/components/MailThreadCard.tsx
 msgid "{count, plural, one {# message} other {# messages}}"
 msgstr "{count, plural, one {# message} other {# messages}}"
