@@ -4154,6 +4154,24 @@ describe("unattended runs and block rules", () => {
     expect(f.effects).toHaveLength(1);
   });
 
+  it("an unattended run calls Praci's own page tool without a card, and a tainted one still asks", async () => {
+    const free = fixture({ name: "page_edit", builtin: true, unattended: true });
+    free.setCalls([{ args: {}, executionId: "c1" }]);
+    // The call itself fails on empty arguments; what matters is that it never asked.
+    await free.run({ expectFailure: true });
+    expect(free.pauseRunForInput).not.toHaveBeenCalled();
+
+    const tainted = fixture({
+      name: "page_edit",
+      builtin: true,
+      unattended: true,
+      externalTaint: true,
+    });
+    tainted.setCalls([{ args: {}, executionId: "c1" }]);
+    await tainted.run({ expectFailure: true });
+    expect(tainted.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
   it("an Ask rule on read_file asks in an attended run", async () => {
     const f = fixture({
       name: "read_file",
