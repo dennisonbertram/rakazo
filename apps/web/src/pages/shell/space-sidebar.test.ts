@@ -60,6 +60,7 @@ vi.mock("../ActivityList", () => ({ ActivityList: () => null }));
 import {
   activeSpaceFirst,
   commitSpaceRename,
+  foldRows,
   sidebarGroupsForSpaces,
   spaceHoldingChat,
 } from "./space-sidebar";
@@ -715,7 +716,13 @@ it("hides an unused idle page agent and reveals it when active", async () => {
     const activeToggle = container.querySelector<HTMLButtonElement>(
       '[data-testid="sidebar-page-agents"]',
     );
+    // The fold stays closed; only the open agent's row shows under it.
+    expect(activeToggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(container.textContent).toContain("Inbox agent");
+    await act(async () => activeToggle?.click());
     expect(activeToggle?.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => activeToggle?.click());
+    expect(activeToggle?.getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).toContain("Inbox agent");
   } finally {
     await act(async () => root.unmount());
@@ -815,7 +822,7 @@ it("folds email chats separately and reveals the active email chat", async () =>
     const activeEmailChats = container.querySelector<HTMLButtonElement>(
       '[data-testid="sidebar-email-chats"]',
     );
-    expect(activeEmailChats?.getAttribute("aria-expanded")).toBe("true");
+    expect(activeEmailChats?.getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).toContain("Client email");
   } finally {
     await act(async () => root.unmount());
@@ -919,4 +926,22 @@ it("opens the command palette from expanded and rail Search", async () => {
     container.remove();
     vi.unstubAllGlobals();
   }
+});
+
+describe("foldRows", () => {
+  const row = (id: string) => ({ depth: 0, item: { kind: "bot", chat: { id } } });
+  const rows = [row("a"), row("b")];
+
+  it("lists every row, nested one level, when the fold is open", () => {
+    expect(foldRows(rows, true, "a").map((r) => [r.item.chat.id, r.depth])).toEqual([
+      ["a", 1],
+      ["b", 1],
+    ]);
+  });
+
+  it("keeps only the open thread under a closed fold", () => {
+    expect(foldRows(rows, false, "b").map((r) => r.item.chat.id)).toEqual(["b"]);
+    expect(foldRows(rows, false, "b", false)).toEqual([]);
+    expect(foldRows(rows, false, "x")).toEqual([]);
+  });
 });
