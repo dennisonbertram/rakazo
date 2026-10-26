@@ -107,7 +107,7 @@ const withLogin = {
     mockRpc({
       "skills.get": live({
         playbook: loginPlaybook,
-        loginPrompts: [{ stepIndex: 2, field: "Password" }],
+        loginPrompts: [{ stepIndex: 2, field: "Password", username: "demo-user" }],
       }),
     }),
 } satisfies Story;
@@ -123,6 +123,10 @@ export const LoginPromptForm: Story = {
       await within(canvasElement).findByLabelText("Site"),
       "https://login.example.test",
     );
+    // The typed username is offered, not assumed.
+    await expect(
+      ((await within(canvasElement).findByLabelText("Username")) as HTMLInputElement).value,
+    ).toBe("demo-user");
   },
 };
 
@@ -132,7 +136,7 @@ export const LoginPromptError: Story = {
     withLogin.beforeEach();
     mockRpc({
       "taughtSkills.saveLogin": () => {
-        throw new Error("Add the username for this login");
+        throw new Error("Could not save the login");
       },
     });
   },

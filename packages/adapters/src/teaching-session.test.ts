@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+import type { TaughtSkillRow } from "./teaching-session.js";
 import {
   appendRecordingEvent,
-  captureTeachingSnapshot,
-  scrubTaughtSkillRow,
   applyTeachingDesktopInput,
+  captureTeachingSnapshot,
   completeTeachingSession,
   emptyRecording,
   expireTaughtSkillTeaching,
   recordTeachingInputEvent,
+  scrubTaughtSkillRow,
 } from "./teaching-session.js";
 
 function skillRow(
@@ -601,6 +602,7 @@ function withHeldValues(harness: ReturnType<typeof recordingDeps>) {
       load: async (ciphertext: string) => ciphertext,
     },
   });
+  return table;
 }
 
 const computerRow = {
@@ -650,7 +652,9 @@ describe("password detection from the sandbox browser", () => {
     expect(events.every((event) => event.sensitive && event.key === undefined)).toBe(true);
     expect(JSON.stringify(current().recording)).not.toContain("hunter2");
     // One check per focus, not per keystroke.
-    expect((deps.sandbox as { pageBrowser: unknown }).pageBrowser).toHaveBeenCalledTimes(1);
+    expect((deps.sandbox as unknown as { pageBrowser: unknown }).pageBrowser).toHaveBeenCalledTimes(
+      1,
+    );
   });
 
   it("checks again after a click, and records ordinary fields normally", async () => {
@@ -682,7 +686,7 @@ describe("password detection from the sandbox browser", () => {
       focused({ autocomplete: "current-password" }),
     );
     await type(deps, "x");
-    expect(current().recording.events[0].sensitive).toBe(true);
+    expect(current().recording.events[0]?.sensitive).toBe(true);
   });
 
   it("falls back to a sign-in window title when the browser cannot answer", async () => {
@@ -743,7 +747,7 @@ describe("held passwords echoed in window titles and snapshots", () => {
     expect(JSON.stringify(current().recording)).not.toContain("hunter2");
     const windows = current().recording.events.filter((e: { kind: string }) => e.kind === "window");
     expect(windows).toHaveLength(1);
-    expect(windows[0].app).toBe("[redacted]");
+    expect(windows[0]?.app).toBe("[redacted]");
     await completeTeachingSession(deps as never, actor, "skill-echo-1", "stopped");
     expect(JSON.stringify(current().recording)).not.toContain("hunter2");
     expect(JSON.stringify(current().playbook)).not.toContain("hunter2");
@@ -759,13 +763,16 @@ describe("held passwords echoed in window titles and snapshots", () => {
         } as never,
       }),
     );
-    withHeldValues(harness);
-    await harness.deps.prisma.teachHeldValue.upsert({
+    const held = withHeldValues(harness);
+    await held.upsert({
       where: { skillId_segment: { segment: 0 } },
       create: { ciphertext: "hunter2", segment: 0 },
       update: {},
     } as never);
-    const row = await scrubTaughtSkillRow(harness.deps as never, harness.current() as never);
+    const row = await scrubTaughtSkillRow(
+      harness.deps as never,
+      harness.current() as unknown as TaughtSkillRow,
+    );
     expect(JSON.stringify(row.recording)).not.toContain("hunter2");
   });
 });

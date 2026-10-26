@@ -34,8 +34,8 @@ import {
   releaseComputerExecutionLease,
   releaseTeachingComputerControlForBot,
   scheduleComputerControlExpiry,
-  scrubTaughtSkillRow,
   screenLeaseIdForRun,
+  scrubTaughtSkillRow,
   teachingControlLeaseExpiresAt,
 } from "@rakazo/adapters";
 import type {

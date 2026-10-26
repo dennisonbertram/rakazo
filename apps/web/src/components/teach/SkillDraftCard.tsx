@@ -24,7 +24,9 @@ function fieldLabel(id: string, title: React.ReactNode) {
 }
 
 const TEST_POLL_MS = 2000;
-const TEST_POLL_LIMIT_MS = 120_000;
+/** After this long a test is still running, so check less often rather than stop. */
+const TEST_POLL_SLOW_AFTER_MS = 120_000;
+const TEST_POLL_SLOW_MS = 10_000;
 
 /** A login name must start with a letter and use lower-case letters, digits, "_" and "-". */
 export function loginNameFromSite(site: string): string {
@@ -47,12 +49,15 @@ function LoginPromptRow({
   skillId,
   stepIndex,
   field,
+  suggestedUsername,
   step,
   onUpdated,
 }: {
   skillId: string;
   stepIndex: number;
   field: string;
+  /** What was typed just before the password; the user confirms it, the server never assumes it. */
+  suggestedUsername?: string;
   step: string | undefined;
   onUpdated: (skill: TaughtSkill) => void;
 }) {
@@ -61,8 +66,7 @@ function LoginPromptRow({
   const [name, setName] = useState("");
   const [nameEdited, setNameEdited] = useState(false);
   const [site, setSite] = useState("");
-  const [username, setUsername] = useState("");
-  const [needsUsername, setNeedsUsername] = useState(false);
+  const [username, setUsername] = useState(suggestedUsername ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,9 +76,7 @@ function LoginPromptRow({
     try {
       onUpdated(await action());
     } catch (err) {
-      const message = errorText(err, t`Could not save login`);
-      if (message.includes("username")) setNeedsUsername(true);
-      setError(message);
+      setError(errorText(err, t`Could not save login`));
     } finally {
       setBusy(false);
     }
@@ -101,7 +103,7 @@ function LoginPromptRow({
                 stepIndex,
                 name,
                 site: site.trim(),
-                ...(username.trim() ? { username: username.trim() } : {}),
+                username: username.trim(),
               }),
             );
           }}
@@ -123,21 +125,23 @@ function LoginPromptRow({
               setNameEdited(true);
             }}
           />
-          {needsUsername ? (
-            <Input
-              aria-label={t`Username`}
-              autoComplete="off"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-            />
-          ) : null}
+          <Input
+            aria-label={t`Username`}
+            autoComplete="off"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+          />
           {error ? (
             <div role="alert" className="text-[13px] text-destructive">
               {error}
             </div>
           ) : null}
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={busy || !name || !site.trim()}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={busy || !name || !site.trim() || !username.trim()}
+            >
               <Trans>Save login</Trans>
             </Button>
             <Button
@@ -212,24 +216,36 @@ export function SkillDraftCard({
     };
   }, [block.skillId, block.status]);
 
-  // The Test outcome settles on the server when the skill is read, so keep reading until it does.
+  // The Test outcome settles on the server when the skill is read, so keep reading until it
+  // does. A long test is polled more slowly, never abandoned: Test stays off while it runs.
   useEffect(() => {
     if (!testing) return;
     const started = Date.now();
-    const timer = window.setInterval(() => {
+    let timer: number | undefined;
+    let stopped = false;
+    const schedule = () => {
+      const slow = Date.now() - started > TEST_POLL_SLOW_AFTER_MS;
+      timer = window.setTimeout(poll, slow ? TEST_POLL_SLOW_MS : TEST_POLL_MS);
+    };
+    const poll = () => {
       void rpc.skills
         .get({ skillId: block.skillId })
         .then((skill: TaughtSkill | null) => {
+          if (stopped) return;
           if (skill?.lastTestOutcome) {
             setLive(skill);
             setTesting(false);
-          } else if (Date.now() - started > TEST_POLL_LIMIT_MS) {
-            setTesting(false);
-          }
+          } else schedule();
         })
-        .catch(() => undefined);
-    }, TEST_POLL_MS);
-    return () => window.clearInterval(timer);
+        .catch(() => {
+          if (!stopped) schedule();
+        });
+    };
+    schedule();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
   }, [testing, block.skillId]);
 
   async function run(action: () => Promise<void>) {
@@ -298,6 +314,7 @@ export function SkillDraftCard({
           skillId={block.skillId}
           stepIndex={prompt.stepIndex}
           field={prompt.field}
+          suggestedUsername={prompt.username}
           step={playbook.steps[prompt.stepIndex]}
           onUpdated={applyLogin}
         />

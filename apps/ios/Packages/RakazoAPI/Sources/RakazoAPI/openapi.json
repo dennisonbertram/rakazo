@@ -99729,6 +99729,9 @@
                               },
                               "field": {
                                 "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -100141,6 +100144,9 @@
                                 "maximum": 9007199254740991
                               },
                               "field": {
+                                "type": "string"
+                              },
+                              "username": {
                                 "type": "string"
                               }
                             },
@@ -100556,6 +100562,9 @@
                                   "maximum": 9007199254740991
                                 },
                                 "field": {
+                                  "type": "string"
+                                },
+                                "username": {
                                   "type": "string"
                                 }
                               },
@@ -101133,6 +101142,9 @@
                               },
                               "field": {
                                 "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -101545,6 +101557,9 @@
                                 "maximum": 9007199254740991
                               },
                               "field": {
+                                "type": "string"
+                              },
+                              "username": {
                                 "type": "string"
                               }
                             },
@@ -101965,6 +101980,9 @@
                               },
                               "field": {
                                 "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -102377,6 +102395,9 @@
                                 "maximum": 9007199254740991
                               },
                               "field": {
+                                "type": "string"
+                              },
+                              "username": {
                                 "type": "string"
                               }
                             },
@@ -102997,6 +103018,9 @@
                                 "maximum": 9007199254740991
                               },
                               "field": {
+                                "type": "string"
+                              },
+                              "username": {
                                 "type": "string"
                               }
                             },
@@ -105228,7 +105252,8 @@
                       "skillId",
                       "stepIndex",
                       "name",
-                      "site"
+                      "site",
+                      "username"
                     ]
                   }
                 },
@@ -105485,6 +105510,9 @@
                                 "maximum": 9007199254740991
                               },
                               "field": {
+                                "type": "string"
+                              },
+                              "username": {
                                 "type": "string"
                               }
                             },
@@ -105904,6 +105932,9 @@
                                 "maximum": 9007199254740991
                               },
                               "field": {
+                                "type": "string"
+                              },
+                              "username": {
                                 "type": "string"
                               }
                             },
