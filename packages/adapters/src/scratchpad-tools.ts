@@ -1,6 +1,14 @@
 import type { ScratchpadCategory, ScratchpadChannel } from "@rakazo/contracts";
 import {
+  cartaAgentSpawnKey,
+  companyAgentSpawnKey,
+  dataRoomAgentSpawnKey,
   emailCompliance,
+  financeAgentSpawnKey,
+  gtmAgentSpawnKey,
+  investorsAgentSpawnKey,
+  isMailThreadAgentSpawnKey,
+  legalAgentSpawnKey,
   ScratchpadCategorySchema,
   ScratchpadChannelSchema,
   ScratchpadDateTimeSchema,
@@ -42,6 +50,28 @@ const CONSUME_APPROVED_POST_INPUT_KEYS = new Set([
   "effectKey",
   "now",
 ]);
+
+/**
+ * The agents an email chat may hand a to-do to. A fixed set of the owner's own agents, keyed by
+ * area, so a model (or text in an email) can never name an arbitrary bot id.
+ */
+export const SCRATCHPAD_HANDOFF_AGENTS = {
+  carta: cartaAgentSpawnKey,
+  finance: financeAgentSpawnKey,
+  legal: legalAgentSpawnKey,
+  data_room: dataRoomAgentSpawnKey,
+  investors: investorsAgentSpawnKey,
+  company: companyAgentSpawnKey,
+  gtm: gtmAgentSpawnKey,
+} as const;
+
+/** `mail-thread:<connectionId>:<threadId>`; connection ids hold no colon. */
+function mailThreadOf(spawnKey: string | null | undefined) {
+  if (!isMailThreadAgentSpawnKey(spawnKey)) return null;
+  const rest = (spawnKey as string).slice("mail-thread:".length);
+  const i = rest.indexOf(":");
+  return i > 0 ? { connectionId: rest.slice(0, i), threadId: rest.slice(i + 1) } : null;
+}
 
 export type ScratchpadToolDeps = {
   prisma: PrismaClient;
@@ -277,6 +307,10 @@ export async function addScratchpadItemFromTool(
     scheduledFor?: string;
     dueAt?: string;
     waitingOn?: string;
+    /** The calling bot's spawn key. An email chat's items are linked to its thread. */
+    callerSpawnKey?: string | null;
+    /** An area (see SCRATCHPAD_HANDOFF_AGENTS) whose agent should own the item. Email chats only. */
+    forAgent?: string;
   },
 ) {
   if ((input as typeof input & { proof?: unknown }).proof !== undefined) {
@@ -324,8 +358,46 @@ export async function addScratchpadItemFromTool(
     status = input.status;
   }
 
+  // Email chat: link the item to its thread, and optionally hand it to the agent that owns the work.
+  const mail = mailThreadOf(input.callerSpawnKey);
+  let botId = input.botId;
+  let addedTo: string | undefined;
+  if (input.forAgent !== undefined) {
+    const key = Object.hasOwn(SCRATCHPAD_HANDOFF_AGENTS, input.forAgent)
+      ? SCRATCHPAD_HANDOFF_AGENTS[input.forAgent as keyof typeof SCRATCHPAD_HANDOFF_AGENTS]
+      : undefined;
+    if (!key) return { error: "forAgent is not a known agent." };
+    if (!mail) return { error: "forAgent can only be used from an email chat." };
+    const owner = await deps.prisma.bot.findFirst({
+      where: {
+        spaceId: input.spaceId,
+        userId: input.userId,
+        spawnKey: key(input.userId),
+        archivedAt: null,
+      },
+      select: { id: true, name: true },
+    });
+    // No such agent in this space: keep the item on the email chat's own bot.
+    if (owner) {
+      botId = owner.id;
+      addedTo = owner.name;
+    }
+  }
+  const message = mail
+    ? await deps.prisma.cachedMailMessage.findFirst({
+        where: {
+          spaceId: input.spaceId,
+          userId: input.userId,
+          connectionId: mail.connectionId,
+          threadId: mail.threadId,
+        },
+        orderBy: { receivedAt: "desc" },
+        select: { providerMessageId: true },
+      })
+    : null;
   const data = {
     ...scopeOf(input),
+    botId,
     title,
     status,
     notes,
@@ -334,21 +406,45 @@ export async function addScratchpadItemFromTool(
     ...(target !== undefined ? { target } : {}),
     ...(scheduledFor ? { scheduledFor } : {}),
     ...open.data,
+    // A to-do handed to another agent is for the person to act on, so it shows in "Waiting on you".
+    ...(addedTo && !open.data.waitingOn ? { waitingOn: "you" } : {}),
+    ...(mail && message
+      ? {
+          mailConnectionId: mail.connectionId,
+          mailThreadId: mail.threadId,
+          mailMessageId: message.providerMessageId,
+        }
+      : {}),
   };
   const create = (client: ScratchpadClient) =>
     client.scratchpadItem.create({ data }) as Promise<ScratchpadRow>;
+  const result = (item: ScratchpadRow) => ({
+    item: mapScratchpadItem(item),
+    ...(addedTo ? { addedTo } : {}),
+  });
 
   if (category === "goal" && status !== "done") {
     return deps.prisma.$transaction(async (tx) => {
-      await lockScope(tx, `scratchpad:goal:${input.spaceId}:${input.userId}:${input.botId}`);
+      await lockScope(tx, `scratchpad:goal:${input.spaceId}:${input.userId}:${botId}`);
       const existing = await tx.scratchpadItem.findFirst({
-        where: { ...scopeOf(input), category: "goal", status: { not: "done" } },
+        where: { ...scopeOf(input), botId, category: "goal", status: { not: "done" } },
       });
       if (existing) return { error: "A non-done goal already exists for this bot." };
-      return { item: mapScratchpadItem(await create(tx)) };
+      return result(await create(tx));
     });
   }
-  return { item: mapScratchpadItem(await create(deps.prisma)) };
+  try {
+    return result(await create(deps.prisma));
+  } catch (error) {
+    // One open item per bot and mail thread (a partial unique index).
+    if ((error as { code?: string }).code === "P2002" && "mailThreadId" in data) {
+      return {
+        error:
+          "That agent already has an open to-do for this email. Update it with scratchpad_update instead.",
+      };
+    }
+    throw error;
+  }
 }
 
 type ScratchpadUpdateInput = Scope & {

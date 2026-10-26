@@ -16,9 +16,10 @@ import {
 } from "@rakazo/contracts";
 import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
-import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
+import { SCRATCHPAD_HANDOFF_AGENTS } from "./scratchpad-tools.js";
+import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { voiceAgentTools } from "./voice-agent-tools.js";
 
 // The owner flag can land in process.env after static imports run (loadRootEnv
@@ -1788,6 +1789,12 @@ export const builtinAgentTools: ConnectorTool[] = [
           maxLength: 120,
           description:
             "Who or what the item waits on. Write exactly 'you' when it waits on the owner, otherwise the other party's name, for example 'Acme legal'.",
+        },
+        forAgent: {
+          type: "string",
+          enum: Object.keys(SCRATCHPAD_HANDOFF_AGENTS),
+          description:
+            "Email chats only: when the to-do belongs to another agent's area, name that agent and the item is recorded there (linked to this email) instead of on this chat's bot.",
         },
       },
       required: ["title"],

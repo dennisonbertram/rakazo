@@ -80,6 +80,7 @@ import {
   isInvestorsAgentSpawnKey,
   isLegalAgentSpawnKey,
   isMailAgentSpawnKey,
+  isMailThreadAgentSpawnKey,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
@@ -5488,7 +5489,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "render_ui") {
             const parsed = parseUiBlocks(args);
-            if (!parsed.ok) return finish({ error: "Invalid UI blocks", problems: parsed.problems });
+            if (!parsed.ok)
+              return finish({ error: "Invalid UI blocks", problems: parsed.problems });
             await publishMessage(
               deps,
               run,
@@ -6142,6 +6144,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               scheduledFor: args.scheduledFor !== undefined ? String(args.scheduledFor) : undefined,
               dueAt: args.dueAt != null ? String(args.dueAt) : undefined,
               waitingOn: args.waitingOn != null ? String(args.waitingOn) : undefined,
+              forAgent: args.forAgent != null ? String(args.forAgent) : undefined,
+              callerSpawnKey: bot.spawnKey,
             });
             return finish(created);
           }
@@ -7725,6 +7729,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     mailSearchGuidance: mailSkill.guidance,
                     financeConnectionLine,
                     mailSortingLine,
+                    mailThreadAgent: isMailThreadAgentSpawnKey(bot.spawnKey),
                     dataRoomEnabled: dataRoomEnabled && !legalOnly && !externalBot,
                     agentSkillsLine: restrictedContext ? undefined : agentSkillsLine,
                     taughtSkillsLine: restrictedContext ? undefined : taughtSkillsLine,
@@ -9288,6 +9293,9 @@ function offeredBuiltinClause(
   return builtinOffered(disabled, name) ? text : undefined;
 }
 
+export const MAIL_NOTE_GUIDANCE =
+  "When the user asks you to make a note or to-do, call scratchpad_add; it is linked to this email automatically. If the work belongs to another agent's area (Carta, finance, legal, data room, investors, company, GTM), set forAgent to that area so the to-do goes to that agent instead of staying here, and tell the user plainly where it went, for example \"Added to the Carta agent's to-dos.\" If the result has no addedTo, say it was added to this chat's to-dos.";
+
 export const MEMORY_GUIDANCE =
   "Save only stable preferences, facts and decisions, never secrets, codes, credentials or raw transcripts. Update or merge an existing memory rather than adding a near-duplicate, and say it is saved only after the write succeeds.";
 
@@ -9627,6 +9635,8 @@ export function userTurnInstructions(parts: {
   financeConnectionLine?: string | undefined;
   /** Set while the mail sort has not finished; see MAIL_SORTING_LINE. */
   mailSortingLine?: string | undefined;
+  /** This run is an email chat's agent. */
+  mailThreadAgent?: boolean;
   /** add_to_data_room is offered in this run. */
   dataRoomEnabled?: boolean;
   agentSkillsLine: string | undefined;
@@ -9653,6 +9663,9 @@ export function userTurnInstructions(parts: {
     NOT_CONNECTED_GUIDANCE,
     parts.financeConnectionLine,
     parts.mailSortingLine,
+    parts.mailThreadAgent
+      ? offeredBuiltinClause(parts.disabledBuiltinTools, "scratchpad_add", MAIL_NOTE_GUIDANCE)
+      : undefined,
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "create_space",
