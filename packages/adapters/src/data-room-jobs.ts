@@ -381,6 +381,27 @@ export async function extractItemText(
   return text.slice(0, DATA_ROOM_TEXT_MAX_CHARS);
 }
 
+/**
+ * Text of a mail attachment through the same local readers, with no model call: a scanned PDF or an
+ * image yields little or nothing here, because vision needs the Data room's consent flow.
+ */
+export function extractAttachmentText(
+  bytes: Uint8Array,
+  file: { mimeType: string; name: string },
+  ctx: AdapterContext,
+): Promise<string> {
+  const noAi: DataRoomAi = {
+    model: null,
+    embedder: null,
+    embeddingModel: null,
+    recipients: [],
+    consentKey: "",
+    allowed: false,
+  };
+  // Only the local readers run: no renderer or runtime, so deps are never used.
+  return extractItemText({} as DataRoomJobDeps, noAi, file as DataRoomItemRecord, bytes, ctx);
+}
+
 /** The first `max` bytes of a stored file, read with one ranged request. */
 async function readHead(
   artifacts: ArtifactStore,
