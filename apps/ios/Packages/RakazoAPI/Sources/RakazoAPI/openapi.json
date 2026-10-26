@@ -12778,6 +12778,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -13219,6 +13222,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -13662,6 +13668,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -14092,6 +14101,9 @@
                           },
                           "teamChatRules": {
                             "type": "string"
+                          },
+                          "crossSpaceCommunication": {
+                            "type": "boolean"
                           },
                           "disabledBuiltinTools": {
                             "default": [],
@@ -14524,6 +14536,9 @@
                           },
                           "teamChatRules": {
                             "type": "string"
+                          },
+                          "crossSpaceCommunication": {
+                            "type": "boolean"
                           },
                           "disabledBuiltinTools": {
                             "default": [],
@@ -15629,6 +15644,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -15872,20 +15890,23 @@
                       "teamChatRules": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema16"
                       },
-                      "disabledBuiltinTools": {
+                      "crossSpaceCommunication": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema17"
                       },
-                      "audience": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
+                      "disabledBuiltinTools": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema18"
                       },
-                      "externalMessageTargets": {
+                      "audience": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema20"
                       },
-                      "externalComputerTools": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema21"
                       },
-                      "runsOn": {
+                      "externalComputerTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema22"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
                       }
                     },
                     "required": [
@@ -16134,6 +16155,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -17424,6 +17448,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -18187,6 +18214,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -22794,6 +22824,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -34420,6 +34453,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -41407,6 +41443,9 @@
                                 "teamChatRules": {
                                   "type": "string"
                                 },
+                                "crossSpaceCommunication": {
+                                  "type": "boolean"
+                                },
                                 "disabledBuiltinTools": {
                                   "default": [],
                                   "type": "array",
@@ -45433,6 +45472,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -61803,6 +61845,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -63424,6 +63469,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -64218,6 +64266,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -70477,6 +70528,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -77407,6 +77461,9 @@
                         },
                         "teamChatRules": {
                           "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -105975,6 +106032,9 @@
                                   "teamChatRules": {
                                     "type": "string"
                                   },
+                                  "crossSpaceCommunication": {
+                                    "type": "boolean"
+                                  },
                                   "disabledBuiltinTools": {
                                     "default": [],
                                     "type": "array",
@@ -117273,6 +117333,9 @@
                         "teamChatRules": {
                           "type": "string"
                         },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -119622,6 +119685,9 @@
           "teamChatRules": {
             "type": "string"
           },
+          "crossSpaceCommunication": {
+            "type": "boolean"
+          },
           "disabledBuiltinTools": {
             "default": [],
             "type": "array",
@@ -120259,6 +120325,9 @@
           "id": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
           },
+          "userId": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+          },
           "botId": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
           },
@@ -120706,35 +120775,38 @@
         "maxLength": 4000
       },
       "RpcBotsUpdateInputSchema17": {
+        "type": "boolean"
+      },
+      "RpcBotsUpdateInputSchema18": {
         "maxItems": 127,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema18"
+          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
         }
       },
-      "RpcBotsUpdateInputSchema18": {
+      "RpcBotsUpdateInputSchema19": {
         "type": "string",
         "minLength": 1,
         "maxLength": 64
       },
-      "RpcBotsUpdateInputSchema19": {
+      "RpcBotsUpdateInputSchema20": {
         "type": "string",
         "enum": [
           "internal",
           "external"
         ]
       },
-      "RpcBotsUpdateInputSchema20": {
+      "RpcBotsUpdateInputSchema21": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema21": {
+      "RpcBotsUpdateInputSchema22": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema22": {
+      "RpcBotsUpdateInputSchema23": {
         "anyOf": [
           {
             "type": "string",
@@ -129164,6 +129236,9 @@
         "type": "object",
         "properties": {
           "id": {
+            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
+          },
+          "userId": {
             "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
           },
           "botId": {
