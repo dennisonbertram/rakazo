@@ -5,6 +5,7 @@ import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { act, cloneElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { closeRestored, UNDO_SEND_MS, undoSend } from "../lib/outbox";
 import { MailApprovalCard } from "./MailApprovalCard";
 
 vi.mock("@lingui/core/macro", () => ({
@@ -73,6 +74,7 @@ let root: ReturnType<typeof createRoot>;
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  vi.useFakeTimers();
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -80,8 +82,13 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  closeRestored();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
+
+// A send waits out the outbox's undo window before the server is called.
+const sent = () => act(async () => void (await vi.advanceTimersByTimeAsync(UNDO_SEND_MS)));
 
 type Props = Partial<ComponentProps<typeof MailApprovalCard>>;
 const render = async (props: Props = {}) => {
@@ -160,6 +167,7 @@ it("holds Send until a sender is chosen when no account was named and several ar
   await choose(select()!, "c2");
   expect(button("Send")?.disabled).toBe(false);
   await click(button("Send"));
+  await sent();
   expect(onAnswer).toHaveBeenCalledWith("allow", undefined, { account: "c2" });
 });
 
@@ -178,6 +186,7 @@ it("shows a plain From line with a single account and sends the agent's call unc
   const { onAnswer } = await render({ accounts: accounts.slice(0, 1) });
   expect(select()).toBeNull();
   await click(button("Send"));
+  await sent();
   expect(onAnswer).toHaveBeenCalledWith("allow", undefined, undefined);
 });
 
@@ -242,6 +251,7 @@ it("edits in place with a distinct style and sends only the changed fields", asy
   await type(host.querySelector("input[aria-label=Subject]") as HTMLInputElement, "Monday");
   await type(host.querySelector("textarea") as HTMLTextAreaElement, "New text");
   await click(button("Send"));
+  await sent();
   expect(onAnswer).toHaveBeenCalledWith("allow", undefined, {
     cc: "lee@example.test",
     subject: "Monday",
@@ -252,6 +262,7 @@ it("edits in place with a distinct style and sends only the changed fields", asy
 it("approves unchanged mail without edits and discards with a deny", async () => {
   const first = await render();
   await click(button("Send"));
+  await sent();
   expect(first.onAnswer).toHaveBeenCalledWith("allow", undefined, undefined);
   const second = await render();
   await click(button("Discard"));
@@ -263,9 +274,11 @@ it("blocks an invalid address or a send with no recipient before calling the ser
   await click(button("Edit"));
   await type(host.querySelector("input[aria-label=To]") as HTMLInputElement, "nope");
   await click(button("Send"));
+  await sent();
   expect(host.textContent).toContain("nope isn't a valid email address");
   await type(host.querySelector("input[aria-label=To]") as HTMLInputElement, "");
   await click(button("Send"));
+  await sent();
   expect(host.textContent).toContain("Add a recipient.");
   expect(onAnswer).not.toHaveBeenCalled();
 });
@@ -305,17 +318,81 @@ it("hides the menu when the person cannot change the bot's tools", async () => {
   expect(host.querySelector("[aria-label='menu trigger']")).toBeNull();
 });
 
-it("disables the actions while an answer is in flight", async () => {
+it("holds Send for the undo window, then disables the actions while the answer is in flight", async () => {
   let finish!: () => void;
   const onAnswer = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
   await render({ onAnswer });
   await click(button("Send"));
-  await click(button("Sending…"));
+  // No in-card "Sending…": the bottom toast says it, and nothing reached the server yet.
+  expect(host.textContent).not.toContain("Sending…");
+  expect(onAnswer).not.toHaveBeenCalled();
+  expect(button("Send")?.disabled).toBe(true);
+  await sent();
+  await click(button("Send"));
   expect(onAnswer).toHaveBeenCalledTimes(1);
-  expect(button("Sending…")?.disabled).toBe(true);
   expect(button("Discard")?.disabled).toBe(true);
   expect(button("Edit")?.disabled).toBe(true);
   await act(async () => finish());
+  expect(button("Discard")?.disabled).toBe(false);
+});
+
+it("Undo before the hold ends sends nothing and leaves the card pending", async () => {
+  const { onAnswer } = await render();
+  await click(button("Send now") ?? button("Send"));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1_000);
+    undoSend();
+  });
+  await sent();
+  expect(onAnswer).not.toHaveBeenCalled();
+  expect(button("Send")?.disabled).toBe(false);
+  expect(button("Discard")?.disabled).toBe(false);
+});
+
+it("Send now holds, then answers with send: true; Undo leaves the draft pending", async () => {
+  const { onAnswer } = await render({ mail: draftMail, canSend: true });
+  await click(button("Send now"));
+  await act(async () => undoSend());
+  await sent();
+  expect(onAnswer).not.toHaveBeenCalled();
+  expect(button("Send now")?.disabled).toBe(false);
+  await click(button("Send now"));
+  expect(onAnswer).not.toHaveBeenCalled();
+  await sent();
+  expect(onAnswer).toHaveBeenCalledWith("allow", undefined, { send: true });
+});
+
+it("Send on a saved draft calls the server only after the hold, and Undo keeps Draft saved", async () => {
+  const onSendDraft = vi.fn(async () => undefined);
+  await render({
+    mail: { ...draftMail, outcome: "saved" },
+    status: "answered",
+    answer: "allow",
+    canSend: true,
+    onSendDraft,
+  });
+  await click(button("Send"));
+  expect(onSendDraft).not.toHaveBeenCalled();
+  await act(async () => undoSend());
+  await sent();
+  expect(onSendDraft).not.toHaveBeenCalled();
+  expect(button("Send")?.disabled).toBe(false);
+  expect(header()).toContain("Draft saved");
+});
+
+it("keeps the send after the card leaves the page during the hold", async () => {
+  const { onAnswer } = await render();
+  await click(button("Send"));
+  await act(async () => root.unmount());
+  await sent();
+  expect(onAnswer).toHaveBeenCalledTimes(1);
+  root = createRoot(host);
+});
+
+it("Save draft and Discard stay immediate", async () => {
+  const { onAnswer } = await render({ mail: draftMail, canSend: true });
+  await click(button("Save draft"));
+  expect(onAnswer).toHaveBeenCalledWith("allow", undefined, undefined);
 });
 
 it("folds a finished card to its header and opens it with the chevron", async () => {
@@ -473,6 +550,7 @@ it("shows a locked card for sending a saved draft, with no recipient required", 
   expect(button("Edit")).toBeUndefined();
   expect(host.textContent).not.toContain("To");
   await click(button("Send saved draft"));
+  await sent();
   expect(onAnswer).toHaveBeenCalledWith("allow", undefined, undefined);
 });
 
@@ -538,6 +616,7 @@ it("offers Send now beside Save draft on a pending draft, and sends the edits wi
   await click(button("Edit"));
   await type(host.querySelector('input[aria-label="Subject"]') as HTMLInputElement, "Monday");
   await click(button("Send now"));
+  await sent();
   expect(onAnswer).toHaveBeenCalledTimes(1);
   expect(onAnswer).toHaveBeenCalledWith("allow", undefined, { subject: "Monday", send: true });
 });
@@ -573,6 +652,7 @@ it("offers Send on a saved draft and asks the server to send it", async () => {
     onSendDraft,
   });
   await click(button("Send"));
+  await sent();
   expect(onSendDraft).toHaveBeenCalledTimes(1);
   expect(onAnswer).not.toHaveBeenCalled();
 });
@@ -588,6 +668,7 @@ it("shows an error when sending a saved draft fails", async () => {
     },
   });
   await click(button("Send"));
+  await sent();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("Could not submit");
 });
 
