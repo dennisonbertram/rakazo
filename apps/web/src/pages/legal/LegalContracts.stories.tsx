@@ -177,18 +177,18 @@ const wide = [
 
 /** Twelve warrants and four notes collapse to two rows; click "+N more" to open one. */
 export const Grouped: StoryObj<typeof meta> = {
-  args: { contracts: mixed, grouped: true },
+  args: { contracts: mixed, grouped: true, selfName: "Example Corp" },
   decorators: wide,
 };
 
 /** The same contracts with grouping off: today's flat list. */
 export const Ungrouped: StoryObj<typeof meta> = {
-  args: { contracts: mixed, grouped: false },
+  args: { contracts: mixed, grouped: false, selfName: "Example Corp" },
   decorators: wide,
 };
 
 /** Grouped on a phone: one card per group. */
 export const GroupedNarrow: StoryObj<typeof meta> = {
-  args: { contracts: mixed, grouped: true },
+  args: { contracts: mixed, grouped: true, selfName: "Example Corp" },
   decorators: Narrow.decorators,
 };

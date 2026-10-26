@@ -316,7 +316,7 @@ export function LegalContracts({
                 className="cursor-pointer group-data-[compact]/table:h-10"
               >
                 <TableCell title={row.name}>
-                  <div className="flex max-w-72 items-center gap-2">
+                  <div className="flex max-w-96 items-center gap-2">
                     <span className="min-w-0 truncate font-medium">{row.name}</span>
                     <MoreButton
                       count={row.contracts.length}

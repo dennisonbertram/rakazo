@@ -47,7 +47,7 @@ export function ContactAvatar({
 export function ContactAvatarGroup({
   people,
   max = 3,
-  size = "sm",
+  size = "default",
   className,
 }: {
   people: ContactAvatarPerson[];
@@ -63,7 +63,7 @@ export function ContactAvatarGroup({
     <Tooltip>
       <TooltipTrigger
         render={<span role="img" aria-label={names} className="inline-flex rounded-full" />}
-        className={cn("-space-x-2", className)}
+        className={cn("-space-x-1", className)}
       >
         {shown.map((person) => (
           <ContactAvatar
