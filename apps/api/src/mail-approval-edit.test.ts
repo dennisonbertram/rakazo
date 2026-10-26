@@ -218,6 +218,20 @@ describe("answerEditedMailApproval", () => {
     expect(t.compose.send).toHaveBeenCalledTimes(1);
   });
 
+  it("tells the agent the person sent it, not edited it, when Send now changed nothing", async () => {
+    const plain = setup({ kind: "mail_draft" });
+    await plain.edit({ send: true });
+    expect((plain.effect.result as { note: string }).note).toBe(
+      "The user sent this email themselves from the approval card. Do not send it again.",
+    );
+    expect(plain.answers[0]?.mailDenial).toMatchObject({
+      note: expect.not.stringContaining("edited"),
+    });
+    const changed = setup({ kind: "mail_draft" });
+    await changed.edit({ send: true, subject: "Monday" });
+    expect((changed.effect.result as { note: string }).note).toContain("edited this email");
+  });
+
   it("sends a draft now with the person's edits and records an unclear outcome", async () => {
     const t = setup({ kind: "mail_draft" });
     t.compose.send.mockResolvedValueOnce({ status: "unknown" } as never);

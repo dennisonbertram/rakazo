@@ -56,6 +56,14 @@ export const DraftSavedSend: Story = {
     onSendDraft: async () => undefined,
   },
 };
+/** Send now failed: the card became a send, so it reads Not sent. */
+export const DraftSendNowFailed: Story = {
+  args: {
+    status: "answered",
+    answer: "deny",
+    mail: { ...mail, tool: "mail_send", connectionId: "connection_1", outcome: "failed" },
+  },
+};
 export const ReplacesSavedDraft: Story = {
   args: { mail: { ...mail, tool: "mail_draft", locked: true } },
 };

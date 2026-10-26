@@ -108,6 +108,10 @@ export async function answerEditedMailApproval(
   if (!account) throw new ORPCError("BAD_REQUEST", { message: "No connected mail account" });
 
   const send = pending.kind === "mail_send" || sendNow;
+  // Send now with no field changed is not an edit; the agent is told so.
+  const edited = (["to", "cc", "bcc", "subject", "body"] as const).some(
+    (key) => checked.edits[key] !== undefined,
+  );
   const claimed = await deps.events.answerRunInput({
     spaceId: actor.spaceId,
     threadId: target.threadId,
@@ -116,7 +120,7 @@ export async function answerEditedMailApproval(
     answeredByUserId: actor.userId,
     answer: "deny",
     mailDenial: {
-      note: mailApprovalAgentNote(send),
+      note: mailApprovalAgentNote(send, undefined, edited),
       // Only what the person typed replaces the card's fields. The rest of the card was redacted
       // when it was made, and the stored call is not, so it is never copied onto the card.
       mail: {
@@ -183,7 +187,7 @@ export async function answerEditedMailApproval(
       messageId: input.messageId,
       effectId: pending.effectId,
       outcome,
-      note: mailApprovalAgentNote(send, outcome),
+      note: mailApprovalAgentNote(send, outcome, edited),
     });
   } finally {
     await afterClaim();

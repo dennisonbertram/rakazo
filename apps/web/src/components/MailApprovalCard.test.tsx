@@ -590,3 +590,14 @@ it("shows an error when sending a saved draft fails", async () => {
   await click(button("Send"));
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("Could not submit");
 });
+
+it("reads Not sent, not Draft not saved, when Send now failed", async () => {
+  // The server flips the card to a send when it claims Send now.
+  await render({
+    mail: { ...mail, outcome: "failed", connectionId: "c1" },
+    status: "answered",
+    answer: "deny",
+  });
+  expect(header()).toContain("Not sent");
+  expect(host.textContent).not.toContain("Draft not saved");
+});
