@@ -149,6 +149,21 @@ export async function commitSpaceRename(input: {
  * The space the app is showing comes first, so the chats at the top of the sidebar belong to the
  * company on screen (Finance switches spaces too); the others keep their order below it.
  */
+/**
+ * The rows listed under a fold header, nested one level. A closed fold still shows the open
+ * thread's row (when it belongs to the fold and `showActive` allows it), like the collapsed Pages
+ * group showing the current page.
+ */
+export function foldRows<
+  T extends { depth: number; item: { kind: string; chat?: { id: string } } },
+>(rows: T[], open: boolean, activeId: string | undefined, showActive = true): T[] {
+  return rows
+    .filter(
+      (row) => open || (showActive && row.item.kind === "bot" && row.item.chat?.id === activeId),
+    )
+    .map((row) => ({ ...row, depth: row.depth + 1 }));
+}
+
 export function activeSpaceFirst<T extends { id: string }>(
   spaces: readonly T[],
   activeId: string | null | undefined,
@@ -1160,10 +1175,6 @@ export function SpaceSidebar({
               ).filter((row) => !inActivity(row));
               const pageAgentRows = foldable ? listedRows.filter(isPageAgent) : [];
               const emailChatRows = foldable ? listedRows.filter(isEmailChat) : [];
-              const holdsActive = (rows: typeof nestedRows) =>
-                rows.some((row) => row.item.kind === "bot" && row.item.chat.id === active?.id);
-              const showPageAgents = pageAgentsOpen || (!pageMode && holdsActive(pageAgentRows));
-              const showEmailChats = emailChatsOpen || holdsActive(emailChatRows);
               const displayRows: (
                 | (typeof nestedRows)[number]
                 | { foldHeader: "page" | "email" }
@@ -1172,16 +1183,10 @@ export function SpaceSidebar({
                   ? [
                       // Page agents sit first, right under the folders above, so the folded groups stay together.
                       ...(pageAgentRows.length ? [{ foldHeader: "page" as const }] : []),
-                      ...(showPageAgents
-                        ? pageAgentsOpen
-                          ? pageAgentRows
-                          : pageAgentRows.filter(
-                              (row) => row.item.kind === "bot" && row.item.chat.id === active?.id,
-                            )
-                        : []),
+                      ...foldRows(pageAgentRows, pageAgentsOpen, active?.id, !pageMode),
                       ...listedRows.filter((row) => !isPageAgent(row) && !isEmailChat(row)),
                       ...(emailChatRows.length ? [{ foldHeader: "email" as const }] : []),
-                      ...(showEmailChats ? emailChatRows : []),
+                      ...foldRows(emailChatRows, emailChatsOpen, active?.id),
                     ]
                   : listedRows;
               const treeActive = nestedRows.some((row) => row.depth > 0 || row.hasChildren);
@@ -1350,7 +1355,7 @@ export function SpaceSidebar({
                               key={displayRow.foldHeader}
                               label={email ? t`Email chats` : t`Page agents`}
                               testId={email ? "sidebar-email-chats" : undefined}
-                              open={email ? showEmailChats : showPageAgents}
+                              open={email ? emailChatsOpen : pageAgentsOpen}
                               // The open page’s own agent is listed but not counted.
                               count={rows.filter((row) => !untouchedPageAgent(row)).length}
                               needsYou={
@@ -1582,7 +1587,7 @@ export function SpaceSidebar({
                                         : "group-hover/row:bg-sidebar-accent"
                                     } data-file-drop:ring-2 data-file-drop:ring-inset data-file-drop:ring-ring`}
                                     style={
-                                      treeActive && !rail
+                                      (treeActive || depth > 0) && !rail
                                         ? { paddingInlineStart: `${24 + depth * 14}px` }
                                         : undefined
                                     }
