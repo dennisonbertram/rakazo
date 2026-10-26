@@ -1843,8 +1843,12 @@ export function SpaceSidebar({
           <button
             type="button"
             data-testid="sidebar-more-rows"
-            className="absolute inset-x-0 bottom-0 z-10 flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            style={{ height: Math.max(moreBarHeight(), moreBarFill) }}
+            className="absolute inset-x-0 z-10 flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            style={{
+              height: moreBarHeight(),
+              // Sit directly under the last whole row; any leftover margin stays blank below the bar.
+              bottom: Math.max(0, moreBarFill - moreBarHeight()),
+            }}
             onClick={() => {
               const pane = sidebarPaneRef.current;
               const list = sidebarScrollRef.current;

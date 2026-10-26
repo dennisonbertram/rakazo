@@ -20,8 +20,13 @@ export function endOnWholeRow(
   const rows = [...list.querySelectorAll<HTMLElement>(rowSelector)].map((row) => ({
     // Only an expanded heading is followed by its own first row; a collapsed one is not.
     head: row.hasAttribute("data-roster-head") && row.getAttribute("aria-expanded") === "true",
+    top: row.getBoundingClientRect().top - top,
     bottom: row.getBoundingClientRect().bottom - top,
   }));
+  // The list snaps its first row to the scroll padding, so it rests scrolled by that much.
+  const pad = Number.parseFloat(getComputedStyle(list).scrollPaddingTop) || 0;
+  const rest = pad && rows[0] ? Math.max(0, rows[0].top - pad) : 0;
+  for (const row of rows) row.bottom -= rest;
   const limit = natural - bar + 0.5;
   let fit = 0;
   rows.forEach((row, i) => {
