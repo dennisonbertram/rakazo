@@ -91,13 +91,15 @@ Action types and their mapping live in one table in core (`ACTION_TYPES`, **New*
 |---|---|---|
 | Send email | Ask | Yes |
 | Spend money | Ask | Yes |
-| Connected apps (write) | Ask | Yes |
-| Calendar changes | Ask | Yes |
+| Connected apps (write) | Allow (asks in background runs) | Yes |
+| Calendar changes | Allow (asks in background runs) | Yes |
 | Edit files and run commands | Allow (asks in background runs) | Yes |
 | Use the computer (browser and desktop) | Allow (asks in background runs) | More |
-| Delete data | Ask | More |
-| Message people outside Praci | Ask | More |
-| Use saved credentials | Ask | More |
+| Delete data | Allow (asks in background runs) | More |
+| Message people outside Praci | Allow (asks in background runs) | More |
+| Use saved credentials | Allow (asks in background runs) | More |
+
+Defaults keep today's live-chat behaviour: only email and purchases ask (user decision, 2026-10-25). Background runs ask for every row except reads, whatever the row says.
 
 Rules:
 - `block` is a new rule effect. At equal specificity Block beats Ask beats Allow. A blocked call returns a clear message to the model saying the user's setting blocks this action and not to retry or work around it (new text; `DENIED_ACTION_MESSAGE` in `packages/adapters/src/approval-effect.ts:364` is about a person's decision and stays as is).
