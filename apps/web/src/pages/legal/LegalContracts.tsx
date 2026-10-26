@@ -1,7 +1,9 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { LegalContract, LegalContractStatus } from "@rakazo/contracts";
+import { groupLegalContracts } from "@rakazo/contracts";
 import {
+  ContactAvatarGroup,
   cn,
   Table,
   TableBody,
@@ -11,7 +13,9 @@ import {
   TableHeadRow,
   TableRow,
 } from "@rakazo/ui-web";
+import { ChevronRight } from "lucide-react";
 import type { MouseEvent } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { DATA_ROOM_PATH } from "../../lib/data-room";
 import { fullDay, hiddenOr } from "../../lib/finance-format";
@@ -100,20 +104,75 @@ function Status({ status }: { status: LegalContractStatus }) {
   );
 }
 
+const parties = (names: string[]) => names.map((name) => ({ name }));
+
+/** The "+N more" button of a collapsed or expanded group. */
+function MoreButton({
+  count,
+  open,
+  onClick,
+}: {
+  count: number;
+  open: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onClick}
+      className="rk-tap inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-border px-2 text-xs text-muted-foreground hover:text-foreground"
+    >
+      <Trans>+{count} more</Trans>
+      <ChevronRight size={12} className={cn("transition-transform", open && "rotate-90")} />
+    </button>
+  );
+}
+
+/** What a group row shows in place of one contract's cells: the shared parts, else a dash. */
+function groupSummary(members: LegalContract[]) {
+  const first = members[0] as LegalContract;
+  const same = <T,>(pick: (c: LegalContract) => T) => members.every((c) => pick(c) === pick(first));
+  const deadlines = members.flatMap((c) => (c.nextDeadline ? [c.nextDeadline] : [])).sort();
+  return {
+    parties: [...new Set(members.flatMap((c) => c.counterparties))],
+    // The group key makes the term dates equal; renewal may still differ.
+    renewal: same(renewal) ? renewal(first) : dash,
+    term: term(first),
+    nextDeadline: deadlines[0] ?? null,
+    first,
+  };
+}
+
 /**
  * Every contract the Legal agent found, with a link to its document in the Data room. Wide, a
  * table with fixed column widths (so hiding amounts does not move the columns); narrow, one card
- * per contract, so nothing is cut off at the side.
+ * per contract, so nothing is cut off at the side. With `grouped`, three or more near-identical
+ * contracts (see groupLegalContracts) share one row that opens to its members.
  */
 export function LegalContracts({
   contracts: all,
   selfName,
+  grouped = false,
 }: {
   contracts: LegalContract[];
   /** The company itself: every contract is with it, so it is left out of Parties. */
   selfName?: string;
+  grouped?: boolean;
 }) {
   const contracts = all.map((contract) => withoutSelf(contract, selfName));
+  const rows = groupLegalContracts(contracts).flatMap((row) =>
+    grouped || row.kind === "single"
+      ? [row]
+      : row.contracts.map((contract) => ({ kind: "single" as const, contract })),
+  );
+  const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (key: string) =>
+    setOpenKeys((keys) => {
+      const next = new Set(keys);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
   const hidden = useHideAmounts();
   const navigate = useNavigate();
   // Any click on a row opens the contract; the title link stays the keyboard and screen-reader target.
@@ -121,46 +180,99 @@ export function LegalContracts({
     if ((event.target as HTMLElement).closest("a, button")) return;
     navigate(`${DATA_ROOM_PATH}?item=${contract.dataRoomItemId}`, { state: { from: "legal" } });
   };
+  const card = (contract: LegalContract, nested = false) => {
+    const names = contract.counterparties.join(", ");
+    const showValue = !hidden && contract.valueCents !== null;
+    return (
+      // biome-ignore lint/a11y/useKeyWithClickEvents: a mouse shortcut; the title link is the keyboard way in.
+      <li
+        key={contract.id}
+        onClick={open(contract)}
+        className={cn("cursor-pointer border-t border-border py-2 text-sm", nested && "ps-4")}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <Title contract={contract} />
+          <span className="flex shrink-0 items-center gap-2">
+            {showValue ? (
+              <span className="tabular-nums">
+                <span className="me-1 text-xs text-muted-foreground">
+                  <Trans>Value</Trans>
+                </span>
+                {value(contract)}
+              </span>
+            ) : null}
+            <Status status={contract.status} />
+          </span>
+        </div>
+        {/* Only what the agent found: no labels, since the values say what they are. */}
+        {names ? <p className="truncate text-xs text-muted-foreground">{names}</p> : null}
+        <p className="text-xs text-muted-foreground">
+          {[term(contract), renewal(contract)].filter((text) => text !== dash).join(" · ")}
+          {contract.nextDeadline ? (
+            <>
+              {" · "}
+              <Trans>Due</Trans> <NextDeadline contract={contract} />
+            </>
+          ) : null}
+        </p>
+      </li>
+    );
+  };
+  const tableRow = (contract: LegalContract, nested = false) => (
+    <TableRow
+      key={contract.id}
+      onClick={open(contract)}
+      className="cursor-pointer group-data-[compact]/table:h-10"
+    >
+      <TableCell title={`${contract.title} (${contract.contractType})`}>
+        <div className={cn("flex max-w-72 items-center gap-2", nested && "ps-4")}>
+          <Title contract={contract} />
+          <Status status={contract.status} />
+        </div>
+      </TableCell>
+      <TableCell>
+        {contract.counterparties.length > 0 ? (
+          <ContactAvatarGroup people={parties(contract.counterparties)} />
+        ) : (
+          dash
+        )}
+      </TableCell>
+      <TableCell className="whitespace-nowrap tabular-nums" title={term(contract)}>
+        {term(contract)}
+      </TableCell>
+      <TableCell className="whitespace-nowrap" title={renewal(contract)}>
+        {renewal(contract)}
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-end tabular-nums">{value(contract)}</TableCell>
+      <TableCell className="whitespace-nowrap ps-4 tabular-nums">
+        <NextDeadline contract={contract} />
+      </TableCell>
+    </TableRow>
+  );
   return (
     <>
       <ul aria-label={t`Contracts`} className="flex flex-col @6xl:hidden">
-        {contracts.map((contract) => {
-          const parties = contract.counterparties.join(", ");
-          const showValue = !hidden && contract.valueCents !== null;
-          return (
-            // biome-ignore lint/a11y/useKeyWithClickEvents: a mouse shortcut; the title link is the keyboard way in.
-            <li
-              key={contract.id}
-              onClick={open(contract)}
-              className="cursor-pointer border-t border-border py-2 text-sm"
-            >
+        {rows.flatMap((row) => {
+          if (row.kind === "single") return [card(row.contract)];
+          const isOpen = openKeys.has(row.key);
+          const sum = groupSummary(row.contracts);
+          return [
+            <li key={row.key} className="border-t border-border py-2 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <Title contract={contract} />
-                <span className="flex shrink-0 items-center gap-2">
-                  {showValue ? (
-                    <span className="tabular-nums">
-                      <span className="me-1 text-xs text-muted-foreground">
-                        <Trans>Value</Trans>
-                      </span>
-                      {value(contract)}
-                    </span>
-                  ) : null}
-                  <Status status={contract.status} />
-                </span>
+                <span className="min-w-0 truncate font-medium">{row.name}</span>
+                <MoreButton
+                  count={row.contracts.length}
+                  open={isOpen}
+                  onClick={() => toggle(row.key)}
+                />
               </div>
-              {/* Only what the agent found: no labels, since the values say what they are. */}
-              {parties ? <p className="truncate text-xs text-muted-foreground">{parties}</p> : null}
+              <p className="truncate text-xs text-muted-foreground">{sum.parties.join(", ")}</p>
               <p className="text-xs text-muted-foreground">
-                {[term(contract), renewal(contract)].filter((text) => text !== dash).join(" · ")}
-                {contract.nextDeadline ? (
-                  <>
-                    {" · "}
-                    <Trans>Due</Trans> <NextDeadline contract={contract} />
-                  </>
-                ) : null}
+                {[sum.term, sum.renewal].filter((text) => text !== dash).join(" · ")}
               </p>
-            </li>
-          );
+            </li>,
+            ...(isOpen ? row.contracts.map((contract) => card(contract, true)) : []),
+          ];
         })}
       </ul>
       <Table compact className="hidden @6xl:table">
@@ -191,37 +303,45 @@ export function LegalContracts({
           </TableHeadRow>
         </TableHeader>
         <TableBody>
-          {contracts.map((contract) => (
-            <TableRow
-              key={contract.id}
-              onClick={open(contract)}
-              className="cursor-pointer group-data-[compact]/table:h-10"
-            >
-              <TableCell title={`${contract.title} (${contract.contractType})`}>
-                <div className="flex max-w-72 items-center gap-2">
-                  <Title contract={contract} />
-                  <Status status={contract.status} />
-                </div>
-              </TableCell>
-              <TableCell title={contract.counterparties.join(", ")}>
-                <span className="block max-w-56 truncate">
-                  {contract.counterparties.join(", ") || dash}
-                </span>
-              </TableCell>
-              <TableCell className="whitespace-nowrap tabular-nums" title={term(contract)}>
-                {term(contract)}
-              </TableCell>
-              <TableCell className="whitespace-nowrap" title={renewal(contract)}>
-                {renewal(contract)}
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-end tabular-nums">
-                {value(contract)}
-              </TableCell>
-              <TableCell className="whitespace-nowrap ps-4 tabular-nums">
-                <NextDeadline contract={contract} />
-              </TableCell>
-            </TableRow>
-          ))}
+          {rows.flatMap((row) => {
+            if (row.kind === "single") return [tableRow(row.contract)];
+            const isOpen = openKeys.has(row.key);
+            const sum = groupSummary(row.contracts);
+            return [
+              <TableRow
+                key={row.key}
+                onClick={(event) => {
+                  if (!(event.target as HTMLElement).closest("button")) toggle(row.key);
+                }}
+                className="cursor-pointer group-data-[compact]/table:h-10"
+              >
+                <TableCell title={row.name}>
+                  <div className="flex max-w-72 items-center gap-2">
+                    <span className="min-w-0 truncate font-medium">{row.name}</span>
+                    <MoreButton
+                      count={row.contracts.length}
+                      open={isOpen}
+                      onClick={() => toggle(row.key)}
+                    />
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {sum.parties.length > 0 ? (
+                    <ContactAvatarGroup people={parties(sum.parties)} />
+                  ) : (
+                    dash
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-nowrap tabular-nums">{sum.term}</TableCell>
+                <TableCell className="whitespace-nowrap">{sum.renewal}</TableCell>
+                <TableCell className="whitespace-nowrap text-end tabular-nums">{dash}</TableCell>
+                <TableCell className="whitespace-nowrap ps-4 tabular-nums">
+                  {sum.nextDeadline ? fullDay(sum.nextDeadline) : dash}
+                </TableCell>
+              </TableRow>,
+              ...(isOpen ? row.contracts.map((contract) => tableRow(contract, true)) : []),
+            ];
+          })}
         </TableBody>
       </Table>
     </>

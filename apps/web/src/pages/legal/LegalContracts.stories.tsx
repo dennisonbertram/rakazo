@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ReactElement } from "react";
 import { contracts } from "./fixtures";
 import { LegalContracts } from "./LegalContracts";
 
@@ -144,4 +145,50 @@ export const TenNarrow: StoryObj<typeof meta> = {
       </div>
     ),
   ],
+};
+
+const holders = ["Ada Example", "Ben Sample", "Cy Fixture", "Dee Mock", "Eli Invented"];
+const warrants = Array.from({ length: 12 }, (_, n) => ({
+  ...contracts[0]!,
+  id: `warrant-${n}`,
+  title: `Series Seed - Warrant to Purchase Tokens (${holders[n % 5]} ${n}) (warrant)`,
+  contractType: "Warrant",
+  counterparties: ["Example Corp", `${holders[n % 5]} ${n}`],
+  effectiveDate: "2021-07-09",
+  expirationDate: "2031-07-09",
+  nextDeadline: "2031-07-09",
+  status: "active" as const,
+}));
+const notes = Array.from({ length: 4 }, (_, n) => ({
+  ...warrants[0]!,
+  id: `note-${n}`,
+  title: `Convertible Note - ${holders[n]}`,
+  contractType: "Note",
+  counterparties: ["Example Corp", holders[n]!],
+}));
+const mixed = [contracts[0]!, ...warrants, contracts[1]!, ...notes];
+const wide = [
+  (Story: () => ReactElement) => (
+    <div className="@container w-[1280px]">
+      <Story />
+    </div>
+  ),
+];
+
+/** Twelve warrants and four notes collapse to two rows; click "+N more" to open one. */
+export const Grouped: StoryObj<typeof meta> = {
+  args: { contracts: mixed, grouped: true },
+  decorators: wide,
+};
+
+/** The same contracts with grouping off: today's flat list. */
+export const Ungrouped: StoryObj<typeof meta> = {
+  args: { contracts: mixed, grouped: false },
+  decorators: wide,
+};
+
+/** Grouped on a phone: one card per group. */
+export const GroupedNarrow: StoryObj<typeof meta> = {
+  args: { contracts: mixed, grouped: true },
+  decorators: Narrow.decorators,
 };
