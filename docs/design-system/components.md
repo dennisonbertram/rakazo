@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 291 of 291
-- Web and shared components: 751
+- Web and shared component files with stories: 293 of 293
+- Web and shared components: 753
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -73,6 +73,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | AppToaster | [apps/web/src/components/AppToaster.tsx](../../apps/web/src/components/AppToaster.tsx) | [AppToaster.stories.tsx](../../apps/web/src/components/AppToaster.stories.tsx) | web |
 | ArtifactFileCard, FilePreview, DownloadError | [apps/web/src/components/ArtifactFileCard.tsx](../../apps/web/src/components/ArtifactFileCard.tsx) | [ArtifactFileCard.stories.tsx](../../apps/web/src/components/ArtifactFileCard.stories.tsx) | web |
 | ArtifactPreview, ImagePreview | [apps/web/src/components/ArtifactPreview.tsx](../../apps/web/src/components/ArtifactPreview.tsx) | [ArtifactPreview.stories.tsx](../../apps/web/src/components/ArtifactPreview.stories.tsx) | web |
+| ArtifactShareDialog | [apps/web/src/components/ArtifactShareDialog.tsx](../../apps/web/src/components/ArtifactShareDialog.tsx) | [ArtifactShareDialog.stories.tsx](../../apps/web/src/components/ArtifactShareDialog.stories.tsx) | web |
 | AskBotButton | [apps/web/src/components/AskBotButton.tsx](../../apps/web/src/components/AskBotButton.tsx) | [AskBotButton.stories.tsx](../../apps/web/src/components/AskBotButton.stories.tsx) | web |
 | AskCard | [apps/web/src/components/AskCard.tsx](../../apps/web/src/components/AskCard.tsx) | [AskCard.stories.tsx](../../apps/web/src/components/AskCard.stories.tsx) | web |
 | AutoFileEmailSetting | [apps/web/src/components/AutoFileEmailSetting.tsx](../../apps/web/src/components/AutoFileEmailSetting.tsx) | [AutoFileEmailSetting.stories.tsx](../../apps/web/src/components/AutoFileEmailSetting.stories.tsx) | web |
@@ -379,6 +380,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | RoutineSchedule | [apps/web/src/pages/RoutineSchedule.tsx](../../apps/web/src/pages/RoutineSchedule.tsx) | [RoutineSchedule.stories.tsx](../../apps/web/src/pages/RoutineSchedule.stories.tsx) | web |
 | ScratchpadSection | [apps/web/src/pages/ScratchpadSection.tsx](../../apps/web/src/pages/ScratchpadSection.tsx) | [ScratchpadSection.stories.tsx](../../apps/web/src/pages/ScratchpadSection.stories.tsx) | web |
 | SettingsOverlay | [apps/web/src/pages/SettingsOverlay.tsx](../../apps/web/src/pages/SettingsOverlay.tsx) | [SettingsOverlay.stories.tsx](../../apps/web/src/pages/SettingsOverlay.stories.tsx) | web |
+| SharedArtifactPage | [apps/web/src/pages/SharedArtifact.tsx](../../apps/web/src/pages/SharedArtifact.tsx) | [SharedArtifact.stories.tsx](../../apps/web/src/pages/SharedArtifact.stories.tsx) | web |
 | ShellPage, ComputerReleaseActions, DesktopKindEmptyState | [apps/web/src/pages/Shell.tsx](../../apps/web/src/pages/Shell.tsx) | [Shell.stories.tsx](../../apps/web/src/pages/Shell.stories.tsx) | web |
 | AvatarStudioPopover | [apps/web/src/pages/shell/avatar-studio-popover.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.tsx) | [avatar-studio-popover.stories.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.stories.tsx) | web |
 | BotCredentialsSection | [apps/web/src/pages/shell/bot-credentials.tsx](../../apps/web/src/pages/shell/bot-credentials.tsx) | [bot-credentials.stories.tsx](../../apps/web/src/pages/shell/bot-credentials.stories.tsx) | web |

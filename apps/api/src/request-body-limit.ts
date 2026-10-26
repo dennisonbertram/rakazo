@@ -63,4 +63,5 @@ export function mountApiRequestBodyLimits(app: Hono): void {
   app.use(`${LOCAL_SETTINGS_RPC}/*`, requestBodyLimit(MAX_RPC_REQUEST_BYTES));
   app.use("/rpc/*", requestBodyLimit(MAX_RPC_REQUEST_BYTES));
   app.use("/api/portal/*", requestBodyLimit(MAX_PORTAL_REQUEST_BYTES));
+  app.use("/api/share/*", requestBodyLimit(MAX_PORTAL_REQUEST_BYTES));
 }

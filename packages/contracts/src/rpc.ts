@@ -115,6 +115,7 @@ import {
   ApprovalChoiceSchema,
   ApprovalTableRowSchema,
   ArtifactSchema,
+  ArtifactShareSchema,
   ArtifactVersionSchema,
   ArtifactWithContentSchema,
   AvatarStyleSchema,
@@ -1311,6 +1312,14 @@ export const appContract = {
     get: oc.input(threadTarget.and(z.object({ artifactId: Id }))).output(ArtifactWithContentSchema),
     getById: oc.input(z.object({ artifactId: Id })).output(ArtifactWithContentSchema),
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  artifactShares: {
+    get: oc.input(z.object({ artifactId: Id })).output(ArtifactShareSchema.nullable()),
+    /** The link is in the answer once; only its hash is stored. A live link of the same artifact ends. */
+    create: oc
+      .input(z.object({ artifactId: Id }))
+      .output(z.object({ url: z.string(), share: ArtifactShareSchema })),
+    revoke: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   files: {
     /** One page of a spreadsheet (.xlsx, .xlsm, .csv, .tsv) from an artifact or a Data room item. */

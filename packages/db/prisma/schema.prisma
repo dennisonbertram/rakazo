@@ -234,6 +234,7 @@ model Member {
 }
 
 model Space {
+  artifactShares              ArtifactShare[]
   scratchpadApprovals         ScratchpadApproval[]
   notifications               Notification[]
   notificationEndpoints       NotificationEndpoint[]
@@ -1401,6 +1402,7 @@ model Artifact {
   rootArtifactId String?
   rootArtifact   Artifact?  @relation("ArtifactVersions", fields: [rootArtifactId], references: [id], onDelete: Cascade)
   versions       Artifact[] @relation("ArtifactVersions")
+  shares         ArtifactShare[]
   version        Int        @default(1)
   // Client-chosen per upload so a retried upload that already landed returns this row.
   clientNonce    String?
@@ -1411,6 +1413,24 @@ model Artifact {
   @@index([rootArtifactId])
   // artifacts_family_version_key is raw SQL: Prisma cannot express COALESCE indexes.
   @@map("artifacts")
+}
+
+/// A view-only public link to one exact artifact version. Only the sha256 of the token is stored.
+model ArtifactShare {
+  id              String    @id @default(cuid())
+  spaceId         String
+  space           Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  artifactId      String
+  artifact        Artifact  @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  tokenHash       String    @unique
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  lastOpenedAt    DateTime?
+
+  @@index([spaceId, artifactId])
+  @@map("artifact_shares")
 }
 
 model UsageRecord {
