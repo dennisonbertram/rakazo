@@ -55,6 +55,7 @@ import {
   formatSkillRunPrompt,
   newRunUnattended,
   PROTECTED_STEP,
+  parseSkillResult,
   sanitizeTeachRecordingEvent,
   teachRecordingTtlMs,
 } from "@rakazo/core";
@@ -330,8 +331,18 @@ async function settleTestOutcome(
   if (!run) return row;
   let outcome: TeachTestOutcome;
   let note: string | null = null;
-  if (run.status === "completed") outcome = "worked";
-  else if (run.status === "failed" || run.status === "cancelled") {
+  if (run.status === "completed") {
+    const reply = await deps.prisma.message.findFirst({
+      where: { runId: row.lastTestRunId, role: "bot" },
+      orderBy: { seq: "desc" },
+      select: { blocks: true },
+    });
+    const text = ((reply?.blocks ?? []) as { kind?: string; text?: string }[])
+      .filter((block) => block.kind === "text")
+      .map((block) => block.text ?? "")
+      .join("\n");
+    ({ outcome, note } = parseSkillResult(text));
+  } else if (run.status === "failed" || run.status === "cancelled") {
     outcome = "stopped";
     note =
       testNote(run.error) ?? (run.status === "cancelled" ? "Stopped before it finished" : null);

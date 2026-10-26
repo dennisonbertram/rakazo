@@ -385,9 +385,34 @@ export function formatSkillRunPrompt(name: string, playbook: SkillPlaybook, test
     `Return: ${playbook.whatToReturn}`,
     `Approval boundaries: ${playbook.approvalBoundaries}`,
     `Failure handling: ${playbook.failureHandling}`,
+    RESULT_LINE_GUIDANCE,
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+const RESULT_LINE_GUIDANCE =
+  'End your final reply with one last line, exactly "Result: worked" if every step was done and the check passed, or "Result: stopped at step N: <reason>" if you stopped or a step could not be done.';
+const RESULT_LINE = /^\s*Result:\s*(worked|stopped(?:\s+at\s+step\s+\d+)?\s*:?\s*(.*))\s*$/im;
+
+/**
+ * How a taught skill run ended, from the "Result:" line the run prompt asks for. Anything but an
+ * explicit "Result: worked" counts as stopped, so a bot that gave up cannot show as Worked.
+ */
+export function parseSkillResult(text: string | null | undefined): {
+  outcome: "worked" | "stopped";
+  note: string | null;
+} {
+  const lines = (text ?? "").split("\n").filter((line) => RESULT_LINE.test(line));
+  const match = RESULT_LINE.exec(lines.at(-1) ?? "");
+  if (!match) return { outcome: "stopped", note: "The bot did not report a result" };
+  if (/^worked$/i.test(match[1]!)) return { outcome: "worked", note: null };
+  const step = /step\s+(\d+)/i.exec(match[1]!)?.[1];
+  const reason = match[2]?.trim().slice(0, 200);
+  return {
+    outcome: "stopped",
+    note: [step ? `Stopped at step ${step}` : "Stopped", reason].filter(Boolean).join(": "),
+  };
 }
 
 /**

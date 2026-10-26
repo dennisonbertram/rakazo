@@ -66,6 +66,10 @@ const STATE = path.join(DIR, "state.json");
 const WEB_ORIGIN = `http://127.0.0.1:${WEB_PORT}`;
 const API_URL = `http://127.0.0.1:${API_PORT}`;
 const DATABASE_URL = `postgres://rakazo_demo:rakazo_demo@127.0.0.1:${PG_PORT}/rakazo_demo`;
+/** DEMO_SANDBOX_PROVIDER=docker also starts the sandbox supervisor, on its own port per slot. */
+const USE_DOCKER_SANDBOX = process.env.DEMO_SANDBOX_PROVIDER === "docker";
+const SUPERVISOR_PORT = 7100 + SLOT;
+const SUPERVISOR_URL = `http://127.0.0.1:${SUPERVISOR_PORT}`;
 const MODEL_KEYS = ["OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"];
 
 interface State {
@@ -139,6 +143,7 @@ function stackEnv(): NodeJS.ProcessEnv {
     BETTER_AUTH_SECRET: "demo-secret-demo-secret-32chars!!",
     ENCRYPTION_KEY: "demo-encryption-key-demo-encryption-key",
     SANDBOX_SUPERVISOR_TOKEN: "demo-supervisor-token-demo-32chars",
+    SANDBOX_SUPERVISOR_URL: SUPERVISOR_URL,
     SCREEN_PROXY_SECRET: "demo-screen-proxy-secret-demo-32chars",
     BETTER_AUTH_URL: WEB_ORIGIN,
     WEB_ORIGIN,
@@ -152,6 +157,21 @@ function stackEnv(): NodeJS.ProcessEnv {
     VITE_DEFAULT_UI_LOCALE: "en",
     ...modelEnv(),
   });
+}
+
+/** The Docker endpoint of the active docker context (OrbStack, Docker Desktop, Colima). */
+function dockerHost(): string {
+  return docker("context", "inspect", "--format", "{{.Endpoints.docker.Host}}").trim();
+}
+
+/** The supervisor runs on the host, so a computer's control port is published on loopback. */
+function supervisorEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    SUPERVISOR_PORT: String(SUPERVISOR_PORT),
+    DOCKER_HOST: dockerHost(),
+    SANDBOX_CONTROL_VIA_LOOPBACK: "true",
+  };
 }
 
 function start(name: string, script: string, args: string[], cwd: string, env: NodeJS.ProcessEnv) {
@@ -224,7 +244,7 @@ Mock demo stack is running (slot ${SLOT}). Every record in it is invented and la
   Postgres:     127.0.0.1:${PG_PORT} (${CONTAINER})
   Sign in as:   ${email}
   Login file:   ${CREDENTIALS}
-  Logs:         ${DIR}/api.log, ${DIR}/web.log
+  Logs:         ${DIR}/api.log, ${DIR}/web.log${USE_DOCKER_SANDBOX ? `, ${DIR}/supervisor.log` : ""}
   Mail outbox:  ${OUTBOX}
 Mail states to try:
   New mail:     one email from Priya arrives ${DEMO_NEW_MAIL_DELAY_MS / 60_000} minutes after start
@@ -234,6 +254,7 @@ Mail states to try:
   Between accounts: mail from Sales mail to Founder mail arrives in Founder mail
 Granola:
   API key:      ${DEMO_GRANOLA_KEY} (fake demo key; paste it on the Granola page)
+${USE_DOCKER_SANDBOX ? `Computers:     real Docker computers via the sandbox supervisor on ${SUPERVISOR_URL}` : "Computers:     fake (DEMO_SANDBOX_PROVIDER=docker gives bots a real Docker computer; build the image first with pnpm sandbox:build)"}
 Stop and delete it with: ${SLOT ? `DEMO_SLOT=${SLOT} ` : ""}pnpm demo:down`);
 }
 
@@ -300,6 +321,21 @@ async function up() {
     run("pnpm", ["--filter", "@rakazo/db", "exec", "prisma", "migrate", "deploy"]);
 
     const require = createRequire(import.meta.url);
+    if (USE_DOCKER_SANDBOX) {
+      // The computer image comes from `pnpm sandbox:build`; the supervisor reports it if missing.
+      const supervisorDir = path.join(ROOT, "infra/sandboxes/supervisor");
+      pids.push(
+        start(
+          "supervisor",
+          require.resolve("tsx/cli"),
+          [path.join(supervisorDir, "src/index.ts")],
+          supervisorDir,
+          supervisorEnv(env),
+        ),
+      );
+      writeFileSync(STATE, JSON.stringify({ slot: SLOT, pids, containerId } satisfies State));
+      await waitFor("the sandbox supervisor", () => healthy(`${SUPERVISOR_URL}/health`));
+    }
     pids.push(
       start(
         "api",
@@ -399,5 +435,8 @@ async function serve() {
 
 const command = process.argv[2];
 const main = { up, down, serve }[command as "up" | "down" | "serve"];
-if (!main) throw new Error("Usage: demo.ts up | down");
+if (!main)
+  throw new Error(
+    "Usage: demo.ts up | down (DEMO_SLOT=0-9; DEMO_SANDBOX_PROVIDER=docker starts the sandbox supervisor and gives bots a real computer, after pnpm sandbox:build)",
+  );
 await main();

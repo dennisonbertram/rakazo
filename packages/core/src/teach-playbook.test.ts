@@ -7,6 +7,7 @@ import {
   fillLoginStep,
   formatSkillRunPrompt,
   PROTECTED_STEP,
+  parseSkillResult,
   promptInvokesSkill,
   redactSecretText,
   sanitizeTeachRecordingEvent,
@@ -347,5 +348,38 @@ describe("splitWindowTitle", () => {
       title: "Pipeline.xlsx - LibreOffice Calc",
     });
     expect(splitWindowTitle("Terminal")).toEqual({ title: "Terminal" });
+  });
+});
+
+describe("parseSkillResult", () => {
+  it("is worked only on an explicit Result: worked line", () => {
+    expect(parseSkillResult("Done.\nResult: worked")).toEqual({ outcome: "worked", note: null });
+    expect(parseSkillResult("Done.").outcome).toBe("stopped");
+    expect(parseSkillResult(null).outcome).toBe("stopped");
+  });
+
+  it("names the step and reason when the bot stopped", () => {
+    expect(
+      parseSkillResult("Could not log in.\nResult: stopped at step 4: no Login button"),
+    ).toEqual({ outcome: "stopped", note: "Stopped at step 4: no Login button" });
+    expect(parseSkillResult("Result: stopped: blocked").note).toBe("Stopped: blocked");
+  });
+
+  it("asks for the result line in every run prompt", () => {
+    expect(
+      formatSkillRunPrompt(
+        "X",
+        {
+          whenToUse: "x",
+          inputs: [],
+          steps: ["Click Export."],
+          howToCheck: "x",
+          whatToReturn: "x",
+          approvalBoundaries: "x",
+          failureHandling: "x",
+        },
+        true,
+      ),
+    ).toContain("Result: worked");
   });
 });

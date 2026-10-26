@@ -41,6 +41,11 @@ const INSTRUCTIONS = [
   "Reply with only a JSON array of strings.",
 ].join(" ");
 
+function skip(reason: string, detail: Record<string, unknown> = {}): null {
+  getLogger().debug("teach steps: keeping coordinate steps", { reason, ...detail });
+  return null;
+}
+
 /**
  * One model call that rewrites the sanitized coordinate steps as plain steps. Returns null
  * (callers keep the coordinate steps) when no usable model is set up, consent is missing, or the
@@ -57,14 +62,15 @@ export async function describeTeachSteps(
   const { scope } = input;
   try {
     const model = await deps.resolveModel?.(scope);
-    if (!model || model.provider === "scripted") return null;
+    if (!model || model.provider === "scripted")
+      return skip("no usable model", { model: model?.provider });
     const recipient = aiRecipient({
       provider: model.provider,
       modelId: model.id,
       baseUrl: model.baseUrl,
       use: "model",
     });
-    if (!recipient) return null;
+    if (!recipient) return skip("no consent recipient", { provider: model.provider });
     const consent = await deps.prisma.aiDataConsent.findUnique({
       where: {
         userId_spaceId_recipientKey: {
@@ -75,7 +81,9 @@ export async function describeTeachSteps(
       },
       select: { version: true },
     });
-    if (consent?.version !== AI_DISCLOSURE_VERSION) return null;
+    if (consent?.version !== AI_DISCLOSURE_VERSION) {
+      return skip("no AI data consent for the model", { recipient: recipient.key });
+    }
 
     const runId = `teach-steps:${scope.botId}:${Date.now()}`;
     const attribution = {
@@ -124,7 +132,9 @@ export async function describeTeachSteps(
       }
       if (event.type === "done" && event.text) text = event.text;
     }
-    return parseSteps(text, input.steps);
+    const steps = parseSteps(text, input.steps);
+    if (!steps) skip("model answer rejected", { sources: input.steps.length, answer: text.length });
+    return steps;
   } catch (error) {
     getLogger().warn("teach steps model call failed; keeping coordinate steps", {
       error: error instanceof Error ? error.message : "unknown",

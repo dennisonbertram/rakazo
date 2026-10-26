@@ -45,6 +45,8 @@ export function loginNameFromSite(site: string): string {
   return /^[a-z]/.test(name) ? name : name ? `login_${name}`.slice(0, 64) : "";
 }
 
+const LOGIN_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+
 function LoginPromptRow({
   skillId,
   stepIndex,
@@ -69,6 +71,7 @@ function LoginPromptRow({
   const [username, setUsername] = useState(suggestedUsername ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nameInvalid = name !== "" && !LOGIN_NAME_PATTERN.test(name);
 
   async function run(action: () => Promise<TaughtSkill>) {
     setBusy(true);
@@ -108,8 +111,14 @@ function LoginPromptRow({
             );
           }}
         >
+          <Label
+            htmlFor={`login-site-${stepIndex}`}
+            className="text-[13px] font-normal text-muted-foreground"
+          >
+            <Trans>Site</Trans>
+          </Label>
           <Input
-            aria-label={t`Site`}
+            id={`login-site-${stepIndex}`}
             placeholder="https://"
             value={site}
             onChange={(event) => {
@@ -117,16 +126,34 @@ function LoginPromptRow({
               if (!nameEdited) setName(loginNameFromSite(event.target.value));
             }}
           />
+          <Label
+            htmlFor={`login-name-${stepIndex}`}
+            className="text-[13px] font-normal text-muted-foreground"
+          >
+            <Trans>Name</Trans>
+          </Label>
           <Input
-            aria-label={t`Name`}
+            id={`login-name-${stepIndex}`}
             value={name}
+            aria-invalid={nameInvalid || undefined}
             onChange={(event) => {
               setName(event.target.value);
               setNameEdited(true);
             }}
           />
+          {nameInvalid ? (
+            <div role="alert" className="text-[13px] text-destructive">
+              <Trans>Lowercase letters, numbers, - and _.</Trans>
+            </div>
+          ) : null}
+          <Label
+            htmlFor={`login-username-${stepIndex}`}
+            className="text-[13px] font-normal text-muted-foreground"
+          >
+            <Trans>Username</Trans>
+          </Label>
           <Input
-            aria-label={t`Username`}
+            id={`login-username-${stepIndex}`}
             autoComplete="off"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
@@ -140,7 +167,7 @@ function LoginPromptRow({
             <Button
               type="submit"
               size="sm"
-              disabled={busy || !name || !site.trim() || !username.trim()}
+              disabled={busy || !name || nameInvalid || !site.trim() || !username.trim()}
             >
               <Trans>Save login</Trans>
             </Button>
@@ -197,6 +224,7 @@ export function SkillDraftCard({
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<TaughtSkill | null>(null);
   const [testing, setTesting] = useState(false);
+  const [discarded, setDiscarded] = useState(false);
 
   useEffect(() => {
     setName(block.name);
@@ -210,7 +238,12 @@ export function SkillDraftCard({
       .then((skill: TaughtSkill | null) => {
         if (!cancelled) setLive(skill);
       })
-      .catch(() => undefined);
+      .catch((err: unknown) => {
+        // A draft discarded by the user or by the 24-hour clean-up no longer exists.
+        if (!cancelled && block.status === "draft" && /not found/i.test(String(err))) {
+          setDiscarded(true);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -280,6 +313,25 @@ export function SkillDraftCard({
   function applyLogin(skill: TaughtSkill) {
     setLive(skill);
     setPlaybook(skill.playbook);
+  }
+
+  async function discardDraft() {
+    await run(async () => {
+      await rpc.taughtSkills.cancel({ skillId: block.skillId });
+      setDiscarded(true);
+      await onRefresh();
+    });
+  }
+
+  if (discarded) {
+    return (
+      <div
+        data-testid="skill-draft-card"
+        className="w-160 max-w-full rounded-2xl border border-border bg-card px-5 py-4 text-[13.5px] text-muted-foreground"
+      >
+        <Trans>Discarded</Trans>
+      </div>
+    );
   }
 
   const skillName = name || block.name || block.goal.slice(0, 80);
@@ -391,6 +443,11 @@ export function SkillDraftCard({
             <Trans>Add to routine</Trans>
           </Button>
         ) : null}
+        {saved ? null : (
+          <Button variant="ghost" disabled={busy || testing} onClick={() => void discardDraft()}>
+            <Trans>Discard</Trans>
+          </Button>
+        )}
         {testing ? (
           <span role="status" className="text-[13px] text-muted-foreground">
             <Trans>Testing…</Trans>

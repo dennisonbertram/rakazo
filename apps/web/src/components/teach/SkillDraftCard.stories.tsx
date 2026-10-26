@@ -130,6 +130,17 @@ export const LoginPromptForm: Story = {
   },
 };
 
+/** The name field shows its rule instead of a generic validation error. */
+export const LoginPromptInvalidName: Story = {
+  ...withLogin,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText("Save as login"));
+    await userEvent.type(await canvas.findByLabelText("Name"), "CRM Login");
+    await expect(await canvas.findByText("Lowercase letters, numbers, - and _.")).toBeTruthy();
+  },
+};
+
 export const LoginPromptError: Story = {
   ...withLogin,
   beforeEach: () => {
@@ -146,6 +157,15 @@ export const LoginPromptError: Story = {
     await userEvent.type(await canvas.findByLabelText("Site"), "https://login.example.test");
     await userEvent.click(await canvas.findByRole("button", { name: "Save login" }));
     await expect(await canvas.findByRole("alert")).toBeTruthy();
+  },
+};
+
+/** A draft that was never saved is expired or discarded: the card says so. */
+export const Discarded: Story = {
+  beforeEach: () => mockRpc({ "taughtSkills.cancel": () => ({ ok: true }) }),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "Discard" }));
+    await expect(await within(canvasElement).findByText("Discarded")).toBeTruthy();
   },
 };
 

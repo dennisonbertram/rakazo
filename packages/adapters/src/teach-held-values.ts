@@ -98,6 +98,27 @@ export async function deleteExpiredHeldValues(db: Db, now = new Date()): Promise
   return result.count;
 }
 
+export const TEACH_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Deletes drafts nobody saved within a day; their held values go with them (cascade). */
+export async function deleteStaleDraftSkills(
+  db: Pick<PrismaClient, "taughtSkill">,
+  now = new Date(),
+): Promise<number> {
+  const result = await db.taughtSkill.deleteMany({
+    where: { status: "draft", updatedAt: { lte: new Date(now.getTime() - TEACH_DRAFT_TTL_MS) } },
+  });
+  return result.count;
+}
+
+/** The reconciler's clean-up: expired held values, then drafts left unsaved. */
+export async function deleteExpiredTeachData(
+  db: Db & Pick<PrismaClient, "taughtSkill">,
+  now = new Date(),
+): Promise<number> {
+  return (await deleteExpiredHeldValues(db, now)) + (await deleteStaleDraftSkills(db, now));
+}
+
 /** Scrubs held values out of text that may echo them (window titles, summaries, paths). */
 export function scrubHeld(text: string, held: readonly { value: string }[]): string {
   return scrubValues(

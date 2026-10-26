@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   testRun: vi.fn(),
   saveLogin: vi.fn(),
   skipLogin: vi.fn(),
+  cancel: vi.fn(),
 }));
 vi.mock("../../lib/rpc", () => ({
   rpc: {
@@ -22,13 +23,16 @@ vi.mock("../../lib/rpc", () => ({
       testRun: api.testRun,
       skipLogin: api.skipLogin,
     },
-    taughtSkills: { saveLogin: api.saveLogin },
+    taughtSkills: { saveLogin: api.saveLogin, cancel: api.cancel },
   },
 }));
 vi.mock("@lingui/react/macro", () => {
   const t = (parts: TemplateStringsArray, ...values: unknown[]) =>
     parts.reduce((text, part, index) => text + part + (values[index] ?? ""), "");
-  return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
+  return {
+    useLingui: () => ({ t }),
+    Trans: ({ children }: { children: ReactNode }) => children,
+  };
 });
 vi.mock("@rakazo/ui-web", () => ({
   Button: ({
@@ -140,14 +144,18 @@ it("stops polling when the card unmounts", async () => {
 
 it("prefills the suggested username and submits it explicitly", async () => {
   api.get.mockResolvedValue(
-    skill({ loginPrompts: [{ stepIndex: 2, field: "Password", username: "alice" }] }),
+    skill({
+      loginPrompts: [{ stepIndex: 2, field: "Password", username: "alice" }],
+    }),
   );
   api.saveLogin.mockResolvedValue(skill());
   const view = await render();
   try {
     await act(async () => button(view.container, "Save as login").click());
     const input = (label: string) =>
-      view.container.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement;
+      view.container.querySelector(
+        `input[id^="login-${label.toLowerCase()}-"]`,
+      ) as HTMLInputElement;
     expect(input("Username").value).toBe("alice");
     const set = async (element: HTMLInputElement, value: string) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -157,6 +165,11 @@ it("prefills the suggested username and submits it explicitly", async () => {
       });
     };
     await set(input("Site"), "https://crm.example.test");
+    await set(input("Name"), "CRM login");
+    expect(view.container.textContent).toContain("Lowercase letters, numbers, - and _.");
+    expect(button(view.container, "Save login").disabled).toBe(true);
+    await set(input("Name"), "crm_example_test");
+    expect(view.container.textContent).not.toContain("Lowercase letters");
     await act(async () => button(view.container, "Save login").click());
     expect(api.saveLogin).toHaveBeenCalledWith({
       skillId: "skill-1",
@@ -165,6 +178,19 @@ it("prefills the suggested username and submits it explicitly", async () => {
       site: "https://crm.example.test",
       username: "alice",
     });
+  } finally {
+    await view.cleanup();
+  }
+});
+
+it("discards a draft and shows Discarded", async () => {
+  api.get.mockResolvedValue(skill());
+  api.cancel.mockResolvedValue({ ok: true });
+  const view = await render();
+  try {
+    await act(async () => button(view.container, "Discard").click());
+    expect(api.cancel).toHaveBeenCalledWith({ skillId: "skill-1" });
+    expect(view.container.textContent).toContain("Discarded");
   } finally {
     await view.cleanup();
   }

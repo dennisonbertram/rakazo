@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createRouterClient } from "@orpc/server";
 import {
   deleteExpiredHeldValues,
+  deleteExpiredTeachData,
   EncryptedSecretStore,
   storeBotSecret,
   taughtSkillPromptForRoutine,
@@ -290,6 +291,17 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
     expect(await prisma.teachHeldValue.count({ where: { skillId: skill.id } })).toBe(0);
   });
 
+  it("deletes drafts left unsaved for a day, with their held values", async () => {
+    const { skill } = await teachSignIn();
+    expect(await prisma.teachHeldValue.count({ where: { skillId: skill.id } })).toBeGreaterThan(0);
+    await deleteExpiredTeachData(prisma);
+    expect(await prisma.taughtSkill.count({ where: { id: skill.id } })).toBe(1);
+    await prisma.$executeRaw`UPDATE taught_skills SET "updatedAt" = now() - interval '25 hours' WHERE id = ${skill.id}`;
+    await deleteExpiredTeachData(prisma);
+    expect(await prisma.taughtSkill.count({ where: { id: skill.id } })).toBe(0);
+    expect(await prisma.teachHeldValue.count({ where: { skillId: skill.id } })).toBe(0);
+  });
+
   it("rejects another user on every skill operation", async () => {
     const { skill } = await teachSignIn();
     await expect(service.get(stranger, skill.id)).rejects.toThrow();
@@ -392,6 +404,26 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
     const first = await service.testRun(owner, skill.id);
     expect((await service.get(owner, skill.id)).lastTestOutcome).toBeNull();
     await prisma.run.update({ where: { id: first.runId }, data: { status: "completed" } });
+    const firstRun = await prisma.run.findUniqueOrThrow({ where: { id: first.runId } });
+    const reply = async (runId: string, threadId: string, text: string) =>
+      prisma.message.create({
+        data: {
+          threadId,
+          runId,
+          role: "bot",
+          seq:
+            ((await prisma.message.aggregate({ where: { threadId }, _max: { seq: true } }))._max
+              .seq ?? 0) + 1,
+          blocks: [{ kind: "text", text }],
+        },
+      });
+    // A completed run with no "Result:" line is not a success.
+    expect(await service.get(owner, skill.id)).toMatchObject({ lastTestOutcome: "stopped" });
+    await prisma.taughtSkill.update({
+      where: { id: skill.id },
+      data: { lastTestOutcome: null, lastTestNote: null },
+    });
+    await reply(first.runId, firstRun.threadId, "Done.\nResult: worked");
     expect(await service.get(owner, skill.id)).toMatchObject({
       lastTestOutcome: "worked",
       lastTestNote: null,
@@ -407,6 +439,14 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
     expect(await service.get(owner, skill.id)).toMatchObject({
       lastTestOutcome: "stopped",
       lastTestNote: "Stopped at step 4: Export button not on screen",
+    });
+
+    const third = await service.testRun(owner, skill.id);
+    await prisma.run.update({ where: { id: third.runId }, data: { status: "completed" } });
+    await reply(third.runId, firstRun.threadId, "Result: stopped at step 2: no Export button");
+    expect(await service.get(owner, skill.id)).toMatchObject({
+      lastTestOutcome: "stopped",
+      lastTestNote: "Stopped at step 2: no Export button",
     });
   });
 
