@@ -25,6 +25,7 @@ function setup(
   const effect = { status: "intended", result: undefined as unknown };
   const answers: Array<{ answer: string; mailDenial?: unknown }> = [];
   const outcomes: string[] = [];
+  const recorded: Array<{ providerIds?: unknown }> = [];
   const events = {
     findMailApprovalForEdit: vi.fn(async (input: { answeredByUserId: string }) =>
       effect.status === "intended" && input.answeredByUserId === "user-1"
@@ -43,6 +44,7 @@ function setup(
       return true;
     }),
     setMailApprovalOutcome: vi.fn(async (input: { outcome: string; note?: string }) => {
+      recorded.push(input);
       outcomes.push(input.outcome);
       if (input.note) effect.result = { note: input.note };
     }),
@@ -53,6 +55,9 @@ function setup(
     mail: { listAccounts: async () => [{ id: "conn-1", address: "me@example.test" }] },
     prisma: {
       cachedMailMessage: { findFirst: async () => null },
+      composeSend: {
+        findUnique: async () => ({ threadId: "gt-1", providerMessageId: "gm-1", draftId: "d-1" }),
+      },
       run: {
         findFirst: async (args: { where: { userId: string } }) =>
           args.where.userId === "user-1"
@@ -83,7 +88,7 @@ function setup(
       compose,
     );
   const allow = () => events.answerRunInput({ answer: "allow" } as never);
-  return { effect, answers, outcomes, events, compose, sent, saved, edit, allow, deps };
+  return { effect, answers, outcomes, recorded, events, compose, sent, saved, edit, allow, deps };
 }
 
 const code = (promise: Promise<unknown>) =>
@@ -100,6 +105,11 @@ describe("answerEditedMailApproval", () => {
     expect(t.effect.result).toMatchObject({ note: expect.stringContaining("sent it themselves") });
     expect(t.answers[0]?.mailDenial).toMatchObject({
       note: expect.stringContaining("not known yet"),
+    });
+    expect(t.recorded[0]?.providerIds).toEqual({
+      threadId: "gt-1",
+      messageId: "gm-1",
+      draftId: "d-1",
     });
     expect(t.compose.send).toHaveBeenCalledTimes(1);
     expect(t.sent[0]).toEqual({
@@ -129,6 +139,7 @@ describe("answerEditedMailApproval", () => {
           findMany: async () => [{ connectionId: "conn-2" }],
           findFirst: async () => ({ id: "cached-1" }),
         },
+        composeSend: { findUnique: async () => null },
       },
     });
     await t.edit({ subject: "Monday" });

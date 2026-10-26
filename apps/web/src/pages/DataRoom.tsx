@@ -17,6 +17,7 @@ import { ComposeEmail, NEW_MESSAGE } from "../components/ComposeEmail";
 import { AutoSortDialog } from "../components/data-room/AutoSortDialog";
 import { DataRoomConsentPrompt } from "../components/data-room/ConsentPrompt";
 import { DataRoomStats } from "../components/data-room/DataRoomStats";
+import { FailedChip } from "../components/data-room/FailedChip";
 import { FilterBar, facetOptions, Tip } from "../components/data-room/FilterBar";
 import { FolderTree } from "../components/data-room/FolderTree";
 import { folderContents, folderNodes } from "../components/data-room/folders";
@@ -804,6 +805,20 @@ export function DataRoomPage({
             {/* Also in Stats, so switching views never moves the folder tree. */}
             <DataRoomConsentPrompt onAllowed={reload} onStatus={setConsent} />
           </div>
+          {filters.status ? null : (
+            <div className={`${PAGE_GUTTER_X} pb-2.5 empty:hidden`}>
+              <FailedChip
+                count={processing.processing?.failed ?? 0}
+                onClick={() =>
+                  setParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.set("status", "failed");
+                    return next;
+                  })
+                }
+              />
+            </div>
+          )}
           <FilterBar
             query={queryInput}
             onQuery={changeQuery}
