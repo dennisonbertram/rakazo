@@ -8,7 +8,12 @@ import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import { botMessageHopExhausted, nextBotMessageHop } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
+import {
+  appendEventInTransaction,
+  CrossSpaceCommunicationBlockedError,
+  createThreadMessageInTransaction,
+  crossSpaceCommunicationAllowed,
+} from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 
 /**
@@ -198,6 +203,8 @@ async function mirrorChannelRun(
         where: { id: peer.identityId! },
       });
       if (!peerIdentity) continue;
+      if (!(await crossSpaceCommunicationAllowed(deps.prisma, identity.botId, peerIdentity.botId)))
+        continue;
       const peerThread = await deps.prisma.thread.findFirst({
         where: { botId: peerIdentity.botId },
       });
@@ -221,17 +228,23 @@ async function mirrorChannelRun(
         ? new RegExp(`@${escapeRegExp(peerBot.name)}\\b`, "i").test(text)
         : false;
       if (mentioned && !botMessageHopExhausted(hop)) {
-        const sent = await deps.events.sendUserMessage({
-          spaceId: peerIdentity.spaceId,
-          threadId: peerThread.id,
-          botId: peerIdentity.botId,
-          userId: peerIdentity.userId,
-          blocks: [block],
-          prompt: `[Group "${channel.name ?? "group"}" — ${fromLabel}]: ${text}`,
-          trigger: "messaging",
-          clientNonce,
-        });
-        if (sent.runId) {
+        const sent = await deps.events
+          .sendUserMessage({
+            spaceId: peerIdentity.spaceId,
+            threadId: peerThread.id,
+            botId: peerIdentity.botId,
+            userId: peerIdentity.userId,
+            blocks: [block],
+            prompt: `[Group "${channel.name ?? "group"}" — ${fromLabel}]: ${text}`,
+            trigger: "messaging",
+            clientNonce,
+            crossSpaceSenderBotId: identity.botId,
+          })
+          .catch((error: unknown) => {
+            if (error instanceof CrossSpaceCommunicationBlockedError) return null;
+            throw error;
+          });
+        if (sent?.runId) {
           await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
             getLogger().error("messaging peer wake enqueue error", error);
           });
@@ -243,22 +256,29 @@ async function mirrorChannelRun(
         where: { threadId_clientNonce: { threadId: peerThread.id, clientNonce } },
       });
       if (existing) continue;
-      const event = await deps.prisma.$transaction(async (tx) => {
-        const created = await createThreadMessageInTransaction(tx, {
-          threadId: peerThread.id,
-          role: "user",
-          blocks: [block],
-          clientNonce,
+      const event = await deps.prisma
+        .$transaction(async (tx) => {
+          const created = await createThreadMessageInTransaction(tx, {
+            threadId: peerThread.id,
+            role: "user",
+            blocks: [block],
+            clientNonce,
+          });
+          if (!(await crossSpaceCommunicationAllowed(tx, identity.botId, peerIdentity.botId)))
+            throw new CrossSpaceCommunicationBlockedError();
+          return appendEventInTransaction(tx, {
+            spaceId: peerIdentity.spaceId,
+            threadId: peerThread.id,
+            botId: peerIdentity.botId,
+            type: "thread.message.created",
+            payload: { messageId: created.id, role: "user", blocks: [block] },
+          });
+        })
+        .catch((error: unknown) => {
+          if (error instanceof CrossSpaceCommunicationBlockedError) return null;
+          throw error;
         });
-        return appendEventInTransaction(tx, {
-          spaceId: peerIdentity.spaceId,
-          threadId: peerThread.id,
-          botId: peerIdentity.botId,
-          type: "thread.message.created",
-          payload: { messageId: created.id, role: "user", blocks: [block] },
-        });
-      });
-      await deps.events.notify(peerThread.id, event.seq).catch(() => undefined);
+      if (event) await deps.events.notify(peerThread.id, event.seq).catch(() => undefined);
     }
   }
 }
@@ -297,13 +317,18 @@ async function sendConnectInvite(
   try {
     return await deps.prisma.$transaction(
       async (tx) => {
+        const communicationAllowed = await crossSpaceCommunicationAllowed(
+          tx,
+          pair.requesterBotId,
+          pair.targetBotId,
+        );
         const locked = await tx.$queryRaw<Array<{ status: string }>>`
           SELECT status FROM agent_connections
           WHERE "requesterBotId" = ${pair.requesterBotId}
             AND "targetBotId" = ${pair.targetBotId}
           FOR UPDATE
         `;
-        if (locked[0]?.status !== "pending") {
+        if (locked[0]?.status !== "pending" || !communicationAllowed) {
           await tx.messagingOutbound.updateMany({
             where: { id: row.id },
             data: { status: "failed" },

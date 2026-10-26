@@ -57,6 +57,7 @@ const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
 const BUILTIN_MAIL_WRITE_TOOLS = new Set(["mail_draft", "mail_modify", "mail_send"]);
 /** Cannot be auto-reviewed or permanently allowed. imessage_send is a message to a person from the user's agent line. */
 const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
+  "respond_agent_connection",
   "create_space",
   "imessage_send",
   "company_fact_upsert",

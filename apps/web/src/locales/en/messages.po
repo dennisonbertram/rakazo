@@ -1327,6 +1327,10 @@ msgstr "Allow changes in {service}"
 msgid "Allow changes in {service}?"
 msgstr "Allow changes in {service}?"
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Allow cross-space bot communication"
+msgstr "Allow cross-space bot communication"
+
 #: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "Allow once"

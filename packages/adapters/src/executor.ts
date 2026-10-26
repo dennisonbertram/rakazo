@@ -197,6 +197,7 @@ import { createUiArtifact } from "@rakazo/ui-artifact";
 import {
   connectAgent,
   messageConnectedAgent,
+  prepareAgentConnectionResponse,
   respondAgentConnection,
 } from "./agent-connections.js";
 import {
@@ -3122,6 +3123,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }),
           // Cross-owner agent connections only exist for chat-linked bots.
           ...(hasMessagingIdentity &&
+          bot.crossSpaceCommunication === true &&
           bot.audience !== "external" &&
           !voiceAgent &&
           !gtmAgent &&
@@ -4105,6 +4107,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? { disclosure: MESSAGING_AI_DISCLOSURE }
                 : {}),
             };
+          }
+          if (name === "respond_agent_connection") {
+            if (nextApprovedTool !== name) {
+              const request = await prepareAgentConnectionResponse(
+                deps.prisma,
+                bot.id,
+                Boolean(args.accept),
+              );
+              if (!request) return { error: "no pending connection request" };
+              args = request;
+            } else if (
+              typeof args.requester_name !== "string" ||
+              typeof args.requester_address !== "string" ||
+              typeof args.requester_provider !== "string"
+            ) {
+              return { error: "connection request is no longer pending" };
+            }
+            effectRequest = args;
           }
           const viaConnector = !BUILTIN_AGENT_TOOL_NAMES.has(name) && !COMPANY_TOOL_NAMES.has(name);
           const builtinDenial = viaConnector ? null : await googleBuiltinDenial(name);
@@ -7211,7 +7231,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               deps,
               { ...run, sourceMessageId: run.sourceMessageId },
               { id: bot.id, name: bot.name },
-              { accept: Boolean(args.accept) },
+              {
+                accept: Boolean(args.accept),
+                connectionId: String(args.connection_id ?? ""),
+                connectionVersion: Number(args.connection_version ?? 0),
+              },
             );
             if (!result.ok) return finish({ error: result.error });
             return finish(result);

@@ -566,6 +566,7 @@ model Bot {
   webhookSecretId        String?
   teamChatAmbientEnabled Boolean               @default(false)
   teamChatRules          String                @default("")
+  crossSpaceCommunication Boolean              @default(false)
   routines               Routine[]
   scratchpadItems        ScratchpadItem[]
   taughtSkills           TaughtSkill[]
@@ -1892,6 +1893,7 @@ model MessagingPollCursor {
 }
 
 model AgentConnection {
+  requestVersion Int      @default(1)
   id             String   @id @default(cuid())
   requesterBotId String
   targetBotId    String
