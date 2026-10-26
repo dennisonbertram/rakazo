@@ -50,6 +50,7 @@ export * from "./pages.js";
 export * from "./pin-list.js";
 export * from "./pins.js";
 export * from "./reactions.js";
+export * from "./routines.js";
 export * from "./rpc.js";
 export * from "./runs.js";
 export * from "./search.js";

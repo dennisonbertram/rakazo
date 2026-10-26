@@ -2398,6 +2398,10 @@ msgstr ""
 msgid "Changed"
 msgstr ""
 
+#: src/pages/RoutineEditor.tsx
+msgid "Changed {changed}"
+msgstr ""
+
 #: src/components/cap-table/CapTableEditor.tsx
 msgid "Changed elsewhere"
 msgstr ""
@@ -2480,6 +2484,10 @@ msgstr ""
 msgid "Check again"
 msgstr ""
 
+#: src/pages/RoutineEditor.tsx
+msgid "Check every"
+msgstr ""
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check failed"
 msgstr "Проверка не удалась"
@@ -2496,6 +2504,10 @@ msgstr ""
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check for updates"
 msgstr "Проверьте наличие обновлений"
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Check in"
+msgstr ""
 
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Check queue"
@@ -2516,6 +2528,14 @@ msgstr "Проверьте URL сервера и сеть, затем повто
 #: src/pages/Auth.tsx
 msgid "Check your email"
 msgstr "Проверьте свою электронную почту"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Check-in every 4 hours"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Checked {checked}"
+msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
 msgid "Checking computer setup…"
@@ -2941,6 +2961,10 @@ msgstr ""
 #: src/pages/ScratchpadSection.tsx
 msgid "Complete"
 msgstr "Завершить"
+
+#: src/pages/ScratchpadSection.tsx
+msgid "Completed {title}"
+msgstr ""
 
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/pages/Inbox.tsx
@@ -4368,6 +4392,14 @@ msgstr "Настроить аватар бота"
 msgid "Cut costs"
 msgstr ""
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Daily"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Daily check-in"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Тёмная"
@@ -4833,6 +4865,10 @@ msgstr ""
 msgid "Done"
 msgstr "Готово"
 
+#: src/pages/ScratchpadSection.tsx
+msgid "Done ({doneCount})"
+msgstr ""
+
 #: src/components/computer/FilesApp.tsx
 #: src/components/data-room/PreviewActions.tsx
 #: src/components/data-room/SelectionBar.tsx
@@ -4981,6 +5017,10 @@ msgstr ""
 #. placeholder {0}: day(audit.dueDate)
 #: src/components/investors/ActionItems.tsx
 msgid "due {0}"
+msgstr ""
+
+#: src/pages/ScratchpadSection.tsx
+msgid "due {dueText}"
 msgstr ""
 
 #: src/pages/legal/LegalDeadlines.tsx
@@ -5190,6 +5230,10 @@ msgstr "Введите API-ключ перед тестом."
 msgid "Enter the command to run."
 msgstr ""
 
+#: src/pages/Shell.tsx
+msgid "Enter the page address, starting with http:// or https://"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Enter the server URL, starting with https://."
 msgstr ""
@@ -5235,6 +5279,14 @@ msgstr "Каждые"
 #: src/pages/RoutineSchedule.tsx
 msgid "every {intervalAmountSelect} {intervalUnitSelect}"
 msgstr "каждые {intervalAmountSelect} {intervalUnitSelect}"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Every 15 minutes"
+msgstr ""
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Every 4 hours"
+msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Every bot loses access to {name}."
@@ -6452,6 +6504,10 @@ msgstr ""
 msgid "Last month, after fees"
 msgstr ""
 
+#: src/pages/RoutineEditor.tsx
+msgid "Last ran {lastRan}"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Last read failed · Try again"
 msgstr ""
@@ -7573,6 +7629,10 @@ msgstr ""
 msgid "Next"
 msgstr ""
 
+#: src/pages/RoutineEditor.tsx
+msgid "Next {next}"
+msgstr ""
+
 #: src/components/FinanceCards.tsx
 msgid "Next 30 days"
 msgstr ""
@@ -8149,6 +8209,10 @@ msgstr ""
 msgid "Nothing to clean up. Senders need {CLEANUP_MIN_MESSAGES} or more messages, and people you have written to or saved as contacts are left out."
 msgstr ""
 
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing to report"
+msgstr ""
+
 #: src/pages/CompanyReview.tsx
 msgid "Nothing to review"
 msgstr ""
@@ -8195,6 +8259,7 @@ msgid "Obligation"
 msgstr ""
 
 #: src/pages/Investors.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Off"
 msgstr ""
 
@@ -8223,6 +8288,10 @@ msgstr "Удалить можно только пустые пространст
 msgid "Only if the server does not use sign-in"
 msgstr ""
 
+#: src/pages/RoutineEditor.tsx
+msgid "Only message me if something needs me"
+msgstr ""
+
 #: src/pages/shell/bot-panel.tsx
 msgid "Only this bot"
 msgstr ""
@@ -8235,7 +8304,6 @@ msgstr ""
 #: src/components/investors/ActionItems.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/pages/portal/PortalOpen.tsx
-#: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/command-palette.tsx
 #: src/pages/shell/transcript.tsx
@@ -8523,6 +8591,10 @@ msgstr ""
 msgid "Page"
 msgstr ""
 
+#: src/pages/RoutineEditor.tsx
+msgid "Page address"
+msgstr ""
+
 #: src/components/PageAgentsRow.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Page agents"
@@ -8663,6 +8735,22 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Приостановлено"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: no access"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: the page changes too often"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: the page could not be checked"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: too many checks today"
+msgstr ""
 
 #: src/components/finance/AddAccountDialog.tsx
 msgid "PDF, CSV, OFX or QFX"
@@ -9562,6 +9650,10 @@ msgstr "Удалить упоминание {0}"
 #: src/pages/RoutineEditor.tsx
 msgid "Remove message trigger"
 msgstr "Удалить триггер сообщения"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Remove page watch"
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Remove schedule"
@@ -12218,6 +12310,7 @@ msgstr ""
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/ScratchpadSection.tsx
 msgid "Undo"
 msgstr ""
 
@@ -12733,6 +12826,10 @@ msgstr ""
 msgid "Waiting on {delegate}"
 msgstr ""
 
+#: src/pages/ScratchpadSection.tsx
+msgid "Waiting on {waitingOn}"
+msgstr ""
+
 #: src/pages/shell/message-cards.tsx
 msgid "Waiting…"
 msgstr "Ожидание…"
@@ -12752,6 +12849,14 @@ msgstr ""
 
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Wallets"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Watch a page"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Watches {host}"
 msgstr ""
 
 #: src/lib/devin-format.ts

@@ -122,6 +122,11 @@ export async function listRoutineRuns(
           ? null
           : firstLine(replyByRun.get(run.id)?.blocks),
       waitingOn: waitingOn.get(run.id) ?? null,
+      // Finished without a message and without handing off: nothing needed the user.
+      silent:
+        run.status === "completed" && !replyByRun.has(run.id) && !endedAt.has(run.id)
+          ? true
+          : undefined,
     })),
   };
 }

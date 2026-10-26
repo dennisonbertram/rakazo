@@ -58,6 +58,7 @@ function handlers(overrides: Partial<BackgroundJobHandlers> = {}): BackgroundJob
     "company.import.unit": vi.fn(async () => undefined),
     "company.import.recover": vi.fn(async () => undefined),
     "company.refresh.tick": vi.fn(async () => undefined),
+    "watch.probe": vi.fn(async () => undefined),
   };
 }
 

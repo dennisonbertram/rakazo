@@ -186,7 +186,7 @@ function rejectInvalidSkillFields(name: string, description: string): string | u
 
 /** The user's skills and built-ins; with `botId`, minus the skills switched off for that bot. */
 export async function listAgentSkillRecords(
-  prisma: PrismaClient,
+  prisma: Pick<PrismaClient, "agentSkill" | "botSkillSetting">,
   owner: SkillOwner & { botId?: string },
 ): Promise<Array<SkillRecord & { id: string }>> {
   const [rows, off] = await Promise.all([

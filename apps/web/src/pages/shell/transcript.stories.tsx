@@ -73,6 +73,23 @@ export const Conversation: Story = {
   ),
 };
 
+/** A routine's message names the routine on one line above the bubble. */
+export const FromRoutine: Story = {
+  render: () => (
+    <div className="h-[560px]">
+      <Transcript
+        {...baseProps}
+        messages={[
+          {
+            ...message(1, "bot", "Nothing needs your attention today."),
+            routineName: "Daily check-in",
+          },
+        ]}
+      />
+    </div>
+  ),
+};
+
 export const Unread: Story = {
   render: () => (
     <div className="h-[560px]">

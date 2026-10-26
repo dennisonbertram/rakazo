@@ -33,6 +33,7 @@ import {
   isMailThreadAgentSpawnKey,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
   RunPhaseSchema,
+  WatchSpecSchema,
 } from "@rakazo/contracts";
 import type { ComposerMention } from "@rakazo/core";
 import {
@@ -269,6 +270,7 @@ import { getToolActivityEnabled, subscribeToolActivity } from "../lib/tool-activ
 import { transcriptCanSnapAfterFrame, transcriptIsNearEnd } from "../lib/transcript-scroll";
 import { speaker } from "../lib/tts";
 import { useNotificationsOff } from "../lib/use-notifications-off";
+import { useRefetchWhileOpen } from "../lib/use-refetch-while-open";
 import { useRememberedMessages } from "../lib/use-remembered-messages";
 import { useRunResumedAt } from "../lib/use-run-resumed-at";
 import { useSidebarGlance } from "../lib/use-sidebar-glance";
@@ -1253,6 +1255,18 @@ export function ShellPage() {
     [active?.id, groupId, inGroup, pendingAttachments],
   );
   const activeRoutines = !inGroup && routinesBotId === active?.id ? routines : [];
+  const reloadRoutines = (botId: string) =>
+    void rpc.routines
+      .list({ botId })
+      .then((next) => {
+        if (activeBotId.current !== botId) return;
+        setRoutines(next);
+        setRoutinesBotId(botId);
+      })
+      .catch(() => undefined);
+  useRefetchWhileOpen(!inGroup && Boolean(active?.id), () => {
+    if (active?.id) reloadRoutines(active.id);
+  });
   const panelTarget = inGroup ? activeGroup?.id : active?.id;
   const panelStorageKey =
     // A page agent panel is not a saved bot panel: never restore or write one for it.
@@ -1873,6 +1887,14 @@ export function ShellPage() {
           event.type === "thread.cleared"
         ) {
           void refreshBots().catch(() => undefined);
+        }
+        if (
+          event.type === "routine.created" ||
+          event.type === "routine.updated" ||
+          event.type === "routine.fired" ||
+          isRunTerminalEvent(event)
+        ) {
+          reloadRoutines(active.id);
         }
         if (event.type === "thread.message.created") {
           const blocks = (event.payload.blocks as Array<{ kind?: string }>) ?? [];
@@ -5246,6 +5268,17 @@ export function ShellPage() {
                         setPanel("routine");
                       }}
                       onStop={() => void stopRun()}
+                      onToggleActive={(next) => {
+                        const botId = active.id;
+                        void rpc.routines
+                          .update({ routineId: routine.id, active: next })
+                          .then((saved) =>
+                            setRoutines((current) =>
+                              current.map((entry) => (entry.id === saved.id ? saved : entry)),
+                            ),
+                          )
+                          .catch(() => reloadRoutines(botId));
+                      }}
                     />
                   );
                 })}
@@ -5392,6 +5425,7 @@ export function ShellPage() {
                   .map(({ id, name }) => ({ id, name }))}
                 onSkillsChange={setAgentSkills}
                 skillsRefreshKey={skillsRefreshKey}
+                onCheckInChange={() => reloadRoutines(active.id)}
                 onSave={async ({ computerMode, ...patch }) => {
                   if (computerMode !== active.computerMode) {
                     await rpc.bots.setComputer({
@@ -5467,9 +5501,17 @@ export function ShellPage() {
                     !routineDraft.schedules.length &&
                     !routineDraft.webhookEnabled &&
                     !routineDraft.githubEnabled &&
+                    !routineDraft.watch &&
                     !routineDraft.messageProvider
                   ) {
                     setRoutineError(t`Add a schedule, webhook, GitHub, or message trigger`);
+                    return;
+                  }
+                  if (
+                    routineDraft.watch &&
+                    !WatchSpecSchema.safeParse(routineDraft.watch).success
+                  ) {
+                    setRoutineError(t`Enter the page address, starting with http:// or https://`);
                     return;
                   }
                   if (!routineDraft.prompt.trim()) {
@@ -5524,6 +5566,9 @@ export function ShellPage() {
                         webhookEnabled: routineDraft.webhookEnabled,
                         githubEnabled: routineDraft.githubEnabled,
                         messageProvider: routineDraft.messageProvider,
+                        quiet: routineDraft.quiet,
+                        // Always sent: the update schema rejects empty crons unless a watch comes with them.
+                        watch: routineDraft.watch,
                         ...(routineDraft.timezone &&
                         routineDraft.timezone !== targetRoutine.timezone
                           ? { timezone: routineDraft.timezone }
@@ -5547,6 +5592,8 @@ export function ShellPage() {
                         webhookEnabled: routineDraft.webhookEnabled,
                         githubEnabled: routineDraft.githubEnabled,
                         messageProvider: routineDraft.messageProvider,
+                        quiet: routineDraft.quiet,
+                        watch: routineDraft.watch,
                         ...routineModel,
                       });
                     }

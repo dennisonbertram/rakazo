@@ -7,7 +7,7 @@ import { NativeActionButton } from "../components/native-action-button";
 import { rpc } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { native, useMobileTokens } from "../lib/native";
-import { routineStatusLine } from "../lib/routine";
+import { routineActivityLine, routineStatusLine } from "../lib/routine";
 import { errorText } from "../lib/user-error";
 
 export default function RoutineDetail() {
@@ -72,6 +72,11 @@ export default function RoutineDetail() {
             <Text style={{ color: tokens.mutedForeground, fontSize: 14 }}>
               {routineStatusLine(routine)}
             </Text>
+            {routineActivityLine(routine) ? (
+              <Text style={{ color: tokens.mutedForeground, fontSize: 14, marginTop: 6 }}>
+                {routineActivityLine(routine)}
+              </Text>
+            ) : null}
           </View>
           <View style={{ gap: 8 }}>
             <Text

@@ -2398,6 +2398,10 @@ msgstr "Change source"
 msgid "Changed"
 msgstr "Changed"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Changed {changed}"
+msgstr "Changed {changed}"
+
 #: src/components/cap-table/CapTableEditor.tsx
 msgid "Changed elsewhere"
 msgstr "Changed elsewhere"
@@ -2480,6 +2484,10 @@ msgstr "Chats grouped into folders"
 msgid "Check again"
 msgstr "Check again"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Check every"
+msgstr "Check every"
+
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check failed"
 msgstr "Check failed"
@@ -2496,6 +2504,10 @@ msgstr "Check for receipt"
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check for updates"
 msgstr "Check for updates"
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Check in"
+msgstr "Check in"
 
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Check queue"
@@ -2516,6 +2528,14 @@ msgstr "Check the server URL and network, then test again."
 #: src/pages/Auth.tsx
 msgid "Check your email"
 msgstr "Check your email"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Check-in every 4 hours"
+msgstr "Check-in every 4 hours"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Checked {checked}"
+msgstr "Checked {checked}"
 
 #: src/components/ComputersUnavailableHint.tsx
 msgid "Checking computer setup…"
@@ -2941,6 +2961,10 @@ msgstr "Company: {0}. Switch company"
 #: src/pages/ScratchpadSection.tsx
 msgid "Complete"
 msgstr "Complete"
+
+#: src/pages/ScratchpadSection.tsx
+msgid "Completed {title}"
+msgstr "Completed {title}"
 
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/pages/Inbox.tsx
@@ -4368,6 +4392,14 @@ msgstr "Customize bot avatar"
 msgid "Cut costs"
 msgstr "Cut costs"
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Daily"
+msgstr "Daily"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Daily check-in"
+msgstr "Daily check-in"
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Dark"
@@ -4833,6 +4865,10 @@ msgstr "Don't share"
 msgid "Done"
 msgstr "Done"
 
+#: src/pages/ScratchpadSection.tsx
+msgid "Done ({doneCount})"
+msgstr "Done ({doneCount})"
+
 #: src/components/computer/FilesApp.tsx
 #: src/components/data-room/PreviewActions.tsx
 #: src/components/data-room/SelectionBar.tsx
@@ -4982,6 +5018,10 @@ msgstr "Due"
 #: src/components/investors/ActionItems.tsx
 msgid "due {0}"
 msgstr "due {0}"
+
+#: src/pages/ScratchpadSection.tsx
+msgid "due {dueText}"
+msgstr "due {dueText}"
 
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Due today"
@@ -5190,6 +5230,10 @@ msgstr "Enter an API key before testing."
 msgid "Enter the command to run."
 msgstr "Enter the command to run."
 
+#: src/pages/Shell.tsx
+msgid "Enter the page address, starting with http:// or https://"
+msgstr "Enter the page address, starting with http:// or https://"
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Enter the server URL, starting with https://."
 msgstr "Enter the server URL, starting with https://."
@@ -5235,6 +5279,14 @@ msgstr "Every"
 #: src/pages/RoutineSchedule.tsx
 msgid "every {intervalAmountSelect} {intervalUnitSelect}"
 msgstr "every {intervalAmountSelect} {intervalUnitSelect}"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Every 15 minutes"
+msgstr "Every 15 minutes"
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Every 4 hours"
+msgstr "Every 4 hours"
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Every bot loses access to {name}."
@@ -6452,6 +6504,10 @@ msgstr "Last month vs 3 mo ago"
 msgid "Last month, after fees"
 msgstr "Last month, after fees"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Last ran {lastRan}"
+msgstr "Last ran {lastRan}"
+
 #: src/pages/Investors.tsx
 msgid "Last read failed · Try again"
 msgstr "Last read failed · Try again"
@@ -7573,6 +7629,10 @@ msgstr "Newsletters"
 msgid "Next"
 msgstr "Next"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Next {next}"
+msgstr "Next {next}"
+
 #: src/components/FinanceCards.tsx
 msgid "Next 30 days"
 msgstr "Next 30 days"
@@ -8149,6 +8209,10 @@ msgstr "Nothing shared yet."
 msgid "Nothing to clean up. Senders need {CLEANUP_MIN_MESSAGES} or more messages, and people you have written to or saved as contacts are left out."
 msgstr "Nothing to clean up. Senders need {CLEANUP_MIN_MESSAGES} or more messages, and people you have written to or saved as contacts are left out."
 
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing to report"
+msgstr "Nothing to report"
+
 #: src/pages/CompanyReview.tsx
 msgid "Nothing to review"
 msgstr "Nothing to review"
@@ -8195,6 +8259,7 @@ msgid "Obligation"
 msgstr "Obligation"
 
 #: src/pages/Investors.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Off"
 msgstr "Off"
 
@@ -8223,6 +8288,10 @@ msgstr "Only empty spaces can be deleted. Delete its bots and groups first."
 msgid "Only if the server does not use sign-in"
 msgstr "Only if the server does not use sign-in"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Only message me if something needs me"
+msgstr "Only message me if something needs me"
+
 #: src/pages/shell/bot-panel.tsx
 msgid "Only this bot"
 msgstr "Only this bot"
@@ -8235,7 +8304,6 @@ msgstr "Only this bot"
 #: src/components/investors/ActionItems.tsx
 #: src/components/markdown-link-prompt.tsx
 #: src/pages/portal/PortalOpen.tsx
-#: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/command-palette.tsx
 #: src/pages/shell/transcript.tsx
@@ -8523,6 +8591,10 @@ msgstr "Owner"
 msgid "Page"
 msgstr "Page"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Page address"
+msgstr "Page address"
+
 #: src/components/PageAgentsRow.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Page agents"
@@ -8663,6 +8735,22 @@ msgstr "Pause"
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Paused"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: no access"
+msgstr "Paused: no access"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: the page changes too often"
+msgstr "Paused: the page changes too often"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: the page could not be checked"
+msgstr "Paused: the page could not be checked"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: too many checks today"
+msgstr "Paused: too many checks today"
 
 #: src/components/finance/AddAccountDialog.tsx
 msgid "PDF, CSV, OFX or QFX"
@@ -9562,6 +9650,10 @@ msgstr "Remove mention {0}"
 #: src/pages/RoutineEditor.tsx
 msgid "Remove message trigger"
 msgstr "Remove message trigger"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Remove page watch"
+msgstr "Remove page watch"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Remove schedule"
@@ -12218,6 +12310,7 @@ msgstr "Undid {restored}, skipped {skipped}"
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/ScratchpadSection.tsx
 msgid "Undo"
 msgstr "Undo"
 
@@ -12733,6 +12826,10 @@ msgstr "Waiting on {0}"
 msgid "Waiting on {delegate}"
 msgstr "Waiting on {delegate}"
 
+#: src/pages/ScratchpadSection.tsx
+msgid "Waiting on {waitingOn}"
+msgstr "Waiting on {waitingOn}"
+
 #: src/pages/shell/message-cards.tsx
 msgid "Waiting…"
 msgstr "Waiting…"
@@ -12753,6 +12850,14 @@ msgstr "Wallet balances and history"
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Wallets"
 msgstr "Wallets"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Watch a page"
+msgstr "Watch a page"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Watches {host}"
+msgstr "Watches {host}"
 
 #: src/lib/devin-format.ts
 msgid "Web"

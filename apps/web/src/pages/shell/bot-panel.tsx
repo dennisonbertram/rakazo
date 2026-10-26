@@ -105,10 +105,69 @@ function ComputerModePicker({
   );
 }
 
+const CHECK_IN_CADENCES = ["off", "daily", "every_4h"] as const;
+
+export function CheckInSetting({ botId, onChange }: { botId: string; onChange?: () => void }) {
+  const { t } = useLingui();
+  const id = useId();
+  const [cadence, setCadence] = useState<(typeof CHECK_IN_CADENCES)[number]>("off");
+  const [error, setError] = useState(false);
+  const request = useRef(0);
+  useEffect(() => {
+    const current = ++request.current;
+    void rpc.checkIn
+      .get({ botId })
+      .then((value) => {
+        if (current === request.current) setCadence(value.cadence);
+      })
+      .catch(() => undefined);
+  }, [botId]);
+  const labels = { off: t`Off`, daily: t`Daily`, every_4h: t`Every 4 hours` };
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/20 pt-4">
+      <label htmlFor={`${id}-check-in`} className="text-[13.5px] font-medium text-foreground">
+        <Trans>Check in</Trans>
+      </label>
+      <NativeSelect
+        id={`${id}-check-in`}
+        className="w-40"
+        value={cadence}
+        onChange={(event) => {
+          const next = event.target.value as (typeof CHECK_IN_CADENCES)[number];
+          const previous = cadence;
+          const current = ++request.current;
+          setCadence(next);
+          setError(false);
+          rpc.checkIn
+            .set({ botId, cadence: next })
+            .then(() => onChange?.())
+            .catch(() => {
+              if (current !== request.current) return;
+              setCadence(previous);
+              setError(true);
+            });
+        }}
+      >
+        {CHECK_IN_CADENCES.map((value) => (
+          <NativeSelectOption key={value} value={value}>
+            {labels[value]}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      {error ? (
+        <span role="alert" className="basis-full text-[13px] text-destructive">
+          <Trans>Could not save</Trans>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function BotSettings({
   bot,
   memoryProviderConfigured,
   onSkillsChange,
+  onCheckInChange,
   skillsRefreshKey,
   onSave,
   onExport,
@@ -130,7 +189,9 @@ export function BotSettings({
   /** A bot just created as "New bot": focus and select its name so it gets named first. */
   focusName?: boolean;
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
-  /** Changes when the agent may have created a skill, so the list reloads. */
+  /** The check-in setting changed, so its managed routine appeared, changed or went away. */
+  onCheckInChange?: () => void;
+  /** Changes when a run ends, so skills and open work the agent added reload. */
   skillsRefreshKey?: number;
   memoryProviderConfigured: boolean;
   onSave: (
@@ -560,6 +621,12 @@ export function BotSettings({
               }}
             />
           </label>
+          <CheckInSetting botId={bot.id} onChange={onCheckInChange} />
+          <ErrorBoundary fallback={<SectionLoadFailed />}>
+            <Suspense fallback={null}>
+              <ScratchpadSection botId={bot.id} refreshKey={skillsRefreshKey} />
+            </Suspense>
+          </ErrorBoundary>
           {botAudienceEditable(bot.spawnKey) ? (
             <div data-testid="bot-audience" className="mt-6 border-t border-border/20 pt-4">
               <div className="text-[13.5px] font-medium text-foreground">
@@ -689,11 +756,6 @@ export function BotSettings({
                   />
                 </div>
               ) : null}
-              <ErrorBoundary fallback={<SectionLoadFailed />}>
-                <Suspense fallback={null}>
-                  <ScratchpadSection botId={bot.id} />
-                </Suspense>
-              </ErrorBoundary>
               {advancedOpened ? (
                 <ErrorBoundary fallback={<SectionLoadFailed />}>
                   <Suspense fallback={null}>

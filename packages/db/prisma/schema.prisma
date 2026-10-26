@@ -265,6 +265,7 @@ model Space {
   tasks                       Task[]
   runs                        Run[]
   routines                    Routine[]
+  routineWatchStates          RoutineWatchState[]
   scratchpadItems             ScratchpadItem[]
   taughtSkills                TaughtSkill[]
   agentSkills                 AgentSkill[]
@@ -945,6 +946,13 @@ model Routine {
   thinkingLevel   String?
   lastRunAt       DateTime?
   nextRunAt       DateTime?
+  /// Server adds silent-reply guidance; a quiet run that says nothing shows "Nothing to report".
+  quiet           Boolean   @default(false)
+  /// WatchSpecSchema JSON ({ kind: "page", url, intervalMinutes }) or null.
+  watch           Json?
+  /// "check_in" marks the one managed check-in routine per bot; its crons/active are the bot's check-in setting.
+  managedKind     String?
+  watchState      RoutineWatchState?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   runs            Run[]
@@ -952,6 +960,34 @@ model Routine {
   @@index([active, nextRunAt])
   @@index([spaceId, botId])
   @@map("routines")
+}
+
+/// Probe state for a page watch, one row per watching routine.
+model RoutineWatchState {
+  routineId         String    @id
+  routine           Routine   @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  spaceId           String
+  space             Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  fingerprint       String?
+  /// Normalized page text, at most 16 KB (enforced in code).
+  snapshot          String?
+  lastCheckedAt     DateTime?
+  lastChangedAt     DateTime?
+  consecutiveErrors Int       @default(0)
+  nextCheckAt       DateTime?
+  /// "errors" | "noisy" | "budget" | "access"
+  pausedReason      String?
+  wakesToday        Int       @default(0)
+  /// YYYY-MM-DD in the routine's time zone.
+  wakesDay          String?
+  /// A change was seen but not yet delivered to the model (daily budget or a wake in flight).
+  pendingChange     Boolean   @default(false)
+  /// Last 10 check outcomes, 1 changed / 0 same, oldest first.
+  recentChanges     Int[]
+
+  @@index([nextCheckAt])
+  @@index([spaceId])
+  @@map("routine_watch_states")
 }
 
 model ScratchpadItem {
@@ -971,10 +1007,15 @@ model ScratchpadItem {
   proof        String?
   approvedAt   DateTime?
   approvedBy   String?
+  /// When the item is due. Not scheduledFor, which is a GTM post time.
+  dueAt        DateTime?
+  waitingOn    String?
+  resolvedReason String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([spaceId, botId, status])
+  @@index([spaceId, botId, status, dueAt])
   @@index([spaceId, botId, updatedAt])
   @@map("scratchpad_items")
 }

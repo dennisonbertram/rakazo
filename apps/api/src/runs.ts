@@ -116,7 +116,27 @@ export async function listSpaceRuns(
       })
     : [];
 
+  // A routine run that completed without posting a message ended silently.
+  const quietCandidates = rows
+    .filter((row) => row.trigger === "routine" && row.status === "completed")
+    .map((row) => row.id);
+  const spoke = new Set(
+    quietCandidates.length
+      ? (
+          await prisma.message.findMany({
+            where: {
+              runId: { in: quietCandidates },
+              role: "bot",
+              thread: { spaceId: actor.spaceId, userId: actor.userId },
+            },
+            select: { runId: true },
+          })
+        ).map((message) => message.runId)
+      : [],
+  );
+
   return rows.map((row) => ({
+    silent: quietCandidates.includes(row.id) && !spoke.has(row.id) ? true : undefined,
     needsApproval:
       row.status === "waiting_input" &&
       pendingAskIsApproval(askMessages.filter((message) => message.runId === row.id)),

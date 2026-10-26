@@ -3234,6 +3234,7 @@ describe("createRunExecutor", () => {
       };
       const enqueue = vi.fn(async () => undefined);
       const routineClaim = vi.fn(async () => ({ count: 1 }));
+      const routineUpdate = vi.fn(async () => ({}));
       const activeRunFindFirst = vi.fn(async () =>
         workState === "active" ? { id: "active-run" } : null,
       );
@@ -3257,6 +3258,7 @@ describe("createRunExecutor", () => {
           callback({
             routine: {
               updateMany: routineClaim,
+              update: routineUpdate,
               findUnique: vi.fn(async () => ({
                 modelProvider: null,
                 modelId: null,
@@ -3294,6 +3296,11 @@ describe("createRunExecutor", () => {
       );
       expect(taskCreate).not.toHaveBeenCalled();
       expect(runCreate).not.toHaveBeenCalled();
+      // Nothing ran, so Last ran goes back to what it was.
+      expect(routineUpdate).toHaveBeenCalledWith({
+        where: { id: "routine-1" },
+        data: { lastRunAt: null },
+      });
       if (workState === "empty") {
         expect(scratchpadFindMany).toHaveBeenCalledWith(
           expect.objectContaining({

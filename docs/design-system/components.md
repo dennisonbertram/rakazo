@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 293 of 293
-- Web and shared components: 753
+- Web and shared components: 756
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -375,17 +375,17 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | UpdateBody, EarlierUpdate, DocumentRow, PortalHome | [apps/web/src/pages/portal/PortalHome.tsx](../../apps/web/src/pages/portal/PortalHome.tsx) | [PortalHome.stories.tsx](../../apps/web/src/pages/portal/PortalHome.stories.tsx) | web |
 | PortalOpen | [apps/web/src/pages/portal/PortalOpen.tsx](../../apps/web/src/pages/portal/PortalOpen.tsx) | [PortalOpen.stories.tsx](../../apps/web/src/pages/portal/PortalOpen.stories.tsx) | web |
 | ResizableSidePanel | [apps/web/src/pages/ResizableSidePanel.tsx](../../apps/web/src/pages/ResizableSidePanel.tsx) | [ResizableSidePanel.stories.tsx](../../apps/web/src/pages/ResizableSidePanel.stories.tsx) | web |
-| RoutineListHeader, RoutineListRow, RoutineEditor, MessageTriggerCard, InboundTriggerCard | [apps/web/src/pages/RoutineEditor.tsx](../../apps/web/src/pages/RoutineEditor.tsx) | [RoutineEditor.stories.tsx](../../apps/web/src/pages/RoutineEditor.stories.tsx) | web |
+| RoutineListHeader, RoutineListRow, RoutineEditor, MessageTriggerCard, WatchTriggerCard, InboundTriggerCard | [apps/web/src/pages/RoutineEditor.tsx](../../apps/web/src/pages/RoutineEditor.tsx) | [RoutineEditor.stories.tsx](../../apps/web/src/pages/RoutineEditor.stories.tsx) | web |
 | RoutineRunHistory | [apps/web/src/pages/RoutineRunHistory.tsx](../../apps/web/src/pages/RoutineRunHistory.tsx) | [RoutineRunHistory.stories.tsx](../../apps/web/src/pages/RoutineRunHistory.stories.tsx) | web |
 | RoutineSchedule | [apps/web/src/pages/RoutineSchedule.tsx](../../apps/web/src/pages/RoutineSchedule.tsx) | [RoutineSchedule.stories.tsx](../../apps/web/src/pages/RoutineSchedule.stories.tsx) | web |
-| ScratchpadSection | [apps/web/src/pages/ScratchpadSection.tsx](../../apps/web/src/pages/ScratchpadSection.tsx) | [ScratchpadSection.stories.tsx](../../apps/web/src/pages/ScratchpadSection.stories.tsx) | web |
+| ScratchpadItemMeta, ScratchpadSection | [apps/web/src/pages/ScratchpadSection.tsx](../../apps/web/src/pages/ScratchpadSection.tsx) | [ScratchpadSection.stories.tsx](../../apps/web/src/pages/ScratchpadSection.stories.tsx) | web |
 | SettingsOverlay | [apps/web/src/pages/SettingsOverlay.tsx](../../apps/web/src/pages/SettingsOverlay.tsx) | [SettingsOverlay.stories.tsx](../../apps/web/src/pages/SettingsOverlay.stories.tsx) | web |
 | SharedArtifactPage | [apps/web/src/pages/SharedArtifact.tsx](../../apps/web/src/pages/SharedArtifact.tsx) | [SharedArtifact.stories.tsx](../../apps/web/src/pages/SharedArtifact.stories.tsx) | web |
 | ShellPage, ComputerReleaseActions, DesktopKindEmptyState | [apps/web/src/pages/Shell.tsx](../../apps/web/src/pages/Shell.tsx) | [Shell.stories.tsx](../../apps/web/src/pages/Shell.stories.tsx) | web |
 | AvatarStudioPopover | [apps/web/src/pages/shell/avatar-studio-popover.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.tsx) | [avatar-studio-popover.stories.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.stories.tsx) | web |
 | BotCredentialsSection | [apps/web/src/pages/shell/bot-credentials.tsx](../../apps/web/src/pages/shell/bot-credentials.tsx) | [bot-credentials.stories.tsx](../../apps/web/src/pages/shell/bot-credentials.stories.tsx) | web |
 | ChartView, GtmView, BotPagePanel | [apps/web/src/pages/shell/bot-page-panel.tsx](../../apps/web/src/pages/shell/bot-page-panel.tsx) | [bot-page-panel.stories.tsx](../../apps/web/src/pages/shell/bot-page-panel.stories.tsx) | web |
-| ComputerModePicker, BotSettings | [apps/web/src/pages/shell/bot-panel.tsx](../../apps/web/src/pages/shell/bot-panel.tsx) | [bot-panel.stories.tsx](../../apps/web/src/pages/shell/bot-panel.stories.tsx) | web |
+| ComputerModePicker, CheckInSetting, BotSettings | [apps/web/src/pages/shell/bot-panel.tsx](../../apps/web/src/pages/shell/bot-panel.tsx) | [bot-panel.stories.tsx](../../apps/web/src/pages/shell/bot-panel.stories.tsx) | web |
 | BotCreatePicker | [apps/web/src/pages/shell/bot-picker.tsx](../../apps/web/src/pages/shell/bot-picker.tsx) | [bot-picker.stories.tsx](../../apps/web/src/pages/shell/bot-picker.stories.tsx) | web |
 | PinsStrip, ItemRow, PinsList | [apps/web/src/pages/shell/bot-pins.tsx](../../apps/web/src/pages/shell/bot-pins.tsx) | [bot-pins.stories.tsx](../../apps/web/src/pages/shell/bot-pins.stories.tsx) | web |
 | SkillSourceBadge, ToolBadge, DraftTool, BotSkillsSection | [apps/web/src/pages/shell/BotSkillsSection.tsx](../../apps/web/src/pages/shell/BotSkillsSection.tsx) | [BotSkillsSection.stories.tsx](../../apps/web/src/pages/shell/BotSkillsSection.stories.tsx) | web |

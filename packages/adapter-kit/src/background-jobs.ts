@@ -85,6 +85,7 @@ const payloadSchemas = {
   }),
   "company.import.recover": z.object({}),
   "company.refresh.tick": z.object({}),
+  "watch.probe": z.object({}),
   "finance.sync": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
   "dataroom.blob.delete": z.object({ spaceId: z.string().min(1), storageKey: z.string().min(1) }),
   "dataroom.ingest": dataRoomStepPayload,
@@ -212,6 +213,11 @@ export function runContinueJob(runId: string): BackgroundJob {
     payload: { runId },
     replaceKey: runJobKey(runId),
   };
+}
+
+/** One tick of the page-watch probe; the cron runs it every minute, this queues one on demand. */
+export function watchProbeJob(): BackgroundJob {
+  return { name: "watch.probe", payload: {}, replaceKey: "watch.probe" };
 }
 
 export function routineWakeupJob(routineId: string, scheduledFor: Date): BackgroundJob {

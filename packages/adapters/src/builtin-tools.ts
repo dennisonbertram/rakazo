@@ -1755,7 +1755,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "scratchpad_add",
     description:
-      "Add an open-work item to this bot's scratchpad. Use for todos or parked work that should outlive this turn. Not a reminder or schedule.",
+      "Add an open-work item to this bot's scratchpad. Use for todos or parked work that should outlive this turn. Not a reminder or schedule. Record who or what the item waits on (waitingOn) and when it is due (dueAt) whenever you know them, so the user is told when it goes past due.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1770,6 +1770,15 @@ export const builtinAgentTools: ConnectorTool[] = [
         channel: { type: "string", enum: ScratchpadChannelSchema.options },
         target: { type: "string", maxLength: 200 },
         scheduledFor: { type: "string", description: "Absolute ISO datetime with timezone." },
+        dueAt: {
+          type: "string",
+          description: "When the item is due: ISO date (2026-11-02) or datetime with timezone.",
+        },
+        waitingOn: {
+          type: "string",
+          maxLength: 120,
+          description: "Who or what the item waits on, for example 'Acme legal'.",
+        },
       },
       required: ["title"],
       additionalProperties: false,
@@ -1777,7 +1786,8 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "scratchpad_update",
-    description: "Update a scratchpad item's title, status, notes, target, schedule, or proof.",
+    description:
+      "Update a scratchpad item's title, status, notes, target, schedule, proof, due date (dueAt) or what it waits on (waitingOn). Keep waitingOn and dueAt current; send an empty string to clear waitingOn and null to clear dueAt.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1788,6 +1798,11 @@ export const builtinAgentTools: ConnectorTool[] = [
         target: { type: "string", maxLength: 200 },
         scheduledFor: { type: "string", description: "Absolute ISO datetime with timezone." },
         proof: { type: "string", maxLength: 2_000 },
+        dueAt: {
+          type: ["string", "null"],
+          description: "ISO date or datetime with timezone; null clears.",
+        },
+        waitingOn: { type: "string", maxLength: 120 },
       },
       required: ["itemId"],
       additionalProperties: false,
@@ -1795,11 +1810,13 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "scratchpad_complete",
-    description: "Mark a scratchpad item done.",
+    description:
+      "Mark a scratchpad item done. Give a short reason when it resolved by itself or for a different reason than you did it.",
     inputSchema: {
       type: "object",
       properties: {
         itemId: { type: "string" },
+        reason: { type: "string", maxLength: 200 },
         proof: { type: "string", maxLength: 2_000 },
       },
       required: ["itemId"],
@@ -1897,8 +1914,32 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "schedule_create",
     description:
-      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone.',
+      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone. For "tell me if X changes" or "let me know when this page updates", use watch_create instead: a cron job that reports "no change" wastes a run and a message every time.',
     inputSchema: scheduleCreateInputSchema,
+  },
+  {
+    name: "watch_create",
+    description:
+      'Watch a web page and wake this bot only when its text changes. Use for "tell me if the pricing page changes" or "let me know when X is published". The page is checked without a model; a change starts a run with a short before/after diff, so the instruction says what to do on a change ("tell me what changed in a sentence"), never "report that nothing changed". The first check only records the page. A watch keeps running, and wakes the bot on every change, until the user pauses or deletes it, so never promise or write "stop after the first change". Pauses for the user to approve a card. At most 5 watches per bot. Use schedule_list, schedule_update (watch: { url, intervalMinutes }) and schedule_cancel to see, change or stop it.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The http or https address of the page." },
+        intervalMinutes: {
+          type: "number",
+          enum: [15, 60, 1440],
+          description: "How often to check: 15, 60 (default) or 1440 minutes.",
+        },
+        name: { type: "string", description: "Short name, e.g. “Pricing page”." },
+        instruction: {
+          type: "string",
+          description:
+            "What to do on each change, e.g. “Tell me what changed in a sentence.” The watch keeps running until the user pauses or deletes it, so do not say to stop monitoring.",
+        },
+      },
+      required: ["url", "name", "instruction"],
+      additionalProperties: false,
+    },
   },
   {
     name: "schedule_list",
@@ -1933,6 +1974,15 @@ export const builtinAgentTools: ConnectorTool[] = [
         },
         timezone: { type: "string", description: "IANA timezone for cron times." },
         enabled: { type: "boolean" },
+        watch: {
+          type: "object",
+          description: "For a watch: the new page address and/or check interval.",
+          properties: {
+            url: { type: "string" },
+            intervalMinutes: { type: "number", enum: [15, 60, 1440] },
+          },
+          additionalProperties: false,
+        },
       },
       required: ["id"],
       additionalProperties: false,

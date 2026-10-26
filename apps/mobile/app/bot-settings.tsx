@@ -37,6 +37,8 @@ import { native, useMobileTokens } from "../lib/native";
 import { errorText } from "../lib/user-error";
 import { stopVoicePlayback } from "../lib/voice";
 
+type CheckInCadence = "off" | "daily" | "every_4h";
+
 type BotSettingsRecord = MobileBot & {
   description?: string;
 };
@@ -72,6 +74,7 @@ export default function BotSettingsScreen() {
   const [skills, setSkills] = useState<BotAgentSkill[]>([]);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [notifyOnFinish, setNotifyOnFinish] = useState(true);
+  const [checkIn, setCheckIn] = useState<CheckInCadence>("off");
 
   useEffect(() => {
     if (!botId) return;
@@ -94,6 +97,31 @@ export default function BotSettingsScreen() {
       })
       .catch((err) => setError(errorText(err, t("Could not load bot"))));
   }, [botId]);
+
+  useEffect(() => {
+    if (!botId) return;
+    void rpc<{ cadence: CheckInCadence }>("checkIn/get", { botId })
+      .then((next) => setCheckIn(next.cadence))
+      .catch(() => undefined);
+  }, [botId]);
+
+  async function chooseCheckIn(cadence: CheckInCadence) {
+    const previous = checkIn;
+    setCheckIn(cadence);
+    setError(null);
+    try {
+      await rpc("checkIn/set", { botId, cadence });
+    } catch {
+      setCheckIn(previous);
+      setError(t("Could not save check-in"));
+    }
+  }
+
+  const checkInChoices: MenuPickerChoice[] = [
+    { key: "off", label: t("Off") },
+    { key: "daily", label: t("Daily") },
+    { key: "every_4h", label: t("Every 4 hours") },
+  ];
 
   const loadSkills = useCallback(() => {
     if (!botId) return;
@@ -527,6 +555,35 @@ export default function BotSettingsScreen() {
             onValueChange={setNotifyOnFinish}
             value={notifyOnFinish}
           />
+        </View>
+        <View style={styles.row}>
+          <Text style={[styles.rowLabel, { color: tokens.mutedForeground }]}>{t("Check in")}</Text>
+          <MenuPickerMenu
+            choices={checkInChoices}
+            label={t("Check in")}
+            onChange={(key) => void chooseCheckIn(key as CheckInCadence)}
+            value={checkIn}
+          >
+            <View
+              accessibilityLabel={t("Check in")}
+              accessibilityRole="button"
+              accessibilityValue={{
+                text: checkInChoices.find((choice) => choice.key === checkIn)?.label ?? "",
+              }}
+              accessible
+              style={styles.voiceTrigger}
+            >
+              <Text numberOfLines={1} style={[styles.rowValue, { color: tokens.foreground }]}>
+                {checkInChoices.find((choice) => choice.key === checkIn)?.label}
+              </Text>
+              <NativeSymbol
+                android="chevron-expand"
+                color={native.tertiaryLabel}
+                ios="chevron.up.chevron.down"
+                size={13}
+              />
+            </View>
+          </MenuPickerMenu>
         </View>
         {deviceVoiceEnabled ? (
           voiceError ? (
