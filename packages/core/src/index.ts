@@ -97,6 +97,7 @@ export * from "./thread-subscription.js";
 export * from "./time-separators.js";
 export * from "./tool-activity.js";
 export * from "./tool-schema.js";
+export * from "./ui-block-text.js";
 export * from "./ui-locale.js";
 export * from "./untrusted-data.js";
 export * from "./user-error.js";

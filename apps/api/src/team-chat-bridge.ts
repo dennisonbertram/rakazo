@@ -7,7 +7,7 @@ import type {
 import { runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import { AutomatedSenderPoliciesSchema } from "@rakazo/contracts";
-import { BOT_MESSAGE_MAX_HOPS } from "@rakazo/core";
+import { BOT_MESSAGE_MAX_HOPS, uiBlockText } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import type { TeamChatEngagementJudge } from "./team-chat-judge.js";
@@ -91,8 +91,13 @@ export function teamChatResponseText(
   allowSilence = false,
 ): string {
   const text = blocks
-    .filter((block): block is Extract<MessageBlock, { kind: "text" }> => block.kind === "text")
-    .map((block) => block.text)
+    .map((block) =>
+      block.kind === "text"
+        ? block.text
+        : block.kind === "ui"
+          ? `\n\n${uiBlockText(block.block)}\n\n`
+          : "",
+    )
     .join("")
     .trim();
   return text || (allowSilence ? "" : `${botName} completed the request without a written reply.`);

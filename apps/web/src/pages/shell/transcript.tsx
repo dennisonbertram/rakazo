@@ -3,7 +3,7 @@ import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ChatMarkdownProps } from "@rakazo/chat-ui/web";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { MailEdits, MessageReaction, ThreadMessage } from "@rakazo/contracts";
+import type { MailEdits, MessageReaction, ThreadMessage, UiBlock } from "@rakazo/contracts";
 import { canReactToThreadMessage, MESSAGE_REACTIONS } from "@rakazo/contracts";
 import {
   DEFAULT_BOT_COLOR,
@@ -81,6 +81,7 @@ import {
   ToolSteps,
 } from "../../components/ToolActivityDisclosure";
 import { SkillDraftCard } from "../../components/teach/SkillDraftCard";
+import { UiBlockView } from "../../components/UiBlockView";
 import { bubbleMeasure, UserTextBubble } from "../../components/UserTextBubble";
 import type { ArtifactTarget } from "../../lib/artifact-open";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../../lib/hide-amounts-preference";
@@ -123,6 +124,11 @@ const AppNavigateContext = createContext<((href: string) => void) | undefined>(u
 function ThreadMarkdown(props: ChatMarkdownProps) {
   const onNavigate = useContext(AppNavigateContext);
   return <ChatMarkdown {...props} onNavigate={onNavigate} />;
+}
+
+/** A render_ui block whose app links navigate in place. */
+function ThreadUiBlock({ block }: { block: UiBlock }) {
+  return <UiBlockView block={block} onNavigate={useContext(AppNavigateContext)} />;
 }
 
 /** A thin line in the bot's accent (neutral without one) marking where unread messages start. */
@@ -1876,6 +1882,13 @@ const MessageView = memo(function MessageView({
         }
         if (block.kind === "card") {
           return <ResultCard key={i} block={block} />;
+        }
+        if (block.kind === "ui") {
+          return (
+            <div key={i} className="flex justify-start">
+              <ThreadUiBlock block={block.block} />
+            </div>
+          );
         }
         if (block.kind === "ask") {
           // A card after text in the same message sits one message-gap (20 px) below it.
