@@ -23,11 +23,13 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { useFinanceQuery } from "../components/finance/ui";
+import { PickFilter, SearchField } from "../components/ListControls";
 import { downloadArtifactBytes } from "../lib/artifact-open";
 import { companyDate, companyDateEnd } from "../lib/company-format";
 import { money } from "../lib/finance-format";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 import { todayIso } from "../lib/legal-format";
+import { useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 import { CompanyCalendar } from "./CompanyCalendar";
@@ -36,6 +38,8 @@ import { CompanyHistory } from "./CompanyHistory";
 import { CompanyPrivacy } from "./CompanyPrivacy";
 import { CompanyRefresh } from "./CompanyRefresh";
 import { CompanyReview } from "./CompanyReview";
+import type { CompanyRow, CompanySort } from "./company-list";
+import { COMPANY_SORTS, companyRows, companySources, DEFAULT_COMPANY_SORT } from "./company-list";
 
 export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
   useHideAmounts();
@@ -96,57 +100,116 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
     roles(row.id).length > 0 &&
     roles(row.id).every((edge) => edge.endsOn && companyDateEnd(edge.endsOn) < todayIso());
   const showEntity = (record: CompanyEntityRecord) => setFact({ kind: "entity", record });
-  const rows = (entities: CompanyEntityRecord[]) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>
-            <Trans>Name</Trans>
-          </TableHead>
-          <TableHead>
-            <Trans>Role</Trans>
-          </TableHead>
-          <TableHead>
-            <Trans>Since</Trans>
-          </TableHead>
-          <TableHead>
-            <Trans>Sources</Trans>
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {entities.map((row) => (
-          <TableRow key={row.id}>
-            <TableCell>
-              <Button variant="link" className="h-auto p-0" onClick={() => showEntity(row)}>
-                {maskCurrencyWhenHidden(row.displayName)}
-              </Button>
-              {row.status !== "confirmed" && (
-                <span className="block text-xs text-muted-foreground">
-                  <Trans>Not confirmed</Trans>
-                </span>
-              )}
-            </TableCell>
-            <TableCell>
-              {roles(row.id)
-                .filter((edge) => !edge.endsOn || companyDateEnd(edge.endsOn) >= todayIso())
-                .map((edge) => (
-                  <Button
-                    key={edge.id}
-                    variant="link"
-                    onClick={() => setFact({ kind: "edge", record: edge })}
-                  >
-                    {maskCurrencyWhenHidden(edge.role ?? "—")}
-                  </Button>
-                ))}
-            </TableCell>
-            <TableCell>{companyDate(roles(row.id)[0]?.startsOn)}</TableCell>
-            <TableCell>{row.readOnly ? "—" : row.evidence.length}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+  // Search, source filter and sort live in the URL: ?q=, source, sort, dir.
+  const list = useListParams(COMPANY_SORTS, DEFAULT_COMPANY_SORT);
+  const filters = { q: list.param("q"), source: list.param("source") };
+  const visible = (entities: CompanyEntityRecord[]) =>
+    companyRows(
+      entities.map(
+        (entity): CompanyRow => ({
+          entity,
+          role:
+            roles(entity.id)
+              .filter((edge) => !edge.endsOn || companyDateEnd(edge.endsOn) >= todayIso())
+              .map((edge) => edge.role)
+              .filter(Boolean)
+              .join(", ") || null,
+          since: roles(entity.id)[0]?.startsOn?.date ?? null,
+        }),
+      ),
+      filters,
+      list.sort,
+    ).map((row) => row.entity);
+  const sortHead = (field: CompanySort) => ({
+    sortDirection: list.sort.field === field ? list.sort.dir : null,
+    onSort: () => list.toggleSort(field),
+  });
+  const toolbar = (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <SearchField
+        name="company-search"
+        value={filters.q ?? ""}
+        onChange={(value) => list.setParam("q", value)}
+        placeholder={t`Search`}
+        label={t`Search`}
+        className="w-56"
+      />
+      <PickFilter
+        label={t`Source`}
+        value={filters.source}
+        options={companySources(data?.entities ?? []).map((kind) => [
+          kind,
+          kind.replaceAll("_", " "),
+        ])}
+        onChange={(value) => list.setParam("source", value)}
+      />
+    </div>
   );
+  const filtered = Boolean(filters.q || filters.source);
+  const noMatches = (entities: CompanyEntityRecord[]) =>
+    filtered &&
+    visible(entities).length === 0 && (
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          <Trans>No matches</Trans>
+        </p>
+        <Button variant="outline" size="sm" onClick={() => list.clear("q", "source")}>
+          <Trans>Clear filters</Trans>
+        </Button>
+      </div>
+    );
+  const rows = (entities: CompanyEntityRecord[]) =>
+    filtered && visible(entities).length === 0 ? null : (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead {...sortHead("name")}>
+              <Trans>Name</Trans>
+            </TableHead>
+            <TableHead {...sortHead("role")}>
+              <Trans>Role</Trans>
+            </TableHead>
+            <TableHead {...sortHead("since")}>
+              <Trans>Since</Trans>
+            </TableHead>
+            <TableHead>
+              <Trans>Sources</Trans>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {visible(entities).map((row) => (
+            <TableRow key={row.id}>
+              <TableCell>
+                <Button variant="link" className="h-auto p-0" onClick={() => showEntity(row)}>
+                  {maskCurrencyWhenHidden(row.displayName)}
+                </Button>
+                {row.status !== "confirmed" && (
+                  <span className="block text-xs text-muted-foreground">
+                    <Trans>Not confirmed</Trans>
+                  </span>
+                )}
+              </TableCell>
+              <TableCell>
+                {roles(row.id)
+                  .filter((edge) => !edge.endsOn || companyDateEnd(edge.endsOn) >= todayIso())
+                  .map((edge) => (
+                    <Button
+                      key={edge.id}
+                      variant="link"
+                      onClick={() => setFact({ kind: "edge", record: edge })}
+                    >
+                      {maskCurrencyWhenHidden(edge.role ?? "—")}
+                    </Button>
+                  ))}
+              </TableCell>
+              <TableCell>{companyDate(roles(row.id)[0]?.startsOn)}</TableCell>
+              <TableCell>{row.readOnly ? "—" : row.evidence.length}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
   return (
     <div className="rk-scroll flex-1 overflow-y-auto px-4 py-5 md:px-7">
       <header className="mb-6 flex items-center justify-between">
@@ -379,8 +442,10 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           )}
           {view === "people" && (
             <>
+              {toolbar}
+              {noMatches(people)}
               {rows(people.filter((row) => !past(row)))}
-              {people.some(past) && (
+              {visible(people.filter(past)).length > 0 && (
                 <details>
                   <summary className="cursor-pointer font-medium">
                     <Trans>Past members</Trans>
@@ -390,13 +455,15 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
               )}
             </>
           )}
+          {view === "organisations" && toolbar}
+          {view === "organisations" && noMatches(organisations)}
           {view === "organisations" &&
-            [...new Set(organisations.map((row) => String(row.attrs.type ?? "other")))]
+            [...new Set(visible(organisations).map((row) => String(row.attrs.type ?? "other")))]
               .sort()
               .map((group) => (
                 <section key={group}>
                   <h2 className="mb-3 font-medium capitalize">{group.replaceAll("_", " ")}</h2>
-                  {organisations
+                  {visible(organisations)
                     .filter((row) => (row.attrs.type ?? "other") === group)
                     .map((row) => (
                       <div key={row.id} className="border-b py-3">
