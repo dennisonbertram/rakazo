@@ -396,6 +396,8 @@ Do not commit `.env`. Never put `COMPOSIO_API_KEY`, OpenRouter keys, or provider
 
 Optional messaging platforms (iMessage, Slack, WhatsApp, Telegram, Feishu/Lark) mount when their env credentials are set — see `.env.example`. Point a Feishu/Lark bot event subscription at `/api/v1/messaging/webhook/lark` (webhook/HTTP inbound only; do not enable long connection). Groups stay iMessage-only.
 
+The Compose files pass the API and worker only the settings each one reads, listed by name, rather than the whole `.env`. A setting whose name you choose, such as `TELEGRAM_BOT_TOKEN_<NAME>`, therefore needs its own line: add it under `api` and `worker` `environment` in an override file layered after the base file (and in `RAKAZO_COMPOSE_FILE` when the updater is enabled), with no value so Compose fills it from `.env`.
+
 ### iMessage through Photon
 
 Photon (photon.codes) runs a hosted iMessage line, so no Mac is needed. Its free plan (a shared number, up to 10 users) is the default for a self-hosted install.
@@ -443,7 +445,9 @@ The Electron desktop app is a client of the same API. Docker and E2B still apply
 - **Desktop provider** / **This Mac** runs commands on the API/worker host. Docker stays the default.
   The Electron app asks once; if you choose This Mac, bots can use working directories under your home
   folder. Do not enable it on a public or shared service. macOS does not show its own permission
-  dialog for this.
+  dialog for this. Commands get only a minimal shell environment (no server secrets), and
+  `SANDBOX_PROVIDER=desktop` is refused unless `NODE_ENV` is `development` or `test` or the process
+  runs inside the Electron app, so a production server never runs bot commands on itself.
 - **Fake** is only an emulator for verification.
 - **None** boots the product without a computer host (fallback when Docker/supervisor is not
   configured, or when a remote provider is selected without its API key).
@@ -645,9 +649,9 @@ docker compose --env-file .env -f infra/compose/docker-compose.prod.yml exec api
 ```
 
 Passing `GIT_SHA` is what makes `/internal/health` report a `"revision"`; a locally built image has no
-other way to know its commit. Prebuilt images from the registry bake it in at publish time, so when
-you switch to a release tag you should leave `GIT_SHA` unset — a value in `.env` would override what
-the image already knows.
+other way to know its commit. Prebuilt images from the registry bake it in at publish time, so
+switching to a release tag needs nothing more: the containers report the revision the image was built
+from, not a `GIT_SHA` in `.env`.
 
 Once a release has been published you can switch this host to prebuilt images by setting
 `RAKAZO_IMAGE_TAG` to that release tag and running `pull` followed by `up -d --wait --pull never`.
