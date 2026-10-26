@@ -139,14 +139,14 @@ export function InboxMessageDialog({
         tabIndex={-1}
         showCloseButton={false}
         className={cn(
-          "top-0 left-0 flex h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col gap-2 rounded-none pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] ring-0 sm:max-w-none md:top-[7.5vh] md:left-1/2 md:h-auto md:max-h-[85vh] md:w-[min(768px,94vw)] md:-translate-x-1/2 md:translate-y-0 md:rounded-xl md:ring-1 md:transition-[left,width,transform] md:duration-200",
-          // From 1280px the dialog grows to up to 1152px, stays centred so both side gutters stay equal,
+          "top-0 left-0 flex h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col gap-2 rounded-none pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] ring-0 sm:max-w-none md:top-[7.5vh] md:left-1/2 md:h-auto md:max-h-[85vh] md:w-[min(1200px,94vw)] md:-translate-x-1/2 md:translate-y-0 md:rounded-xl md:ring-1 md:transition-[left,width,transform] md:duration-200",
+          // From 1280px the dialog grows to up to 1440px, stays centred so both side gutters stay equal,
           // and the panel sits beside the email. Below that the panel overlays
           // the dialog's right side and the email column reserves that space, so no text runs under it.
           // The `!` is needed because Tailwind emits an arbitrary min-width variant before `md`, which
           // would otherwise win.
           agentBot &&
-            "md:h-[85vh] min-[1280px]:w-[min(1152px,calc(50vw+376px))]! min-[1280px]:flex-row min-[1280px]:gap-0",
+            "md:h-[85vh] min-[1280px]:w-[min(1440px,calc(50vw+376px))]! min-[1280px]:flex-row min-[1280px]:gap-0",
           composing && "invisible",
         )}
       >
@@ -635,7 +635,10 @@ function InboxMessage({
               <SandboxedHtmlViewer html={message.html} title={message.subject} email />
             </div>
           ) : (
-            <p dir="auto" className="whitespace-pre-wrap py-4 wrap-anywhere text-sm">
+            <p
+              dir="auto"
+              className="mt-3 whitespace-pre-wrap rounded-lg border border-border bg-card px-4 py-6 wrap-anywhere text-sm sm:px-8"
+            >
               {maskCurrencyWhenHidden(message.text ?? "")}
             </p>
           )}
