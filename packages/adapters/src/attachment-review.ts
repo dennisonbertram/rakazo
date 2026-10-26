@@ -17,6 +17,38 @@ export type AttachmentReviewResult =
   | { status: "needs_consent"; recipient: { key: string; name: string } }
   | { status: "unavailable" };
 
+/**
+ * The recipient the user has not allowed yet, as a `needs_consent` result; null when the model
+ * shares nothing outside the app (no recipient) or the user accepted the current disclosure.
+ */
+export async function missingConsent(
+  prisma: Pick<PrismaClient, "aiDataConsent">,
+  scope: { userId: string; spaceId: string },
+  model: AgentRunModel,
+): Promise<{ status: "needs_consent"; recipient: { key: string; name: string } } | null> {
+  const recipient = aiRecipient({
+    provider: model.provider,
+    modelId: model.id,
+    baseUrl: model.baseUrl,
+    use: "model",
+  });
+  // No recipient: the scripted runtime or a model that shares nothing outside the app.
+  if (!recipient) return null;
+  const consent = await prisma.aiDataConsent.findUnique({
+    where: {
+      userId_spaceId_recipientKey: {
+        userId: scope.userId,
+        spaceId: scope.spaceId,
+        recipientKey: recipient.key,
+      },
+    },
+    select: { version: true },
+  });
+  return consent?.version === AI_DISCLOSURE_VERSION
+    ? null
+    : { status: "needs_consent", recipient: { key: recipient.key, name: recipient.name } };
+}
+
 const TIMEOUT_MS = 90_000;
 /** What the model reads of the file and of the email; the rest is cut. */
 export const REVIEW_TEXT_CHARS = 60_000;
@@ -97,28 +129,8 @@ export async function reviewAttachment(
   try {
     const model = await deps.resolveModel?.(scope);
     if (!model) return { status: "unavailable" };
-    const recipient = aiRecipient({
-      provider: model.provider,
-      modelId: model.id,
-      baseUrl: model.baseUrl,
-      use: "model",
-    });
-    // No recipient: the scripted runtime or a model that shares nothing outside the app.
-    if (recipient) {
-      const consent = await deps.prisma.aiDataConsent.findUnique({
-        where: {
-          userId_spaceId_recipientKey: {
-            userId: scope.userId,
-            spaceId: scope.spaceId,
-            recipientKey: recipient.key,
-          },
-        },
-        select: { version: true },
-      });
-      if (consent?.version !== AI_DISCLOSURE_VERSION) {
-        return { status: "needs_consent", recipient: { key: recipient.key, name: recipient.name } };
-      }
-    }
+    const needsConsent = await missingConsent(deps.prisma, scope, model);
+    if (needsConsent) return needsConsent;
     const runId = `attachment-review:${crypto.randomUUID()}`;
     const attribution = { ...scope, operationId: runId, operationKind: "retrieval" as const };
     const first = `${input.context}\n\n${REVIEW_REQUEST}`;

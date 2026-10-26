@@ -643,3 +643,44 @@ export const InboxAttachmentReviewOutputSchema = z.discriminatedUnion("status", 
 ]);
 export type InboxAttachmentReviewInput = z.input<typeof InboxAttachmentReviewInputSchema>;
 export type InboxAttachmentReviewOutput = z.infer<typeof InboxAttachmentReviewOutputSchema>;
+
+/** The address of a person the user is reading or writing to. */
+export const InboxPersonInputSchema = z.object({ email: z.string().trim().min(3).max(254) });
+
+const PersonMeetingSchema = z.object({
+  title: z.string(),
+  start: z.string(),
+  /** Where the meeting can be opened; null when its source has no page. */
+  href: z.string().nullable(),
+});
+
+/** What the user already has about one person. Every source is optional: a failed one is left empty. */
+export const InboxPersonContextSchema = z.object({
+  email: z.string(),
+  name: z.string().nullable(),
+  organization: z.string().nullable(),
+  /** The contact's kind, such as "investor"; null when the address is not a contact. */
+  kind: z.string().nullable(),
+  contactId: Id.nullable(),
+  /** The user's newest message to this address. */
+  lastEmailedAt: z.string().nullable(),
+  threadCount: z.number().int().nonnegative(),
+  /** Newest first; `id` opens the thread's newest cached message. */
+  threads: z.array(z.object({ id: Id, subject: z.string(), receivedAt: z.string() })),
+  lastMeeting: PersonMeetingSchema.nullable(),
+  nextMeeting: PersonMeetingSchema.nullable(),
+  documents: z.array(z.object({ id: Id, name: z.string() })),
+  todos: z.array(z.object({ id: Id, text: z.string(), dueOn: z.string().nullable() })),
+});
+
+export const InboxPersonSummaryOutputSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("ok"), summary: z.string() }),
+  z.object({
+    status: z.literal("needs_consent"),
+    recipient: z.object({ key: z.string(), name: z.string() }),
+  }),
+  z.object({ status: z.literal("unavailable") }),
+]);
+export type InboxPersonInput = z.input<typeof InboxPersonInputSchema>;
+export type InboxPersonContext = z.infer<typeof InboxPersonContextSchema>;
+export type InboxPersonSummaryOutput = z.infer<typeof InboxPersonSummaryOutputSchema>;

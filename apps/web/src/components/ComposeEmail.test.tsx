@@ -71,6 +71,12 @@ vi.mock("@rakazo/ui-web", () => {
   };
 });
 
+vi.mock("./inbox/EmailSidePanel", () => ({
+  EmailSidePanel: ({ people }: { people: Array<{ email: string }> }) => (
+    <aside data-testid="context-panel">{people.map((p) => p.email).join(",")}</aside>
+  ),
+}));
+
 import { closeRestored, getOutbox, UNDO_SEND_MS, undoSend } from "../lib/outbox";
 import type { ComposeSeed } from "./ComposeEmail";
 import { ComposeEmail } from "./ComposeEmail";
@@ -849,4 +855,16 @@ it("will not send a new message with no From account chosen", async () => {
   await act(async () => button("Send").click());
   expect(document.body.textContent).toContain("Choose which account to send from.");
   expect(send).not.toHaveBeenCalled();
+});
+
+it("shows context for the To recipients only, and the Context button hides it", async () => {
+  await open(reply("replyAll"));
+  const panel = () => document.querySelector('[data-testid="context-panel"]');
+  // Cc people are not who the message is for.
+  expect(panel()?.textContent).toBe("sam@example.test");
+  const toggle = document.querySelector<HTMLElement>('button[aria-label="Context"]');
+  await act(async () => toggle?.click());
+  expect(panel()).toBeNull();
+  await act(async () => toggle?.click());
+  expect(panel()).not.toBeNull();
 });

@@ -277,6 +277,9 @@ import {
   InboxMessageSchema,
   InboxMoveInputSchema,
   InboxMoveOutputSchema,
+  InboxPersonContextSchema,
+  InboxPersonInputSchema,
+  InboxPersonSummaryOutputSchema,
   InboxRefreshInputSchema,
   InboxRefreshOutputSchema,
   InboxScopeInputSchema,
@@ -1562,6 +1565,10 @@ export const appContract = {
     reviewAttachment: oc
       .input(InboxAttachmentReviewInputSchema)
       .output(InboxAttachmentReviewOutputSchema),
+    /** Facts about one address from the user's own contacts, mail, calendar, meetings, Data room and to-dos; no model. */
+    personContext: oc.input(InboxPersonInputSchema).output(InboxPersonContextSchema),
+    /** A short model summary of `personContext`; facts do not wait for it. */
+    personSummary: oc.input(InboxPersonInputSchema).output(InboxPersonSummaryOutputSchema),
     list: oc.input(InboxListInputSchema).output(InboxListOutputSchema),
     refresh: oc.input(InboxRefreshInputSchema).output(InboxRefreshOutputSchema),
     get: oc.input(z.object({ messageId: Id })).output(InboxMessageSchema),
