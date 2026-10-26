@@ -34,6 +34,24 @@ const rules: ActionApprovalRule[] = [
   },
 ];
 
+const tableRows = [
+  "send_email",
+  "spend_money",
+  "connected_apps_write",
+  "calendar_changes",
+  "files_and_commands",
+  "use_computer",
+  "delete_data",
+  "message_outside",
+  "use_credentials",
+].map((actionType, index) => ({
+  actionType,
+  primary: index < 5,
+  effect: actionType === "send_email" || actionType === "spend_money" ? "ask" : "allow",
+  spaceEffect: actionType === "send_email" || actionType === "spend_money" ? "ask" : "allow",
+  botEffect: null,
+}));
+
 const meta = {
   title: "Settings/ApprovalRulesSettings",
   component: ApprovalRulesSettings,
@@ -54,6 +72,7 @@ type Story = StoryObj<typeof meta>;
 export const WithRules: Story = {
   beforeEach: () =>
     mockRpc({
+      "approvalRules.table": { rows: tableRows },
       "approvalRules.list": rules,
       "approvalRules.set": (input: unknown) => ({
         id: "rule_new",
@@ -67,6 +86,7 @@ export const WithRules: Story = {
 export const NoRules: Story = {
   beforeEach: () =>
     mockRpc({
+      "approvalRules.table": { rows: tableRows },
       "approvalRules.list": [],
     }),
 };

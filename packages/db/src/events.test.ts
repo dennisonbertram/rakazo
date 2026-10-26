@@ -2734,6 +2734,7 @@ describe("sendUserMessage", () => {
         ]),
         findUnique: vi.fn().mockResolvedValue({ status: "running" }),
         create: vi.fn(),
+        update: vi.fn(),
       },
       event: {
         create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
@@ -2761,6 +2762,64 @@ describe("sendUserMessage", () => {
     expect(tx.steeringMessage.create).toHaveBeenCalledWith({
       data: { messageId: "message-1", botId: "bot-1", userId: "user-1", runId: "run-user" },
     });
+  });
+});
+
+describe("sendUserMessage taint on a busy run", () => {
+  function busyTx() {
+    const tx = {
+      thread: {
+        update: vi
+          .fn()
+          .mockResolvedValueOnce({ nextMessageSeq: 5 })
+          .mockResolvedValueOnce({ nextEventSeq: 9 }),
+      },
+      message: {
+        create: vi.fn().mockResolvedValue({ id: "message-1", seq: 4 }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      steeringMessage: { create: vi.fn() },
+      task: { create: vi.fn() },
+      run: {
+        findMany: vi.fn().mockResolvedValue([{ id: "run-0", taskId: "task-0", trigger: "user" }]),
+        findUnique: vi.fn().mockResolvedValue({ status: "running" }),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+    return { tx, prisma };
+  }
+  const base = {
+    spaceId: "workspace-1",
+    threadId: "thread-1",
+    botId: "bot-1",
+    userId: "user-1",
+    blocks: [{ kind: "text" as const, text: "hello" }],
+    prompt: "hello",
+  };
+
+  it("taints the busy conversational run when an inbound message steers it", async () => {
+    const { tx, prisma } = busyTx();
+    await sendUserMessage(prisma, { ...base, trigger: "messaging" });
+    expect(tx.run.update).toHaveBeenCalledWith({
+      where: { id: "run-0" },
+      data: { externalTaint: true },
+    });
+  });
+
+  it("leaves the busy run alone when the owner steers it", async () => {
+    const { tx, prisma } = busyTx();
+    await sendUserMessage(prisma, { ...base, trigger: "follow_up" });
+    expect(tx.run.update).not.toHaveBeenCalled();
   });
 });
 

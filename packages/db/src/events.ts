@@ -471,6 +471,11 @@ export async function sendUserMessage(
         }
       } else if (createRun && busy) {
         const held = !isConversationalRun(busy.trigger);
+        // The run will read this message as steering, so outside content taints it for the rest
+        // of its life. The taint alone forces approval cards; `unattended` stays as created.
+        if (!held && newRunExternalTaint({ trigger: input.trigger, source: input.sourceRun })) {
+          await tx.run.update({ where: { id: busy.id }, data: { externalTaint: true } });
+        }
         await tx.steeringMessage.create({
           data: {
             messageId: message.id,

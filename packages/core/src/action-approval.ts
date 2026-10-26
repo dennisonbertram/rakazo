@@ -203,6 +203,11 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "pins_write",
   "attach_file",
   "recall_memory",
+  // Metadata reads that return names and schedules only, never values.
+  "task_catalog",
+  "schedule_list",
+  "schedule_runs",
+  "list_secrets",
 ]);
 
 /** True when a tainted run may call the tool without a card. Same scratchpad rule as unattended. */
@@ -342,7 +347,14 @@ export function actionTypeForTool(input: {
     // Built-ins that need approval but have no row of their own write to connected services.
     return APPROVAL_REQUIRED_BUILTIN_TOOLS.has(toolName) ? "connected_apps_write" : null;
   }
-  if (!connectorToolRequiresApproval(toolName, input.readOnly)) return null;
+  // A declared read-only hint is honoured only when the name is not mutating or compound. A
+  // name like gmail_send_email is classified by name, so a connector cannot dodge a category
+  // Block by claiming readOnly. Unattended runs still ask through unattendedToolRequiresApproval.
+  const declaredRead =
+    input.readOnly === true &&
+    !MUTATING_CONNECTOR_PATTERN.test(toolName) &&
+    !COMPOUND_CONNECTOR_ACTION_PATTERN.test(toolName);
+  if (declaredRead || !connectorToolRequiresApproval(toolName, input.readOnly)) return null;
   const kind = (input.connectorKind ?? connectorKindFromToolName(toolName)).toLowerCase();
   if (PURCHASE_CONNECTOR_SLUGS.has(kind) || /purchase|pay_|charge|checkout|buy_/i.test(toolName)) {
     return "spend_money";

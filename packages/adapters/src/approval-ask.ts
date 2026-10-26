@@ -28,6 +28,8 @@ export function buildApprovalAskBlock(
   secrets: string[],
   options?: {
     reviewReason?: string;
+    /** One plain sentence under the card: the call asked because of a background run or a rule. */
+    approvalReason?: string;
     fullMail?: boolean;
     fullCompany?: boolean;
     integrationWriteTool?: string;
@@ -113,6 +115,7 @@ export function buildApprovalAskBlock(
         : args,
       secrets,
     ),
+    approvalReason: options?.approvalReason,
     status: "pending",
     actions:
       toolName === "create_space"

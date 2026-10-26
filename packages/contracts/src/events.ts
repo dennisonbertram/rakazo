@@ -47,6 +47,8 @@ export const ProductEventType = z.enum([
   "skill.draft.created",
   "skill.saved",
   "effect.recorded",
+  /** payload: { tool, actionType, decision, source, unattended, tainted }; never the arguments */
+  "approval.decided",
   "agent.tool.called",
   "agent.tool.completed",
   "effect.reconciled",
