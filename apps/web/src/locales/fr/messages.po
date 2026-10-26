@@ -745,6 +745,11 @@ msgstr ""
 msgid "* So far"
 msgstr ""
 
+#. placeholder {0}: items.length - MONTH_CHIPS
+#: src/pages/Calendar.tsx
+msgid "+{0} more"
+msgstr ""
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "+{count} more"
 msgstr ""
@@ -1199,7 +1204,6 @@ msgstr "Avancé..."
 msgid "Advisor"
 msgstr ""
 
-#: src/pages/Calendar.tsx
 #: src/pages/CompanyCalendar.tsx
 msgid "Agenda"
 msgstr ""
@@ -4508,6 +4512,10 @@ msgstr ""
 msgid "day"
 msgstr "jour"
 
+#: src/pages/Calendar.tsx
+msgid "Day"
+msgstr ""
+
 #: src/pages/RoutineSchedule.tsx
 msgid "Day of week"
 msgstr ""
@@ -5922,6 +5930,10 @@ msgstr ""
 msgid "Google apps"
 msgstr ""
 
+#: src/pages/Calendar.tsx
+msgid "Google Calendar"
+msgstr ""
+
 #: src/components/data-room/FilterBar.tsx
 msgid "Google Drive"
 msgstr ""
@@ -6824,6 +6836,7 @@ msgstr "Charger automatiquement les images web"
 
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Finance.tsx
 #: src/pages/Shell.tsx
 msgid "Loading"
@@ -7753,6 +7766,7 @@ msgid "Newsletters"
 msgstr ""
 
 #: src/components/tour/TourPopover.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Next"
 msgstr ""
@@ -9190,6 +9204,10 @@ msgstr "L'aperçu n'est pas disponible pour ce type de fichier — téléchargez
 msgid "Preview sample"
 msgstr ""
 
+#: src/pages/Calendar.tsx
+msgid "Previous"
+msgstr ""
+
 #: src/components/inbox/MailAttachments.tsx
 msgid "Previous attachment"
 msgstr ""
@@ -10539,6 +10557,10 @@ msgstr ""
 
 #: src/pages/Legal.tsx
 msgid "Scanning…"
+msgstr ""
+
+#: src/pages/Calendar.tsx
+msgid "Schedule"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx
@@ -13206,6 +13228,7 @@ msgid "week"
 msgstr ""
 
 #: src/components/finance/ui.tsx
+#: src/pages/Calendar.tsx
 msgid "Week"
 msgstr ""
 

@@ -8286,6 +8286,7 @@ export function createRouter(deps: RouterDeps) {
                 ),
               }
             : null,
+          { sources: input.sources ?? "all" },
         );
       }),
     },

@@ -745,6 +745,11 @@ msgstr "* Month to date"
 msgid "* So far"
 msgstr "* So far"
 
+#. placeholder {0}: items.length - MONTH_CHIPS
+#: src/pages/Calendar.tsx
+msgid "+{0} more"
+msgstr "+{0} more"
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "+{count} more"
 msgstr "+{count} more"
@@ -1199,7 +1204,6 @@ msgstr "Advanced..."
 msgid "Advisor"
 msgstr "Advisor"
 
-#: src/pages/Calendar.tsx
 #: src/pages/CompanyCalendar.tsx
 msgid "Agenda"
 msgstr "Agenda"
@@ -4508,6 +4512,10 @@ msgstr "Date window"
 msgid "day"
 msgstr "day"
 
+#: src/pages/Calendar.tsx
+msgid "Day"
+msgstr "Day"
+
 #: src/pages/RoutineSchedule.tsx
 msgid "Day of week"
 msgstr "Day of week"
@@ -5922,6 +5930,10 @@ msgstr "Goal"
 msgid "Google apps"
 msgstr "Google apps"
 
+#: src/pages/Calendar.tsx
+msgid "Google Calendar"
+msgstr "Google Calendar"
+
 #: src/components/data-room/FilterBar.tsx
 msgid "Google Drive"
 msgstr "Google Drive"
@@ -6824,6 +6836,7 @@ msgstr "Load web images automatically"
 
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Finance.tsx
 #: src/pages/Shell.tsx
 msgid "Loading"
@@ -7753,6 +7766,7 @@ msgid "Newsletters"
 msgstr "Newsletters"
 
 #: src/components/tour/TourPopover.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Next"
 msgstr "Next"
@@ -9190,6 +9204,10 @@ msgstr "Preview isn't available for this file type — download it to view it."
 msgid "Preview sample"
 msgstr "Preview sample"
 
+#: src/pages/Calendar.tsx
+msgid "Previous"
+msgstr "Previous"
+
 #: src/components/inbox/MailAttachments.tsx
 msgid "Previous attachment"
 msgstr "Previous attachment"
@@ -10540,6 +10558,10 @@ msgstr "Scanning now"
 #: src/pages/Legal.tsx
 msgid "Scanning…"
 msgstr "Scanning…"
+
+#: src/pages/Calendar.tsx
+msgid "Schedule"
+msgstr "Schedule"
 
 #: src/pages/shell/transcript.tsx
 msgid "Scheduled run failed: {failedNote}"
@@ -13206,6 +13228,7 @@ msgid "week"
 msgstr "week"
 
 #: src/components/finance/ui.tsx
+#: src/pages/Calendar.tsx
 msgid "Week"
 msgstr "Week"
 

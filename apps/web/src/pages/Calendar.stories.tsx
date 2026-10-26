@@ -5,12 +5,21 @@ import { mockRpc } from "../lib/__mocks__/rpc";
 import { mockBots } from "../stories/fixtures";
 import { CalendarPage } from "./Calendar";
 
-/** A time `days` from today at `hour` o'clock UTC. Dates move with the clock so Today and the window always line up. */
-const at = (days: number, hour: number) => {
+/** A time `days` from today at `hour` o'clock local. Dates move with the clock so Today and the window always line up. */
+const at = (days: number, hour: number, minute = 0) => {
   const now = new Date();
   return new Date(
-    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + days, hour),
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + days,
+    hour,
+    minute,
   ).toISOString();
+};
+/** An all-day item sits at midnight UTC of its date. */
+const allDayAt = (days: number) => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + days)).toISOString();
 };
 
 const base = { end: null, botId: null, botName: null, account: null, href: null } as const;
@@ -22,7 +31,8 @@ const items: CalendarItem[] = [
     id: "e1",
     kind: "event",
     title: "Team standup",
-    start: at(0, 17),
+    start: at(0, 9),
+    end: at(0, 10),
     account: "Work",
     href: "https://calendar.example.test/e1",
   }),
@@ -30,7 +40,7 @@ const items: CalendarItem[] = [
     id: "t1",
     kind: "todo",
     title: "Send the investor update",
-    start: at(0, 22),
+    start: at(0, 9, 30),
     botId: "bot_ada",
     botName: "Ada",
   }),
@@ -43,10 +53,19 @@ const items: CalendarItem[] = [
     botName: "Ben",
   }),
   item({
+    id: "e3",
+    kind: "event",
+    title: "Customer call",
+    start: at(0, 9, 15),
+    end: at(0, 9, 45),
+    account: "Work",
+    href: "https://calendar.example.test/e3",
+  }),
+  item({
     id: "e2",
     kind: "event",
     title: "Offsite",
-    start: at(2, 0),
+    start: allDayAt(2),
     allDay: true,
     account: "Personal",
     href: "https://calendar.example.test/e2",
@@ -59,7 +78,7 @@ const items: CalendarItem[] = [
     botId: "bot_cy",
     botName: "Cy",
   }),
-  item({ id: "i1", kind: "todo", title: "Sign the lease", start: at(3, 0), allDay: true }),
+  item({ id: "i1", kind: "todo", title: "Sign the lease", start: allDayAt(3), allDay: true }),
 ];
 
 const agenda = (over: Partial<CalendarAgenda> = {}): CalendarAgenda => ({
@@ -73,56 +92,107 @@ const meta = {
   title: "Pages/Calendar",
   component: CalendarPage,
   args: { bots: mockBots, onOpenBot: () => {} },
+  // The shell gives the page a bounded height; the time grid scrolls inside it.
+  decorators: [
+    (Story) => (
+      <div className="flex h-screen flex-col">
+        <Story />
+      </div>
+    ),
+  ],
 } satisfies Meta<typeof CalendarPage>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Agenda: Story = { beforeEach: () => mockRpc({ "calendar.agenda": agenda() }) };
+/** Answers the way the API does: the bots' items for "local", the events for "google". */
+const split = (data: CalendarAgenda) => (input: { sources?: "local" | "google" }) =>
+  Promise.resolve({
+    ...data,
+    items: data.items.filter((entry) => (input.sources === "local") === (entry.kind !== "event")),
+    errors: input.sources === "local" ? [] : data.errors,
+  });
+const withAgenda = (data: CalendarAgenda) => () => mockRpc({ "calendar.agenda": split(data) });
+const view = (name: string) => ({ initialEntries: [`/app/calendar?view=${name}`] });
 
-export const MonthView: Story = {
-  parameters: { initialEntries: ["/app/calendar?view=month"] },
-  beforeEach: () => mockRpc({ "calendar.agenda": agenda() }),
+export const Week: Story = { beforeEach: withAgenda(agenda()) };
+
+export const Day: Story = { parameters: view("day"), beforeEach: withAgenda(agenda()) };
+
+export const MonthView: Story = { parameters: view("month"), beforeEach: withAgenda(agenda()) };
+
+export const Schedule: Story = { parameters: view("schedule"), beforeEach: withAgenda(agenda()) };
+
+/** Bot items show at once; the Google request is still pending, so only the small spinner marks it. */
+export const GoogleLoading: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "calendar.agenda": (input: { sources?: "local" | "google" }) =>
+        input.sources === "google" ? new Promise(() => {}) : split(agenda())(input),
+    }),
 };
 
+export const GoogleError: Story = {
+  beforeEach: withAgenda(
+    agenda({
+      items: items.filter((entry) => entry.account !== "Work"),
+      errors: [{ account: "Work", message: "Couldn't load Work" }],
+    }),
+  ),
+};
+
+/** Three items at the same time cascade, each titled, instead of shrinking to slivers. */
+export const OverlappingWeek: Story = {
+  beforeEach: withAgenda(
+    agenda({
+      items: [
+        item({
+          id: "o1",
+          kind: "todo",
+          title: "Send the investor update",
+          start: at(1, 9),
+          botId: "bot_ada",
+          botName: "Ada",
+        }),
+        item({
+          id: "o2",
+          kind: "todo",
+          title: "Review the board deck",
+          start: at(1, 9),
+          botId: "bot_ben",
+          botName: "Ben",
+        }),
+        item({
+          id: "o3",
+          kind: "todo",
+          title: "Reply to Priya",
+          start: at(1, 9, 15),
+          botId: "bot_cy",
+          botName: "Cy",
+        }),
+      ],
+    }),
+  ),
+};
+
+export const EmptyWeek: Story = { beforeEach: withAgenda(agenda({ items: [] })) };
+
 export const FilteredToCheckBacks: Story = {
-  parameters: { initialEntries: ["/app/calendar?kind=check_back"] },
-  beforeEach: () => mockRpc({ "calendar.agenda": agenda() }),
+  parameters: view("week&kind=check_back"),
+  beforeEach: withAgenda(agenda()),
 };
 
 export const Searched: Story = {
-  beforeEach: () => mockRpc({ "calendar.agenda": agenda() }),
+  beforeEach: withAgenda(agenda()),
   play: async ({ canvasElement }) => {
     await userEvent.type(await within(canvasElement).findByRole("searchbox"), "zzz");
   },
 };
 
-export const Empty: Story = {
-  beforeEach: () => mockRpc({ "calendar.agenda": agenda({ items: [] }) }),
-};
-
 /** Bot items still show, with one quiet link to connect Google Calendar. */
 export const NoGoogleCalendar: Story = {
-  beforeEach: () =>
-    mockRpc({
-      "calendar.agenda": agenda({
-        items: items.filter((entry) => entry.kind !== "event"),
-        googleConnected: false,
-      }),
-    }),
-};
-
-export const AccountFailed: Story = {
-  beforeEach: () =>
-    mockRpc({
-      "calendar.agenda": agenda({
-        items: items.filter((entry) => entry.account !== "Work"),
-        errors: [{ account: "Work", message: "Google Calendar access expired" }],
-      }),
-    }),
-};
-
-export const Loading: Story = {
-  beforeEach: () => mockRpc({ "calendar.agenda": () => new Promise(() => {}) }),
+  beforeEach: withAgenda(
+    agenda({ items: items.filter((entry) => entry.kind !== "event"), googleConnected: false }),
+  ),
 };
 
 export const LoadError: Story = {

@@ -78,6 +78,13 @@ export function useListParams<F extends string>(
     param: (name: string) => params.get(name) || undefined,
     setParam: (name: string, value: string | undefined) =>
       update((p) => (value ? p.set(name, value) : p.delete(name))),
+    /** Sets or removes several params in one history update. */
+    setParams: (changes: Record<string, string | undefined>) =>
+      update((p) => {
+        for (const [name, value] of Object.entries(changes))
+          if (value) p.set(name, value);
+          else p.delete(name);
+      }),
     /** Removes these params (the "Clear filters" button); the sort stays. */
     clear: (...names: string[]) =>
       update((p) => {

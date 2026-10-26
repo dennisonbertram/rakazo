@@ -10,6 +10,9 @@ import { OPEN_SCRATCHPAD_STATUSES } from "./scratchpad-tools.js";
 
 const MAX_PER_QUERY = 250;
 const OPEN_BOT = { archivedAt: null };
+/** How long one Google account gets before it is reported as failed. */
+export const ACCOUNT_TIMEOUT_MS = 8000;
+const CALENDAR_LIST_PAGES = 4;
 
 export type CalendarAgendaDeps = Pick<CalendarToolDeps, "connectors" | "google"> & {
   prisma: Pick<PrismaClient, "scratchpadItem" | "inboxTodo" | "routine">;
@@ -31,56 +34,78 @@ export async function calendarAgenda(
   scope: { spaceId: string; userId: string },
   range: { from: Date; to: Date },
   google: { accounts: CalendarAccount[]; context: AdapterContext } | null,
+  options: { sources?: "all" | "local" | "google"; accountTimeoutMs?: number } = {},
 ): Promise<CalendarAgenda> {
   const errors: CalendarAgenda["errors"] = [];
   const accounts = google?.accounts ?? [];
+  const sources = options.sources ?? "all";
+  const timeoutMs = options.accountTimeoutMs ?? ACCOUNT_TIMEOUT_MS;
+  const none = <T>() => Promise.resolve([] as T[]);
   const [events, todos, inboxTodos, routines] = await Promise.all([
     Promise.all(
-      accounts.map(async (account) => {
-        const result = await accountEvents(deps, account, google!.context, range).catch(
-          (error: unknown) => ({ items: [] as CalendarItem[], failed: errorText(error) }),
-        );
+      (sources === "local" ? [] : accounts).map(async (account) => {
+        const result = await withTimeout(
+          timeoutMs,
+          google!.context,
+          (context) => accountEvents(deps, account, context, range),
+          account.label,
+        ).catch((error: unknown) => ({
+          items: [] as CalendarItem[],
+          failed: error instanceof TimeoutError ? error.message : errorText(error),
+        }));
         if (result.failed) errors.push({ account: account.label, message: result.failed });
         return result.items;
       }),
     ),
-    deps.prisma.scratchpadItem.findMany({
-      where: {
-        ...scope,
-        status: { in: OPEN_SCRATCHPAD_STATUSES },
-        dueAt: { gte: range.from, lt: range.to },
-        bot: OPEN_BOT,
-      },
-      select: { id: true, title: true, dueAt: true, botId: true, bot: { select: { name: true } } },
-      orderBy: { dueAt: "asc" },
-      take: MAX_PER_QUERY,
-    }),
-    deps.prisma.inboxTodo.findMany({
-      where: { ...scope, doneAt: null, dueOn: { gte: range.from, lt: range.to } },
-      select: { id: true, text: true, dueOn: true },
-      orderBy: { dueOn: "asc" },
-      take: MAX_PER_QUERY,
-    }),
-    deps.prisma.routine.findMany({
-      where: {
-        ...scope,
-        active: true,
-        managedKind: null,
-        watch: { equals: Prisma.DbNull },
-        nextRunAt: { gte: range.from, lt: range.to },
-        bot: OPEN_BOT,
-      },
-      select: {
-        id: true,
-        name: true,
-        crons: true,
-        nextRunAt: true,
-        botId: true,
-        bot: { select: { name: true } },
-      },
-      orderBy: { nextRunAt: "asc" },
-      take: MAX_PER_QUERY,
-    }),
+    sources === "google"
+      ? none<never>()
+      : deps.prisma.scratchpadItem.findMany({
+          where: {
+            ...scope,
+            status: { in: OPEN_SCRATCHPAD_STATUSES },
+            dueAt: { gte: range.from, lt: range.to },
+            bot: OPEN_BOT,
+          },
+          select: {
+            id: true,
+            title: true,
+            dueAt: true,
+            botId: true,
+            bot: { select: { name: true } },
+          },
+          orderBy: { dueAt: "asc" },
+          take: MAX_PER_QUERY,
+        }),
+    sources === "google"
+      ? none<never>()
+      : deps.prisma.inboxTodo.findMany({
+          where: { ...scope, doneAt: null, dueOn: { gte: range.from, lt: range.to } },
+          select: { id: true, text: true, dueOn: true },
+          orderBy: { dueOn: "asc" },
+          take: MAX_PER_QUERY,
+        }),
+    sources === "google"
+      ? none<never>()
+      : deps.prisma.routine.findMany({
+          where: {
+            ...scope,
+            active: true,
+            managedKind: null,
+            watch: { equals: Prisma.DbNull },
+            nextRunAt: { gte: range.from, lt: range.to },
+            bot: OPEN_BOT,
+          },
+          select: {
+            id: true,
+            name: true,
+            crons: true,
+            nextRunAt: true,
+            botId: true,
+            bot: { select: { name: true } },
+          },
+          orderBy: { nextRunAt: "asc" },
+          take: MAX_PER_QUERY,
+        }),
   ]);
   const local = (
     item: Pick<CalendarItem, "id" | "kind" | "title" | "allDay" | "botId" | "botName">,
@@ -149,6 +174,27 @@ export async function calendarAgenda(
   return { items, errors, googleConnected: accounts.length > 0 };
 }
 
+class TimeoutError extends Error {}
+
+/** Runs `work` with a context whose signal also aborts after `ms`; a work that ignores the signal is still cut off. */
+async function withTimeout<T>(
+  ms: number,
+  context: AdapterContext,
+  work: (context: AdapterContext) => Promise<T>,
+  label: string,
+): Promise<T> {
+  const timeout = AbortSignal.timeout(ms);
+  const timedOut = new Promise<never>((_, reject) =>
+    timeout.addEventListener("abort", () => reject(new TimeoutError(`Couldn't load ${label}`)), {
+      once: true,
+    }),
+  );
+  return Promise.race([
+    work({ ...context, signal: AbortSignal.any([context.signal, timeout]) }),
+    timedOut,
+  ]);
+}
+
 /** Events of every selected calendar of one account. A failed calendar marks the account as failed but keeps the others. */
 async function accountEvents(
   deps: Pick<CalendarToolDeps, "connectors" | "google">,
@@ -157,12 +203,24 @@ async function accountEvents(
   range: { from: Date; to: Date },
 ): Promise<{ items: CalendarItem[]; failed?: string }> {
   const get = (url: string) => request(deps, account, context, "GET", url);
-  const listed = asRecord(
-    await get(`${CALENDAR_API}/users/me/calendarList?minAccessRole=reader&maxResults=100`),
-  );
-  const calendars = (Array.isArray(listed?.items) ? listed.items : [])
-    .map(asRecord)
-    .filter((entry) => entry && entry.selected === true && !entry.deleted && str(entry.id));
+  const calendars: Record<string, unknown>[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < CALENDAR_LIST_PAGES; page++) {
+    const listed = asRecord(
+      await get(
+        `${CALENDAR_API}/users/me/calendarList?minAccessRole=reader&maxResults=250${
+          pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""
+        }`,
+      ),
+    );
+    for (const entry of Array.isArray(listed?.items) ? listed.items : []) {
+      const record = asRecord(entry);
+      if (record && record.selected === true && !record.deleted && str(record.id))
+        calendars.push(record);
+    }
+    pageToken = str(listed?.nextPageToken);
+    if (!pageToken) break;
+  }
   const items: CalendarItem[] = [];
   let failed: string | undefined;
   await Promise.all(
@@ -177,11 +235,11 @@ async function accountEvents(
       try {
         const data = asRecord(
           await get(
-            `${CALENDAR_API}/calendars/${encodeURIComponent(str(calendar!.id)!)}/events?${params}`,
+            `${CALENDAR_API}/calendars/${encodeURIComponent(str(calendar.id)!)}/events?${params}`,
           ),
         );
         for (const raw of Array.isArray(data?.items) ? data.items : []) {
-          const item = eventItem(raw, account, str(calendar!.id)!);
+          const item = eventItem(raw, account, str(calendar.id)!);
           if (item) items.push(item);
         }
       } catch (error) {

@@ -26,7 +26,12 @@ export const CalendarItemSchema = z.object({
 export type CalendarItem = z.infer<typeof CalendarItemSchema>;
 
 export const CalendarAgendaInputSchema = z
-  .object({ from: IsoDate, to: IsoDate })
+  .object({
+    from: IsoDate,
+    to: IsoDate,
+    /** "local" is the bots' items only and never waits for Google; "google" is the events only. Default both. */
+    sources: z.enum(["all", "local", "google"]).optional(),
+  })
   .refine(({ from, to }) => Date.parse(to) > Date.parse(from), { message: "to must be after from" })
   .refine(
     ({ from, to }) => Date.parse(to) - Date.parse(from) <= CALENDAR_AGENDA_MAX_DAYS * 86_400_000,
