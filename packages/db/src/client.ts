@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import type { PoolClient } from "pg";
 import { Pool } from "pg";
 import { PrismaClient } from "./generated/prisma/client.js";
+import { installDbContext, withRowLevelSecurity } from "./row-security.js";
 import { withTextSanitization } from "./text-sanitization.js";
 
 export type Db = PrismaClient;
@@ -35,6 +36,7 @@ export function createPool(connectionString: string, options: DbClientOptions = 
     client.on("error", () => undefined);
   });
   installConnectRetry(pool);
+  installDbContext(pool);
   return pool;
 }
 
@@ -44,8 +46,9 @@ export function createDb(
 ): { prisma: PrismaClient; pool: Pool } {
   const pool = createPool(connectionString, options);
   const adapter = new PrismaPg(pool);
-  // Text is cleaned for Postgres before any query sees it.
-  const prisma = withTextSanitization(new PrismaClient({ adapter }));
+  // Text is cleaned for Postgres before any query sees it. Row-level security wraps
+  // everything else, so its findUnique rewrite still runs through the sanitizer.
+  const prisma = withRowLevelSecurity(withTextSanitization(new PrismaClient({ adapter })));
   return { prisma, pool };
 }
 

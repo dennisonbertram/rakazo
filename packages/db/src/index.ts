@@ -17,6 +17,7 @@ export * from "./credential-secrets.js";
 export * from "./data-room.js";
 export * from "./data-room-autosort.js";
 export * from "./data-room-imports.js";
+export * from "./database-access.js";
 export * from "./events.js";
 export * from "./expire-stuck-run.js";
 export * from "./external-conversations.js";
@@ -41,6 +42,7 @@ export * from "./push-endpoints.js";
 export * from "./realtime-follow.js";
 export * from "./repos.js";
 export * from "./routine-watch.js";
+export * from "./row-security.js";
 export {
   announceDelegatePending,
   closeApprovalCardsInTransaction,

@@ -7,6 +7,7 @@ import type {
   BillingProvider,
   JobPublisher,
   ManagedConnectorProvider,
+  MessagingInboundEvent,
   MessagingSurface,
   RealtimeFanout,
   SandboxProvider,
@@ -114,6 +115,7 @@ import {
   createNotificationEvents,
   createPool,
   createThreadEvents,
+  describeRowSecurity,
   endSessionPushTokens,
   IsolationError,
   parsePositiveInteger,
@@ -121,6 +123,9 @@ import {
   pushSessionExpiresAt,
   recordUsage,
   requireMembership,
+  rowSecurityWarning,
+  runAsSystem,
+  runAsTenant,
 } from "@rakazo/db";
 import type { Logger } from "@rakazo/logging";
 import {
@@ -205,31 +210,38 @@ export interface AppHandles {
   stop: () => Promise<void>;
 }
 
-export async function createApp(
-  overrides: Partial<AppEnv> & {
-    prisma?: PrismaClient;
-    realtime?: RealtimeFanout;
-    sandbox?: SandboxProvider;
-    composio?: ComposioProvider;
-    pipedream?: ManagedConnectorProvider;
-    messaging?: MessagingSurface;
-    email?: TransactionalEmailProvider;
-    billing?: BillingProvider;
-    remoteConnectors?: RemoteConnectorDependencies;
-    logger?: Logger;
-    runtime?: AgentRuntime;
-    contextStrategy?: AgentContextStrategy;
-    /** Replaces the Mercury and Brex tool caller, so a stack with canned finance data can run offline. */
-    financeCallToolFor?: FinanceSyncDeps["callToolFor"];
-    /** Replaces the network for wallet balances, prices, ENS and exchange reads, so canned crypto data runs offline. */
-    cryptoFetch?: typeof fetch;
-    /** Replaces the real meeting providers, so the demo and tests run Granola against its emulator. */
-    meetingSources?: MeetingSourceRegistry;
-    /** Offline acceptance seams limited to GTM account and queue reads. */
-    gtmQueueReader?: GtmQueueReader;
-    gtmMcp?: Pick<McpConnector, "callServerTool">;
-  } = {},
-): Promise<AppHandles> {
+// Startup and everything it schedules (pollers, team chat, the in-memory job
+// queue, retries) runs across tenants. Requests start without a context and get
+// one per route: tenant for signed-in procedures, system for auth and webhooks.
+export function createApp(overrides: CreateAppOverrides = {}): Promise<AppHandles> {
+  return runAsSystem("api startup and background work", () => buildApp(overrides));
+}
+
+type CreateAppOverrides = Partial<AppEnv> & {
+  prisma?: PrismaClient;
+  realtime?: RealtimeFanout;
+  sandbox?: SandboxProvider;
+  composio?: ComposioProvider;
+  pipedream?: ManagedConnectorProvider;
+  messaging?: MessagingSurface;
+  email?: TransactionalEmailProvider;
+  billing?: BillingProvider;
+  remoteConnectors?: RemoteConnectorDependencies;
+  logger?: Logger;
+  runtime?: AgentRuntime;
+  contextStrategy?: AgentContextStrategy;
+  /** Replaces the Mercury and Brex tool caller, so a stack with canned finance data can run offline. */
+  financeCallToolFor?: FinanceSyncDeps["callToolFor"];
+  /** Replaces the network for wallet balances, prices, ENS and exchange reads, so canned crypto data runs offline. */
+  cryptoFetch?: typeof fetch;
+  /** Replaces the real meeting providers, so the demo and tests run Granola against its emulator. */
+  meetingSources?: MeetingSourceRegistry;
+  /** Offline acceptance seams limited to GTM account and queue reads. */
+  gtmQueueReader?: GtmQueueReader;
+  gtmMcp?: Pick<McpConnector, "callServerTool">;
+};
+
+async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const {
     prisma: prismaOverride,
     realtime: realtimeOverride,
@@ -260,6 +272,8 @@ export async function createApp(
         applicationName: "rakazo-api",
       });
   let { prisma } = created;
+  const rowSecurity = rowSecurityWarning(await describeRowSecurity(prisma));
+  if (rowSecurity) logger.warn(rowSecurity);
   const realtime =
     realtimeOverride ??
     (created.pool
@@ -849,6 +863,22 @@ export async function createApp(
     });
   }
   app.use(PORTAL_PATH, portalNoStore);
+  // Account and session tables, signup bootstrap and account deletion span tenants;
+  // webhooks and public links authenticate a bot, provider or token, then resolve the
+  // tenant from it. Nothing here has a signed-in Space to scope to.
+  for (const [path, reason] of [
+    ["/api/auth/*", "authentication"],
+    ["/api/v1/bots/*", "bot webhook"],
+    ["/api/v1/messaging/*", "messaging webhook"],
+    ["/api/v1/phone/*", "messaging webhook"],
+    ["/api/v1/billing/*", "billing webhook"],
+    ["/api/v1/mail/*", "mail push webhook"],
+    ["/api/internal/screen-target", "screen proxy capability check"],
+    ["/api/share/*", "public artifact share link"],
+    [PORTAL_PATH, "investor portal link"],
+  ] as const) {
+    app.use(path, (_c, next) => runAsSystem(reason, next));
+  }
   app.get("/api/auth/capabilities", (c) => {
     return c.json({
       sso: env.oidc
@@ -889,9 +919,32 @@ export async function createApp(
     );
     return actor && { actor, sessionId: session.session.id };
   };
-  const sessionActor = async (request: Request) => (await requestSession(request))?.actor ?? null;
+  // One lookup per request: the Space scope below and the route itself both ask.
+  const sessions = new WeakMap<Request, ReturnType<typeof requestSession>>();
+  const cachedSession = (request: Request) => {
+    let session = sessions.get(request);
+    if (!session) {
+      session = requestSession(request);
+      sessions.set(request, session);
+    }
+    return session;
+  };
+  const sessionActor = async (request: Request) => (await cachedSession(request))?.actor ?? null;
+  // Routes the signed-in user calls outside RPC run scoped to their Space.
+  for (const path of [
+    "/api/inbox/*",
+    "/api/contacts/*",
+    "/api/data-room/*",
+    "/api/account/*",
+    "/api/voice/*",
+  ]) {
+    app.use(path, async (c, next) => {
+      const actor = await sessionActor(c.req.raw);
+      return actor ? runAsTenant(actor, next) : next();
+    });
+  }
   app.use("/rpc/*", async (c, next) => {
-    const session = await requestSession(c.req.raw);
+    const session = await cachedSession(c.req.raw);
     const actor = session?.actor ?? null;
     if (actor) {
       enrichLogContext({ "user.id": actor.userId, "space.id": actor.spaceId });
@@ -1149,7 +1202,7 @@ export async function createApp(
         })();
       }
     }
-    messaging.onInbound(async (event) => {
+    const handleInbound = async (event: MessagingInboundEvent) => {
       if (event.type !== "message") {
         await applyMessagingOutboundStatus(prisma, event);
         return;
@@ -1174,7 +1227,8 @@ export async function createApp(
         throw new Error("Team chat bridge is unavailable");
       }
       await inbound(event);
-    });
+    };
+    messaging.onInbound((event) => runAsSystem("messaging inbound", () => handleInbound(event)));
     mountMessagingWebhookRoutes(app, { messaging });
     // Start polling-mode adapters (e.g. Telegram with no public webhook URL
     // registered) immediately rather than waiting for the first webhook

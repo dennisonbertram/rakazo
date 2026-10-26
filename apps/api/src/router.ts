@@ -315,6 +315,8 @@ import {
   resumeWatch,
   revokeArtifactShare,
   revokePortal,
+  runAsSystem,
+  runAsTenant,
   SafeActiveError,
   SafeCapRequiredError,
   SafeStateError,
@@ -562,7 +564,7 @@ import { rememberedMessageIds, rememberThreadMessage } from "./remember-message.
 import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
 import type { RouterDeps } from "./routes/context.js";
-import { createRouteContext } from "./routes/context.js";
+import { asTenant, createRouteContext } from "./routes/context.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
 
 import { listRoutineRuns } from "./routine-runs.js";
@@ -646,32 +648,38 @@ async function reconcilePendingConnections(
   const updates = [
     ...(sync.connectIds.length > 0
       ? [
-          prisma.connection.updateMany({
-            where: {
-              id: { in: sync.connectIds },
-              spaceId: owner.spaceId,
-              userId: owner.userId,
-              status: "pending",
-            },
-            data: { status: "connected" },
-          }),
+          (tx: Prisma.TransactionClient) =>
+            tx.connection.updateMany({
+              where: {
+                id: { in: sync.connectIds },
+                spaceId: owner.spaceId,
+                userId: owner.userId,
+                status: "pending",
+              },
+              data: { status: "connected" },
+            }),
         ]
       : []),
     ...(sync.revokeIds.length > 0
       ? [
-          prisma.connection.updateMany({
-            where: {
-              id: { in: sync.revokeIds },
-              spaceId: owner.spaceId,
-              userId: owner.userId,
-              status: "pending",
-            },
-            data: { status: "revoked" },
-          }),
+          (tx: Prisma.TransactionClient) =>
+            tx.connection.updateMany({
+              where: {
+                id: { in: sync.revokeIds },
+                spaceId: owner.spaceId,
+                userId: owner.userId,
+                status: "pending",
+              },
+              data: { status: "revoked" },
+            }),
         ]
       : []),
   ];
-  if (updates.length > 0) await prisma.$transaction(updates);
+  // Interactive rather than a batch: a batch cannot carry the request's database context.
+  if (updates.length > 0)
+    await prisma.$transaction(async (tx) => {
+      for (const update of updates) await update(tx);
+    });
 }
 
 /** Serialize begin/revoke for one user+provider so slug-wide remote deletes cannot race a new connect. */
@@ -1195,6 +1203,24 @@ async function resolveSpaceBoard(
   return found;
 }
 
+/**
+ * Runs `fn` scoped to another of the actor's Spaces. Membership is checked first,
+ * so a client-supplied Space id never opens that Space's rows on its own.
+ */
+async function asMemberOf<T>(
+  prisma: PrismaClient,
+  actor: Actor,
+  spaceId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const member = await prisma.spaceMember.findFirst({
+    where: { spaceId, userId: actor.userId },
+    select: { id: true },
+  });
+  if (!member) throw new ORPCError("NOT_FOUND", { message: new SpaceNotFoundError().message });
+  return runAsTenant({ spaceId, userId: actor.userId }, fn);
+}
+
 export function createRouter(deps: RouterDeps) {
   const routeContext = createRouteContext(deps);
   const { os, authed } = routeContext;
@@ -1515,8 +1541,9 @@ export function createRouter(deps: RouterDeps) {
       return next();
     })
     .use(async ({ context, next }) => {
-      if (!context.actor) throw new ORPCError("UNAUTHORIZED");
-      return next({ context: { ...context, actor: context.actor } });
+      const actor = context.actor;
+      if (!actor) throw new ORPCError("UNAUTHORIZED");
+      return asTenant(actor, () => next({ context: { ...context, actor } }));
     });
   const ticketDeps = {
     prisma: deps.prisma,
@@ -1566,186 +1593,200 @@ export function createRouter(deps: RouterDeps) {
       list: authed.spaces.list.handler(async ({ context }) =>
         spaceNavigationDto(deps, context.actor, repos, groupRepos),
       ),
-      create: authed.spaces.create.handler(async ({ context, input }) => {
-        let space: { id: string; name: string };
-        try {
-          space = await createSpaceForMember(deps.prisma, {
-            currentSpaceId: context.actor.spaceId,
-            userId: context.actor.userId,
-            name: input.name,
-          });
-        } catch (error) {
-          if (error instanceof SpaceLimitError || error instanceof InvalidSpaceNameError) {
-            throw new ORPCError("BAD_REQUEST", { message: error.message });
+      // Seeds a Space whose id does not exist yet; the member limit is checked inside.
+      create: authed.spaces.create.handler(({ context, input }) =>
+        runAsSystem("create a Space for its member", async () => {
+          let space: { id: string; name: string };
+          try {
+            space = await createSpaceForMember(deps.prisma, {
+              currentSpaceId: context.actor.spaceId,
+              userId: context.actor.userId,
+              name: input.name,
+            });
+          } catch (error) {
+            if (error instanceof SpaceLimitError || error instanceof InvalidSpaceNameError) {
+              throw new ORPCError("BAD_REQUEST", { message: error.message });
+            }
+            throw error;
           }
-          throw error;
-        }
-        return {
-          id: space.id,
-          name: space.name,
-          isDefault: false,
-          hasContent: false,
-          canRename: true,
-          canDelete: true,
-          bots: [],
-          groups: [],
-          externalConversations: [],
-          botSections: [],
-        };
-      }),
-      rename: authed.spaces.rename.handler(async ({ context, input }) => {
-        try {
-          return await renameSpaceForMember(deps.prisma, {
+          return {
+            id: space.id,
+            name: space.name,
+            isDefault: false,
+            hasContent: false,
+            canRename: true,
+            canDelete: true,
+            bots: [],
+            groups: [],
+            externalConversations: [],
+            botSections: [],
+          };
+        }),
+      ),
+      // Renames another of the member's Spaces; membership is checked first.
+      rename: authed.spaces.rename.handler(({ context, input }) =>
+        asMemberOf(deps.prisma, context.actor, input.spaceId, async () => {
+          try {
+            return await renameSpaceForMember(deps.prisma, {
+              currentSpaceId: context.actor.spaceId,
+              userId: context.actor.userId,
+              spaceId: input.spaceId,
+              name: input.name,
+            });
+          } catch (error) {
+            if (error instanceof SpaceNotFoundError) {
+              throw new ORPCError("NOT_FOUND", { message: error.message });
+            }
+            if (error instanceof CannotRenameSpaceAsNonOwnerError) {
+              throw new ORPCError("FORBIDDEN", { message: error.message });
+            }
+            if (error instanceof InvalidSpaceNameError) {
+              throw new ORPCError("BAD_REQUEST", { message: error.message });
+            }
+            if (error instanceof SpaceDeletionInProgressError) {
+              throw new ORPCError("CONFLICT", { message: error.message });
+            }
+            throw error;
+          }
+        }),
+      ),
+      // Acts on the Space being deleted, not the current one, so its emptiness check and
+      // teardown see that Space's rows. Membership is checked first.
+      remove: authed.spaces.remove.handler(({ context, input }) =>
+        asMemberOf(deps.prisma, context.actor, input.spaceId, async () => {
+          let claimId: string | null = null;
+          let claimActive = false;
+          let claimHealthy = true;
+          let claimReleasable = false;
+          let claimRenewal: ReturnType<typeof setInterval> | null = null;
+          const deleteInput = {
             currentSpaceId: context.actor.spaceId,
             userId: context.actor.userId,
             spaceId: input.spaceId,
-            name: input.name,
-          });
-        } catch (error) {
-          if (error instanceof SpaceNotFoundError) {
-            throw new ORPCError("NOT_FOUND", { message: error.message });
-          }
-          if (error instanceof CannotRenameSpaceAsNonOwnerError) {
-            throw new ORPCError("FORBIDDEN", { message: error.message });
-          }
-          if (error instanceof InvalidSpaceNameError) {
-            throw new ORPCError("BAD_REQUEST", { message: error.message });
-          }
-          if (error instanceof SpaceDeletionInProgressError) {
-            throw new ORPCError("CONFLICT", { message: error.message });
-          }
-          throw error;
-        }
-      }),
-      remove: authed.spaces.remove.handler(async ({ context, input }) => {
-        let claimId: string | null = null;
-        let claimActive = false;
-        let claimHealthy = true;
-        let claimReleasable = false;
-        let claimRenewal: ReturnType<typeof setInterval> | null = null;
-        const deleteInput = {
-          currentSpaceId: context.actor.spaceId,
-          userId: context.actor.userId,
-          spaceId: input.spaceId,
-        };
-        try {
-          // Claim emptiness before external teardown. Bot and group creation
-          // take the same lifecycle lock and reject the Space until deletion
-          // finishes or this claim is released.
-          const claim = await claimEmptySpaceDeletionForMember(deps.prisma, deleteInput);
-          claimId = claim.claimId;
-          claimActive = true;
-          // A recovered worker can safely finish deletion, but cannot know
-          // whether the previous worker still has provider teardown in flight.
-          // Keep the Space claimed on failure so content cannot reuse it.
-          claimReleasable = !claim.recovered;
-          const claimedInput = { ...deleteInput, claimId };
-          const assertClaim = async () => {
-            if (!claimHealthy) throw new SpaceDeletionInProgressError();
-            try {
-              const renewed = await renewSpaceDeletionClaim(deps.prisma, claimedInput);
-              if (!renewed) {
+          };
+          try {
+            // Claim emptiness before external teardown. Bot and group creation
+            // take the same lifecycle lock and reject the Space until deletion
+            // finishes or this claim is released.
+            const claim = await claimEmptySpaceDeletionForMember(deps.prisma, deleteInput);
+            claimId = claim.claimId;
+            claimActive = true;
+            // A recovered worker can safely finish deletion, but cannot know
+            // whether the previous worker still has provider teardown in flight.
+            // Keep the Space claimed on failure so content cannot reuse it.
+            claimReleasable = !claim.recovered;
+            const claimedInput = { ...deleteInput, claimId };
+            const assertClaim = async () => {
+              if (!claimHealthy) throw new SpaceDeletionInProgressError();
+              try {
+                const renewed = await renewSpaceDeletionClaim(deps.prisma, claimedInput);
+                if (!renewed) {
+                  claimHealthy = false;
+                  claimReleasable = false;
+                  throw new SpaceDeletionInProgressError();
+                }
+              } catch (error) {
                 claimHealthy = false;
                 claimReleasable = false;
-                throw new SpaceDeletionInProgressError();
+                throw error;
               }
-            } catch (error) {
-              claimHealthy = false;
-              claimReleasable = false;
-              throw error;
-            }
-          };
-          claimRenewal = setInterval(() => {
-            void assertClaim().catch((renewalError) => {
-              if (claimActive) {
-                getLogger().error("space deletion claim renewal failed", renewalError);
-              }
-            });
-          }, SPACE_DELETION_CLAIM_TIMEOUT_MS / 5);
-          const adapterContext = connectionContext(context.actor, "spaces.remove", context.signal);
-          for (const computer of claim.computers) {
-            await assertClaim();
-            // Provider errors are ambiguous: teardown may have reached the
-            // remote service. From this point, only successful deletion may
-            // unblock content creation; a stale recovery must finish it.
-            claimReleasable = false;
-            let teardownTimer: ReturnType<typeof setTimeout> | undefined;
-            try {
-              await Promise.race([
-                deps.sandbox.destroy(toComputerRef(computer), {
-                  ...adapterContext,
-                  botId: computer.homeKey,
-                }),
-                new Promise<never>((_, reject) => {
-                  teardownTimer = setTimeout(() => {
-                    // Stop renewal so the claim goes stale and a later
-                    // worker can recover; never release after teardown
-                    // started, since the hung destroy may still complete.
-                    claimHealthy = false;
-                    claimReleasable = false;
-                    reject(new Error("Space sandbox teardown timed out"));
-                  }, spaceTeardownTimeoutMs());
-                }),
-              ]);
-            } finally {
-              if (teardownTimer !== undefined) clearTimeout(teardownTimer);
-            }
-            // Never clear a provider handle after this worker loses its claim.
-            await assertClaim();
-            await deps.prisma.computer.updateMany({
-              where: {
-                spaceId: input.spaceId,
-                homeKey: computer.homeKey,
-                providerRef: computer.providerRef,
-                space: { deletionClaimId: claimId },
-              },
-              data: { state: "stopped", providerRef: null },
-            });
-          }
-          await assertClaim();
-          claimActive = false;
-          if (claimRenewal) {
-            clearInterval(claimRenewal);
-            claimRenewal = null;
-          }
-          const fallback = await deleteEmptySpaceForMember(deps.prisma, claimedInput);
-          for (const storageKey of fallback.dataRoomStorageKeys) {
-            await deps.jobs
-              .enqueue(dataRoomBlobDeleteJob(input.spaceId, storageKey))
-              .catch((jobError) => getLogger().error("data room blob cleanup", jobError));
-          }
-          return { ok: true as const, activeSpaceId: fallback.id };
-        } catch (error) {
-          if (context.signal?.aborted) claimReleasable = false;
-          if (claimId && claimReleasable) {
-            await releaseSpaceDeletionClaim(deps.prisma, { ...deleteInput, claimId }).catch(
-              (releaseError) => {
-                getLogger().error("space deletion claim release failed", releaseError);
-              },
+            };
+            claimRenewal = setInterval(() => {
+              void assertClaim().catch((renewalError) => {
+                if (claimActive) {
+                  getLogger().error("space deletion claim renewal failed", renewalError);
+                }
+              });
+            }, SPACE_DELETION_CLAIM_TIMEOUT_MS / 5);
+            const adapterContext = connectionContext(
+              context.actor,
+              "spaces.remove",
+              context.signal,
             );
+            for (const computer of claim.computers) {
+              await assertClaim();
+              // Provider errors are ambiguous: teardown may have reached the
+              // remote service. From this point, only successful deletion may
+              // unblock content creation; a stale recovery must finish it.
+              claimReleasable = false;
+              let teardownTimer: ReturnType<typeof setTimeout> | undefined;
+              try {
+                await Promise.race([
+                  deps.sandbox.destroy(toComputerRef(computer), {
+                    ...adapterContext,
+                    botId: computer.homeKey,
+                  }),
+                  new Promise<never>((_, reject) => {
+                    teardownTimer = setTimeout(() => {
+                      // Stop renewal so the claim goes stale and a later
+                      // worker can recover; never release after teardown
+                      // started, since the hung destroy may still complete.
+                      claimHealthy = false;
+                      claimReleasable = false;
+                      reject(new Error("Space sandbox teardown timed out"));
+                    }, spaceTeardownTimeoutMs());
+                  }),
+                ]);
+              } finally {
+                if (teardownTimer !== undefined) clearTimeout(teardownTimer);
+              }
+              // Never clear a provider handle after this worker loses its claim.
+              await assertClaim();
+              await deps.prisma.computer.updateMany({
+                where: {
+                  spaceId: input.spaceId,
+                  homeKey: computer.homeKey,
+                  providerRef: computer.providerRef,
+                  space: { deletionClaimId: claimId },
+                },
+                data: { state: "stopped", providerRef: null },
+              });
+            }
+            await assertClaim();
+            claimActive = false;
+            if (claimRenewal) {
+              clearInterval(claimRenewal);
+              claimRenewal = null;
+            }
+            const fallback = await deleteEmptySpaceForMember(deps.prisma, claimedInput);
+            for (const storageKey of fallback.dataRoomStorageKeys) {
+              await deps.jobs
+                .enqueue(dataRoomBlobDeleteJob(input.spaceId, storageKey))
+                .catch((jobError) => getLogger().error("data room blob cleanup", jobError));
+            }
+            return { ok: true as const, activeSpaceId: fallback.id };
+          } catch (error) {
+            if (context.signal?.aborted) claimReleasable = false;
+            if (claimId && claimReleasable) {
+              await releaseSpaceDeletionClaim(deps.prisma, { ...deleteInput, claimId }).catch(
+                (releaseError) => {
+                  getLogger().error("space deletion claim release failed", releaseError);
+                },
+              );
+            }
+            if (error instanceof SpaceNotFoundError) {
+              throw new ORPCError("NOT_FOUND", { message: error.message });
+            }
+            if (error instanceof CannotDeleteSpaceAsNonOwnerError) {
+              throw new ORPCError("FORBIDDEN", { message: error.message });
+            }
+            if (error instanceof SpaceDeletionInProgressError) {
+              throw new ORPCError("CONFLICT", { message: error.message });
+            }
+            if (
+              error instanceof CannotDeleteDefaultSpaceError ||
+              error instanceof CannotDeleteLastSpaceError ||
+              error instanceof SpaceNotEmptyError
+            ) {
+              throw new ORPCError("BAD_REQUEST", { message: error.message });
+            }
+            throw error;
+          } finally {
+            claimActive = false;
+            if (claimRenewal) clearInterval(claimRenewal);
           }
-          if (error instanceof SpaceNotFoundError) {
-            throw new ORPCError("NOT_FOUND", { message: error.message });
-          }
-          if (error instanceof CannotDeleteSpaceAsNonOwnerError) {
-            throw new ORPCError("FORBIDDEN", { message: error.message });
-          }
-          if (error instanceof SpaceDeletionInProgressError) {
-            throw new ORPCError("CONFLICT", { message: error.message });
-          }
-          if (
-            error instanceof CannotDeleteDefaultSpaceError ||
-            error instanceof CannotDeleteLastSpaceError ||
-            error instanceof SpaceNotEmptyError
-          ) {
-            throw new ORPCError("BAD_REQUEST", { message: error.message });
-          }
-          throw error;
-        } finally {
-          claimActive = false;
-          if (claimRenewal) clearInterval(claimRenewal);
-        }
-      }),
+        }),
+      ),
     },
     bootstrap: authed.bootstrap.handler(async ({ context, input }) => {
       const actor = context.actor;
@@ -7177,10 +7218,12 @@ export function createRouter(deps: RouterDeps) {
     },
     messaging: {
       status: authed.messaging.status.handler(async ({ context }) => {
-        const identities = await deps.prisma.messagingIdentity.findMany({
-          where: { userId: context.actor.userId },
-          orderBy: { createdAt: "asc" },
-        });
+        const identities = await acrossChatIdentities(() =>
+          deps.prisma.messagingIdentity.findMany({
+            where: { userId: context.actor.userId },
+            orderBy: { createdAt: "asc" },
+          }),
+        );
         return {
           enabled: deps.messaging?.enabled ?? false,
           providers: deps.messaging?.providers ?? [],
@@ -7235,9 +7278,11 @@ export function createRouter(deps: RouterDeps) {
       },
       identities: {
         setBot: authed.messaging.identities.setBot.handler(async ({ context, input }) => {
-          const identity = await deps.prisma.messagingIdentity.findFirst({
-            where: { id: input.identityId, userId: context.actor.userId },
-          });
+          const identity = await acrossChatIdentities(() =>
+            deps.prisma.messagingIdentity.findFirst({
+              where: { id: input.identityId, userId: context.actor.userId },
+            }),
+          );
           if (!identity) throw new ORPCError("NOT_FOUND");
           const bot = await deps.prisma.bot.findFirst({
             where: {
@@ -7253,12 +7298,14 @@ export function createRouter(deps: RouterDeps) {
             throw new ORPCError("BAD_REQUEST", { message: MESSAGING_PHOTON_BLOCKED_MESSAGE });
           }
           try {
-            const updated = await deps.prisma.messagingIdentity.update({
-              where: { id: identity.id },
-              // The identity must live in the bot's space: runs resolve
-              // credentials, memory, and approval rules from run.spaceId.
-              data: { botId: bot.id, spaceId: context.actor.spaceId },
-            });
+            const updated = await acrossChatIdentities(() =>
+              deps.prisma.messagingIdentity.update({
+                where: { id: identity.id },
+                // The identity must live in the bot's space: runs resolve
+                // credentials, memory, and approval rules from run.spaceId.
+                data: { botId: bot.id, spaceId: context.actor.spaceId },
+              }),
+            );
             return messagingIdentityDto(deps.prisma, updated);
           } catch (error) {
             // botId is unique: the target bot is already linked elsewhere.
@@ -7271,9 +7318,11 @@ export function createRouter(deps: RouterDeps) {
           }
         }),
         unlink: authed.messaging.identities.unlink.handler(async ({ context, input }) => {
-          const { count } = await deps.prisma.messagingIdentity.deleteMany({
-            where: { id: input.identityId, userId: context.actor.userId },
-          });
+          const { count } = await acrossChatIdentities(() =>
+            deps.prisma.messagingIdentity.deleteMany({
+              where: { id: input.identityId, userId: context.actor.userId },
+            }),
+          );
           if (count === 0) throw new ORPCError("NOT_FOUND");
           return { ok: true as const };
         }),
@@ -7367,44 +7416,46 @@ export function createRouter(deps: RouterDeps) {
               })
             : null;
           if (!connection) throw new ORPCError("NOT_FOUND");
-          const { updated, notifyRequester } = await deps.prisma.$transaction(async (tx) => {
-            // The claim holds the connection row lock through commit, so a
-            // revoke either beats it or waits — it can never interleave with
-            // the confirmation write below.
-            const { count } = await tx.agentConnection.updateMany({
-              where: { id: connection.id, status: "pending" },
-              data: { status: input.accept ? "approved" : "declined" },
-            });
-            if (count === 0) {
-              // Lost a race with revoke: approval must never overwrite it.
-              throw new ORPCError("NOT_FOUND");
-            }
-            const row = await tx.agentConnection.findUniqueOrThrow({
-              where: { id: connection.id },
-            });
-            if (!input.accept) return { updated: row, notifyRequester: false };
-            // Parity with the text-command path: the requester hears about it.
-            const requesterIdentity = await tx.messagingIdentity.findUnique({
-              where: { botId: connection.requesterBotId },
-            });
-            if (!requesterIdentity) return { updated: row, notifyRequester: false };
-            const key = `command:connected:${connection.id}`;
-            // A re-approved pair starts a fresh cycle; clear the stale row or
-            // skipDuplicates would swallow the new confirmation.
-            await tx.messagingOutbound.deleteMany({ where: { idempotencyKey: key } });
-            await tx.messagingOutbound.createMany({
-              data: [
-                {
-                  idempotencyKey: key,
-                  kind: "dm",
-                  identityId: requesterIdentity.id,
-                  body: "Your connection request was accepted. Your agents can now message each other.",
-                },
-              ],
-              skipDuplicates: true,
-            });
-            return { updated: row, notifyRequester: true };
-          });
+          const { updated, notifyRequester } = await acrossChatIdentities(() =>
+            deps.prisma.$transaction(async (tx) => {
+              // The claim holds the connection row lock through commit, so a
+              // revoke either beats it or waits — it can never interleave with
+              // the confirmation write below.
+              const { count } = await tx.agentConnection.updateMany({
+                where: { id: connection.id, status: "pending" },
+                data: { status: input.accept ? "approved" : "declined" },
+              });
+              if (count === 0) {
+                // Lost a race with revoke: approval must never overwrite it.
+                throw new ORPCError("NOT_FOUND");
+              }
+              const row = await tx.agentConnection.findUniqueOrThrow({
+                where: { id: connection.id },
+              });
+              if (!input.accept) return { updated: row, notifyRequester: false };
+              // Parity with the text-command path: the requester hears about it.
+              const requesterIdentity = await tx.messagingIdentity.findUnique({
+                where: { botId: connection.requesterBotId },
+              });
+              if (!requesterIdentity) return { updated: row, notifyRequester: false };
+              const key = `command:connected:${connection.id}`;
+              // A re-approved pair starts a fresh cycle; clear the stale row or
+              // skipDuplicates would swallow the new confirmation.
+              await tx.messagingOutbound.deleteMany({ where: { idempotencyKey: key } });
+              await tx.messagingOutbound.createMany({
+                data: [
+                  {
+                    idempotencyKey: key,
+                    kind: "dm",
+                    identityId: requesterIdentity.id,
+                    body: "Your connection request was accepted. Your agents can now message each other.",
+                  },
+                ],
+                skipDuplicates: true,
+              });
+              return { updated: row, notifyRequester: true };
+            }),
+          );
           if (notifyRequester) {
             await deps.jobs.enqueue(messagingDeliverJob()).catch((error) => {
               getLogger().error("messaging connection confirmation enqueue error", error);
@@ -7430,24 +7481,26 @@ export function createRouter(deps: RouterDeps) {
           // finish — otherwise it could reopen and create a fresh invite that
           // a post-commit deleteMany would then wipe while leaving the row
           // pending with no approval prompt.
-          await deps.prisma.$transaction(async (tx) => {
-            const { count } = await tx.agentConnection.updateMany({
-              where: { id: connection.id, status: connection.status },
-              data: { status: "revoked" },
-            });
-            if (count === 0) throw new ORPCError("NOT_FOUND");
-            // Cancel undelivered invites, including rows the drain already
-            // claimed (status sent, no providerHandle yet). Connect-invite
-            // delivery holds this connection row FOR UPDATE through
-            // sendDirect, so revoke either waits until the DM is sent or
-            // deletes the claim before send starts.
-            await tx.messagingOutbound.deleteMany({
-              where: {
-                idempotencyKey: `connect:${connection.requesterBotId}:${connection.targetBotId}`,
-                OR: [{ status: "pending" }, { status: "sent", providerHandle: null }],
-              },
-            });
-          });
+          await acrossChatIdentities(() =>
+            deps.prisma.$transaction(async (tx) => {
+              const { count } = await tx.agentConnection.updateMany({
+                where: { id: connection.id, status: connection.status },
+                data: { status: "revoked" },
+              });
+              if (count === 0) throw new ORPCError("NOT_FOUND");
+              // Cancel undelivered invites, including rows the drain already
+              // claimed (status sent, no providerHandle yet). Connect-invite
+              // delivery holds this connection row FOR UPDATE through
+              // sendDirect, so revoke either waits until the DM is sent or
+              // deletes the claim before send starts.
+              await tx.messagingOutbound.deleteMany({
+                where: {
+                  idempotencyKey: `connect:${connection.requesterBotId}:${connection.targetBotId}`,
+                  OR: [{ status: "pending" }, { status: "sent", providerHandle: null }],
+                },
+              });
+            }),
+          );
           return { ok: true as const };
         }),
       },
@@ -9074,7 +9127,20 @@ export function createRouter(deps: RouterDeps) {
   });
 }
 
-async function spaceNavigationDto(
+// Lists every Space the member belongs to, with each one's bots and threads, so it
+// reads across Spaces. Every query below is limited to the member's Spaces.
+function spaceNavigationDto(
+  deps: RouterDeps,
+  actor: Actor,
+  repos: ReturnType<typeof createRepos>,
+  groupRepos: ReturnType<typeof createGroupRepos>,
+): Promise<SpaceNavigation> {
+  return runAsSystem("space navigation across the member's Spaces", () =>
+    memberSpaceNavigation(deps, actor, repos, groupRepos),
+  );
+}
+
+async function memberSpaceNavigation(
   deps: RouterDeps,
   actor: Actor,
   repos: ReturnType<typeof createRepos>,
@@ -9955,21 +10021,34 @@ async function messagingIdentitiesFor(
   prisma: PrismaClient,
   userId: string,
 ): Promise<MessagingIdentityRecord[]> {
-  return prisma.messagingIdentity.findMany({
-    where: { userId },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, botId: true },
-  });
+  return acrossChatIdentities(() =>
+    prisma.messagingIdentity.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, botId: true },
+    }),
+  );
+}
+
+/**
+ * Chat identities belong to the account, linked to bots in any of its Spaces, and an
+ * agent connection joins two accounts' bots. Every query run through this names the
+ * actor's own identities or bots, or a peer the actor is connected to.
+ */
+function acrossChatIdentities<T>(fn: () => Promise<T>): Promise<T> {
+  return runAsSystem("the account's chat identities and agent connections across Spaces", fn);
 }
 
 async function messagingIdentityDto(
   prisma: PrismaClient,
   identity: { id: string; provider: string; address: string; botId: string },
 ) {
-  const bot = await prisma.bot.findUnique({
-    where: { id: identity.botId },
-    select: { name: true },
-  });
+  const bot = await acrossChatIdentities(() =>
+    prisma.bot.findUnique({
+      where: { id: identity.botId },
+      select: { name: true },
+    }),
+  );
   return {
     id: identity.id,
     provider: identity.provider,
@@ -10021,14 +10100,15 @@ async function messagingConnectionDto(
     };
   }
   const peerBotId = incoming ? connection.requesterBotId : connection.targetBotId;
-  const peerBot = await prisma.bot.findUnique({
-    where: { id: peerBotId },
-    select: { name: true },
-  });
-  const peerIdentity = await prisma.messagingIdentity.findUnique({
-    where: { botId: peerBotId },
-    select: { userId: true },
-  });
+  const [peerBot, peerIdentity] = await acrossChatIdentities(() =>
+    Promise.all([
+      prisma.bot.findUnique({ where: { id: peerBotId }, select: { name: true } }),
+      prisma.messagingIdentity.findUnique({
+        where: { botId: peerBotId },
+        select: { userId: true },
+      }),
+    ]),
+  );
   const peerOwner = peerIdentity
     ? await prisma.user.findUnique({
         where: { id: peerIdentity.userId },
