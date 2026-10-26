@@ -13,6 +13,8 @@ A bot can keep track of work that is still open and tell you when something need
 
 ## Check in
 
+On a phone, the **Check in** setting is in the bot's settings too.
+
 Open a bot's settings and find **Check in**, next to **Notifications**. Choose one of:
 
 - **Off.** The bot does not check in. This is the default.
