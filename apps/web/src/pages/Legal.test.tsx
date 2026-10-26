@@ -820,8 +820,7 @@ it("starts a scan from the unchecked documents line and opens Deadlines on the o
   // The tile said 1, so the list it opens shows that one, not every open deadline.
   expect(container.textContent).toContain("Return the security deposit paperwork");
   expect(container.textContent).not.toContain("Send non-renewal notice");
-  expect(container.textContent).toContain("Showing 1 overdue deadline.");
-  await click(button("Show all 2 open deadlines"));
+  await click(button("Remove filter Due"));
   expect(container.textContent).toContain("Send non-renewal notice");
 });
 
@@ -981,7 +980,7 @@ it("opens no two deadline rows with the same words and leaves out an all-active 
     contracts: overview.contracts.map((c) => ({ ...c, status: "active" as const })),
   });
   await render(<LegalPage />);
-  expect(container.textContent).not.toContain("Status");
+  expect([...container.querySelectorAll("th")].map((th) => th.textContent)).not.toContain("Status");
 });
 
 it("keeps the same columns whatever the statuses: no Status column, a chip by the title", async () => {
@@ -1060,7 +1059,10 @@ it("opens the contract from a click anywhere on its row, and shows the Renewal n
       <Where />
     </>,
   );
-  const row = container.querySelector("tbody tr");
+  // The table lists contracts by end date, so the lease comes first.
+  const row = [...container.querySelectorAll("tbody tr")].find((tr) =>
+    tr.textContent?.includes("Master Services"),
+  );
   const renewalCell = [...(row?.querySelectorAll("td") ?? [])].find((td) =>
     td.textContent?.startsWith("Auto-renews"),
   );
@@ -1309,4 +1311,59 @@ describe("grouped contracts", () => {
     expect(toggle?.getAttribute("aria-pressed")).toBe("false");
     expect(rows()).toBe(4);
   });
+});
+
+const renderAt = async (url: string) => {
+  // A fresh router each time, so the URL is the one asked for.
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={[url]}>
+        <LegalPage />
+      </MemoryRouter>,
+    ),
+  );
+  await flush();
+};
+const bodyTitles = () =>
+  [...container.querySelectorAll("tbody tr")].map((tr) => tr.querySelector("td")?.textContent);
+
+it("filters and sorts contracts from the URL, keeps the tab count, and offers Clear filters", async () => {
+  rpcMock.overview.mockResolvedValue(overview);
+  await renderAt("/app/legal?status=expired");
+  expect(bodyTitles()).toEqual(["Office leaseExpired"]);
+  expect(tab("Contracts")?.textContent).toContain("2");
+  await click(button("Remove filter Status"));
+  expect(bodyTitles()).toHaveLength(2);
+  // A header click sorts by that column and marks it.
+  await click(container.querySelector("th button"));
+  const name = container.querySelector("th");
+  expect(name?.getAttribute("aria-sort")).toBe("ascending");
+  expect(bodyTitles()[0]).toContain("Master Services Agreement");
+  await click(container.querySelector("th button"));
+  expect(name?.getAttribute("aria-sort")).toBe("descending");
+  expect(bodyTitles()[0]).toContain("Office lease");
+  await renderAt("/app/legal?q=zzz");
+  expect(container.textContent).toContain("No matches");
+  await click(button("Clear filters"));
+  expect(bodyTitles()).toHaveLength(2);
+});
+
+it("shows a due-soon chip that opens the filtered Deadlines, and hides it there", async () => {
+  rpcMock.overview.mockResolvedValue({
+    ...overview,
+    deadlines: [
+      { ...deadlines[0]!, dueDate: "2000-01-01" },
+      { ...deadlines[1]!, dueDate: "2999-01-01" },
+    ],
+  });
+  await renderAt("/app/legal");
+  expect(container.querySelector('a[href="/app/legal?view=deadlines&due=soon"]')?.textContent).toBe(
+    "1 due soon",
+  );
+  await renderAt("/app/legal?view=deadlines&due=soon");
+  expect(container.querySelector('a[href="/app/legal?view=deadlines&due=soon"]')).toBeNull();
+  expect(container.textContent).toContain("Return the security deposit paperwork");
+  expect(container.textContent).not.toContain("Send non-renewal notice");
 });
