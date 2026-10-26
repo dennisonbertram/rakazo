@@ -16,10 +16,13 @@ import {
   MAX_COMPOSE_BODY,
 } from "@rakazo/contracts";
 import { humanizeToolName, redactSecrets } from "@rakazo/core";
+import { urlSite } from "@rakazo/core/egress";
 import { buildRawMessage, displayAddress, parseRecipients } from "./mail-compose.js";
 
 const MAX_APPROVAL_SUMMARY_LENGTH = 500;
 const MAX_APPROVAL_DETAIL_LENGTH = 4_000;
+/** Longer fetch URLs are refused, so an approval card always shows the whole URL it sends. */
+export const MAX_FETCH_URL_LENGTH = 2_048;
 
 export function buildApprovalAskBlock(
   effectId: string,
@@ -47,6 +50,7 @@ export function buildApprovalAskBlock(
     moneyNames?: MoneyNames;
   },
 ): MessageBlock {
+  const fetchSite = webFetchSite(toolName, args);
   const summary =
     options?.schedule?.summary ??
     describeApprovalAction(
@@ -125,6 +129,7 @@ export function buildApprovalAskBlock(
       secrets,
     ),
     approvalReason: options?.approvalReason,
+    ...(fetchSite ? { site: fetchSite } : {}),
     status: "pending",
     actions:
       toolName === "create_space"
@@ -146,10 +151,19 @@ export function buildApprovalAskBlock(
             options?.noAlwaysAllow ||
             toolName === "imessage_send"
               ? []
-              : [{ id: "always", label: "Always allow this tool" }]),
+              : [
+                  {
+                    id: "always",
+                    label: fetchSite ? `Always allow ${fetchSite}` : "Always allow this tool",
+                  },
+                ]),
             { id: "deny", label: "Deny" },
           ],
   };
+}
+
+function webFetchSite(toolName: string, args: Record<string, unknown>): string | undefined {
+  return toolName === "web_fetch" && typeof args.url === "string" ? urlSite(args.url) : undefined;
 }
 
 /**
@@ -371,7 +385,7 @@ export function describeApprovalAction(
   if (toolName === "contacts_save") {
     return `Save contact “${args.name ? String(args.name) : "Untitled"}”`;
   }
-  const target = pickScopeLabel(args);
+  const target = webFetchSite(toolName, args) ?? pickScopeLabel(args);
   const label = serviceName
     ? `${serviceName}: ${humanizeToolName(toolName)}`
     : humanizeToolName(toolName);
@@ -404,10 +418,13 @@ function formatApprovalDetail(
       "Bots, groups, chats, files, memory, and integrations in this space stay separate from other spaces.",
     );
   }
+  // A fetch carries data in its path and query, so the card shows the whole URL.
   const keys =
     toolName === "contacts_save"
       ? ["name", "email", "organization", "kind", "notes"]
-      : ["collection", "title", "to", "subject", "amount", "body"];
+      : toolName === "web_fetch"
+        ? ["url"]
+        : ["collection", "title", "to", "subject", "amount", "body"];
   for (const key of keys) {
     const value = args[key];
     if (value == null || value === "") continue;

