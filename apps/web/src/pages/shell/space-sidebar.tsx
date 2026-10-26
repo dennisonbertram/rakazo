@@ -1170,7 +1170,7 @@ export function SpaceSidebar({
               )[] =
                 pageAgentRows.length || emailChatRows.length
                   ? [
-                      ...listedRows.filter((row) => !isPageAgent(row) && !isEmailChat(row)),
+                      // Page agents sit first, right under the folders above, so the folded groups stay together.
                       ...(pageAgentRows.length ? [{ foldHeader: "page" as const }] : []),
                       ...(showPageAgents
                         ? pageAgentsOpen
@@ -1179,6 +1179,7 @@ export function SpaceSidebar({
                               (row) => row.item.kind === "bot" && row.item.chat.id === active?.id,
                             )
                         : []),
+                      ...listedRows.filter((row) => !isPageAgent(row) && !isEmailChat(row)),
                       ...(emailChatRows.length ? [{ foldHeader: "email" as const }] : []),
                       ...(showEmailChats ? emailChatRows : []),
                     ]
