@@ -19,7 +19,13 @@ vi.mock("@lingui/react/macro", () => ({
 }));
 
 const agendaMock = vi.hoisted(() => vi.fn());
-vi.mock("../lib/rpc", () => ({ rpc: { calendar: { agenda: agendaMock } } }));
+const waitingMock = vi.hoisted(() => vi.fn());
+vi.mock("../lib/rpc", () => ({
+  rpc: {
+    calendar: { agenda: agendaMock },
+    scratchpad: { waitingOnYou: waitingMock, update: vi.fn() },
+  },
+}));
 
 import { CalendarPage } from "./Calendar";
 
@@ -74,6 +80,8 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   agendaMock.mockReset();
+  waitingMock.mockReset();
+  waitingMock.mockResolvedValue([]);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -194,4 +202,26 @@ it("keeps titles and drops icons when items overlap", async () => {
   expect(col.textContent).toContain("First thing");
   expect(col.textContent).toContain("Second thing");
   expect(col.querySelector('[role="img"]')).toBeNull();
+});
+
+it("shows open to-dos waiting on the person above the grid, and still loads without them", async () => {
+  agendaMock.mockImplementation(answer(agenda()));
+  waitingMock.mockResolvedValue([
+    {
+      id: "t1",
+      botId: "b1",
+      botName: "Ada",
+      title: "Sign the form",
+      waitingOn: "you",
+      dueAt: null,
+    },
+  ]);
+  await mount("/app/calendar?view=week");
+  expect(container.textContent).toContain("Sign the form");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  waitingMock.mockRejectedValue(new Error("down"));
+  await mount("/app/calendar?view=week");
+  expect(container.textContent).not.toContain("Sign the form");
+  expect(container.textContent).toContain("Calendar");
 });
