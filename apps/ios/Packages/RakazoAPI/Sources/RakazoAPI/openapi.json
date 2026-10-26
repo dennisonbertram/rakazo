@@ -95034,6 +95034,9 @@
                                   "null"
                                 ]
                               },
+                              "silent": {
+                                "type": "boolean"
+                              },
                               "waitingOn": {
                                 "type": [
                                   "string",
@@ -96436,6 +96439,9 @@
                                 "type": "string"
                               },
                               "needsApproval": {
+                                "type": "boolean"
+                              },
+                              "silent": {
                                 "type": "boolean"
                               },
                               "updatedAt": {

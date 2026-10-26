@@ -60,6 +60,8 @@ describe("routine history", () => {
     expect(RoutineHistorySchema.parse(history)).toEqual(history);
     expect(history.runs.map((row) => row.messageId)).toEqual([null, "reply-new", null]);
     expect(history.runs.map((row) => row.groupId)).toEqual([null, "group-1", null]);
+    // Only the completed run with no message ended silently.
+    expect(history.runs.map((row) => row.silent)).toEqual([true, undefined, undefined]);
     expect(history.runs[2]?.startedAt).toBeNull();
     expect(runs).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -8,6 +8,7 @@ import type { PoolClient } from "pg";
 import { returnBotMessageOutcome } from "./bot-messages.js";
 import { scheduleComputerControlExpiry } from "./computer-control.js";
 import { reconcileMailApprovals } from "./mail-approval-recovery.js";
+import { notifyPastDueItems } from "./past-due.js";
 import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
 import { isUserProgressClientNonce } from "./user-progress.js";
@@ -155,6 +156,15 @@ export function createJobReconciler(
         });
       } catch (error) {
         getLogger().error("stuck work reconciliation", error);
+      }
+      try {
+        await notifyPastDueItems({
+          prisma: deps.prisma,
+          notificationEvents: deps.notificationEvents,
+          now,
+        });
+      } catch (error) {
+        getLogger().error("past-due reconciliation", error);
       }
       if (deps.events) {
         try {
