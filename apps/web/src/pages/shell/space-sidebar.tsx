@@ -86,7 +86,6 @@ import { desktopBridge } from "../../lib/desktop";
 import { maskCurrencyWhenHidden } from "../../lib/hide-amounts-preference";
 import { isUnclaimedFileDrag } from "../../lib/pending-attachments";
 import type { Panel } from "../../lib/right-panel-state";
-import { rightPanelStorageKey, writeRightPanelState } from "../../lib/right-panel-state";
 import {
   compactRosterStatusLabel,
   rosterHasUndismissedRunError,
@@ -423,6 +422,7 @@ export type SpaceSidebarProps = {
   onAttachmentPick: (files: ArrayLike<File> | null, targetThreadKey?: string) => boolean;
   setFocusComposerBotId: Dispatch<SetStateAction<string | null>>;
   openBot: (id: string) => void | Promise<void>;
+  openBotSettings: (id: string) => void;
   moveSidebarItem: (
     item: { kind: "bot" | "group"; id: string },
     folderId: string | null,
@@ -535,6 +535,7 @@ export function SpaceSidebar({
   onAttachmentPick,
   setFocusComposerBotId,
   openBot,
+  openBotSettings,
   moveSidebarItem,
   botMenuAnchor,
   setBotMenu,
@@ -1059,17 +1060,7 @@ export function SpaceSidebar({
           {activityMode && !rail ? (
             <ActivityList
               onListedBots={setActivityBotIds}
-              onOpenWaitingItem={(item) => {
-                setMobileSidebarOpen(false);
-                // The bot page restores this panel on wide screens; Open work is in it.
-                if (userId && bootstrapMe?.spaceId) {
-                  writeRightPanelState(
-                    rightPanelStorageKey(userId, bootstrapMe.spaceId, "bot", item.botId),
-                    "settings",
-                  );
-                }
-                navigate(`/app/${item.botId}`);
-              }}
+              onOpenWaitingItem={(item) => openBotSettings(item.botId)}
               onOpenRun={(run) => {
                 setMobileSidebarOpen(false);
                 if (run.groupId) navigate(`/app/g/${run.groupId}`);

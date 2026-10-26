@@ -146,7 +146,8 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
   const rowsRef = useRef<HTMLDivElement>(null);
   const layoutKey = [...filteredActive, ...filteredRecent]
     .map((run) => `${run.runId}${run.status}`)
-    .join();
+    .join()
+    .concat(`|${waitingItems.map((item) => item.id).join()}`);
   // biome-ignore lint/correctness/useExhaustiveDependencies: layoutKey, showFinished and error change which rows are drawn
   useLayoutEffect(() => {
     const scroller = rowsRef.current;

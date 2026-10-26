@@ -275,6 +275,7 @@ export function SidebarFixture({
     onAttachmentPick: () => false,
     setFocusComposerBotId,
     openBot: async () => undefined,
+    openBotSettings: () => undefined,
     moveSidebarItem: async () => undefined,
     botMenuAnchor,
     setBotMenu,
