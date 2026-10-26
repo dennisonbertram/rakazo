@@ -3556,6 +3556,34 @@ export function createRunExecutor(deps: ExecutorDeps) {
             if (!offeredToolNames.has(name)) {
               return { error: `Tool ${name} is not available to this bot.` };
             }
+            // This branch returns before the common gate, so a Block rule is checked here too.
+            const blockedGtm = resolveActionApprovalDetail({
+              toolName: name,
+              viaConnector: false,
+              rules: await loadApprovalRules(),
+              botId: bot.id,
+            });
+            if (blockedGtm.decision === "block") {
+              try {
+                await deps.events.append({
+                  spaceId: run.spaceId,
+                  threadId: thread.id,
+                  botId: bot.id,
+                  runId: run.id,
+                  type: "approval.decided",
+                  payload: {
+                    tool: name,
+                    decision: "block",
+                    source: "block",
+                    unattended: run.unattended === true,
+                    tainted: run.externalTaint === true || externalTaint(),
+                  },
+                });
+              } catch (error) {
+                getLogger().warn("approval decision not recorded", { runId: run.id, error });
+              }
+              return { error: BLOCKED_ACTION_MESSAGE };
+            }
             const parsed = GtmPostInputSchema.safeParse(args);
             if (!parsed.success) return { error: "Invalid approved-post input." };
             if (
