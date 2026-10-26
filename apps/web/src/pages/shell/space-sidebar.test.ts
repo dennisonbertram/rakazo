@@ -55,6 +55,10 @@ vi.mock("../../components/tour/FirstRunTour", () => ({
         )
       : null,
 }));
+vi.mock("./rows-below", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./rows-below")>()),
+  rowsBelow: () => 3,
+}));
 vi.mock("../ActivityList", () => ({ ActivityList: () => null }));
 
 import {
@@ -944,4 +948,38 @@ describe("foldRows", () => {
     expect(foldRows(rows, false, "b", false)).toEqual([]);
     expect(foldRows(rows, false, "x")).toEqual([]);
   });
+});
+
+it("shows the +N more bar slim, at the bottom of the list", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  stubSidebarObservers();
+  const frames: (() => void)[] = [];
+  vi.stubGlobal("requestAnimationFrame", (run: () => void) => frames.push(run));
+  Element.prototype.scrollIntoView ??= () => undefined;
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        createElement(MemoryRouter, null, createElement(SidebarFixture, { mode: "expanded" })),
+      ),
+    );
+    await act(async () => {
+      for (const run of frames.splice(0)) run();
+    });
+    const bar = container.querySelector<HTMLElement>('[data-testid="sidebar-more-rows"]');
+    expect(bar?.textContent).toBe("+3 more");
+    expect(bar?.style.height).toBe("28px");
+    expect(bar?.className).toContain("bottom-0");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
 });
