@@ -97,11 +97,30 @@ The backend decrypts the value and the page browser types it only if the page is
 
 ## Managing saved credentials
 
-Owners can read back what is saved without asking the bot. In the web app, open a bot's settings,
-expand **Advanced**, and use the **Credentials** section. It lists each credential's name, origin
-and authentication type and never its value. From there you can add a credential, replace its value
-on the same destination, or remove one after confirming. Remove deletes the saved value immediately.
-The Electron desktop app hosts the same web UI, so it has the same section.
+Owners can read back what is saved without asking the bot. In the web app, open a bot's settings and
+use the **Credentials** section, which sits outside **Advanced**. It lists each credential's name,
+origin and authentication type and never its value. Each row also shows one muted line: **Used 2d ago**
+or **Not used yet**. From there you can add a credential, replace its value on the same destination,
+or remove one after confirming. Remove deletes the saved value immediately. The Electron desktop app
+hosts the same web UI, so it has the same section. A command variable's form says **The bot can read
+this value.**
+
+### Last used and Needs attention
+
+`BotSecret.lastUsedAt` is set after every successful `secret_request` and after a login fill succeeds.
+A 401 or 403 from the saved origin sets `needsAttentionAt`, the row shows **Needs attention**, and the
+owner gets one notification per credential per day (deduplicated on the credential id). A later
+successful use or a replaced value clears the mark.
+
+Both updates are guarded by the credential revision: they match on the row id and the ciphertext the
+request used. A request that was already running when the owner replaced the value cannot mark or clear
+the new value. Bookkeeping errors are dropped and never fail the request.
+
+### Unattended runs
+
+In a run nobody is watching, `secret_request` with `GET` or `HEAD` to the saved origin runs without a
+card. Any other method asks. `request_secret` and `request_takeover` do not pause on a card nobody sees:
+they end the run with a notification. See `docs/unattended-bots/PRD.md`, sections 4.1 and 4.3.
 
 Mobile does not host that web settings shell, so it has no credential management screen.
 The thread credential card still works on the phone, including website logins, and that is how a
