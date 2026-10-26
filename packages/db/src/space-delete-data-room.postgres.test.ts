@@ -21,7 +21,7 @@ describePostgres("space deletion and Data room blobs (PostgreSQL)", () => {
     await close();
   });
 
-  it("returns the storage keys of the deleted space's items", async () => {
+  it("returns the storage keys of the deleted space's items and contact photos", async () => {
     const db = createDb(databaseUrl!);
     prisma = db.prisma;
     close = async () => {
@@ -68,10 +68,24 @@ describePostgres("space deletion and Data room blobs (PostgreSQL)", () => {
       data: [item("a", `blob/a-${suffix}`), item("b", null)],
     });
 
+    await prisma.contactPhoto.create({
+      data: {
+        spaceId,
+        userId,
+        email: "ann@example.test",
+        storageKey: `photo/a-${suffix}`,
+        source: "google",
+        contentType: "image/png",
+        contentHash: "h",
+        fetchedAt: new Date(),
+      },
+    });
+
     const input = { currentSpaceId: spaceId, userId, spaceId };
     const claim = await claimEmptySpaceDeletionForMember(prisma, input);
     const result = await deleteEmptySpaceForMember(prisma, { ...input, claimId: claim.claimId });
-    expect(result.dataRoomStorageKeys).toEqual([`blob/a-${suffix}`]);
+    expect(result.dataRoomStorageKeys).toEqual([`blob/a-${suffix}`, `photo/a-${suffix}`]);
     expect(await prisma.dataRoomItem.count({ where: { spaceId } })).toBe(0);
+    expect(await prisma.contactPhoto.count({ where: { spaceId } })).toBe(0);
   });
 });

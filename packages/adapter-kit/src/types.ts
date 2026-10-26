@@ -772,6 +772,8 @@ export interface BackgroundJobPayloads {
   "inbox.triage": { userId: string; spaceId: string };
   /** Syncs one mail connection into the cache; one queued job per connection. */
   "mail.sync": { spaceId: string; userId: string; connectionId: string };
+  /** Fetches the profile photos of a connected account's contacts; one queued job per connection, at most daily. */
+  "contacts.photos": { spaceId: string; userId: string; connectionId: string };
   /** Files the document attachments of one newly synced message into the Data room; one queued job per message. */
   "mail.attachments": {
     spaceId: string;

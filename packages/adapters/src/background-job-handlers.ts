@@ -24,6 +24,7 @@ import type { CompanyImportEngine } from "./company-import-engine.js";
 import { expireComputerControl } from "./computer-control.js";
 import { scheduleComputerSleep, sleepComputerIfIdle } from "./computer-idle.js";
 import { performComputerUpdate } from "./computer-update.js";
+import { runContactPhotosJob } from "./contact-photos-job.js";
 import { runBoxFileImport, runBoxImport } from "./data-room-box-import.js";
 import { runDriveFileImport, runDriveImport } from "./data-room-drive-import.js";
 import { DATA_ROOM_STREAM_TIMEOUT_MS } from "./data-room-files.js";
@@ -45,6 +46,7 @@ import type { FinanceSyncDeps } from "./finance-sync.js";
 import { syncFinanceForUser } from "./finance-sync.js";
 import type { GmailPushConfig } from "./gmail-push.js";
 import { ensureMailWatch, runMailWatchRenewal } from "./gmail-push.js";
+import { GoogleContactPhotoSource } from "./google-contact-photos.js";
 import { compactHistory } from "./history-compaction.js";
 import { createInboxClassifierProvider } from "./inbox-classifier-factory.js";
 import { runInboxTriage, triageReadiness } from "./inbox-triage.js";
@@ -265,6 +267,18 @@ export function createBackgroundJobHandlers(deps: {
       if (!mail || !artifacts) throw new Error("Mail attachment filing is not configured");
       await runMailAttachmentFiling(
         { prisma: deps.prisma, jobs: deps.jobs, mail, artifacts },
+        payload,
+      );
+    },
+    "contacts.photos": async (payload) => {
+      // Without the Google connector or the blob store there is nothing to fetch with or into.
+      if (!deps.artifacts || !deps.connectors) return;
+      await runContactPhotosJob(
+        {
+          prisma: deps.prisma,
+          artifacts: deps.artifacts,
+          source: new GoogleContactPhotoSource({ connectors: deps.connectors }),
+        },
         payload,
       );
     },
