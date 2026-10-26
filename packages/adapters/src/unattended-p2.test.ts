@@ -275,27 +275,38 @@ describe("past-due notification", () => {
   const now = new Date("2026-10-26T15:00:00.000Z");
   beforeEach(() => vi.mocked(notifyThreadEvent).mockClear());
 
-  const item = (botId: string, title: string, userId = "user-1") => ({
+  const group = (botId: string, n: number) => ({
     spaceId: "space-1",
-    userId,
+    userId: "user-1",
     botId,
-    title,
-    bot: { name: botId === "b1" ? "Ada" : "Bo", thread: { id: `t-${botId}`, groupId: null } },
+    _count: { _all: n },
   });
-  const prisma = (items: unknown[]) =>
+  const firstTitle: Record<string, string> = { b1: "NDA", b2: "Invoice" };
+  const prisma = (groups: unknown[]) =>
     ({
-      scratchpadItem: { findMany: vi.fn(async () => items) },
+      scratchpadItem: {
+        groupBy: vi.fn(async () => groups),
+        findFirst: vi.fn(async ({ where }: { where: { botId: string } }) => ({
+          title: firstTitle[where.botId],
+        })),
+      },
+      bot: {
+        findMany: vi.fn(async () => [
+          { id: "b1", name: "Ada", thread: { id: "t-b1", groupId: null } },
+          { id: "b2", name: "Bo", thread: { id: "t-b2", groupId: null } },
+        ]),
+      },
       user: { findMany: vi.fn(async () => [{ id: "user-1", timezone: "UTC" }]) },
     }) as unknown as PrismaClient;
 
-  it("sends one grouped notification per bot with the first title and a bot+day key", async () => {
-    const p = prisma([item("b1", "NDA"), item("b1", "Quote"), item("b2", "Invoice")]);
+  it("notifies every bot with overdue items, however many another has, with the first title and a bot+day key", async () => {
+    const p = prisma([group("b1", 2000), group("b2", 1)]);
     expect(await notifyPastDueItems({ prisma: p, now })).toBe(2);
     const calls = vi.mocked(notifyThreadEvent).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.[3]).toMatchObject({
       kind: "help",
-      title: "Ada: 2 items are past due",
+      title: "Ada: 2000 items are past due",
       body: "NDA",
     });
     expect(calls[1]?.[3]).toMatchObject({ title: "Bo: 1 item is past due", body: "Invoice" });
@@ -304,7 +315,7 @@ describe("past-due notification", () => {
   });
 
   it("repeats the same key on a later sweep the same day, so the store dedupes", async () => {
-    const p = prisma([item("b1", "NDA")]);
+    const p = prisma([group("b1", 1)]);
     await notifyPastDueItems({ prisma: p, now });
     await notifyPastDueItems({ prisma: p, now: new Date("2026-10-26T20:00:00Z") });
     const keys = vi.mocked(notifyThreadEvent).mock.calls.map((call) => call[4]);
@@ -314,8 +325,9 @@ describe("past-due notification", () => {
   it("queries only open or parked items past due on active bots", async () => {
     const p = prisma([]);
     await notifyPastDueItems({ prisma: p, now });
-    expect(p.scratchpadItem.findMany).toHaveBeenCalledWith(
+    expect(p.scratchpadItem.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
+        by: ["spaceId", "userId", "botId"],
         where: {
           status: { in: ["open", "parked"] },
           dueAt: { lt: now },

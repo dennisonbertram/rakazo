@@ -3,9 +3,6 @@ import type { NotificationEvents, PrismaClient } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { notifyThreadEvent } from "./run-notification.js";
 
-// ponytail: one sweep reads at most this many past-due items; counts above it undercount. Page by bot if it matters.
-const SWEEP_LIMIT = 1_000;
-
 /**
  * One attention notification per bot per day for open items past their dueAt, whether or not the
  * bot checks in. The dedupe key is bot + the owner's local day, so later sweeps are no-ops.
@@ -15,59 +12,60 @@ export async function notifyPastDueItems(deps: {
   notificationEvents?: NotificationEvents;
   now: Date;
 }): Promise<number> {
-  const items = await deps.prisma.scratchpadItem.findMany({
-    where: {
-      status: { in: ["open", "parked"] },
-      dueAt: { lt: deps.now },
-      bot: { archivedAt: null },
-    },
-    orderBy: [{ dueAt: "asc" }, { id: "asc" }],
-    take: SWEEP_LIMIT,
-    select: {
-      spaceId: true,
-      userId: true,
-      botId: true,
-      title: true,
-      bot: { select: { name: true, thread: { select: { id: true, groupId: true } } } },
-    },
+  const where = {
+    status: { in: ["open", "parked"] },
+    dueAt: { lt: deps.now },
+    bot: { archivedAt: null },
+  };
+  // Grouped in the database so a bot with thousands of overdue items cannot hide another bot.
+  const counts = await deps.prisma.scratchpadItem.groupBy({
+    by: ["spaceId", "userId", "botId"],
+    where,
+    _count: { _all: true },
   });
-  const byBot = new Map<string, typeof items>();
-  for (const item of items) {
-    const key = `${item.spaceId}:${item.userId}:${item.botId}`;
-    byBot.set(key, [...(byBot.get(key) ?? []), item]);
-  }
-  const users = byBot.size
+  const bots = counts.length
+    ? await deps.prisma.bot.findMany({
+        where: { id: { in: counts.map((c) => c.botId) } },
+        select: { id: true, name: true, thread: { select: { id: true, groupId: true } } },
+      })
+    : [];
+  const botById = new Map(bots.map((bot) => [bot.id, bot]));
+  const users = counts.length
     ? await deps.prisma.user.findMany({
-        where: { id: { in: [...new Set(items.map((item) => item.userId))] } },
+        where: { id: { in: [...new Set(counts.map((c) => c.userId))] } },
         select: { id: true, timezone: true },
       })
     : [];
   const zones = new Map(users.map((user) => [user.id, user.timezone ?? "UTC"]));
 
   let sent = 0;
-  for (const group of byBot.values()) {
-    const first = group[0]!;
-    const thread = first.bot.thread;
-    if (!thread) continue;
-    const day = watchDay(deps.now, zones.get(first.userId) ?? "UTC");
+  for (const group of counts) {
+    const bot = botById.get(group.botId);
+    const thread = bot?.thread;
+    if (!bot || !thread) continue;
+    const first = await deps.prisma.scratchpadItem.findFirst({
+      where: { ...where, spaceId: group.spaceId, userId: group.userId, botId: group.botId },
+      orderBy: [{ dueAt: "asc" }, { id: "asc" }],
+      select: { title: true },
+    });
+    const count = group._count._all;
+    const day = watchDay(deps.now, zones.get(group.userId) ?? "UTC");
     const title =
-      group.length === 1
-        ? `${first.bot.name}: 1 item is past due`
-        : `${first.bot.name}: ${group.length} items are past due`;
+      count === 1 ? `${bot.name}: 1 item is past due` : `${bot.name}: ${count} items are past due`;
     try {
       const result = await notifyThreadEvent(
         deps.prisma,
         deps.notificationEvents,
-        { spaceId: first.spaceId, userId: first.userId, botId: first.botId, threadId: thread.id },
+        { spaceId: group.spaceId, userId: group.userId, botId: group.botId, threadId: thread.id },
         {
           kind: "help",
           title,
-          body: first.title,
-          botId: first.botId,
+          body: first?.title ?? "",
+          botId: group.botId,
           threadId: thread.id,
           ...(thread.groupId ? { groupId: thread.groupId } : {}),
         },
-        `past-due:${first.botId}:${day}`,
+        `past-due:${group.botId}:${day}`,
       );
       if (result === "created") sent += 1;
     } catch (error) {
