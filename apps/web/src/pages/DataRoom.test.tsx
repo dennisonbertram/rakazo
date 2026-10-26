@@ -1382,3 +1382,33 @@ it("shows the files list, not Stats, when the failed-files badge is followed fro
   expect(container.querySelector('[data-testid="data-room-stats"]')).toBeNull();
   expect(rpcMock.list.mock.calls.at(-1)?.[0]).toMatchObject({ status: "failed" });
 });
+
+const processingWithFailed = (failed: number) => ({
+  reading: 0,
+  tagging: 0,
+  indexing: 0,
+  failed,
+  current: null,
+});
+
+it("explains the sidebar failed count with a chip that filters to the failed files, gone at 0", async () => {
+  rpcMock.processing.mockResolvedValue(processingWithFailed(1));
+  await renderPage();
+  const chip = () => container.querySelector<HTMLButtonElement>('[data-testid="failed-chip"]');
+  expect(chip()?.textContent).toBe("1 failed");
+  await act(async () => chip()?.click());
+  expect(rpcMock.list.mock.calls.at(-1)?.[0]).toMatchObject({ status: "failed" });
+  // The Status filter shows the state now, so the chip steps aside.
+  expect(chip()).toBeNull();
+  // Clearing the filter brings the chip back while a file is still failed.
+  await act(async () => {
+    container.querySelector<HTMLElement>('[data-testid="go-all"]')?.click();
+  });
+  expect(chip()).not.toBeNull();
+  rpcMock.processing.mockResolvedValue(processingWithFailed(0));
+  await act(async () => {
+    window.dispatchEvent(new Event("rakazo:data-room-changed"));
+  });
+  await settle();
+  expect(chip()).toBeNull();
+});
