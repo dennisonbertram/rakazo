@@ -38,6 +38,17 @@ const withoutAccount = ({ account: _picked, ...rest }: NormalizedMailEdits) => r
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
+/** The provider ids a compose record holds, as the card stores them. */
+export function composeIds(
+  row: { threadId: string | null; providerMessageId: string | null; draftId: string | null } | null,
+) {
+  return {
+    ...(row?.threadId ? { threadId: row.threadId } : {}),
+    ...(row?.providerMessageId ? { messageId: row.providerMessageId } : {}),
+    ...(row?.draftId ? { draftId: row.draftId } : {}),
+  };
+}
+
 /**
  * An edited Send or Save draft on a mail approval, or Send now on a draft. It is the person's own action: the pending
  * agent call is denied first (one atomic claim, so a plain approval elsewhere cannot also run it),
@@ -181,12 +192,29 @@ export async function answerEditedMailApproval(
       // for example a database write that failed once the draft or message already existed.
       if (!(error instanceof ORPCError)) outcome = "unknown";
     }
+    // The provider's ids come from the send record the server wrote, never from the client.
+    const sentRow =
+      outcome === "sent" || outcome === "saved"
+        ? await deps.prisma.composeSend
+            .findUnique({
+              where: {
+                spaceId_userId_clientId: {
+                  spaceId: actor.spaceId,
+                  userId: actor.userId,
+                  clientId: mailApprovalComposeClientId(pending.effectId),
+                },
+              },
+              select: { threadId: true, providerMessageId: true, draftId: true },
+            })
+            .catch(() => null)
+        : null;
     await deps.events.setMailApprovalOutcome({
       spaceId: actor.spaceId,
       threadId: target.threadId,
       messageId: input.messageId,
       effectId: pending.effectId,
       outcome,
+      providerIds: composeIds(sentRow),
       note: mailApprovalAgentNote(send, outcome, edited),
     });
   } finally {

@@ -411,6 +411,14 @@ it("links a saved draft to Gmail Drafts", async () => {
   expect(openLink()?.href).toBe("https://mail.google.com/mail/u/me%40example.test/#drafts");
 });
 
+it("links a sent mail to its conversation, or its message when there is no thread id", async () => {
+  const done = { status: "answered", answer: "allow" } as const;
+  await render({ mail: { ...mail, outcome: "sent", threadId: "18abc", messageId: "m1" }, ...done });
+  expect(openLink()?.href).toBe("https://mail.google.com/mail/u/me%40example.test/#all/18abc");
+  await render({ mail: { ...mail, outcome: "sent", messageId: "m1" }, ...done });
+  expect(openLink()?.href).toBe("https://mail.google.com/mail/u/me%40example.test/#all/m1");
+});
+
 it("has no Gmail link on a pending or unsent card", async () => {
   await render();
   expect(openLink()).toBeNull();

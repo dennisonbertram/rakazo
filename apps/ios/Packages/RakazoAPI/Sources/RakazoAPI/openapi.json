@@ -8432,6 +8432,15 @@
                                                         "failed"
                                                       ]
                                                     },
+                                                    "threadId": {
+                                                      "type": "string"
+                                                    },
+                                                    "messageId": {
+                                                      "type": "string"
+                                                    },
+                                                    "draftId": {
+                                                      "type": "string"
+                                                    },
                                                     "connectionId": {
                                                       "type": "string"
                                                     },
@@ -42744,6 +42753,15 @@
                                                 "failed"
                                               ]
                                             },
+                                            "threadId": {
+                                              "type": "string"
+                                            },
+                                            "messageId": {
+                                              "type": "string"
+                                            },
+                                            "draftId": {
+                                              "type": "string"
+                                            },
                                             "connectionId": {
                                               "type": "string"
                                             },
@@ -59127,6 +59145,15 @@
                                                 "unknown",
                                                 "failed"
                                               ]
+                                            },
+                                            "threadId": {
+                                              "type": "string"
+                                            },
+                                            "messageId": {
+                                              "type": "string"
+                                            },
+                                            "draftId": {
+                                              "type": "string"
                                             },
                                             "connectionId": {
                                               "type": "string"
@@ -108954,6 +108981,15 @@
                                                 "failed"
                                               ]
                                             },
+                                            "threadId": {
+                                              "type": "string"
+                                            },
+                                            "messageId": {
+                                              "type": "string"
+                                            },
+                                            "draftId": {
+                                              "type": "string"
+                                            },
                                             "connectionId": {
                                               "type": "string"
                                             },
@@ -111145,6 +111181,15 @@
                                                 "unknown",
                                                 "failed"
                                               ]
+                                            },
+                                            "threadId": {
+                                              "type": "string"
+                                            },
+                                            "messageId": {
+                                              "type": "string"
+                                            },
+                                            "draftId": {
+                                              "type": "string"
                                             },
                                             "connectionId": {
                                               "type": "string"

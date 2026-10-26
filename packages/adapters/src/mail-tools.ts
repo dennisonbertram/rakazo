@@ -1004,8 +1004,11 @@ async function mailSend(
       : { error: `An earlier send of this message may or may not have gone out. ${CHECK_SENT}` };
   }
 
-  const record = (data: { state: string; providerMessageId?: string | null }) =>
-    table.update({ where: { id: row.id }, data }).catch(() => undefined);
+  const record = (data: {
+    state: string;
+    providerMessageId?: string | null;
+    threadId?: string | null;
+  }) => table.update({ where: { id: row.id }, data }).catch(() => undefined);
   let sending = false;
   try {
     let draftId = given || row.draftId;
@@ -1019,7 +1022,11 @@ async function mailSend(
     sending = true;
     const sent = await deps.mail.sendDraft(account, draftId, writeContext(deps, account, context));
     sending = false;
-    await record({ state: "sent", providerMessageId: sent.messageId || null });
+    await record({
+      state: "sent",
+      providerMessageId: sent.messageId || null,
+      threadId: sent.threadId || null,
+    });
     // So the Inbox shows the reply in its conversation, and the thread leaves Needs reply.
     await syncAfterSend({ prisma: deps.prisma, jobs: deps.jobs }, account, {
       ...context,
@@ -1031,6 +1038,8 @@ async function mailSend(
       account: accountName(account),
       to: draft.to.map(addressText),
       subject: draft.subject,
+      ...(sent.messageId ? { messageId: sent.messageId } : {}),
+      ...(sent.threadId ? { threadId: sent.threadId } : {}),
       note: "The email was sent. Tell the user it was sent; do not offer it again.",
     };
   } catch (error) {

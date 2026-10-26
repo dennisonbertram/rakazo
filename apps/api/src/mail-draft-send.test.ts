@@ -108,7 +108,13 @@ describe("sendSavedMailDraft", () => {
     expect(t.sendDraft).toHaveBeenCalledTimes(1);
     expect(t.sendDraft.mock.calls[0]?.[0]).toMatchObject({ id: "conn-1" });
     expect(t.sendDraft.mock.calls[0]?.[1]).toBe("draft-9");
-    expect(t.outcomes).toEqual([expect.objectContaining({ outcome: "sent", tool: "mail_send" })]);
+    expect(t.outcomes).toEqual([
+      expect.objectContaining({
+        outcome: "sent",
+        tool: "mail_send",
+        providerIds: { threadId: "gt-1", messageId: "gm-1", draftId: "draft-9" },
+      }),
+    ]);
     expect(t.row()).toMatchObject({ state: "sent", draftId: "draft-9" });
   });
 

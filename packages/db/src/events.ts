@@ -604,6 +604,8 @@ export interface SetMailApprovalOutcomeInput {
   /** With a failed outcome: the account the send used, so the card can reopen the draft in the composer. */
   connectionId?: string;
   account?: string;
+  /** Provider ids of the sent or saved mail, for the card's link into the mail app. */
+  providerIds?: { threadId?: string; messageId?: string; draftId?: string };
   /**
    * For a recovery write: apply only while the approval is still unsettled (the effect still has
    * this note) and the compose record is in this state (null: there is none). Checked under the
@@ -707,6 +709,7 @@ export async function setMailApprovalOutcome(
           ...(input.tool ? { tool: input.tool } : {}),
           ...(input.error ? { error: input.error.slice(0, 300) } : {}),
           ...(input.connectionId ? { connectionId: input.connectionId } : {}),
+          ...(input.outcome === "sent" || input.outcome === "saved" ? input.providerIds : {}),
           ...(input.account && !block.mail.account ? { account: input.account } : {}),
         },
       };
