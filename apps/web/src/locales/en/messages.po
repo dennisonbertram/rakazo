@@ -2397,10 +2397,6 @@ msgstr "Change"
 msgid "Change password"
 msgstr "Change password"
 
-#: src/components/tour/FirstRunTour.tsx
-msgid "Change settings, export your data or retake this tour from here."
-msgstr "Change settings, export your data or retake this tour from here."
-
 #: src/pages/Investors.tsx
 msgid "Change source"
 msgstr "Change source"
@@ -4714,6 +4710,7 @@ msgstr "Disabled tools"
 #: src/components/ComposeEmail.tsx
 #: src/components/finance/StatementReviewCard.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/shell/BotSkillsSection.tsx
@@ -4729,6 +4726,7 @@ msgid "Discard this import?"
 msgstr "Discard this import?"
 
 #: src/components/MailApprovalCard.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Discarded"
 msgstr "Discarded"
@@ -5914,6 +5912,10 @@ msgstr "Hang up, then enter the code on screen."
 msgid "Has attachment"
 msgstr "Has attachment"
 
+#: src/components/tour/FirstRunTour.tsx
+msgid "Have a bot run on a schedule, or watch a page and tell you only when it changes. Background runs only read; they ask before they send or change anything."
+msgstr "Have a bot run on a schedule, or watch a page and tell you only when it changes. Background runs only read; they ask before they send or change anything."
+
 #: src/pages/RoutineEditor.tsx
 msgid "header"
 msgstr "header"
@@ -6847,6 +6849,10 @@ msgstr "Low"
 #: src/lib/model-catalog.ts
 msgid "Low"
 msgstr "Low"
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Lowercase letters, numbers, - and _."
+msgstr "Lowercase letters, numbers, - and _."
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Lowercase letters, numbers, hyphens and underscores, starting with a letter."
@@ -10078,6 +10084,7 @@ msgstr "Round actions"
 msgid "Routine"
 msgstr "Routine"
 
+#: src/components/tour/FirstRunTour.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
@@ -10781,6 +10788,10 @@ msgstr "Setting up the agent..."
 #: src/pages/shell/space-sidebar.tsx
 msgid "Settings"
 msgstr "Settings"
+
+#: src/components/tour/FirstRunTour.tsx
+msgid "Settings has Approvals, where you choose what bots may do on their own: Allow, Ask or Block. Export your data or retake this tour here."
+msgstr "Settings has Approvals, where you choose what bots may do on their own: Allow, Ask or Block. Export your data or retake this tour here."
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/ModelSettingsOverlay.tsx
