@@ -7,6 +7,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authClient } from "../lib/auth";
 import type { AuthCapabilities } from "../lib/auth-capabilities";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
+import { passkeyCancelled, passkeysAvailable } from "../lib/passkey-support";
 import { clearSpaceSelection } from "../lib/rpc";
 import { signInNext } from "../lib/sign-in-next";
 import { runSsoFlow } from "../lib/sso-flow";
@@ -139,6 +140,39 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     }
   }
 
+  const showPasskey =
+    mode === "in" && Boolean(reset?.passwordAuth) && passkeysAvailable(reset?.passkey);
+
+  async function signInWithPasskey(autoFill: boolean) {
+    setError(null);
+    try {
+      const result = await authClient.signIn.passkey({ autoFill });
+      if (result.error) {
+        if (!passkeyCancelled(result.error)) {
+          setError(authErrorText(result.error, t`Could not continue`));
+        }
+        return;
+      }
+      clearSpaceSelection();
+      navigate(signInNext(searchParams.get("next")));
+    } catch {
+      setError(t`Could not reach the server`);
+    }
+  }
+
+  // Browser autofill offers the saved passkeys from the email field; it needs no click.
+  useEffect(() => {
+    if (!showPasskey) return;
+    let active = true;
+    void window.PublicKeyCredential?.isConditionalMediationAvailable?.().then((available) => {
+      if (available && active) void signInWithPasskey(true);
+    });
+    return () => {
+      active = false;
+    };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: start the autofill call once per page
+  }, [showPasskey]);
+
   async function signInWithSso() {
     setError(null);
     try {
@@ -268,7 +302,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                 <Input
                   id="email"
                   name="email"
-                  autoComplete="username"
+                  autoComplete={showPasskey ? "username webauthn" : "username"}
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -377,6 +411,18 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   <Trans>Create account</Trans>
                 )}
               </Button>
+              {showPasskey ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  disabled={pending}
+                  className={submitClass}
+                  onClick={() => void signInWithPasskey(false)}
+                >
+                  <Trans>Sign in with passkey</Trans>
+                </Button>
+              ) : null}
               {reset.sso && mode !== "forgot" ? (
                 <Button
                   type="button"

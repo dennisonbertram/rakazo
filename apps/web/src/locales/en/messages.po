@@ -1098,6 +1098,10 @@ msgstr "Add new email attachments automatically"
 msgid "Add page"
 msgstr "Add page"
 
+#: src/components/PasskeySettings.tsx
+msgid "Add passkey"
+msgstr "Add passkey"
+
 #: src/components/ContactDialog.tsx
 #: src/pages/Fundraising.tsx
 msgid "Add prospect"
@@ -3537,6 +3541,7 @@ msgid "Could not connect to the computer screen"
 msgstr "Could not connect to the computer screen"
 
 #: src/components/AccountAccess.tsx
+#: src/components/PasskeySettings.tsx
 #: src/lib/account-security.ts
 #: src/lib/sso-flow.ts
 #: src/lib/user-error.ts
@@ -8838,6 +8843,14 @@ msgstr "Party"
 msgid "Passed"
 msgstr "Passed"
 
+#: src/components/PasskeySettings.tsx
+msgid "Passkey"
+msgstr "Passkey"
+
+#: src/components/PasskeySettings.tsx
+msgid "Passkeys"
+msgstr "Passkeys"
+
 #: src/components/AskCard.tsx
 #: src/pages/Auth.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -9768,6 +9781,7 @@ msgstr "Reminder"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
@@ -9854,6 +9868,10 @@ msgstr "Remove message trigger"
 #: src/pages/RoutineEditor.tsx
 msgid "Remove page watch"
 msgstr "Remove page watch"
+
+#: src/components/PasskeySettings.tsx
+msgid "Remove passkey {label}"
+msgstr "Remove passkey {label}"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Remove schedule"
@@ -11209,6 +11227,10 @@ msgstr "Sign in with ChatGPT"
 #: src/pages/Onboarding.tsx
 msgid "Sign in with OpenRouter"
 msgstr "Sign in with OpenRouter"
+
+#: src/pages/Auth.tsx
+msgid "Sign in with passkey"
+msgstr "Sign in with passkey"
 
 #: src/lib/model-connection-preflight.ts
 msgid "Sign in with the subscription, or test the API key instead."
