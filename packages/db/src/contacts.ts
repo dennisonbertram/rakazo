@@ -1,13 +1,17 @@
 import type {
   Contact,
+  ContactDetail,
   ContactKind,
   ContactLinked,
   ContactSaveInput,
   ContactStage,
 } from "@rakazo/contracts";
+import { CONTACT_DETAIL_LIMIT } from "@rakazo/contracts";
 import type { Prisma, PrismaClient } from "./client.js";
 import { endPortalAccess } from "./investor-portal.js";
+import { listMeetings } from "./meetings.js";
 import { isUniqueViolation } from "./prisma-errors.js";
+import { toSafe } from "./safes.js";
 import { IsolationError } from "./scope.js";
 
 export class ContactEmailTakenError extends Error {
@@ -145,6 +149,77 @@ export async function getContact(prisma: Db, actor: Scope, id: string): Promise<
   });
   if (!row) throw new IsolationError("Contact not found");
   return toContact(row);
+}
+
+/**
+ * The contact and what is stored against it. Mail and meetings match the contact's email address
+ * (sender or recipient; attendee); documents (shared from the Data room) and SAFEs match its id.
+ * Every query is scoped to the user's space and user; IsolationError when the contact is not theirs.
+ */
+export async function contactDetail(
+  prisma: PrismaClient,
+  actor: Scope,
+  id: string,
+): Promise<ContactDetail> {
+  const scope = ownerOf(actor);
+  const contact = await getContact(prisma, scope, id);
+  const email = contact.email?.toLowerCase();
+  const limit = CONTACT_DETAIL_LIMIT;
+  const [messageIds, meetings, shares, safes] = await Promise.all([
+    email
+      ? prisma.$queryRaw<{ id: string }[]>`
+          SELECT "id" FROM (
+            SELECT DISTINCT ON ("threadId") "id", "receivedAt" FROM "mail_messages"
+            WHERE "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId} AND NOT "isSpam"
+              AND (lower("fromAddress") = ${email}
+                OR EXISTS (SELECT 1 FROM unnest("toAddresses" || "ccAddresses") AS a WHERE lower(a) = ${email}))
+            ORDER BY "threadId", "receivedAt" DESC
+          ) AS newest ORDER BY "receivedAt" DESC LIMIT ${limit}`
+      : [],
+    email ? listMeetings(prisma, scope, { attendeeEmail: email, limit }) : [],
+    prisma.investorShare.findMany({
+      where: { ...scope, contactId: id },
+      select: { dataRoomItem: { select: { id: true, name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    prisma.safe.findMany({
+      where: { ...scope, contactId: id },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+  ]);
+  const messages = await prisma.cachedMailMessage.findMany({
+    where: { ...scope, id: { in: messageIds.map((row) => row.id) } },
+  });
+  const byId = new Map(messages.map((message) => [message.id, message]));
+  return {
+    contact,
+    mail: messageIds.flatMap(({ id: messageId }) => {
+      const m = byId.get(messageId);
+      return m
+        ? [
+            {
+              id: m.id,
+              subject: m.subject,
+              from: m.fromName || m.fromAddress,
+              snippet: m.snippet,
+              receivedAt: m.receivedAt.toISOString(),
+            },
+          ]
+        : [];
+    }),
+    meetings: meetings.map((m) => ({
+      id: m.id,
+      title: m.title,
+      startedAt: m.startedAt.toISOString(),
+    })),
+    documents: shares.map((share) => share.dataRoomItem),
+    safes: safes.map((row) => {
+      const safe = toSafe(row);
+      return { id: safe.id, amountCents: safe.amountCents, status: safe.status };
+    }),
+  };
 }
 
 /** What deleting the contact removes besides its own fields; later slices add their links here. */

@@ -15,7 +15,7 @@ import {
 } from "@rakazo/ui-web";
 import { Plus, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { ContactDialog, contactKindNames } from "../components/ContactDialog";
 import { PickFilter, SearchField } from "../components/ListControls";
@@ -42,6 +42,7 @@ export function ContactsPage({
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [error, setError] = useState("");
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const setParam = (key: string, value: string | undefined) =>
     setParams(
       (current) => {
@@ -201,7 +202,10 @@ export function ContactsPage({
                         key={contact.id}
                         data-contact-id={contact.id}
                         className={contact.id === savedId ? SAVED_ROW_CLASS : ""}
-                        onOpen={() => setEditing(contact)}
+                        onOpen={() =>
+                          // The search and filter ride along, so Back restores them.
+                          navigate(`/app/contacts/${contact.id}${params.size ? `?${params}` : ""}`)
+                        }
                       >
                         <TableCell>
                           <button
