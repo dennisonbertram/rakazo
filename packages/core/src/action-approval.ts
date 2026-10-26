@@ -342,7 +342,11 @@ export function actionTypeForTool(input: {
     // Built-ins that need approval but have no row of their own write to connected services.
     return APPROVAL_REQUIRED_BUILTIN_TOOLS.has(toolName) ? "connected_apps_write" : null;
   }
-  if (!connectorToolRequiresApproval(toolName, input.readOnly)) return null;
+  // A declared read-only tool keeps today's live-chat behaviour (no default ask); unattended runs
+  // still ask through unattendedToolRequiresApproval, which does not trust the hint.
+  if (input.readOnly === true || !connectorToolRequiresApproval(toolName, input.readOnly)) {
+    return null;
+  }
   const kind = (input.connectorKind ?? connectorKindFromToolName(toolName)).toLowerCase();
   if (PURCHASE_CONNECTOR_SLUGS.has(kind) || /purchase|pay_|charge|checkout|buy_/i.test(toolName)) {
     return "spend_money";
