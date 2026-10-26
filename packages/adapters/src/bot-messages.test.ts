@@ -1,5 +1,5 @@
 import { BOT_SHARE_HELD_MESSAGE } from "@rakazo/contracts";
-import { PrivateFragments } from "@rakazo/core";
+import { botMessageAllowsSilence, buildBotMessageWakePrompt, PrivateFragments } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
 import type { MessageBotOptions } from "./bot-messages.js";
@@ -1260,5 +1260,80 @@ describe("messages to an external bot are checked against what the run read", ()
       expect(delivered(h), status).toEqual([]);
       expect(h.tx.externalEffect.create).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe("a delegate that has not answered yet", () => {
+  const pendingRequest = {
+    blocks: [
+      {
+        kind: "bot_message_sent",
+        toBotId: "bot-target",
+        toBotName: "Analyst",
+        text: "x",
+        intent: "request",
+      },
+    ],
+  };
+
+  it("is not sent the same request again", async () => {
+    const harness = deps();
+    (harness.deps.prisma.message.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      pendingRequest,
+    ]);
+    const sent = await messageBot(harness.deps, run, sender, {
+      bot_id: "bot-target",
+      message: "check drafts again",
+    });
+    expect(sent).toMatchObject({ ok: false });
+    expect(harness.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("can be asked a new question after the owner wrote again", async () => {
+    const harness = deps();
+    (harness.deps.prisma.message.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { role: "user", blocks: [{ kind: "text", text: "Do they have receipts?" }] },
+      pendingRequest,
+    ]);
+    const sent = await messageBot(harness.deps, run, sender, {
+      bot_id: "bot-target",
+      message: "do the drafts have receipts?",
+    });
+    expect(sent).toMatchObject({ ok: true });
+  });
+
+  it("can be asked again once it has answered", async () => {
+    const harness = deps();
+    const result = {
+      blocks: [
+        {
+          kind: "bot_message_received",
+          fromBotId: "bot-target",
+          fromBotName: "Analyst",
+          text: "done",
+          intent: "result",
+        },
+      ],
+    };
+    (harness.deps.prisma.message.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      result,
+      pendingRequest,
+    ]);
+    const sent = await messageBot(harness.deps, run, sender, {
+      bot_id: "bot-target",
+      message: "and receipts?",
+    });
+    expect(sent).toMatchObject({ ok: true });
+  });
+
+  it("wakes the requester without forcing a visible message on a progress note", () => {
+    expect(botMessageAllowsSilence("status", true)).toBe(true);
+    expect(botMessageAllowsSilence("result", true)).toBe(false);
+    const prompt = buildBotMessageWakePrompt({
+      from: { id: "b", name: "Analyst" },
+      text: "checking now",
+      intent: "status",
+    });
+    expect(prompt).toContain('do not post a "waiting" message');
   });
 });
