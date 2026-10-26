@@ -498,6 +498,7 @@ export async function cancelScheduleFromTool(
     },
   });
   if (!existing) return { error: "Schedule not found." };
+  if (existing.managedKind) return { error: MANAGED_CHECK_IN_ERROR };
 
   await deps.prisma.routine.delete({ where: { id: existing.id } });
   await deps.jobs.cancel(routineJobKey(existing.id));
@@ -562,6 +563,23 @@ function ownedRoutine(scope: ScheduleScope, id: string) {
   };
 }
 
+const MANAGED_CHECK_IN_ERROR = "This check-in is managed in the bot's settings.";
+
+/** A routine keeps firing on its own: a watch, any non-one-shot schedule, or a webhook, GitHub or message trigger. */
+function routineRepeats(routine: {
+  crons: string[];
+  watch?: unknown;
+  webhookEnabled?: boolean;
+  githubEnabled?: boolean;
+  messageProvider?: string | null;
+}) {
+  return (
+    Boolean(routine.watch) ||
+    !isOneShotRoutineCrons(routine.crons) ||
+    Boolean(routine.webhookEnabled || routine.githubEnabled || routine.messageProvider)
+  );
+}
+
 const TIMING_FIELDS = ["cron", "every", "unit", "runAt", "delayMinutes", "delaySeconds"] as const;
 
 function timingOf(input: unknown): Record<string, unknown> {
@@ -589,6 +607,7 @@ export async function updateScheduleFromTool(
   if (!id) return { error: "id is required." };
   const existing = await deps.prisma.routine.findFirst({ where: ownedRoutine(input, id) });
   if (!existing) return { error: "Schedule not found." };
+  if (existing.managedKind) return { error: MANAGED_CHECK_IN_ERROR };
 
   let watch: WatchSpec | undefined;
   if (input.watch && typeof input.watch === "object") {
@@ -789,6 +808,8 @@ export async function scheduleApproval(
     : await deps.prisma.routine.findFirst({ where: ownedRoutine(scope, String(args.id ?? "")) });
   // The tool reports "not found" without any effect.
   if (!create && !existing) return undefined;
+  // The tool refuses the managed check-in without any effect.
+  if (existing?.managedKind) return undefined;
 
   const timing = create ? timingOf(args) : timingOf(args.schedule);
   const timezone =
@@ -804,7 +825,8 @@ export async function scheduleApproval(
   const promptChanges =
     !create &&
     (isScheduleValueProvided(args.prompt) || (Boolean(args.watch) && Boolean(existing?.watch)));
-  const existingRepeats = Boolean(existing) && !isOneShotRoutineCrons(existing?.crons ?? []);
+  // Judged on the routine as it is now; the edit's own timing is covered by newlyRepeats.
+  const existingRepeats = Boolean(existing) && routineRepeats(existing!);
   if (!newlyRepeats && !(promptChanges && existingRepeats)) return undefined;
 
   const name = create ? String(args.name ?? "").trim() : (existing?.name ?? "");
