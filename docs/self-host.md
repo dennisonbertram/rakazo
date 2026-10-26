@@ -191,6 +191,12 @@ With only `DATABASE_URL` set, migrations and the app share one login. Everything
 but `pnpm db:migrate`, the API and the worker warn that row-level security is not enforced. To fix
 this, set `DATABASE_MIGRATION_URL` to the owner and `DATABASE_URL` to a new login.
 
+Host-run stack (`pnpm dev`, or a service that runs the API and worker from a checkout) on a
+database that already exists: nothing is needed to keep it working. To turn row-level security on,
+copy the current `DATABASE_URL` value into `DATABASE_MIGRATION_URL`, change `DATABASE_URL` to the
+same host, port and database with user `rakazo_app` and a new URI-safe password
+(`openssl rand -hex 16`), run `pnpm db:migrate`, then restart the API and worker.
+
 Run `pg_dump` as the owner. The app login would only dump rows it is allowed to see.
 
 The Docker supervisor is not published as its own image and is not exposed on the host. It runs from
