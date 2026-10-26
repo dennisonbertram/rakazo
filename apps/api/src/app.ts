@@ -932,7 +932,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         // Same user in the same space, so leaving the space also ends a stream.
         // A database failure rejects this check; only a missing membership is unauthorized.
         stillAuthorized: async () => {
-          const current = await sessionActor(c.req.raw);
+          // Not the cached lookup: this check exists to see a sign-out that happened since.
+          const current = (await requestSession(c.req.raw))?.actor ?? null;
           return Boolean(
             actor && current?.userId === actor.userId && current.spaceId === actor.spaceId,
           );
