@@ -107,6 +107,18 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "legal_upsert_deadline",
   "legal_upsert_node",
   "legal_link",
+  // Reads from the owner's own connected Google mail, Drive and calendar, and their contacts. Each
+  // is a GET (or a read of Praci's synced cache), with no send, draft, label, move, share or delete.
+  // mail_search only stores its own continuation record in Praci. Tainted runs still ask, as above.
+  "mail_search",
+  "mail_grep",
+  "mail_get",
+  "inbox_overview",
+  "drive_search",
+  "drive_read",
+  "calendar_list_events",
+  "calendar_get_event",
+  "contacts_list",
 ]);
 
 /**
