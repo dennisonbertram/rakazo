@@ -4752,11 +4752,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
               select: { id: true, status: true, request: true, result: true },
             });
+            // Connector wrappers cover many tools, so they compare arguments; any other tool
+            // is refused outright once the owner has denied it in this run.
+            const wrapperKind =
+              replayEffectToolName === CATALOG_APPROVAL_TOOL ||
+              replayEffectToolName === "connectors_execute_tool";
             const repeated =
               denied.find(
                 (prior) =>
                   prior.id !== applied.effect.id &&
-                  repeatsDeniedRequest(replayEffectToolName, prior.request, effectRequest),
+                  (!wrapperKind ||
+                    repeatsDeniedRequest(replayEffectToolName, prior.request, effectRequest)),
               ) ??
               (await priorDenialAwaitingOwner(
                 deps.prisma,

@@ -1081,6 +1081,20 @@ describe("connector read-only metadata and approval enforcement", () => {
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     });
 
+    it("refuses the same tool with different arguments after a denial in the same run", async () => {
+      const f = fixture({
+        catalog,
+        rules: [{ effect: "require_approval", matchKind: "tool", matchValue: "demo_get_item" }],
+      });
+      await f.run();
+      f.effects[0]!.status = "denied";
+      f.setCalls([{ args: { id: "item-2" }, executionId: "call-2" }]);
+      await f.run();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.results.at(-1)).toEqual({ error: DENIED_ACTION_MESSAGE });
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
     it("allows a new card when the user asks again in a new run", async () => {
       const f = fixture({
         catalog,
