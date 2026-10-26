@@ -50,6 +50,35 @@ const webhookRoutine: Routine = {
   messageProvider: "slack",
 };
 
+const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+
+const watchRoutine: Routine = {
+  ...routine,
+  id: "routine_watch",
+  name: "Pricing page",
+  crons: [],
+  quiet: true,
+  watch: { kind: "page", url: "https://example.com/pricing", intervalMinutes: 60 },
+  lastRunAt: null,
+  nextRunAt: null,
+  status: {
+    lastRunAt: null,
+    nextRunAt: null,
+    lastCheckedAt: minutesAgo(4),
+    lastChangedAt: minutesAgo(26 * 60),
+    pausedReason: null,
+  },
+};
+
+const checkInRoutine: Routine = {
+  ...routine,
+  id: "routine_check_in",
+  name: "Check in",
+  crons: ["0 9 * * *"],
+  managedKind: "check_in",
+  quiet: true,
+};
+
 const meta = {
   title: "Routines/RoutineEditor",
   parameters: {
@@ -109,6 +138,50 @@ export const ListRows: Story = {
         running={false}
         onOpen={() => undefined}
         onStop={() => undefined}
+      />
+      <RoutineListRow
+        routine={watchRoutine}
+        running={false}
+        onOpen={() => undefined}
+        onStop={() => undefined}
+      />
+      <RoutineListRow
+        routine={{
+          ...watchRoutine,
+          id: "r6",
+          name: "Pricing page, paused",
+          active: false,
+          status: { ...watchRoutine.status, pausedReason: "errors" },
+        }}
+        running={false}
+        onOpen={() => undefined}
+        onStop={() => undefined}
+      />
+      <RoutineListRow
+        routine={{
+          ...watchRoutine,
+          id: "r7",
+          name: "Changes too often",
+          active: false,
+          status: { ...watchRoutine.status, pausedReason: "noisy" },
+        }}
+        running={false}
+        onOpen={() => undefined}
+        onStop={() => undefined}
+      />
+      <RoutineListRow
+        routine={checkInRoutine}
+        running={false}
+        onOpen={() => undefined}
+        onStop={() => undefined}
+        onToggleActive={() => undefined}
+      />
+      <RoutineListRow
+        routine={{ ...checkInRoutine, id: "r8", active: false, crons: ["0 */4 * * *"] }}
+        running={false}
+        onOpen={() => undefined}
+        onStop={() => undefined}
+        onToggleActive={() => undefined}
       />
       <RoutineListRow
         routine={{
@@ -271,6 +344,45 @@ export const PausedWithError: Story = {
       editing={routine}
       initial={{ ...draftFromRoutine(routine), active: false }}
       error="Could not save this routine"
+    />
+  ),
+};
+
+/** Choosing "Watch a page" on a new routine adds this card and turns the quiet switch on. */
+export const NewWatch: Story = {
+  render: () => (
+    <Editor
+      editing={null}
+      initial={{
+        ...emptyRoutineDraft(),
+        name: "Pricing page",
+        quiet: true,
+        watch: { kind: "page", url: "", intervalMinutes: 60 },
+      }}
+    />
+  ),
+};
+
+export const EditingWatch: Story = {
+  render: () => <Editor editing={watchRoutine} initial={draftFromRoutine(watchRoutine)} />,
+};
+
+export const QuietOff: Story = {
+  render: () => <Editor editing={routine} initial={draftFromRoutine(routine)} />,
+};
+
+export const WatchRejected: Story = {
+  render: () => (
+    <Editor
+      editing={null}
+      initial={{
+        ...emptyRoutineDraft(),
+        name: "Pricing page",
+        prompt: "Tell me what changed.",
+        quiet: true,
+        watch: { kind: "page", url: "https://example.com/pricing", intervalMinutes: 15 },
+      }}
+      error="This bot already watches 5 pages."
     />
   ),
 };

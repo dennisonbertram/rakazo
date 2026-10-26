@@ -5,6 +5,7 @@ import type {
   ModelCatalogEntry,
   ModelCredential,
   Routine,
+  WatchSpec,
 } from "@rakazo/contracts";
 import type { CronFreq, CronPreset } from "@rakazo/core";
 import {
@@ -33,6 +34,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Switch,
   Textarea,
   Tooltip,
   TooltipContent,
@@ -41,6 +43,7 @@ import {
 import {
   ChevronLeft,
   Clock,
+  Eye,
   GitBranch,
   Globe,
   MessageSquare,
@@ -57,6 +60,7 @@ import {
   parseModelOptionKey,
   thinkingLevelLabel,
 } from "../lib/model-catalog";
+import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { isHiddenBuiltinSkill, slashSkillLabel } from "../lib/slash-skills";
 import { RoutineRunHistory } from "./RoutineRunHistory";
@@ -102,6 +106,9 @@ export type RoutineDraftState = {
   thinkingLevel: string;
   /** Empty keeps the routine's zone, or the account zone for a new routine. */
   timezone: string;
+  /** Only message the user when something needs them. */
+  quiet: boolean;
+  watch: WatchSpec | null;
 };
 
 export function emptyRoutineDraft(): RoutineDraftState {
@@ -117,6 +124,8 @@ export function emptyRoutineDraft(): RoutineDraftState {
     modelKey: "",
     thinkingLevel: "",
     timezone: "",
+    quiet: false,
+    watch: null,
   };
 }
 
@@ -136,12 +145,33 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
         : "",
     thinkingLevel: routine.thinkingLevel ?? "",
     timezone: routine.timezone,
+    quiet: routine.quiet,
+    watch: routine.watch,
   };
 }
 
+function watchHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function checkInSummary(routine: Routine): string {
+  // The 4-hour check-in repeats on an hour step ("0 */4 * * *"); the daily one runs once a day.
+  const everyFourHours = routine.crons.some((cron) => cron.split(/\s+/)[1]?.includes("/4"));
+  return everyFourHours ? t`Check-in every 4 hours` : t`Daily check-in`;
+}
+
 export function routineTriggerSummary(routine: Routine): string {
+  if (routine.managedKind === "check_in") return checkInSummary(routine);
   if (!routine.active) return t`Paused`;
   const parts: string[] = [];
+  if (routine.watch) {
+    const host = watchHost(routine.watch.url);
+    parts.push(t`Watches ${host}`);
+  }
   if (routine.webhookEnabled) parts.push(t`When a webhook fires`);
   if (routine.githubEnabled) parts.push(t`Git event`);
   if (routine.messageProvider === "slack") parts.push(t`Slack message`);
@@ -149,6 +179,61 @@ export function routineTriggerSummary(routine: Routine): string {
   else if (routine.messageProvider) parts.push(t`Message event`);
   for (const cron of routine.crons) parts.push(formatCron(cron));
   return parts.length > 0 ? parts.join(" · ") : t`No trigger`;
+}
+
+function formatRunTime(iso: string, zone: string, locale: string, now = new Date()): string {
+  const date = new Date(iso);
+  const time = { hour: "numeric", minute: "2-digit", timeZone: zone } as const;
+  const dayKey = (value: Date) => value.toLocaleDateString("en-CA", { timeZone: zone });
+  if (dayKey(date) === dayKey(now)) return date.toLocaleTimeString(locale, time);
+  const days = Math.abs(date.getTime() - now.getTime()) / 86_400_000;
+  return date.toLocaleString(
+    locale,
+    days < 6 ? { weekday: "short", ...time } : { month: "short", day: "numeric", ...time },
+  );
+}
+
+/** The muted second line of a routine row; null when there is nothing to say yet. */
+export function routineStatusLine(
+  routine: Routine,
+  locale = "en",
+  now = new Date(),
+): string | null {
+  const { status } = routine;
+  if (status.pausedReason) {
+    switch (status.pausedReason) {
+      case "errors":
+        return t`Paused: the page could not be checked`;
+      case "noisy":
+        return t`Paused: the page changes too often`;
+      case "access":
+        return t`Paused: no access`;
+      case "budget":
+        return t`Paused: too many checks today`;
+    }
+  }
+  const parts: string[] = [];
+  if (routine.watch) {
+    if (status.lastCheckedAt) {
+      const checked = formatRelativeTime(status.lastCheckedAt, now);
+      parts.push(t`Checked ${checked}`);
+    }
+    if (status.lastChangedAt) {
+      const changed = formatRelativeTime(status.lastChangedAt, now);
+      parts.push(t`Changed ${changed}`);
+    }
+  } else {
+    const lastRunAt = status.lastRunAt ?? routine.lastRunAt;
+    if (lastRunAt) {
+      const lastRan = formatRunTime(lastRunAt, routine.timezone, locale, now);
+      parts.push(t`Last ran ${lastRan}`);
+    }
+    if (status.nextRunAt && routine.active) {
+      const next = formatRunTime(status.nextRunAt, routine.timezone, locale, now);
+      parts.push(t`Next ${next}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 export function RoutineListHeader({ onCreate }: { onCreate: () => void }) {
@@ -175,17 +260,23 @@ export function RoutineListRow({
   running,
   onOpen,
   onStop,
+  onToggleActive,
 }: {
   routine: Routine;
   running: boolean;
   onOpen: () => void;
   onStop: () => void;
+  /** A managed routine (the check-in) shows only this switch; it cannot be opened. */
+  onToggleActive?: (active: boolean) => void;
 }) {
+  const { i18n } = useLingui();
+  const managed = routine.managedKind !== null;
+  const statusLine = routineStatusLine(routine, i18n.locale || "en");
+  const Body = managed ? "div" : "button";
   return (
     <div className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 hover:bg-accent">
-      <button
-        type="button"
-        onClick={onOpen}
+      <Body
+        {...(managed ? {} : { type: "button" as const, onClick: onOpen })}
         className="flex min-w-0 flex-1 items-center gap-3 text-start"
       >
         <span className="grid h-5 w-5 place-items-center">
@@ -203,8 +294,23 @@ export function RoutineListRow({
             {routineTriggerSummary(routine)}
             {routine.modelProvider && routine.modelId ? ` · ${routine.modelId}` : ""}
           </span>
+          {statusLine ? (
+            <span
+              data-testid="routine-status-line"
+              className="block truncate text-[12.5px] text-muted-foreground/80"
+            >
+              {statusLine}
+            </span>
+          ) : null}
         </span>
-      </button>
+      </Body>
+      {managed ? (
+        <Switch
+          checked={routine.active}
+          aria-label={t`Active`}
+          onCheckedChange={(checked) => onToggleActive?.(checked)}
+        />
+      ) : null}
       {running ? (
         <Button
           size="xs"
@@ -318,6 +424,7 @@ export function RoutineEditor({
     draft.schedules.length > 0 ||
     draft.webhookEnabled ||
     draft.githubEnabled ||
+    Boolean(draft.watch) ||
     Boolean(draft.messageProvider);
   // A saved routine has nothing to save until a field changes. The baseline is the draft as
   // it stood when this routine was opened or last saved (the parent swaps `editing` on save).
@@ -360,6 +467,15 @@ export function RoutineEditor({
     if (!webhook.configured) {
       await onEnsureWebhook().catch(() => undefined);
     }
+  }
+
+  function addWatch() {
+    // A watch starts quiet on a new routine: most changes need no message.
+    onChange({
+      ...draft,
+      watch: { kind: "page", url: "", intervalMinutes: 60 },
+      ...(editing ? {} : { quiet: true }),
+    });
   }
 
   function addMessageProvider(provider: string) {
@@ -659,6 +775,14 @@ export function RoutineEditor({
             />
           ) : null}
 
+          {draft.watch ? (
+            <WatchTriggerCard
+              watch={draft.watch}
+              onChange={(watch) => onChange({ ...draft, watch })}
+              onRemove={() => onChange({ ...draft, watch: null })}
+            />
+          ) : null}
+
           {draft.messageProvider ? (
             <MessageTriggerCard
               provider={draft.messageProvider}
@@ -701,6 +825,11 @@ export function RoutineEditor({
               ))}
             </DropdownMenuGroup>
 
+            <DropdownMenuItem disabled={Boolean(draft.watch)} onClick={addWatch}>
+              <Eye />
+              <Trans>Watch a page</Trans>
+            </DropdownMenuItem>
+
             {slackAvailable ? (
               <DropdownMenuItem
                 disabled={draft.messageProvider === "slack"}
@@ -740,6 +869,18 @@ export function RoutineEditor({
           </p>
         ) : null}
       </div>
+
+      <label
+        htmlFor={`${fieldId}-quiet`}
+        className="mt-5 flex items-center justify-between gap-3 text-sm text-foreground/80 pointer-coarse:min-h-11"
+      >
+        <Trans>Only message me if something needs me</Trans>
+        <Switch
+          id={`${fieldId}-quiet`}
+          checked={draft.quiet}
+          onCheckedChange={(checked) => onChange({ ...draft, quiet: checked })}
+        />
+      </label>
 
       <div className="mt-5">
         <Button disabled={saving || running || !hasTriggers || unchanged} onClick={onSave}>
@@ -790,6 +931,79 @@ function MessageTriggerCard({ provider, onRemove }: { provider: string; onRemove
       <p className="mt-2.5 text-[13.5px] text-muted-foreground/70">
         <Trans>Runs when this bot receives a verified message from this provider.</Trans>
       </p>
+    </div>
+  );
+}
+
+const WATCH_INTERVALS = [15, 60, 1440] as const;
+
+function WatchTriggerCard({
+  watch,
+  onChange,
+  onRemove,
+}: {
+  watch: WatchSpec;
+  onChange: (next: WatchSpec) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useLingui();
+  const id = useId();
+  const labels: Record<(typeof WATCH_INTERVALS)[number], string> = {
+    15: t`Every 15 minutes`,
+    60: t`Every hour`,
+    1440: t`Every day`,
+  };
+  return (
+    <div className="rounded-xl border border-border p-3" data-testid="watch-card">
+      <div className="flex items-center gap-2.5 px-0.5">
+        <Eye size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
+        <span className="flex-1 text-[14.5px] text-foreground">
+          <Trans>Watch a page</Trans>
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t`Remove page watch`}
+          onClick={onRemove}
+          className="text-muted-foreground"
+        >
+          <X />
+        </Button>
+      </div>
+      <div className="mt-2.5 space-y-2.5 text-[13.5px]">
+        <label htmlFor={`${id}-url`} className="block text-muted-foreground/70">
+          <Trans>Page address</Trans>
+          <Input
+            id={`${id}-url`}
+            type="url"
+            inputMode="url"
+            value={watch.url}
+            placeholder="https://"
+            onChange={(event) => onChange({ ...watch, url: event.target.value.trim() })}
+            className="mt-1"
+          />
+        </label>
+        <label htmlFor={`${id}-every`} className="block text-muted-foreground/70">
+          <Trans>Check every</Trans>
+          <NativeSelect
+            id={`${id}-every`}
+            className="mt-1 w-full"
+            value={String(watch.intervalMinutes)}
+            onChange={(event) =>
+              onChange({
+                ...watch,
+                intervalMinutes: Number(event.target.value) as WatchSpec["intervalMinutes"],
+              })
+            }
+          >
+            {WATCH_INTERVALS.map((minutes) => (
+              <NativeSelectOption key={minutes} value={String(minutes)}>
+                {labels[minutes]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </label>
+      </div>
     </div>
   );
 }

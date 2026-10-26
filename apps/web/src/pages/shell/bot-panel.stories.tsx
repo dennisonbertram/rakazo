@@ -23,6 +23,8 @@ const setup = () => {
     "models.credentials": [],
     "models.list": [],
     "scratchpad.list": [],
+    "checkIn.get": { cadence: "off" },
+    "checkIn.set": (input: { cadence: string }) => ({ cadence: input.cadence }),
     "botSecrets.list": [],
     "memory.list": [],
     "agentSkills.list": [],
@@ -180,4 +182,12 @@ export const ExternalWithAllowedBot: Story = {
 export const PageAgentHasNoAudienceSwitch: Story = {
   beforeEach: setup,
   args: { bot: { ...scoutBot, spawnKey: "finance-agent:user_demo" } },
+};
+
+/** The Check in select sits under Notifications and saves on change. */
+export const CheckInDaily: Story = {
+  beforeEach: () => {
+    setup();
+    mockRpc({ "checkIn.get": { cadence: "daily" } });
+  },
 };

@@ -14,7 +14,13 @@ vi.mock("../lib/rpc", () => ({
   rpc: { models: { credentials: async () => [], list: async () => [] } },
 }));
 
-import { emptyRoutineDraft, RoutineEditor, RoutineListHeader } from "./RoutineEditor";
+import {
+  emptyRoutineDraft,
+  RoutineEditor,
+  RoutineListHeader,
+  routineStatusLine,
+  routineTriggerSummary,
+} from "./RoutineEditor";
 
 async function buttons(editing: Routine | null) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -290,4 +296,55 @@ it("keeps @mentions in the instruction when there are no skills to pick", async 
   await act(async () => root.unmount());
   el.remove();
   vi.unstubAllGlobals();
+});
+
+const baseRoutine = {
+  crons: [],
+  timezone: "UTC",
+  active: true,
+  webhookEnabled: false,
+  githubEnabled: false,
+  messageProvider: null,
+  watch: null,
+  managedKind: null,
+  status: {
+    lastRunAt: null,
+    nextRunAt: null,
+    lastCheckedAt: null,
+    lastChangedAt: null,
+    pausedReason: null,
+  },
+} as unknown as Routine;
+
+it("describes a watch, a check-in and a pause in the row", () => {
+  const now = new Date("2026-02-02T12:00:00Z");
+  const watch = {
+    ...baseRoutine,
+    watch: { kind: "page", url: "https://example.com/pricing", intervalMinutes: 60 },
+    status: {
+      ...baseRoutine.status,
+      lastCheckedAt: "2026-02-02T11:56:00Z",
+      lastChangedAt: "2026-02-01T12:00:00Z",
+    },
+  } as Routine;
+  expect(routineTriggerSummary(watch)).toBe("Watches example.com");
+  expect(routineStatusLine(watch, "en", now)).toBe("Checked 4m ago · Changed 1d ago");
+  const paused = { ...watch, status: { ...watch.status, pausedReason: "noisy" } } as Routine;
+  expect(routineStatusLine(paused, "en", now)).toBe("Paused: the page changes too often");
+  const checkIn = { ...baseRoutine, managedKind: "check_in", crons: ["0 9 * * *"] } as Routine;
+  expect(routineTriggerSummary(checkIn)).toBe("Daily check-in");
+  expect(routineTriggerSummary({ ...checkIn, crons: ["0 */4 * * *"] })).toBe(
+    "Check-in every 4 hours",
+  );
+  const schedule = {
+    ...baseRoutine,
+    crons: ["0 8 * * *"],
+    status: {
+      ...baseRoutine.status,
+      lastRunAt: "2026-02-02T08:00:00Z",
+      nextRunAt: "2026-02-03T08:00:00Z",
+    },
+  } as Routine;
+  expect(routineStatusLine(schedule, "en", now)).toBe("Last ran 8:00 AM · Next Tue 8:00 AM");
+  expect(routineStatusLine(baseRoutine, "en", now)).toBeNull();
 });

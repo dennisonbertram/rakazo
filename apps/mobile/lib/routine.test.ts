@@ -1,6 +1,6 @@
 import type { Routine } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
-import { routineStatusLine } from "./routine.js";
+import { routineActivityLine, routineStatusLine } from "./routine.js";
 
 function routine(partial: Partial<Routine>): Routine {
   return {
@@ -64,5 +64,30 @@ describe("routineStatusLine", () => {
 
   it("omits the trigger segment when there are no triggers", () => {
     expect(routineStatusLine(routine({}))).toBe("Active · UTC");
+  });
+});
+
+describe("routineActivityLine", () => {
+  const now = new Date("2026-02-02T12:00:00Z");
+  it("says when a watch last checked and changed", () => {
+    const watch = routine({
+      watch: { kind: "page", url: "https://example.com/pricing", intervalMinutes: 60 },
+      status: {
+        lastRunAt: null,
+        nextRunAt: null,
+        lastCheckedAt: "2026-02-02T11:56:00Z",
+        lastChangedAt: null,
+        pausedReason: null,
+      },
+    });
+    expect(routineActivityLine(watch, now)).toBe("Checked 4 minutes ago");
+    expect(routineStatusLine(watch)).toBe("Active · Watches example.com · UTC");
+  });
+  it("says why a watch is paused and has nothing to say for a new routine", () => {
+    const paused = routine({
+      status: { ...routine({}).status, pausedReason: "noisy" },
+    });
+    expect(routineActivityLine(paused, now)).toBe("Paused: the page changes too often");
+    expect(routineActivityLine(routine({}), now)).toBeNull();
   });
 });

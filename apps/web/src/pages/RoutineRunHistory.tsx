@@ -262,7 +262,11 @@ export function RoutineRunHistory({
                   )}
                 </div>
                 {name ? <p className="mt-1 truncate font-medium text-foreground">{name}</p> : null}
-                {run.preview && !run.waitingOn ? (
+                {run.silent && !run.waitingOn ? (
+                  <p className={name ? "" : "mt-1"}>
+                    <Trans>Nothing to report</Trans>
+                  </p>
+                ) : run.preview && !run.waitingOn ? (
                   <p className={`truncate text-foreground ${name ? "" : "mt-1"}`}>{run.preview}</p>
                 ) : null}
                 <div className="mt-1 flex items-center justify-between gap-2">
