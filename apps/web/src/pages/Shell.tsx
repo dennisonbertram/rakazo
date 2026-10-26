@@ -270,6 +270,7 @@ import { getToolActivityEnabled, subscribeToolActivity } from "../lib/tool-activ
 import { transcriptCanSnapAfterFrame, transcriptIsNearEnd } from "../lib/transcript-scroll";
 import { speaker } from "../lib/tts";
 import { useNotificationsOff } from "../lib/use-notifications-off";
+import { useRefetchWhileOpen } from "../lib/use-refetch-while-open";
 import { useRememberedMessages } from "../lib/use-remembered-messages";
 import { useRunResumedAt } from "../lib/use-run-resumed-at";
 import { useSidebarGlance } from "../lib/use-sidebar-glance";
@@ -1263,6 +1264,9 @@ export function ShellPage() {
         setRoutinesBotId(botId);
       })
       .catch(() => undefined);
+  useRefetchWhileOpen(!inGroup && Boolean(active?.id), () => {
+    if (active?.id) reloadRoutines(active.id);
+  });
   const panelTarget = inGroup ? activeGroup?.id : active?.id;
   const panelStorageKey =
     // A page agent panel is not a saved bot panel: never restore or write one for it.
@@ -1883,6 +1887,14 @@ export function ShellPage() {
           event.type === "thread.cleared"
         ) {
           void refreshBots().catch(() => undefined);
+        }
+        if (
+          event.type === "routine.created" ||
+          event.type === "routine.updated" ||
+          event.type === "routine.fired" ||
+          isRunTerminalEvent(event)
+        ) {
+          reloadRoutines(active.id);
         }
         if (event.type === "thread.message.created") {
           const blocks = (event.payload.blocks as Array<{ kind?: string }>) ?? [];

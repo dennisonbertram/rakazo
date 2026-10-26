@@ -83,9 +83,11 @@ describe("check-in daily cap", () => {
     };
     const taskCreate = vi.fn(async () => ({ id: "task-1" }));
     const runCreate = vi.fn(async () => ({ id: "run-1", taskId: "task-1" }));
+    const routineUpdate = vi.fn(async () => ({}));
     const tx = {
       routine: {
         updateMany: vi.fn(async () => ({ count: 1 })),
+        update: routineUpdate,
         findUnique: vi.fn(async () => ({
           modelProvider: null,
           modelId: null,
@@ -122,13 +124,18 @@ describe("check-in daily cap", () => {
       jobs: { enqueue: vi.fn(async () => undefined), cancel: vi.fn(), close: vi.fn() },
       events: { append: vi.fn(async () => undefined) },
     } as unknown as Parameters<typeof createRunExecutor>[0]);
-    return { executor, scheduledAt, taskCreate, runCreate };
+    return { executor, scheduledAt, taskCreate, runCreate, routineUpdate };
   }
 
   it("skips the wake while a check-in run is still active", async () => {
     const busy = wake(false, true);
     await busy.executor.wakeRoutine("routine-1", busy.scheduledAt.toISOString());
     expect(busy.runCreate).not.toHaveBeenCalled();
+    // The schedule moved on but nothing ran: Last ran goes back to its old value.
+    expect(busy.routineUpdate).toHaveBeenCalledWith({
+      where: { id: "routine-1" },
+      data: { lastRunAt: null },
+    });
   });
 
   it("ends a check-in reply silently when another run already posted today", async () => {
@@ -154,9 +161,14 @@ describe("check-in daily cap", () => {
     const skipped = wake(true);
     await skipped.executor.wakeRoutine("routine-1", skipped.scheduledAt.toISOString());
     expect(skipped.runCreate).not.toHaveBeenCalled();
+    expect(skipped.routineUpdate).toHaveBeenCalledWith({
+      where: { id: "routine-1" },
+      data: { lastRunAt: null },
+    });
 
     const ran = wake(false);
     await ran.executor.wakeRoutine("routine-1", ran.scheduledAt.toISOString());
+    expect(ran.routineUpdate).not.toHaveBeenCalled();
     expect(ran.taskCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ prompt: checkInInstruction() }),
     });
