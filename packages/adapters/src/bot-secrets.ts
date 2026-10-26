@@ -198,7 +198,7 @@ export async function findCommandVariableConflict(
   )?.name;
 }
 
-type SecretRow = { id: string; name: string };
+type SecretRow = { id: string; name: string; ciphertext: string };
 
 /**
  * Record a successful use. A failed write must never fail the request, so errors are dropped.
@@ -212,7 +212,9 @@ async function recordSecretUse(
   outcome: "ok" | "rejected",
 ) {
   try {
-    const where = { id: row.id, ...scopeFields(scope) };
+    // Match the ciphertext this request used, so a late result cannot touch a replacement that
+    // kept the row id.
+    const where = { id: row.id, ciphertext: row.ciphertext, ...scopeFields(scope) };
     if (outcome === "ok") {
       await prisma.botSecret.updateMany({
         where,
@@ -220,7 +222,11 @@ async function recordSecretUse(
       });
       return;
     }
-    await prisma.botSecret.updateMany({ where, data: { needsAttentionAt: new Date() } });
+    const marked = await prisma.botSecret.updateMany({
+      where,
+      data: { needsAttentionAt: new Date() },
+    });
+    if (marked.count === 0) return;
     await createNotification(prisma, {
       spaceId: scope.spaceId,
       userId: scope.userId,
@@ -604,6 +610,12 @@ export async function requestWithBotSecret(input: {
       }),
       signal,
     );
+    // Only a 2xx counts as a use; other errors (404, 429, 5xx) say nothing about the credential.
+    // Recorded before the body read, so a huge or broken body cannot skip it.
+    if (response.ok) await recordSecretUse(input.prisma, input.scope, row, "ok");
+    else if (response.status === 401 || response.status === 403) {
+      await recordSecretUse(input.prisma, input.scope, row, "rejected");
+    }
     const bytes = await readBodyCapped(response, 1_000_000, signal);
     const text = new TextDecoder().decode(bytes);
     let body: unknown = text;
@@ -614,11 +626,6 @@ export async function requestWithBotSecret(input: {
     }
     // Redact before truncating, so an output boundary cannot expose part of a value.
     const safe = JSON.stringify(redactConnectorPayload(body, redactions));
-    // Only a 2xx counts as a use; other errors (404, 429, 5xx) say nothing about the credential.
-    if (response.ok) await recordSecretUse(input.prisma, input.scope, row, "ok");
-    else if (response.status === 401 || response.status === 403) {
-      await recordSecretUse(input.prisma, input.scope, row, "rejected");
-    }
     return {
       status: response.status,
       body: safe.length > 20_000 ? safe.slice(0, 20_000) : JSON.parse(safe),
@@ -645,7 +652,16 @@ export async function resolveLoginFill(input: {
   scope: BotSecretScope;
   name: string;
   field: LoginField;
-}): Promise<{ text: string; origin: string; redactions: string[] } | { error: string }> {
+}): Promise<
+  | {
+      text: string;
+      origin: string;
+      redactions: string[];
+      /** Call once the page action that used the value has succeeded. */
+      markUsed: () => Promise<void>;
+    }
+  | { error: string }
+> {
   const row = await input.prisma.botSecret.findFirst({
     where: { ...scopeFields(input.scope), name: input.name },
   });
@@ -673,9 +689,9 @@ export async function resolveLoginFill(input: {
     return { error: "Website logins can only be filled on an HTTPS origin." };
   }
   const login = decodeLoginSecret(await input.secretStore.load(row.ciphertext, row.id));
-  await recordSecretUse(input.prisma, input.scope, row, "ok");
   return {
     text: login[input.field],
+    markUsed: () => recordSecretUse(input.prisma, input.scope, row, "ok"),
     origin: destination.origin,
     // Redaction is substring replacement, so a short username would mangle unrelated text.
     redactions: [

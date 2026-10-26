@@ -729,6 +729,7 @@ describe("saved website logins", () => {
     expect(await resolveLoginFill({ ...input, field: "password" })).toEqual({
       text: "fake-password-1",
       origin: "https://login.example.test",
+      markUsed: expect.any(Function),
       redactions: expect.arrayContaining(["fake-password-1", "fake-user@example.test"]),
     });
     expect(await resolveLoginFill({ ...input, field: "username" })).toMatchObject({
@@ -794,7 +795,7 @@ describe("saved website logins", () => {
 describe("credential use bookkeeping", () => {
   async function trackedFixture(status: number) {
     const { input, findFirst } = await fixture();
-    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const updateMany = vi.fn(async (_args?: any) => ({ count: 1 }));
     // createNotification runs a transaction; a rejected credential only needs it to be called.
     const tx = {
       $executeRaw: vi.fn(),
@@ -819,7 +820,7 @@ describe("credential use bookkeeping", () => {
     const { input, updateMany } = await trackedFixture(200);
     await requestWithBotSecret(input);
     expect(updateMany).toHaveBeenCalledWith({
-      where: { id: "secret-1", ...scope },
+      where: { id: "secret-1", ciphertext: expect.any(String), ...scope },
       data: { lastUsedAt: expect.any(Date), needsAttentionAt: null },
     });
   });
@@ -837,7 +838,7 @@ describe("credential use bookkeeping", () => {
       await requestWithBotSecret(input);
       expect(updateMany).toHaveBeenCalledTimes(1);
       expect(updateMany).toHaveBeenCalledWith({
-        where: { id: "secret-1", ...scope },
+        where: { id: "secret-1", ciphertext: expect.any(String), ...scope },
         data: { needsAttentionAt: expect.any(Date) },
       });
       expect(transaction).toHaveBeenCalledTimes(1);
@@ -856,13 +857,71 @@ describe("credential use bookkeeping", () => {
     expect(await requestWithBotSecret(input)).toMatchObject({ status: 200 });
   });
 
+  it("still marks a 401 when the body read fails", async () => {
+    const { input, updateMany } = await trackedFixture(401);
+    const body = new ReadableStream({
+      pull() {
+        throw new Error("stream broke");
+      },
+    });
+    input.remote.fetch.mockResolvedValue(new Response(body, { status: 401 }));
+    expect(await requestWithBotSecret(input)).toMatchObject({ error: expect.any(String) });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "secret-1", ciphertext: expect.any(String), ...scope },
+      data: { needsAttentionAt: expect.any(Date) },
+    });
+  });
+
+  describe("a credential replaced during an in-flight request", () => {
+    async function replacedFixture(status: number) {
+      const { input, updateMany, transaction } = await trackedFixture(status);
+      // The replacement keeps the row id but has new ciphertext. Updates apply only on a match.
+      const current = { ciphertext: "replacement" };
+      updateMany.mockImplementation(async (args: { where: { ciphertext: string } }) => ({
+        count: args.where.ciphertext === current.ciphertext ? 1 : 0,
+      }));
+      input.remote.fetch.mockImplementation(async () => {
+        current.ciphertext = "replacement";
+        return new Response("{}", { status });
+      });
+      return { input, updateMany, transaction };
+    }
+
+    it("does not mark the replacement or notify on a late 401", async () => {
+      const { input, updateMany, transaction } = await replacedFixture(401);
+      await requestWithBotSecret(input);
+      const where = (updateMany.mock.calls[0] as unknown as [{ where: { ciphertext: string } }])[0]
+        .where;
+      expect(where.ciphertext).not.toBe("replacement");
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("does not clear the replacement's mark on a late 200", async () => {
+      const { input, updateMany } = await replacedFixture(200);
+      await requestWithBotSecret(input);
+      const where = (updateMany.mock.calls[0] as unknown as [{ where: { ciphertext: string } }])[0]
+        .where;
+      expect(where.ciphertext).not.toBe("replacement");
+    });
+  });
+
   it("stamps a login fill", async () => {
     const { prisma } = await loginFixtureForUse();
     const updateMany = vi.fn(async () => ({ count: 1 }));
     (prisma as unknown as { botSecret: { updateMany: unknown } }).botSecret.updateMany = updateMany;
-    await resolveLoginFill({ prisma, secretStore, scope, name: "site_login", field: "password" });
+    const resolved = await resolveLoginFill({
+      prisma,
+      secretStore,
+      scope,
+      name: "site_login",
+      field: "password",
+    });
+    // Resolving a value is not a use; the caller marks it after the page action succeeds.
+    expect(updateMany).not.toHaveBeenCalled();
+    if ("error" in resolved) throw new Error(resolved.error);
+    await resolved.markUsed();
     expect(updateMany).toHaveBeenCalledWith({
-      where: { id: "login-1", ...scope },
+      where: { id: "login-1", ciphertext: expect.any(String), ...scope },
       data: { lastUsedAt: expect.any(Date), needsAttentionAt: null },
     });
   });
