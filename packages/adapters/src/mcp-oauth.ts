@@ -1138,12 +1138,7 @@ export class McpOAuthBroker {
               let grant: TokenGrant;
               try {
                 grant = {
-                  tokens: await requestRefresh(
-                    oauth,
-                    current,
-                    network.fetch,
-                    allowPrivateEndpoint,
-                  ),
+                  tokens: await requestRefresh(oauth, current, network.fetch, allowPrivateEndpoint),
                 };
                 grant.obtainedAt = Date.now();
               } catch (error) {

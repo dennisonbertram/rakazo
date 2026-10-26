@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asSystem, createDb, runAsTenant } from "@rakazo/db";
+import { createDb } from "@rakazo/db";
 import { afterAll, describe, expect, it } from "vitest";
 import type { OAuthMaterial } from "./mcp-oauth.js";
 import { McpOAuthBroker } from "./mcp-oauth.js";
@@ -28,7 +28,7 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
   afterAll(async () => {
     const [first] = databases;
     if (first) {
-      const prisma = asSystem(first.prisma);
+      const prisma = first.prisma;
       await prisma.organization.deleteMany({ where: { id: { in: users } } });
       await prisma.user.deleteMany({ where: { id: { in: users } } });
     }
@@ -39,7 +39,7 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
   });
 
   async function seed(material: OAuthMaterial) {
-    const prisma = asSystem(openDb().prisma);
+    const prisma = openDb().prisma;
     const id = randomUUID();
     users.push(id);
     await prisma.user.create({
@@ -127,17 +127,11 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
     });
     const seeded = await Promise.all([1, 2, 3].map(() => seed(expiredMaterial())));
     const providers = await Promise.all(
-      seeded.map(({ server, context }) =>
-        runAsTenant(context, () => broker.providerFor(server, context)),
-      ),
+      seeded.map(({ server, context }) => broker.providerFor(server, context)),
     );
 
     const started = Date.now();
-    const tokens = await Promise.all(
-      providers.map((provider, index) =>
-        runAsTenant(seeded[index]!.context, () => provider?.tokens()),
-      ),
-    );
+    const tokens = await Promise.all(providers.map((provider) => provider?.tokens()));
 
     expect(tokens.map((token) => token?.access_token)).toEqual([
       "access-1",
@@ -146,7 +140,7 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
     ]);
     expect(Date.now() - started).toBeLessThan(5_000);
     for (const { server } of seeded) {
-      const row = await asSystem(db.prisma).secret.findFirstOrThrow({
+      const row = await db.prisma.secret.findFirstOrThrow({
         where: { mcpServers: { some: { id: server.id } } },
       });
       expect(

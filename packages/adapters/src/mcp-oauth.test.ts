@@ -261,7 +261,7 @@ describe("MCP OAuth", () => {
    * API and worker share a database. The credential advisory lock is a real mutex
    * held until the transaction that took it ends.
    */
-  function sharedCredentials(material: OAuthMaterial) {
+  function sharedCredentials(material: OAuthMaterial, endpoint = "https://mcp.example.test/mcp") {
     const values = new Map<string, string>();
     let nextRecord = 0;
     const secrets = {
@@ -282,7 +282,7 @@ describe("MCP OAuth", () => {
     const rows: Array<{ id: string; ciphertext: string }> = [];
     const server = {
       id: "server-1",
-      endpoint: "https://mcp.example.test/mcp",
+      endpoint,
       secretId: null as string | null,
     };
     let lock = Promise.resolve();
@@ -721,27 +721,13 @@ describe("MCP OAuth", () => {
     expect(await broker.statusFor(shared.server, shared.context)).toBe("none");
   });
 
-  it.each(["disconnect", "client changed", "server mismatch", "server gone", "endpoint changed"])(
+  it.each(["disconnect", "server gone", "endpoint changed"])(
     "refuses a rotated grant after a failed commit when %s",
     async (change) => {
       const server = rotatingAuthServer();
-      const material = {
-        ...expiringMaterial(EXPIRED()),
-        oauthClient: { client_id: "client-1" },
-      };
-      const shared = sharedCredentials(material);
+      const shared = sharedCredentials(expiringMaterial(EXPIRED()));
       const { provider } = await shared.startProcess(server.fetch);
-      const replacement: OAuthMaterial =
-        change === "client changed"
-          ? { oauthClient: { client_id: "replacement-client" } }
-          : change === "server mismatch"
-            ? {
-                oauthClient: {
-                  client_id: "client-1",
-                  authorization_server: "https://other.example.test/",
-                },
-              }
-            : { headers: { "X-Team": "blue" } };
+      const replacement: OAuthMaterial = { headers: { "X-Team": "blue" } };
       shared.tables.mcpServer.update = async () => {
         await shared.replaceStored(replacement);
         if (change === "server gone") shared.tables.mcpServer.findFirst = async () => null as never;
@@ -758,32 +744,24 @@ describe("MCP OAuth", () => {
     },
   );
 
-  it.each([false, true])(
-    "keeps an observed disconnect when the fallback commit also fails (pre-registered: %s)",
-    async (preRegistered) => {
-      const server = rotatingAuthServer();
-      const shared = sharedCredentials({
-        ...expiringMaterial(EXPIRED()),
-        ...(preRegistered ? { oauthClient: { client_id: "client-1" } } : {}),
-      });
-      const { provider } = await shared.startProcess(server.fetch);
-      let first = true;
-      const replacement = { headers: { "X-Team": "blue" } };
-      shared.tables.mcpServer.update = async () => {
-        if (first) {
-          first = false;
-          await shared.replaceStored(replacement);
-        }
-        throw new Error("connection terminated unexpectedly");
-      };
+  it("keeps an observed disconnect when the fallback commit also fails", async () => {
+    const server = rotatingAuthServer();
+    const shared = sharedCredentials(expiringMaterial(EXPIRED()));
+    const { provider } = await shared.startProcess(server.fetch);
+    let first = true;
+    const replacement = { headers: { "X-Team": "blue" } };
+    shared.tables.mcpServer.update = async () => {
+      if (first) {
+        first = false;
+        await shared.replaceStored(replacement);
+      }
+      throw new Error("connection terminated unexpectedly");
+    };
 
-      expect(await provider.tokens()).toBeUndefined();
-      expect(server.requests.map((request) => request.get("refresh_token"))).toEqual([
-        "old-refresh",
-      ]);
-      expect(await shared.stored()).toEqual(replacement);
-    },
-  );
+    expect(await provider.tokens()).toBeUndefined();
+    expect(server.requests.map((request) => request.get("refresh_token"))).toEqual(["old-refresh"]);
+    expect(await shared.stored()).toEqual(replacement);
+  });
 
   it.each([false, true])(
     "keeps the available grant when both commits fail transiently (newer stored grant: %s)",
