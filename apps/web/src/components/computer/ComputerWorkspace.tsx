@@ -24,6 +24,7 @@ export function ComputerWorkspace({
   hasControl,
   dock,
   onTakeControl,
+  recordingSkillId,
   children,
 }: {
   botId: string;
@@ -33,6 +34,8 @@ export function ComputerWorkspace({
   onTakeControl?: () => Promise<boolean>;
   /** Hidden while teaching so recording captures only the screen. */
   dock: boolean;
+  /** The teaching recording in progress, when there is one. */
+  recordingSkillId?: string;
   children: ReactNode;
 }) {
   const { t } = useLingui();
@@ -93,6 +96,7 @@ export function ComputerWorkspace({
                     botId={botId}
                     canUseShell={shellAvailable && hasControl}
                     onTakeControl={shellAvailable ? onTakeControl : undefined}
+                    recordingSkillId={recordingSkillId}
                   />
                 </Suspense>
               </ErrorBoundary>

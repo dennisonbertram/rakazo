@@ -6335,6 +6335,7 @@ export function ShellPage() {
                 computer={computer}
                 hasControl={hasControl}
                 dock
+                recordingSkillId={recordingSkill?.id}
                 onTakeControl={
                   computer?.state === "running" &&
                   !hasControl &&
