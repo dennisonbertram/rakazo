@@ -719,6 +719,12 @@ describe("external taint safe tools", () => {
     expect(externalTaintAllowsTool("web_fetch")).toBe(false);
   });
 
+  it("keeps internal metadata reads free", () => {
+    for (const name of ["task_catalog", "schedule_list", "schedule_runs", "list_secrets"]) {
+      expect(externalTaintAllowsTool(name)).toBe(true);
+    }
+  });
+
   it("applies the scratchpad category rule", () => {
     expect(externalTaintAllowsTool("scratchpad_list")).toBe(true);
     expect(externalTaintAllowsTool("scratchpad_add", { category: "followup" })).toBe(true);

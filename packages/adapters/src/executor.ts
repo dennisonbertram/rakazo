@@ -4480,9 +4480,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? undefined
                 : await resolveMoneyNames(callRoute?.toolName ?? name, args, readApprovalName);
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
-              reviewReason: externalTaintedCall
-                ? [EXTERNAL_REQUEST_REASON, reviewReason].filter(Boolean).join("\n")
-                : reviewReason,
+              // The card's reason line already says "Requested by an external bot".
+              reviewReason:
+                externalTaintedCall && approvalCardReason !== EXTERNAL_REQUEST_REASON
+                  ? [EXTERNAL_REQUEST_REASON, reviewReason].filter(Boolean).join("\n")
+                  : reviewReason,
               fullMail: isCartaMailSend(bot.spawnKey, name),
               fullCompany:
                 (name === "company_fact_upsert" || name === "company_import_start") &&

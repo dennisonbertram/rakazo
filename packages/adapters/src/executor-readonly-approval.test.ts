@@ -2752,7 +2752,7 @@ describe("Mercury agent writes, offline end to end", () => {
     expect(mercury.sendMoneyRequests).toHaveLength(0);
     f.effects[0]!.status = "denied";
     await f.run();
-    expect(f.results.at(-1)).toMatchObject({ error: expect.stringContaining("denied") });
+    expect(f.results.at(-1)).toMatchObject({ error: expect.stringContaining("declined") });
     expect(mercury.sendMoneyRequests).toHaveLength(0);
   });
 
@@ -3795,6 +3795,7 @@ describe("runs that began with an external bot", () => {
   const askBlock = (f: ReturnType<typeof fixture>) =>
     (f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: unknown[] }])[0].blocks[0] as {
       detail?: string;
+      approvalReason?: string;
       actions: { id: string }[];
     };
 
@@ -3809,7 +3810,9 @@ describe("runs that began with an external bot", () => {
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     const card = askBlock(f);
-    expect(card.detail).toContain(EXTERNAL_REQUEST_REASON);
+    // Shown once, on the reason line, not again in the detail.
+    expect(card.approvalReason).toBe(EXTERNAL_REQUEST_REASON);
+    expect(card.detail ?? "").not.toContain(EXTERNAL_REQUEST_REASON);
     expect(card.actions.map((action) => action.id)).not.toContain("always");
     expect(JSON.stringify(card.actions)).not.toMatch(/always/i);
   });
@@ -3938,8 +3941,13 @@ describe("runs that began with an external bot", () => {
   });
 
   it("finishes a read-only effect that a marked run's gate recorded, so a retry returns it", async () => {
-    const f = fixture({ name: "schedule_runs", builtin: true, history: [{ blocks: [marked] }] });
-    f.setCalls([{ args: {}, executionId: "c1" }]);
+    const f = fixture({
+      name: "mail_search",
+      builtin: true,
+      mail: { listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]) },
+      history: [{ blocks: [marked] }],
+    });
+    f.setCalls([{ args: { queries: ["from:investor"] }, executionId: "c1" }]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     f.effects[0]!.status = "approved";
@@ -3947,7 +3955,7 @@ describe("runs that began with an external bot", () => {
     expect(f.effects).toHaveLength(1);
     expect(f.effects[0]!.status).toBe("completed");
     // The model retries the same call (a lost response): it gets the stored result, not "uncertain".
-    f.setCalls([{ args: {}, executionId: "c2" }]);
+    f.setCalls([{ args: { queries: ["from:investor"] }, executionId: "c2" }]);
     await f.run();
     expect(JSON.stringify(f.results.at(-1))).not.toMatch(/uncertain/i);
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();

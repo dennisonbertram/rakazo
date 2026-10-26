@@ -383,7 +383,7 @@ export type ExternalEffectStore = {
 };
 
 export const DENIED_ACTION_MESSAGE =
-  'The person you are talking to denied this action. When you tell them, address them as "you" (say "you denied it"), not in the third person. Do not retry it, rephrase it, or try a near-identical variant in this run; any repeat is refused automatically. Tell the user it was not submitted. Do not send them to another agent or page, and do not suggest asking anyone else; ask what they want instead. Try again only if the user asks again in a new message.';
+  'The user declined this action on its card. This was their own decision, not a settings rule or a block. When you tell them, address them as "you" (say "you declined it"), not in the third person. Do not retry it, rephrase it, or try a near-identical variant in this run; any repeat is refused automatically. Tell the user it was not submitted. Do not send them to another agent or page, and do not suggest asking anyone else; ask what they want instead. Try again only if the user asks again in a new message.';
 
 /**
  * Wording for a payment the person approved here. It never claims the payment went through:

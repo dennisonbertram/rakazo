@@ -203,6 +203,11 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "pins_write",
   "attach_file",
   "recall_memory",
+  // Metadata reads that return names and schedules only, never values.
+  "task_catalog",
+  "schedule_list",
+  "schedule_runs",
+  "list_secrets",
 ]);
 
 /** True when a tainted run may call the tool without a card. Same scratchpad rule as unattended. */
