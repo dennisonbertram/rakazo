@@ -29,6 +29,10 @@ Set the rule for each kind of action in **Settings, Privacy and approvals**. The
 - **Ask** shows a card every time.
 - **Block** refuses the action. The bot is told your settings block it, and it does not try again or look for another way.
 
+![Chief reports that an email was blocked by the approval settings and not sent](/docs/approval-blocked.webp)
+
+*Demo data.*
+
 A background run asks even when a row says **Allow**, and a row set to **Block** blocks background runs too. Some actions, such as sending an iMessage, always ask and cannot be set to **Allow**.
 
 To change one bot, open its settings and use **Approvals**. Each row starts at **Same as all bots**. Choose another value to override the table for that bot only.
