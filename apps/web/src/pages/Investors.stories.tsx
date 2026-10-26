@@ -134,6 +134,21 @@ export const ContactsTab: Story = {
     mockRpc({ "contacts.list": contacts, "mcp.servers.list": [cartaServer], ...noUpdates }),
 };
 
+/** Investors with pipeline stages: the Stage filter and Sort control appear, sorted by stage. */
+export const ContactsSortedByStage: Story = {
+  parameters: { initialEntries: ["/app/investors?tab=contacts&sort=stage&dir=desc"] },
+  beforeEach: () =>
+    mockRpc({
+      "contacts.list": [
+        { ...contacts[0], stage: "meeting", checkSizeCents: 5_000_000 },
+        { ...contacts[1] },
+        { ...contacts[2], stage: "target", checkSizeCents: null },
+      ],
+      "mcp.servers.list": [cartaServer],
+      ...noUpdates,
+    }),
+};
+
 export const WithAuditRequests: Story = {
   beforeEach: () =>
     mockRpc({
