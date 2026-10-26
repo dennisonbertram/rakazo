@@ -2815,6 +2815,16 @@ describe("mobile thread event reduction", () => {
     ).toBe("Sender now: Subject now\nSender late: Subject late");
   });
 
+  it("degrades a ui block to its Markdown", () => {
+    expect(
+      blockText(
+        mobileMessage("ui-1", [
+          { kind: "ui", block: { type: "summary", items: [{ label: "Plan", value: "Team" }] } },
+        ]),
+      ),
+    ).toBe("- Plan: Team");
+  });
+
   it("gives finance and skill draft blocks readable text", () => {
     const text = (block: unknown) => blockText(mobileMessage("b", [block as never]));
     expect(

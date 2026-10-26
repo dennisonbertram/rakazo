@@ -16,6 +16,7 @@ import {
 } from "@rakazo/contracts";
 import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
+import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
 import { voiceAgentTools } from "./voice-agent-tools.js";
@@ -1538,6 +1539,14 @@ export const builtinAgentTools: ConnectorTool[] = [
       },
       required: ["sheets"],
     },
+  },
+  {
+    name: "render_ui",
+    description:
+      "Show structured content in the chat reply as typed blocks (1 to 5 per call). Block types: table (title?, columns [{label, align?}], rows of text or numbers, up to 50 rows and 8 columns), sections ([{heading, body}], body is Markdown), summary (title?, items [{label, value}]), stats ([{label, value, hint?}], up to 6), cards ([{title, subtitle?, body?, badge?, href?}], href is https or an app path), callout (tone info, warning, success or danger, title?, body). Invalid input returns the problems to fix.",
+    inputSchema: (({ $schema: _schema, ...rest }) => rest)(
+      z.toJSONSchema(uiBlocksInputSchema, { io: "input" }),
+    ),
   },
   {
     name: "create_ui_artifact",

@@ -4,6 +4,7 @@ import { ChartDataSchema, ChartSpecSchema, refineChartRows } from "./chart.js";
 import { Id } from "./ids.js";
 import { MAX_COMPOSE_BODY } from "./inbox.js";
 import { McpTransportSchema } from "./mcp.js";
+import { UiBlockSchema } from "./ui-block.js";
 
 export const ProductEventType = z.enum([
   "thread.message.created",
@@ -395,6 +396,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
       .min(1),
   }),
   z.object({ kind: z.literal("finance"), card: FinanceCardSchema }),
+  /** A typed layout block the bot produced with render_ui: table, sections, stats and so on. */
+  z.object({ kind: z.literal("ui"), block: UiBlockSchema }),
   z.object({
     kind: z.literal("image"),
     artifactId: Id,

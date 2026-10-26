@@ -7,6 +7,7 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { blocksToAgentHistoryText } from "./attachments.js";
 import { replyAttachment } from "./message-replies.js";
+import { uiBlockSummary } from "./ui-block-text.js";
 
 const markdownParser = unified().use(remarkParse).use(remarkGfm);
 /** Past this much source text in one message, quote derivation refuses to run. */
@@ -178,6 +179,8 @@ function replyBlockText(block: MessageBlock): string {
       return block.subject;
     case "finance":
       return financeCardSummary(block.card);
+    case "ui":
+      return uiBlockSummary(block.block);
     case "image":
     case "file":
       return block.name || blocksToAgentHistoryText([block]);

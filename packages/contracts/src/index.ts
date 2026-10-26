@@ -59,6 +59,7 @@ export * from "./search.js";
 export * from "./sidebar-folders.js";
 export * from "./sidebar-pages.js";
 export * from "./terminal.js";
+export * from "./ui-block.js";
 export * from "./voice-agent.js";
 export * from "./wispr-flow.js";
 export * from "./zernio.js";

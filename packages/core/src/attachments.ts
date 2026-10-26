@@ -6,6 +6,7 @@ import {
   isAttachmentImageMimeType,
   UI_ARTIFACT_MIME_TYPE,
 } from "@rakazo/contracts";
+import { uiBlockText } from "./ui-block-text.js";
 
 export class AttachmentValidationError extends Error {
   constructor(message: string) {
@@ -134,6 +135,7 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       if (block.kind === "text") return block.text;
       if (block.kind === "mail_thread") return mailThreadPlaceholder(block);
       if (block.kind === "chart") return `[chart: ${block.name}]`;
+      if (block.kind === "ui") return uiBlockText(block.block);
       if (block.kind === "image") return `[image: ${block.name}]`;
       if (block.kind === "file") {
         return `[file: ${block.name} (${block.mimeType}, ${block.size} bytes)]`;
