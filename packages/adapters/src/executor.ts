@@ -10046,6 +10046,11 @@ async function recordApprovedMailOutcome(
       effectId,
       outcome,
       ...(error ? { error } : {}),
+      providerIds: {
+        ...(typeof result.threadId === "string" ? { threadId: result.threadId } : {}),
+        ...(typeof result.messageId === "string" ? { messageId: result.messageId } : {}),
+        ...(typeof result.draftId === "string" ? { draftId: result.draftId } : {}),
+      },
       // So a failed send can be reopened in the composer from the account it was sent from.
       ...(outcome === "failed" && account
         ? { connectionId: account.id, account: account.name }

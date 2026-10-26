@@ -107,7 +107,14 @@ export async function reconcileMailApprovals(deps: {
             clientId: mailApprovalComposeClientId(effect.id),
           },
         },
-        select: { id: true, state: true, draftId: true, updatedAt: true },
+        select: {
+          id: true,
+          state: true,
+          draftId: true,
+          threadId: true,
+          providerMessageId: true,
+          updatedAt: true,
+        },
       });
       if (row && row.updatedAt > cutoff) continue;
       let outcome: Outcome = "unknown";
@@ -159,6 +166,15 @@ export async function reconcileMailApprovals(deps: {
         ...(card ? { messageId: card.id } : {}),
         effectId: effect.id,
         outcome,
+        ...(row
+          ? {
+              providerIds: {
+                ...(row.threadId ? { threadId: row.threadId } : {}),
+                ...(row.providerMessageId ? { messageId: row.providerMessageId } : {}),
+                ...(row.draftId ? { draftId: row.draftId } : {}),
+              },
+            }
+          : {}),
         note: mailApprovalAgentNote(send, outcome),
         onlyIf: {
           note: claimNote,

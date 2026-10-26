@@ -168,6 +168,10 @@ export const MailApprovalSchema = z.object({
   locked: z.boolean().optional(),
   /** Set after the person edited it and sent it themselves: how that ended. */
   outcome: z.enum(["sent", "saved", "unknown", "failed"]).optional(),
+  /** With a sent or saved outcome: the provider's ids, recorded by the server, to link to the mail. */
+  threadId: z.string().optional(),
+  messageId: z.string().optional(),
+  draftId: z.string().optional(),
   /** With a failed outcome: the connection the composer should open on. */
   connectionId: z.string().optional(),
   /** With a failed outcome: why, in words the person can act on. */
