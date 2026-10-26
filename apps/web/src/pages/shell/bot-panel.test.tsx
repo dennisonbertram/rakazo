@@ -39,6 +39,7 @@ vi.mock("@rakazo/ui-web", () => ({
     <button type="button" {...props} />
   ),
   Input: (props: ComponentProps<"input">) => <input {...props} />,
+  Skeleton: (props: ComponentProps<"div">) => <div {...props} />,
   Textarea: (props: ComponentProps<"textarea">) => <textarea {...props} />,
   NativeSelect: (props: ComponentProps<"select">) => <select {...props} />,
   NativeSelectOption: (props: ComponentProps<"option">) => <option {...props} />,

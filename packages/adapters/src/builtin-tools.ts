@@ -2036,7 +2036,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "skill_create",
     description:
-      "Create a reusable Claude Agent Skill (generic how-to SKILL.md) shared across assistants. The Pi runtime already understands this format; we persist and inject them. The skill is saved as a draft that the owner must approve before anyone can use it. Use when a multi-step task is worth repeating or the user asks to save a skill. Do not include account names, channels, or inboxes — those belong in a routine.",
+      "Create a reusable Claude Agent Skill (generic how-to SKILL.md) shared across assistants. The Pi runtime already understands this format; we persist and inject them. The skill is saved as a draft that the owner must approve before anyone can use it. Use when a multi-step task is worth repeating or the user asks to save a skill. Do not include account names, channels, or inboxes — those belong in a routine. To make a reusable computation (the same result every time from data you already fetched), add toolSource and toolInputSchema: the tool is pure JavaScript `function run(input)` with no network or files, so gather data with read tools first, then call tool_run. Test-run the draft with tool_run on a small sample before you propose it, and pass what you ran as sampleInput and sampleOutput.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2054,6 +2054,26 @@ export const builtinAgentTools: ConnectorTool[] = [
           description:
             "Optional full SKILL.md (frontmatter + body) instead of name/description/body.",
         },
+        toolSource: {
+          type: "string",
+          description:
+            "Optional. Makes this skill a reusable tool: pure JavaScript that defines `function run(input) { ... return result; }`. It runs in a sandbox with no network, files, timers, require or import, only the input and a JSON return value (2 s, 32 MB, 256 KB result). Gather data with read tools first, then pass it to the tool with tool_run. Max 64 KB.",
+        },
+        toolInputSchema: {
+          type: "object",
+          description:
+            "Required with toolSource. JSON Schema subset for the input: type object, properties (each with type string, number, integer, boolean, array or object, and items for arrays), required, enum, description. No other keywords.",
+        },
+        reads: {
+          type: "string",
+          description: "One plain line shown to the owner: what data the tool works on.",
+        },
+        writes: {
+          type: "string",
+          description: 'One plain line shown to the owner, normally "Nothing".',
+        },
+        sampleInput: { description: "The input you test-ran the draft tool with." },
+        sampleOutput: { description: "What the draft tool returned for sampleInput." },
       },
     },
   },
@@ -2070,8 +2090,42 @@ export const builtinAgentTools: ConnectorTool[] = [
         description: { type: "string" },
         body: { type: "string" },
         content: { type: "string", description: "Optional full replacement SKILL.md." },
+        toolSource: {
+          type: "string",
+          description:
+            "Optional. Makes this skill a reusable tool: pure JavaScript that defines `function run(input) { ... return result; }`. It runs in a sandbox with no network, files, timers, require or import, only the input and a JSON return value (2 s, 32 MB, 256 KB result). Gather data with read tools first, then pass it to the tool with tool_run. Max 64 KB.",
+        },
+        toolInputSchema: {
+          type: "object",
+          description:
+            "Required with toolSource. JSON Schema subset for the input: type object, properties (each with type string, number, integer, boolean, array or object, and items for arrays), required, enum, description. No other keywords.",
+        },
+        reads: {
+          type: "string",
+          description: "One plain line shown to the owner: what data the tool works on.",
+        },
+        writes: {
+          type: "string",
+          description: 'One plain line shown to the owner, normally "Nothing".',
+        },
+        sampleInput: { description: "The input you test-ran the draft tool with." },
+        sampleOutput: { description: "What the draft tool returned for sampleInput." },
       },
     },
+  },
+  {
+    name: "tool_run",
+    description:
+      "Run a saved tool (a skill with a script) on JSON input and return its JSON result. The tool is a pure function: it cannot read data, so fetch the data first and pass it in. Only owner-approved tools run in background runs; a draft you wrote can be test-run only in a chat the owner is in. Saved tools and their input are listed by task_catalog.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Exact tool (skill) name." },
+        input: { type: "object", description: "The input, matching the tool's input schema." },
+      },
+      required: ["name", "input"],
+    },
+    readOnly: true,
   },
   {
     name: "skill_delete",

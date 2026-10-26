@@ -143,6 +143,7 @@ import type { AppEnv } from "./env.js";
 import { loadEnv } from "./env.js";
 import type { GtmQueueReader } from "./gtm.js";
 import { healthRoutes } from "./health.js";
+import { mountArtifactShare, prismaShareStore } from "./artifact-share.js";
 import { mountInboxAttachment } from "./inbox-attachment.js";
 import {
   mountInvestorPortal,
@@ -911,6 +912,7 @@ export async function createApp(
     artifacts,
     isTrustedOrigin: (origin) => isTrustedOrigin(origin, env),
   });
+  mountArtifactShare(app, { store: prismaShareStore(prisma), artifacts });
   mountAccountExportDownload(app, { prisma, artifacts }, loggedActor);
   mountVoiceHttpRoutes(app, { prisma, secrets, ticketBoardEnabled }, (c) => loggedActor(c.req.raw));
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });

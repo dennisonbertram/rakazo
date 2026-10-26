@@ -804,7 +804,7 @@ export const Transcript = memo(function Transcript({
               {showDividerId === message.id ? <UnreadDivider /> : null}
               {message.routineName ? (
                 <p
-                  className="mb-1 truncate text-xs text-muted-foreground"
+                  className="mb-1 shrink-0 truncate text-xs text-muted-foreground"
                   data-testid="routine-label"
                 >
                   {t`From routine: ${message.routineName}`}

@@ -557,7 +557,9 @@ import {
   skillCreateFromTool,
   skillDeleteFromTool,
   skillReadFromTool,
+  skillToolArgs,
   skillUpdateFromTool,
+  toolRunFromTool,
 } from "./skill-tools.js";
 import {
   createSpreadsheetBytes,
@@ -620,10 +622,15 @@ const NO_FRAGMENT_TOOLS = new Set([
   "render_plot",
 ]);
 
+/** Returned to a check-in run whose call would need approval. */
+const CHECK_IN_READ_ONLY_MESSAGE =
+  "Check-ins only read and report. Mention this in your message instead.";
+
 /** Final note of an unattended run that stopped because it needs the owner. */
 const UNATTENDED_NEEDS_OWNER_NOTE = "Stopped. I sent you a note about what I need.";
 
 export const READ_ONLY_AGENT_TOOLS = new Set([
+  "tool_run",
   "imessage_list_conversations",
   "imessage_read",
   "computer_observe",
@@ -1294,6 +1301,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           },
         });
         if (updated.count !== 1) return null;
+        // A skipped wake moves the schedule on but did not run, so Last ran stays as it was.
+        const skipped = async <Reason extends "active-run" | "no-work">(reason: Reason) => {
+          await tx.routine.update({
+            where: { id: routine.id },
+            data: { lastRunAt: previousLastRunAt },
+          });
+          return reason;
+        };
         if (gtmAgent) {
           const active = await tx.run.findFirst({
             where: {
@@ -1305,12 +1320,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
             select: { id: true },
           });
-          if (active) return "active-run" as const;
+          if (active) return skipped("active-run");
           const item = await findWorkableOpenItem(
             { prisma: tx as PrismaClient },
             { spaceId: routine.spaceId, userId: routine.userId, botId: bot.id },
           );
-          if (!item) return "no-work" as const;
+          if (!item) return skipped("no-work");
           gtmItemId = item.id;
         }
         // At most one check-in message per bot per day, and one check-in run at a time; the
@@ -1323,8 +1338,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
             select: { id: true },
           });
-          if (active) return "active-run" as const;
-          if (await checkInPostedToday(tx, routine, new Date())) return "no-work" as const;
+          if (active) return skipped("active-run");
+          if (await checkInPostedToday(tx, routine, new Date())) return skipped("no-work");
         }
         if (isLegalAgentSpawnKey(bot.spawnKey)) {
           // Scan now and the daily wakeup share one lock and one rule: a scan already in flight is
@@ -1338,7 +1353,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
             select: { id: true },
           });
-          if (active) return "active-run" as const;
+          if (active) return skipped("active-run");
         }
         // The claim locks the row, so this is the model that was committed when it fired.
         const currentModel = await tx.routine.findUnique({
@@ -4161,6 +4176,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   checkerConfigured,
                   unattended: run.unattended,
                 });
+          // A check-in only reads and reports: a call that would ask fails at once, with no card and no pause.
+          if (
+            (plan === "ask" || plan === "judge") &&
+            run.routineId &&
+            (
+              await deps.prisma.routine.findUnique({
+                where: { id: run.routineId },
+                select: { managedKind: true },
+              })
+            )?.managedKind === CHECK_IN_MANAGED_KIND
+          ) {
+            await recordDecision("block", "check_in");
+            return { error: CHECK_IN_READ_ONLY_MESSAGE };
+          }
           let reviewReason: string | undefined;
           let gateDecision: "ask" | "allow" = plan === "ask" ? "ask" : "allow";
           const needsApprovalEarly = plan === "ask" || plan === "judge";
@@ -4682,6 +4711,46 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return result;
             }
           }
+          // Every parallel call of a denied tool resolves to the denial, not a new card.
+          const askUnlessDenied = async () => {
+            // A denial ends this request for the run: a reworded retry gets no new card.
+            const denied = await deps.prisma.externalEffect.findMany({
+              where: {
+                spaceId: run.spaceId,
+                runId,
+                kind: replayEffectToolName,
+                status: "denied",
+              },
+              select: { id: true, status: true, request: true, result: true },
+            });
+            // Connector wrappers cover many tools, so they compare arguments; any other tool
+            // is refused outright once the owner has denied it in this run.
+            const wrapperKind =
+              replayEffectToolName === CATALOG_APPROVAL_TOOL ||
+              replayEffectToolName === "connectors_execute_tool";
+            const repeated =
+              denied.find(
+                (prior) =>
+                  prior.id !== applied!.effect.id &&
+                  (!wrapperKind ||
+                    repeatsDeniedRequest(replayEffectToolName, prior.request, effectRequest)),
+              ) ??
+              (await priorDenialAwaitingOwner(
+                deps.prisma,
+                run,
+                replayEffectToolName,
+                effectRequest,
+                applied!.effect.id,
+              ));
+            if (repeated) {
+              const gate = resolveDuplicateEffectGate(repeated, name);
+              const result =
+                gate.action === "return" ? gate.result : { error: DENIED_ACTION_MESSAGE };
+              await completeEffect(deps, applied!.effect.id, "intended", result);
+              return result;
+            }
+            return requestApproval();
+          };
           if (applied?.duplicate) {
             const gate = resolveDuplicateEffectGate(applied.effect, name);
             if (gate.action === "return") {
@@ -4736,7 +4805,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 if (current?.status === "waiting_input") {
                   return pauseForApproval();
                 }
-                return requestApproval();
+                return askUnlessDenied();
               }
             } else if (gate.action === "uncertain") {
               return settleUncertainEffect(deps.prisma, applied.effect.id, gate.toolName);
@@ -4745,43 +4814,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               if (early !== undefined) return early;
             }
           } else if (needsApproval && applied) {
-            // A denial ends this request for the run: a reworded retry gets no new card.
-            const denied = await deps.prisma.externalEffect.findMany({
-              where: {
-                spaceId: run.spaceId,
-                runId,
-                kind: replayEffectToolName,
-                status: "denied",
-              },
-              select: { id: true, status: true, request: true, result: true },
-            });
-            // Connector wrappers cover many tools, so they compare arguments; any other tool
-            // is refused outright once the owner has denied it in this run.
-            const wrapperKind =
-              replayEffectToolName === CATALOG_APPROVAL_TOOL ||
-              replayEffectToolName === "connectors_execute_tool";
-            const repeated =
-              denied.find(
-                (prior) =>
-                  prior.id !== applied.effect.id &&
-                  (!wrapperKind ||
-                    repeatsDeniedRequest(replayEffectToolName, prior.request, effectRequest)),
-              ) ??
-              (await priorDenialAwaitingOwner(
-                deps.prisma,
-                run,
-                replayEffectToolName,
-                effectRequest,
-                applied.effect.id,
-              ));
-            if (repeated) {
-              const gate = resolveDuplicateEffectGate(repeated, name);
-              const result =
-                gate.action === "return" ? gate.result : { error: DENIED_ACTION_MESSAGE };
-              await completeEffect(deps, applied.effect.id, "intended", result);
-              return result;
-            }
-            return requestApproval();
+            return askUnlessDenied();
           } else if (bypassApproval && applied) {
             const early = await claimOrReturn("intended");
             if (early !== undefined) return early;
@@ -5818,7 +5851,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       });
                       if ("error" in resolved) return resolved;
                       registerRunSecrets(resolved.redactions);
-                      return { text: resolved.text, origin: resolved.origin };
+                      return {
+                        text: resolved.text,
+                        origin: resolved.origin,
+                        markUsed: resolved.markUsed,
+                      };
                     },
                   });
               unchangedVisualStreak = unchangedVisualStreakAfterPageBrowser(
@@ -6078,6 +6115,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   description: args.description ? String(args.description) : undefined,
                   body: args.body ? String(args.body) : undefined,
                   content: args.content ? String(args.content) : undefined,
+                  ...skillToolArgs(args),
                 },
               ),
             );
@@ -6098,8 +6136,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     args.description !== undefined ? String(args.description) : undefined,
                   body: args.body !== undefined ? String(args.body) : undefined,
                   content: args.content ? String(args.content) : undefined,
+                  ...skillToolArgs(args),
                 },
               ),
+            );
+          }
+          if (name === "tool_run") {
+            // A draft script may be test-run only in a chat the owner is in, never in a background or
+            // tainted run.
+            return toolRunFromTool(
+              deps.prisma,
+              { spaceId: run.spaceId, userId: run.userId, botId: run.botId },
+              { name: args.name ? String(args.name) : undefined, input: args.input },
+              { allowDraft: run.unattended === false && !run.externalTaint && !externalTaint() },
             );
           }
           if (name === "skill_delete") {

@@ -11,8 +11,10 @@ const api = vi.hoisted(() => ({
   listVersions: vi.fn(() => new Promise(() => {})),
   getById: vi.fn(),
 }));
-vi.mock("../lib/rpc", () => ({ rpc: { artifacts: api } }));
+const shares = vi.hoisted(() => ({ get: vi.fn(async () => null as unknown) }));
+vi.mock("../lib/rpc", () => ({ rpc: { artifacts: api, artifactShares: shares } }));
 vi.mock("../lib/artifact-open", () => ({
+  bytesToBase64: vi.fn(),
   decodeArtifactBase64: vi.fn(),
   downloadArtifactBytes: vi.fn(),
 }));
@@ -427,6 +429,23 @@ it("names the delete button after the title, without the file extension", async 
     await act(async () => (del as HTMLElement).click());
     const title = document.querySelector("[data-slot=alert-dialog-title]")?.textContent;
     expect(title).toBe('Delete "Fundraising Plan"?');
+  } finally {
+    await page.cleanup();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("tells the owner that deleting also stops the share link, only when there is one", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  api.listSpace.mockResolvedValue({ items: [artifact("Plan.md", "artifact-1")], nextCursor: null });
+  shares.get.mockResolvedValueOnce({ artifactId: "artifact-1", version: 1, expiresAt: "x" });
+  const page = await renderArtifacts("/app/artifacts");
+  try {
+    const del = page.container.querySelector("button[aria-label^='Delete']");
+    await act(async () => (del as HTMLElement).click());
+    expect(document.querySelector("[data-slot=alert-dialog-description]")?.textContent).toContain(
+      "This also stops its link.",
+    );
   } finally {
     await page.cleanup();
     vi.unstubAllGlobals();

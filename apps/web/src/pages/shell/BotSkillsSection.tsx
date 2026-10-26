@@ -67,6 +67,57 @@ export function SkillSourceBadge({
   );
 }
 
+function ToolBadge() {
+  return (
+    <Badge
+      variant="secondary"
+      className="rounded-full px-1.5 py-0 text-[11px] font-normal text-muted-foreground"
+    >
+      <Trans>Tool</Trans>
+    </Badge>
+  );
+}
+
+const sampleText = (value: unknown) => JSON.stringify(value) ?? "";
+
+/** What the owner approves for a tool: the bot's two plain lines, its test run, and the script. */
+function DraftTool({ tool }: { tool: NonNullable<AgentSkillDraft["tool"]> }) {
+  const hasSample = tool.sampleInput !== undefined || tool.sampleOutput !== undefined;
+  return (
+    <div className="mt-2 text-[12.5px]" data-testid="bot-skill-draft-tool">
+      {tool.reads ? (
+        <div dir="auto">
+          <span className="text-muted-foreground">
+            <Trans>Reads:</Trans>
+          </span>{" "}
+          {tool.reads}
+        </div>
+      ) : null}
+      <div dir="auto">
+        <span className="text-muted-foreground">
+          <Trans>Writes:</Trans>
+        </span>{" "}
+        {tool.writes ?? <Trans>nothing</Trans>}
+      </div>
+      {hasSample ? (
+        <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-2 font-mono">
+          {sampleText(tool.sampleInput)}
+          {"\n→ "}
+          {sampleText(tool.sampleOutput)}
+        </pre>
+      ) : null}
+      <details className="mt-1">
+        <summary className="cursor-pointer text-muted-foreground">
+          <Trans>Code</Trans>
+        </summary>
+        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-2 font-mono">
+          {tool.source}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
 /** Display only: the instructions without the leading `---` front matter block. */
 function skillBody(content: string) {
   return content.replace(/^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, "").trim();
@@ -292,7 +343,7 @@ export function BotSkillsSection({
     write(
       () =>
         approve
-          ? rpc.agentSkills.approveDraft({ skillId: draft.id })
+          ? rpc.agentSkills.approveDraft({ skillId: draft.id, toolHash: draft.tool?.hash })
           : rpc.agentSkills.discardDraft({ skillId: draft.id }),
       approve ? t`Could not approve skill` : t`Could not discard skill`,
     );
@@ -364,6 +415,7 @@ export function BotSkillsSection({
             {entry.source === "builtin" ? null : (
               <SkillSourceBadge source={entry.source} origin={entry.origin} />
             )}
+            {entry.tool ? <ToolBadge /> : null}
           </span>
           <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground" dir="auto">
             {label.description}
@@ -479,6 +531,7 @@ export function BotSkillsSection({
               >
                 {skillBody(draft.content)}
               </pre>
+              {draft.tool ? <DraftTool tool={draft.tool} /> : null}
               <div className="sticky bottom-0 mt-2 flex items-center gap-2 bg-background py-1.5">
                 <Button
                   type="button"

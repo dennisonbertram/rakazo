@@ -1,4 +1,5 @@
 export * from "./approval-rules.js";
+export * from "./artifact-shares.js";
 export * from "./artifact-versions.js";
 export * from "./audit-requests.js";
 export * from "./billing.js";

@@ -150,6 +150,7 @@ import type {
 import {
   ATTACHMENT_MAX_BYTES,
   actorScope,
+  isShareableArtifactMimeType,
   BotSecretAuth,
   botAudienceEditable,
   ComputerCommandSchema,
@@ -213,6 +214,9 @@ import {
   approvalTable,
   assignSafe,
   autoGroupSidebar,
+  createArtifactShare,
+  getArtifactShare,
+  revokeArtifactShare,
   BotSectionNameConflictError,
   CannotDeleteDefaultSpaceError,
   CannotDeleteLastSpaceError,
@@ -335,6 +339,7 @@ import {
   touchGroupUpdatedAt,
   unassignSafe,
   unblockPortal,
+  UnshareableArtifactError,
   undoCapTableSource,
   unseenBotKinds,
   unseenCounts,
@@ -663,6 +668,9 @@ async function reconcilePendingConnections(
 /** Serialize begin/revoke for one user+provider so slug-wide remote deletes cannot race a new connect. */
 
 /** A provider saying the remote account does not exist: it is already gone, so revoke is done. */
+const shareJson = (share: { artifactId: string; version: number; expiresAt: Date } | null) =>
+  share && { ...share, expiresAt: share.expiresAt.toISOString() };
+
 function isRemoteAccountGone(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const status = error as { status?: unknown; statusCode?: unknown };
@@ -1088,6 +1096,8 @@ function botSecretMetadataDto(row: {
   auth: unknown;
   createdAt: Date;
   updatedAt: Date;
+  lastUsedAt: Date | null;
+  needsAttentionAt: Date | null;
 }): BotSecretMetadata {
   // Unreadable or no-longer-storable destinations become auth:null so the owner UI stays remove-only.
   const parsed = BotSecretAuth.safeParse(row.auth);
@@ -1106,6 +1116,8 @@ function botSecretMetadataDto(row: {
     auth,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+    needsAttentionAt: row.needsAttentionAt?.toISOString() ?? null,
   };
 }
 
@@ -4907,7 +4919,7 @@ export function createRouter(deps: RouterDeps) {
         agentSkills.drafts(context.actor),
       ),
       approveDraft: authed.agentSkills.approveDraft.handler(async ({ context, input }) =>
-        agentSkills.approveDraft(context.actor, input.skillId),
+        agentSkills.approveDraft(context.actor, input.skillId, input.toolHash),
       ),
       discardDraft: authed.agentSkills.discardDraft.handler(async ({ context, input }) =>
         agentSkills.discardDraft(context.actor, input.skillId),
@@ -8534,6 +8546,35 @@ export function createRouter(deps: RouterDeps) {
       }),
       remove: authed.artifacts.remove.handler(async ({ context, input }) => {
         return deleteArtifactFamily(deps, context.actor, { familyId: input.artifactId });
+      }),
+    },
+    artifactShares: {
+      get: authed.artifactShares.get.handler(async ({ context, input }) =>
+        shareJson(await getArtifactShare(deps.prisma, context.actor, input.artifactId)),
+      ),
+      create: authed.artifactShares.create.handler(async ({ context, input }) => {
+        try {
+          const { token } = await createArtifactShare(
+            deps.prisma,
+            context.actor,
+            input.artifactId,
+            isShareableArtifactMimeType,
+          );
+          const share = await getArtifactShare(deps.prisma, context.actor, input.artifactId);
+          return {
+            url: `${deps.env.webOrigin}/s#${token}`,
+            share: shareJson(share)!,
+          };
+        } catch (error) {
+          if (error instanceof UnshareableArtifactError) {
+            throw new ORPCError("BAD_REQUEST", { message: error.message });
+          }
+          throw error;
+        }
+      }),
+      revoke: authed.artifactShares.revoke.handler(async ({ context, input }) => {
+        await revokeArtifactShare(deps.prisma, context.actor, input.artifactId);
+        return { ok: true as const };
       }),
     },
     files: {

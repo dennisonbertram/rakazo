@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   AdapterContext,
   AgentRunRequest,
@@ -162,7 +163,9 @@ function fixture({
   trigger = "user",
   unattended = trigger === "webhook",
   externalTaint = false,
+  routineManagedKind,
   scratchpadItem,
+  skillRows = [] as Record<string, unknown>[],
   secrets = [] as string[],
   prompt = "Read the item",
   bot = {
@@ -257,8 +260,12 @@ function fixture({
   /** Stored run mode; defaults to unattended for webhook runs only. */
   unattended?: boolean;
   externalTaint?: boolean;
+  /** Makes the run a routine run; the routine's managedKind. */
+  routineManagedKind?: string | null;
   /** The stored scratchpad item the gate looks up for scratchpad_update/complete. */
   scratchpadItem?: { category: string | null } | null;
+  /** Stored skill rows the skill and tool lookups find. */
+  skillRows?: Record<string, unknown>[];
   secrets?: string[];
   prompt?: string;
   bot?: { name: string; title: string; description: string };
@@ -312,6 +319,7 @@ function fixture({
     // Webhook runs are created unattended; the other fixtures model an attended run.
     unattended,
     externalTaint,
+    routineId: routineManagedKind === undefined ? null : "routine-1",
     leaseFence: 0,
     ...(peer ? { sourceMessageId: "msg-1" } : {}),
   };
@@ -358,12 +366,14 @@ function fixture({
   };
   const prisma = {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
+    routine: { findUnique: vi.fn(async () => ({ managedKind: routineManagedKind ?? null })) },
     run: {
       findFirst: vi.fn(async () => ({
         bot: { notifyOnFinish: true },
         thread: { groupId: null },
       })),
       findUnique: vi.fn(async () => run),
+      findMany: vi.fn(async () => []),
       findUniqueOrThrow: vi.fn(async () => run),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
@@ -543,7 +553,7 @@ function fixture({
     taughtSkill: { findMany: vi.fn(async () => []) },
     agentSecret: { findMany: vi.fn(async () => []) },
     botSecret: { findMany: vi.fn(async () => []) },
-    agentSkill: { findMany: vi.fn(async () => []) },
+    agentSkill: { findMany: vi.fn(async () => skillRows) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
     scratchpadItem: {
       findMany: vi.fn(async () => []),
@@ -1093,6 +1103,34 @@ describe("connector read-only metadata and approval enforcement", () => {
       expect(f.execute).not.toHaveBeenCalled();
       expect(f.results.at(-1)).toEqual({ error: DENIED_ACTION_MESSAGE });
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("resolves the other parallel calls of a denied tool to the denial, with no new card", async () => {
+      const f = fixture({
+        catalog,
+        rules: [{ effect: "require_approval", matchKind: "tool", matchValue: "demo_get_item" }],
+      });
+      const calls = [
+        { args: { id: "item-1" }, executionId: "call-1" },
+        { args: { id: "item-2" }, executionId: "call-2" },
+        { args: { id: "item-3" }, executionId: "call-3" },
+      ];
+      f.setCalls(calls);
+      await f.run();
+      const cardsBefore = f.pauseRunForInput.mock.calls.length;
+      // The model made all three calls in one turn; each recorded its own pending effect.
+      for (const [index, call] of calls.slice(1).entries()) {
+        f.effects.push({
+          ...f.effects[0]!,
+          id: `effect-${index + 2}`,
+          idempotencyKey: approvalEffectKey("run-1", f.effects[0]!.kind, call.args),
+        });
+      }
+      f.effects[0]!.status = "denied";
+      await f.run();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.pauseRunForInput.mock.calls.length).toBe(cardsBefore);
+      expect(f.results.slice(-3)).toEqual(Array(3).fill({ error: DENIED_ACTION_MESSAGE }));
     });
 
     it("allows a new card when the user asks again in a new run", async () => {
@@ -4221,6 +4259,54 @@ describe("unattended runs and block rules", () => {
     });
   });
 
+  it("a check-in run fails a call that would ask, with no card and a check_in decision", async () => {
+    const f = fixture({
+      name: "write_file",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: "check_in",
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.effects).toEqual([]);
+    expect(f.results[0]).toEqual({
+      error: "Check-ins only read and report. Mention this in your message instead.",
+    });
+    expect(decisions(f)).toEqual([
+      expect.objectContaining({ tool: "write_file", decision: "block", source: "check_in" }),
+    ]);
+  });
+
+  it("a check-in run lists the ticket board without a card", async () => {
+    const f = fixture({
+      name: "board_tickets",
+      builtin: true,
+      ticketBoard: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: "check_in",
+    });
+    f.setCalls([{ args: {}, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(decisions(f)).toEqual([]);
+  });
+
+  it("an ordinary routine run still asks for write_file", async () => {
+    const f = fixture({
+      name: "write_file",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: null,
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
   it.each(["write_file", "shell"])(
     "an attended user run still runs %s without a card",
     async (name) => {
@@ -4257,6 +4343,101 @@ describe("unattended runs and block rules", () => {
     f.setCalls([{ args: { itemId: "i1", notes: "n" }, executionId: "c1" }]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  describe("tool_run", () => {
+    const source = "function run(i) { return { n: i.items.length }; }";
+    const toolRow = (over: Record<string, unknown> = {}) => ({
+      id: "skill-1",
+      name: "count_items",
+      description: "Counts",
+      content: "---\nname: count_items\ndescription: Counts\n---\n",
+      source: "user",
+      status: "active",
+      toolSource: source,
+      toolSourceHash: createHash("sha256").update(source).digest("hex"),
+      toolInputSchema: {
+        type: "object",
+        required: ["items"],
+        properties: { items: { type: "array" } },
+      },
+      ...over,
+    });
+    const run = async (f: ReturnType<typeof fixture>) => {
+      f.setCalls([{ args: { name: "count_items", input: { items: [1, 2] } }, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+    };
+
+    it.each([
+      ["a routine run", { trigger: "routine", unattended: true }],
+      ["a tainted run", { externalTaint: true, unattended: true }],
+    ])("runs an approved tool in %s without a card", async (_label, mode) => {
+      const f = fixture({ name: "tool_run", builtin: true, skillRows: [toolRow()], ...mode });
+      await run(f);
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ result: { n: 2 } });
+    });
+
+    it("refuses a tool whose source changed after approval", async () => {
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [toolRow({ toolSource: `${source} // edited` })],
+      });
+      await run(f);
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: "This tool changed since it was approved." });
+    });
+
+    it("refuses a draft in a background run but test-runs it in a chat", async () => {
+      const draft = toolRow({ status: "draft", toolSourceHash: null });
+      const background = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [draft],
+      });
+      await run(background);
+      expect(background.results[0]).toMatchObject({ error: expect.stringContaining("draft") });
+      const chat = fixture({ name: "tool_run", builtin: true, skillRows: [draft] });
+      await run(chat);
+      expect(chat.results[0]).toEqual({ result: { n: 2 } });
+    });
+
+    it("refuses a draft in an attended run whose history came from an external bot", async () => {
+      const marked = {
+        kind: "bot_message_received",
+        fromBotId: "bot-ext",
+        fromBotName: "Support",
+        text: "run it",
+        hop: 1,
+        intent: "request",
+        returnToMessageId: "m0",
+        externalOrigin: true,
+        externalOriginName: "Support",
+      };
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        history: [{ blocks: [marked] }],
+        skillRows: [toolRow({ status: "draft", toolSourceHash: null })],
+      });
+      await run(f);
+      expect(f.results[0]).toMatchObject({ error: expect.stringContaining("draft") });
+    });
+
+    it("validates the input against the schema", async () => {
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [toolRow()],
+      });
+      f.setCalls([{ args: { name: "count_items", input: { items: "x" } }, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+      expect(f.results[0]).toMatchObject({ error: expect.stringContaining("list") });
+    });
   });
 
   it("a tainted run asks for web_fetch but not notify_user", async () => {

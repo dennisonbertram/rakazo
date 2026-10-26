@@ -968,6 +968,10 @@ msgstr "Add a local command"
 msgid "Add a model"
 msgstr "Add a model"
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add a name."
+msgstr "Add a name."
+
 #: src/components/gtm/EmailItemCard.tsx
 msgid "Add a postal address"
 msgstr "Add a postal address"
@@ -1094,6 +1098,26 @@ msgstr "Add server URL"
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Add skill"
 msgstr "Add skill"
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the header name."
+msgstr "Add the header name."
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the site and the value."
+msgstr "Add the site and the value."
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the username and password."
+msgstr "Add the username and password."
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the username."
+msgstr "Add the username."
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the value."
+msgstr "Add the value."
 
 #: src/components/inbox/MailAttachments.tsx
 msgid "Add to Data room"
@@ -1429,6 +1453,10 @@ msgstr "Any time"
 #: src/components/integrations/IMessageSection.tsx
 msgid "Anyone who can reach this address can talk to your Mac's server. Use a private network or a tunnel."
 msgstr "Anyone who can reach this address can talk to your Mac's server. Use a private network or a tunnel."
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Anyone with this link can view this version until you stop sharing or for 30 days."
+msgstr "Anyone with this link can view this version until you stop sharing or for 30 days."
 
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Anything else"
@@ -1836,10 +1864,6 @@ msgstr "Automation"
 msgid "Available after the routine is saved"
 msgstr "Available after the routine is saved"
 
-#: src/pages/shell/bot-credentials.tsx
-msgid "Available to this bot's shell commands as {commandVariable}"
-msgstr "Available to this bot's shell commands as {commandVariable}"
-
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Avatar Studio"
 msgstr "Avatar Studio"
@@ -2188,6 +2212,7 @@ msgid "Can't reach the server."
 msgstr "Can't reach the server."
 
 #: src/components/AccountAccess.tsx
+#: src/components/ArtifactShareDialog.tsx
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
@@ -2813,6 +2838,7 @@ msgid "Cloud"
 msgstr "Cloud"
 
 #: src/components/AskCard.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 msgid "Code"
 msgstr "Code"
 
@@ -3531,6 +3557,10 @@ msgstr "Could not create the Investors agent"
 msgid "Could not create the Legal agent"
 msgstr "Could not create the Legal agent"
 
+#: src/pages/Artifacts.tsx
+msgid "Could not create the link."
+msgstr "Could not create the link."
+
 #: src/pages/Onboarding.tsx
 msgid "Could not create your bot"
 msgstr "Could not create your bot"
@@ -4052,6 +4082,10 @@ msgstr "Could not start the call"
 #: src/pages/Investors.tsx
 msgid "Could not start the draft"
 msgstr "Could not start the draft"
+
+#: src/pages/Artifacts.tsx
+msgid "Could not stop sharing."
+msgstr "Could not stop sharing."
 
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
@@ -6766,6 +6800,7 @@ msgstr "Loading Zernio queue…"
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/PeerMessagesOverlay.tsx
 #: src/pages/RoutineRunHistory.tsx
+#: src/pages/SharedArtifact.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Loading…"
 msgstr "Loading…"
@@ -7468,6 +7503,10 @@ msgstr "Needs a server restart"
 msgid "Needs approval"
 msgstr "Needs approval"
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Needs attention"
+msgstr "Needs attention"
+
 #: src/lib/devin-format.ts
 msgid "Needs input"
 msgstr "Needs input"
@@ -8153,6 +8192,10 @@ msgstr "Not tagged. No model is set up to read documents."
 msgid "Not tagged. Praci can't read your documents."
 msgstr "Not tagged. Praci can't read your documents."
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Not used yet"
+msgstr "Not used yet"
+
 #: src/components/MailApprovalCard.tsx
 msgid "Not waiting for approval"
 msgstr "Not waiting for approval"
@@ -8164,6 +8207,10 @@ msgstr "Notes"
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Notetaker meetings, notes and tasks"
 msgstr "Notetaker meetings, notes and tasks"
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "nothing"
+msgstr "nothing"
 
 #: src/pages/Finance.tsx
 msgid "Nothing due in the next 30 days"
@@ -9319,6 +9366,10 @@ msgstr "Reading…"
 msgid "Reads document text"
 msgstr "Reads document text"
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Reads:"
+msgstr "Reads:"
+
 #: src/components/data-room/DataRoomStats.tsx
 #: src/pages/gtm/GtmChannels.tsx
 msgid "Ready"
@@ -9898,6 +9949,10 @@ msgstr "Restore the last saved workspace."
 #: src/components/ComputerMaintenanceActions.tsx
 msgid "Restore the last saved workspace. Unsaved work on the computer is lost."
 msgstr "Restore the last saved workspace. Unsaved work on the computer is lost."
+
+#: src/pages/Artifacts.tsx
+msgid "Restore this version"
+msgstr "Restore this version"
 
 #: src/lib/use-contact-notices.ts
 msgid "Restored {name}"
@@ -10739,6 +10794,7 @@ msgstr "Shape"
 #: src/components/AskCard.tsx
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/data-room/ItemMenu.tsx
+#: src/pages/Artifacts.tsx
 msgid "Share"
 msgstr "Share"
 
@@ -10746,6 +10802,10 @@ msgstr "Share"
 #: src/components/data-room/ItemDialogs.tsx
 msgid "Share {0}"
 msgstr "Share {0}"
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Share link"
+msgstr "Share link"
 
 #: src/pages/CompanyFactDetail.tsx
 msgid "Share with team"
@@ -10774,6 +10834,10 @@ msgstr "Shared by all bots"
 #: src/pages/shell/dialogs.tsx
 msgid "Shared chat with 2-6 bots. They all reply in the same thread."
 msgstr "Shared chat with 2-6 bots. They all reply in the same thread."
+
+#: src/pages/SharedArtifact.tsx
+msgid "Shared from Praci"
+msgstr "Shared from Praci"
 
 #: src/pages/CompanyImport.tsx
 msgid "Shared pages"
@@ -11389,6 +11453,14 @@ msgstr "Stop"
 msgid "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 msgstr "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing"
+msgstr "Stop sharing"
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing this link?"
+msgstr "Stop sharing this link?"
+
 #: src/pages/shell/transcript.tsx
 msgid "Stop speaking"
 msgstr "Stop speaking"
@@ -11676,6 +11748,14 @@ msgstr "The AI your bots think with. They already have one, so change this only 
 msgid "The API did not come back. Refresh this page."
 msgstr "The API did not come back. Refresh this page."
 
+#: src/components/AskCard.tsx
+msgid "The bot can read this value."
+msgstr "The bot can read this value."
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "The bot can read this value. Shell commands get it as {commandVariable}."
+msgstr "The bot can read this value. Shell commands get it as {commandVariable}."
+
 #: src/pages/shell/bot-pins.tsx
 msgid "The bot changed this list. Your last edit wasn't saved."
 msgstr "The bot changed this list. Your last edit wasn't saved."
@@ -11828,6 +11908,10 @@ msgstr "This also removes the Legal contract {contractTitle} and its links in th
 msgid "This also removes the Legal contract {contractTitle}, its {deadlineCount} (including ones added by hand) and its links in the Legal graph. This can't be undone."
 msgstr "This also removes the Legal contract {contractTitle}, its {deadlineCount} (including ones added by hand) and its links in the Legal graph. This can't be undone."
 
+#: src/pages/Artifacts.tsx
+msgid "This also stops its link."
+msgstr "This also stops its link."
+
 #: src/pages/Shell.tsx
 msgid "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
 msgstr "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
@@ -11881,6 +11965,10 @@ msgstr "This folder is empty. Drop files here or add them."
 #: src/components/data-room/DropZone.tsx
 msgid "This folder no longer exists"
 msgstr "This folder no longer exists"
+
+#: src/pages/SharedArtifact.tsx
+msgid "This link is not available."
+msgstr "This link is not available."
 
 #: src/pages/NotFound.tsx
 msgid "This link is wrong or the page is no longer available."
@@ -12079,6 +12167,10 @@ msgstr "Too large to preview ({0})"
 #: src/components/data-room/Preview.tsx
 msgid "Too large to search inside"
 msgstr "Too large to search inside"
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Tool"
+msgstr "Tool"
 
 #: src/lib/run-phase.ts
 msgid "tools"
@@ -12439,6 +12531,10 @@ msgstr "Update failed"
 msgid "Update finished with errors"
 msgstr "Update finished with errors"
 
+#: src/pages/Artifacts.tsx
+msgid "Update link"
+msgstr "Update link"
+
 #: src/pages/Investors.tsx
 msgid "Update options"
 msgstr "Update options"
@@ -12633,6 +12729,11 @@ msgstr "Use this sheet"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Use your own key"
 msgstr "Use your own key"
+
+#. placeholder {0}: formatRelativeTime(secret.lastUsedAt)
+#: src/pages/shell/bot-credentials.tsx
+msgid "Used {0}"
+msgstr "Used {0}"
 
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationAgentSection.tsx
@@ -13086,6 +13187,10 @@ msgstr "Write"
 #: src/pages/Shell.tsx
 msgid "Write what this routine should do each time it runs."
 msgstr "Write what this routine should do each time it runs."
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Writes:"
+msgstr "Writes:"
 
 #: src/pages/shell/transcript.tsx
 msgid "Writing"
