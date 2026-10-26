@@ -4509,7 +4509,10 @@ export function createRouter(deps: RouterDeps) {
             });
             // "Last ran" counts a test. A one-shot keeps lastRunAt for "already ran", so it is left alone.
             if (!isOneShotRoutineCrons(routine.crons)) {
-              await tx.routine.update({ where: { id: routine.id }, data: { lastRunAt: new Date() } });
+              await tx.routine.update({
+                where: { id: routine.id },
+                data: { lastRunAt: new Date() },
+              });
             }
             return created;
           });
