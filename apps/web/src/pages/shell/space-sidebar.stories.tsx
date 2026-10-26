@@ -65,6 +65,36 @@ const pageAgentBots = [
     spawnKey: "finance-agent:user_demo",
     updatedAt: "2026-01-01T00:04:00.000Z",
   }),
+  makeBot({
+    id: "bot_page_devin",
+    name: "Devin agent",
+    spawnKey: "devin-agent:user_demo",
+    updatedAt: "2026-01-01T00:05:00.000Z",
+  }),
+  makeBot({
+    id: "bot_page_box",
+    name: "Box agent",
+    spawnKey: "box-agent:user_demo",
+    updatedAt: "2026-01-01T00:06:00.000Z",
+  }),
+  makeBot({
+    id: "bot_page_carta",
+    name: "Carta agent",
+    spawnKey: "carta-agent:user_demo",
+    updatedAt: "2026-01-01T00:07:00.000Z",
+  }),
+  makeBot({
+    id: "bot_page_brex",
+    name: "Brex agent",
+    spawnKey: "brex-agent:user_demo",
+    updatedAt: "2026-01-01T00:08:00.000Z",
+  }),
+  makeBot({
+    id: "bot_page_mercury",
+    name: "Mercury agent",
+    spawnKey: "mercury-agent:user_demo",
+    updatedAt: "2026-01-01T00:09:00.000Z",
+  }),
 ];
 const emailChatBots = [
   makeBot({
@@ -108,6 +138,7 @@ export function SidebarFixture({
   onTourSkip = () => undefined,
   onTourEnd = () => undefined,
   pageAgents = false,
+  crowded = false,
   singlePageAgent = false,
   emailChats = false,
   activePageAgent = false,
@@ -127,6 +158,8 @@ export function SidebarFixture({
   onTourSkip?: () => void;
   onTourEnd?: () => void;
   pageAgents?: boolean;
+  /** Page agents that have been used, so all of them are listed. */
+  crowded?: boolean;
   singlePageAgent?: boolean;
   emailChats?: boolean;
   activePageAgent?: boolean;
@@ -161,7 +194,11 @@ export function SidebarFixture({
   } | null>(null);
   const fixtureBots = [
     ...bots,
-    ...(pageAgents ? (singlePageAgent ? pageAgentBots.slice(0, 1) : pageAgentBots) : []),
+    ...(pageAgents
+      ? (singlePageAgent ? pageAgentBots.slice(0, 1) : pageAgentBots).map((bot) =>
+          crowded ? { ...bot, preview: "Ready" } : bot,
+        )
+      : []),
     ...(emailChats ? emailChatBots : []),
   ];
   const [, setDeleteTarget] = useState<ReturnType<typeof makeBot> | null>(null);
@@ -328,6 +365,11 @@ export const FolderAndRoster: Story = {
 
 export const DevinNeedsYou: Story = {
   render: () => <SidebarFixture mode="expanded" devinMode devinConnected devinNeedsYou={2} />,
+};
+
+/** Open "Page agents" and scroll: its header stays pinned at the top. */
+export const PageAgents: Story = {
+  render: () => <SidebarFixture mode="expanded" pageAgents />,
 };
 
 export const Fundraising: Story = {
