@@ -49,6 +49,18 @@ export const HtmlBody: Story = {
     }),
 };
 
+/** An HTML email whose own styles remove all margins: its text must still sit inside the card's padding. */
+export const HtmlBodyNoMargins: Story = {
+  args: { messageId: "msg_html_flush" },
+  beforeEach: () =>
+    mockRpc({
+      "inbox.get": {
+        ...message,
+        html: '<html><head><style>body{margin:0;padding:0}</style></head><body><table width="100%"><tr><td>Sample update: the invented release notes start at the left edge of the message, and a long line wraps so the right padding is visible too. Nothing here is real.</td></tr></table></body></html>',
+      },
+    }),
+};
+
 /** The user's own reply, found by search: named "You", and its plain HTML reads as text in the app's style. */
 export const OwnSentReply: Story = {
   args: { messageId: "msg_own" },
