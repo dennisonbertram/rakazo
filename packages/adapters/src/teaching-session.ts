@@ -31,6 +31,7 @@ import {
   createThreadMessageInTransaction,
   IsolationError,
 } from "@rakazo/db";
+import { getLogger } from "@rakazo/logging";
 import { revokeScreenControl } from "./computer-control.js";
 import { scheduleComputerSleep } from "./computer-idle.js";
 import { toComputerRef } from "./computer-support.js";
@@ -576,7 +577,10 @@ async function describePlainSteps(
       steps: playbook.steps,
     });
     return steps ? { steps, eventCount: stored.events.length } : null;
-  } catch {
+  } catch (error) {
+    getLogger().warn("teach steps failed; keeping coordinate steps", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return null;
   }
 }

@@ -463,7 +463,11 @@ export function SkillDraftCard({
             data-testid="skill-test-result"
           >
             {live?.lastTestNote ? (
-              <Trans>Stopped: {live.lastTestNote}</Trans>
+              /^stopped/i.test(live.lastTestNote) ? (
+                live.lastTestNote
+              ) : (
+                <Trans>Stopped: {live.lastTestNote}</Trans>
+              )
             ) : (
               <Trans>Stopped</Trans>
             )}

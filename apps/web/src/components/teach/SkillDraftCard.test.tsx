@@ -195,3 +195,16 @@ it("discards a draft and shows Discarded", async () => {
     await view.cleanup();
   }
 });
+
+it("does not repeat Stopped when the note already starts with it", async () => {
+  api.get.mockResolvedValue(
+    skill({ lastTestOutcome: "stopped", lastTestNote: "Stopped at step 2: no Export button" }),
+  );
+  const view = await render();
+  try {
+    expect(view.container.textContent).toContain("Stopped at step 2: no Export button");
+    expect(view.container.textContent).not.toContain("Stopped: Stopped");
+  } finally {
+    await view.cleanup();
+  }
+});

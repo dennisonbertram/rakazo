@@ -132,9 +132,7 @@ export async function describeTeachSteps(
       }
       if (event.type === "done" && event.text) text = event.text;
     }
-    const steps = parseSteps(text, input.steps);
-    if (!steps) skip("model answer rejected", { sources: input.steps.length, answer: text.length });
-    return steps;
+    return parseSteps(text, input.steps);
   } catch (error) {
     getLogger().warn("teach steps model call failed; keeping coordinate steps", {
       error: error instanceof Error ? error.message : "unknown",
@@ -160,25 +158,32 @@ function lineMatchesSource(line: string, source: string): boolean {
 
 /** The model's answer, only when it is one valid rewrite per source step; otherwise null. */
 function parseSteps(text: string, source: string[]): string[] | null {
+  const reject = (reason: string, detail: Record<string, unknown> = {}) =>
+    skip(`model answer rejected: ${reason}`, { sources: source.length, ...detail });
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
-  if (start === -1 || end <= start) return null;
+  if (start === -1 || end <= start) return reject("no list", { answerChars: text.length });
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
   } catch {
-    return null;
+    return reject("not JSON");
   }
-  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAX_STEPS) return null;
-  if (parsed.length !== source.length) return null;
-  const lines = parsed.map((step) => (typeof step === "string" ? step.trim() : null));
-  if (
-    !lines.every(
-      (line, index): line is string =>
-        line !== null && line.length <= MAX_STEP_CHARS && lineMatchesSource(line, source[index]!),
-    )
-  ) {
-    return null;
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAX_STEPS) {
+    return reject("bad list size");
+  }
+  if (parsed.length !== source.length) return reject("step count differs", { got: parsed.length });
+  // One unfaithful line keeps its recorded text; it must not discard the rest.
+  const lines = parsed.map((step, index) => {
+    const line = typeof step === "string" ? step.trim() : "";
+    if (line && line.length <= MAX_STEP_CHARS && lineMatchesSource(line, source[index]!)) {
+      return line;
+    }
+    skip("model step rejected, keeping the recorded step", { step: index + 1, line });
+    return source[index]!;
+  });
+  if (lines.every((line, index) => line === source[index])) {
+    return reject("no step was rewritten");
   }
   return lines;
 }
