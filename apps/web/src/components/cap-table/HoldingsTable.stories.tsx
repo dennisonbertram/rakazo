@@ -60,3 +60,8 @@ type Story = StoryObj<typeof meta>;
 
 /** A holder with a contact offers Open contact; one without offers Add as contact; the pool has no menu. */
 export const Default: Story = {};
+
+/** Filtered to one security with the holder sorted descending. */
+export const Sorted: Story = {
+  parameters: { initialEntries: ["/?sort=holder&dir=desc&security=Seed%20Preferred"] },
+};

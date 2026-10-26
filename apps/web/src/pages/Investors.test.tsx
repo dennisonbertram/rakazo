@@ -188,7 +188,7 @@ const blur = (el: HTMLElement) =>
 async function show(url = "/app/investors", props: Parameters<typeof InvestorsPage>[0] = {}) {
   await act(async () =>
     root.render(
-      <MemoryRouter initialEntries={[url]}>
+      <MemoryRouter key={url} initialEntries={[url]}>
         <InvestorsPage {...props} />
         <NotificationToaster onOpen={() => {}} />
       </MemoryRouter>,
@@ -1743,4 +1743,42 @@ it("shows one section per tab, keeps the tab in the URL, and falls back to Cap t
   await click(tab("Updates"));
   expect(container.querySelector('section[aria-label="Updates"]')).not.toBeNull();
   expect(container.querySelector('section[aria-label="Contacts"]')).toBeNull();
+});
+
+it("sorts the Contacts tab by organization and stage and filters by stage", async () => {
+  rpcMock.list.mockResolvedValue([
+    {
+      ...contact("c1", "Ada", "investor"),
+      organization: "Zed Fund",
+      stage: "meeting",
+      checkSizeCents: 5_000_000,
+    },
+    {
+      ...contact("c2", "Bo", "investor"),
+      organization: "Alpha Fund",
+      stage: "target",
+      checkSizeCents: 1_000_000,
+    },
+    {
+      ...contact("c3", "Cy", "investor"),
+      organization: null,
+      stage: "meeting",
+      checkSizeCents: null,
+    },
+  ]);
+  const names = () =>
+    [...container.querySelectorAll("[data-contact-id] [data-row-open]")].map(
+      (b) => b.querySelector("span")?.textContent,
+    );
+  await show("/app/investors?tab=contacts");
+  expect(names()).toEqual(["Ada", "Bo", "Cy"]);
+  await show("/app/investors?tab=contacts&sort=organization");
+  expect(names()).toEqual(["Bo", "Ada", "Cy"]);
+  await show("/app/investors?tab=contacts&sort=stage&dir=desc");
+  expect(names()).toEqual(["Ada", "Cy", "Bo"]);
+  await show("/app/investors?tab=contacts&sort=check&dir=desc");
+  expect(names()).toEqual(["Ada", "Bo", "Cy"]);
+  await show("/app/investors?tab=contacts&stage=meeting");
+  expect(names()).toEqual(["Ada", "Cy"]);
+  expect(button("Sort: Name")).toBeDefined();
 });

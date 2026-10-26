@@ -53,6 +53,11 @@ export const Searched: Story = {
   },
 };
 
+export const SortedByKind: Story = {
+  parameters: { initialEntries: ["/app/contacts?sort=kind&dir=desc"] },
+  beforeEach: () => mockRpc({ "contacts.list": contacts }),
+};
+
 export const NoMatches: Story = {
   beforeEach: () => mockRpc({ "contacts.list": contacts }),
   play: async ({ canvasElement }) => {

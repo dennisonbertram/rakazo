@@ -13,7 +13,7 @@ import type {
   PortalLink,
   Safe,
 } from "@rakazo/contracts";
-import { isCartaEndpoint } from "@rakazo/contracts";
+import { ContactStageSchema, isCartaEndpoint } from "@rakazo/contracts";
 import { capTableMath, countedSafes, equityRaisedUsd, isSafeSecurity } from "@rakazo/core";
 import {
   AlertDialog,
@@ -57,7 +57,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { ContactDeleteConfirm, hasLinks } from "../components/ContactDeleteConfirm";
 import type { ContactPrefill as Prefill } from "../components/ContactDialog";
-import { ContactDialog } from "../components/ContactDialog";
+import { ContactDialog, contactStageNames } from "../components/ContactDialog";
 import { CopyLinkDialog } from "../components/CopyLinkDialog";
 import type { SaveResult } from "../components/cap-table/CapTableEditor";
 import { CapTableEditor } from "../components/cap-table/CapTableEditor";
@@ -71,7 +71,7 @@ import { DRIVE_PAGE } from "../components/data-room/ImportFromEmail";
 import { CustomConnectionDialog } from "../components/integrations/CustomConnectionDialog";
 import { useIntegrations } from "../components/integrations/useIntegrations";
 import { ActionItems } from "../components/investors/ActionItems";
-import { SearchField } from "../components/ListControls";
+import { PickFilter, SearchField, SortControl } from "../components/ListControls";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { StillLoading } from "../components/ShellSkeleton";
@@ -79,6 +79,7 @@ import { hasConnectedCarta } from "../lib/carta-agent";
 import { shareCount, shortDay, usdFigure } from "../lib/finance-format";
 import { useHideAmounts } from "../lib/hide-amounts-preference";
 import { FIRST_PARTY_MCP } from "../lib/integrations";
+import { sortBy, useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import { SAVED_ROW_CLASS, useContactNotices } from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
@@ -93,6 +94,9 @@ const CONTACT_TABS = ["investor", "board"] as const satisfies readonly ContactKi
 type ContactTab = (typeof CONTACT_TABS)[number];
 const parseTab = (value: string | null): ContactTab =>
   CONTACT_TABS.find((tab) => tab === value) ?? "investor";
+
+/** The Contacts section's sorts; name ascending is the default. */
+const CONTACT_SORTS = ["name", "organization", "stage", "check"] as const;
 
 /** The page sections, one tab each; the first is the default. */
 const SECTIONS = ["cap-table", "updates", "contacts"] as const;
@@ -595,6 +599,7 @@ export function InvestorsPage({
       { replace: true },
     );
   const query = params.get("q") ?? "";
+  const list = useListParams(CONTACT_SORTS, { field: "name", dir: "asc" });
   const [editing, setEditing] = useState<Contact | Prefill | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{
     contact: Contact;
@@ -1022,14 +1027,44 @@ export function InvestorsPage({
       : [];
 
   const needle = query.trim().toLowerCase();
-  const shown = allContacts
-    .filter(
+  const stage = ContactStageSchema.safeParse(list.param("stage")).data;
+  const ofTab = allContacts.filter((c) => c.kind === tab);
+  const stagesUsed = ContactStageSchema.options.filter((value) =>
+    ofTab.some((c) => c.stage === value),
+  );
+  const hasCheck = ofTab.some((c) => c.checkSizeCents != null);
+  const { field: sortField, dir: sortDir } = list.sort;
+  const sortKey = (c: Contact) =>
+    sortField === "name"
+      ? c.name
+      : sortField === "organization"
+        ? c.organization || null
+        : sortField === "stage"
+          ? c.stage
+            ? ContactStageSchema.options.indexOf(c.stage)
+            : null
+          : (c.checkSizeCents ?? null);
+  const shown = sortBy(
+    ofTab.filter(
       (c) =>
-        c.kind === tab &&
+        (!stage || c.stage === stage) &&
         (!needle ||
           [c.name, c.organization, c.email].some((text) => text?.toLowerCase().includes(needle))),
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    ),
+    sortKey,
+    sortDir,
+  );
+  const sortNames: Record<(typeof CONTACT_SORTS)[number], string> = {
+    name: t`Name`,
+    organization: t`Organization`,
+    stage: t`Stage`,
+    check: t`Check size`,
+  };
+  const sortFields = CONTACT_SORTS.filter(
+    (f) =>
+      f === "name" || f === "organization" || (f === "stage" ? stagesUsed.length > 0 : hasCheck),
+  );
+  const stageNames = contactStageNames();
   const tabNames: Record<ContactTab, string> = {
     investor: t`SAFEs and funds`,
     board: t`Board`,
@@ -1476,14 +1511,32 @@ export function InvestorsPage({
                       </Button>
                     ) : null}
                     {allContacts.length > 0 && !error ? (
-                      <SearchField
-                        className="w-full @md/bd:ms-auto @md/bd:w-56"
-                        value={query}
-                        onChange={(next) => setParam("q", next || undefined)}
-                        placeholder={t`Search`}
-                        label={t`Search`}
-                        name="contact-search"
-                      />
+                      <>
+                        <SearchField
+                          className="w-full @md/bd:ms-auto @md/bd:w-56"
+                          value={query}
+                          onChange={(next) => setParam("q", next || undefined)}
+                          placeholder={t`Search`}
+                          label={t`Search`}
+                          name="contact-search"
+                        />
+                        {stagesUsed.length > 0 ? (
+                          <PickFilter
+                            label={t`Stage`}
+                            value={stage}
+                            options={stagesUsed.map((value) => [value, stageNames[value]])}
+                            onChange={(next) => list.setParam("stage", next)}
+                          />
+                        ) : null}
+                        <SortControl
+                          fields={sortFields.map((f) => [f, sortNames[f]])}
+                          field={sortField}
+                          fieldLabel={sortNames[sortField]}
+                          direction={sortDir}
+                          onField={(next) => list.setSort({ field: next, dir: "asc" })}
+                          onDirection={(next) => list.setSort({ field: sortField, dir: next })}
+                        />
+                      </>
                     ) : null}
                   </div>
                   {error ? (
@@ -1500,7 +1553,7 @@ export function InvestorsPage({
                       ))}
                     </div>
                   ) : shown.length === 0 ? (
-                    needle ? (
+                    needle || stage ? (
                       <div className="flex flex-col items-center gap-3 py-10 text-center">
                         <p className="text-sm text-muted-foreground">
                           <Trans>No matches</Trans>
@@ -1508,7 +1561,7 @@ export function InvestorsPage({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setParam("q", undefined)}
+                          onClick={() => list.clear("q", "stage")}
                         >
                           <Trans>Clear filters</Trans>
                         </Button>
