@@ -185,6 +185,8 @@ export const MailEditsSchema = z
     bcc: z.string().max(4_000),
     subject: z.string().max(998),
     body: z.string().max(MAX_COMPOSE_BODY),
+    /** Send now: the person sends the mail themselves instead of saving the draft. */
+    send: z.boolean(),
   })
   .partial()
   .strict();

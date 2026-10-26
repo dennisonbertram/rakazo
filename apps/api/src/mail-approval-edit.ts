@@ -8,6 +8,7 @@ import {
   normalizeMailEdits,
 } from "@rakazo/adapters";
 import type { Actor, ComposeFields, ComposeResult, MailEdits } from "@rakazo/contracts";
+import { disabledBuiltinToolSet } from "@rakazo/contracts";
 import type { ThreadEvents } from "@rakazo/db";
 import { mailApprovalComposeClientId } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -38,7 +39,7 @@ const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
 /**
- * An edited Send or Save draft on a mail approval. It is the person's own action: the pending
+ * An edited Send or Save draft on a mail approval, or Send now on a draft. It is the person's own action: the pending
  * agent call is denied first (one atomic claim, so a plain approval elsewhere cannot also run it),
  * and only the winner of that claim sends, through the same compose path as the Inbox composer.
  * The compose record is keyed by the effect, so a repeat can never send twice. The outcome is
@@ -74,6 +75,17 @@ export async function answerEditedMailApproval(
   if (deps.mailWritesDisabled) {
     throw new ORPCError("PRECONDITION_FAILED", { message: "Sending is turned off." });
   }
+  // Send now on a draft is the person's own send, so the bot's sending switch applies to it.
+  const sendNow = pending.kind === "mail_draft" && input.mail.send === true;
+  if (sendNow) {
+    const run = await deps.prisma.run.findFirst({
+      where: { id: input.runId, spaceId: actor.spaceId, userId: actor.userId },
+      select: { bot: { select: { disabledBuiltinTools: true } } },
+    });
+    if (!run || disabledBuiltinToolSet(run.bot.disabledBuiltinTools).has("mail_send")) {
+      throw new ORPCError("PRECONDITION_FAILED", { message: "Sending is turned off." });
+    }
+  }
 
   // The account is the caller's own connection, found from the address the agent named.
   const accounts = await deps.mail.listAccounts(
@@ -95,7 +107,7 @@ export async function answerEditedMailApproval(
         );
   if (!account) throw new ORPCError("BAD_REQUEST", { message: "No connected mail account" });
 
-  const send = pending.kind === "mail_send";
+  const send = pending.kind === "mail_send" || sendNow;
   const claimed = await deps.events.answerRunInput({
     spaceId: actor.spaceId,
     threadId: target.threadId,
@@ -107,7 +119,12 @@ export async function answerEditedMailApproval(
       note: mailApprovalAgentNote(send),
       // Only what the person typed replaces the card's fields. The rest of the card was redacted
       // when it was made, and the stored call is not, so it is never copied onto the card.
-      mail: { ...withoutAccount(checked.edits), connectionId: account.id },
+      mail: {
+        ...withoutAccount(checked.edits),
+        connectionId: account.id,
+        // The card now describes an email that is being sent, not a draft being saved.
+        ...(sendNow ? { tool: "mail_send" as const } : {}),
+      },
     },
   });
   if (!claimed) {

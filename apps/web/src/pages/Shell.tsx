@@ -2997,6 +2997,28 @@ export function ShellPage() {
         });
       },
       editableBotName: (botId) => botsRef.current.find((bot) => bot.id === botId)?.name,
+      canSend: (botId) => {
+        const bot = botsRef.current.find((item) => item.id === botId);
+        return Boolean(bot) && !bot?.disabledBuiltinTools.includes("mail_send");
+      },
+      sendDraft: async (message) => {
+        const botId = activeBotId.current;
+        const groupId = activeGroupId.current;
+        if (!botId && !groupId) return;
+        const result = await rpc.threads.sendDraft({
+          ...(groupId ? { groupId } : { botId: botId! }),
+          runId: message.runId ?? "",
+          messageId: message.id,
+        });
+        if (result.status !== "sent" && result.status !== "unknown") {
+          throw new Error(t`Could not submit this answer`);
+        }
+        if (groupId && activeGroupId.current === groupId) {
+          await refreshGroupThreadRef.current(groupId);
+        } else if (botId && activeBotId.current === botId) {
+          await refreshThreadRef.current(botId);
+        }
+      },
       disableTool: async (botId, tool) => {
         const bot = botsRef.current.find((item) => item.id === botId);
         if (!bot) return;

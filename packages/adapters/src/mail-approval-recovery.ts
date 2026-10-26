@@ -90,7 +90,8 @@ export async function reconcileMailApprovals(deps: {
   for (const effect of effects) {
     const claimNote = (effect.result as { note: string }).note;
     try {
-      const send = effect.kind === "mail_send";
+      // A draft approval the person sent now carries the send note.
+      const send = claimNote === mailApprovalAgentNote(true);
       const row = await deps.prisma.composeSend.findUnique({
         where: {
           spaceId_userId_clientId: {

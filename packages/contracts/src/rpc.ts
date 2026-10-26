@@ -743,6 +743,13 @@ export const appContract = {
       )
       .output(z.object({ ok: z.literal(true) })),
     /**
+     * Sends the draft a mail_draft card saved. The draft and account come from the server's record
+     * of that tool call; the client only names the card.
+     */
+    sendDraft: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id }))
+      .output(ComposeResultSchema),
+    /**
      * Moves the read boundary forward to the message `upToMessageId` (the newest when omitted);
      * never backward, and an unknown id changes nothing. `toEnd` says the reader reached the end of
      * the latest page, which clears the unread flag even when newer stored messages are hidden.

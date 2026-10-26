@@ -42,6 +42,20 @@ export const WithCc: Story = {
   args: { mail: { ...mail, cc: ["lee@example.test"], bcc: ["pat@example.test"] } },
 };
 export const Draft: Story = { args: { mail: { ...mail, tool: "mail_draft" } } };
+/** Sending is on for this bot: Send now sends the draft instead of saving it. */
+export const DraftSendNow: Story = {
+  args: { mail: { ...mail, tool: "mail_draft" }, canSend: true },
+};
+/** A saved draft offers Send, which sends it from the person's mail account. */
+export const DraftSavedSend: Story = {
+  args: {
+    status: "answered",
+    answer: "allow",
+    mail: { ...mail, tool: "mail_draft", outcome: "saved" },
+    canSend: true,
+    onSendDraft: async () => undefined,
+  },
+};
 export const ReplacesSavedDraft: Story = {
   args: { mail: { ...mail, tool: "mail_draft", locked: true } },
 };
