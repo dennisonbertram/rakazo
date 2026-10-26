@@ -8487,6 +8487,10 @@ msgstr ""
 msgid "Open in full window"
 msgstr "पूरी विंडो में खोलें"
 
+#: src/components/MailApprovalCard.tsx
+msgid "Open in Gmail"
+msgstr ""
+
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Open in Mercury"
 msgstr ""

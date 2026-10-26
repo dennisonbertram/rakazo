@@ -821,7 +821,11 @@ export const Transcript = memo(function Transcript({
                       `group/message relative hover:z-20 @max-md:[@media(hover:hover)]:pt-4 @max-sm:[@media(hover:hover)]:pb-5 ${
                         // A full-width row has no gutter, so it reserves room under it for the rail (and the hover time).
                         fullWidth || mailCard
-                          ? `[@media(hover:hover)]:pb-14${cardOnly ? "" : " [@media(hover:none)]:pb-11"}`
+                          ? // Whole class names only: Tailwind finds a class by its text, and one glued to `${…}` is never generated.
+                            cn(
+                              "[@media(hover:hover)]:pb-14 @max-sm:[@media(hover:hover)]:pb-14",
+                              !cardOnly && "[@media(hover:none)]:pb-11",
+                            )
                           : ""
                       }`
                 }

@@ -4,6 +4,7 @@ import {
   closeRestored,
   createAgentSendWatch,
   getOutbox,
+  holdCommit,
   holdDiscard,
   holdSend,
   MAIL_SENT_EVENT,
@@ -105,4 +106,36 @@ it("announces an approved agent send once the run that sends it ends", () => {
   watch.running(true);
   watch.running(false);
   expect(sent).toHaveBeenCalledTimes(2);
+});
+
+it("holds a generic commit, runs it after the window and reports it went out", async () => {
+  const commit = vi.fn().mockResolvedValue(undefined);
+  const onEnd = vi.fn();
+  holdCommit(commit, onEnd);
+  expect(getOutbox().view).toEqual({ kind: "sending", undoable: true });
+  await vi.advanceTimersByTimeAsync(UNDO_SEND_MS - 1);
+  expect(commit).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(commit).toHaveBeenCalledTimes(1);
+  expect(onEnd).toHaveBeenCalledWith(null);
+  expect(getOutbox().view).toEqual({ kind: "sent" });
+});
+
+it("undo prevents a held commit and opens no composer", async () => {
+  const commit = vi.fn().mockResolvedValue(undefined);
+  const onEnd = vi.fn();
+  holdCommit(commit, onEnd);
+  undoSend();
+  await vi.advanceTimersByTimeAsync(UNDO_SEND_MS);
+  expect(commit).not.toHaveBeenCalled();
+  expect(onEnd).toHaveBeenCalledWith(undefined);
+  expect(getOutbox()).toEqual({ view: null, restoring: null });
+});
+
+it("a failed commit clears the toast, opens no composer and reports the reason", async () => {
+  const onEnd = vi.fn();
+  holdCommit(() => Promise.reject(new Error("Mail is off")), onEnd);
+  await vi.advanceTimersByTimeAsync(UNDO_SEND_MS);
+  expect(onEnd).toHaveBeenCalledWith("Mail is off");
+  expect(getOutbox()).toEqual({ view: null, restoring: null });
 });

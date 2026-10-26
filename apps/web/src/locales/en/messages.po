@@ -8487,6 +8487,10 @@ msgstr "Open in composer"
 msgid "Open in full window"
 msgstr "Open in full window"
 
+#: src/components/MailApprovalCard.tsx
+msgid "Open in Gmail"
+msgstr "Open in Gmail"
+
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Open in Mercury"
 msgstr "Open in Mercury"

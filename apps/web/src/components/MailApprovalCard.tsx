@@ -14,8 +14,10 @@ import {
   NativeSelectOption,
   Textarea,
 } from "@rakazo/ui-web";
-import { ChevronDown, ChevronsUpDown, Mail, MoreHorizontal } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronsUpDown, Mail, MoreHorizontal } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { gmailFolderUrl } from "../lib/gmail-link";
+import { holdCommit } from "../lib/outbox";
 import { parseRecipient, splitEntries } from "../lib/recipients";
 import { errorText } from "../lib/user-error";
 import { invalidAddressText } from "./compose/RecipientField";
@@ -130,6 +132,7 @@ export function MailApprovalCard({
   const interactive = !answered && canAnswer;
   const busy = pendingAction !== null;
   const draft = mail.tool === "mail_draft";
+  const gmailUrl = answered ? gmailFolderUrl(mail) : null;
   // A send of a saved draft: the agent named only the draft, so there is nothing to edit or show.
   const savedDraftSend = !draft && Boolean(mail.locked);
   const shown = answered ? initial : fields;
@@ -185,13 +188,13 @@ export function MailApprovalCard({
     if (action === "send") {
       setPendingAction(action);
       setError(null);
-      try {
-        await onSendDraft?.();
-      } catch (err) {
-        setError(errorText(err, t`Could not submit this answer`));
-      } finally {
-        setPendingAction(null);
-      }
+      holdCommit(
+        async () => void (await onSendDraft?.()),
+        (problem) => {
+          if (typeof problem === "string") setError(problem || t`Could not submit this answer`);
+          setPendingAction(null);
+        },
+      );
       return;
     }
     if (action === "allow") {
@@ -215,6 +218,19 @@ export function MailApprovalCard({
     setPendingAction(sendNow ? "sendNow" : action);
     setError(null);
     ownAnswer.current = true;
+    // A send waits out the bottom toast's undo window; saving a draft and denying go at once.
+    if (action === "allow" && (sendNow || !draft)) {
+      holdCommit(
+        async () => void (await onAnswer("allow", undefined, edits)),
+        (problem) => {
+          if (problem === null) setEditing(false);
+          else ownAnswer.current = false;
+          if (typeof problem === "string") setError(problem || t`Could not submit this answer`);
+          setPendingAction(null);
+        },
+      );
+      return;
+    }
     try {
       if (action === "disable") {
         await onDisableTool?.(mail.tool);
@@ -320,17 +336,33 @@ export function MailApprovalCard({
     >
       <div className="flex items-center gap-3 px-5 py-3.5">
         {answered ? (
-          <button
-            ref={toggleRef}
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
-            className="flex min-w-0 flex-1 items-center gap-3 text-start"
-          >
-            {tile}
-            {headerText}
-            <ChevronsUpDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-          </button>
+          <>
+            <button
+              ref={toggleRef}
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((value) => !value)}
+              className="flex min-w-0 flex-1 items-center gap-3 text-start"
+            >
+              {tile}
+              {headerText}
+              <ChevronsUpDown
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted-foreground"
+              />
+            </button>
+            {gmailUrl ? (
+              <a
+                href={gmailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t`Open in Gmail`}
+                className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <ArrowUpRight aria-hidden="true" className="size-4" />
+              </a>
+            ) : null}
+          </>
         ) : (
           <>
             {tile}
@@ -356,7 +388,7 @@ export function MailApprovalCard({
             disabled={busy}
             onClick={() => void submit("send")}
           >
-            {pendingAction === "send" ? <Trans>Sending…</Trans> : <Trans>Send</Trans>}
+            <Trans>Send</Trans>
           </Button>
         ) : null}
       </div>
@@ -511,11 +543,7 @@ export function MailApprovalCard({
                       disabled={busy || allowDisabled || needsAccount}
                       onClick={() => void submit("allow", true)}
                     >
-                      {pendingAction === "sendNow" ? (
-                        <Trans>Sending…</Trans>
-                      ) : (
-                        <Trans>Send now</Trans>
-                      )}
+                      <Trans>Send now</Trans>
                     </Button>
                   ) : null}
                   <Button
@@ -527,12 +555,8 @@ export function MailApprovalCard({
                   >
                     {allowLabel ? (
                       allowLabel
-                    ) : pendingAction === "allow" ? (
-                      draft ? (
-                        <Trans>Saving…</Trans>
-                      ) : (
-                        <Trans>Sending…</Trans>
-                      )
+                    ) : pendingAction === "allow" && draft ? (
+                      <Trans>Saving…</Trans>
                     ) : draft ? (
                       <Trans>Save draft</Trans>
                     ) : savedDraftSend ? (

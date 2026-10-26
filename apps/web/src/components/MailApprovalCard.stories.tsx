@@ -46,7 +46,7 @@ export const Draft: Story = { args: { mail: { ...mail, tool: "mail_draft" } } };
 export const DraftSendNow: Story = {
   args: { mail: { ...mail, tool: "mail_draft" }, canSend: true },
 };
-/** A saved draft offers Send, which sends it from the person's mail account. */
+/** A saved draft offers Send, which sends it from the person's mail account, and links to Gmail Drafts. */
 export const DraftSavedSend: Story = {
   args: {
     status: "answered",
@@ -67,6 +67,7 @@ export const DraftSendNowFailed: Story = {
 export const ReplacesSavedDraft: Story = {
   args: { mail: { ...mail, tool: "mail_draft", locked: true } },
 };
+/** A sent card links to its account's Sent folder in Gmail. */
 export const Sent: Story = {
   args: {
     status: "answered",
