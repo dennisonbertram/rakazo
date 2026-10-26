@@ -51,6 +51,7 @@ import {
   createTicket,
   createVoiceProvider,
   defaultCatalogModelId,
+  deleteContactPhotosForConnection,
   deleteMailConnectionData,
   deleteMailSearches,
   deploymentAutoReviewDefault,
@@ -101,6 +102,7 @@ import {
   renderPageChartSvg,
   replaceComputer,
   requestAccountExport,
+  requestContactPhotos,
   resolveAutoReviewChecker,
   resolveBotUploadPath,
   resolveBotWorkspaceCwd,
@@ -350,6 +352,7 @@ import {
   updateNotificationPreferences,
   upsertCheckInRoutine,
   watchLimitError,
+  withContactPhotos,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { createAgentSkillsService } from "./agent-skills.js";
@@ -1374,6 +1377,14 @@ export function createRouter(deps: RouterDeps) {
     prisma: deps.prisma,
     mcpOAuth,
     ...(deps.safeCallToolFor ? { safeCallToolFor: deps.safeCallToolFor } : {}),
+  };
+  // A failed enqueue only delays the photos to the next visit, so it must not fail the page.
+  const queueContactPhotos = (scope: { spaceId: string; userId: string }) => {
+    requestContactPhotos({ prisma: deps.prisma, jobs: deps.jobs }, scope).catch((error) =>
+      getLogger().warn("contact photos enqueue failed", {
+        reason: error instanceof Error ? error.name : "error",
+      }),
+    );
   };
   const financeDeps = {
     prisma: deps.prisma,
@@ -6815,6 +6826,7 @@ export function createRouter(deps: RouterDeps) {
           ? await prepareManagedConnectorForTransaction(configured)
           : undefined;
         let agentToArchive: string | null = null;
+        let photoKeys: string[] = [];
         // What the revoke took off the row, to put back if the remote revoke fails recoverably.
         const undo: {
           ownership: {
@@ -6827,6 +6839,7 @@ export function createRouter(deps: RouterDeps) {
           deps.prisma.$transaction(
             async (tx) => {
               agentToArchive = null;
+              photoKeys = [];
               undo.ownership = null;
               const row = await tx.connection.findFirst({
                 where: {
@@ -6906,6 +6919,12 @@ export function createRouter(deps: RouterDeps) {
                 userId: context.actor.userId,
                 connectionId: row.id,
               });
+              if (row.connectorId === "google" && isMailConnection(row))
+                photoKeys = await deleteContactPhotosForConnection(tx, {
+                  spaceId: context.actor.spaceId,
+                  userId: context.actor.userId,
+                  connectionId: row.id,
+                });
 
               const remaining = await tx.connection.count({
                 where: {
@@ -7088,6 +7107,10 @@ export function createRouter(deps: RouterDeps) {
             }
           }
         }
+        for (const storageKey of photoKeys)
+          await deps.jobs
+            .enqueue(dataRoomBlobDeleteJob(context.actor.spaceId, storageKey))
+            .catch((jobError) => getLogger().error("contact photo blob cleanup", jobError));
         // The connection's own agent goes with it, archived after the revoke committed. The Inbox
         // agent serves every Gmail account, so it only loses this one.
         if (agentToArchive)
@@ -8225,12 +8248,18 @@ export function createRouter(deps: RouterDeps) {
       ),
     },
     contacts: {
-      list: authed.contacts.list.handler(({ context, input }) =>
-        listContacts(deps.prisma, actorScope(context.actor), input),
-      ),
-      detail: authed.contacts.detail.handler(({ context, input }) =>
-        contactDetail(deps.prisma, actorScope(context.actor), input.id).catch(contactNotFound),
-      ),
+      list: authed.contacts.list.handler(async ({ context, input }) => {
+        const scope = actorScope(context.actor);
+        queueContactPhotos(scope);
+        return withContactPhotos(deps.prisma, scope, await listContacts(deps.prisma, scope, input));
+      }),
+      detail: authed.contacts.detail.handler(async ({ context, input }) => {
+        const scope = actorScope(context.actor);
+        queueContactPhotos(scope);
+        const detail = await contactDetail(deps.prisma, scope, input.id).catch(contactNotFound);
+        const [contact] = await withContactPhotos(deps.prisma, scope, [detail.contact]);
+        return { ...detail, contact: contact! };
+      }),
       save: authed.contacts.save.handler(({ context, input }) =>
         saveContact(deps.prisma, actorScope(context.actor), input).catch(contactNotFound),
       ),

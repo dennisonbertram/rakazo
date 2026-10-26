@@ -110,6 +110,9 @@ function fixture({
     dataRoomItem: {
       findMany: vi.fn(async () => [{ spaceId: "space-1", storageKey: "blob/k1" }]),
     },
+    contactPhoto: {
+      findMany: vi.fn(async () => [{ spaceId: "space-1", storageKey: "photo/k2" }]),
+    },
     computer: {
       findMany: vi.fn(async () => [
         {
@@ -504,7 +507,10 @@ describe("session credentials", () => {
     const deleted = await f.request("/delete-user", { password: "offline-password12" }, token);
     expect(deleted.status).toBe(200);
     expect(f.data.user).toHaveLength(0);
-    expect(f.blobs).toEqual([{ spaceId: "space-1", storageKey: "blob/k1" }]);
+    expect(f.blobs).toEqual([
+      { spaceId: "space-1", storageKey: "blob/k1" },
+      { spaceId: "space-1", storageKey: "photo/k2" },
+    ]);
     expect(f.homes).toEqual([
       expect.objectContaining({ homeKey: "home-1", homeSnapshotId: "snap-2" }),
     ]);

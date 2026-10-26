@@ -26,6 +26,7 @@ model User {
   aiDataConsents              AiDataConsent[]
   mailSearches                MailSearch[]
   contacts                    Contact[]
+  contactPhotos               ContactPhoto[]
   capTableSnapshots           CapTableSnapshot[]
   investorUpdates             InvestorUpdate[]
   investorShares              InvestorShare[]
@@ -286,6 +287,7 @@ model Space {
   botPages                    BotPage[]
   botPins                     BotPins[]
   contacts                    Contact[]
+  contactPhotos               ContactPhoto[]
   capTableSnapshots           CapTableSnapshot[]
   investorUpdates             InvestorUpdate[]
   investorShares              InvestorShare[]
@@ -1221,6 +1223,7 @@ model Connection {
   meetings            Meeting[]
   meetingSyncState    MeetingSyncState?
   mailSyncState       MailSyncState?
+  contactPhotoSync    ContactPhotoSync?
   dataRoomSyncState   DataRoomSyncState?
   dataRoomItems       DataRoomItem[]
   composeSends        ComposeSend[]
@@ -2705,6 +2708,34 @@ model Contact {
   @@index([botId])
   @@index([roundId])
   @@map("contacts")
+}
+
+/// A contact's profile photo, stored as a blob in the object store. One per user and lower-cased email.
+model ContactPhoto {
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email       String
+  storageKey  String
+  /// Where the photo came from, for example "google".
+  source      String
+  contentType String
+  /// SHA-256 of the bytes, hex.
+  contentHash String
+  fetchedAt   DateTime
+
+  @@id([spaceId, userId, email])
+  @@map("contact_photos")
+}
+
+/// When a connected Google account's contact photos were last fetched; at most one fetch a day.
+model ContactPhotoSync {
+  connectionId String     @id
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  fetchedAt    DateTime
+
+  @@map("contact_photo_syncs")
 }
 
 /// A Data room document one investor contact may download from the portal.

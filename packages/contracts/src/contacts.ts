@@ -45,6 +45,8 @@ export const ContactSchema = z.object({
   portalBlockedAt: IsoDate.nullish(),
   /** When Send SAFE opened Mercury; the prospect reads Waiting for Mercury until a SAFE attaches or Not sent. */
   mercurySentAt: IsoDate.nullish(),
+  /** Where the contact's profile photo is served (an authenticated API path); absent when there is none. Set by contacts.list and contacts.detail. */
+  photoUrl: z.string().nullish(),
   /** The agent that added the contact; null for a contact added by hand. */
   addedBy: z.object({ id: Id, name: z.string() }).nullable(),
   createdAt: IsoDate,

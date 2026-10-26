@@ -495,6 +495,12 @@ export async function deleteEmptySpaceForMember(
             select: { storageKey: true, thumbnailKey: true },
           })
         ).flatMap((item) => [item.storageKey, item.thumbnailKey].filter((key) => key !== null));
+        // Contact photo blobs go through the same cleanup job.
+        const photos = await tx.contactPhoto.findMany({
+          where: { spaceId: input.spaceId },
+          select: { storageKey: true },
+        });
+        dataRoomStorageKeys.push(...photos.map((photo) => photo.storageKey));
         await tx.space.delete({ where: { id: input.spaceId } });
         if (input.spaceId !== input.currentSpaceId) {
           return { id: input.currentSpaceId, dataRoomStorageKeys };

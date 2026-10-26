@@ -260,7 +260,7 @@ it("shows the organization, else the email, under the name", async () => {
     { ...contact("c4", "Di", "other"), email: null },
   ]);
   await show();
-  const under = [...container.querySelectorAll("tbody td:first-child div")].map(
+  const under = [...container.querySelectorAll("tbody td:first-child div.truncate")].map(
     (div) => div.textContent,
   );
   expect(under).toEqual(["Acme Corp", "cy@example.test", "Acme Corp"]);
@@ -290,4 +290,34 @@ it("keeps the header out of the scrolling list", async () => {
   const scroller = container.querySelector(".rk-scroll");
   expect(scroller?.querySelector("[data-page-header]")).toBeNull();
   expect(scroller?.querySelector("table")).not.toBeNull();
+});
+
+it("gives the avatar the contact's photo when there is one", async () => {
+  // The avatar shows its image only once the browser has loaded it; jsdom never does.
+  class LoadedImage {
+    onload: (() => void) | null = null;
+    set src(_: string) {
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+  vi.stubGlobal("Image", LoadedImage);
+  try {
+    rpcMock.list.mockResolvedValue([
+      {
+        ...contact("c1", "Ada", "customer"),
+        photoUrl: "/api/contacts/photo?email=ada%40example.test",
+      },
+      contact("c2", "Bo", "vendor"),
+    ]);
+    await show();
+    await flush();
+    const rowOf = (name: string) =>
+      [...container.querySelectorAll("tbody tr")].find((row) => row.textContent?.includes(name));
+    expect(rowOf("Ada")?.querySelector("img")?.getAttribute("src")).toBe(
+      "/api/contacts/photo?email=ada%40example.test",
+    );
+    expect(rowOf("Bo")?.querySelector("img")).toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

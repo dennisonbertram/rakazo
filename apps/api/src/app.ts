@@ -139,6 +139,7 @@ import { mountArtifactShare, prismaShareStore } from "./artifact-share.js";
 import { createBillingService } from "./billing.js";
 import { mountBillingRoutes } from "./billing-webhook.js";
 import { createCompanyImportPage } from "./company-import-page.js";
+import { mountContactPhoto } from "./contact-photo.js";
 import { mountDataRoomRoutes } from "./data-room.js";
 import { mountEmailImageProxy } from "./email-image-proxy.js";
 import type { AppEnv } from "./env.js";
@@ -917,6 +918,7 @@ export async function createApp(
   };
   mountEmailImageProxy(app, { secret: env.authSecret }, async (request) => sessionActor(request));
   mountInboxAttachment(app, { prisma, mail }, loggedActor);
+  mountContactPhoto(app, { prisma, artifacts }, loggedActor);
   mountDataRoomRoutes(app, { prisma, artifacts, jobs }, loggedActor);
   mountInvestorPortal(app, {
     store: prismaPortalStore(prisma),

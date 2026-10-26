@@ -40,6 +40,11 @@ const payloadSchemas = {
     userId: z.string().min(1),
     connectionId: z.string().min(1),
   }),
+  "contacts.photos": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    connectionId: z.string().min(1),
+  }),
   "mail.attachments": z.object({
     spaceId: z.string().min(1),
     userId: z.string().min(1),
@@ -358,6 +363,20 @@ export function mailSyncJob(
     replaceKey: mailSyncJobKey(scope.connectionId),
     maxAttempts: 3,
     ...(availableAt ? { availableAt } : {}),
+  };
+}
+
+/** One queued job per connection; the handler skips a connection fetched within the day. */
+export function contactPhotosJob(scope: {
+  spaceId: string;
+  userId: string;
+  connectionId: string;
+}): BackgroundJob {
+  return {
+    name: "contacts.photos",
+    payload: scope,
+    replaceKey: `contacts.photos:${scope.connectionId}`,
+    maxAttempts: 3,
   };
 }
 

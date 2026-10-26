@@ -32990,6 +32990,12 @@
                                 }
                               ]
                             },
+                            "photoUrl": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "addedBy": {
                               "anyOf": [
                                 {
@@ -33590,6 +33596,12 @@
                               }
                             ]
                           },
+                          "photoUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "addedBy": {
                             "anyOf": [
                               {
@@ -33997,6 +34009,12 @@
                             {
                               "type": "null"
                             }
+                          ]
+                        },
+                        "photoUrl": {
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "addedBy": {
@@ -54125,6 +54143,12 @@
                                   }
                                 ]
                               },
+                              "photoUrl": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "addedBy": {
                                 "anyOf": [
                                   {
@@ -54666,6 +54690,12 @@
                             }
                           ]
                         },
+                        "photoUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "addedBy": {
                           "anyOf": [
                             {
@@ -54981,6 +55011,12 @@
                             {
                               "type": "null"
                             }
+                          ]
+                        },
+                        "photoUrl": {
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "addedBy": {
@@ -55332,6 +55368,12 @@
                             {
                               "type": "null"
                             }
+                          ]
+                        },
+                        "photoUrl": {
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "addedBy": {
@@ -72777,6 +72819,12 @@
                             }
                           ]
                         },
+                        "photoUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "addedBy": {
                           "anyOf": [
                             {
@@ -73092,6 +73140,12 @@
                             {
                               "type": "null"
                             }
+                          ]
+                        },
+                        "photoUrl": {
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "addedBy": {
