@@ -90,6 +90,7 @@ import {
   removeAccountExportBlobs,
   removePiUserSessions,
   resolveEnsName,
+  runWatchProbeTick,
   ScriptedAgentRuntime,
   SmtpEmailProvider,
   SpaceMemoryProviderResolver,
@@ -677,6 +678,8 @@ export async function createApp(
         reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
         reconcileCompanyImports: () => companyImport.recoveryJob(),
         reconcileTeachHeldValues: () => deleteExpiredHeldValues(prisma),
+        // Graphile mode runs watch.probe from RECURRING_JOBS in apps/worker; memory mode has no cron.
+        runWatchProbes: () => runWatchProbeTick({ prisma, jobs, events, notificationEvents }),
       })
     : undefined;
   reconciler?.start();

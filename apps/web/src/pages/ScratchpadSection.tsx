@@ -37,7 +37,14 @@ export function ScratchpadItemMeta({
   );
 }
 
-export function ScratchpadSection({ botId }: { botId: string }) {
+export function ScratchpadSection({
+  botId,
+  refreshKey = 0,
+}: {
+  botId: string;
+  /** Changes when a run ends, so items the bot added in chat show up without a reload. */
+  refreshKey?: number;
+}) {
   const { t } = useLingui();
   const [items, setItems] = useState<ScratchpadItem[]>([]);
   const [draft, setDraft] = useState("");
@@ -68,6 +75,14 @@ export function ScratchpadSection({ botId }: { botId: string }) {
       listGeneration.current += 1;
     };
   }, [botId]);
+
+  const lastRefreshKey = useRef(refreshKey);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refresh only reads botId and refs
+  useEffect(() => {
+    if (lastRefreshKey.current === refreshKey) return;
+    lastRefreshKey.current = refreshKey;
+    void refresh().catch(() => undefined);
+  }, [refreshKey]);
 
   async function addItem() {
     const title = draft.trim();

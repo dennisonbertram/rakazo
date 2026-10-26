@@ -85,6 +85,16 @@ describe("createJobReconciler", () => {
     expect(prisma.messagingOutbound.findFirst).toHaveBeenCalled();
   });
 
+  it("runs the watch probe tick on every reconcile", async () => {
+    const runWatchProbes = vi.fn(async () => undefined);
+    await createJobReconciler({
+      prisma: fakePrisma(),
+      jobs: publisher().jobs,
+      runWatchProbes,
+    }).reconcileOnce();
+    expect(runWatchProbes).toHaveBeenCalledOnce();
+  });
+
   it("restores a due pending messaging outbox drain", async () => {
     const prisma = fakePrisma();
     vi.mocked(prisma.messagingOutbound.findFirst).mockResolvedValue({ id: "outbound-1" } as never);

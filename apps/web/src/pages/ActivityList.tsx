@@ -118,6 +118,10 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
     [recentRuns, filters],
   );
 
+  // A quiet routine run that said nothing is not "finished work": it stays out of the count and sits last, dimmed.
+  const finishedRuns = useMemo(() => filteredRecent.filter((run) => !run.silent), [filteredRecent]);
+  const quietRuns = useMemo(() => filteredRecent.filter((run) => run.silent), [filteredRecent]);
+
   const filtersOn = activityFiltersActive(filters);
   const [showFilters, setShowFilters] = useState(false);
   const [showFinished, setShowFinished] = useState(false);
@@ -254,7 +258,7 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
           </p>
         ) : null}
         {/* Finished runs need nothing from the person, so they stay folded unless filtering. */}
-        {filteredRecent.length > 0 && !showFinished && !filtersOn ? (
+        {finishedRuns.length > 0 && !showFinished && !filtersOn ? (
           <Button
             type="button"
             variant="ghost"
@@ -264,7 +268,7 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
             aria-expanded={false}
             onClick={() => setShowFinished(true)}
           >
-            {plural(filteredRecent.length, {
+            {plural(finishedRuns.length, {
               one: "Show # finished run",
               other: "Show # finished runs",
             })}
@@ -275,7 +279,7 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
             title={<Trans>Finished</Trans>}
             headingRef={finishedRef}
           >
-            {filteredRecent.map((run) => (
+            {[...finishedRuns, ...quietRuns].map((run) => (
               <ActivityRow key={run.runId} run={run} onOpen={() => onOpenRun(run)} />
             ))}
           </ActivitySection>
@@ -526,7 +530,8 @@ function ActivityRow({
 }) {
   const { t } = useLingui();
   const title = run.groupName ? `${run.botName} · ${run.groupName}` : run.botName;
-  const label = statusLabel(run.status, run.needsApproval);
+  const quiet = run.silent === true;
+  const label = quiet ? t`Nothing to report` : statusLabel(run.status, run.needsApproval);
   const activityLabel = t`${title}, ${label}`;
   const tone = statusTone(run.status, run.updatedAt);
   return (
@@ -535,7 +540,7 @@ function ActivityRow({
       aria-label={activityLabel}
       onClick={onOpen}
       data-activity-row=""
-      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent ${compact ? "py-1.5" : "py-[9px]"}`}
+      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent ${compact ? "py-1.5" : "py-[9px]"} ${quiet ? "opacity-60" : ""}`}
     >
       <span
         className={`mt-1.5 size-2 shrink-0 rounded-full bg-current ${tone}`}
@@ -554,7 +559,7 @@ function ActivityRow({
         </div>
         <div hidden={compact} className="mt-0.5">
           <span className={`block text-xs ${tone}`}>{label}</span>
-          {run.promptSnippet ? (
+          {run.promptSnippet && !quiet ? (
             <span className="block truncate text-[13px] text-muted-foreground">
               {run.promptSnippet}
             </span>

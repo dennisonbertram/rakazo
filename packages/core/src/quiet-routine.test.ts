@@ -46,5 +46,6 @@ describe("prompts", () => {
   it("asks for at most one message", () => {
     expect(checkInInstruction()).toMatch(/at most one message/);
     expect(checkInInstruction()).toMatch(/silently/);
+    expect(checkInInstruction()).toMatch(/never take actions or request approvals/i);
   });
 });

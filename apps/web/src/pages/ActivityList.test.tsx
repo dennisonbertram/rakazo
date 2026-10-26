@@ -122,6 +122,30 @@ it("leads with what needs the founder and folds finished runs until asked", asyn
   expect(container.querySelectorAll('button[aria-label$=", Done"]')).toHaveLength(2);
 });
 
+it("keeps quiet routine runs out of the Finished count and shows them dimmed without the prompt", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  api.runs.list.mockImplementation(async ({ filter }: { filter: string }) => ({
+    runs:
+      filter === "active"
+        ? []
+        : [run("b", "completed"), { ...run("q", "completed"), silent: true }],
+  }));
+  const container = document.createElement("div");
+  document.body.append(container);
+  await act(async () => createRoot(container).render(view()));
+  const toggle = container.querySelector<HTMLButtonElement>(
+    '[data-testid="activity-show-finished"]',
+  );
+  expect(toggle?.textContent).toBe("Show 1 finished run");
+  Element.prototype.scrollIntoView = vi.fn();
+  await act(async () => toggle?.click());
+  const quiet = container.querySelector('button[aria-label$=", Nothing to report"]');
+  expect(quiet).not.toBeNull();
+  expect(quiet?.textContent).toContain("Nothing to report");
+  expect(quiet?.textContent).not.toContain(run("q", "completed").promptSnippet);
+  expect(container.querySelectorAll('button[aria-label$=", Done"]')).toHaveLength(1);
+});
+
 it("says nothing needs the founder when only finished runs exist", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   api.runs.list.mockImplementation(async ({ filter }: { filter: string }) => ({

@@ -16,6 +16,7 @@ export function quietRoutineGuidance(): string {
 export function checkInInstruction(): string {
   return [
     "Check in for the user.",
+    "Only read and report. Never take actions or request approvals in a check-in; if something needs doing, say so in the message.",
     "Review your open items (note what each one is waiting on and when it is due) and anything that happened since the last check-in.",
     "If nothing needs the user, finish silently.",
     "Otherwise lead with the one thing that needs the user, then add a short list of anything else. Send at most one message.",

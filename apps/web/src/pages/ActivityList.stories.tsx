@@ -71,6 +71,31 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = { beforeEach: () => mockRpc({ "runs.list": byFilter }) };
 
+/** A quiet check-in that said nothing: dimmed, not counted under Finished. */
+export const WithQuietRun: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "runs.list": (input: unknown) =>
+        (input as { filter: string }).filter === "active"
+          ? { runs: [] }
+          : {
+              runs: [
+                ...recent,
+                row({
+                  runId: "run_quiet",
+                  status: "completed",
+                  trigger: "routine",
+                  silent: true,
+                  promptSnippet: "Check in for the user.",
+                }),
+              ],
+            },
+    }),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByTestId("activity-show-finished"));
+  },
+};
+
 export const Loading: Story = {
   beforeEach: () => mockRpc({ "runs.list": () => new Promise(() => {}) }),
 };

@@ -2760,6 +2760,14 @@ describeJourneys("required product journeys", () => {
       (snap) => !snap.run || ["completed", "failed", "cancelled"].includes(snap.run.status),
     );
     expect(connector.records.length).toBeGreaterThan(recordsBefore);
+    // A test run counts as the last run for the status line.
+    const listed = await rpc<Array<{ id: string; lastRunAt: string | null }>>(
+      app,
+      cookie,
+      "routines/list",
+      { botId: bot.id },
+    );
+    expect(listed.find((r) => r.id === routine.id)?.lastRunAt).toBeTruthy();
   });
 
   it("22: a routine schedule with any malformed or mixed one-shot cron is rejected", async () => {

@@ -191,7 +191,7 @@ export function BotSettings({
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
   /** The check-in setting changed, so its managed routine appeared, changed or went away. */
   onCheckInChange?: () => void;
-  /** Changes when the agent may have created a skill, so the list reloads. */
+  /** Changes when a run ends, so skills and open work the agent added reload. */
   skillsRefreshKey?: number;
   memoryProviderConfigured: boolean;
   onSave: (
@@ -624,7 +624,7 @@ export function BotSettings({
           <CheckInSetting botId={bot.id} onChange={onCheckInChange} />
           <ErrorBoundary fallback={<SectionLoadFailed />}>
             <Suspense fallback={null}>
-              <ScratchpadSection botId={bot.id} />
+              <ScratchpadSection botId={bot.id} refreshKey={skillsRefreshKey} />
             </Suspense>
           </ErrorBoundary>
           {botAudienceEditable(bot.spawnKey) ? (

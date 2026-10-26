@@ -132,6 +132,7 @@ Rules:
 - At most one wake per watch per interval; changes seen while a wake is running fold into the next one.
 - Errors back off exponentially; after 5 consecutive failures the watch pauses and the row says so. One notification on pause.
 - Scheduling: a new `watchProbeJob` (`packages/adapter-kit/src/background-jobs.ts`), keyed `watch:<routineId>`, separate from `routineWakeupJob` so it never replaces a queued timed wake.
+- The probe tick runs from the `watch.probe` cron in `apps/worker` (Graphile mode) and from the job reconciler every 30 seconds in the single-process mode (`WAKEUP_DRIVER=memory`, used by the demo). Each mode has one scheduler; the claim uses SKIP LOCKED and a lease, so a stray second tick is safe.
 
 **Watch a connected app (Should).** Same card, second option: a connected app and one read-only tool with fixed arguments, chosen in chat by the bot (no argument form in the UI). The tool must pass `connectorToolRequiresApproval(...) === false` with its declared `readOnly`. On every check the probe re-resolves the bot's connection and tool through the same path the executor uses, including the `beforeDispatch` authorization callback (`executor.ts:6934`, `composio-connector.ts:830`); a revoked grant, a removed account or a tool whose declared effect changed pauses the watch. It fingerprints the JSON result. This is how "tell me if runway drops below 9 months" works: the watch wakes on a balance change and the quiet routine decides whether to speak.
 
