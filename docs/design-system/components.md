@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 303 of 303
-- Web and shared components: 778
+- Web and shared component files with stories: 305 of 305
+- Web and shared components: 783
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -242,7 +242,9 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | CleanupActionBar | [apps/web/src/components/inbox/CleanupActionBar.tsx](../../apps/web/src/components/inbox/CleanupActionBar.tsx) | [CleanupActionBar.stories.tsx](../../apps/web/src/components/inbox/CleanupActionBar.stories.tsx) | web |
 | CleanupHistory | [apps/web/src/components/inbox/CleanupHistory.tsx](../../apps/web/src/components/inbox/CleanupHistory.tsx) | [CleanupHistory.stories.tsx](../../apps/web/src/components/inbox/CleanupHistory.stories.tsx) | web |
 | CleanupSenderRow | [apps/web/src/components/inbox/CleanupSenderRow.tsx](../../apps/web/src/components/inbox/CleanupSenderRow.tsx) | [CleanupSenderRow.stories.tsx](../../apps/web/src/components/inbox/CleanupSenderRow.stories.tsx) | web |
+| Row, Meeting, PersonFacts, ContextPanel | [apps/web/src/components/inbox/ContextPanel.tsx](../../apps/web/src/components/inbox/ContextPanel.tsx) | [ContextPanel.stories.tsx](../../apps/web/src/components/inbox/ContextPanel.stories.tsx) | web |
 | EmailAgentPanel | [apps/web/src/components/inbox/EmailAgentPanel.tsx](../../apps/web/src/components/inbox/EmailAgentPanel.tsx) | [EmailAgentPanel.stories.tsx](../../apps/web/src/components/inbox/EmailAgentPanel.stories.tsx) | web |
+| EmailSidePanel | [apps/web/src/components/inbox/EmailSidePanel.tsx](../../apps/web/src/components/inbox/EmailSidePanel.tsx) | [EmailSidePanel.stories.tsx](../../apps/web/src/components/inbox/EmailSidePanel.stories.tsx) | web |
 | InboxCleanup, OpenLink | [apps/web/src/components/inbox/InboxCleanup.tsx](../../apps/web/src/components/inbox/InboxCleanup.tsx) | [InboxCleanup.stories.tsx](../../apps/web/src/components/inbox/InboxCleanup.stories.tsx) | web |
 | InboxDigest | [apps/web/src/components/inbox/InboxDigest.tsx](../../apps/web/src/components/inbox/InboxDigest.tsx) | [InboxDigest.stories.tsx](../../apps/web/src/components/inbox/InboxDigest.stories.tsx) | web |
 | Addresses, InboxMessageDialog, InboxMessage, SentMark, ThreadMessages, ThreadMessage | [apps/web/src/components/inbox/InboxMessageDialog.tsx](../../apps/web/src/components/inbox/InboxMessageDialog.tsx) | [InboxMessageDialog.stories.tsx](../../apps/web/src/components/inbox/InboxMessageDialog.stories.tsx) | web |
