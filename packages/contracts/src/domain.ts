@@ -487,6 +487,8 @@ export const RoutineSchema = z.object({
   watch: WatchSpecSchema.nullable(),
   /** "check_in" for a bot's managed check-in routine (editable only via Active). */
   managedKind: RoutineManagedKindSchema.nullable(),
+  /** The taught skill this routine runs (its current playbook), or null. */
+  taughtSkill: z.object({ id: Id, name: z.string() }).nullable().optional(),
   status: RoutineStatusSchema,
   createdAt: z.string(),
 });
@@ -496,7 +498,10 @@ export const CreateRoutineInput = z
   .object({
     botId: Id,
     name: z.string().min(1).max(80),
-    prompt: z.string().min(1),
+    /** Required unless `taughtSkillId` is set; then the skill's current playbook is the prompt. */
+    prompt: z.string().default(""),
+    /** A saved taught skill on this bot. */
+    taughtSkillId: Id.nullable().default(null),
     crons: z.array(z.string().min(1)).default([]),
     /** Defaults to the user's stored time zone, then UTC. */
     timezone: z.string().optional(),
@@ -520,6 +525,9 @@ export const CreateRoutineInput = z
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);
+    if (!value.taughtSkillId && !value.prompt.trim()) {
+      ctx.addIssue({ code: "custom", message: "Add an instruction", path: ["prompt"] });
+    }
     if (
       value.crons.length === 0 &&
       !value.watch &&
@@ -615,7 +623,7 @@ export type SkillPlaybook = z.infer<typeof SkillPlaybookSchema>;
 
 export const TeachRecordingEventSchema = z.object({
   at: z.string(),
-  kind: z.enum(["pointer", "key", "clipboard", "snapshot", "scroll"]),
+  kind: z.enum(["pointer", "key", "clipboard", "snapshot", "scroll", "window", "file", "command"]),
   x: z.number().optional(),
   y: z.number().optional(),
   button: z.string().optional(),
@@ -624,6 +632,17 @@ export const TeachRecordingEventSchema = z.object({
   text: z.string().optional(),
   summary: z.string().optional(),
   sensitive: z.boolean().optional(),
+  /** Label of the field the input went to (for example "Password"); names a protected step. */
+  field: z.string().max(120).optional(),
+  /** Which protected value this event belongs to; the server sets it. */
+  segment: z.number().int().optional(),
+  /** window: the window title and the app it belongs to. */
+  title: z.string().max(300).optional(),
+  app: z.string().max(120).optional(),
+  /** file: the path that was written, never its content. */
+  path: z.string().max(500).optional(),
+  /** command: the command line, with secrets removed. */
+  command: z.string().max(1000).optional(),
 });
 export type TeachRecordingEvent = z.infer<typeof TeachRecordingEventSchema>;
 
@@ -641,6 +660,18 @@ export const TeachRecordingSchema = z.object({
 });
 export type TeachRecording = z.infer<typeof TeachRecordingSchema>;
 
+export const TeachTestOutcomeSchema = z.enum(["worked", "stopped"]);
+export type TeachTestOutcome = z.infer<typeof TeachTestOutcomeSchema>;
+
+/** A password the user typed while teaching. Until they save or skip it, the server holds the value. */
+export const TeachLoginPromptSchema = z.object({
+  stepIndex: z.number().int().min(0),
+  field: z.string(),
+  /** The username typed just before the password, offered for the user to confirm. */
+  username: z.string().optional(),
+});
+export type TeachLoginPrompt = z.infer<typeof TeachLoginPromptSchema>;
+
 export const TaughtSkillSchema = z.object({
   id: Id,
   botId: Id,
@@ -652,10 +683,27 @@ export const TaughtSkillSchema = z.object({
   startedAt: z.string().nullable(),
   expiresAt: z.string().nullable(),
   stoppedAt: z.string().nullable(),
+  /** When a chat, routine or test run last used this skill. */
+  lastRunAt: z.string().nullable().optional(),
+  /** Result of the latest Test run; null while it runs or before any test. */
+  lastTestOutcome: TeachTestOutcomeSchema.nullable().optional(),
+  lastTestNote: z.string().nullable().optional(),
+  /** Steps that wait for "Save as login" or "Skip". Empty once every value is saved or skipped. */
+  loginPrompts: z.array(TeachLoginPromptSchema).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type TaughtSkill = z.infer<typeof TaughtSkillSchema>;
+
+/** One row of `taughtSkills.list`. */
+export const TaughtSkillSummarySchema = z.object({
+  id: Id,
+  name: z.string(),
+  goal: z.string(),
+  lastRunAt: z.string().nullable(),
+  updatedAt: z.string(),
+});
+export type TaughtSkillSummary = z.infer<typeof TaughtSkillSummarySchema>;
 
 export const AgentSkillSourceSchema = z.enum(["user", "builtin", "plugin"]);
 export type AgentSkillSource = z.infer<typeof AgentSkillSourceSchema>;

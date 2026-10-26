@@ -165,7 +165,7 @@ msgstr ""
 msgid "{0, plural, one {Last full month} other {Last # full months}}"
 msgstr ""
 
-#. placeholder {0}: filteredRecent.length
+#. placeholder {0}: finishedRuns.length
 #: src/pages/ActivityList.tsx
 msgid "{0, plural, one {Show # finished run} other {Show # finished runs}}"
 msgstr ""
@@ -905,6 +905,7 @@ msgstr ""
 #: src/components/investors/ActionItems.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Investors.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Actions for {0}"
 msgstr "{0} 작업 메뉴"
@@ -2241,7 +2242,9 @@ msgstr "서버에 연결할 수 없습니다."
 #: src/components/integrations/SignInStep.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/markdown-link-prompt.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
+#: src/components/teach/TeachRecordingChrome.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyImport.tsx
@@ -2271,6 +2274,14 @@ msgstr "답장 취소"
 
 #: src/components/fundraising/SafeList.tsx
 msgid "Cancel SAFE"
+msgstr ""
+
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Cancel teaching"
+msgstr ""
+
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Cancel teaching?"
 msgstr ""
 
 #: src/components/fundraising/SafeList.tsx
@@ -3970,6 +3981,10 @@ msgstr "그룹을 저장하지 못했습니다."
 msgid "Could not save Hide amounts"
 msgstr ""
 
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Could not save login"
+msgstr ""
+
 #: src/pages/Onboarding.tsx
 msgid "Could not save model"
 msgstr "AI 모델을 저장하지 못했습니다."
@@ -3982,6 +3997,7 @@ msgstr "자동 실행을 저장하지 못했습니다."
 msgid "Could not save rule"
 msgstr "확인 규칙을 저장하지 못했습니다."
 
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Could not save skill"
 msgstr "스킬을 저장하지 못했습니다"
@@ -4514,6 +4530,7 @@ msgstr "{0} 삭제"
 #. placeholder {0}: item.name
 #: src/components/ContactDeleteConfirm.tsx
 #: src/components/data-room/ItemDialogs.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Delete {0}?"
 msgstr "{0}을 삭제할까요?"
@@ -6433,6 +6450,10 @@ msgstr "기억은 유지"
 msgid "Keep separate"
 msgstr ""
 
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Keep teaching"
+msgstr ""
+
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Keep this deadline"
 msgstr ""
@@ -6510,6 +6531,11 @@ msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Last read failed · Try again"
+msgstr ""
+
+#. placeholder {0}: formatRelativeTime(entry.lastRunAt)
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Last run {0}"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx
@@ -7301,6 +7327,7 @@ msgstr ""
 #: src/components/inbox/CleanupActionBar.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/transcript.tsx
 msgid "More"
@@ -8106,6 +8133,10 @@ msgstr ""
 msgid "Not retried: the space changed"
 msgstr ""
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Not run yet"
+msgstr ""
+
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Not saved"
@@ -8209,12 +8240,17 @@ msgstr ""
 msgid "Nothing to clean up. Senders need {CLEANUP_MIN_MESSAGES} or more messages, and people you have written to or saved as contacts are left out."
 msgstr ""
 
+#: src/pages/ActivityList.tsx
 #: src/pages/RoutineRunHistory.tsx
 msgid "Nothing to report"
 msgstr ""
 
 #: src/pages/CompanyReview.tsx
 msgid "Nothing to review"
+msgstr ""
+
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Nothing you showed will be kept."
 msgstr ""
 
 #: src/pages/legal/LegalDeadlines.tsx
@@ -9664,6 +9700,10 @@ msgstr "일정 제거"
 msgid "Remove skill {0}"
 msgstr "작업 기술 {0} 삭제"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Remove taught skill"
+msgstr ""
+
 #. placeholder {0}: fullDay(confirming.statement.periodStart)
 #. placeholder {1}: fullDay(confirming.statement.periodEnd)
 #: src/components/finance/StatementImport.tsx
@@ -10048,6 +10088,10 @@ msgstr "자동 실행"
 msgid "Routines that run while you're away"
 msgstr ""
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Routines that use it will stop using it."
+msgstr ""
+
 #: src/pages/gtm/GtmChannels.tsx
 msgid "Rule"
 msgstr ""
@@ -10099,6 +10143,11 @@ msgstr ""
 
 #: src/pages/shell/composer.tsx
 msgid "Runs on send"
+msgstr ""
+
+#. placeholder {0}: draft.taughtSkill.name
+#: src/pages/RoutineEditor.tsx
+msgid "Runs taught skill: {0}"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
@@ -10197,6 +10246,10 @@ msgstr ""
 msgid "Save address"
 msgstr ""
 
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Save as login"
+msgstr ""
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Save backups"
 msgstr "백업 모델 저장"
@@ -10207,6 +10260,10 @@ msgstr ""
 
 #: src/components/MailApprovalCard.tsx
 msgid "Save draft"
+msgstr ""
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Save login"
 msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
@@ -11019,6 +11076,7 @@ msgstr ""
 msgid "Single line"
 msgstr ""
 
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Site"
 msgstr ""
@@ -11026,6 +11084,10 @@ msgstr ""
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/Preview.tsx
 msgid "Size"
+msgstr ""
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Skill"
 msgstr ""
 
 #. placeholder {0}: label.title
@@ -11044,6 +11106,7 @@ msgstr ""
 
 #: src/components/integrations/AgentStep.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Shell.tsx
 msgid "Skip"
 msgstr "건너뛰기"
@@ -11325,6 +11388,12 @@ msgstr ""
 msgid "Status"
 msgstr ""
 
+#. placeholder {0}: stepIndex + 1
+#. placeholder {1}: step || field
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Step {0}: {1}"
+msgstr ""
+
 #: src/components/integrations/SignInStep.tsx
 msgid "Step 1 of {totalSteps}"
 msgstr ""
@@ -11399,6 +11468,15 @@ msgstr "읽기 중지"
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Stop teaching"
 msgstr "가르치기 종료"
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Stopped"
+msgstr ""
+
+#. placeholder {0}: live.lastTestNote
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Stopped: {0}"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Stored securely. Never shown here."
@@ -11554,6 +11632,11 @@ msgstr ""
 msgid "tasks, tickets"
 msgstr ""
 
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Taught"
+msgstr ""
+
 #: src/components/data-room/format.ts
 msgid "Tax document"
 msgstr ""
@@ -11620,6 +11703,7 @@ msgstr "로그인 테스트"
 
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/ModelConnectionPreflightNotice.tsx
+#: src/components/teach/SkillDraftCard.tsx
 msgid "Testing…"
 msgstr "테스트 중…"
 
@@ -12659,6 +12743,7 @@ msgid "Used by"
 msgstr ""
 
 #: src/components/SecretRequestDialog.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Username"
 msgstr ""
@@ -13069,6 +13154,10 @@ msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Work this bot repeats for you, like a cash check every Monday."
+msgstr ""
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Worked"
 msgstr ""
 
 #: src/lib/devin-format.ts

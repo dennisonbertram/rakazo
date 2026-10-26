@@ -111,6 +111,8 @@ export function createJobReconciler(
     reconcileDataRoom?: () => Promise<unknown>;
     reconcileMeetings?: () => Promise<unknown>;
     reconcileCompanyImports?: () => Promise<void>;
+    /** Deletes typed passwords held for teaching that nobody saved or skipped in time. */
+    reconcileTeachHeldValues?: () => Promise<unknown>;
     /** Watch probes; the in-process mode has no Graphile cron, so the tick runs here. */
     runWatchProbes?: () => Promise<unknown>;
   },
@@ -138,6 +140,7 @@ export function createJobReconciler(
           deps.reconcileDataRoom,
           deps.reconcileMeetings,
           deps.reconcileCompanyImports,
+          deps.reconcileTeachHeldValues,
           deps.runWatchProbes,
         ].map(async (reconcile) => reconcile?.()),
       );

@@ -9404,6 +9404,29 @@
                                   }
                                 ]
                               },
+                              "taughtSkill": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "status": {
                                 "type": "object",
                                 "properties": {
@@ -94547,47 +94570,49 @@
                       "prompt": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema2"
                       },
-                      "crons": {
+                      "taughtSkillId": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema3"
                       },
-                      "timezone": {
+                      "crons": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema4"
                       },
-                      "notify": {
+                      "timezone": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema5"
                       },
-                      "active": {
+                      "notify": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema6"
                       },
-                      "webhookEnabled": {
+                      "active": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema7"
                       },
-                      "githubEnabled": {
+                      "webhookEnabled": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema8"
                       },
-                      "messageProvider": {
+                      "githubEnabled": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema9"
                       },
-                      "modelProvider": {
+                      "messageProvider": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema10"
                       },
-                      "modelId": {
+                      "modelProvider": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema11"
                       },
-                      "thinkingLevel": {
+                      "modelId": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema12"
                       },
-                      "quiet": {
+                      "thinkingLevel": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema13"
                       },
-                      "watch": {
+                      "quiet": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema14"
+                      },
+                      "watch": {
+                        "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema15"
                       }
                     },
                     "required": [
                       "botId",
-                      "name",
-                      "prompt"
+                      "name"
                     ],
                     "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
                     "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
@@ -94754,6 +94779,29 @@
                             {
                               "type": "string",
                               "const": "check_in"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "taughtSkill": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -95431,6 +95479,29 @@
                               }
                             ]
                           },
+                          "taughtSkill": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "$ref": "#/components/schemas/RpcRoutinesListOutputSchema0"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "status": {
                             "type": "object",
                             "properties": {
@@ -95965,44 +96036,47 @@
                       "prompt": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema2"
                       },
-                      "crons": {
+                      "taughtSkillId": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema3"
                       },
-                      "timezone": {
+                      "crons": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema4"
                       },
-                      "active": {
+                      "timezone": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema5"
                       },
-                      "notify": {
+                      "active": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema6"
                       },
-                      "webhookEnabled": {
+                      "notify": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema7"
                       },
-                      "githubEnabled": {
+                      "webhookEnabled": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema8"
                       },
-                      "messageProvider": {
+                      "githubEnabled": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema9"
                       },
-                      "modelProvider": {
+                      "messageProvider": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema10"
                       },
-                      "modelId": {
+                      "modelProvider": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema11"
                       },
-                      "thinkingLevel": {
+                      "modelId": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema12"
                       },
-                      "runAt": {
+                      "thinkingLevel": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema13"
                       },
-                      "quiet": {
+                      "runAt": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema14"
                       },
-                      "watch": {
+                      "quiet": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema15"
+                      },
+                      "watch": {
+                        "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema16"
                       }
                     },
                     "required": [
@@ -96173,6 +96247,29 @@
                             {
                               "type": "string",
                               "const": "check_in"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "taughtSkill": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -99358,7 +99455,10 @@
                               "key",
                               "clipboard",
                               "snapshot",
-                              "scroll"
+                              "scroll",
+                              "window",
+                              "file",
+                              "command"
                             ]
                           },
                           "x": {
@@ -99384,6 +99484,31 @@
                           },
                           "sensitive": {
                             "type": "boolean"
+                          },
+                          "field": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "segment": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "title": {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          "app": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "path": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "command": {
+                            "type": "string",
+                            "maxLength": 1000
                           }
                         },
                         "required": [
@@ -99501,7 +99626,10 @@
                                       "key",
                                       "clipboard",
                                       "snapshot",
-                                      "scroll"
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
                                     ]
                                   },
                                   "x": {
@@ -99527,6 +99655,31 @@
                                   },
                                   "sensitive": {
                                     "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
                                   }
                                 },
                                 "required": [
@@ -99585,6 +99738,56 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "createdAt": {
                           "type": "string"
@@ -99839,7 +100042,10 @@
                                       "key",
                                       "clipboard",
                                       "snapshot",
-                                      "scroll"
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
                                     ]
                                   },
                                   "x": {
@@ -99865,6 +100071,31 @@
                                   },
                                   "sensitive": {
                                     "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
                                   }
                                 },
                                 "required": [
@@ -99923,6 +100154,56 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "createdAt": {
                           "type": "string"
@@ -100179,7 +100460,10 @@
                                         "key",
                                         "clipboard",
                                         "snapshot",
-                                        "scroll"
+                                        "scroll",
+                                        "window",
+                                        "file",
+                                        "command"
                                       ]
                                     },
                                     "x": {
@@ -100205,6 +100489,31 @@
                                     },
                                     "sensitive": {
                                       "type": "boolean"
+                                    },
+                                    "field": {
+                                      "type": "string",
+                                      "maxLength": 120
+                                    },
+                                    "segment": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "title": {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    "app": {
+                                      "type": "string",
+                                      "maxLength": 120
+                                    },
+                                    "path": {
+                                      "type": "string",
+                                      "maxLength": 500
+                                    },
+                                    "command": {
+                                      "type": "string",
+                                      "maxLength": 1000
                                     }
                                   },
                                   "required": [
@@ -100263,6 +100572,56 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "lastRunAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "lastTestOutcome": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "worked",
+                                  "stopped"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lastTestNote": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "loginPrompts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "stepIndex": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "field": {
+                                  "type": "string"
+                                },
+                                "username": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stepIndex",
+                                "field"
+                              ],
+                              "additionalProperties": false
+                            }
                           },
                           "createdAt": {
                             "type": "string"
@@ -100680,7 +101039,10 @@
                                       "key",
                                       "clipboard",
                                       "snapshot",
-                                      "scroll"
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
                                     ]
                                   },
                                   "x": {
@@ -100706,6 +101068,31 @@
                                   },
                                   "sensitive": {
                                     "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
                                   }
                                 },
                                 "required": [
@@ -100764,6 +101151,56 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "createdAt": {
                           "type": "string"
@@ -101018,7 +101455,10 @@
                                       "key",
                                       "clipboard",
                                       "snapshot",
-                                      "scroll"
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
                                     ]
                                   },
                                   "x": {
@@ -101044,6 +101484,31 @@
                                   },
                                   "sensitive": {
                                     "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
                                   }
                                 },
                                 "required": [
@@ -101102,6 +101567,56 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "createdAt": {
                           "type": "string"
@@ -101362,7 +101877,10 @@
                                       "key",
                                       "clipboard",
                                       "snapshot",
-                                      "scroll"
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
                                     ]
                                   },
                                   "x": {
@@ -101388,6 +101906,31 @@
                                   },
                                   "sensitive": {
                                     "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
                                   }
                                 },
                                 "required": [
@@ -101446,6 +101989,56 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "createdAt": {
                           "type": "string"
@@ -101700,7 +102293,10 @@
                                       "key",
                                       "clipboard",
                                       "snapshot",
-                                      "scroll"
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
                                     ]
                                   },
                                   "x": {
@@ -101726,6 +102322,31 @@
                                   },
                                   "sensitive": {
                                     "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
                                   }
                                 },
                                 "required": [
@@ -101784,6 +102405,56 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "createdAt": {
                           "type": "string"
@@ -102245,7 +102916,10 @@
                                       "key",
                                       "clipboard",
                                       "snapshot",
-                                      "scroll"
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
                                     ]
                                   },
                                   "x": {
@@ -102271,6 +102945,31 @@
                                   },
                                   "sensitive": {
                                     "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
                                   }
                                 },
                                 "required": [
@@ -102329,6 +103028,56 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "createdAt": {
                           "type": "string"
@@ -103904,6 +104653,1366 @@
                       "required": [
                         "id",
                         "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/taughtSkills/cancel": {
+      "post": {
+        "operationId": "rpc_taughtSkills_cancel",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "skillId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "skillId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/taughtSkills/delete": {
+      "post": {
+        "operationId": "rpc_taughtSkills_delete",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "skillId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "skillId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/taughtSkills/list": {
+      "post": {
+        "operationId": "rpc_taughtSkills_list",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "botId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "goal": {
+                            "type": "string"
+                          },
+                          "lastRunAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "goal",
+                          "lastRunAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/taughtSkills/saveLogin": {
+      "post": {
+        "operationId": "rpc_taughtSkills_saveLogin",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "skillId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "stepIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                      },
+                      "site": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "username": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "skillId",
+                      "stepIndex",
+                      "name",
+                      "site",
+                      "username"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcTaughtSkillsSaveLoginOutputSchema0"
+                        },
+                        "botId": {
+                          "$ref": "#/components/schemas/RpcTaughtSkillsSaveLoginOutputSchema0"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "goal": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "recording",
+                            "drafting",
+                            "draft",
+                            "saved"
+                          ]
+                        },
+                        "playbook": {
+                          "type": "object",
+                          "properties": {
+                            "whenToUse": {
+                              "type": "string"
+                            },
+                            "inputs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "steps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "howToCheck": {
+                              "type": "string"
+                            },
+                            "whatToReturn": {
+                              "type": "string"
+                            },
+                            "approvalBoundaries": {
+                              "type": "string"
+                            },
+                            "failureHandling": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "whenToUse",
+                            "inputs",
+                            "steps",
+                            "howToCheck",
+                            "whatToReturn",
+                            "approvalBoundaries",
+                            "failureHandling"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "recording": {
+                          "type": "object",
+                          "properties": {
+                            "events": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "at": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pointer",
+                                      "key",
+                                      "clipboard",
+                                      "snapshot",
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
+                                    ]
+                                  },
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "button": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "type": "string"
+                                  },
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  },
+                                  "summary": {
+                                    "type": "string"
+                                  },
+                                  "sensitive": {
+                                    "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
+                                  }
+                                },
+                                "required": [
+                                  "at",
+                                  "kind"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "snapshots": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "at": {
+                                    "type": "string"
+                                  },
+                                  "summary": {
+                                    "type": "string"
+                                  },
+                                  "hash": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "at",
+                                  "summary"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "controlLeaseId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "events",
+                            "snapshots"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "startedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "stoppedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "botId",
+                        "name",
+                        "goal",
+                        "status",
+                        "playbook",
+                        "recording",
+                        "startedAt",
+                        "expiresAt",
+                        "stoppedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/taughtSkills/skipLogin": {
+      "post": {
+        "operationId": "rpc_taughtSkills_skipLogin",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "skillId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "stepIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "skillId",
+                      "stepIndex"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcTaughtSkillsSkipLoginOutputSchema0"
+                        },
+                        "botId": {
+                          "$ref": "#/components/schemas/RpcTaughtSkillsSkipLoginOutputSchema0"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "goal": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "recording",
+                            "drafting",
+                            "draft",
+                            "saved"
+                          ]
+                        },
+                        "playbook": {
+                          "type": "object",
+                          "properties": {
+                            "whenToUse": {
+                              "type": "string"
+                            },
+                            "inputs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "steps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "howToCheck": {
+                              "type": "string"
+                            },
+                            "whatToReturn": {
+                              "type": "string"
+                            },
+                            "approvalBoundaries": {
+                              "type": "string"
+                            },
+                            "failureHandling": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "whenToUse",
+                            "inputs",
+                            "steps",
+                            "howToCheck",
+                            "whatToReturn",
+                            "approvalBoundaries",
+                            "failureHandling"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "recording": {
+                          "type": "object",
+                          "properties": {
+                            "events": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "at": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pointer",
+                                      "key",
+                                      "clipboard",
+                                      "snapshot",
+                                      "scroll",
+                                      "window",
+                                      "file",
+                                      "command"
+                                    ]
+                                  },
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "button": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "type": "string"
+                                  },
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  },
+                                  "summary": {
+                                    "type": "string"
+                                  },
+                                  "sensitive": {
+                                    "type": "boolean"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "segment": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "maxLength": 120
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 1000
+                                  }
+                                },
+                                "required": [
+                                  "at",
+                                  "kind"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "snapshots": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "at": {
+                                    "type": "string"
+                                  },
+                                  "summary": {
+                                    "type": "string"
+                                  },
+                                  "hash": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "at",
+                                  "summary"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "controlLeaseId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "events",
+                            "snapshots"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "startedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "stoppedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastRunAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "lastTestOutcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "worked",
+                                "stopped"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lastTestNote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "loginPrompts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepIndex": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "field": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepIndex",
+                              "field"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "botId",
+                        "name",
+                        "goal",
+                        "status",
+                        "playbook",
+                        "recording",
+                        "startedAt",
+                        "expiresAt",
+                        "stoppedAt",
+                        "createdAt",
+                        "updatedAt"
                       ],
                       "additionalProperties": false
                     }
@@ -123266,10 +125375,21 @@
         "maxLength": 80
       },
       "RpcRoutinesCreateInputSchema2": {
-        "type": "string",
-        "minLength": 1
+        "default": "",
+        "type": "string"
       },
       "RpcRoutinesCreateInputSchema3": {
+        "default": null,
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema0"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "RpcRoutinesCreateInputSchema4": {
         "default": [],
         "type": "array",
         "items": {
@@ -123277,15 +125397,11 @@
           "minLength": 1
         }
       },
-      "RpcRoutinesCreateInputSchema4": {
+      "RpcRoutinesCreateInputSchema5": {
         "type": "string"
       },
-      "RpcRoutinesCreateInputSchema5": {
-        "default": true,
-        "type": "boolean"
-      },
       "RpcRoutinesCreateInputSchema6": {
-        "default": false,
+        "default": true,
         "type": "boolean"
       },
       "RpcRoutinesCreateInputSchema7": {
@@ -123297,6 +125413,10 @@
         "type": "boolean"
       },
       "RpcRoutinesCreateInputSchema9": {
+        "default": false,
+        "type": "boolean"
+      },
+      "RpcRoutinesCreateInputSchema10": {
         "default": null,
         "anyOf": [
           {
@@ -123310,7 +125430,7 @@
           }
         ]
       },
-      "RpcRoutinesCreateInputSchema10": {
+      "RpcRoutinesCreateInputSchema11": {
         "default": null,
         "anyOf": [
           {
@@ -123323,7 +125443,7 @@
           }
         ]
       },
-      "RpcRoutinesCreateInputSchema11": {
+      "RpcRoutinesCreateInputSchema12": {
         "default": null,
         "anyOf": [
           {
@@ -123336,7 +125456,7 @@
           }
         ]
       },
-      "RpcRoutinesCreateInputSchema12": {
+      "RpcRoutinesCreateInputSchema13": {
         "default": null,
         "anyOf": [
           {
@@ -123356,10 +125476,10 @@
           }
         ]
       },
-      "RpcRoutinesCreateInputSchema13": {
+      "RpcRoutinesCreateInputSchema14": {
         "type": "boolean"
       },
-      "RpcRoutinesCreateInputSchema14": {
+      "RpcRoutinesCreateInputSchema15": {
         "default": null,
         "anyOf": [
           {
@@ -123433,17 +125553,24 @@
         "type": "string"
       },
       "RpcRoutinesUpdateInputSchema3": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema0"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "RpcRoutinesUpdateInputSchema4": {
         "type": "array",
         "items": {
           "type": "string",
           "minLength": 1
         }
       },
-      "RpcRoutinesUpdateInputSchema4": {
-        "type": "string"
-      },
       "RpcRoutinesUpdateInputSchema5": {
-        "type": "boolean"
+        "type": "string"
       },
       "RpcRoutinesUpdateInputSchema6": {
         "type": "boolean"
@@ -123455,6 +125582,9 @@
         "type": "boolean"
       },
       "RpcRoutinesUpdateInputSchema9": {
+        "type": "boolean"
+      },
+      "RpcRoutinesUpdateInputSchema10": {
         "anyOf": [
           {
             "type": "string",
@@ -123467,7 +125597,7 @@
           }
         ]
       },
-      "RpcRoutinesUpdateInputSchema10": {
+      "RpcRoutinesUpdateInputSchema11": {
         "anyOf": [
           {
             "type": "string",
@@ -123479,7 +125609,7 @@
           }
         ]
       },
-      "RpcRoutinesUpdateInputSchema11": {
+      "RpcRoutinesUpdateInputSchema12": {
         "anyOf": [
           {
             "type": "string",
@@ -123491,7 +125621,7 @@
           }
         ]
       },
-      "RpcRoutinesUpdateInputSchema12": {
+      "RpcRoutinesUpdateInputSchema13": {
         "anyOf": [
           {
             "type": "string",
@@ -123510,15 +125640,15 @@
           }
         ]
       },
-      "RpcRoutinesUpdateInputSchema13": {
+      "RpcRoutinesUpdateInputSchema14": {
         "type": "string",
         "format": "date-time",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
       },
-      "RpcRoutinesUpdateInputSchema14": {
+      "RpcRoutinesUpdateInputSchema15": {
         "type": "boolean"
       },
-      "RpcRoutinesUpdateInputSchema15": {
+      "RpcRoutinesUpdateInputSchema16": {
         "anyOf": [
           {
             "type": "object",
@@ -124191,6 +126321,14 @@
           "updatedAt"
         ],
         "additionalProperties": false
+      },
+      "RpcTaughtSkillsSaveLoginOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcTaughtSkillsSkipLoginOutputSchema0": {
+        "type": "string",
+        "minLength": 1
       },
       "RpcThreadsAnswerInputSchema0": {
         "type": "string",

@@ -572,6 +572,27 @@ def snapshot(client: CdpClient, session_id: str) -> dict[str, Any]:
     return {"ok": True, **data}
 
 
+def focus(client: CdpClient, session_id: str) -> dict[str, Any]:
+    """Facts about the focused field. Never returns its value."""
+    data = eval_json(client, session_id, """(() => {
+      const el = document.activeElement;
+      const attr = (name) => (el && el.getAttribute(name) || "").slice(0, 120);
+      return {
+        hasFocus: document.hasFocus(),
+        tag: el ? el.tagName.toLowerCase() : "",
+        type: el && "type" in el ? String(el.type || "").toLowerCase() : "",
+        autocomplete: attr("autocomplete"),
+        name: attr("name"),
+        id: attr("id"),
+        label: (attr("aria-label") || Array.from(el && el.labels || []).map(l => l.textContent).join(" ").trim()).slice(0, 120),
+        placeholder: attr("placeholder"),
+      };
+    })()""")
+    if not isinstance(data, dict):
+        raise RuntimeError("focus returned non-object")
+    return {"ok": True, "focus": data}
+
+
 def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> dict[str, Any]:
     if not actions or len(actions) > 24:
         raise RuntimeError("Expected 1 to 24 actions")
@@ -667,6 +688,8 @@ def run(argv: list[str]) -> int:
                 result = navigate(client, session_id, str(args.get("url") or ""))
             elif command == "snapshot":
                 result = snapshot(client, session_id)
+            elif command == "focus":
+                result = focus(client, session_id)
             elif command == "act":
                 actions = args.get("actions")
                 if not isinstance(actions, list):

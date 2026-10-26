@@ -109,6 +109,8 @@ export type RoutineDraftState = {
   /** Only message the user when something needs them. */
   quiet: boolean;
   watch: WatchSpec | null;
+  /** A saved taught skill this routine runs by reference, instead of pasted text. */
+  taughtSkill: { id: string; name: string } | null;
 };
 
 export function emptyRoutineDraft(): RoutineDraftState {
@@ -126,6 +128,7 @@ export function emptyRoutineDraft(): RoutineDraftState {
     timezone: "",
     quiet: false,
     watch: null,
+    taughtSkill: null,
   };
 }
 
@@ -147,6 +150,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
     timezone: routine.timezone,
     quiet: routine.quiet,
     watch: routine.watch,
+    taughtSkill: routine.taughtSkill ?? null,
   };
 }
 
@@ -324,6 +328,8 @@ export function RoutineListRow({
   );
 }
 
+const TAUGHT_PREFIX = "taught:";
+
 function withoutSkillMention(prompt: string, skill: string) {
   const mention = new RegExp(
     `(^|[\\s(,])@${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=[\\s,.)]|$)`,
@@ -345,6 +351,7 @@ export function RoutineEditor({
   githubPath,
   messageProviders,
   skills = [],
+  taughtSkills = [],
   saving,
   running,
   error,
@@ -364,6 +371,8 @@ export function RoutineEditor({
   messageProviders: string[];
   /** The bot's skills; choosing one adds an @mention, which loads it when the routine runs. */
   skills?: AgentSkillCatalogEntry[];
+  /** Saved taught skills; choosing one makes the routine run it by reference. */
+  taughtSkills?: { id: string; name: string }[];
   saving: boolean;
   running: boolean;
   error: string | null;
@@ -580,7 +589,7 @@ export function RoutineEditor({
           id={`${fieldId}-prompt`}
           value={instruction}
           placeholder={
-            skill
+            skill || draft.taughtSkill
               ? t`Optional: add details for this skill`
               : t`What should this routine do each time it runs?`
           }
@@ -590,16 +599,47 @@ export function RoutineEditor({
         />
       </label>
 
-      {pickableSkills.length > 0 ? (
+      {draft.taughtSkill ? (
+        <div className="mt-2 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-foreground">
+          <span className="min-w-0 flex-1 truncate" dir="auto" data-testid="routine-taught-skill">
+            <Trans>Runs taught skill: {draft.taughtSkill.name}</Trans>
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t`Remove taught skill`}
+            onClick={() => onChange({ ...draft, taughtSkill: null })}
+          >
+            <X size={14} strokeWidth={1.8} />
+          </Button>
+        </div>
+      ) : pickableSkills.length > 0 || taughtSkills.length > 0 ? (
         <NativeSelect
           aria-label={t`Add a skill`}
           className="mt-2 w-full"
           value={skill ?? ""}
-          onChange={(event) =>
-            onChange({ ...draft, prompt: withSkillMention(instruction, event.target.value) })
-          }
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value.startsWith(TAUGHT_PREFIX)) {
+              const id = value.slice(TAUGHT_PREFIX.length);
+              const picked = taughtSkills.find((entry) => entry.id === id);
+              if (picked) onChange({ ...draft, prompt: instruction, taughtSkill: picked });
+              return;
+            }
+            onChange({ ...draft, prompt: withSkillMention(instruction, value) });
+          }}
         >
           <NativeSelectOption value="">{t`Add a skill`}</NativeSelectOption>
+          {taughtSkills.length ? (
+            <NativeSelectOptGroup label={t`Taught`}>
+              {taughtSkills.map((entry) => (
+                <NativeSelectOption key={entry.id} value={`${TAUGHT_PREFIX}${entry.id}`}>
+                  {entry.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelectOptGroup>
+          ) : null}
           {[
             { label: t`Yours`, entries: pickableSkills.filter((entry) => entry.source === "user") },
             {

@@ -165,7 +165,7 @@ msgstr "{0, plural, one {Its # transaction will be removed from Finance.} other 
 msgid "{0, plural, one {Last full month} other {Last # full months}}"
 msgstr "{0, plural, one {Last full month} other {Last # full months}}"
 
-#. placeholder {0}: filteredRecent.length
+#. placeholder {0}: finishedRuns.length
 #: src/pages/ActivityList.tsx
 msgid "{0, plural, one {Show # finished run} other {Show # finished runs}}"
 msgstr "{0, plural, one {Show # finished run} other {Show # finished runs}}"
@@ -905,6 +905,7 @@ msgstr "Actions"
 #: src/components/investors/ActionItems.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Investors.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Actions for {0}"
 msgstr "Actions for {0}"
@@ -2241,7 +2242,9 @@ msgstr "Can't reach the server."
 #: src/components/integrations/SignInStep.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/markdown-link-prompt.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
+#: src/components/teach/TeachRecordingChrome.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyImport.tsx
@@ -2272,6 +2275,14 @@ msgstr "Cancel reply"
 #: src/components/fundraising/SafeList.tsx
 msgid "Cancel SAFE"
 msgstr "Cancel SAFE"
+
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Cancel teaching"
+msgstr "Cancel teaching"
+
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Cancel teaching?"
+msgstr "Cancel teaching?"
 
 #: src/components/fundraising/SafeList.tsx
 #: src/pages/BillingSettingsPanel.tsx
@@ -3970,6 +3981,10 @@ msgstr "Could not save group"
 msgid "Could not save Hide amounts"
 msgstr "Could not save Hide amounts"
 
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Could not save login"
+msgstr "Could not save login"
+
 #: src/pages/Onboarding.tsx
 msgid "Could not save model"
 msgstr "Could not save model"
@@ -3982,6 +3997,7 @@ msgstr "Could not save routine"
 msgid "Could not save rule"
 msgstr "Could not save rule"
 
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Could not save skill"
 msgstr "Could not save skill"
@@ -4514,6 +4530,7 @@ msgstr "Delete {0}"
 #. placeholder {0}: item.name
 #: src/components/ContactDeleteConfirm.tsx
 #: src/components/data-room/ItemDialogs.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Delete {0}?"
 msgstr "Delete {0}?"
@@ -6433,6 +6450,10 @@ msgstr "Keep memories"
 msgid "Keep separate"
 msgstr "Keep separate"
 
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Keep teaching"
+msgstr "Keep teaching"
+
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Keep this deadline"
 msgstr "Keep this deadline"
@@ -6511,6 +6532,11 @@ msgstr "Last ran {lastRan}"
 #: src/pages/Investors.tsx
 msgid "Last read failed · Try again"
 msgstr "Last read failed · Try again"
+
+#. placeholder {0}: formatRelativeTime(entry.lastRunAt)
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Last run {0}"
+msgstr "Last run {0}"
 
 #: src/pages/shell/transcript.tsx
 msgid "Last run failed: {failedNote}"
@@ -7301,6 +7327,7 @@ msgstr "Monthly spend · {0} – {1}"
 #: src/components/inbox/CleanupActionBar.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/transcript.tsx
 msgid "More"
@@ -8106,6 +8133,10 @@ msgstr "Not read"
 msgid "Not retried: the space changed"
 msgstr "Not retried: the space changed"
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Not run yet"
+msgstr "Not run yet"
+
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Not saved"
@@ -8209,6 +8240,7 @@ msgstr "Nothing shared yet."
 msgid "Nothing to clean up. Senders need {CLEANUP_MIN_MESSAGES} or more messages, and people you have written to or saved as contacts are left out."
 msgstr "Nothing to clean up. Senders need {CLEANUP_MIN_MESSAGES} or more messages, and people you have written to or saved as contacts are left out."
 
+#: src/pages/ActivityList.tsx
 #: src/pages/RoutineRunHistory.tsx
 msgid "Nothing to report"
 msgstr "Nothing to report"
@@ -8216,6 +8248,10 @@ msgstr "Nothing to report"
 #: src/pages/CompanyReview.tsx
 msgid "Nothing to review"
 msgstr "Nothing to review"
+
+#: src/components/teach/TeachRecordingChrome.tsx
+msgid "Nothing you showed will be kept."
+msgstr "Nothing you showed will be kept."
 
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Notice deadlines are derived from the expiration date and the notice period."
@@ -9664,6 +9700,10 @@ msgstr "Remove schedule"
 msgid "Remove skill {0}"
 msgstr "Remove skill {0}"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Remove taught skill"
+msgstr "Remove taught skill"
+
 #. placeholder {0}: fullDay(confirming.statement.periodStart)
 #. placeholder {1}: fullDay(confirming.statement.periodEnd)
 #: src/components/finance/StatementImport.tsx
@@ -10048,6 +10088,10 @@ msgstr "Routines"
 msgid "Routines that run while you're away"
 msgstr "Routines that run while you're away"
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Routines that use it will stop using it."
+msgstr "Routines that use it will stop using it."
+
 #: src/pages/gtm/GtmChannels.tsx
 msgid "Rule"
 msgstr "Rule"
@@ -10100,6 +10144,11 @@ msgstr "Runs on"
 #: src/pages/shell/composer.tsx
 msgid "Runs on send"
 msgstr "Runs on send"
+
+#. placeholder {0}: draft.taughtSkill.name
+#: src/pages/RoutineEditor.tsx
+msgid "Runs taught skill: {0}"
+msgstr "Runs taught skill: {0}"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Runs when this bot receives a verified message from this provider."
@@ -10197,6 +10246,10 @@ msgstr "Save {0} as a contact"
 msgid "Save address"
 msgstr "Save address"
 
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Save as login"
+msgstr "Save as login"
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Save backups"
 msgstr "Save backups"
@@ -10208,6 +10261,10 @@ msgstr "Save credential"
 #: src/components/MailApprovalCard.tsx
 msgid "Save draft"
 msgstr "Save draft"
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Save login"
+msgstr "Save login"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Save new value"
@@ -11019,6 +11076,7 @@ msgstr "Since {from}"
 msgid "Single line"
 msgstr "Single line"
 
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Site"
 msgstr "Site"
@@ -11027,6 +11085,10 @@ msgstr "Site"
 #: src/components/data-room/Preview.tsx
 msgid "Size"
 msgstr "Size"
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Skill"
+msgstr "Skill"
 
 #. placeholder {0}: label.title
 #: src/pages/shell/composer.tsx
@@ -11044,6 +11106,7 @@ msgstr "Skills and actions"
 
 #: src/components/integrations/AgentStep.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Shell.tsx
 msgid "Skip"
 msgstr "Skip"
@@ -11325,6 +11388,12 @@ msgstr "Stats"
 msgid "Status"
 msgstr "Status"
 
+#. placeholder {0}: stepIndex + 1
+#. placeholder {1}: step || field
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Step {0}: {1}"
+msgstr "Step {0}: {1}"
+
 #: src/components/integrations/SignInStep.tsx
 msgid "Step 1 of {totalSteps}"
 msgstr "Step 1 of {totalSteps}"
@@ -11399,6 +11468,15 @@ msgstr "Stop speaking"
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Stop teaching"
 msgstr "Stop teaching"
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Stopped"
+msgstr "Stopped"
+
+#. placeholder {0}: live.lastTestNote
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Stopped: {0}"
+msgstr "Stopped: {0}"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Stored securely. Never shown here."
@@ -11554,6 +11632,11 @@ msgstr "Task board"
 msgid "tasks, tickets"
 msgstr "tasks, tickets"
 
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Taught"
+msgstr "Taught"
+
 #: src/components/data-room/format.ts
 msgid "Tax document"
 msgstr "Tax document"
@@ -11620,6 +11703,7 @@ msgstr "Test sign-in"
 
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/ModelConnectionPreflightNotice.tsx
+#: src/components/teach/SkillDraftCard.tsx
 msgid "Testing…"
 msgstr "Testing…"
 
@@ -12659,6 +12743,7 @@ msgid "Used by"
 msgstr "Used by"
 
 #: src/components/SecretRequestDialog.tsx
+#: src/components/teach/SkillDraftCard.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Username"
 msgstr "Username"
@@ -13070,6 +13155,10 @@ msgstr "Won't do"
 #: src/pages/RoutineEditor.tsx
 msgid "Work this bot repeats for you, like a cash check every Monday."
 msgstr "Work this bot repeats for you, like a cash check every Monday."
+
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Worked"
+msgstr "Worked"
 
 #: src/lib/devin-format.ts
 #: src/pages/ActivityList.tsx
