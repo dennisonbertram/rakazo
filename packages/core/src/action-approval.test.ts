@@ -635,8 +635,30 @@ describe("unattendedToolRequiresApproval", () => {
     "mail_send",
     "contacts_add",
     "cap_table_update",
+    "mail_draft",
+    "mail_modify",
+    "drive_create_file",
+    "drive_update_file",
+    "calendar_create_event",
+    "calendar_update_event",
+    "calendar_delete_event",
+    "contacts_save",
   ])("asks for %s in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+  });
+
+  it.each([
+    "mail_search",
+    "mail_grep",
+    "mail_get",
+    "inbox_overview",
+    "drive_search",
+    "drive_read",
+    "calendar_list_events",
+    "calendar_get_event",
+    "contacts_list",
+  ])("does not ask for the read-only %s in an unattended run", (name) => {
+    expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
   });
 
   it.each([
