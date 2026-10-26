@@ -44,6 +44,7 @@ import {
   expireComputerExecutionLeases,
   IsolationError,
   lockOwnedGroup,
+  settleApprovalsOfEndedRuns,
   touchGroupUpdatedAt,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -1223,6 +1224,22 @@ export async function stopThreadRuns(
 ) {
   const { runIds, computers, leases, eventSeq } = await deps.prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
+    // A stopped run answers no card: close each open approval and the effects behind it, so a
+    // stored card can never be approved later. Closed before the runs are cancelled, because a
+    // cancelled run can no longer write to the thread. Grouped by bot: each card event names one.
+    const stopping = await tx.run.findMany({
+      where: { threadId: target.threadId, status: { in: [...ACTIVE_RUN_STATUSES] } },
+      select: { id: true, botId: true },
+    });
+    for (const botId of new Set(stopping.map((run) => run.botId))) {
+      await settleApprovalsOfEndedRuns(tx, {
+        spaceId: actor.spaceId,
+        threadId: target.threadId,
+        botId,
+        runIds: stopping.filter((run) => run.botId === botId).map((run) => run.id),
+        answer: "stopped",
+      });
+    }
     const cancelled = await tx.run.updateManyAndReturn({
       where: {
         threadId: target.threadId,

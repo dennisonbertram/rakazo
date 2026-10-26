@@ -47,6 +47,7 @@ export {
   closeApprovalCardsInTransaction,
   delegatePendingAgents,
   delegatePendingIds,
+  settleApprovalsOfEndedRuns,
 } from "./run-pauses.js";
 export * from "./run-secrets.js";
 export * from "./safes.js";

@@ -128,6 +128,31 @@ export async function closeApprovalCardsInTransaction(
 }
 
 /**
+ * Runs that ended without an answer (expired, or stopped by the user) leave no approval open: the
+ * unanswered cards close with `answer`, and when there was one, every effect still pending for
+ * those runs takes the same status, so nothing behind a card can run later.
+ */
+export async function settleApprovalsOfEndedRuns(
+  tx: Prisma.TransactionClient,
+  input: {
+    spaceId: string;
+    threadId: string;
+    botId: string;
+    runIds: string[];
+    answer: ClosedApprovalAnswer;
+  },
+): Promise<number> {
+  const closed = await closeApprovalCardsInTransaction(tx, input);
+  if (closed > 0) {
+    await tx.externalEffect.updateMany({
+      where: { runId: { in: input.runIds }, spaceId: input.spaceId, status: "intended" },
+      data: { status: input.answer },
+    });
+  }
+  return closed;
+}
+
+/**
  * A newer approval for the identical request (same tool and arguments) replaces older delegated ones waiting in this
  * thread (the sender asked twice for one job). The older cards are closed and their runs cancelled
  * without an outcome message, so the thread shows one live card and one outcome.

@@ -15,9 +15,9 @@ import type { NotificationEvents, Prisma, PrismaClient, ThreadEvents } from "@ra
 import {
   announceDelegatePending,
   appendEventInTransaction,
-  closeApprovalCardsInTransaction,
   expireStuckRun,
   externalChannels,
+  settleApprovalsOfEndedRuns,
   withTransactionRetry,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -333,19 +333,13 @@ async function expireOne(
         ) {
           return null;
         }
-        const closed = await closeApprovalCardsInTransaction(tx, {
+        await settleApprovalsOfEndedRuns(tx, {
           spaceId: run.spaceId,
           threadId: run.threadId,
           botId: run.botId,
           runIds: [run.id],
           answer: "expired",
         });
-        if (closed > 0) {
-          await tx.externalEffect.updateMany({
-            where: { runId: run.id, spaceId: run.spaceId, status: "intended" },
-            data: { status: "expired" },
-          });
-        }
       }
       return expireStuckRun(tx, {
         runId: run.id,

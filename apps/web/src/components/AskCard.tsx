@@ -41,6 +41,7 @@ function formatAnsweredState(
   }
   if (answer === "superseded") return t`Replaced by a newer request`;
   if (answer === "expired") return t`Expired`;
+  if (answer === "stopped") return t`Stopped`;
   if (outcome === "created") return t`Created`;
   if (outcome === "cancelled") return t`Cancelled`;
   if (answer === "allow") return waitsFor ? t`Approved here. Waiting for ${waitsFor}` : t`Approved`;

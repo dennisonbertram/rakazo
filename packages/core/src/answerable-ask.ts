@@ -76,9 +76,10 @@ export function resolveAskChoice(
 
 /**
  * Answers the server stores on an approval card it closed itself, so no later click can approve it:
- * a newer request for the same delegated work replaced it, or its run failed before it was answered.
+ * a newer request for the same delegated work replaced it, its run failed or expired before it was
+ * answered, or the user stopped the run.
  */
-export const CLOSED_APPROVAL_ANSWERS = ["superseded", "expired"] as const;
+export const CLOSED_APPROVAL_ANSWERS = ["superseded", "expired", "stopped"] as const;
 export type ClosedApprovalAnswer = (typeof CLOSED_APPROVAL_ANSWERS)[number];
 
 export function isClosedApprovalAnswer(answer: string | undefined): answer is ClosedApprovalAnswer {

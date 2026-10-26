@@ -11629,6 +11629,7 @@ msgstr "가르치기 종료"
 msgid "Stop tracking"
 msgstr ""
 
+#: src/components/AskCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Stopped"
 msgstr ""
