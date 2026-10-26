@@ -154,6 +154,24 @@ export const List: Story = {
   },
 };
 
+/** The list sorted by name; the sort and the filters are in the URL. */
+export const ListSortedByName: Story = {
+  ...List,
+  render: () => <Page at="/app/artifacts?sort=name&dir=asc" />,
+};
+
+/** Cards sorted by name, with the Sort control beside the filters. */
+export const CardsSortedByName: Story = {
+  beforeEach: () => load(),
+  render: () => <Page at="/app/artifacts?sort=name&dir=asc" />,
+};
+
+/** The Type filter set from the URL. */
+export const TypeFilterSet: Story = {
+  beforeEach: () => load(),
+  render: () => <Page at="/app/artifacts?type=page" />,
+};
+
 export const Loading: Story = {
   beforeEach: () =>
     mockRpc({ bootstrap, "artifacts.listSpace": () => new Promise(() => undefined) }),

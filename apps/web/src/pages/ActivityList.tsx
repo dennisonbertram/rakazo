@@ -2,26 +2,20 @@ import { plural, t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { RunActivityRow, RunStatus, WaitingOnYouItem } from "@rakazo/contracts";
 import { isAgedStuckWork } from "@rakazo/core";
-import {
-  Button,
-  Input,
-  Label,
-  NativeSelect,
-  NativeSelectOption,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@rakazo/ui-web";
+import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import type { ReactNode, Ref } from "react";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { PickFilter, SearchField, SortControl } from "../components/ListControls";
 import { RowsSkeleton } from "../components/RowsSkeleton";
-import type { ActivityListFilters } from "../lib/activity-list-filters";
+import type { ActivityListFilters, ActivitySort } from "../lib/activity-list-filters";
 import {
+  ACTIVITY_SORTS,
   activityFiltersActive,
-  clearActivityFilterField,
-  emptyActivityFilters,
+  DEFAULT_ACTIVITY_SORT,
   filterActivityRuns,
+  sortActivityRuns,
 } from "../lib/activity-list-filters";
+import { useListParams } from "../lib/list-params";
 import { needsAnswerLabel } from "../lib/roster-status";
 import { formatRosterTime } from "../lib/roster-time";
 import { rpc } from "../lib/rpc";
@@ -53,7 +47,17 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
   const [waitingItems, setWaitingItems] = useState<WaitingOnYouItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<ActivityListFilters>(emptyActivityFilters);
+  // The filters and sort live in the URL; the names are prefixed because the sidebar shares the URL with its page.
+  const list = useListParams(ACTIVITY_SORTS, DEFAULT_ACTIVITY_SORT, ACTIVITY_PARAM);
+  const query = list.param(`${ACTIVITY_PARAM}q`) ?? "";
+  const askedStatus = list.param(`${ACTIVITY_PARAM}status`);
+  const status = STATUS_FILTERS.find((s) => s === askedStatus) ?? "all";
+  const from = list.param(`${ACTIVITY_PARAM}from`) ?? "";
+  const to = list.param(`${ACTIVITY_PARAM}to`) ?? "";
+  const filters = useMemo<ActivityListFilters>(
+    () => ({ query, status, dateRange: { from, to } }),
+    [query, status, from, to],
+  );
 
   const reloadRef = useRef<(() => void) | null>(null);
 
@@ -111,9 +115,11 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
     };
   }, [t]);
 
+  const { field: sortField, dir: sortDir } = list.sort;
   const filteredActive = useMemo(
-    () => filterActivityRuns(activeRuns, filters),
-    [activeRuns, filters],
+    () =>
+      sortActivityRuns(filterActivityRuns(activeRuns, filters), { field: sortField, dir: sortDir }),
+    [activeRuns, filters, sortField, sortDir],
   );
   useEffect(() => {
     onListedBots?.(new Set(filteredActive.map((run) => run.botId)));
@@ -121,8 +127,9 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
   }, [filteredActive, onListedBots]);
 
   const filteredRecent = useMemo(
-    () => filterActivityRuns(recentRuns, filters),
-    [recentRuns, filters],
+    () =>
+      sortActivityRuns(filterActivityRuns(recentRuns, filters), { field: sortField, dir: sortDir }),
+    [recentRuns, filters, sortField, sortDir],
   );
 
   // A quiet routine run that said nothing is not "finished work": it stays out of the count and sits last, dimmed.
@@ -228,7 +235,7 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
             ) : null}
           </PopoverTrigger>
           <PopoverContent side="right" align="start" className="w-72" initialFocus={false}>
-            <ActivityFilters filters={filters} onChange={setFilters} />
+            <ActivityFilters filters={filters} list={list} />
           </PopoverContent>
         </Popover>
       </div>
@@ -305,6 +312,9 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
   );
 }
 
+/** Put in front of this list's URL params so they do not clash with the page's own. */
+const ACTIVITY_PARAM = "activity-";
+
 const NEEDS_YOU = new Set<RunStatus>(["waiting_input", "waiting_takeover"]);
 
 /** A titled group of runs; renders nothing when it has none. */
@@ -378,159 +388,81 @@ function ActivityError({
 
 function ActivityFilters({
   filters,
-  onChange,
+  list,
 }: {
   filters: ActivityListFilters;
-  onChange: (next: ActivityListFilters) => void;
+  list: ReturnType<typeof useListParams<ActivitySort>>;
 }) {
   const { t } = useLingui();
-  const searchId = useId();
-  const statusId = useId();
-  const fromId = useId();
-  const toId = useId();
+  const param = (name: string) => `${ACTIVITY_PARAM}${name}`;
   const filtersOn = activityFiltersActive(filters);
-  const statusLabelText = filters.status === "all" ? null : statusLabel(filters.status);
+  const sortNames: [ActivitySort, string][] = [
+    ["updated", t`Updated`],
+    ["bot", t`Bot`],
+  ];
 
   return (
     <div className="flex flex-col gap-2">
-      <div>
-        <Label htmlFor={statusId} className="text-[12.5px] text-muted-foreground/80">
-          <Trans>Status</Trans>
-        </Label>
-        <NativeSelect
-          id={statusId}
-          data-testid="activity-status-filter"
-          value={filters.status}
-          onChange={(event) =>
-            onChange({
-              ...filters,
-              status: event.target.value as ActivityListFilters["status"],
-            })
-          }
-          className="mt-1 w-full"
-        >
-          <NativeSelectOption value="all">{t`All statuses`}</NativeSelectOption>
-          {STATUS_FILTERS.map((status) => (
-            <NativeSelectOption key={status} value={status}>
-              {statusLabel(status)}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+      <SearchField
+        value={filters.query}
+        onChange={(value) => list.setParam(param("q"), value)}
+        placeholder={t`Search runs`}
+        label={t`Search activity`}
+        name="activity-search"
+      />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <PickFilter
+          label={t`Status`}
+          value={filters.status === "all" ? undefined : filters.status}
+          options={STATUS_FILTERS.map((status) => [status, statusLabel(status)])}
+          onChange={(value) => list.setParam(param("status"), value)}
+        />
+        <SortControl
+          fields={sortNames}
+          field={list.sort.field}
+          fieldLabel={sortNames.find(([field]) => field === list.sort.field)?.[1] ?? ""}
+          direction={list.sort.dir}
+          onField={(field) => list.setSort({ field, dir: field === "bot" ? "asc" : "desc" })}
+          onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+        />
       </div>
-      <details className="group">
-        <summary className="cursor-pointer text-[12.5px] text-muted-foreground/80">
-          <Trans>More filters</Trans>
-        </summary>
-        <div className="mt-2 flex flex-col gap-2">
-          <div>
-            <Label htmlFor={searchId} className="sr-only">
-              <Trans>Search activity</Trans>
-            </Label>
-            <Input
-              id={searchId}
-              data-testid="activity-search"
-              value={filters.query}
-              onChange={(event) => onChange({ ...filters, query: event.target.value })}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") onChange(clearActivityFilterField(filters, "query"));
-              }}
-              placeholder={t`Search runs`}
-              autoComplete="off"
-              className="rounded-xl bg-card text-[13px] dark:bg-input"
-            />
-          </div>
-          <div>
-            <Label htmlFor={fromId} className="text-[12.5px] text-muted-foreground/80">
-              <Trans>From</Trans>
-            </Label>
-            <Input
-              id={fromId}
-              data-testid="activity-date-from"
-              type="date"
-              value={filters.dateRange.from}
-              onChange={(event) =>
-                onChange({
-                  ...filters,
-                  dateRange: { ...filters.dateRange, from: event.target.value },
-                })
-              }
-              className="mt-1 rounded-xl bg-card text-[13px] dark:bg-input"
-            />
-          </div>
-          <div>
-            <Label htmlFor={toId} className="text-[12.5px] text-muted-foreground/80">
-              <Trans>To</Trans>
-            </Label>
-            <Input
-              id={toId}
-              data-testid="activity-date-to"
-              type="date"
-              value={filters.dateRange.to}
-              onChange={(event) =>
-                onChange({
-                  ...filters,
-                  dateRange: { ...filters.dateRange, to: event.target.value },
-                })
-              }
-              className="mt-1 rounded-xl bg-card text-[13px] dark:bg-input"
-            />
-          </div>
-        </div>
-      </details>
+      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80">
+        <Trans>From</Trans>
+        <Input
+          type="date"
+          name="activity-from"
+          aria-label={t`From`}
+          data-testid="activity-date-from"
+          value={filters.dateRange.from}
+          onChange={(event) => list.setParam(param("from"), event.target.value)}
+          className="w-40 rounded-xl bg-card text-[13px] dark:bg-input"
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80">
+        <Trans>To</Trans>
+        <Input
+          type="date"
+          name="activity-to"
+          aria-label={t`To`}
+          data-testid="activity-date-to"
+          value={filters.dateRange.to}
+          onChange={(event) => list.setParam(param("to"), event.target.value)}
+          className="w-40 rounded-xl bg-card text-[13px] dark:bg-input"
+        />
+      </div>
       {filtersOn ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {filters.query.trim() ? (
-            <FilterChip
-              label={t`Search: ${filters.query.trim()}`}
-              onClear={() => onChange(clearActivityFilterField(filters, "query"))}
-            />
-          ) : null}
-          {statusLabelText ? (
-            <FilterChip
-              label={statusLabelText}
-              onClear={() => onChange(clearActivityFilterField(filters, "status"))}
-            />
-          ) : null}
-          {filters.dateRange.from ? (
-            <FilterChip
-              label={t`From ${filters.dateRange.from}`}
-              onClear={() => onChange(clearActivityFilterField(filters, "from"))}
-            />
-          ) : null}
-          {filters.dateRange.to ? (
-            <FilterChip
-              label={t`To ${filters.dateRange.to}`}
-              onClear={() => onChange(clearActivityFilterField(filters, "to"))}
-            />
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 rounded-full px-2 text-[12px]"
-            data-testid="activity-reset-filters"
-            onClick={() => onChange(emptyActivityFilters())}
-          >
-            <Trans>Reset all</Trans>
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 self-start rounded-full px-2 text-[12px]"
+          data-testid="activity-reset-filters"
+          onClick={() => list.clear(...["q", "status", "from", "to"].map(param))}
+        >
+          <Trans>Reset all</Trans>
+        </Button>
       ) : null}
     </div>
-  );
-}
-
-function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
-  const { t } = useLingui();
-  return (
-    <button
-      type="button"
-      className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11.5px] text-foreground hover:bg-accent"
-      onClick={onClear}
-      aria-label={t`Clear filter ${label}`}
-    >
-      <span className="truncate">{label}</span>
-      <span aria-hidden>×</span>
-    </button>
   );
 }
 

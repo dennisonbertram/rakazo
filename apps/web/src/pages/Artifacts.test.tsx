@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -54,6 +54,11 @@ function typeSearch(container: HTMLElement, value: string) {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function Where() {
+  const { search } = useLocation();
+  return <output data-testid="where">{search}</output>;
+}
+
 async function renderArtifacts(path = "/app/artifacts", bots: never[] = []) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -61,6 +66,7 @@ async function renderArtifacts(path = "/app/artifacts", bots: never[] = []) {
   await act(async () =>
     root.render(
       <MemoryRouter initialEntries={[path]}>
+        <Where />
         <Routes>
           <Route path="/app/artifacts" element={<ArtifactsPage bots={bots} />} />
           <Route path="/app/artifacts/:artifactId" element={<ArtifactsPage bots={bots} />} />
@@ -517,6 +523,91 @@ it("clears the date filter when the palette applies a search", async () => {
   } finally {
     await act(async () => root.unmount());
     container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+const names = (container: HTMLElement) =>
+  [...container.querySelectorAll("[data-testid='artifact-row'] a")].map((a) => a.textContent);
+
+it("sorts the table by header, keeps the sort in the URL, and shows newest first by default", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  window.localStorage.setItem("rakazo:artifacts-view-mode", "list");
+  api.listSpace.mockResolvedValue({
+    items: [
+      artifact("Bravo", "a", "2026-01-03T00:00:00.000Z"),
+      artifact("Alpha", "b", "2026-01-02T00:00:00.000Z"),
+      { ...artifact("Charlie", "c", "2026-01-01T00:00:00.000Z"), mimeType: "text/html" },
+    ],
+    nextCursor: null,
+  });
+  const page = await renderArtifacts();
+  try {
+    const head = (name: string) =>
+      [...page.container.querySelectorAll<HTMLElement>("th button")].find(
+        (b) => b.textContent === name,
+      ) as HTMLElement;
+    const where = () => page.container.querySelector("[data-testid='where']")?.textContent;
+    expect(names(page.container)).toEqual(["Bravo", "Alpha", "Charlie"]);
+    await act(async () => head("Name").click());
+    expect(names(page.container)).toEqual(["Alpha", "Bravo", "Charlie"]);
+    expect(where()).toBe("?sort=name&dir=asc");
+    await act(async () => head("Name").click());
+    expect(names(page.container)).toEqual(["Charlie", "Bravo", "Alpha"]);
+    await act(async () => head("Type").click());
+    expect(names(page.container)[0]).toBe("Bravo");
+    expect(names(page.container)[2]).toBe("Charlie");
+  } finally {
+    await page.cleanup();
+    window.localStorage.removeItem("rakazo:artifacts-view-mode");
+    vi.unstubAllGlobals();
+  }
+});
+
+it("reads search, type and date filters from the URL and writes them back", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  window.localStorage.setItem("rakazo:artifacts-view-mode", "list");
+  api.listSpace.mockResolvedValue({
+    items: [
+      artifact("Bravo", "a"),
+      { ...artifact("Charlie", "c"), mimeType: "text/html" },
+      artifact("Old doc", "d", "2020-01-01T00:00:00.000Z"),
+    ],
+    nextCursor: null,
+  });
+  const page = await renderArtifacts("/app/artifacts?type=page");
+  try {
+    expect(names(page.container)).toEqual(["Charlie"]);
+    expect(button(page.container, "Type: Page")).toBeDefined();
+    await act(async () =>
+      page.container
+        .querySelector<HTMLButtonElement>("button[aria-label='Remove filter Type']")
+        ?.click(),
+    );
+    expect(names(page.container)).toHaveLength(3);
+    await act(async () => typeSearch(page.container, "bravo"));
+    expect(page.container.querySelector("[data-testid='where']")?.textContent).toBe("?q=bravo");
+    expect(names(page.container)).toEqual(["Bravo"]);
+  } finally {
+    await page.cleanup();
+    window.localStorage.removeItem("rakazo:artifacts-view-mode");
+    vi.unstubAllGlobals();
+  }
+});
+
+it("keeps the filters in the URL when an artifact opens", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  window.localStorage.setItem("rakazo:artifacts-view-mode", "list");
+  api.listSpace.mockResolvedValue({ items: [artifact("Bravo", "a")], nextCursor: null });
+  const page = await renderArtifacts("/app/artifacts?q=bravo&added=today");
+  try {
+    await act(async () => page.container.querySelector<HTMLAnchorElement>("tr a")?.click());
+    expect(page.container.querySelector("[data-testid='where']")?.textContent).toBe(
+      "?q=bravo&added=today",
+    );
+  } finally {
+    await page.cleanup();
+    window.localStorage.removeItem("rakazo:artifacts-view-mode");
     vi.unstubAllGlobals();
   }
 });

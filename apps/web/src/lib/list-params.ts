@@ -31,17 +31,25 @@ export function sortBy<T>(
  * `setParam` (undefined or "" removes one). The sort uses `sort` and `dir`; a value that is not in
  * `fields` falls back to `fallback`, and the URL stays clean while the sort equals the fallback.
  * `toggleSort(field)` is for a column header: a new column sorts ascending, the same column flips.
+ * A list that shares its page with another (a sidebar widget) passes a `prefix`, which goes in front
+ * of the `sort` and `dir` names; it names its filter params itself.
  */
-export function useListParams<F extends string>(fields: readonly F[], fallback: Sort<F>) {
+export function useListParams<F extends string>(
+  fields: readonly F[],
+  fallback: Sort<F>,
+  prefix = "",
+) {
+  const sortKey = `${prefix}sort`;
+  const dirKey = `${prefix}dir`;
   const [params, setParams] = useSearchParams();
-  const asked = params.get("sort");
+  const asked = params.get(sortKey);
   const field = fields.includes(asked as F) ? (asked as F) : fallback.field;
   const sort: Sort<F> = {
     field,
     dir:
-      params.get("dir") === "desc"
+      params.get(dirKey) === "desc"
         ? "desc"
-        : params.get("dir") === "asc"
+        : params.get(dirKey) === "asc"
           ? "asc"
           : field === fallback.field
             ? fallback.dir
@@ -59,11 +67,11 @@ export function useListParams<F extends string>(fields: readonly F[], fallback: 
   const setSort = (next: Sort<F>) =>
     update((p) => {
       if (next.field === fallback.field && next.dir === fallback.dir) {
-        p.delete("sort");
-        p.delete("dir");
+        p.delete(sortKey);
+        p.delete(dirKey);
       } else {
-        p.set("sort", next.field);
-        p.set("dir", next.dir);
+        p.set(sortKey, next.field);
+        p.set(dirKey, next.dir);
       }
     });
   return {
