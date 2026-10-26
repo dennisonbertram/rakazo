@@ -10,7 +10,12 @@ import {
 import { ThreadMessageSchema } from "./events.js";
 import { Id, MemoryScope, RunStatus, SandboxKind } from "./ids.js";
 import { McpHeadersSchema, McpRemoteEndpointSchema, McpTransportSchema } from "./mcp.js";
-import { RoutineManagedKindSchema, RoutineStatusSchema, WatchSpecSchema } from "./routines.js";
+import {
+  PageWatchSpecSchema,
+  RoutineManagedKindSchema,
+  RoutineStatusSchema,
+  WatchSpecSchema,
+} from "./routines.js";
 import { RunTriggerSchema } from "./runs.js";
 
 export const ComputerModeSchema = z.enum(["team", "dedicated"]);
@@ -521,7 +526,7 @@ export const CreateRoutineInput = z
     thinkingLevel: ThinkingLevelSchema.nullable().default(null),
     /** Defaults to on for a watch and off otherwise. */
     quiet: z.boolean().optional(),
-    watch: WatchSpecSchema.nullable().default(null),
+    watch: PageWatchSpecSchema.nullable().default(null),
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);

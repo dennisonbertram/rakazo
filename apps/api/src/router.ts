@@ -204,6 +204,7 @@ import {
   newRunUnattended,
   nextCronDateAcrossStrict,
   splitPage,
+  stableJsonText,
   withAppDirectory,
 } from "@rakazo/core";
 import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
@@ -4328,7 +4329,13 @@ export function createRouter(deps: RouterDeps) {
         const watch = input.watch === undefined ? existing.watch : input.watch;
         const watchChanged =
           input.watch !== undefined &&
-          JSON.stringify(input.watch) !== JSON.stringify(existing.watch);
+          stableJsonText(input.watch) !== stableJsonText(existing.watch);
+        // Only the bot sets up a connected-app watch, from chat; the editor can send one back unchanged.
+        if (input.watch?.kind === "connector" && watchChanged) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "A connected-app watch is set up in chat.",
+          });
+        }
         if (input.watch && !existing.watch) {
           await assertWatchLimits(deps.prisma, context.actor.spaceId, existing.botId);
         }

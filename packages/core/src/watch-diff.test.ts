@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { fingerprintText } from "./node/watch-fingerprint.js";
-import { diffSnapshots, normalizePageText, truncateSnapshot } from "./watch-diff.js";
+import {
+  diffSnapshots,
+  normalizePageText,
+  stableJsonText,
+  truncateSnapshot,
+} from "./watch-diff.js";
 
 describe("normalizePageText", () => {
   it("drops scripts, styles and comments, keeps text, decodes entities", () => {
@@ -60,5 +65,13 @@ describe("diffSnapshots", () => {
       "+ line number 2",
       "…7 more changes",
     ]);
+  });
+});
+
+describe("stableJsonText", () => {
+  it("gives equal text for equal data in any key order, one line per value", () => {
+    const a = stableJsonText({ b: 1, a: { d: [1, { z: 1, y: 2 }], c: "x" } });
+    expect(a).toBe(stableJsonText({ a: { c: "x", d: [1, { y: 2, z: 1 }] }, b: 1 }));
+    expect(diffSnapshots(a, a.replace('"b": 1', '"b": 2'))).toBe('-   "b": 1\n+   "b": 2');
   });
 });

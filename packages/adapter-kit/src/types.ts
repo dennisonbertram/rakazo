@@ -266,6 +266,8 @@ export interface ConnectorTool {
   inputSchema: Record<string, unknown>;
   /** Declared effect. `false` forces approval; `true` never relaxes the name-based gate. */
   readOnly?: boolean;
+  /** The provider's own read-only annotation (MCP readOnlyHint), kept for ordinary bots. Only a connected-app watch reads it. */
+  readOnlyHint?: boolean;
   /** Provider-reported display-only pricing metadata. */
   reportedCost?: { description: string; discount?: string };
   /** In-process routing metadata. It is never exposed to the model. */

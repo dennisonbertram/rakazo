@@ -304,6 +304,7 @@ async function main() {
     devinCallTool: createDevinCallTool(prisma, mcp),
     notificationEvents,
     artifacts,
+    connector: stack.connector,
     connectors: stack.connector,
     boxAccessToken: boxAccessToken(mcpOAuth),
     notificationChannels: [

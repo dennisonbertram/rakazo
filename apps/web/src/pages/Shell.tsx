@@ -5653,7 +5653,7 @@ export function ShellPage() {
                         githubEnabled: routineDraft.githubEnabled,
                         messageProvider: routineDraft.messageProvider,
                         quiet: routineDraft.quiet,
-                        watch: routineDraft.watch,
+                        watch: routineDraft.watch?.kind === "page" ? routineDraft.watch : null,
                         ...routineModel,
                       });
                     }

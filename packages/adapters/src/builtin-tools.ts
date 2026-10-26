@@ -1926,11 +1926,20 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "watch_create",
     description:
-      'Watch a web page and wake this bot only when its text changes. Use for "tell me if the pricing page changes" or "let me know when X is published". The page is checked without a model; a change starts a run with a short before/after diff, so the instruction says what to do on a change ("tell me what changed in a sentence"), never "report that nothing changed". The first check only records the page. A watch keeps running, and wakes the bot on every change, until the user pauses or deletes it, so never promise or write "stop after the first change". Pauses for the user to approve a card. At most 5 watches per bot. Use schedule_list, schedule_update (watch: { url, intervalMinutes }) and schedule_cancel to see, change or stop it.',
+      'Watch a web page, or one read-only tool of a connected app, and wake this bot only when its text or result changes. Use for "tell me if the pricing page changes" or "let me know when X is published". To watch a connected app (for example "tell me if the Mercury balance changes"), pass tool (the exact name of a read-only tool you were offered, one that only gets or lists data) and its fixed arguments instead of url; the tool is called without a model on every check and a write tool is refused. The page or tool is checked without a model; a change starts a run with a short before/after diff, so the instruction says what to do on a change ("tell me what changed in a sentence"), never "report that nothing changed". The first check only records the page. A watch keeps running, and wakes the bot on every change, until the user pauses or deletes it, so never promise or write "stop after the first change". Pauses for the user to approve a card. At most 5 watches per bot. Use schedule_list, schedule_update (watch: { url, intervalMinutes }) and schedule_cancel to see, change or stop it.',
     inputSchema: {
       type: "object",
       properties: {
         url: { type: "string", description: "The http or https address of the page." },
+        tool: {
+          type: "string",
+          description:
+            "Instead of url: the exact name of a read-only connected-app tool you were offered.",
+        },
+        arguments: {
+          type: "object",
+          description: "With tool: the fixed arguments to call it with on every check.",
+        },
         intervalMinutes: {
           type: "number",
           enum: [15, 60, 1440],
@@ -1943,7 +1952,7 @@ export const builtinAgentTools: ConnectorTool[] = [
             "What to do on each change, e.g. “Tell me what changed in a sentence.” The watch keeps running until the user pauses or deletes it, so do not say to stop monitoring.",
         },
       },
-      required: ["url", "name", "instruction"],
+      required: ["name", "instruction"],
       additionalProperties: false,
     },
   },

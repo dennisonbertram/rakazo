@@ -7,6 +7,7 @@ import type {
   Routine,
   WatchSpec,
 } from "@rakazo/contracts";
+import { connectorToolLabel } from "@rakazo/contracts";
 import type { CronFreq, CronPreset } from "@rakazo/core";
 import {
   cronFromPreset,
@@ -173,7 +174,8 @@ export function routineTriggerSummary(routine: Routine): string {
   if (!routine.active) return t`Paused`;
   const parts: string[] = [];
   if (routine.watch) {
-    const host = watchHost(routine.watch.url);
+    const host =
+      routine.watch.kind === "connector" ? routine.watch.appName : watchHost(routine.watch.url);
     parts.push(t`Watches ${host}`);
   }
   if (routine.webhookEnabled) parts.push(t`When a webhook fires`);
@@ -207,9 +209,13 @@ export function routineStatusLine(
   if (status.pausedReason) {
     switch (status.pausedReason) {
       case "errors":
-        return t`Paused: the page could not be checked`;
+        return routine.watch?.kind === "connector"
+          ? t`Paused: the app could not be checked`
+          : t`Paused: the page could not be checked`;
       case "noisy":
-        return t`Paused: the page changes too often`;
+        return routine.watch?.kind === "connector"
+          ? t`Paused: the app result changes too often`
+          : t`Paused: the page changes too often`;
       case "access":
         return t`Paused: no access`;
       case "budget":
@@ -993,6 +999,32 @@ function WatchTriggerCard({
     60: t`Every hour`,
     1440: t`Every day`,
   };
+  // The bot sets a connected-app watch up in chat; the card only shows it.
+  if (watch.kind === "connector") {
+    const tool = connectorToolLabel(watch.toolName);
+    return (
+      <div className="rounded-xl border border-border p-3" data-testid="watch-card">
+        <div className="flex items-center gap-2.5 px-0.5">
+          <Eye size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
+          <span className="flex-1 text-[14.5px] text-foreground">
+            <Trans>Watch a connected app</Trans>
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t`Remove app watch`}
+            onClick={onRemove}
+            className="text-muted-foreground"
+          >
+            <X />
+          </Button>
+        </div>
+        <p className="mt-2.5 px-0.5 text-[13.5px] text-muted-foreground">
+          {watch.appName} · {tool} · {labels[watch.intervalMinutes]}
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="rounded-xl border border-border p-3" data-testid="watch-card">
       <div className="flex items-center gap-2.5 px-0.5">

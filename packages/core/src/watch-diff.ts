@@ -92,3 +92,20 @@ export function diffSnapshots(before: string, after: string, maxChars = 4_000): 
   }
   return out.join("\n");
 }
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, item]) => [key, sortKeys(item)]),
+    );
+  }
+  return value;
+}
+
+/** A tool result as indented JSON with keys in sorted order, so equal data gives equal text and the line diff shows what changed. */
+export function stableJsonText(value: unknown): string {
+  return JSON.stringify(sortKeys(value), null, 2) ?? "null";
+}

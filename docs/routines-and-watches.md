@@ -64,7 +64,15 @@ The claim uses `SKIP LOCKED` and the lease, so an extra tick is harmless.
 
 `watch_create` (url, intervalMinutes, name, instruction) uses the same approval card as repeating schedules. `schedule_list`, `schedule_update` and `schedule_cancel` cover list, edit and delete. Only a run the owner started may create a watch or schedule (`packages/adapters/src/schedule-tools.ts`); routine and other background runs cannot.
 
-Not built yet from the PRD: watching a connected app, and watch creation on mobile (chat covers it).
+Watch creation on mobile is not built (chat covers it).
+
+### Connected-app watches
+
+`watch_create` also takes `tool` (the exact name of a read-only tool the bot was offered) and `arguments` instead of `url`. The routine's `watch` is `{ kind: "connector", connectorId, connectionId?, resourceId?, toolName, arguments, appName, intervalMinutes }` (`ConnectorWatchSpecSchema`). Only the bot creates one, from chat: the routine create API rejects the kind, the update API accepts it only unchanged, and `schedule_update` refuses to edit it. The editor shows it read-only.
+
+Creation and every check go through `resolveWatchTool` (`packages/adapters/src/watch-connector.ts`): load the bot (not archived, same space and user), load its connections, drop the ones it may not use (`deniedConnectionIds`, agent-linked, not connected), discover the connector's tools with only those connections in the context, and require the named tool with the stored route. The tool must pass `toolRequiresApproval(name, true, readOnly) === false`. Before the provider call the connector runs `connectionDenial` (`connection-denial.ts`, the same function the executor uses) again through `beforeDispatch`.
+
+If the connection is revoked or limited, the tool is gone, or it is no longer a plain read, the watch pauses as "access" with one notification that names the cause, and the tool is not called. The result is fingerprinted as JSON with sorted keys (`stableJsonText`); the snapshot, diff, wake prompt, taint, limits and backoff are the page-watch ones. Tools behind a lazy catalog (more than the direct-tool limit) cannot be watched.
 
 ## Check-ins
 

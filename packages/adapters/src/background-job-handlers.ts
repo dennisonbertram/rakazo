@@ -3,6 +3,7 @@ import type {
   AgentRuntime,
   ArtifactStore,
   BackgroundJobHandlers,
+  ConnectorProvider,
   JobPublisher,
   MailProvider,
   MessagingSurface,
@@ -87,6 +88,8 @@ export function createBackgroundJobHandlers(deps: {
   notificationEvents?: NotificationEvents;
   /** Deletes the blobs of removed Data room items and reads them for ingest. */
   artifacts?: ArtifactStore;
+  /** Needed for connected-app watches; without it they pause. */
+  connector?: ConnectorProvider;
   /** Needed only to import Google Drive folders. */
   connectors?: DriveFilesDeps["connectors"];
   /** Needed to import Box folders: every process that runs jobs must pass it, or queued Box files fail. */
@@ -411,6 +414,7 @@ export function createBackgroundJobHandlers(deps: {
       await runWatchProbeTick({
         prisma: deps.prisma,
         jobs: deps.jobs,
+        connector: deps.connector,
         events: deps.events,
         notificationEvents: deps.notificationEvents,
       });

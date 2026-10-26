@@ -302,6 +302,9 @@ export class McpConnector implements ConnectorProvider {
               name: `mcp__${assignment.server.slug}__${tool.name}`,
               description: tool.description ?? tool.name,
               inputSchema: tool.inputSchema as Record<string, unknown>,
+              ...(typeof tool.annotations?.readOnlyHint === "boolean"
+                ? { readOnlyHint: tool.annotations.readOnlyHint }
+                : {}),
               // Only for the server's agent: false makes the executor ask before each write.
               ...(isServerAgent(assignment)
                 ? {
