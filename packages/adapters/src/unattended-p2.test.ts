@@ -1,7 +1,7 @@
 import { checkInInstruction, quietRoutineGuidance } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { checkInPostedToday } from "./check-in.js";
+import { checkInPostedToday, checkInReplyIsOver } from "./check-in.js";
 import { createRunExecutor, userTurnInstructions } from "./executor.js";
 import { notifyPastDueItems } from "./past-due.js";
 import { notifyThreadEvent } from "./run-notification.js";
@@ -65,7 +65,7 @@ describe("check-in daily cap", () => {
     expect(await checkInPostedToday(db([]), routine, now)).toBe(false);
   });
 
-  function wake(posted: boolean) {
+  function wake(posted: boolean, activeRun = false) {
     const scheduledAt = new Date(Date.now() - 1000);
     const routineRow = {
       id: "routine-1",
@@ -93,7 +93,7 @@ describe("check-in daily cap", () => {
         })),
       },
       run: {
-        findFirst: vi.fn(async () => null),
+        findFirst: vi.fn(async () => (activeRun ? { id: "active" } : null)),
         findMany: vi.fn(async () => [{ id: "old-run" }]),
         create: runCreate,
       },
@@ -124,6 +124,31 @@ describe("check-in daily cap", () => {
     } as unknown as Parameters<typeof createRunExecutor>[0]);
     return { executor, scheduledAt, taskCreate, runCreate };
   }
+
+  it("skips the wake while a check-in run is still active", async () => {
+    const busy = wake(false, true);
+    await busy.executor.wakeRoutine("routine-1", busy.scheduledAt.toISOString());
+    expect(busy.runCreate).not.toHaveBeenCalled();
+  });
+
+  it("ends a check-in reply silently when another run already posted today", async () => {
+    const routineRow = { id: "r1", timezone: "UTC", managedKind: "check_in" };
+    const dbFor = (row: unknown, posted: boolean) =>
+      ({
+        routine: { findUnique: vi.fn(async () => row) },
+        run: { findMany: vi.fn(async () => [{ id: "earlier" }]) },
+        message: { findMany: vi.fn(async () => (posted ? [{ createdAt: new Date() }] : [])) },
+      }) as never;
+    const run = { id: "now", routineId: "r1" };
+    expect(await checkInReplyIsOver(dbFor(routineRow, true), run, new Date())).toBe(true);
+    expect(await checkInReplyIsOver(dbFor(routineRow, false), run, new Date())).toBe(false);
+    expect(
+      await checkInReplyIsOver(dbFor({ ...routineRow, managedKind: null }, true), run, new Date()),
+    ).toBe(false);
+    expect(
+      await checkInReplyIsOver(dbFor(null, true), { id: "x", routineId: null }, new Date()),
+    ).toBe(false);
+  });
 
   it("skips the wake after a message today and runs the built-in instruction otherwise", async () => {
     const skipped = wake(true);

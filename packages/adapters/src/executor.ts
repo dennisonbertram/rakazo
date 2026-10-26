@@ -283,7 +283,7 @@ import {
   listCalendarAccounts,
   selectCalendarTools,
 } from "./calendar-tools.js";
-import { checkInPostedToday } from "./check-in.js";
+import { checkInPostedToday, checkInReplyIsOver } from "./check-in.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
 import type { CloudAgentConnection } from "./cloud-agent-factory.js";
 import { cloudAgentsEnabled } from "./cloud-agent-factory.js";
@@ -1310,9 +1310,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (!item) return "no-work" as const;
           gtmItemId = item.id;
         }
-        // At most one check-in message per bot per day; the schedule still moves on.
-        if (isCheckIn && (await checkInPostedToday(tx, routine, new Date()))) {
-          return "no-work" as const;
+        // At most one check-in message per bot per day, and one check-in run at a time; the
+        // schedule still moves on.
+        if (isCheckIn) {
+          const active = await tx.run.findFirst({
+            where: {
+              routineId: routine.id,
+              status: { in: ["queued", "leased", "running", "waiting_input", "waiting_takeover"] },
+            },
+            select: { id: true },
+          });
+          if (active) return "active-run" as const;
+          if (await checkInPostedToday(tx, routine, new Date())) return "no-work" as const;
         }
         if (isLegalAgentSpawnKey(bot.spawnKey)) {
           // Scan now and the daily wakeup share one lock and one rule: a scan already in flight is
@@ -8106,6 +8115,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (unattendedNeedsOwner && !assembled.trim()) {
             assembled = UNATTENDED_NEEDS_OWNER_NOTE;
             messageSegments = [...messageSegments, { kind: "text", text: assembled }];
+          }
+          // The daily check-in cap holds at reply time too: a second reply ends silently.
+          if (
+            assembled.trim() &&
+            !isExactNoResponse(assembled) &&
+            (await checkInReplyIsOver(deps.prisma, run, new Date()))
+          ) {
+            assembled = NO_RESPONSE;
+            messageSegments = [{ kind: "text", text: NO_RESPONSE }];
           }
           flushPendingTools();
           // Only routine runs are instructed to emit NO_RESPONSE. Other
