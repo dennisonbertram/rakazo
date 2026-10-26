@@ -10,6 +10,8 @@ import {
   callIdFromClientNonce,
   isApprovalAskBlock,
   isConversationalRun,
+  newRunExternalTaint,
+  newRunUnattended,
   sanitizeJsonValue,
 } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
@@ -209,6 +211,13 @@ export interface SendUserMessageInput {
   trigger: "user" | "follow_up" | "webhook" | "messaging";
   clientNonce?: string;
   linkMessageToRun?: boolean;
+  /**
+   * The run that caused this message, when there is one (for example a run forwarding to another
+   * bot). Its mode is copied. Without it the mode comes from the trigger: user and follow_up are
+   * the owner typing, webhook and messaging are unattended and carry outside content.
+   */
+  sourceRun?: { unattended: boolean; externalTaint: boolean } | null;
+
   /** When false, persist the user message without starting a run (team-chat transcript). */
   createRun?: boolean;
   /** When true, start a new run even if the bot is already busy (team-chat delivery). */
@@ -443,6 +452,8 @@ export async function sendUserMessage(
             userId: input.userId,
             status: "queued",
             trigger: input.trigger,
+            unattended: newRunUnattended({ trigger: input.trigger, source: input.sourceRun }),
+            externalTaint: newRunExternalTaint({ trigger: input.trigger, source: input.sourceRun }),
             clientNonce: input.clientNonce ? `send:${message.id}` : undefined,
             sourceMessageId: message.id,
             ...(input.modelPin
@@ -460,6 +471,11 @@ export async function sendUserMessage(
         }
       } else if (createRun && busy) {
         const held = !isConversationalRun(busy.trigger);
+        // The run will read this message as steering, so outside content taints it for the rest
+        // of its life. The taint alone forces approval cards; `unattended` stays as created.
+        if (!held && newRunExternalTaint({ trigger: input.trigger, source: input.sourceRun })) {
+          await tx.run.update({ where: { id: busy.id }, data: { externalTaint: true } });
+        }
         await tx.steeringMessage.create({
           data: {
             messageId: message.id,

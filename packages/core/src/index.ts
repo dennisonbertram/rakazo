@@ -73,6 +73,7 @@ export * from "./pages.js";
 export * from "./record.js";
 export * from "./remote-images.js";
 export * from "./response-bytes.js";
+export * from "./run-mode.js";
 export * from "./run-state.js";
 export * from "./safes.js";
 export * from "./sandbox-command.js";

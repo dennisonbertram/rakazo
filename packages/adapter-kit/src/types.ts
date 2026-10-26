@@ -521,6 +521,11 @@ export interface AgentRunRequest {
   tools: ConnectorTool[];
   /** Optional child-tool boundary for identities with restricted helper access. */
   subagentToolNames?: ReadonlySet<string>;
+  /**
+   * Asked before each run_subagent call, which the runtime starts itself and so never reaches the
+   * executor's approval gate. A returned string refuses the call and is shown to the model.
+   */
+  subagentDenial?: () => Promise<string | undefined>;
   /** False prevents helpers from requesting a different model recipient. */
   subagentModelSelectionAllowed?: boolean;
   model: AgentRunModel;

@@ -3591,14 +3591,14 @@
                         "type": "object",
                         "properties": {
                           "id": {
-                            "type": "string",
-                            "minLength": 1
+                            "$ref": "#/components/schemas/RpcApprovalRulesListOutputSchema0"
                           },
                           "effect": {
                             "type": "string",
                             "enum": [
                               "always_allow",
-                              "require_approval"
+                              "require_approval",
+                              "block"
                             ]
                           },
                           "matchKind": {
@@ -3611,6 +3611,16 @@
                           },
                           "matchValue": {
                             "type": "string"
+                          },
+                          "botId": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcApprovalRulesListOutputSchema0"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "createdAt": {
                             "type": "string"
@@ -3906,7 +3916,8 @@
                         "type": "string",
                         "enum": [
                           "always_allow",
-                          "require_approval"
+                          "require_approval",
+                          "block"
                         ]
                       },
                       "matchKind": {
@@ -3918,6 +3929,10 @@
                         ]
                       },
                       "matchValue": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "botId": {
                         "type": "string",
                         "minLength": 1
                       }
@@ -3952,14 +3967,14 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "string",
-                          "minLength": 1
+                          "$ref": "#/components/schemas/RpcApprovalRulesSetOutputSchema0"
                         },
                         "effect": {
                           "type": "string",
                           "enum": [
                             "always_allow",
-                            "require_approval"
+                            "require_approval",
+                            "block"
                           ]
                         },
                         "matchKind": {
@@ -3973,6 +3988,16 @@
                         "matchValue": {
                           "type": "string"
                         },
+                        "botId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcApprovalRulesSetOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "createdAt": {
                           "type": "string"
                         }
@@ -3983,6 +4008,396 @@
                         "matchKind",
                         "matchValue",
                         "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/approvalRules/setActionType": {
+      "post": {
+        "operationId": "rpc_approvalRules_setActionType",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "actionType": {
+                        "type": "string",
+                        "enum": [
+                          "send_email",
+                          "spend_money",
+                          "connected_apps_write",
+                          "calendar_changes",
+                          "files_and_commands",
+                          "use_computer",
+                          "delete_data",
+                          "message_outside",
+                          "use_credentials"
+                        ]
+                      },
+                      "botId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "effect": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "allow",
+                              "ask",
+                              "block"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "actionType",
+                      "effect"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/approvalRules/table": {
+      "post": {
+        "operationId": "rpc_approvalRules_table",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "actionType": {
+                                "type": "string",
+                                "enum": [
+                                  "send_email",
+                                  "spend_money",
+                                  "connected_apps_write",
+                                  "calendar_changes",
+                                  "files_and_commands",
+                                  "use_computer",
+                                  "delete_data",
+                                  "message_outside",
+                                  "use_credentials"
+                                ]
+                              },
+                              "effect": {
+                                "$ref": "#/components/schemas/RpcApprovalRulesTableOutputSchema0"
+                              },
+                              "spaceEffect": {
+                                "$ref": "#/components/schemas/RpcApprovalRulesTableOutputSchema0"
+                              },
+                              "botEffect": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcApprovalRulesTableOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "actionType",
+                              "effect",
+                              "spaceEffect",
+                              "botEffect",
+                              "primary"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "rows"
                       ],
                       "additionalProperties": false
                     }
@@ -7382,6 +7797,9 @@
                                                   "const": "ask"
                                                 },
                                                 "text": {
+                                                  "type": "string"
+                                                },
+                                                "approvalReason": {
                                                   "type": "string"
                                                 },
                                                 "approvalEffectId": {
@@ -40719,6 +41137,9 @@
                                         "text": {
                                           "type": "string"
                                         },
+                                        "approvalReason": {
+                                          "type": "string"
+                                        },
                                         "approvalEffectId": {
                                           "$ref": "#/components/schemas/RpcExportBotOutputSchema0"
                                         },
@@ -57095,6 +57516,9 @@
                                           "const": "ask"
                                         },
                                         "text": {
+                                          "type": "string"
+                                        },
+                                        "approvalReason": {
                                           "type": "string"
                                         },
                                         "approvalEffectId": {
@@ -103443,6 +103867,9 @@
                                         "text": {
                                           "type": "string"
                                         },
+                                        "approvalReason": {
+                                          "type": "string"
+                                        },
                                         "approvalEffectId": {
                                           "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
                                         },
@@ -105627,6 +106054,9 @@
                                           "const": "ask"
                                         },
                                         "text": {
+                                          "type": "string"
+                                        },
+                                        "approvalReason": {
                                           "type": "string"
                                         },
                                         "approvalEffectId": {
@@ -113647,6 +114077,22 @@
       },
       "RpcAiConsentAllowInputSchema0": {
         "type": "string"
+      },
+      "RpcApprovalRulesListOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcApprovalRulesSetOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcApprovalRulesTableOutputSchema0": {
+        "type": "string",
+        "enum": [
+          "allow",
+          "ask",
+          "block"
+        ]
       },
       "RpcArtifactsCreateOutputSchema0": {
         "type": "string",

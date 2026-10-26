@@ -187,13 +187,19 @@ model ActionApprovalRule {
   space           Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   createdByUserId String
   createdByUser   User     @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  // always_allow, require_approval or block.
   effect          String
+  // Null for a space-wide rule; a bot id for that bot's override.
+  botId           String?
+  bot             Bot?     @relation(fields: [botId], references: [id], onDelete: Cascade)
   matchKind       String
   matchValue      String
   createdAt       DateTime @default(now())
 
-  @@unique([spaceId, createdByUserId, effect, matchKind, matchValue])
+  // One rule per target: unique index action_approval_rules_target_key (raw SQL in migration
+  // 20261227000000) on (spaceId, createdByUserId, COALESCE(botId, ''), matchKind, lower(matchValue)).
   @@index([spaceId, createdByUserId])
+  @@index([botId])
   @@map("action_approval_rules")
 }
 
@@ -509,6 +515,7 @@ model SpaceVoicePreference {
 }
 
 model Bot {
+  actionApprovalRules    ActionApprovalRule[]
   scratchpadApprovals    ScratchpadApproval[]
   screenGeneration       Int                   @default(0)
   mailSearches           MailSearch[]
@@ -767,6 +774,11 @@ model Run {
   userId               String
   status               String
   trigger              String
+  // Decided once when the run is created (newRunUnattended in core); true when nobody is watching.
+  // Defaults to true so a creation path that forgets to set it fails closed.
+  unattended           Boolean           @default(true)
+  // The prompt carries outside content; calls outside the taint-safe list ask. Never cleared.
+  externalTaint        Boolean           @default(false)
   modelProvider        String?
   modelId              String?
   thinkingLevel        String?

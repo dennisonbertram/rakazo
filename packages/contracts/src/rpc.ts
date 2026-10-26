@@ -102,6 +102,7 @@ import {
 } from "./data-room-autosort.js";
 import { DevinAgentOutputSchema, DevinKeyInputSchema, DevinSessionsOutputSchema } from "./devin.js";
 import {
+  ActionApprovalEffectSchema,
   ActionApprovalRuleSchema,
   ActionAutoReviewSettingsSchema,
   AgentSecretInputSchema,
@@ -110,6 +111,9 @@ import {
   AgentSkillDraftSchema,
   AgentSkillSchema,
   AppBootstrapSchema,
+  ApprovalActionTypeSchema,
+  ApprovalChoiceSchema,
+  ApprovalTableRowSchema,
   ArtifactSchema,
   ArtifactVersionSchema,
   ArtifactWithContentSchema,
@@ -1244,12 +1248,27 @@ export const appContract = {
     set: oc
       .input(
         z.object({
-          effect: z.enum(["always_allow", "require_approval"]),
+          effect: ActionApprovalEffectSchema,
           matchKind: z.enum(["tool", "connector", "category"]),
           matchValue: z.string().min(1),
+          botId: Id.optional(),
         }),
       )
       .output(ActionApprovalRuleSchema),
+    /** The action-type table; with a botId, rows also show that bot's override. */
+    table: oc
+      .input(z.object({ botId: Id.optional() }))
+      .output(z.object({ rows: z.array(ApprovalTableRowSchema) })),
+    /** effect null clears the bot override, or resets the space row to its default. */
+    setActionType: oc
+      .input(
+        z.object({
+          actionType: ApprovalActionTypeSchema,
+          botId: Id.optional(),
+          effect: ApprovalChoiceSchema.nullable(),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
   },
   autoReview: {

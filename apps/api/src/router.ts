@@ -196,6 +196,7 @@ import {
   MESSAGING_PHOTON_BLOCKED_MESSAGE,
   matchFeaturedConnectorId,
   messagingProviderBlocksBot,
+  newRunUnattended,
   nextCronDateAcrossStrict,
   splitPage,
   withAppDirectory,
@@ -205,6 +206,7 @@ import {
   addSidebarFolder,
   addSidebarPage,
   appendEventInTransaction,
+  approvalTable,
   assignSafe,
   autoGroupSidebar,
   BotSectionNameConflictError,
@@ -257,6 +259,7 @@ import {
   isUniqueViolation,
   linkedContact,
   linkedImessageIdentities,
+  listApprovalRules,
   listAuditRequests,
   listBoards,
   listContacts,
@@ -315,6 +318,8 @@ import {
   saveSafe,
   selectSpaceModelPreference,
   selectSpaceVoicePreference,
+  setActionTypeChoice,
+  setApprovalRule,
   setSidebarFolderCollapsed,
   shareDocument,
   toBoardDto,
@@ -728,6 +733,24 @@ function computerContext(actor: Actor, botId: string, operationId: string): Adap
 const EXCLUSIVE_SERVER_MESSAGE = "This integration is used only by its agent.";
 const RECONNECT_DEVIN_MESSAGE = "Use Reconnect on the Devin page to replace the key.";
 
+function approvalRuleDto(row: {
+  id: string;
+  effect: string;
+  matchKind: string;
+  matchValue: string;
+  botId: string | null;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    effect: row.effect as "always_allow" | "require_approval" | "block",
+    matchKind: row.matchKind as "tool" | "connector" | "category",
+    matchValue: row.matchValue,
+    botId: row.botId,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 function mcpServerDto(
   row: {
     id: string;
@@ -1115,6 +1138,7 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
         userId: actor.userId,
         status: "queued",
         trigger: "created",
+        unattended: newRunUnattended({ trigger: "created" }),
       },
       select: { id: true },
     });
@@ -3027,6 +3051,7 @@ export function createRouter(deps: RouterDeps) {
                 userId: context.actor.userId,
                 status: "queued",
                 trigger: "follow_up",
+                unattended: newRunUnattended({ trigger: "follow_up" }),
                 sourceMessageId: message.id,
               },
               select: { id: true },
@@ -3122,6 +3147,7 @@ export function createRouter(deps: RouterDeps) {
                 userId: context.actor.userId,
                 status: "queued",
                 trigger: "call_end",
+                unattended: newRunUnattended({ trigger: "call_end" }),
                 clientNonce: callClientNonce(input.callId),
               },
               select: { id: true },
@@ -4410,6 +4436,7 @@ export function createRouter(deps: RouterDeps) {
                 userId: context.actor.userId,
                 status: "queued",
                 trigger: "routine",
+                unattended: newRunUnattended({ trigger: "routine" }),
                 routineId: routine.id,
                 ...routineRunModelPin(currentModel),
                 clientNonce: nonce,
@@ -7220,48 +7247,42 @@ export function createRouter(deps: RouterDeps) {
     },
     approvalRules: {
       list: authed.approvalRules.list.handler(async ({ context }) => {
-        const rows = await deps.prisma.actionApprovalRule.findMany({
-          where: {
-            spaceId: context.actor.spaceId,
-            createdByUserId: context.actor.userId,
-          },
-          orderBy: { createdAt: "asc" },
+        const rows = await listApprovalRules(deps.prisma, {
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
         });
-        return rows.map((row) => ({
-          id: row.id,
-          effect: row.effect as "always_allow" | "require_approval",
-          matchKind: row.matchKind as "tool" | "connector" | "category",
-          matchValue: row.matchValue,
-          createdAt: row.createdAt.toISOString(),
-        }));
+        return rows.map(approvalRuleDto);
       }),
       set: authed.approvalRules.set.handler(async ({ context, input }) => {
-        const row = await deps.prisma.actionApprovalRule.upsert({
-          where: {
-            spaceId_createdByUserId_effect_matchKind_matchValue: {
-              spaceId: context.actor.spaceId,
-              createdByUserId: context.actor.userId,
-              effect: input.effect,
-              matchKind: input.matchKind,
-              matchValue: input.matchValue,
-            },
-          },
-          create: {
-            spaceId: context.actor.spaceId,
-            createdByUserId: context.actor.userId,
-            effect: input.effect,
-            matchKind: input.matchKind,
-            matchValue: input.matchValue,
-          },
-          update: {},
+        // A bot rule needs a bot the caller can see.
+        if (input.botId) await repos.getBot(context.actor, input.botId);
+        const row = await setApprovalRule(deps.prisma, {
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+          ...input,
         });
+        return approvalRuleDto(row);
+      }),
+      table: authed.approvalRules.table.handler(async ({ context, input }) => {
+        if (input.botId) await repos.getBot(context.actor, input.botId);
         return {
-          id: row.id,
-          effect: row.effect as "always_allow" | "require_approval",
-          matchKind: row.matchKind as "tool" | "connector" | "category",
-          matchValue: row.matchValue,
-          createdAt: row.createdAt.toISOString(),
+          rows: await approvalTable(deps.prisma, {
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+            botId: input.botId,
+          }),
         };
+      }),
+      setActionType: authed.approvalRules.setActionType.handler(async ({ context, input }) => {
+        if (input.botId) await repos.getBot(context.actor, input.botId);
+        await setActionTypeChoice(deps.prisma, {
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+          botId: input.botId,
+          actionType: input.actionType,
+          choice: input.effect,
+        });
+        return { ok: true as const };
       }),
       remove: authed.approvalRules.remove.handler(async ({ context, input }) => {
         await deps.prisma.actionApprovalRule.deleteMany({

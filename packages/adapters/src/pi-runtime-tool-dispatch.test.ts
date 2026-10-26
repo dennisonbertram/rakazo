@@ -604,6 +604,48 @@ describe("Pi connector tool dispatch", () => {
     expect(fakeAgentState.createdToolSets[1]).not.toContain("company_search");
   });
 
+  it("does not start a helper when the executor denies run_subagent", async () => {
+    fakeAgentState.mode = "subagent-inspect";
+    const runtime = new PiAgentRuntime();
+    const request = {
+      botId: "ordinary-agent",
+      threadId: "thread-1",
+      runId: "denied-run",
+      prompt: "Delegate a bounded task.",
+      instructions: "Use a helper.",
+      history: [],
+      tools: [
+        {
+          name: "run_subagent",
+          description: "Delegate bounded work",
+          inputSchema: { type: "object", properties: {} },
+        },
+        {
+          name: "mail_send",
+          description: "Send mail",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+      model: { provider: "test", id: "dispatch-test-model" },
+      executeTool: vi.fn(async () => ({ untrusted: true })),
+      subagentToolNames: new Set(["mail_send"]),
+      subagentDenial: vi.fn(async () => "Helpers are not available in this run."),
+    };
+    const events: unknown[] = [];
+    for await (const event of runtime.run(request, {
+      operationId: "denied-run",
+      traceId: "denied-run",
+      spaceId: "space-1",
+      userId: "owner-1",
+      signal: new AbortController().signal,
+    })) {
+      events.push(event);
+    }
+    expect(request.subagentDenial).toHaveBeenCalled();
+    expect(fakeAgentState.createdToolSets).toHaveLength(1);
+    expect(events).not.toContainEqual(expect.objectContaining({ type: "subagent" }));
+  });
+
   it("injects durable steering at Pi's next safe turn boundary", async () => {
     fakeAgentState.mode = "empty";
     let claimCount = 0;

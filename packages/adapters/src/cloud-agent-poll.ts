@@ -6,7 +6,7 @@ import type {
 } from "@rakazo/adapter-kit";
 import { CloudAgentRequestRejected, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
-import { cloudAgentHttpsUrl } from "@rakazo/core";
+import { cloudAgentHttpsUrl, newRunUnattended } from "@rakazo/core";
 import type { CloudAgent } from "@rakazo/db";
 import { appendEventInTransaction, Prisma } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -316,6 +316,7 @@ async function finishPoll(
             taskId: task.id,
             status: "queued",
             trigger: "cloud_agent",
+            unattended: newRunUnattended({ trigger: "cloud_agent" }),
             clientNonce: `cloud-agent-wake-run:${agent.id}:${saved.generation}`,
           },
         });
