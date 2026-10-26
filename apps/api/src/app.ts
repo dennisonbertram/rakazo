@@ -93,6 +93,7 @@ import {
   SpaceMemoryProviderResolver,
   StripeBillingProvider,
   sandboxProviderOptionsFromEnv,
+  runWatchProbeTick,
   stripeBillingConfigFromEnv,
   syncCryptoHoldings,
   toTeamChatInbound,
@@ -674,6 +675,8 @@ export async function createApp(
         reconcileComputerUpdates: () => reconcileComputerUpdates({ prisma, jobs }),
         reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
         reconcileCompanyImports: () => companyImport.recoveryJob(),
+        // Graphile mode runs watch.probe from RECURRING_JOBS in apps/worker; memory mode has no cron.
+        runWatchProbes: () => runWatchProbeTick({ prisma, jobs, events, notificationEvents }),
       })
     : undefined;
   reconciler?.start();

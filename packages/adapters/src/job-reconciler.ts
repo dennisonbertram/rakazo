@@ -111,6 +111,8 @@ export function createJobReconciler(
     reconcileDataRoom?: () => Promise<unknown>;
     reconcileMeetings?: () => Promise<unknown>;
     reconcileCompanyImports?: () => Promise<void>;
+    /** Watch probes; the in-process mode has no Graphile cron, so the tick runs here. */
+    runWatchProbes?: () => Promise<unknown>;
   },
   options: { intervalMs?: number; batchSize?: number } = {},
 ) {
@@ -136,6 +138,7 @@ export function createJobReconciler(
           deps.reconcileDataRoom,
           deps.reconcileMeetings,
           deps.reconcileCompanyImports,
+          deps.runWatchProbes,
         ].map(async (reconcile) => reconcile?.()),
       );
       for (const result of auxiliary) {
