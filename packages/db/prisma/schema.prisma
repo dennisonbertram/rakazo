@@ -1015,11 +1015,19 @@ model ScratchpadItem {
   dueAt        DateTime?
   waitingOn    String?
   resolvedReason String?
+  /// Set when the item tracks a mail thread. Deleting the connection drops the link, not the item.
+  mailConnectionId String?
+  mailConnection   Connection? @relation(fields: [mailConnectionId], references: [id], onDelete: SetNull)
+  mailThreadId     String?
+  /// The provider message id mail_get takes.
+  mailMessageId    String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([spaceId, botId, status])
   @@index([spaceId, botId, status, dueAt])
+  @@index([mailConnectionId])
+  // Partial unique index scratchpad_items_open_mail_thread_key is created in SQL.
   @@index([spaceId, botId, updatedAt])
   @@map("scratchpad_items")
 }
@@ -1209,6 +1217,7 @@ model Connection {
   mailSenderDecisions MailSenderDecision[]
   mailActionLogs      MailActionLog[]
   inboxTodos          InboxTodo[]
+  scratchpadItems     ScratchpadItem[]
   meetings            Meeting[]
   meetingSyncState    MeetingSyncState?
   mailSyncState       MailSyncState?

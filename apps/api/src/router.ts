@@ -477,6 +477,7 @@ import {
   inboxUnarchiveMany,
 } from "./inbox-modify.js";
 import { inboxAskAgent } from "./inbox-thread-agent.js";
+import { inboxTrack, inboxUntrack } from "./inbox-track.js";
 import { inboxUnsubscribe } from "./inbox-unsubscribe.js";
 import {
   connectionAgentSpawnKeys,
@@ -8374,6 +8375,12 @@ export function createRouter(deps: RouterDeps) {
           input,
           context.signal,
         ),
+      ),
+      track: authed.inbox.track.handler(({ context, input }) =>
+        inboxTrack(deps.prisma, context.actor, input.messageId),
+      ),
+      untrack: authed.inbox.untrack.handler(({ context, input }) =>
+        inboxUntrack(deps.prisma, context.actor, input.messageId),
       ),
       archive: authed.inbox.archive.handler(({ context, input }) =>
         inboxArchive(

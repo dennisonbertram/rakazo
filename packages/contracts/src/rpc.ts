@@ -1553,6 +1553,10 @@ export const appContract = {
     unreadCount: oc.output(z.object({ count: z.number().int() })),
     feedback: oc.input(InboxFeedbackInputSchema).output(InboxFeedbackOutputSchema),
     markRead: oc.input(InboxMarkReadInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** Adds the message's thread to the Chief's Open work. Tracking a tracked thread does nothing. */
+    track: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Marks the thread's open Chief item done. */
+    untrack: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     archive: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     unarchive: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     archiveMany: oc.input(InboxBulkInputSchema).output(InboxBulkResultSchema),
