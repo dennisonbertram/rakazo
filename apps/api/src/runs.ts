@@ -164,7 +164,7 @@ export async function listSpaceRuns(
 }
 
 /**
- * The "needs approval" notifications (seen or not: viewing a card is not answering it) whose card is still waiting for an answer: the run is
+ * The "needs approval" notifications (seen or not: viewing a card is not answering it) whose card is still waiting for an answer, one per card: the run is
  * held for input, its agent exists and is not archived, and a card on it is unanswered. Reading the
  * runs rather than the notification history keeps an old approval, or one for a deleted agent,
  * from being restored or dropped by how long ago it was sent.
@@ -185,11 +185,13 @@ export async function listPendingApprovalNotifications(prisma: PrismaClient, act
     orderBy: { seq: "asc" },
     select: { runId: true, blocks: true },
   });
+  // A held run waits on one card, and it must be an approval: an older approval notification does
+  // not count while the run now waits on a plain question.
   const runIds = runs
-    .filter((run) => pendingAskSnippet(messages.filter((m) => m.runId === run.id)) !== undefined)
+    .filter((run) => pendingAskIsApproval(messages.filter((m) => m.runId === run.id)))
     .map((run) => run.id);
   if (runIds.length === 0) return [];
-  return prisma.notification.findMany({
+  const notifications = await prisma.notification.findMany({
     where: {
       spaceId: actor.spaceId,
       userId: actor.userId,
@@ -200,6 +202,15 @@ export async function listPendingApprovalNotifications(prisma: PrismaClient, act
       title: { endsWith: " needs approval" },
       dismissedAt: null,
     },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
+  // Every approval the run asked leaves a notification; answering a card only marks it seen. Only
+  // the newest one belongs to the card still waiting, so keep one per run (oldest run first).
+  const newestPerRun = new Map<string, (typeof notifications)[number]>();
+  for (const notification of notifications) {
+    if (notification.runId && !newestPerRun.has(notification.runId)) {
+      newestPerRun.set(notification.runId, notification);
+    }
+  }
+  return [...newestPerRun.values()].reverse();
 }
