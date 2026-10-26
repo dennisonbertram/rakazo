@@ -1642,9 +1642,25 @@ export interface BrowserActResult {
 export type PageBrowserCommand =
   | { command: "navigate"; url: string }
   | { command: "snapshot" }
+  | { command: "focus" }
   | { command: "act"; actions: BrowserActStep[] };
 
-export type PageBrowserResult = Partial<BrowserSnapshotResult & BrowserActResult> & { ok: boolean };
+/** The field with keyboard focus in the page: facts only, the caller decides what they mean. */
+export interface PageBrowserFocus {
+  hasFocus: boolean;
+  tag?: string;
+  type?: string;
+  autocomplete?: string;
+  name?: string;
+  id?: string;
+  label?: string;
+  placeholder?: string;
+}
+
+export type PageBrowserResult = Partial<BrowserSnapshotResult & BrowserActResult> & {
+  ok: boolean;
+  focus?: PageBrowserFocus;
+};
 
 /** Vendor-neutral status for a remote cloud coding agent. */
 export type CloudAgentStatus = "running" | "finished" | "failed" | "cancelled";

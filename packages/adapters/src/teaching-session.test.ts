@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   appendRecordingEvent,
+  captureTeachingSnapshot,
+  scrubTaughtSkillRow,
   applyTeachingDesktopInput,
   completeTeachingSession,
   emptyRecording,
@@ -558,6 +560,213 @@ describe("password detection without Protected input", () => {
       current().recording.events.every((event: { sensitive?: boolean }) => event.sensitive),
     ).toBe(true);
     expect((current().playbook as { steps: string[] }).steps).toEqual(['Type "[redacted input]".']);
+  });
+});
+
+/** Adds in-memory held-value storage so typed passwords can be tracked without Postgres. */
+function withHeldValues(harness: ReturnType<typeof recordingDeps>) {
+  const rows = new Map<number, Record<string, unknown>>();
+  const table = {
+    findUnique: vi.fn(
+      async ({ where }: { where: { skillId_segment: { segment: number } } }) =>
+        rows.get(where.skillId_segment.segment) ?? null,
+    ),
+    upsert: vi.fn(
+      async ({
+        where,
+        create,
+        update,
+      }: {
+        where: { skillId_segment: { segment: number } };
+        create: Record<string, unknown>;
+        update: Record<string, unknown>;
+      }) => {
+        const key = where.skillId_segment.segment;
+        rows.set(key, {
+          ...(rows.get(key) ?? create),
+          ...update,
+          ...(rows.has(key) ? {} : create),
+        });
+      },
+    ),
+    findMany: vi.fn(async () => [...rows.values()]),
+    deleteMany: vi.fn(async () => ({ count: 0 })),
+    updateMany: vi.fn(async () => ({ count: 0 })),
+  };
+  Object.assign(harness.tx, { teachHeldValue: table });
+  Object.assign(harness.deps.prisma, { teachHeldValue: table });
+  Object.assign(harness.deps, {
+    secrets: {
+      put: async (value: string) => ({ ciphertext: value }),
+      load: async (ciphertext: string) => ciphertext,
+    },
+  });
+}
+
+const computerRow = {
+  id: "computer-1",
+  homeKey: "bot-1",
+  kind: "e2b",
+  providerRef: "box-1",
+  controlHolder: "user",
+  controlBotId: "bot-1",
+  controlLeaseId: "lease-1",
+};
+
+describe("password detection from the sandbox browser", () => {
+  const actor = { spaceId: "workspace-1", userId: "user-1" } as never;
+
+  function setup(skillId: string) {
+    const harness = recordingDeps(skillRow({ id: skillId }));
+    harness.tx.bot.findUnique = vi.fn(async () => ({
+      id: "bot-1",
+      thread: { id: "thread-1" },
+      computer: computerRow,
+    }));
+    harness.deps.prisma.bot.findUnique = harness.tx.bot.findUnique as never;
+    const sandbox = harness.deps.sandbox as Record<string, unknown>;
+    sandbox.sendInput = vi.fn();
+    sandbox.observe = vi.fn(async () => ({ activeWindow: { title: "Inbox" } }));
+    return harness;
+  }
+  const type = async (deps: unknown, text: string) => {
+    for (const key of text) {
+      await recordTeachingInputEvent(deps as never, actor, "bot-1", { kind: "key", key });
+    }
+  };
+  const focused = (fields: Record<string, unknown>) => ({
+    ok: true,
+    focus: { hasFocus: true, tag: "input", type: "text", ...fields },
+  });
+
+  it("never stores keys typed into a password input, with no label from the client", async () => {
+    const { deps, current } = setup("skill-focus-1");
+    (deps.sandbox as Record<string, unknown>).pageBrowser = vi.fn(async () =>
+      focused({ type: "password", name: "pw" }),
+    );
+    await type(deps, "hunter2");
+    const events = current().recording.events as { sensitive?: boolean; key?: string }[];
+    expect(events).toHaveLength(7);
+    expect(events.every((event) => event.sensitive && event.key === undefined)).toBe(true);
+    expect(JSON.stringify(current().recording)).not.toContain("hunter2");
+    // One check per focus, not per keystroke.
+    expect((deps.sandbox as { pageBrowser: unknown }).pageBrowser).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks again after a click, and records ordinary fields normally", async () => {
+    const { deps, current } = setup("skill-focus-2");
+    const pageBrowser = vi
+      .fn()
+      .mockResolvedValueOnce(focused({ type: "password" }))
+      .mockResolvedValueOnce(focused({ type: "text", name: "search" }));
+    (deps.sandbox as Record<string, unknown>).pageBrowser = pageBrowser;
+    await type(deps, "ab");
+    await recordTeachingInputEvent(deps as never, actor, "bot-1", {
+      kind: "pointer",
+      x: 1,
+      y: 2,
+      button: "left",
+      type: "click",
+    });
+    await type(deps, "cd");
+    expect(pageBrowser).toHaveBeenCalledTimes(2);
+    const keys = (current().recording.events as { kind: string; key?: string }[])
+      .filter((event) => event.kind === "key")
+      .map((event) => event.key);
+    expect(keys).toEqual([undefined, undefined, "c", "d"]);
+  });
+
+  it("treats an autocomplete current-password field as protected", async () => {
+    const { deps, current } = setup("skill-focus-3");
+    (deps.sandbox as Record<string, unknown>).pageBrowser = vi.fn(async () =>
+      focused({ autocomplete: "current-password" }),
+    );
+    await type(deps, "x");
+    expect(current().recording.events[0].sensitive).toBe(true);
+  });
+
+  it("falls back to a sign-in window title when the browser cannot answer", async () => {
+    const { deps, current } = setup("skill-focus-4");
+    const sandbox = deps.sandbox as Record<string, unknown>;
+    sandbox.pageBrowser = vi.fn(async () => {
+      throw new Error("detached");
+    });
+    sandbox.observe = vi.fn(async () => ({ activeWindow: { title: "Sign in - Acme" } }));
+    await type(deps, "hunter2");
+    expect(JSON.stringify(current().recording)).not.toContain("hunter2");
+    expect(current().recording.events.every((e: { sensitive?: boolean }) => e.sensitive)).toBe(
+      true,
+    );
+  });
+
+  it("keeps recording ordinary typing when neither check finds a credential", async () => {
+    const { deps, current } = setup("skill-focus-5");
+    (deps.sandbox as Record<string, unknown>).pageBrowser = vi.fn(async () => ({ ok: false }));
+    await type(deps, "hi");
+    expect(current().recording.events.map((e: { key?: string }) => e.key)).toEqual(["h", "i"]);
+  });
+});
+
+describe("held passwords echoed in window titles and snapshots", () => {
+  const actor = { spaceId: "workspace-1", userId: "user-1" } as never;
+
+  it("never persists the held value, or an app name derived from it, before or after Stop", async () => {
+    const harness = recordingDeps(skillRow({ id: "skill-echo-1" }));
+    withHeldValues(harness);
+    const { deps, current, tx } = harness;
+    const bot = { id: "bot-1", thread: { id: "thread-1" }, computer: computerRow };
+    tx.bot.findUnique = vi.fn(async () => bot);
+    tx.message.findMany = vi
+      .fn()
+      .mockResolvedValue([
+        { id: "message-1", blocks: [{ kind: "skill_draft", skillId: "skill-echo-1" }] },
+      ]);
+    deps.prisma.bot.findUnique = vi.fn().mockResolvedValue(bot);
+    const sandbox = deps.sandbox as Record<string, unknown>;
+    sandbox.sendInput = vi.fn();
+    sandbox.observe = vi.fn(async () => ({ activeWindow: { title: "Document - hunter2" } }));
+    for (const key of "hunter2") {
+      await recordTeachingInputEvent(deps as never, actor, "bot-1", {
+        kind: "key",
+        key,
+        field: "Password",
+      });
+    }
+    await recordTeachingInputEvent(deps as never, actor, "bot-1", {
+      kind: "pointer",
+      x: 1,
+      y: 2,
+      button: "left",
+      type: "click",
+    });
+    await captureTeachingSnapshot(deps as never, actor, bot as never, current() as never);
+    expect(JSON.stringify(current().recording)).not.toContain("hunter2");
+    const windows = current().recording.events.filter((e: { kind: string }) => e.kind === "window");
+    expect(windows).toHaveLength(1);
+    expect(windows[0].app).toBe("[redacted]");
+    await completeTeachingSession(deps as never, actor, "skill-echo-1", "stopped");
+    expect(JSON.stringify(current().recording)).not.toContain("hunter2");
+    expect(JSON.stringify(current().playbook)).not.toContain("hunter2");
+  });
+
+  it("scrubs a recording it returns to the user while recording", async () => {
+    const harness = recordingDeps(
+      skillRow({
+        id: "skill-echo-2",
+        recording: {
+          events: [{ at: "1", kind: "window", title: "Doc - hunter2", app: "hunter2" }],
+          snapshots: [{ at: "1", summary: "Doc - hunter2" }],
+        } as never,
+      }),
+    );
+    withHeldValues(harness);
+    await harness.deps.prisma.teachHeldValue.upsert({
+      where: { skillId_segment: { segment: 0 } },
+      create: { ciphertext: "hunter2", segment: 0 },
+      update: {},
+    } as never);
+    const row = await scrubTaughtSkillRow(harness.deps as never, harness.current() as never);
+    expect(JSON.stringify(row.recording)).not.toContain("hunter2");
   });
 });
 
