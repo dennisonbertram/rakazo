@@ -41,17 +41,18 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArtifactPreview } from "../components/ArtifactPreview";
 import { ArtifactShareDialog } from "../components/ArtifactShareDialog";
 import { AskBotButton } from "../components/AskBotButton";
 import { Tip } from "../components/data-room/FilterBar";
-import { PickFilter, SearchField } from "../components/ListControls";
+import { PickFilter, SearchField, SortControl } from "../components/ListControls";
 import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { StillLoading } from "../components/ShellSkeleton";
 import { artifactDisplayName as displayName } from "../lib/artifact-name";
 import { bytesToBase64, decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
+import { sortBy, useListParams } from "../lib/list-params";
 import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { canPreviewSpreadsheet } from "../lib/spreadsheet";
@@ -59,6 +60,11 @@ import { errorText } from "../lib/user-error";
 
 type ViewMode = "grid" | "list";
 type DateFilter = "all" | "today" | "week" | "month";
+const DATE_FILTERS = ["today", "week", "month"] as const;
+const ARTIFACT_SORTS = ["name", "bot", "type", "added"] as const;
+type ArtifactSort = (typeof ARTIFACT_SORTS)[number];
+/** The server lists newest first; that stays the default. */
+const DEFAULT_ARTIFACT_SORT = { field: "added", dir: "desc" } as const;
 const VIEW_MODE_STORAGE_KEY = "rakazo:artifacts-view-mode";
 const LIST_PAGE_SIZE = 60;
 
@@ -66,12 +72,21 @@ type ArtifactSummary = Artifact & { versionCount: number };
 
 const isSheet = (mimeType: string) => /csv|spreadsheet|excel/.test(mimeType);
 
+/** A locale-independent key for an artifact's kind, safe to keep in the URL. */
+function kindKey(mimeType: string): string {
+  if (mimeType === "text/html") return "page";
+  if (mimeType === "text/markdown") return "doc";
+  if (isSheet(mimeType)) return "sheet";
+  return mimeBadgeLabel(mimeType);
+}
+
 /** Plain words for the card badge: Maya knows a Doc, a Sheet and a Page, not MD, CSV and HTML. */
 function kindLabel(mimeType: string): string {
-  if (mimeType === "text/html") return translate`Page`;
-  if (mimeType === "text/markdown") return translate`Doc`;
-  if (isSheet(mimeType)) return translate`Sheet`;
-  return mimeBadgeLabel(mimeType);
+  const key = kindKey(mimeType);
+  if (key === "page") return translate`Page`;
+  if (key === "doc") return translate`Doc`;
+  if (key === "sheet") return translate`Sheet`;
+  return key;
 }
 
 /** The saved choice; with none, a phone gets the list (one card fills most of its screen). */
@@ -120,6 +135,7 @@ export function ArtifactsPage({
 }) {
   const { artifactId } = useParams<{ artifactId?: string }>();
   const navigate = useNavigate();
+  const artifactPath = useArtifactPath();
   const { t } = useLingui();
   const [items, setItems] = useState<ArtifactSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -127,21 +143,16 @@ export function ArtifactsPage({
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
   const listingGenerationRef = useRef(0);
-  const [activeBotId, setActiveBotId] = useState<string | null>(null);
+  // Search, filters and sort live in the URL; the palette's "See all in Artifacts" arrives as ?q=.
+  const list = useListParams(ARTIFACT_SORTS, DEFAULT_ARTIFACT_SORT);
+  const searchQuery = list.param("q") ?? "";
+  const activeBotId = list.param("bot") ?? null;
+  const typeFilter = list.param("type");
+  const askedDate = list.param("added");
+  const dateFilter: DateFilter = DATE_FILTERS.find((d) => d === askedDate) ?? "all";
   // Bots that own at least one artifact. Only grows, so filtering to one bot keeps the others listed.
   const [ownerBotIds, setOwnerBotIds] = useState<ReadonlySet<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>(readViewMode);
-  // The palette's "See all in Artifacts" arrives as ?q=.
-  const urlQuery = useSearchParams()[0].get("q") ?? "";
-  const [searchQuery, setSearchQuery] = useState(urlQuery);
-  useEffect(() => {
-    if (!urlQuery) return;
-    // Show every match: an earlier bot or date filter would hide some of them.
-    setSearchQuery(urlQuery);
-    setDateFilter("all");
-    setActiveBotId(null);
-  }, [urlQuery]);
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [maximized, setMaximized] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ArtifactSummary | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -240,19 +251,38 @@ export function ArtifactsPage({
   const filteredItems = useMemo(() => {
     if (!items) return null;
     const now = new Date();
-    return items.filter((item) => {
-      if (!matchesCalendarDateFilter(item.createdAt, dateFilter, now)) return false;
-      return matchesArtifactQuery(item, searchQuery);
-    });
-  }, [items, searchQuery, dateFilter]);
+    const kept = items.filter(
+      (item) =>
+        matchesCalendarDateFilter(item.createdAt, dateFilter, now) &&
+        (!typeFilter || kindKey(item.mimeType) === typeFilter) &&
+        matchesArtifactQuery(item, searchQuery),
+    );
+    // ponytail: the list API has no order parameter, so sorting covers only the loaded pages;
+    // pass the sort to listSpace (and its cursor) to sort the whole space.
+    const botName = (item: ArtifactSummary) => bots.find((b) => b.id === item.botId)?.name;
+    const pick = {
+      name: (item: ArtifactSummary) => displayName(item.name),
+      bot: botName,
+      type: (item: ArtifactSummary) => kindLabel(item.mimeType),
+      added: (item: ArtifactSummary) => item.createdAt,
+    }[list.sort.field];
+    return sortBy(kept, pick, list.sort.dir);
+  }, [items, searchQuery, dateFilter, typeFilter, bots, list.sort.field, list.sort.dir]);
 
-  const clientFilterActive = searchQuery.trim().length > 0 || dateFilter !== "all";
+  const typeOptions = useMemo(
+    () =>
+      [...new Map((items ?? []).map((i) => [kindKey(i.mimeType), kindLabel(i.mimeType)]))].sort(
+        (a, b) => a[1].localeCompare(b[1]),
+      ),
+    [items],
+  );
+
+  const clientFilterActive =
+    searchQuery.trim().length > 0 || dateFilter !== "all" || typeFilter !== undefined;
   const filterActive = clientFilterActive || activeBotId !== null;
 
   function clearFilters() {
-    setSearchQuery("");
-    setDateFilter("all");
-    setActiveBotId(null);
+    list.clear("q", "bot", "type", "added");
   }
 
   // A filter that hides the open artifact closes it, so the list never sits beside an unrelated preview.
@@ -263,13 +293,13 @@ export function ArtifactsPage({
       filteredItems &&
       !filteredItems.some((i) => i.id === artifactId)
     )
-      navigate("/app/artifacts");
-  }, [artifactId, filterActive, filteredItems, navigate]);
+      navigate(artifactPath());
+  }, [artifactId, filterActive, filteredItems, navigate, artifactPath]);
   const autoFetchedCursorRef = useRef<string | null>(null);
 
   useEffect(() => {
     autoFetchedCursorRef.current = null;
-  }, [searchQuery, dateFilter, activeBotId]);
+  }, [searchQuery, dateFilter, typeFilter, activeBotId]);
 
   // Search and date filters only see loaded pages, so keep paging until something matches.
   useEffect(() => {
@@ -284,7 +314,7 @@ export function ArtifactsPage({
     setViewMode(mode);
     writeViewMode(mode);
     // The split view always lists rows; picking a view leaves it for the full list.
-    if (artifactId) navigate("/app/artifacts");
+    if (artifactId) navigate(artifactPath());
   }
 
   async function confirmDelete() {
@@ -294,7 +324,7 @@ export function ArtifactsPage({
     try {
       await rpc.artifacts.remove({ artifactId: pendingDelete.id });
       setItems((current) => current?.filter((item) => item.id !== pendingDelete.id) ?? current);
-      if (artifactId === pendingDelete.id) navigate("/app/artifacts");
+      if (artifactId === pendingDelete.id) navigate(artifactPath());
       setPendingDelete(null);
     } catch (error) {
       setDeleteError(errorText(error, t`Could not delete this artifact.`));
@@ -362,7 +392,7 @@ export function ArtifactsPage({
           <SearchField
             className="w-full md:w-72"
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={(value) => list.setParam("q", value)}
             placeholder={t`Search`}
             label={t`Search artifacts`}
             name="artifacts-search"
@@ -376,14 +406,37 @@ export function ArtifactsPage({
               ["week", t`This week`],
               ["month", t`This month`],
             ]}
-            onChange={(next) => setDateFilter((next as DateFilter | undefined) ?? "all")}
+            onChange={(next) => list.setParam("added", next)}
+          />
+          <PickFilter
+            label={t`Type`}
+            value={typeFilter}
+            options={typeOptions}
+            onChange={(next) => list.setParam("type", next)}
           />
           {ownerBots.length > 1 ? (
             <PickFilter
               label={t`Bot`}
               value={activeBotId ?? undefined}
               options={ownerBots.map((bot) => [bot.id, bot.name])}
-              onChange={(next) => setActiveBotId(next ?? null)}
+              onChange={(next) => list.setParam("bot", next)}
+            />
+          ) : null}
+          {viewMode === "grid" ? (
+            <SortControl
+              fields={[
+                ["name", t`Name`],
+                ["bot", t`Bot`],
+                ["type", t`Type`],
+                ["added", t`Added`],
+              ]}
+              field={list.sort.field}
+              fieldLabel={
+                { name: t`Name`, bot: t`Bot`, type: t`Type`, added: t`Added` }[list.sort.field]
+              }
+              direction={list.sort.dir}
+              onField={(field) => list.setSort({ field, dir: field === "added" ? "desc" : "asc" })}
+              onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
             />
           ) : null}
           {/* On a phone the header has no room for the view switch, so it waits here with the filters. */}
@@ -417,6 +470,8 @@ export function ArtifactsPage({
           </>
         ) : (
           <BrowsingPane
+            sort={list.sort}
+            onSort={list.toggleSort}
             items={filteredItems}
             filtered={filterActive}
             onClearFilters={clearFilters}
@@ -480,7 +535,20 @@ export function ArtifactsPage({
   );
 }
 
+/** Paths to the list or one artifact that keep the URL's search, filters and sort. */
+function useArtifactPath() {
+  const { search } = useLocation();
+  return (id?: string) => ({ pathname: id ? `/app/artifacts/${id}` : "/app/artifacts", search });
+}
+
+type SortProps = {
+  sort: { field: ArtifactSort; dir: "asc" | "desc" };
+  onSort: (field: ArtifactSort) => void;
+};
+
 function BrowsingPane({
+  sort,
+  onSort,
   items,
   filtered,
   onClearFilters,
@@ -491,7 +559,7 @@ function BrowsingPane({
   nextCursor,
   loadingMore,
   onLoadMore,
-}: {
+}: SortProps & {
   items: ArtifactSummary[] | null;
   filtered: boolean;
   onClearFilters: () => void;
@@ -552,7 +620,13 @@ function BrowsingPane({
           ))}
         </div>
       ) : (
-        <ArtifactTable items={items} botsById={botsById} onRequestDelete={onRequestDelete} />
+        <ArtifactTable
+          sort={sort}
+          onSort={onSort}
+          items={items}
+          botsById={botsById}
+          onRequestDelete={onRequestDelete}
+        />
       )}
       {nextCursor ? (
         <div className="pb-4">
@@ -569,14 +643,17 @@ const MID_COLUMN = "hidden @min-[720px]/list:table-column";
 
 /** The list view: one row per artifact, in the same table the Data room and Cap table use. */
 function ArtifactTable({
+  sort,
+  onSort,
   items,
   botsById,
   onRequestDelete,
-}: {
+}: SortProps & {
   items: ArtifactSummary[];
   botsById: Map<string, Bot>;
   onRequestDelete: (artifact: ArtifactSummary) => void;
 }) {
+  const artifactPath = useArtifactPath();
   const { t } = useLingui();
   const navigate = useNavigate();
   const showBot = botsById.size > 0;
@@ -594,18 +671,33 @@ function ArtifactTable({
           className="sticky top-0 z-10 hidden bg-background @min-[720px]/list:table-header-group"
         >
           <TableHeadRow>
-            <TableHead>
+            <TableHead
+              sortDirection={sort.field === "name" ? sort.dir : null}
+              onSort={() => onSort("name")}
+            >
               <Trans>Name</Trans>
             </TableHead>
             {showBot ? (
-              <TableHead className={MID_COL}>
+              <TableHead
+                className={MID_COL}
+                sortDirection={sort.field === "bot" ? sort.dir : null}
+                onSort={() => onSort("bot")}
+              >
                 <Trans>Bot</Trans>
               </TableHead>
             ) : null}
-            <TableHead className={MID_COL}>
+            <TableHead
+              className={MID_COL}
+              sortDirection={sort.field === "type" ? sort.dir : null}
+              onSort={() => onSort("type")}
+            >
               <Trans>Type</Trans>
             </TableHead>
-            <TableHead className={`${MID_COL} text-end`}>
+            <TableHead
+              className={`${MID_COL} text-end`}
+              sortDirection={sort.field === "added" ? sort.dir : null}
+              onSort={() => onSort("added")}
+            >
               <Trans>Added</Trans>
             </TableHead>
           </TableHeadRow>
@@ -619,7 +711,7 @@ function ArtifactTable({
                 key={artifact.id}
                 data-testid="artifact-row"
                 className="group/row h-10 cursor-pointer [&>td]:py-1.5"
-                onClick={() => navigate(`/app/artifacts/${artifact.id}`)}
+                onClick={() => navigate(artifactPath(artifact.id))}
               >
                 <TableCell>
                   <div className="flex min-w-0 items-center gap-2">
@@ -628,7 +720,7 @@ function ArtifactTable({
                     </span>
                     <div className="flex min-w-0 flex-col">
                       <Link
-                        to={`/app/artifacts/${artifact.id}`}
+                        to={artifactPath(artifact.id)}
                         onClick={(event) => event.stopPropagation()}
                         className="truncate font-medium"
                         title={artifact.name}
@@ -858,12 +950,13 @@ function ArtifactCard({
   showTime: boolean;
   onRequestDelete: (artifact: ArtifactSummary) => void;
 }) {
+  const artifactPath = useArtifactPath();
   const { t } = useLingui();
   const title = displayName(artifact.name);
   return (
     <div className="group relative">
       <Link
-        to={`/app/artifacts/${artifact.id}`}
+        to={artifactPath(artifact.id)}
         // h-full: cards in one grid row share a height, so the hover Delete stays inside each.
         className="flex h-full items-start gap-3 rounded-2xl border border-border bg-card p-3 text-foreground hover:bg-accent/40 max-md:items-center"
       >
@@ -941,12 +1034,13 @@ function ArtifactRow({
   showTime: boolean;
   onRequestDelete: (artifact: ArtifactSummary) => void;
 }) {
+  const artifactPath = useArtifactPath();
   const { t } = useLingui();
   const title = displayName(artifact.name);
   return (
     <div className={`group relative ${active ? "bg-accent/60" : "hover:bg-accent/40"}`}>
       <Link
-        to={`/app/artifacts/${artifact.id}`}
+        to={artifactPath(artifact.id)}
         aria-current={active ? "page" : undefined}
         title={[bot?.name, artifact.description].filter(Boolean).join(" · ") || undefined}
         className="flex h-10 items-center gap-2 px-4 pe-10"
@@ -1027,6 +1121,7 @@ function PreviewPane({
   maximized: boolean;
   onToggleMaximize: () => void;
 }) {
+  const artifactPath = useArtifactPath();
   const { t } = useLingui();
   const [versions, setVersions] = useState<ArtifactVersion[] | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -1157,7 +1252,7 @@ function PreviewPane({
           variant="ghost"
           size="icon"
           className="shrink-0 md:hidden"
-          render={<Link to="/app/artifacts" />}
+          render={<Link to={artifactPath()} />}
           aria-label={t`Back to artifacts`}
         >
           <ArrowLeft size={18} strokeWidth={1.9} />
