@@ -79,6 +79,20 @@ vi.mock("./EmailAgentPanel", () => ({
     </aside>
   ),
 }));
+vi.mock("./ContextPanel", () => ({
+  ContextPanel: ({ people }: { people: Array<{ email: string }> }) => (
+    <div data-testid="context-people">{people.map((p) => p.email).join(",")}</div>
+  ),
+}));
+vi.mock("react-router-dom", () => ({
+  Link: ({ to, render: _render, ...props }: { to: string; render?: unknown }) => (
+    <a href={to} {...props} />
+  ),
+}));
+vi.mock("../../lib/mail-context-panel", async () => {
+  const { useState } = await import("react");
+  return { useContextPanelOpen: () => useState(true) };
+});
 const get = vi.fn();
 vi.mock("../../lib/rpc", () => ({
   rpc: { inbox: { get: (input: unknown) => get(input) } },
@@ -378,13 +392,76 @@ it("Ask agent opens the email's agent in a panel, which closes again and can sta
   expect(document.querySelector("[data-slot=dialog-content] > div")?.className).toContain(
     "md:pe-96",
   );
-  expect(document.querySelector('[data-testid="agent-panel"]')?.parentElement?.className).toContain(
-    "absolute",
-  );
+  expect(
+    document.querySelector('[data-testid="email-side-panel"]')?.parentElement?.className,
+  ).toContain("absolute");
   await click("panel draft");
   expect(document.querySelector('[data-testid="compose"]')?.textContent).toBe("reply:Hi Sam");
   await click("panel close");
   expect(document.querySelector('[data-testid="agent-panel"]')).toBeNull();
+});
+
+const tab = (name: string) =>
+  [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find((el) =>
+    el.textContent?.includes(name),
+  );
+
+it("opens on Context with the sender, and the Context button hides and shows the panel", async () => {
+  get.mockImplementation(async ({ messageId }) => ({
+    ...message(messageId),
+    from: "Ann Lee <ann@example.com>",
+  }));
+  act(() => root.render(<InboxMessageDialog messageId="m4" onClose={() => {}} />));
+  await flush();
+  const people = () => document.querySelector('[data-testid="context-people"]')?.textContent;
+  expect(people()).toBe("ann@example.com");
+  // Without an agent to switch to, there are no tabs.
+  expect(tab("Agent")).toBeUndefined();
+  const toggle = () =>
+    document.querySelector<HTMLElement>('button[aria-label="Context"][aria-pressed]');
+  await act(async () => toggle()?.click());
+  expect(people()).toBeUndefined();
+  await act(async () => toggle()?.click());
+  expect(people()).toBe("ann@example.com");
+});
+
+it("names the recipients of a message the user wrote", async () => {
+  get.mockImplementation(async ({ messageId }) => ({
+    ...message(messageId),
+    fromSelf: true,
+    to: "Kevin Zhao <kevin@acme.example.test>, kevin@acme.example.test",
+    cc: "kim@example.com",
+  }));
+  act(() => root.render(<InboxMessageDialog messageId="m5" onClose={() => {}} />));
+  await flush();
+  expect(document.querySelector('[data-testid="context-people"]')?.textContent).toBe(
+    "kevin@acme.example.test,kim@example.com",
+  );
+});
+
+it("creates the email's agent when its tab is first opened, and keeps its chat between tabs", async () => {
+  get.mockImplementation(async ({ messageId }) => message(messageId));
+  const onAskAgentPanel = vi.fn().mockResolvedValue({ id: "bot-1", name: "Thread agent" });
+  act(() =>
+    root.render(
+      <InboxMessageDialog messageId="m6" onAskAgentPanel={onAskAgentPanel} onClose={() => {}} />,
+    ),
+  );
+  await flush();
+  expect(document.querySelector('[data-testid="agent-panel"]')).toBeNull();
+  await act(async () => tab("Agent")?.click());
+  await flush();
+  expect(onAskAgentPanel).toHaveBeenCalledTimes(1);
+  expect(tab("Agent")?.getAttribute("aria-selected")).toBe("true");
+  const agent = document.querySelector('[data-testid="agent-panel"]');
+  expect(agent?.textContent).toContain("Thread agent");
+  await act(async () => tab("Context")?.click());
+  expect(tab("Context")?.getAttribute("aria-selected")).toBe("true");
+  // Still mounted, only hidden.
+  expect(document.querySelector('[data-testid="agent-panel"]')).toBe(agent);
+  expect(agent?.parentElement?.className).toContain("hidden");
+  await act(async () => tab("Agent")?.click());
+  expect(onAskAgentPanel).toHaveBeenCalledTimes(1);
 });
 
 it("reopens a failed send with its own recipients and subject", async () => {
