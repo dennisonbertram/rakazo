@@ -12,7 +12,7 @@ import {
   resolveAskChoice,
 } from "@rakazo/core";
 import { Button, Input } from "@rakazo/ui-web";
-import { Check, KeyRound, X } from "lucide-react";
+import { Check, ChevronDown, KeyRound, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 import { errorText } from "../lib/user-error";
@@ -117,7 +117,9 @@ export function AskCard({
   const [answer, setAnswer] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [toolIdOpen, setToolIdOpen] = useState(false);
   const questionId = useId();
+  const toolIdPanel = useId();
   const answeredHere = useRef(false);
   // A card that replaces one just answered keeps its buttons off for a second, so a second click
   // meant for the old card cannot approve the new one.
@@ -198,6 +200,31 @@ export function AskCard({
       <div id={questionId} className="text-[15.5px] leading-[1.5] text-foreground">
         <ChatMarkdown>{block.text}</ChatMarkdown>
       </div>
+      {block.toolId ? (
+        <div className="mt-1">
+          <button
+            type="button"
+            aria-expanded={toolIdOpen}
+            aria-controls={toolIdPanel}
+            aria-label={t`Tool name`}
+            className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setToolIdOpen((open) => !open)}
+          >
+            <ChevronDown
+              aria-hidden
+              className={`size-4 transition-transform ${toolIdOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {toolIdOpen ? (
+            <code
+              id={toolIdPanel}
+              className="ms-1 break-all font-mono text-[12.5px] text-muted-foreground"
+            >
+              {block.toolId}
+            </code>
+          ) : null}
+        </div>
+      ) : null}
       {secretInput && block.credential ? (
         <div
           data-testid="secret-ask-destination"

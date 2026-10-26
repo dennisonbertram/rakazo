@@ -94,6 +94,12 @@ type ContactTab = (typeof CONTACT_TABS)[number];
 const parseTab = (value: string | null): ContactTab =>
   CONTACT_TABS.find((tab) => tab === value) ?? "investor";
 
+/** The page sections, one tab each; the first is the default. */
+const SECTIONS = ["cap-table", "updates", "contacts"] as const;
+type Section = (typeof SECTIONS)[number];
+const parseSection = (value: string | null): Section =>
+  SECTIONS.find((section) => section === value) ?? "cap-table";
+
 /** How often the page asks again while the Carta agent is still reading. */
 const POLL_MS = 3000;
 /** How often an idle page checks for a change made elsewhere, such as in another tab. */
@@ -577,6 +583,7 @@ export function InvestorsPage({
   const [cap, setCap] = useState<CapTableState | null>(null);
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get("kind"));
+  const section = parseSection(params.get("tab"));
   const setParam = (key: string, value: string | undefined) =>
     setParams(
       (current) => {
@@ -1221,6 +1228,24 @@ export function InvestorsPage({
           </div>
         ) : null}
         <div className="flex flex-col gap-4">
+          <Tabs
+            value={section}
+            onValueChange={(next) =>
+              setParam("tab", next === SECTIONS[0] ? undefined : String(next))
+            }
+          >
+            <TabsList className="max-w-full rounded-full" aria-label={t`Sections`}>
+              <TabsTrigger value="cap-table" className="rounded-full px-3">
+                <Trans>Cap table</Trans>
+              </TabsTrigger>
+              <TabsTrigger value="updates" className="rounded-full px-3">
+                <Trans>Updates</Trans>
+              </TabsTrigger>
+              <TabsTrigger value="contacts" className="rounded-full px-3">
+                <Trans>Contacts</Trans>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           <ActionItems
             drafts={(updates ?? []).filter((u) => u.status === "draft")}
             audits={audits
@@ -1246,254 +1271,273 @@ export function InvestorsPage({
             </div>
           ) : (
             <>
-              <SectionCard
-                title={t`Cap table`}
-                actions={<span ref={setStatusSlot} className="flex items-center gap-2 text-xs" />}
-              >
-                {snapshot && math ? (
-                  <>
-                    {snapshot.holders.length === 0 &&
-                    !snapshot.fullyDilutedShares &&
-                    !snapshot.latest409a &&
-                    countedSafes(safes).length === 0 ? null : (
-                      <Summary
-                        snapshot={snapshot}
-                        safes={safes}
-                        safesLoaded={safesLoaded}
-                        safesFailed={safesFailed}
-                        syncing={syncing}
-                        onRetry={() => void loadCap()}
-                      />
-                    )}
-                    {snapshot.source === "native" ? (
-                      <CapTableEditor
-                        snapshot={snapshot}
-                        onSave={saveTable}
-                        contactIdFor={(name) =>
-                          contactFor(allContacts, { name, email: null })?.id ?? null
-                        }
-                        onAddContact={(name) => addHolderAsContact(name)}
-                        onOpenContact={openContact}
-                        statusSlot={statusSlot}
-                      />
-                    ) : (
-                      <div className="@container">
-                        <OwnershipBar
-                          className="mb-3"
-                          classes={math.classes}
-                          pool={math.pool?.percent ?? null}
-                        />
-                        <HoldingsTable
-                          rows={holdingRows}
-                          onAddContact={(row) =>
-                            addHolderAsContact(
-                              row.name,
-                              snapshot.holders.find((holder) => holder.name === row.name)?.email ??
-                                null,
-                            )
-                          }
-                          onOpenContact={openContact}
-                        />
-                      </div>
-                    )}
-                    <SafeRows safes={safes} />
-                  </>
-                ) : (
-                  <>
-                    {reading ? (
-                      <p className="text-sm text-muted-foreground">
-                        <Trans>Reading Carta…</Trans>
-                      </p>
-                    ) : sheetPending && sheetReading ? (
-                      <p className="text-sm text-muted-foreground">
-                        {t`Reading ${raw?.sourceRef?.name ?? ""}…`}
-                      </p>
-                    ) : sheetPending && readFailed ? (
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="w-full text-warning">
-                          <Trans>The sheet could not be read.</Trans>
-                        </span>
-                        <Button variant="outline" onClick={() => void refresh()}>
-                          <Trans>Try again</Trans>
-                        </Button>
-                        <Button variant="outline" onClick={() => void typeItIn()}>
-                          <Trans>Type it in</Trans>
-                        </Button>
-                      </div>
-                    ) : (
-                      // No table yet: pick where it comes from. None is filled; the page cannot know which fits.
-                      <div className="grid grid-cols-1 gap-2 @md/bd:grid-cols-3">
-                        {neverRead ? (
-                          // Connected but unread: reading starts with a model; Type it in stays available.
-                          needsModel && onOpenModelSettings ? (
-                            <Button
-                              variant="outline"
-                              className={SOURCE_BUTTON}
-                              onClick={onOpenModelSettings}
-                            >
-                              <CirclePlus aria-hidden="true" className="text-muted-foreground" />
-                              <Trans>Add a model</Trans>
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              className={SOURCE_BUTTON}
-                              onClick={() => void refresh()}
-                            >
-                              <CirclePlus aria-hidden="true" className="text-muted-foreground" />
-                              <Trans>Read cap table</Trans>
-                            </Button>
-                          )
-                        ) : serversFailed ? null : (
-                          <Button
-                            variant="outline"
-                            className={SOURCE_BUTTON}
-                            onClick={() => setConnecting(true)}
-                          >
-                            <CirclePlus aria-hidden="true" className="text-muted-foreground" />
-                            {cartaExpired ? (
-                              <Trans>Reconnect Carta</Trans>
-                            ) : (
-                              <Trans>Connect Carta</Trans>
-                            )}
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          className={SOURCE_BUTTON}
-                          onClick={() => void chooseSheet()}
-                        >
-                          <Sheet aria-hidden="true" className="text-muted-foreground" />
-                          <Trans>Use a Google Sheet</Trans>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className={SOURCE_BUTTON}
-                          onClick={() => void typeItIn()}
-                        >
-                          <Type aria-hidden="true" className="text-muted-foreground" />
-                          <Trans>Type it in</Trans>
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </SectionCard>
-
-              <UpdatesSection
-                updates={updates}
-                cadence={cadence}
-                failed={updatesFailed}
-                onNew={() => void startUpdate("investors")}
-                onOpen={(update) => navigate(`/app/investors/updates/${update.id}`)}
-                onRetry={retryUpdate}
-                onMarkDelivered={(update) =>
-                  void updateAction(
-                    () => rpc.investors.updates.markDelivered({ id: update.id }),
-                    t`Could not mark delivered`,
-                  )
-                }
-                onDuplicate={(update) =>
-                  void rpc.investors.updates
-                    .duplicate({ id: update.id })
-                    .then((copy) => navigate(`/app/investors/updates/${copy.id}`))
-                    .catch((cause) => notify(errorText(cause, t`Could not duplicate`)))
-                }
-                onDelete={setDeletingUpdate}
-                onReminder={changeReminder}
-                onReload={loadUpdates}
-                doneToggle={
-                  audits.some((a) => a.status === "done")
-                    ? { shown: showDone, onToggle: () => setShowDone((v) => !v) }
-                    : null
-                }
-              />
-
-              <SectionCard title={t`Contacts`}>
-                <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <Tabs
-                    value={tab}
-                    onValueChange={(next) =>
-                      setParam("kind", next === "investor" ? undefined : String(next))
+              {section === "cap-table" ? (
+                <>
+                  <SectionCard
+                    title={t`Cap table`}
+                    actions={
+                      <span ref={setStatusSlot} className="flex items-center gap-2 text-xs" />
                     }
                   >
-                    <TabsList className="rounded-2xl" aria-label={t`Kind`}>
-                      {CONTACT_TABS.map((value) => (
-                        <TabsTrigger
-                          key={value}
-                          value={value}
-                          className="h-7 flex-none rounded-full px-3"
-                        >
-                          {tabNames[value]}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
-                  {tab === "board" && hasBoard ? (
-                    <Button variant="outline" size="sm" onClick={() => void startUpdate("board")}>
-                      <Trans>Message the board</Trans>
-                    </Button>
-                  ) : null}
-                  {allContacts.length > 0 && !error ? (
-                    <SearchField
-                      className="w-full @md/bd:ms-auto @md/bd:w-56"
-                      value={query}
-                      onChange={(next) => setParam("q", next || undefined)}
-                      placeholder={t`Search`}
-                      label={t`Search`}
-                      name="contact-search"
-                    />
-                  ) : null}
-                </div>
-                {error ? (
-                  <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className="text-destructive">{error}</span>
-                    <Button variant="outline" size="sm" onClick={load}>
-                      <Trans>Try again</Trans>
-                    </Button>
+                    {snapshot && math ? (
+                      <>
+                        {snapshot.holders.length === 0 &&
+                        !snapshot.fullyDilutedShares &&
+                        !snapshot.latest409a &&
+                        countedSafes(safes).length === 0 ? null : (
+                          <Summary
+                            snapshot={snapshot}
+                            safes={safes}
+                            safesLoaded={safesLoaded}
+                            safesFailed={safesFailed}
+                            syncing={syncing}
+                            onRetry={() => void loadCap()}
+                          />
+                        )}
+                        {snapshot.source === "native" ? (
+                          <CapTableEditor
+                            snapshot={snapshot}
+                            onSave={saveTable}
+                            contactIdFor={(name) =>
+                              contactFor(allContacts, { name, email: null })?.id ?? null
+                            }
+                            onAddContact={(name) => addHolderAsContact(name)}
+                            onOpenContact={openContact}
+                            statusSlot={statusSlot}
+                          />
+                        ) : (
+                          <div className="@container">
+                            <OwnershipBar
+                              className="mb-3"
+                              classes={math.classes}
+                              pool={math.pool?.percent ?? null}
+                            />
+                            <HoldingsTable
+                              rows={holdingRows}
+                              onAddContact={(row) =>
+                                addHolderAsContact(
+                                  row.name,
+                                  snapshot.holders.find((holder) => holder.name === row.name)
+                                    ?.email ?? null,
+                                )
+                              }
+                              onOpenContact={openContact}
+                            />
+                          </div>
+                        )}
+                        <SafeRows safes={safes} />
+                      </>
+                    ) : (
+                      <>
+                        {reading ? (
+                          <p className="text-sm text-muted-foreground">
+                            <Trans>Reading Carta…</Trans>
+                          </p>
+                        ) : sheetPending && sheetReading ? (
+                          <p className="text-sm text-muted-foreground">
+                            {t`Reading ${raw?.sourceRef?.name ?? ""}…`}
+                          </p>
+                        ) : sheetPending && readFailed ? (
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="w-full text-warning">
+                              <Trans>The sheet could not be read.</Trans>
+                            </span>
+                            <Button variant="outline" onClick={() => void refresh()}>
+                              <Trans>Try again</Trans>
+                            </Button>
+                            <Button variant="outline" onClick={() => void typeItIn()}>
+                              <Trans>Type it in</Trans>
+                            </Button>
+                          </div>
+                        ) : (
+                          // No table yet: pick where it comes from. None is filled; the page cannot know which fits.
+                          <div className="grid grid-cols-1 gap-2 @md/bd:grid-cols-3">
+                            {neverRead ? (
+                              // Connected but unread: reading starts with a model; Type it in stays available.
+                              needsModel && onOpenModelSettings ? (
+                                <Button
+                                  variant="outline"
+                                  className={SOURCE_BUTTON}
+                                  onClick={onOpenModelSettings}
+                                >
+                                  <CirclePlus
+                                    aria-hidden="true"
+                                    className="text-muted-foreground"
+                                  />
+                                  <Trans>Add a model</Trans>
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  className={SOURCE_BUTTON}
+                                  onClick={() => void refresh()}
+                                >
+                                  <CirclePlus
+                                    aria-hidden="true"
+                                    className="text-muted-foreground"
+                                  />
+                                  <Trans>Read cap table</Trans>
+                                </Button>
+                              )
+                            ) : serversFailed ? null : (
+                              <Button
+                                variant="outline"
+                                className={SOURCE_BUTTON}
+                                onClick={() => setConnecting(true)}
+                              >
+                                <CirclePlus aria-hidden="true" className="text-muted-foreground" />
+                                {cartaExpired ? (
+                                  <Trans>Reconnect Carta</Trans>
+                                ) : (
+                                  <Trans>Connect Carta</Trans>
+                                )}
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              className={SOURCE_BUTTON}
+                              onClick={() => void chooseSheet()}
+                            >
+                              <Sheet aria-hidden="true" className="text-muted-foreground" />
+                              <Trans>Use a Google Sheet</Trans>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className={SOURCE_BUTTON}
+                              onClick={() => void typeItIn()}
+                            >
+                              <Type aria-hidden="true" className="text-muted-foreground" />
+                              <Trans>Type it in</Trans>
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </SectionCard>
+                  <FolderDocuments folderPath={CAP_TABLE_FOLDER} />
+                </>
+              ) : null}
+
+              {section === "updates" ? (
+                <UpdatesSection
+                  updates={updates}
+                  cadence={cadence}
+                  failed={updatesFailed}
+                  onNew={() => void startUpdate("investors")}
+                  onOpen={(update) => navigate(`/app/investors/updates/${update.id}`)}
+                  onRetry={retryUpdate}
+                  onMarkDelivered={(update) =>
+                    void updateAction(
+                      () => rpc.investors.updates.markDelivered({ id: update.id }),
+                      t`Could not mark delivered`,
+                    )
+                  }
+                  onDuplicate={(update) =>
+                    void rpc.investors.updates
+                      .duplicate({ id: update.id })
+                      .then((copy) => navigate(`/app/investors/updates/${copy.id}`))
+                      .catch((cause) => notify(errorText(cause, t`Could not duplicate`)))
+                  }
+                  onDelete={setDeletingUpdate}
+                  onReminder={changeReminder}
+                  onReload={loadUpdates}
+                  doneToggle={
+                    audits.some((a) => a.status === "done")
+                      ? { shown: showDone, onToggle: () => setShowDone((v) => !v) }
+                      : null
+                  }
+                />
+              ) : null}
+
+              {section === "contacts" ? (
+                <SectionCard title={t`Contacts`}>
+                  <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <Tabs
+                      value={tab}
+                      onValueChange={(next) =>
+                        setParam("kind", next === "investor" ? undefined : String(next))
+                      }
+                    >
+                      <TabsList className="rounded-2xl" aria-label={t`Kind`}>
+                        {CONTACT_TABS.map((value) => (
+                          <TabsTrigger
+                            key={value}
+                            value={value}
+                            className="h-7 flex-none rounded-full px-3"
+                          >
+                            {tabNames[value]}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </Tabs>
+                    {tab === "board" && hasBoard ? (
+                      <Button variant="outline" size="sm" onClick={() => void startUpdate("board")}>
+                        <Trans>Message the board</Trans>
+                      </Button>
+                    ) : null}
+                    {allContacts.length > 0 && !error ? (
+                      <SearchField
+                        className="w-full @md/bd:ms-auto @md/bd:w-56"
+                        value={query}
+                        onChange={(next) => setParam("q", next || undefined)}
+                        placeholder={t`Search`}
+                        label={t`Search`}
+                        name="contact-search"
+                      />
+                    ) : null}
                   </div>
-                ) : contacts === null ? (
-                  <div className="flex flex-col gap-2" aria-busy="true">
-                    {[0, 1].map((n) => (
-                      <Skeleton key={n} className="h-9 w-full" />
-                    ))}
-                  </div>
-                ) : shown.length === 0 ? (
-                  needle ? (
-                    <div className="flex flex-col items-center gap-3 py-10 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        <Trans>No matches</Trans>
-                      </p>
-                      <Button variant="outline" size="sm" onClick={() => setParam("q", undefined)}>
-                        <Trans>Clear filters</Trans>
+                  {error ? (
+                    <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
+                      <span className="text-destructive">{error}</span>
+                      <Button variant="outline" size="sm" onClick={load}>
+                        <Trans>Try again</Trans>
                       </Button>
                     </div>
+                  ) : contacts === null ? (
+                    <div className="flex flex-col gap-2" aria-busy="true">
+                      {[0, 1].map((n) => (
+                        <Skeleton key={n} className="h-9 w-full" />
+                      ))}
+                    </div>
+                  ) : shown.length === 0 ? (
+                    needle ? (
+                      <div className="flex flex-col items-center gap-3 py-10 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          <Trans>No matches</Trans>
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setParam("q", undefined)}
+                        >
+                          <Trans>Clear filters</Trans>
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        <Trans>No contacts yet</Trans>
+                      </p>
+                    )
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      <Trans>No contacts yet</Trans>
-                    </p>
-                  )
-                ) : (
-                  <ul>
-                    {shown.map((contact) => (
-                      <ContactRow
-                        key={contact.id}
-                        contact={contact}
-                        saved={contact.id === savedId}
-                        portal={tab === "investor"}
-                        onEdit={() => setEditing(contact)}
-                        onDelete={() => void deleteContact(contact)}
-                        onResend={() => void sendLink(contact, false)}
-                        onCopyLink={() => void sendLink(contact, true)}
-                        onRevoke={() => void changePortal(contact, "revoke")}
-                        onUnblock={() => void changePortal(contact, "unblock")}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </SectionCard>
-
-              <FolderDocuments folderPath={CAP_TABLE_FOLDER} />
+                    <ul>
+                      {shown.map((contact) => (
+                        <ContactRow
+                          key={contact.id}
+                          contact={contact}
+                          saved={contact.id === savedId}
+                          portal={tab === "investor"}
+                          onEdit={() => setEditing(contact)}
+                          onDelete={() => void deleteContact(contact)}
+                          onResend={() => void sendLink(contact, false)}
+                          onCopyLink={() => void sendLink(contact, true)}
+                          onRevoke={() => void changePortal(contact, "revoke")}
+                          onUnblock={() => void changePortal(contact, "unblock")}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </SectionCard>
+              ) : null}
             </>
           )}
         </div>

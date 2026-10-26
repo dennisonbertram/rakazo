@@ -230,7 +230,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
     wasSending.current = false;
     const count = update.deliveries.filter((d) => d.state === "sent").length;
     toast(t`Sent to ${count}`);
-    navigate("/app/investors");
+    navigate("/app/investors?tab=updates");
   }, [update, sending, navigate]);
 
   const tbd = useMemo(() => countTbd(body), [body]);
@@ -278,7 +278,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
       await flushSave();
       const result = await rpc.investors.updates.post({ id: updateId });
       toast(t`Posted · ${result.notified} notified`);
-      navigate("/app/investors");
+      navigate("/app/investors?tab=updates");
       return result.update;
     });
   };
@@ -362,7 +362,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className={`${PAGE_GUTTER_X} pt-2`}>
         <Link
-          to="/app/investors"
+          to="/app/investors?tab=updates"
           className="mb-1 inline-flex min-h-6 items-center gap-1 text-sm text-muted-foreground hover:text-foreground pointer-coarse:min-h-11"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
@@ -597,7 +597,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
                   <Trans>Mark delivered</Trans>
                 </Button>
               ) : null}
-              <Button onClick={() => navigate("/app/investors")}>
+              <Button onClick={() => navigate("/app/investors?tab=updates")}>
                 <Trans>Done</Trans>
               </Button>
             </>

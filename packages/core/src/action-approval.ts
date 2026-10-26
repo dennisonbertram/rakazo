@@ -96,6 +96,17 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "attach_file",
   "page_write",
   "pins_write",
+  "page_edit",
+  // Praci's own legal records (reads and upserts in the actor's space and user rows). No mail,
+  // posting or connector write. Tainted runs still ask: none of these is in EXTERNAL_TAINT_SAFE_TOOLS
+  // or MEETING_TAINT_FREE_TOOLS, and the executor checks taint separately from this gate. Integration-agent
+  // writes (requiresMandatoryApproval), Company tools, bot tool switches and space rules are unaffected.
+  "legal_unreviewed_documents",
+  "legal_query",
+  "legal_upsert_contract",
+  "legal_upsert_deadline",
+  "legal_upsert_node",
+  "legal_link",
 ]);
 
 /**

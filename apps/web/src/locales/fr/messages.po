@@ -8787,6 +8787,14 @@ msgid "Paused: no access"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
+msgid "Paused: the app could not be checked"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: the app result changes too often"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
 msgid "Paused: the page changes too often"
 msgstr ""
 
@@ -9665,6 +9673,10 @@ msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Remove account"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Remove app watch"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
@@ -11484,6 +11496,10 @@ msgstr "Arrêter la lecture"
 msgid "Stop teaching"
 msgstr "Arrêter l'enseignement"
 
+#: src/components/inbox/InboxRow.tsx
+msgid "Stop tracking"
+msgstr ""
+
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Stopped"
 msgstr ""
@@ -12231,6 +12247,15 @@ msgstr ""
 msgid "Tour"
 msgstr ""
 
+#: src/components/inbox/InboxRow.tsx
+msgid "Track"
+msgstr ""
+
+#. placeholder {0}: maskCurrencyWhenHidden(status.subject)
+#: src/pages/Inbox.tsx
+msgid "Tracking \"{0}\""
+msgstr ""
+
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Transactions"
@@ -12953,6 +12978,10 @@ msgstr ""
 
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Wallets"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Watch a connected app"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx

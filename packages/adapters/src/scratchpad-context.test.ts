@@ -92,3 +92,25 @@ describe("scratchpad prompt context", () => {
     expect(result?.endsWith("</scratchpad_open>")).toBe(true);
   });
 });
+
+describe("scratchpad prompt context for tracked mail", () => {
+  it("adds the provider message id so the bot can call mail_get", async () => {
+    const findMany = vi.fn(async () => [
+      {
+        id: "a",
+        botId: "bot",
+        title: "Contract <b>review</b>",
+        status: "open",
+        notes: "",
+        mailMessageId: "gmail-123",
+        createdAt: new Date("2026-08-25T12:00:00.000Z"),
+        updatedAt: new Date("2026-08-25T12:00:00.000Z"),
+      },
+    ]);
+    const result = await loadAgentScratchpadContext(
+      { prisma: { scratchpadItem: { findMany } } as never },
+      { spaceId: "ws", userId: "user", botId: "bot" },
+    );
+    expect(result).toContain("mail: id gmail-123; (id: a)");
+  });
+});

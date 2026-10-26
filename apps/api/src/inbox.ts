@@ -45,6 +45,7 @@ import { Prisma } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { proxyEmailImages } from "./email-image-proxy.js";
 import { removeFiltersOfSender } from "./inbox-sender-rules.js";
+import { trackedThreads } from "./inbox-track.js";
 
 export interface InboxDeps {
   prisma: PrismaClient;
@@ -382,6 +383,12 @@ export async function inboxList(
     select: { id: true, name: true },
   });
   const accounts = mailAccountsOf(connections);
+  const withTracked = async (rows: MailRow[]) => {
+    const tracked = await trackedThreads(prisma, actor, rows);
+    return rows.map((row) =>
+      tracked.has(`${row.connectionId}:${row.threadId}`) ? { ...row, tracked: true } : row,
+    );
+  };
   const agentOut = agent ? { botId: agent.id, name: agent.name } : null;
   const { ready, blocked: triageBlocked } = await triageStatus(deps, actor);
   const enabled = ready !== null;
@@ -409,7 +416,7 @@ export async function inboxList(
     return {
       accounts,
       agent: agentOut,
-      rows: result.messages.map((m) => toMailRow(m, enabled, marks)),
+      rows: await withTracked(result.messages.map((m) => toMailRow(m, enabled, marks))),
       syncedAt: null,
       failedAccounts: result.failed,
       reconnectAccounts: result.reconnect,
@@ -467,7 +474,9 @@ export async function inboxList(
     pileCounts(prisma, actor, ids),
   ]);
 
-  const rows = oneRowPerThread(messages).map((m) => toMailRow(m, enabled, marks));
+  const rows = await withTracked(
+    oneRowPerThread(messages).map((m) => toMailRow(m, enabled, marks)),
+  );
   // A rate limit stays reported until a sync clears the stored error, even while another process holds the sync claim,
   // so an expired pause or a refresh that skipped its own sync never turns into "No mail".
   const current = states.filter((s) => s.lastErrorAt);

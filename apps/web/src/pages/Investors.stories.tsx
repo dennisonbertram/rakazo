@@ -120,6 +120,20 @@ export const Default: Story = {
 };
 
 /** Audit requests in Action items: a new one, one with a draft ready and new mail, and a closed one behind Show done. */
+/** The Updates tab shows only the updates section. */
+export const UpdatesTab: Story = {
+  parameters: { initialEntries: ["/app/investors?tab=updates"] },
+  beforeEach: () =>
+    mockRpc({ "contacts.list": contacts, "mcp.servers.list": [cartaServer], ...noUpdates }),
+};
+
+/** The Contacts tab shows only the contacts section, with its Investors and Board kinds. */
+export const ContactsTab: Story = {
+  parameters: { initialEntries: ["/app/investors?tab=contacts"] },
+  beforeEach: () =>
+    mockRpc({ "contacts.list": contacts, "mcp.servers.list": [cartaServer], ...noUpdates }),
+};
+
 export const WithAuditRequests: Story = {
   beforeEach: () =>
     mockRpc({
@@ -167,6 +181,7 @@ export const WithAuditRequests: Story = {
 
 /** The Portal column: never invited, invited, opened, revoked, and unblocked with no new link yet. */
 export const PortalStates: Story = {
+  parameters: { initialEntries: ["/app/investors?tab=contacts"] },
   beforeEach: () =>
     mockRpc({
       "contacts.list": [
@@ -197,6 +212,7 @@ export const PortalStates: Story = {
 
 /** A Posted update in the list, alongside a sent one. */
 export const WithPostedUpdate: Story = {
+  parameters: { initialEntries: ["/app/investors?tab=updates"] },
   beforeEach: () =>
     mockRpc({
       "contacts.list": contacts,
@@ -211,6 +227,7 @@ export const WithPostedUpdate: Story = {
 
 /** A draft waiting in Action items, a Sending row, a Partly sent row with Retry, and a sent update. */
 export const WithUpdates: Story = {
+  parameters: { initialEntries: ["/app/investors?tab=updates"] },
   beforeEach: () =>
     mockRpc({
       "contacts.list": contacts,
@@ -290,7 +307,7 @@ export const CartaNeedsSignIn: Story = {
 
 /** A kind tab with no contacts of that kind names the kind and offers to add one. */
 export const NoBoardMembers: Story = {
-  parameters: { initialEntries: ["/app/investors?kind=board"] },
+  parameters: { initialEntries: ["/app/investors?tab=contacts&kind=board"] },
   beforeEach: () =>
     mockRpc({ "contacts.list": [contacts[0], contacts[2]], "mcp.servers.list": [cartaServer] }),
 };

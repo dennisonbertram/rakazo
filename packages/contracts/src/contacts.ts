@@ -82,3 +82,28 @@ export const ContactLinkedSchema = z.object({
   documents: z.array(z.string()),
 });
 export type ContactLinked = z.infer<typeof ContactLinkedSchema>;
+
+/** Most rows of each related list the contact page shows. */
+export const CONTACT_DETAIL_LIMIT = 10;
+
+/**
+ * A contact with what is stored against it: mail threads and meetings matched by the contact's email
+ * address, and Data room documents and SAFEs linked by contact id. A list with nothing in it is empty.
+ */
+export const ContactDetailSchema = z.object({
+  contact: ContactSchema,
+  /** One row per thread, its newest message, newest thread first. */
+  mail: z.array(
+    z.object({
+      id: Id,
+      subject: z.string(),
+      from: z.string(),
+      snippet: z.string(),
+      receivedAt: IsoDate,
+    }),
+  ),
+  meetings: z.array(z.object({ id: Id, title: z.string(), startedAt: IsoDate })),
+  documents: z.array(z.object({ id: Id, name: z.string() })),
+  safes: z.array(z.object({ id: Id, amountCents: z.number().int(), status: z.string() })),
+});
+export type ContactDetail = z.infer<typeof ContactDetailSchema>;

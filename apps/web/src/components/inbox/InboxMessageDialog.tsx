@@ -173,6 +173,7 @@ export function InboxMessageDialog({
             notice={notice}
             composing={composing}
             setComposing={setComposing}
+            closeDialog={onClose}
           />
         ) : null}
       </DialogContent>
@@ -203,6 +204,7 @@ function InboxMessage({
   notice,
   composing,
   setComposing,
+  closeDialog,
 }: {
   messageId: string;
   subject?: string;
@@ -224,6 +226,7 @@ function InboxMessage({
   notice?: React.ReactNode;
   composing: ComposeMode | null;
   setComposing: (mode: ComposeMode | null) => void;
+  closeDialog: () => void;
 }) {
   const { t } = useLingui();
   useHideAmounts();
@@ -565,6 +568,8 @@ function InboxMessage({
             accounts={[]}
             draft={composing === "reply" ? agentDraft : undefined}
             restore={restore}
+            // Send closes the preview too; Undo and a failed send bring the composer back (MailOutbox).
+            onSent={closeDialog}
             onClose={() => {
               setComposing(null);
               setAgentDraft(undefined);

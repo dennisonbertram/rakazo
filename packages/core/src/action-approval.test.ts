@@ -632,6 +632,9 @@ describe("unattendedToolRequiresApproval", () => {
     "open_path",
     "launch_app",
     "add_to_data_room",
+    "mail_send",
+    "contacts_add",
+    "cap_table_update",
   ])("asks for %s in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
   });
@@ -644,8 +647,22 @@ describe("unattendedToolRequiresApproval", () => {
     "attach_file",
     "page_write",
     "pins_write",
+    "legal_unreviewed_documents",
+    "legal_upsert_contract",
+    "legal_upsert_deadline",
+    "legal_upsert_node",
+    "legal_link",
+    "legal_query",
   ])("lets %s run in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
+  });
+
+  it("keeps an internal legal tool asking in a tainted run", () => {
+    expect(externalTaintAllowsTool("legal_upsert_contract")).toBe(false);
+  });
+
+  it("does not exempt a connector tool that shares a legal name", () => {
+    expect(unattendedToolRequiresApproval(true, "legal_upsert_contract", true)).toBe(true);
   });
 
   it("allows only GET and HEAD secret requests", () => {

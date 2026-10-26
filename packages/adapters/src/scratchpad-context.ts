@@ -37,7 +37,8 @@ export async function loadAgentScratchpadContext(
     const waiting = item.waitingOn ? ` waiting on ${escapePromptData(item.waitingOn)};` : "";
     const due = item.dueAt ? ` due ${item.dueAt.slice(0, 10)};` : "";
     const meta = waiting || due ? ` (${`${waiting}${due}`.trim().replace(/;$/, "")})` : "";
-    const line = `${lines.length === 0 ? "" : "\n"}- [${item.status}]${classification} ${escapePromptData(item.title)}${meta}${notes} (id: ${escapePromptData(item.id)})`;
+    const mail = item.mailMessageId ? ` mail: id ${escapePromptData(item.mailMessageId)};` : "";
+    const line = `${lines.length === 0 ? "" : "\n"}- [${item.status}]${classification} ${escapePromptData(item.title)}${meta}${notes}${mail} (id: ${escapePromptData(item.id)})`;
     const lineBytes = byteLength(line);
     if (lineBytes > remainingBytes) {
       const truncated = truncateUtf8(line, remainingBytes);

@@ -329,3 +329,18 @@ it("shows a paperclip by the time only when the message has an attachment", asyn
   await show({ row: { ...row, hasAttachment: true } });
   expect(document.querySelector('[aria-label="Has attachment"]')).not.toBeNull();
 });
+
+it("tracks an untracked row and offers Stop tracking, pressed, on a tracked one", async () => {
+  const onTrack = vi.fn();
+  await show({ onTrack });
+  const track = document.querySelector<HTMLElement>('button[aria-label="Track"]');
+  expect(track?.getAttribute("aria-pressed")).toBe("false");
+  await act(async () => track?.click());
+  expect(onTrack).toHaveBeenCalledWith("m1", true);
+
+  await show({ onTrack, row: { ...row, tracked: true } });
+  const stop = document.querySelector<HTMLElement>('button[aria-label="Stop tracking"]');
+  expect(stop?.getAttribute("aria-pressed")).toBe("true");
+  await act(async () => stop?.click());
+  expect(onTrack).toHaveBeenLastCalledWith("m1", false);
+});

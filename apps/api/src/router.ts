@@ -231,6 +231,7 @@ import {
   closeRound,
   companyForActor,
   companyWriter,
+  contactDetail,
   createArtifactShare,
   createExternalConversationRepos,
   createGroupRepos,
@@ -477,6 +478,7 @@ import {
   inboxUnarchiveMany,
 } from "./inbox-modify.js";
 import { inboxAskAgent } from "./inbox-thread-agent.js";
+import { inboxTrack, inboxUntrack } from "./inbox-track.js";
 import { inboxUnsubscribe } from "./inbox-unsubscribe.js";
 import {
   connectionAgentSpawnKeys,
@@ -516,6 +518,7 @@ import {
   legalUpdateDeadline,
 } from "./legal.js";
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
+import { sendSavedMailDraft } from "./mail-draft-send.js";
 import {
   dismissMcpServerApprovals,
   resolveMcpApprovalCards,
@@ -3220,6 +3223,15 @@ export function createRouter(deps: RouterDeps) {
           getLogger().error("call end enqueue", error);
         });
         return { ok: true as const };
+      }),
+      sendDraft: authed.threads.sendDraft.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return sendSavedMailDraft(
+          { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
+          context.actor,
+          target,
+          input,
+        );
       }),
       answer: authed.threads.answer.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
@@ -8215,6 +8227,9 @@ export function createRouter(deps: RouterDeps) {
       list: authed.contacts.list.handler(({ context, input }) =>
         listContacts(deps.prisma, actorScope(context.actor), input),
       ),
+      detail: authed.contacts.detail.handler(({ context, input }) =>
+        contactDetail(deps.prisma, actorScope(context.actor), input.id).catch(contactNotFound),
+      ),
       save: authed.contacts.save.handler(({ context, input }) =>
         saveContact(deps.prisma, actorScope(context.actor), input).catch(contactNotFound),
       ),
@@ -8374,6 +8389,12 @@ export function createRouter(deps: RouterDeps) {
           input,
           context.signal,
         ),
+      ),
+      track: authed.inbox.track.handler(({ context, input }) =>
+        inboxTrack(deps.prisma, context.actor, input.messageId),
+      ),
+      untrack: authed.inbox.untrack.handler(({ context, input }) =>
+        inboxUntrack(deps.prisma, context.actor, input.messageId),
       ),
       archive: authed.inbox.archive.handler(({ context, input }) =>
         inboxArchive(

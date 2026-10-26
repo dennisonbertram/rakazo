@@ -165,6 +165,7 @@ export function ComposeEmail({
   draft,
   spaceId,
   onClose,
+  onSent,
 }: {
   seed: ComposeSeed;
   /** The From choices for a new message; with more than one, a picker shows. */
@@ -178,6 +179,8 @@ export function ComposeEmail({
   /** The Space the composer belongs to; save, send and discard stay in it if the shared selection moves. */
   spaceId?: string | null;
   onClose: () => void;
+  /** Called when Send has been pressed and the message is queued, just before `onClose`. */
+  onSent?: () => void;
 }) {
   const spaceContext = useMemo(
     () => (spaceId === undefined ? {} : { context: { spaceId } }),
@@ -551,6 +554,7 @@ export function ComposeEmail({
       }, reopen);
       done.current = true;
       forgetClosed(seed);
+      onSent?.();
       onClose();
       return;
     } catch (cause) {

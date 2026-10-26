@@ -94,6 +94,18 @@ export const Read: Story = { args: { row: base } };
 /** An archived email found by search. */
 export const Archived: Story = { args: { row: { ...base, inInbox: false } } };
 
+/** Tracked in the Chief's Open work; the Eye action is pressed and offers Stop tracking. */
+export const Tracked: Story = {
+  args: {
+    row: { ...base, tracked: true },
+    selected: true,
+    onMark: noop,
+    onArchive: noop,
+    onRead: noop,
+    onTrack: noop,
+  },
+};
+
 export const Selected: Story = {
   args: { row: rows[0] as MailRow, selected: true, onMark: noop, onArchive: noop, onRead: noop },
 };

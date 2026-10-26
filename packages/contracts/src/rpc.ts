@@ -66,6 +66,7 @@ import {
 } from "./company-privacy.js";
 import { CompanyReviewResolveSchema, CompanyReviewSchema } from "./company-review.js";
 import {
+  ContactDetailSchema,
   ContactLinkedSchema,
   ContactListInputSchema,
   ContactSaveInputSchema,
@@ -742,6 +743,13 @@ export const appContract = {
         }),
       )
       .output(z.object({ ok: z.literal(true) })),
+    /**
+     * Sends the draft a mail_draft card saved. The draft and account come from the server's record
+     * of that tool call; the client only names the card.
+     */
+    sendDraft: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id }))
+      .output(ComposeResultSchema),
     /**
      * Moves the read boundary forward to the message `upToMessageId` (the newest when omitted);
      * never backward, and an unknown id changes nothing. `toEnd` says the reader reached the end of
@@ -1553,6 +1561,10 @@ export const appContract = {
     unreadCount: oc.output(z.object({ count: z.number().int() })),
     feedback: oc.input(InboxFeedbackInputSchema).output(InboxFeedbackOutputSchema),
     markRead: oc.input(InboxMarkReadInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** Adds the message's thread to the Chief's Open work. Tracking a tracked thread does nothing. */
+    track: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Marks the thread's open Chief item done. */
+    untrack: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     archive: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     unarchive: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     archiveMany: oc.input(InboxBulkInputSchema).output(InboxBulkResultSchema),
@@ -1829,6 +1841,8 @@ export const appContract = {
   },
   contacts: {
     list: oc.input(ContactListInputSchema).output(z.array(ContactSchema)),
+    /** One contact with its related mail, meetings, documents and SAFEs; NOT_FOUND when it is not the user's. */
+    detail: oc.input(z.object({ id: Id })).output(ContactDetailSchema),
     save: oc.input(ContactSaveInputSchema).output(ContactSchema),
     delete: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
     /** What deleting the contact would remove besides its own fields. */

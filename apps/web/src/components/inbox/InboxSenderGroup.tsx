@@ -27,6 +27,7 @@ export function InboxSenderGroup({
   onMark,
   onArchive,
   onRead,
+  onTrack,
   onArchiveGroup,
   onPickGroup,
   selectedId,
@@ -40,6 +41,7 @@ export function InboxSenderGroup({
   onMark: ((messageId: string, mark: InboxMark | null) => void) | undefined;
   onArchive?: (messageId: string) => void;
   onRead?: (messageId: string, read: boolean) => void;
+  onTrack?: (messageId: string, track: boolean) => void;
   /** Archives every message of the group. */
   onArchiveGroup?: () => void;
   /** Checks, or unchecks, every message of the group. */
@@ -56,6 +58,7 @@ export function InboxSenderGroup({
     onMark,
     onArchive,
     onRead,
+    onTrack,
     selected: row.id === selectedId,
     ...rowPicking(row.id, picking),
   });

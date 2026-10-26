@@ -55,7 +55,8 @@ function Row({
 
 /**
  * The approval card for a mail_draft or mail_send call. Send approves the same pending call, with
- * the fields the person changed; Discard denies it. The server checks the edits again.
+ * the fields the person changed; Discard denies it. On a draft, Send now sends it instead of
+ * saving it, and a saved draft offers Send. The server checks the edits again.
  */
 export function MailApprovalCard({
   mail,
@@ -66,6 +67,8 @@ export function MailApprovalCard({
   onAnswer,
   onDisableTool,
   onOpenComposer,
+  canSend = false,
+  onSendDraft,
   initialEditing = false,
   allowLabel,
   allowDisabled = false,
@@ -86,12 +89,16 @@ export function MailApprovalCard({
   onDisableTool?: (tool: MailApproval["tool"]) => Promise<void>;
   /** Offered when the person's own edited send did not go out. */
   onOpenComposer?: (mail: MailApproval) => void;
+  /** Sending is on for this bot: only then does a draft offer Send now, or a saved draft Send. */
+  canSend?: boolean;
+  /** Sends the draft this card saved; the server finds it. */
+  onSendDraft?: () => Promise<void>;
   initialEditing?: boolean;
   /** One plain line on why the call asked (background run, rule, outside content). */
   reason?: string;
   allowLabel?: string;
   allowDisabled?: boolean;
-  onFieldsChange?: (fields: Required<Omit<MailEdits, "account">>) => void;
+  onFieldsChange?: (fields: Required<Omit<MailEdits, "account" | "send">>) => void;
   toOnly?: boolean;
   /** The person's connected mail accounts; with more than one, the card lets them pick the sender. */
   accounts?: readonly MailAccountSummary[];
@@ -126,6 +133,8 @@ export function MailApprovalCard({
   // A send of a saved draft: the agent named only the draft, so there is nothing to edit or show.
   const savedDraftSend = !draft && Boolean(mail.locked);
   const shown = answered ? initial : fields;
+  const canSendSaved = answered && draft && mail.outcome === "saved" && canSend && !!onSendDraft;
+  const canSendNow = interactive && draft && canSend && !allowLabel;
   // With no sender named, the send waits for the accounts, and for a pick when there are several.
   const senderOpen = interactive && !mail.account && !mail.locked;
   const chooseAccount = senderOpen && accountsStatus === "ready" && accounts.length > 1;
@@ -170,15 +179,28 @@ export function MailApprovalCard({
     onFieldsChange?.(next);
   };
 
-  async function submit(action: "allow" | "deny" | "disable") {
+  async function submit(action: "allow" | "deny" | "disable" | "send", sendNow = false) {
     if (busy || (action === "allow" && (allowDisabled || needsAccount))) return;
     let edits: MailEdits | undefined;
+    if (action === "send") {
+      setPendingAction(action);
+      setError(null);
+      try {
+        await onSendDraft?.();
+      } catch (err) {
+        setError(errorText(err, t`Could not submit this answer`));
+      } finally {
+        setPendingAction(null);
+      }
+      return;
+    }
     if (action === "allow") {
       const changed = (Object.keys(fields) as (keyof Fields)[]).filter(
         (key) => fields[key] !== initial[key],
       );
       if (changed.length) edits = Object.fromEntries(changed.map((key) => [key, fields[key]]));
       if (chooseAccount) edits = { ...edits, account };
+      if (sendNow) edits = { ...edits, send: true };
       const recipients = [fields.to, fields.cc, fields.bcc].flatMap((text) =>
         splitEntries(text)
           .map((entry) => entry.trim())
@@ -190,7 +212,7 @@ export function MailApprovalCard({
       if (!draft && !savedDraftSend && recipients.length === 0)
         return setError(t`Add a recipient.`);
     }
-    setPendingAction(action);
+    setPendingAction(sendNow ? "sendNow" : action);
     setError(null);
     ownAnswer.current = true;
     try {
@@ -327,6 +349,16 @@ export function MailApprovalCard({
             ) : null}
           </>
         )}
+        {canSendSaved ? (
+          <Button
+            size="sm"
+            className="rounded-full"
+            disabled={busy}
+            onClick={() => void submit("send")}
+          >
+            {pendingAction === "send" ? <Trans>Sending…</Trans> : <Trans>Send</Trans>}
+          </Button>
+        ) : null}
       </div>
       {open ? (
         <div className="px-5 pb-5 @sm:px-6">
@@ -473,7 +505,21 @@ export function MailApprovalCard({
               {reason ? <p className="pt-3 text-[13px] text-muted-foreground">{reason}</p> : null}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-4">
                 <div className="flex items-center gap-2">
+                  {canSendNow ? (
+                    <Button
+                      className="rounded-full"
+                      disabled={busy || allowDisabled || needsAccount}
+                      onClick={() => void submit("allow", true)}
+                    >
+                      {pendingAction === "sendNow" ? (
+                        <Trans>Sending…</Trans>
+                      ) : (
+                        <Trans>Send now</Trans>
+                      )}
+                    </Button>
+                  ) : null}
                   <Button
+                    variant={canSendNow ? "secondary" : "default"}
                     className="rounded-full"
                     disabled={busy || allowDisabled || needsAccount}
                     aria-describedby={chooseAccount && !account ? `${confirmId}-hint` : undefined}

@@ -595,6 +595,8 @@ export interface SetMailApprovalOutcomeInput {
   messageId?: string;
   effectId: string;
   outcome: NonNullable<MailApproval["outcome"]>;
+  /** Changes what the card describes, e.g. a saved draft that was then sent. */
+  tool?: MailApproval["tool"];
   /** Replaces the note the agent reads when it resumes, so it matches how the send ended. */
   note?: string;
   /** With a failed outcome: the reason the card shows. */
@@ -702,6 +704,7 @@ export async function setMailApprovalOutcome(
         mail: {
           ...block.mail,
           outcome: input.outcome,
+          ...(input.tool ? { tool: input.tool } : {}),
           ...(input.error ? { error: input.error.slice(0, 300) } : {}),
           ...(input.connectionId ? { connectionId: input.connectionId } : {}),
           ...(input.account && !block.mail.account ? { account: input.account } : {}),

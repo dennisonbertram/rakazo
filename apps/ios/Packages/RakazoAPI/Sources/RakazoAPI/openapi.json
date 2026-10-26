@@ -8368,6 +8368,9 @@
                                                 "approvalEffectId": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
                                                 },
+                                                "toolId": {
+                                                  "type": "string"
+                                                },
                                                 "detail": {
                                                   "type": "string"
                                                 },
@@ -9869,39 +9872,83 @@
                               "watch": {
                                 "anyOf": [
                                   {
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "const": "page"
-                                      },
-                                      "url": {
-                                        "type": "string",
-                                        "maxLength": 2048
-                                      },
-                                      "intervalMinutes": {
-                                        "anyOf": [
-                                          {
-                                            "type": "number",
-                                            "const": 15
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "page"
                                           },
-                                          {
-                                            "type": "number",
-                                            "const": 60
+                                          "url": {
+                                            "type": "string",
+                                            "maxLength": 2048
                                           },
-                                          {
-                                            "type": "number",
-                                            "const": 1440
+                                          "intervalMinutes": {
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
                                           }
-                                        ]
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "url",
+                                          "intervalMinutes"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "connector"
+                                          },
+                                          "connectorId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "connectionId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "resourceId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "toolName": {
+                                            "type": "string",
+                                            "pattern": "^[A-Za-z0-9_.:-]{1,200}$"
+                                          },
+                                          "arguments": {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                            },
+                                            "additionalProperties": {
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+                                            }
+                                          },
+                                          "appName": {
+                                            "type": "string",
+                                            "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
+                                          },
+                                          "intervalMinutes": {
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "connectorId",
+                                          "toolName",
+                                          "arguments",
+                                          "appName",
+                                          "intervalMinutes"
+                                        ],
+                                        "additionalProperties": false
                                       }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "url",
-                                      "intervalMinutes"
-                                    ],
-                                    "additionalProperties": false
+                                    ]
                                   },
                                   {
                                     "type": "null"
@@ -10225,10 +10272,10 @@
                                     "automatedSenderPolicies": {
                                       "type": "object",
                                       "propertyNames": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
                                       },
                                       "additionalProperties": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
                                       }
                                     },
                                     "automatedSenders": {
@@ -42205,6 +42252,9 @@
                                         "approvalEffectId": {
                                           "$ref": "#/components/schemas/RpcExportBotOutputSchema0"
                                         },
+                                        "toolId": {
+                                          "type": "string"
+                                        },
                                         "detail": {
                                           "type": "string"
                                         },
@@ -58586,6 +58636,9 @@
                                         "approvalEffectId": {
                                           "$ref": "#/components/schemas/RpcGroupsGetOutputSchema0"
                                         },
+                                        "toolId": {
+                                          "type": "string"
+                                        },
                                         "detail": {
                                           "type": "string"
                                         },
@@ -66114,6 +66167,9 @@
                               },
                               "hasAttachment": {
                                 "type": "boolean"
+                              },
+                              "tracked": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -67409,6 +67465,165 @@
         ]
       }
     },
+    "/rpc/inbox/track": {
+      "post": {
+        "operationId": "rpc_inbox_track",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "messageId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "messageId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/inbox/unarchive": {
       "post": {
         "operationId": "rpc_inbox_unarchive",
@@ -68024,6 +68239,165 @@
                       "required": [
                         "status",
                         "method"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/inbox/untrack": {
+      "post": {
+        "operationId": "rpc_inbox_untrack",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "messageId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "messageId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
                       ],
                       "additionalProperties": false
                     }
@@ -95278,39 +95652,83 @@
                         "watch": {
                           "anyOf": [
                             {
-                              "type": "object",
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "const": "page"
-                                },
-                                "url": {
-                                  "type": "string",
-                                  "maxLength": 2048
-                                },
-                                "intervalMinutes": {
-                                  "anyOf": [
-                                    {
-                                      "type": "number",
-                                      "const": 15
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "page"
                                     },
-                                    {
-                                      "type": "number",
-                                      "const": 60
+                                    "url": {
+                                      "type": "string",
+                                      "maxLength": 2048
                                     },
-                                    {
-                                      "type": "number",
-                                      "const": 1440
+                                    "intervalMinutes": {
+                                      "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema1"
                                     }
-                                  ]
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "url",
+                                    "intervalMinutes"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "connector"
+                                    },
+                                    "connectorId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "connectionId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 128
+                                    },
+                                    "resourceId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 128
+                                    },
+                                    "toolName": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_.:-]{1,200}$"
+                                    },
+                                    "arguments": {
+                                      "type": "object",
+                                      "propertyNames": {
+                                        "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema2"
+                                      },
+                                      "additionalProperties": {
+                                        "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema3"
+                                      }
+                                    },
+                                    "appName": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
+                                    },
+                                    "intervalMinutes": {
+                                      "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema1"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "connectorId",
+                                    "toolName",
+                                    "arguments",
+                                    "appName",
+                                    "intervalMinutes"
+                                  ],
+                                  "additionalProperties": false
                                 }
-                              },
-                              "required": [
-                                "kind",
-                                "url",
-                                "intervalMinutes"
-                              ],
-                              "additionalProperties": false
+                              ]
                             },
                             {
                               "type": "null"
@@ -95972,39 +96390,83 @@
                           "watch": {
                             "anyOf": [
                               {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "const": "page"
-                                  },
-                                  "url": {
-                                    "type": "string",
-                                    "maxLength": 2048
-                                  },
-                                  "intervalMinutes": {
-                                    "anyOf": [
-                                      {
-                                        "type": "number",
-                                        "const": 15
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "page"
                                       },
-                                      {
-                                        "type": "number",
-                                        "const": 60
+                                      "url": {
+                                        "type": "string",
+                                        "maxLength": 2048
                                       },
-                                      {
-                                        "type": "number",
-                                        "const": 1440
+                                      "intervalMinutes": {
+                                        "$ref": "#/components/schemas/RpcRoutinesListOutputSchema1"
                                       }
-                                    ]
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "url",
+                                      "intervalMinutes"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "connector"
+                                      },
+                                      "connectorId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 64
+                                      },
+                                      "connectionId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "resourceId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "toolName": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z0-9_.:-]{1,200}$"
+                                      },
+                                      "arguments": {
+                                        "type": "object",
+                                        "propertyNames": {
+                                          "$ref": "#/components/schemas/RpcRoutinesListOutputSchema2"
+                                        },
+                                        "additionalProperties": {
+                                          "$ref": "#/components/schemas/RpcRoutinesListOutputSchema3"
+                                        }
+                                      },
+                                      "appName": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
+                                      },
+                                      "intervalMinutes": {
+                                        "$ref": "#/components/schemas/RpcRoutinesListOutputSchema1"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "connectorId",
+                                      "toolName",
+                                      "arguments",
+                                      "appName",
+                                      "intervalMinutes"
+                                    ],
+                                    "additionalProperties": false
                                   }
-                                },
-                                "required": [
-                                  "kind",
-                                  "url",
-                                  "intervalMinutes"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               {
                                 "type": "null"
@@ -96746,39 +97208,83 @@
                         "watch": {
                           "anyOf": [
                             {
-                              "type": "object",
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "const": "page"
-                                },
-                                "url": {
-                                  "type": "string",
-                                  "maxLength": 2048
-                                },
-                                "intervalMinutes": {
-                                  "anyOf": [
-                                    {
-                                      "type": "number",
-                                      "const": 15
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "page"
                                     },
-                                    {
-                                      "type": "number",
-                                      "const": 60
+                                    "url": {
+                                      "type": "string",
+                                      "maxLength": 2048
                                     },
-                                    {
-                                      "type": "number",
-                                      "const": 1440
+                                    "intervalMinutes": {
+                                      "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema1"
                                     }
-                                  ]
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "url",
+                                    "intervalMinutes"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "connector"
+                                    },
+                                    "connectorId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "connectionId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 128
+                                    },
+                                    "resourceId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 128
+                                    },
+                                    "toolName": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_.:-]{1,200}$"
+                                    },
+                                    "arguments": {
+                                      "type": "object",
+                                      "propertyNames": {
+                                        "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema2"
+                                      },
+                                      "additionalProperties": {
+                                        "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema3"
+                                      }
+                                    },
+                                    "appName": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
+                                    },
+                                    "intervalMinutes": {
+                                      "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema1"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "connectorId",
+                                    "toolName",
+                                    "arguments",
+                                    "appName",
+                                    "intervalMinutes"
+                                  ],
+                                  "additionalProperties": false
                                 }
-                              },
-                              "required": [
-                                "kind",
-                                "url",
-                                "intervalMinutes"
-                              ],
-                              "additionalProperties": false
+                              ]
                             },
                             {
                               "type": "null"
@@ -97519,6 +98025,12 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "mailMessageId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -97847,6 +98359,12 @@
                               {
                                 "type": "null"
                               }
+                            ]
+                          },
+                          "mailMessageId": {
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -98396,6 +98914,12 @@
                             {
                               "type": "null"
                             }
+                          ]
+                        },
+                        "mailMessageId": {
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -106915,6 +107439,9 @@
                           "body": {
                             "type": "string",
                             "maxLength": 150000
+                          },
+                          "send": {
+                            "type": "boolean"
                           }
                         },
                         "additionalProperties": false
@@ -107705,6 +108232,9 @@
                                         },
                                         "approvalEffectId": {
                                           "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
+                                        },
+                                        "toolId": {
+                                          "type": "string"
                                         },
                                         "detail": {
                                           "type": "string"
@@ -109895,6 +110425,9 @@
                                         "approvalEffectId": {
                                           "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema0"
                                         },
+                                        "toolId": {
+                                          "type": "string"
+                                        },
                                         "detail": {
                                           "type": "string"
                                         },
@@ -111844,6 +112377,190 @@
                         "taskId",
                         "runId",
                         "seq"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/threads/sendDraft": {
+      "post": {
+        "operationId": "rpc_threads_sendDraft",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "$ref": "#/components/schemas/RpcThreadsSendDraftInputSchema0"
+                      },
+                      "groupId": {
+                        "$ref": "#/components/schemas/RpcThreadsSendDraftInputSchema0"
+                      },
+                      "runId": {
+                        "$ref": "#/components/schemas/RpcThreadsSendDraftInputSchema0"
+                      },
+                      "messageId": {
+                        "$ref": "#/components/schemas/RpcThreadsSendDraftInputSchema0"
+                      }
+                    },
+                    "required": [
+                      "runId",
+                      "messageId"
+                    ],
+                    "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                    "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "saved",
+                            "sent",
+                            "unknown",
+                            "reconnect",
+                            "disabled",
+                            "failed"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "rejected",
+                            "rate_limited"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
                       ],
                       "additionalProperties": false
                     }
@@ -118881,21 +119598,71 @@
         "additionalProperties": false
       },
       "RpcBootstrapOutputSchema47": {
+        "anyOf": [
+          {
+            "type": "number",
+            "const": 15
+          },
+          {
+            "type": "number",
+            "const": 60
+          },
+          {
+            "type": "number",
+            "const": 1440
+          }
+        ]
+      },
+      "RpcBootstrapOutputSchema48": {
+        "type": "string"
+      },
+      "RpcBootstrapOutputSchema49": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+            }
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+            }
+          }
+        ]
+      },
+      "RpcBootstrapOutputSchema50": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcBootstrapOutputSchema48": {
+      "RpcBootstrapOutputSchema51": {
         "type": "object",
         "properties": {
           "name": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema52"
           },
           "mode": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
           },
           "rollupHours": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
           }
         },
         "required": [
@@ -118904,12 +119671,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema49": {
+      "RpcBootstrapOutputSchema52": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcBootstrapOutputSchema50": {
+      "RpcBootstrapOutputSchema53": {
         "type": "string",
         "enum": [
           "ignore",
@@ -118918,7 +119685,7 @@
           "user"
         ]
       },
-      "RpcBootstrapOutputSchema51": {
+      "RpcBootstrapOutputSchema54": {
         "type": "integer",
         "minimum": 1,
         "maximum": 720
@@ -123988,6 +124755,12 @@
                 "type": "null"
               }
             ]
+          },
+          "mailMessageId": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -126095,6 +126868,56 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcRoutinesCreateOutputSchema1": {
+        "anyOf": [
+          {
+            "type": "number",
+            "const": 15
+          },
+          {
+            "type": "number",
+            "const": 60
+          },
+          {
+            "type": "number",
+            "const": 1440
+          }
+        ]
+      },
+      "RpcRoutinesCreateOutputSchema2": {
+        "type": "string"
+      },
+      "RpcRoutinesCreateOutputSchema3": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema3"
+            }
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema3"
+            }
+          }
+        ]
+      },
       "RpcRoutinesCreateInputSchema0": {
         "type": "string",
         "minLength": 1
@@ -126268,9 +127091,109 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcRoutinesListOutputSchema1": {
+        "anyOf": [
+          {
+            "type": "number",
+            "const": 15
+          },
+          {
+            "type": "number",
+            "const": 60
+          },
+          {
+            "type": "number",
+            "const": 1440
+          }
+        ]
+      },
+      "RpcRoutinesListOutputSchema2": {
+        "type": "string"
+      },
+      "RpcRoutinesListOutputSchema3": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RpcRoutinesListOutputSchema3"
+            }
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RpcRoutinesListOutputSchema3"
+            }
+          }
+        ]
+      },
       "RpcRoutinesUpdateOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcRoutinesUpdateOutputSchema1": {
+        "anyOf": [
+          {
+            "type": "number",
+            "const": 15
+          },
+          {
+            "type": "number",
+            "const": 60
+          },
+          {
+            "type": "number",
+            "const": 1440
+          }
+        ]
+      },
+      "RpcRoutinesUpdateOutputSchema2": {
+        "type": "string"
+      },
+      "RpcRoutinesUpdateOutputSchema3": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema3"
+            }
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema3"
+            }
+          }
+        ]
       },
       "RpcRoutinesUpdateInputSchema0": {
         "type": "string",
@@ -126381,41 +127304,134 @@
       "RpcRoutinesUpdateInputSchema16": {
         "anyOf": [
           {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "const": "page"
-              },
-              "url": {
-                "type": "string",
-                "maxLength": 2048
-              },
-              "intervalMinutes": {
-                "anyOf": [
-                  {
-                    "type": "number",
-                    "const": 15
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "page"
                   },
-                  {
-                    "type": "number",
-                    "const": 60
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2048
                   },
-                  {
-                    "type": "number",
-                    "const": 1440
+                  "intervalMinutes": {
+                    "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema17"
                   }
+                },
+                "required": [
+                  "kind",
+                  "url",
+                  "intervalMinutes"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "connector"
+                  },
+                  "connectorId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "resourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "toolName": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{1,200}$"
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "propertyNames": {
+                      "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema18"
+                    },
+                    "additionalProperties": {
+                      "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema19"
+                    }
+                  },
+                  "appName": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
+                  },
+                  "intervalMinutes": {
+                    "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema17"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "connectorId",
+                  "toolName",
+                  "arguments",
+                  "appName",
+                  "intervalMinutes"
                 ]
               }
-            },
-            "required": [
-              "kind",
-              "url",
-              "intervalMinutes"
             ]
           },
           {
             "type": "null"
+          }
+        ]
+      },
+      "RpcRoutinesUpdateInputSchema17": {
+        "anyOf": [
+          {
+            "type": "number",
+            "const": 15
+          },
+          {
+            "type": "number",
+            "const": 60
+          },
+          {
+            "type": "number",
+            "const": 1440
+          }
+        ]
+      },
+      "RpcRoutinesUpdateInputSchema18": {
+        "type": "string"
+      },
+      "RpcRoutinesUpdateInputSchema19": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema19"
+            }
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema19"
+            }
           }
         ]
       },
@@ -127931,6 +128947,10 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 200
+      },
+      "RpcThreadsSendDraftInputSchema0": {
+        "type": "string",
+        "minLength": 1
       },
       "RpcThreadsStopInputSchema0": {
         "$ref": "#/components/schemas/RpcThreadsStopInputSchema1"

@@ -24,14 +24,16 @@ describe("buildApprovalAskBlock tool identity", () => {
     expect(b.text).toBe("Review before Other Bank: Request payment → $5.00");
   });
 
-  it("always shows the exact fully qualified tool id in the detail", () => {
-    expect(ask("mcp__finance-mercury__requestPayment", "Mercury").detail).toContain(
-      "tool: mcp__finance-mercury__requestPayment",
-    );
-    expect(ask("mcp__finance-other__requestPayment", "Other Bank").detail).toContain(
-      "tool: mcp__finance-other__requestPayment",
-    );
-    expect(ask("gmail_send_email").detail).toContain("tool: gmail_send_email");
+  it("carries the exact fully qualified tool id as toolId, not in the detail", () => {
+    for (const id of [
+      "mcp__finance-mercury__requestPayment",
+      "mcp__finance-other__requestPayment",
+      "gmail_send_email",
+    ]) {
+      const block = ask(id);
+      expect(block.toolId).toBe(id);
+      expect(block.detail ?? "").not.toContain("tool:");
+    }
   });
 
   it("keeps hand-written built-in phrasing and the Always allow action", () => {

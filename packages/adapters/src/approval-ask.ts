@@ -84,6 +84,15 @@ export function buildApprovalAskBlock(
   return {
     kind: "ask",
     approvalEffectId: effectId,
+    // The card's chevron reveals the exact id; hand-written cards and writes name it in their detail.
+    toolId:
+      HAND_WRITTEN_TOOLS.has(toolName) ||
+      toolName === "create_space" ||
+      isSendMoney(toolName) ||
+      options?.integrationWriteTool !== undefined ||
+      options?.schedule
+        ? undefined
+        : toolName,
     text: truncate(
       redactSecrets(
         toolName === "create_space" || isSendMoney(toolName)
@@ -390,7 +399,6 @@ function formatApprovalDetail(
   if (reviewReason?.trim()) {
     lines.push(reviewReason.trim().replace(/\u2014|\u2013/g, "-"));
   }
-  if (!HAND_WRITTEN_TOOLS.has(toolName)) lines.push(`tool: ${toolName}`);
   if (toolName === "create_space") {
     lines.push(
       "Bots, groups, chats, files, memory, and integrations in this space stay separate from other spaces.",

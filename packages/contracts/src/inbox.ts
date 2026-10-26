@@ -144,6 +144,8 @@ export const MailRowSchema = z.object({
   pile: InboxPileSchema.nullable().optional(),
   /** The message carries an attached file; optional for older servers and rows synced before it was recorded. */
   hasAttachment: z.boolean().optional(),
+  /** The Chief tracks this thread in Open work; optional for older servers. */
+  tracked: z.boolean().optional(),
 });
 
 /** Which account a request covers; omitted means every connected mail account. */

@@ -27,12 +27,15 @@ vi.mock("../../components/ComposeEmail", () => ({
     seed,
     draft,
     restore,
+    onSent,
   }: {
     seed: { kind: string };
     draft?: string;
     restore?: { fields: object; replyToId?: string };
+    onSent?: () => void;
   }) => (
     <div data-testid="compose">
+      <button type="button" aria-label="mock send" onClick={onSent} />
       {seed.kind}
       {draft ? `:${draft}` : ""}
       {restore ? `|${JSON.stringify(restore.fields)}|reply-to:${restore.replyToId}` : ""}
@@ -548,6 +551,20 @@ it("says the email has an unsent reply and continues it in the mode it was writt
   } finally {
     forgetClosed(seed);
   }
+});
+
+it("closes the preview when the reply composer sends, leaving Undo to the outbox", async () => {
+  get.mockImplementation(async () => message("m1"));
+  const onClose = vi.fn();
+  act(() => root.render(<InboxMessageDialog messageId="m1" onClose={onClose} />));
+  await flush();
+  const reply = [...document.querySelectorAll("button")].find((b) => b.textContent === "Reply");
+  await act(async () => reply?.click());
+  expect(onClose).not.toHaveBeenCalled();
+  await act(async () =>
+    (document.querySelector('[aria-label="mock send"]') as HTMLElement).click(),
+  );
+  expect(onClose).toHaveBeenCalledTimes(1);
 });
 
 it("takes the read state from the message and hides Archive once it left the Inbox", async () => {

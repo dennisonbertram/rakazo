@@ -528,3 +528,76 @@ it("keeps the More button on the Send and Discard line when the account hint sho
   expect(row.contains(hint as Node)).toBe(false);
   expect(row.contains(host.querySelector("[aria-label=More]"))).toBe(true);
 });
+
+const draftMail: MailApproval = { ...mail, tool: "mail_draft" };
+
+it("offers Send now beside Save draft on a pending draft, and sends the edits with send: true", async () => {
+  const { onAnswer } = await render({ mail: draftMail, canSend: true });
+  expect(button("Send now")).toBeDefined();
+  expect(button("Save draft")).toBeDefined();
+  await click(button("Edit"));
+  await type(host.querySelector('input[aria-label="Subject"]') as HTMLInputElement, "Monday");
+  await click(button("Send now"));
+  expect(onAnswer).toHaveBeenCalledTimes(1);
+  expect(onAnswer).toHaveBeenCalledWith("allow", undefined, { subject: "Monday", send: true });
+});
+
+it("Save draft still saves without send", async () => {
+  const { onAnswer } = await render({ mail: draftMail, canSend: true });
+  await click(button("Save draft"));
+  expect(onAnswer).toHaveBeenCalledWith("allow", undefined, undefined);
+});
+
+it("hides Send now and Send when sending is off, and on a send card", async () => {
+  await render({ mail: draftMail, canSend: false });
+  expect(button("Send now")).toBeUndefined();
+  await render({ canSend: true });
+  expect(button("Send now")).toBeUndefined();
+  await render({
+    mail: { ...draftMail, outcome: "saved" },
+    status: "answered",
+    answer: "allow",
+    canSend: false,
+    onSendDraft: vi.fn(async () => undefined),
+  });
+  expect(button("Send")).toBeUndefined();
+});
+
+it("offers Send on a saved draft and asks the server to send it", async () => {
+  const onSendDraft = vi.fn(async () => undefined);
+  const { onAnswer } = await render({
+    mail: { ...draftMail, outcome: "saved" },
+    status: "answered",
+    answer: "allow",
+    canSend: true,
+    onSendDraft,
+  });
+  await click(button("Send"));
+  expect(onSendDraft).toHaveBeenCalledTimes(1);
+  expect(onAnswer).not.toHaveBeenCalled();
+});
+
+it("shows an error when sending a saved draft fails", async () => {
+  await render({
+    mail: { ...draftMail, outcome: "saved" },
+    status: "answered",
+    answer: "allow",
+    canSend: true,
+    onSendDraft: async () => {
+      throw new Error("Could not submit this answer");
+    },
+  });
+  await click(button("Send"));
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Could not submit");
+});
+
+it("reads Not sent, not Draft not saved, when Send now failed", async () => {
+  // The server flips the card to a send when it claims Send now.
+  await render({
+    mail: { ...mail, outcome: "failed", connectionId: "c1" },
+    status: "answered",
+    answer: "deny",
+  });
+  expect(header()).toContain("Not sent");
+  expect(host.textContent).not.toContain("Draft not saved");
+});
