@@ -39,6 +39,7 @@ export * from "./prisma-errors.js";
 export * from "./push-endpoints.js";
 export * from "./realtime-follow.js";
 export * from "./repos.js";
+export * from "./routine-watch.js";
 export { delegatePendingAgents, delegatePendingIds } from "./run-pauses.js";
 export * from "./safes.js";
 export * from "./scope.js";

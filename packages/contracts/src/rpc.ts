@@ -335,6 +335,7 @@ import {
   BotPinsSchema,
 } from "./pins.js";
 import { MessageReactionSchema } from "./reactions.js";
+import { CheckInGetInput, CheckInSchema, CheckInSetInput, WatchSpecSchema } from "./routines.js";
 import { RoutineHistorySchema, RoutineRunCursorSchema, RunsListOutputSchema } from "./runs.js";
 import { SearchQueryOutputSchema } from "./search.js";
 import {
@@ -867,11 +868,15 @@ export const appContract = {
             thinkingLevel: ThinkingLevelSchema.nullable().optional(),
             /** ISO datetime to arm a never-run one-shot. */
             runAt: IsoDate.optional(),
+            quiet: z.boolean().optional(),
+            /** Null removes the watch. */
+            watch: WatchSpecSchema.nullable().optional(),
           })
           .superRefine((value, ctx) => {
             if (
               value.crons &&
               value.crons.length === 0 &&
+              !value.watch &&
               value.webhookEnabled === false &&
               value.githubEnabled === false &&
               value.messageProvider === null
@@ -895,6 +900,10 @@ export const appContract = {
       )
       .output(z.object({ runId: Id })),
   },
+  checkIn: {
+    get: oc.input(CheckInGetInput).output(CheckInSchema),
+    set: oc.input(CheckInSetInput).output(CheckInSchema),
+  },
   scratchpad: {
     list: oc
       .input(
@@ -916,6 +925,10 @@ export const appContract = {
             notes: z.string().max(4_000).optional(),
             target: z.string().max(200).optional(),
             scheduledFor: z.iso.datetime({ offset: true }).optional(),
+            /** Null clears. */
+            dueAt: z.iso.datetime({ offset: true }).nullable().optional(),
+            waitingOn: z.string().max(200).nullable().optional(),
+            resolvedReason: z.string().max(500).nullable().optional(),
             proof: z.string().max(2_000).optional(),
             updatedAt: z.iso.datetime({ offset: true }).optional(),
             reapprove: z.boolean().optional(),

@@ -205,7 +205,9 @@ threads.json           Your conversations.
 messages.json          Every message in your conversations.
 memories.json          Your agents' memory documents.
 skills.json            Your skills.
-routines.json          Your routines, with their cron schedules.
+routines.json          Your routines, with their schedules, quiet setting and page watches.
+routine-watch-state.json  What your page watches last saw: the page text (up to 16 KB) and check times.
+scratchpad-items.json  Your agents' open items, with what they wait on and when they are due.
 contacts.json          Your contacts.
 meetings.json          Your synced meetings, with notes and transcripts.
 cap-table.json         The latest cap table snapshot.
@@ -253,6 +255,22 @@ function collectors(prisma: PrismaClient, userId: string, spaceIds: string[]) {
     ["memories.json", (a) => prisma.memoryDocument.findMany(page({ where: own, ...after(a) }))],
     ["skills.json", (a) => prisma.agentSkill.findMany(page({ where: own, ...after(a) }))],
     ["routines.json", (a) => prisma.routine.findMany(page({ where: own, ...after(a) }))],
+    [
+      "routine-watch-state.json",
+      async (a) =>
+        (
+          await prisma.routineWatchState.findMany({
+            where: { spaceId: own.spaceId, routine: { userId } },
+            take: PAGE,
+            orderBy: { routineId: "asc" },
+            ...(a ? { cursor: { routineId: a }, skip: 1 } : {}),
+          })
+        ).map((row) => ({ ...row, id: row.routineId })),
+    ],
+    [
+      "scratchpad-items.json",
+      (a) => prisma.scratchpadItem.findMany(page({ where: own, ...after(a) })),
+    ],
     ["contacts.json", (a) => prisma.contact.findMany(page({ where: own, ...after(a) }))],
     ["meetings.json", (a) => prisma.meeting.findMany(page({ where: own, ...after(a) }))],
     ["cap-table.json", (a) => prisma.capTableSnapshot.findMany(page({ where: own, ...after(a) }))],

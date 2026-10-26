@@ -3708,6 +3708,9 @@ describe("routines.update", () => {
     thinkingLevel: null,
     lastRunAt: null,
     nextRunAt: null,
+    quiet: false,
+    watch: null,
+    managedKind: null,
     createdAt: new Date("2026-09-01T00:00:00.000Z"),
   };
 

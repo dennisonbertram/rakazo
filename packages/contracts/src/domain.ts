@@ -10,6 +10,7 @@ import {
 import { ThreadMessageSchema } from "./events.js";
 import { Id, MemoryScope, RunStatus, SandboxKind } from "./ids.js";
 import { McpHeadersSchema, McpRemoteEndpointSchema, McpTransportSchema } from "./mcp.js";
+import { RoutineManagedKindSchema, RoutineStatusSchema, WatchSpecSchema } from "./routines.js";
 import { RunTriggerSchema } from "./runs.js";
 
 export const ComputerModeSchema = z.enum(["team", "dedicated"]);
@@ -481,6 +482,12 @@ export const RoutineSchema = z.object({
   thinkingLevel: ThinkingLevelSchema.nullable(),
   lastRunAt: z.string().nullable(),
   nextRunAt: z.string().nullable(),
+  /** Only message the user when something needs them; the server adds the silent-reply guidance. */
+  quiet: z.boolean(),
+  watch: WatchSpecSchema.nullable(),
+  /** "check_in" for a bot's managed check-in routine (editable only via Active). */
+  managedKind: RoutineManagedKindSchema.nullable(),
+  status: RoutineStatusSchema,
   createdAt: z.string(),
 });
 export type Routine = z.infer<typeof RoutineSchema>;
@@ -507,11 +514,15 @@ export const CreateRoutineInput = z
     modelProvider: z.string().trim().min(1).max(80).nullable().default(null),
     modelId: z.string().trim().min(1).max(200).nullable().default(null),
     thinkingLevel: ThinkingLevelSchema.nullable().default(null),
+    /** Defaults to on for a watch and off otherwise. */
+    quiet: z.boolean().optional(),
+    watch: WatchSpecSchema.nullable().default(null),
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);
     if (
       value.crons.length === 0 &&
+      !value.watch &&
       !value.webhookEnabled &&
       !value.githubEnabled &&
       !value.messageProvider
@@ -569,6 +580,9 @@ export const ScratchpadItemSchema = z.object({
   proof: z.string().max(2_000).nullish(),
   approvedAt: ScratchpadDateTimeSchema.nullish(),
   approvedBy: z.enum(["user", "policy"]).nullish(),
+  dueAt: ScratchpadDateTimeSchema.nullish(),
+  waitingOn: z.string().max(200).nullish(),
+  resolvedReason: z.string().max(500).nullish(),
 });
 export type ScratchpadItem = z.infer<typeof ScratchpadItemSchema>;
 
@@ -581,6 +595,8 @@ export const CreateScratchpadItemInput = z.object({
   channel: ScratchpadChannelSchema.optional(),
   target: z.string().max(200).optional(),
   scheduledFor: ScratchpadDateTimeSchema.optional(),
+  dueAt: ScratchpadDateTimeSchema.optional(),
+  waitingOn: z.string().max(200).optional(),
 });
 
 export const TaughtSkillStatusSchema = z.enum(["recording", "drafting", "draft", "saved"]);

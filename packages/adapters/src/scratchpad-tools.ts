@@ -58,6 +58,9 @@ type ScratchpadRow = {
   proof?: string | null;
   approvedAt?: Date | null;
   approvedBy?: string | null;
+  dueAt?: Date | null;
+  waitingOn?: string | null;
+  resolvedReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -92,6 +95,9 @@ export function mapScratchpadItem(row: ScratchpadRow) {
     proof: row.proof ?? null,
     approvedAt: row.approvedAt?.toISOString() ?? null,
     approvedBy: approvedByValue(row.approvedBy),
+    dueAt: row.dueAt?.toISOString() ?? null,
+    waitingOn: row.waitingOn ?? null,
+    resolvedReason: row.resolvedReason ?? null,
   };
 }
 

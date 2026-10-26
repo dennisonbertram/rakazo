@@ -27,6 +27,16 @@ const routine: Routine = {
   thinkingLevel: null,
   lastRunAt: "2026-01-01T09:00:00.000Z",
   nextRunAt: "2026-01-02T09:00:00.000Z",
+  quiet: false,
+  watch: null,
+  managedKind: null,
+  status: {
+    lastRunAt: "2026-01-01T09:00:00.000Z",
+    nextRunAt: "2026-01-02T09:00:00.000Z",
+    lastCheckedAt: null,
+    lastChangedAt: null,
+    pausedReason: null,
+  },
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 

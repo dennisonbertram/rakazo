@@ -144,6 +144,7 @@ import type {
   NotificationDto,
   Routine,
   SpaceNavigation,
+  WatchPausedReason,
 } from "@rakazo/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
@@ -179,6 +180,7 @@ import {
   OPENAI_COMPATIBLE_PROVIDER_ID,
   parseTicketRef,
   usableModelId,
+  WatchSpecSchema,
 } from "@rakazo/contracts";
 import {
   ACTIVE_RUN_STATUSES,
@@ -199,6 +201,8 @@ import {
   newRunUnattended,
   nextCronDateAcrossStrict,
   splitPage,
+  WATCHES_PER_BOT,
+  WATCHES_PER_SPACE,
   withAppDirectory,
 } from "@rakazo/core";
 import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
@@ -225,6 +229,7 @@ import {
   closeRound,
   companyForActor,
   companyWriter,
+  countWatches,
   createExternalConversationRepos,
   createGroupRepos,
   createRepos,
@@ -248,6 +253,7 @@ import {
   formatMessagingLinkCode,
   getAuditRequest,
   getCapTableSnapshot,
+  getCheckInCadence,
   getContact,
   getInvestorUpdate,
   getNotificationPreferences,
@@ -299,6 +305,7 @@ import {
   replaceSpaceBackupModels,
   restoreBotUnderComputerQuota,
   restoreSidebar,
+  resumeWatch,
   revokePortal,
   SafeActiveError,
   SafeCapRequiredError,
@@ -322,6 +329,7 @@ import {
   setApprovalRule,
   setSidebarFolderCollapsed,
   shareDocument,
+  syncWatchState,
   toBoardDto,
   toTicketCommentDto,
   toTicketDto,
@@ -333,6 +341,7 @@ import {
   unseenCounts,
   unshareDocument,
   updateNotificationPreferences,
+  upsertCheckInRoutine,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { createAgentSkillsService } from "./agent-skills.js";
@@ -4142,6 +4151,9 @@ export function createRouter(deps: RouterDeps) {
         }
         const bot = await repos.getBot(context.actor, input.botId);
         await assertRoutineModel(deps, context.actor, input);
+        if (input.watch) {
+          await assertWatchLimits(deps.prisma, context.actor.spaceId, input.botId);
+        }
         const timezone =
           input.timezone ??
           (
@@ -4174,9 +4186,22 @@ export function createRouter(deps: RouterDeps) {
             modelProvider: input.modelProvider,
             modelId: input.modelId,
             thinkingLevel: input.thinkingLevel,
+            // A watch is quiet by default; everything else keeps today's behavior.
+            quiet: input.quiet ?? Boolean(input.watch),
+            watch: input.watch ?? undefined,
             nextRunAt,
           },
+          include: { watchState: true },
         });
+        if (input.watch) {
+          await syncWatchState(deps.prisma, {
+            routineId: row.id,
+            spaceId: row.spaceId,
+            watch: input.watch,
+            watchChanged: true,
+            now: new Date(),
+          });
+        }
         if (bot.thread) {
           await deps.events.append({
             spaceId: context.actor.spaceId,
@@ -4239,7 +4264,24 @@ export function createRouter(deps: RouterDeps) {
         if (modelChanged) {
           await assertRoutineModel(deps, context.actor, { modelProvider, modelId });
         }
-        if (crons.length === 0 && !webhookEnabled && !githubEnabled && !messageProvider) {
+        if (existing.managedKind) {
+          const edited = Object.entries(input).filter(
+            ([key, value]) => key !== "routineId" && key !== "active" && value !== undefined,
+          );
+          if (edited.length > 0) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "This routine is managed by the check-in setting.",
+            });
+          }
+        }
+        const watch = input.watch === undefined ? existing.watch : input.watch;
+        const watchChanged =
+          input.watch !== undefined &&
+          JSON.stringify(input.watch) !== JSON.stringify(existing.watch);
+        if (input.watch && !existing.watch) {
+          await assertWatchLimits(deps.prisma, context.actor.spaceId, existing.botId);
+        }
+        if (crons.length === 0 && !watch && !webhookEnabled && !githubEnabled && !messageProvider) {
           throw new ORPCError("BAD_REQUEST", {
             message: "Add a schedule, webhook, GitHub, or message trigger",
           });
@@ -4323,9 +4365,12 @@ export function createRouter(deps: RouterDeps) {
               webhookEnabled: input.webhookEnabled,
               githubEnabled: input.githubEnabled,
               messageProvider: input.messageProvider,
+              quiet: input.quiet,
+              ...(input.watch === undefined ? {} : { watch: input.watch ?? Prisma.DbNull }),
               ...(touchesModel ? { modelProvider, modelId, thinkingLevel } : {}),
               nextRunAt,
             },
+            include: { watchState: true },
           })
           .catch(async (error: unknown) => {
             if (isRecordNotFound(error)) {
@@ -4356,6 +4401,22 @@ export function createRouter(deps: RouterDeps) {
             payload: { routineId: row.id, active: row.active },
           });
         }
+        if (input.watch !== undefined) {
+          await syncWatchState(deps.prisma, {
+            routineId: row.id,
+            spaceId: row.spaceId,
+            watch: input.watch,
+            watchChanged,
+            now: new Date(),
+          });
+        } else if (!existing.active && row.active && row.watch) {
+          // Turning a paused watch back on checks again now.
+          await resumeWatch(deps.prisma, {
+            routineId: row.id,
+            spaceId: row.spaceId,
+            now: new Date(),
+          });
+        }
         const scheduleNeedsSync =
           existing.active !== row.active ||
           scheduleChanged ||
@@ -4374,6 +4435,11 @@ export function createRouter(deps: RouterDeps) {
           where: { id: input.routineId, spaceId: context.actor.spaceId },
         });
         if (!existing) throw new IsolationError();
+        if (existing.managedKind) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Turn off the check-in setting instead.",
+          });
+        }
         await deps.prisma.routine.delete({ where: { id: existing.id } });
         await deps.jobs.cancel(routineJobKey(existing.id));
         return { ok: true as const };
@@ -4460,6 +4526,37 @@ export function createRouter(deps: RouterDeps) {
           getLogger().error("routine testRun enqueue", error);
         });
         return { runId: run.id };
+      }),
+    },
+    checkIn: {
+      get: authed.checkIn.get.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        return {
+          cadence: await getCheckInCadence(deps.prisma, {
+            spaceId: context.actor.spaceId,
+            botId: input.botId,
+          }),
+        };
+      }),
+      set: authed.checkIn.set.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        const user = await deps.prisma.user.findUnique({
+          where: { id: context.actor.userId },
+          select: { timezone: true },
+        });
+        const routine = await upsertCheckInRoutine(deps.prisma, {
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+          botId: input.botId,
+          cadence: input.cadence,
+          timezone: user?.timezone && isValidTimezone(user.timezone) ? user.timezone : "UTC",
+        });
+        if (routine?.active && routine.nextRunAt) {
+          await deps.jobs.enqueue(routineWakeupJob(routine.id, routine.nextRunAt));
+        } else if (routine) {
+          await deps.jobs.cancel(routineJobKey(routine.id));
+        }
+        return { cadence: input.cadence };
       }),
     },
     scratchpad: {
@@ -9473,6 +9570,15 @@ function nextRoutineDate(crons: string[], timezone: string): Date {
   return next;
 }
 
+async function assertWatchLimits(prisma: PrismaClient, spaceId: string, botId: string) {
+  const count = await countWatches(prisma, { spaceId, botId });
+  if (count.bot >= WATCHES_PER_BOT || count.space >= WATCHES_PER_SPACE) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: `A bot can watch ${WATCHES_PER_BOT} pages and a space ${WATCHES_PER_SPACE}.`,
+    });
+  }
+}
+
 /** A routine may only name a model the space has connected. */
 async function assertRoutineModel(
   deps: RouterDeps,
@@ -9506,8 +9612,17 @@ function mapRoutine(row: {
   thinkingLevel: string | null;
   lastRunAt: Date | null;
   nextRunAt: Date | null;
+  quiet: boolean;
+  watch: unknown;
+  managedKind: string | null;
+  watchState?: {
+    lastCheckedAt: Date | null;
+    lastChangedAt: Date | null;
+    pausedReason: string | null;
+  } | null;
   createdAt: Date;
 }): Routine {
+  const watch = WatchSpecSchema.safeParse(row.watch);
   return {
     id: row.id,
     botId: row.botId,
@@ -9525,6 +9640,16 @@ function mapRoutine(row: {
     thinkingLevel: (row.thinkingLevel as Routine["thinkingLevel"]) ?? null,
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
+    quiet: row.quiet,
+    watch: watch.success ? watch.data : null,
+    managedKind: row.managedKind === "check_in" ? "check_in" : null,
+    status: {
+      lastRunAt: row.lastRunAt?.toISOString() ?? null,
+      nextRunAt: row.nextRunAt?.toISOString() ?? null,
+      lastCheckedAt: row.watchState?.lastCheckedAt?.toISOString() ?? null,
+      lastChangedAt: row.watchState?.lastChangedAt?.toISOString() ?? null,
+      pausedReason: (row.watchState?.pausedReason as WatchPausedReason | null) ?? null,
+    },
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -9532,6 +9657,7 @@ function mapRoutine(row: {
 async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
   const rows = await deps.prisma.routine.findMany({
     where: { botId, spaceId: actor.spaceId },
+    include: { watchState: true },
   });
   return rows.map(mapRoutine);
 }
