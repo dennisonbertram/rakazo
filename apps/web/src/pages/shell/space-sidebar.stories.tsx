@@ -264,6 +264,7 @@ export function SidebarFixture({
     investorsMode,
     fundraisingMode,
     contactsMode: false,
+    calendarMode: false,
     companyMode: false,
     dataRoomMode: false,
     artifactsMode: false,
