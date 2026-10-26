@@ -203,6 +203,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("ask"),
     text: z.string(),
+    /** One plain sentence under the card, only for background or rule-caused asks. */
+    approvalReason: z.string().optional(),
     approvalEffectId: Id.optional(),
     detail: z.string().optional(),
     /** Show `detail` behind a "Details" disclosure (raw tool arguments), not open on the card. */

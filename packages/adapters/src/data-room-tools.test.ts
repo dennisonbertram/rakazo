@@ -72,10 +72,13 @@ describe("Data room tool lists", () => {
     for (const name of DATA_ROOM_TOOL_NAMES) expect(BUILTIN_TOOL_NAMES).toContain(name);
   });
 
-  it("runs the tools unattended without approval, and records only the writing one", () => {
+  it("runs the reads unattended without approval, and records only the writing one", () => {
     for (const name of DATA_ROOM_TOOL_NAMES) {
       expect(toolRequiresApproval(name, false)).toBe(false);
-      expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(false);
+      // Adding writes, so it asks in a background run; the reads stay free.
+      expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(
+        name === "add_to_data_room",
+      );
     }
     expect(READ_ONLY_AGENT_TOOLS.has("search_data_room")).toBe(true);
     expect(READ_ONLY_AGENT_TOOLS.has("read_data_room_item")).toBe(true);

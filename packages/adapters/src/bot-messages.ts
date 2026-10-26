@@ -13,6 +13,7 @@ import {
   botMessageContext,
   botMessageHopExhausted,
   buildBotMessageWakePrompt,
+  chainedRunMode,
   checkOutbound,
   clampBotMessage,
   nextBotMessageHop,
@@ -348,7 +349,7 @@ export async function messageBot(
                 ? { in: ["completed", "failed", "cancelled"] }
                 : "running",
           },
-          select: { id: true },
+          select: { id: true, unattended: true, externalTaint: true },
         });
         if (!senderStillRunning)
           return { ok: false as const, error: "source run is no longer active" };
@@ -426,6 +427,8 @@ export async function messageBot(
             status: "queued",
           },
         });
+        // A message from a run puts the receiving bot in that run's mode.
+        const mode = chainedRunMode("bot_message", senderStillRunning);
         const nextRun = await tx.run.create({
           data: {
             spaceId: run.spaceId,
@@ -435,6 +438,8 @@ export async function messageBot(
             userId: run.userId,
             status: "queued",
             trigger: "bot_message",
+            unattended: mode.unattended,
+            externalTaint: mode.externalTaint,
             sourceMessageId: inbound.id,
           },
           select: { id: true },

@@ -810,14 +810,46 @@ export function preferNativeGoogle(
   );
 }
 
+export const ActionApprovalEffectSchema = z.enum(["always_allow", "require_approval", "block"]);
 export const ActionApprovalRuleSchema = z.object({
   id: Id,
-  effect: z.enum(["always_allow", "require_approval"]),
+  effect: ActionApprovalEffectSchema,
   matchKind: z.enum(["tool", "connector", "category"]),
   matchValue: z.string(),
+  /** null for a space-wide rule; a bot id for that bot's override. */
+  botId: Id.nullable().optional(),
   createdAt: z.string(),
 });
 export type ActionApprovalRule = z.infer<typeof ActionApprovalRuleSchema>;
+
+/** The three choices of the approvals table, as the person sees them: Allow, Ask, Block. */
+export const ApprovalChoiceSchema = z.enum(["allow", "ask", "block"]);
+export type ApprovalChoice = z.infer<typeof ApprovalChoiceSchema>;
+
+export const APPROVAL_ACTION_TYPE_IDS = [
+  "send_email",
+  "spend_money",
+  "connected_apps_write",
+  "calendar_changes",
+  "files_and_commands",
+  "use_computer",
+  "delete_data",
+  "message_outside",
+  "use_credentials",
+] as const;
+export const ApprovalActionTypeSchema = z.enum(APPROVAL_ACTION_TYPE_IDS);
+export type ApprovalActionType = z.infer<typeof ApprovalActionTypeSchema>;
+
+export const ApprovalTableRowSchema = z.object({
+  actionType: ApprovalActionTypeSchema,
+  /** What applies for this scope: the bot override if there is one, else the space row, else the default. */
+  effect: ApprovalChoiceSchema,
+  spaceEffect: ApprovalChoiceSchema,
+  /** null when the bot has no override ("Same as all bots"); always null without a botId. */
+  botEffect: ApprovalChoiceSchema.nullable(),
+  primary: z.boolean(),
+});
+export type ApprovalTableRow = z.infer<typeof ApprovalTableRowSchema>;
 
 export const ActionAutoReviewSettingsSchema = z.object({
   enabled: z.boolean(),

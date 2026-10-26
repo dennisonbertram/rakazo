@@ -1788,7 +1788,9 @@ describe("answerRunInput", () => {
         update: vi.fn().mockResolvedValue({ id: "effect-1" }),
       },
       actionApprovalRule: {
-        upsert: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
       },
       thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }) },
       event: {
@@ -1822,24 +1824,17 @@ describe("answerRunInput", () => {
       where: { id: "effect-1" },
       data: { status: "approved" },
     });
-    expect(tx.actionApprovalRule.upsert).toHaveBeenCalledWith({
-      where: {
-        spaceId_createdByUserId_effect_matchKind_matchValue: {
-          spaceId: "workspace-1",
-          createdByUserId: "user-1",
-          effect: "always_allow",
-          matchKind: "tool",
-          matchValue: "destination.write",
-        },
-      },
-      create: {
+    // Always allow replaces any rule for the tool (one rule per target).
+    expect(tx.actionApprovalRule.deleteMany).toHaveBeenCalled();
+    expect(tx.actionApprovalRule.create).toHaveBeenCalledWith({
+      data: {
         spaceId: "workspace-1",
         createdByUserId: "user-1",
+        botId: null,
         effect: "always_allow",
         matchKind: "tool",
         matchValue: "destination.write",
       },
-      update: {},
     });
   });
 

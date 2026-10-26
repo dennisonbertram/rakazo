@@ -7,7 +7,7 @@ import {
   isCartaEndpoint,
   pageAgentColor,
 } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES, newRunUnattended } from "@rakazo/core";
 import type { createRepos, PrismaClient } from "@rakazo/db";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -247,6 +247,7 @@ export async function startCartaSync(
         taskId: task.id,
         status: "queued",
         trigger: "routine",
+        unattended: newRunUnattended({ trigger: "routine" }),
       },
       select: { id: true },
     });

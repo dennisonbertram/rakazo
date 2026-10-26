@@ -40,6 +40,7 @@ import {
   ACTIVE_RUN_STATUSES,
   buildPlaybookFromRecording,
   formatSkillRunPrompt,
+  newRunUnattended,
   teachRecordingTtlMs,
 } from "@rakazo/core";
 import type { createRepos, PrismaClient, ThreadEvents } from "@rakazo/db";
@@ -530,6 +531,7 @@ export function createTaughtSkillsService(deps: TaughtSkillsDeps) {
           userId: actor.userId,
           status: "queued",
           trigger: "skill",
+          unattended: newRunUnattended({ trigger: "skill" }),
         },
       });
       await deps.jobs.enqueue(runContinueJob(run.id));

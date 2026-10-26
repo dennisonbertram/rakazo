@@ -293,6 +293,8 @@ function fixture({
     userId: "user-1",
     status: "queued",
     trigger,
+    // Webhook runs are created unattended; the other fixtures model an attended run.
+    unattended: trigger === "webhook",
     leaseFence: 0,
     ...(peer ? { sourceMessageId: "msg-1" } : {}),
   };

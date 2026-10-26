@@ -126,6 +126,7 @@ import {
   messagingChannelId,
   messagingChannelPrivacyBlock,
   messagingDmSurfaceNote,
+  newRunUnattended,
   nextCronDateAcross,
   nextFence,
   ownsLine,
@@ -142,7 +143,7 @@ import {
   toolRequiresApproval,
   toolRequiresExplicitApproval,
   truncatedPlainText,
-  unattendedTriggerToolRequiresApproval,
+  unattendedToolRequiresApproval,
   userTurnMessageForRun,
   VOICE_AGENT_INSTRUCTIONS,
   withInboxAgentStandIn,
@@ -1333,6 +1334,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             userId: routine.userId,
             status: "queued",
             trigger: "routine",
+            unattended: newRunUnattended({ trigger: "routine" }),
             routineId: routine.id,
             ...routineRunModelPin(currentModel),
           },
@@ -3918,11 +3920,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : COMPANY_TOOL_NAMES.has(name)
               ? tools.find((tool) => tool.name === name)?.readOnly
               : undefined;
-          const requiresUnattendedApproval = unattendedTriggerToolRequiresApproval(
-            run.trigger,
+          const requiresUnattendedApproval = unattendedToolRequiresApproval(
+            run.unattended,
             name,
             viaConnector,
             declaredReadOnly,
+            args,
           );
           // Only a repeating schedule asks; a one-off reminder fires once and stays free.
           const scheduleScope = {

@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { ActionApprovalRule } from "./action-approval.js";
+import type { ActionApprovalRule, ActionApprovalSource } from "./action-approval.js";
 import {
+  ACTION_TYPES,
+  actionTypeForTool,
   applyJudgeDecision,
+  buildApprovalTable,
   connectorKindFromToolName,
   connectorToolRequiresApproval,
+  EXTERNAL_TAINT_SAFE_TOOLS,
+  externalTaintAllowsTool,
   isApprovalAskBlock,
   isSecretAskBlock,
   planActionGate,
@@ -11,6 +16,8 @@ import {
   resolveActionApprovalDetail,
   toolRequiresApproval,
   toolRequiresExplicitApproval,
+  toolRuleAllowsAllow,
+  unattendedToolRequiresApproval,
   unattendedTriggerToolRequiresApproval,
 } from "./action-approval.js";
 
@@ -264,12 +271,7 @@ describe("resolveActionApproval", () => {
         rules: [],
       }),
     ).toBe("allow");
-    expect(
-      resolveActionApproval({
-        toolName: "destination.write",
-        rules: [],
-      }),
-    ).toBe("allow");
+    expect(resolveActionApproval({ toolName: "remember", rules: [] })).toBe("allow");
   });
 
   it("lets a tool exception override a broader category rule", () => {
@@ -293,7 +295,7 @@ describe("resolveActionApproval", () => {
     ).toMatchObject({ decision: "allow", source: "always_allow" });
     expect(
       resolveActionApprovalDetail({
-        toolName: "destination.write",
+        toolName: "remember",
         rules: [],
       }),
     ).toMatchObject({ decision: "allow", source: "default" });
@@ -415,5 +417,288 @@ describe("drive write tools", () => {
   });
   it.each(["drive_search", "drive_read"])("%s does not", (name) => {
     expect(toolRequiresApproval(name, false)).toBe(false);
+  });
+});
+
+const rule = (
+  effect: "always_allow" | "require_approval" | "block",
+  matchKind: "tool" | "connector" | "category",
+  matchValue: string,
+  botId: string | null = null,
+) => ({ effect, matchKind, matchValue, botId });
+
+describe("actionTypeForTool", () => {
+  it.each([
+    ["mail_send", false, "send_email"],
+    ["mail_draft", false, "send_email"],
+    ["mail_modify", false, "send_email"],
+    ["calendar_create_event", false, "calendar_changes"],
+    ["calendar_delete_event", false, "calendar_changes"],
+    ["write_file", false, "files_and_commands"],
+    ["shell", false, "files_and_commands"],
+    ["open_path", false, "files_and_commands"],
+    ["launch_app", false, "files_and_commands"],
+    ["computer_act", false, "use_computer"],
+    ["browser_act", false, "use_computer"],
+    ["browser_navigate", false, "use_computer"],
+    ["delete_bot", false, "delete_data"],
+    ["forget_memory", false, "delete_data"],
+    ["forget_secret", false, "delete_data"],
+    ["imessage_send", false, "message_outside"],
+    ["secret_request", false, "use_credentials"],
+    ["fill_secret", false, "use_credentials"],
+    ["drive_create_file", false, "connected_apps_write"],
+    ["gmail_send_email", true, "send_email"],
+    ["stripe_create_charge", true, "spend_money"],
+    ["googlecalendar_create_event", true, "calendar_changes"],
+    ["slack_post_message", true, "message_outside"],
+    ["github_delete_branch", true, "delete_data"],
+    ["github_create_issue", true, "connected_apps_write"],
+  ] as const)("%s (connector %s) is %s", (toolName, viaConnector, expected) => {
+    expect(actionTypeForTool({ toolName, viaConnector })).toBe(expected);
+  });
+
+  it("maps read-only tools to no action type", () => {
+    expect(actionTypeForTool({ toolName: "read_file" })).toBeNull();
+    expect(actionTypeForTool({ toolName: "github_get_issue", viaConnector: true })).toBeNull();
+    expect(
+      actionTypeForTool({ toolName: "github_get_issue", viaConnector: true, readOnly: false }),
+    ).toBe("connected_apps_write");
+  });
+
+  it("lists the nine action types, five shown by default", () => {
+    expect(ACTION_TYPES.map((type) => type.id)).toHaveLength(9);
+    expect(ACTION_TYPES.filter((type) => type.primary)).toHaveLength(5);
+    expect(ACTION_TYPES.find((type) => type.id === "files_and_commands")?.defaultEffect).toBe(
+      "allow",
+    );
+  });
+});
+
+describe("block rules and per-bot rules", () => {
+  const gmail = { toolName: "gmail_send_email", connectorKind: "gmail", viaConnector: true };
+
+  it("block beats ask beats allow at equal specificity", () => {
+    expect(
+      resolveActionApprovalDetail({
+        ...gmail,
+        rules: [rule("always_allow", "category", "send_email"), rule("block", "category", "email")],
+      }),
+    ).toMatchObject({ decision: "block", source: "block" });
+    expect(
+      resolveActionApprovalDetail({
+        ...gmail,
+        rules: [
+          rule("always_allow", "category", "send_email"),
+          rule("require_approval", "category", "email"),
+        ],
+      }),
+    ).toMatchObject({ decision: "ask", source: "require_approval" });
+  });
+
+  it("a more specific rule still wins over a block", () => {
+    expect(
+      resolveActionApproval({
+        ...gmail,
+        rules: [
+          rule("block", "category", "send_email"),
+          rule("always_allow", "tool", "gmail_send_email"),
+        ],
+      }),
+    ).toBe("allow");
+  });
+
+  it("a bot rule beats a space rule at any specificity", () => {
+    const rules = [
+      rule("always_allow", "tool", "gmail_send_email"),
+      rule("block", "category", "send_email", "bot-1"),
+    ];
+    expect(resolveActionApproval({ ...gmail, rules, botId: "bot-1" })).toBe("block");
+    expect(resolveActionApproval({ ...gmail, rules, botId: "bot-2" })).toBe("allow");
+    expect(resolveActionApproval({ ...gmail, rules })).toBe("allow");
+  });
+
+  it("falls back to space rules when the bot has no matching rule", () => {
+    const rules = [
+      rule("block", "category", "send_email"),
+      rule("always_allow", "category", "spend_money", "bot-1"),
+    ];
+    expect(resolveActionApproval({ ...gmail, rules, botId: "bot-1" })).toBe("block");
+  });
+
+  it("uses the action type default when no rule matches", () => {
+    expect(resolveActionApprovalDetail({ ...gmail, rules: [] })).toMatchObject({
+      decision: "ask",
+      source: "action_type_default",
+    });
+    expect(resolveActionApprovalDetail({ toolName: "shell", rules: [] })).toMatchObject({
+      decision: "allow",
+      source: "action_type_default",
+    });
+    expect(resolveActionApprovalDetail({ toolName: "remember", rules: [] })).toMatchObject({
+      decision: "allow",
+      source: "default",
+    });
+  });
+
+  it("never allows an explicit-approval tool, but can block it", () => {
+    expect(
+      resolveActionApprovalDetail({
+        toolName: "imessage_send",
+        rules: [rule("always_allow", "tool", "imessage_send")],
+      }),
+    ).toMatchObject({ decision: "ask" });
+    expect(
+      resolveActionApprovalDetail({
+        toolName: "imessage_send",
+        rules: [rule("block", "category", "message_outside")],
+      }),
+    ).toMatchObject({ decision: "block" });
+    expect(toolRuleAllowsAllow("imessage_send")).toBe(false);
+    expect(toolRuleAllowsAllow("shell")).toBe(true);
+  });
+});
+
+describe("planActionGate with block and unattended runs", () => {
+  const base = { consequential: true, autoReviewEnabled: true, checkerConfigured: true };
+  const resolved = (decision: "ask" | "allow" | "block", source: ActionApprovalSource) => ({
+    decision,
+    source,
+    matchingRules: [],
+  });
+
+  it("blocks without review", () => {
+    expect(planActionGate({ ...base, resolved: resolved("block", "block") })).toBe("block");
+  });
+
+  it("plans a judge for a default only when attended", () => {
+    expect(planActionGate({ ...base, resolved: resolved("allow", "default") })).toBe("judge");
+    expect(planActionGate({ ...base, resolved: resolved("ask", "action_type_default") })).toBe(
+      "judge",
+    );
+    expect(
+      planActionGate({ ...base, unattended: true, resolved: resolved("allow", "default") }),
+    ).toBe("allow");
+    expect(
+      planActionGate({
+        ...base,
+        unattended: true,
+        resolved: resolved("ask", "action_type_default"),
+      }),
+    ).toBe("ask");
+  });
+
+  it("never judges a rule", () => {
+    expect(planActionGate({ ...base, resolved: resolved("ask", "require_approval") })).toBe("ask");
+    expect(planActionGate({ ...base, resolved: resolved("allow", "always_allow") })).toBe("allow");
+  });
+});
+
+describe("unattendedToolRequiresApproval", () => {
+  it("never asks for an attended run", () => {
+    expect(unattendedToolRequiresApproval(false, "shell", false)).toBe(false);
+    expect(unattendedToolRequiresApproval(false, "github_create_issue", true)).toBe(false);
+  });
+
+  it.each([
+    "write_file",
+    "shell",
+    "computer_act",
+    "browser_act",
+    "open_path",
+    "launch_app",
+    "add_to_data_room",
+  ])("asks for %s in an unattended run", (name) => {
+    expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+  });
+
+  it.each([
+    "read_file",
+    "run_subagent",
+    "notify_user",
+    "create_ui_artifact",
+    "attach_file",
+    "page_write",
+    "pins_write",
+  ])("lets %s run in an unattended run", (name) => {
+    expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
+  });
+
+  it("allows only GET and HEAD secret requests", () => {
+    expect(unattendedToolRequiresApproval(true, "secret_request", false, undefined, {})).toBe(
+      false,
+    );
+    for (const method of ["GET", "HEAD"]) {
+      expect(
+        unattendedToolRequiresApproval(true, "secret_request", false, undefined, { method }),
+      ).toBe(false);
+    }
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+      expect(
+        unattendedToolRequiresApproval(true, "secret_request", false, undefined, { method }),
+      ).toBe(true);
+    }
+  });
+
+  it("gates scratchpad writes by category and fails closed when it is unknown", () => {
+    const check = (name: string, args: Record<string, unknown>) =>
+      unattendedToolRequiresApproval(true, name, false, undefined, args);
+    expect(check("scratchpad_add", {})).toBe(false);
+    expect(check("scratchpad_add", { category: "followup" })).toBe(false);
+    expect(check("scratchpad_add", { category: "public_post" })).toBe(true);
+    expect(check("scratchpad_update", { category: "followup" })).toBe(false);
+    expect(check("scratchpad_update", { category: "outbound_email" })).toBe(true);
+    expect(check("scratchpad_complete", {})).toBe(true);
+    expect(check("scratchpad_complete", { category: "create_account" })).toBe(true);
+  });
+
+  it("asks for connector writes and lets declared reads run", () => {
+    expect(unattendedToolRequiresApproval(true, "github_create_issue", true)).toBe(true);
+    expect(unattendedToolRequiresApproval(true, "github_get_issue", true, true)).toBe(false);
+  });
+});
+
+describe("buildApprovalTable", () => {
+  it("shows defaults, space rules, legacy aliases and a bot override", () => {
+    const rows = buildApprovalTable(
+      [
+        rule("require_approval", "category", "email"),
+        rule("block", "category", "delete_data"),
+        rule("always_allow", "category", "send_email", "bot-1"),
+        rule("block", "category", "delete_data", "bot-2"),
+      ],
+      "bot-1",
+    );
+    const byType = Object.fromEntries(rows.map((row) => [row.actionType, row]));
+    expect(rows).toHaveLength(9);
+    expect(byType.send_email).toMatchObject({
+      spaceEffect: "ask",
+      botEffect: "allow",
+      effect: "allow",
+    });
+    expect(byType.delete_data).toMatchObject({
+      spaceEffect: "block",
+      botEffect: null,
+      effect: "block",
+    });
+    expect(byType.files_and_commands).toMatchObject({ spaceEffect: "allow", botEffect: null });
+    expect(buildApprovalTable([], undefined)[0]).toMatchObject({ botEffect: null, primary: true });
+  });
+});
+
+describe("external taint safe tools", () => {
+  it("excludes tools that can carry private data out", () => {
+    for (const name of ["web_fetch", "web_search", "search_data_room", "company_get", "shell"]) {
+      expect(EXTERNAL_TAINT_SAFE_TOOLS.has(name)).toBe(false);
+    }
+    expect(externalTaintAllowsTool("ask_user")).toBe(true);
+    expect(externalTaintAllowsTool("web_fetch")).toBe(false);
+  });
+
+  it("applies the scratchpad category rule", () => {
+    expect(externalTaintAllowsTool("scratchpad_list")).toBe(true);
+    expect(externalTaintAllowsTool("scratchpad_add", { category: "followup" })).toBe(true);
+    expect(externalTaintAllowsTool("scratchpad_add", { category: "public_post" })).toBe(false);
+    expect(externalTaintAllowsTool("scratchpad_complete", {})).toBe(false);
   });
 });

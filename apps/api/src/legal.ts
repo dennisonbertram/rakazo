@@ -5,7 +5,7 @@ import type { DataRoomAi } from "@rakazo/adapters";
 import { toLegalContract, toLegalDeadline } from "@rakazo/adapters";
 import type { Actor, Bot, LegalGraph, LegalOverview } from "@rakazo/contracts";
 import { LEGAL_AGENT_MODEL, LEGAL_SCAN_ROUTINE_NAME } from "@rakazo/contracts";
-import { connectionRowsForAudience, deniedConnectionIds } from "@rakazo/core";
+import { connectionRowsForAudience, deniedConnectionIds, newRunUnattended } from "@rakazo/core";
 import type { createRepos, PrismaClient } from "@rakazo/db";
 import { createLegalRepos, IsolationError, LEGAL_NOT_LEGAL_TYPE } from "@rakazo/db";
 import { createDataRoomService } from "./data-room.js";
@@ -264,6 +264,7 @@ export async function legalScanNow(deps: LegalDeps, actor: Actor) {
         taskId: task.id,
         status: "queued",
         trigger: "routine",
+        unattended: newRunUnattended({ trigger: "routine" }),
         routineId: routine.id,
       },
       select: { id: true },
