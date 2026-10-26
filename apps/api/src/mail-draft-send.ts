@@ -7,6 +7,7 @@ import { mailApprovalComposeClientId } from "@rakazo/db";
 import { mailContext } from "./inbox.js";
 import type { ComposeDeps } from "./inbox-compose.js";
 import { inboxComposeSendDraft } from "./inbox-compose.js";
+import { composeIds } from "./mail-approval-edit.js";
 
 export type MailDraftSendDeps = ComposeDeps & {
   events: Pick<ThreadEvents, "setMailApprovalOutcome">;
@@ -86,6 +87,14 @@ export async function sendSavedMailDraft(
       messageId: input.messageId,
       effectId: effect.id,
       outcome: result.status,
+      providerIds: composeIds(
+        await deps.prisma.composeSend
+          .findUnique({
+            where: { spaceId_userId_clientId: { ...scope, clientId } },
+            select: { threadId: true, providerMessageId: true, draftId: true },
+          })
+          .catch(() => null),
+      ),
       // The card now describes a sent email, so "unknown" points at Sent, not Drafts.
       tool: "mail_send",
     });

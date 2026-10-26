@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 296 of 296
-- Web and shared components: 770
+- Web and shared component files with stories: 298 of 298
+- Web and shared components: 772
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -177,6 +177,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Section, Card, BarRows, OverTime, DataRoomStats | [apps/web/src/components/data-room/DataRoomStats.tsx](../../apps/web/src/components/data-room/DataRoomStats.tsx) | [DataRoomStats.stories.tsx](../../apps/web/src/components/data-room/DataRoomStats.stories.tsx) | web |
 | DriveRow | [apps/web/src/components/data-room/DriveRow.tsx](../../apps/web/src/components/data-room/DriveRow.tsx) | [DriveRow.stories.tsx](../../apps/web/src/components/data-room/DriveRow.stories.tsx) | web |
 | DataRoomDropZone | [apps/web/src/components/data-room/DropZone.tsx](../../apps/web/src/components/data-room/DropZone.tsx) | [DropZone.stories.tsx](../../apps/web/src/components/data-room/DropZone.stories.tsx) | web |
+| FailedChip | [apps/web/src/components/data-room/FailedChip.tsx](../../apps/web/src/components/data-room/FailedChip.tsx) | [FailedChip.stories.tsx](../../apps/web/src/components/data-room/FailedChip.stories.tsx) | web |
 | ToolbarTip, Chip, DateFilter, FilterBar | [apps/web/src/components/data-room/FilterBar.tsx](../../apps/web/src/components/data-room/FilterBar.tsx) | [FilterBar.stories.tsx](../../apps/web/src/components/data-room/FilterBar.stories.tsx) | web |
 | FolderDocuments | [apps/web/src/components/data-room/FolderDocuments.tsx](../../apps/web/src/components/data-room/FolderDocuments.tsx) | [FolderDocuments.stories.tsx](../../apps/web/src/components/data-room/FolderDocuments.stories.tsx) | web |
 | FolderTree | [apps/web/src/components/data-room/FolderTree.tsx](../../apps/web/src/components/data-room/FolderTree.tsx) | [FolderTree.stories.tsx](../../apps/web/src/components/data-room/FolderTree.stories.tsx) | web |
@@ -234,6 +235,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
+| AttachmentReviewDialog | [apps/web/src/components/inbox/AttachmentReviewDialog.tsx](../../apps/web/src/components/inbox/AttachmentReviewDialog.tsx) | [AttachmentReviewDialog.stories.tsx](../../apps/web/src/components/inbox/AttachmentReviewDialog.stories.tsx) | web |
 | CleanupActionBar | [apps/web/src/components/inbox/CleanupActionBar.tsx](../../apps/web/src/components/inbox/CleanupActionBar.tsx) | [CleanupActionBar.stories.tsx](../../apps/web/src/components/inbox/CleanupActionBar.stories.tsx) | web |
 | CleanupHistory | [apps/web/src/components/inbox/CleanupHistory.tsx](../../apps/web/src/components/inbox/CleanupHistory.tsx) | [CleanupHistory.stories.tsx](../../apps/web/src/components/inbox/CleanupHistory.stories.tsx) | web |
 | CleanupSenderRow | [apps/web/src/components/inbox/CleanupSenderRow.tsx](../../apps/web/src/components/inbox/CleanupSenderRow.tsx) | [CleanupSenderRow.stories.tsx](../../apps/web/src/components/inbox/CleanupSenderRow.stories.tsx) | web |

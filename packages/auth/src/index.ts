@@ -365,6 +365,16 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
               },
               select: { spaceId: true, storageKey: true },
             });
+            // Contact photos cascade with the user and the personal spaces; their blobs do not.
+            const photos = await tx.contactPhoto.findMany({
+              where: {
+                OR: [
+                  { userId: user.id },
+                  { space: { organizationId: { in: personalOrganizationIds } } },
+                ],
+              },
+              select: { spaceId: true, storageKey: true },
+            });
             // Deleting the personal organizations cascades to their Computers, not to the
             // home snapshots in object storage.
             const homes = await tx.computer.findMany({
@@ -389,9 +399,12 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
               where: { id: { in: personalOrganizationIds } },
             });
             return {
-              blobs: items.flatMap(({ spaceId, storageKey }) =>
-                storageKey ? [{ spaceId, storageKey }] : [],
-              ),
+              blobs: [
+                ...items.flatMap(({ spaceId, storageKey }) =>
+                  storageKey ? [{ spaceId, storageKey }] : [],
+                ),
+                ...photos,
+              ],
               homes,
             };
           });

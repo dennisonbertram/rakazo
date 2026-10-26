@@ -11,6 +11,7 @@ import { createDb } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   checkPhoto,
+  deleteContactPhotosForConnection,
   PHOTO_MAX_BYTES,
   requestContactPhotos,
   runContactPhotosJob,
@@ -243,5 +244,89 @@ describePostgres("contacts.photos job (PostgreSQL)", () => {
     expect(emails).toContain("good@example.test");
     for (const bad of ["svg", "big", "lie", "null"])
       expect(emails).not.toContain(`${bad}@example.test`);
+  });
+
+  it("prunes a photo the account no longer lists or that became a placeholder, and its blob", async () => {
+    const solo = { userId: other.userId, spaceId: other.spaceId };
+    // Pruning only runs when no other Google login could own the rows.
+    await prisma.connection.updateMany({ where: solo, data: { status: "revoked" } });
+    const conn = await connect(solo, CONTACTS_READONLY);
+    const payload = { ...solo, connectionId: conn.id };
+    const image = {
+      u1: { bytes: PNG(21), contentType: "image/png" },
+      u2: { bytes: PNG(22), contentType: "image/png" },
+    };
+    const first = sourceOf(
+      [
+        { emails: ["keep@example.test"], url: "u1" },
+        { emails: ["gone@example.test"], url: "u2" },
+      ],
+      image,
+    );
+    await runContactPhotosJob(
+      { prisma, artifacts, source: first.source, now: () => new Date("2026-10-01T00:00:00Z") },
+      payload,
+    );
+    const gone = await prisma.contactPhoto.findFirstOrThrow({
+      where: { ...solo, email: "gone@example.test" },
+    });
+    // The second listing no longer includes the address (removed, or now Google's placeholder).
+    const second = sourceOf([{ emails: ["keep@example.test"], url: "u1" }], image);
+    await runContactPhotosJob(
+      { prisma, artifacts, source: second.source, now: () => new Date("2026-10-03T00:00:00Z") },
+      payload,
+    );
+    expect((await photosOf(solo)).map((r) => r.email)).toEqual(["keep@example.test"]);
+    expect(artifacts.blobs.has(gone.storageKey)).toBe(false);
+  });
+
+  it("does not prune when the listing fails part way", async () => {
+    const solo = { userId: other.userId, spaceId: other.spaceId };
+    const before = await photosOf(solo);
+    expect(before.length).toBeGreaterThan(0);
+    const conn = await connect(solo, CONTACTS_READONLY);
+    const broken: ContactPhotoSource = {
+      list: () => ({
+        [Symbol.asyncIterator]: () => ({
+          next: async () => {
+            throw new Error("People API down");
+          },
+        }),
+      }),
+      download: async () => null,
+    };
+    await expect(
+      runContactPhotosJob(
+        { prisma, artifacts, source: broken, now: () => new Date("2026-11-01T00:00:00Z") },
+        { ...solo, connectionId: conn.id },
+      ),
+    ).rejects.toThrow();
+    expect(await photosOf(solo)).toHaveLength(before.length);
+  });
+
+  it("revoking the only Google login returns the photo keys and removes the rows", async () => {
+    const lone = { userId: `${owner.userId}`, spaceId: owner.spaceId };
+    const rowsBefore = await photosOf(lone);
+    expect(rowsBefore.length).toBeGreaterThan(0);
+    const all = await prisma.connection.findMany({ where: { ...lone, connectorId: "google" } });
+    // Keep one scoped login connected and revoke the others: photos stay.
+    const [keep, ...rest] = all.filter((c) => (c.metadata as { scope?: string }).scope);
+    await prisma.connection.updateMany({
+      where: { id: { in: all.filter((c) => c.id !== keep?.id).map((c) => c.id) } },
+      data: { status: "revoked" },
+    });
+    const stays = await prisma.$transaction((tx) =>
+      deleteContactPhotosForConnection(tx, { ...lone, connectionId: (rest[0] ?? all[0])!.id }),
+    );
+    expect(stays).toEqual([]);
+    expect(await photosOf(lone)).toHaveLength(rowsBefore.length);
+    // Now the last scoped login goes.
+    await prisma.connection.update({ where: { id: keep!.id }, data: { status: "revoked" } });
+    const keys = await prisma.$transaction((tx) =>
+      deleteContactPhotosForConnection(tx, { ...lone, connectionId: keep!.id }),
+    );
+    expect(keys.sort()).toEqual(rowsBefore.map((r) => r.storageKey).sort());
+    expect(await photosOf(lone)).toEqual([]);
+    expect(await prisma.contactPhotoSync.count({ where: { connectionId: keep!.id } })).toBe(0);
   });
 });

@@ -51,6 +51,7 @@ import {
   createTicket,
   createVoiceProvider,
   defaultCatalogModelId,
+  deleteContactPhotosForConnection,
   deleteMailConnectionData,
   deleteMailSearches,
   deploymentAutoReviewDefault,
@@ -463,6 +464,7 @@ import {
 } from "./inbox.js";
 import { inboxActionsList, inboxActionsUndo } from "./inbox-actions.js";
 import { ensureInboxAgent } from "./inbox-agent.js";
+import { inboxReviewAttachment } from "./inbox-attachment-review.js";
 import { inboxCleanupArchive, inboxCleanupForget, inboxCleanupList } from "./inbox-cleanup.js";
 import {
   accountOut,
@@ -6824,6 +6826,7 @@ export function createRouter(deps: RouterDeps) {
           ? await prepareManagedConnectorForTransaction(configured)
           : undefined;
         let agentToArchive: string | null = null;
+        let photoKeys: string[] = [];
         // What the revoke took off the row, to put back if the remote revoke fails recoverably.
         const undo: {
           ownership: {
@@ -6836,6 +6839,7 @@ export function createRouter(deps: RouterDeps) {
           deps.prisma.$transaction(
             async (tx) => {
               agentToArchive = null;
+              photoKeys = [];
               undo.ownership = null;
               const row = await tx.connection.findFirst({
                 where: {
@@ -6915,6 +6919,12 @@ export function createRouter(deps: RouterDeps) {
                 userId: context.actor.userId,
                 connectionId: row.id,
               });
+              if (row.connectorId === "google" && isMailConnection(row))
+                photoKeys = await deleteContactPhotosForConnection(tx, {
+                  spaceId: context.actor.spaceId,
+                  userId: context.actor.userId,
+                  connectionId: row.id,
+                });
 
               const remaining = await tx.connection.count({
                 where: {
@@ -7097,6 +7107,10 @@ export function createRouter(deps: RouterDeps) {
             }
           }
         }
+        for (const storageKey of photoKeys)
+          await deps.jobs
+            .enqueue(dataRoomBlobDeleteJob(context.actor.spaceId, storageKey))
+            .catch((jobError) => getLogger().error("contact photo blob cleanup", jobError));
         // The connection's own agent goes with it, archived after the revoke committed. The Inbox
         // agent serves every Gmail account, so it only loses this one.
         if (agentToArchive)
@@ -8378,6 +8392,9 @@ export function createRouter(deps: RouterDeps) {
             throw mapSpaceLifecycleError(error);
           },
         ),
+      ),
+      reviewAttachment: authed.inbox.reviewAttachment.handler(({ context, input }) =>
+        inboxReviewAttachment(deps, context.actor, input, context.signal),
       ),
       list: authed.inbox.list.handler(({ context, input }) =>
         inboxList(deps, context.actor, input, context.signal),

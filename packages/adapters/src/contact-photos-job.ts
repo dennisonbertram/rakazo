@@ -7,7 +7,7 @@ import type {
   JobPublisher,
 } from "@rakazo/adapter-kit";
 import { contactPhotosJob } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { Prisma, PrismaClient } from "@rakazo/db";
 import { CONTACTS_OTHER_READONLY, CONTACTS_READONLY } from "./google-connector.js";
 
 export const PHOTO_MAX_BYTES = 200 * 1024;
@@ -73,6 +73,45 @@ export async function requestContactPhotos(
   }
 }
 
+/**
+ * Run in the transaction that revokes a Google login: forgets its fetch state and, when no other
+ * connected Google login can still read contacts, deletes the user's Google photo rows. Returns the
+ * blob keys the caller must delete after the commit.
+ */
+export async function deleteContactPhotosForConnection(
+  tx: Prisma.TransactionClient,
+  scope: { spaceId: string; userId: string; connectionId: string },
+): Promise<string[]> {
+  const { spaceId, userId, connectionId } = scope;
+  await tx.contactPhotoSync.deleteMany({
+    where: { connectionId, connection: { spaceId, userId } },
+  });
+  if (await otherContactsLogin(tx, scope)) return [];
+  const where = { spaceId, userId, source: "google" };
+  const rows = await tx.contactPhoto.findMany({ where, select: { storageKey: true } });
+  await tx.contactPhoto.deleteMany({ where });
+  return rows.map((row) => row.storageKey);
+}
+
+/** Another connected Google login of the user that can read contacts, so shared photo rows stay. */
+async function otherContactsLogin(
+  db: Pick<Prisma.TransactionClient, "connection">,
+  scope: { spaceId: string; userId: string; connectionId: string },
+): Promise<boolean> {
+  const others = await db.connection.findMany({
+    where: {
+      spaceId: scope.spaceId,
+      userId: scope.userId,
+      connectorId: "google",
+      status: "connected",
+      provider: { equals: "gmail", mode: "insensitive" },
+      id: { not: scope.connectionId },
+    },
+    select: { metadata: true },
+  });
+  return others.some((other) => hasContactsScope(other.metadata));
+}
+
 export interface ContactPhotosDeps {
   prisma: PrismaClient;
   artifacts: ArtifactStore;
@@ -121,9 +160,14 @@ export async function runContactPhotosJob(
     accountRef: connection.providerRef,
   };
   const seen = new Set<string>();
+  const kept = new Set<string>();
   let stored = 0;
+  let complete = true;
   for await (const ref of source.list(account, context)) {
-    if (stored >= MAX_PHOTOS_PER_RUN) break;
+    if (stored >= MAX_PHOTOS_PER_RUN) {
+      complete = false;
+      break;
+    }
     const emails = ref.emails.filter((email) => !seen.has(email));
     if (emails.length === 0) continue;
     for (const email of emails) seen.add(email);
@@ -133,6 +177,7 @@ export async function runContactPhotosJob(
     stored++;
     const contentHash = createHash("sha256").update(image.bytes).digest("hex");
     for (const email of emails) {
+      kept.add(email);
       const owner = { spaceId, userId, email };
       const existing = await prisma.contactPhoto.findUnique({
         where: { spaceId_userId_email: owner },
@@ -165,6 +210,20 @@ export async function runContactPhotosJob(
         update: data,
       });
       if (existing) await artifacts.remove(existing.storageKey, context).catch(() => undefined);
+    }
+  }
+  // A listing that ended early must not prune. With another Google login the rows may be its photos.
+  // ponytail: rows do not record their connection; per-connection pruning needs a connectionId column.
+  if (complete && !(await otherContactsLogin(prisma, { spaceId, userId, connectionId }))) {
+    const stale = await prisma.contactPhoto.findMany({
+      where: { spaceId, userId, source: "google", email: { notIn: [...kept] } },
+      select: { email: true, storageKey: true },
+    });
+    for (const row of stale) {
+      await prisma.contactPhoto.deleteMany({
+        where: { spaceId, userId, email: row.email, storageKey: row.storageKey },
+      });
+      await artifacts.remove(row.storageKey, context).catch(() => undefined);
     }
   }
   await prisma.contactPhotoSync.upsert({

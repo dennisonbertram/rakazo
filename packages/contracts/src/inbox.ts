@@ -619,3 +619,27 @@ export type MailActionKind = z.infer<typeof MailActionKindSchema>;
 export type MailActionsListOutput = z.infer<typeof MailActionsListOutputSchema>;
 export type MailActionUndoInput = z.infer<typeof MailActionUndoInputSchema>;
 export type MailActionUndoOutput = z.infer<typeof MailActionUndoOutputSchema>;
+
+/** One turn of the throwaway chat about an attachment; the browser holds it and sends it back. */
+export const InboxAttachmentReviewInputSchema = z.object({
+  messageId: Id,
+  attachmentId: z.string().min(1).max(1024),
+  /** Absent for the first review; a follow-up question otherwise. */
+  question: z.string().trim().min(1).max(2000).optional(),
+  /** The chat so far, starting with the review. */
+  history: z
+    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(20_000) }))
+    .max(20)
+    .default([]),
+});
+
+export const InboxAttachmentReviewOutputSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("ok"), answer: z.string() }),
+  z.object({
+    status: z.literal("needs_consent"),
+    recipient: z.object({ key: z.string(), name: z.string() }),
+  }),
+  z.object({ status: z.literal("unavailable") }),
+]);
+export type InboxAttachmentReviewInput = z.input<typeof InboxAttachmentReviewInputSchema>;
+export type InboxAttachmentReviewOutput = z.infer<typeof InboxAttachmentReviewOutputSchema>;
