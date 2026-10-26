@@ -192,3 +192,34 @@ export const GroupedNarrow: StoryObj<typeof meta> = {
   args: { contracts: mixed, grouped: true, selfName: "Example Corp" },
   decorators: Narrow.decorators,
 };
+
+/** Filters and sort come from the URL: active contracts, by value, largest first. */
+export const FilteredAndSorted: StoryObj<typeof meta> = {
+  args: {
+    contracts: [
+      ...contracts,
+      { ...contracts[0]!, id: "x", title: "Data processing addendum", valueCents: "900000" },
+    ],
+  },
+  parameters: { initialEntries: ["/?status=active&sort=value&dir=desc"] },
+  decorators: wide,
+};
+
+/** Nothing matches the search: No matches and Clear filters. */
+export const NoMatches: StoryObj<typeof meta> = {
+  parameters: { initialEntries: ["/?q=zzz"] },
+  decorators: wide,
+};
+
+/** Narrow: the cards have no headers, so the toolbar's Sort control mirrors them. */
+export const NarrowSorted: StoryObj<typeof meta> = {
+  parameters: { initialEntries: ["/?sort=name&dir=desc"] },
+  decorators: Narrow.decorators,
+};
+
+/** Grouping with a sort and a party filter: groups sort by their earliest date and lose members that do not match. */
+export const GroupedFilteredSorted: StoryObj<typeof meta> = {
+  args: { contracts: mixed, grouped: true, selfName: "Example Corp" },
+  parameters: { initialEntries: ["/?type=Warrant&sort=deadline&dir=desc"] },
+  decorators: wide,
+};

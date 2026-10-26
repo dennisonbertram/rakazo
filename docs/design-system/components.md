@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 297 of 297
-- Web and shared components: 771
+- Web and shared component files with stories: 298 of 298
+- Web and shared components: 772
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -361,6 +361,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | UpdateEditor | [apps/web/src/pages/investors/UpdateEditor.tsx](../../apps/web/src/pages/investors/UpdateEditor.tsx) | [UpdateEditor.stories.tsx](../../apps/web/src/pages/investors/UpdateEditor.stories.tsx) | web |
 | KnowledgeSection, SpaceMemorySection, MemoryDocumentList | [apps/web/src/pages/KnowledgeSection.tsx](../../apps/web/src/pages/KnowledgeSection.tsx) | [KnowledgeSection.stories.tsx](../../apps/web/src/pages/KnowledgeSection.stories.tsx) | web |
 | LegalPage, Legal, DoneDeadlines, GraphTab, BuildingGraph, LegalSkeleton | [apps/web/src/pages/Legal.tsx](../../apps/web/src/pages/Legal.tsx) | [Legal.stories.tsx](../../apps/web/src/pages/Legal.stories.tsx) | web |
+| DueSoonChip | [apps/web/src/pages/legal/DueSoonChip.tsx](../../apps/web/src/pages/legal/DueSoonChip.tsx) | [DueSoonChip.stories.tsx](../../apps/web/src/pages/legal/DueSoonChip.stories.tsx) | web |
 | NextDeadline, Title, Status, MoreButton, LegalContracts | [apps/web/src/pages/legal/LegalContracts.tsx](../../apps/web/src/pages/legal/LegalContracts.tsx) | [LegalContracts.stories.tsx](../../apps/web/src/pages/legal/LegalContracts.stories.tsx) | web |
 | LegalDeadlines | [apps/web/src/pages/legal/LegalDeadlines.tsx](../../apps/web/src/pages/legal/LegalDeadlines.tsx) | [LegalDeadlines.stories.tsx](../../apps/web/src/pages/legal/LegalDeadlines.stories.tsx) | web |
 | LocalSettingsPage | [apps/web/src/pages/LocalSettings.tsx](../../apps/web/src/pages/LocalSettings.tsx) | [LocalSettings.stories.tsx](../../apps/web/src/pages/LocalSettings.stories.tsx) | web |
