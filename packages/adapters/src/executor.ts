@@ -90,11 +90,13 @@ import {
 import type { ActionApprovalRule, ToolCallStreak } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
+  actionTypeForTool,
   appendTextSegment,
   appendToolCallSegment,
   applyJudgeDecision,
   assertTransition,
   attachToolNotes,
+  BLOCKED_ACTION_MESSAGE,
   blocksToAgentHistoryText,
   botMayUseConnection,
   botMessageAllowsSilence,
@@ -110,6 +112,7 @@ import {
   endsSentence,
   expandSkillReferencesInPrompt,
   externalOriginNotice,
+  externalTaintAllowsTool,
   findSkillByName,
   formatSkillRunPrompt,
   formatSkillsCatalogInstruction,
@@ -168,6 +171,7 @@ import {
   isDatabaseInterruption,
   isTooManyDatabaseConnections,
   isUniqueViolation,
+  listApprovalRules,
   loadRunHistoryMessages,
   parseComputerMode,
   readHistory,
@@ -3143,16 +3147,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         // Names read for approval cards, once per id for the run.
         const approvalNameReads = new Map<string, Promise<unknown>>();
-        let approvalRulesPromise: Promise<ActionApprovalRule[]> | undefined;
-        const loadApprovalRules = () => {
-          approvalRulesPromise ??= deps.prisma.actionApprovalRule
-            .findMany({
-              where: { spaceId: run.spaceId, createdByUserId: run.userId },
-              select: { effect: true, matchKind: true, matchValue: true },
-            })
-            .then((rules) => rules as ActionApprovalRule[]);
-          return approvalRulesPromise;
-        };
+        // Read before each tool call, so a rule saved while the run is active applies to the next call.
+        const loadApprovalRules = async () =>
+          (await listApprovalRules(deps.prisma, {
+            spaceId: run.spaceId,
+            userId: run.userId,
+            botId: bot.id,
+          })) as ActionApprovalRule[];
         let autoReviewPreferencePromise: Promise<boolean> | undefined;
         const loadAutoReviewPreference = () => {
           autoReviewPreferencePromise ??= deps.prisma.actionAutoReviewPreference
@@ -3920,13 +3921,96 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : COMPANY_TOOL_NAMES.has(name)
               ? tools.find((tool) => tool.name === name)?.readOnly
               : undefined;
+          // The gate sees the stored category of a scratchpad item (the model cannot name it), so
+          // non-gated items run unattended and gated ones ask. A missing item has no category: it asks.
+          let policyArgs = args;
+          if (
+            (run.unattended || run.externalTaint || externalTaint()) &&
+            (name === "scratchpad_update" || name === "scratchpad_complete")
+          ) {
+            const item = await deps.prisma.scratchpadItem
+              .findFirst({
+                where: {
+                  id: String(args.itemId ?? ""),
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  botId: bot.id,
+                },
+                select: { category: true },
+              })
+              .catch(() => null);
+            policyArgs = { ...args, category: item ? (item.category ?? "none") : undefined };
+          }
           const requiresUnattendedApproval = unattendedToolRequiresApproval(
             run.unattended,
             name,
             viaConnector,
             declaredReadOnly,
-            args,
+            policyArgs,
           );
+          const connectorKind = connectorKindFromToolName(
+            name,
+            connectedPlugins.map((plugin) => plugin.provider),
+          );
+          const actionType = actionTypeForTool({
+            toolName: name,
+            viaConnector,
+            connectorKind,
+            readOnly: declaredReadOnly,
+          });
+          const approvalRules = await loadApprovalRules();
+          const approvalResolved = resolveActionApprovalDetail({
+            toolName: name,
+            connectorKind,
+            viaConnector,
+            readOnly: declaredReadOnly,
+            rules: approvalRules,
+            botId: bot.id,
+          });
+          const runTainted = run.externalTaint === true || externalTaint();
+          const recordDecision = async (decision: "allow" | "ask" | "block", source: string) => {
+            try {
+              await deps.events.append({
+                spaceId: run.spaceId,
+                threadId: thread.id,
+                botId: bot.id,
+                runId: run.id,
+                type: "approval.decided",
+                payload: {
+                  tool: name,
+                  actionType,
+                  decision,
+                  source,
+                  unattended: run.unattended === true,
+                  tainted: runTainted,
+                },
+              });
+            } catch (error) {
+              getLogger().warn("approval decision not recorded", { runId: run.id, error });
+            }
+          };
+          // A Block rule beats every ask and every approved-but-unrun effect: no card, no effect.
+          if (approvalResolved.decision === "block") {
+            await recordDecision("block", "block");
+            return { error: BLOCKED_ACTION_MESSAGE };
+          }
+          // Nobody is there to answer a sign-in or secret card: tell the owner and end the request.
+          if (run.unattended && (name === "request_takeover" || name === "request_secret")) {
+            await notifyRun(deps, run, {
+              kind: "help",
+              title:
+                name === "request_takeover"
+                  ? `${bot.name} needs you to sign in`
+                  : `${bot.name} needs a value from you`,
+              body: String(args.reason ?? args.label ?? ""),
+              botId: bot.id,
+              threadId: thread.id,
+            });
+            return {
+              error:
+                "The user is not here to answer. Do not ask again; finish what you can without it and say what is missing.",
+            };
+          }
           // Only a repeating schedule asks; a one-off reminder fires once and stays free.
           const scheduleScope = {
             spaceId: run.spaceId,
@@ -3967,7 +4051,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // Likewise for a run that began with an external bot: everything outside the short free
           // list asks, whether it reads private data or writes. Read at each call so a marked
           // message claimed as steering mid-run counts from then on.
-          const externalTaintedCall = externalTaint() && !EXTERNAL_TAINT_FREE_TOOLS.has(name);
+          const externalTaintedCall = runTainted && !externalTaintAllowsTool(name, policyArgs);
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
             meetingTaintedCall ||
@@ -3980,27 +4064,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
             writeOnAgentConnection ||
             // An owner agent's writes on a peer's request never pass on a saved rule or Auto Review.
             (ownerAgentPeer && OWNER_PEER_WRITE_TOOLS.has(name));
-          const connectorKind = connectorKindFromToolName(
-            name,
-            connectedPlugins.map((plugin) => plugin.provider),
-          );
-          const approvalResolved = requiresMandatoryApproval
+          const gateResolved = requiresMandatoryApproval
             ? {
                 decision: "ask" as const,
                 source: "default" as const,
                 matchingRules: [],
               }
-            : resolveActionApprovalDetail({
-                toolName: name,
-                connectorKind,
-                readOnly: declaredReadOnly,
-                rules: await loadApprovalRules(),
-              });
-          const autoReviewPref = requiresMandatoryApproval
-            ? false
-            : await loadAutoReviewPreference();
-          const injectedReview = requiresMandatoryApproval ? undefined : deps.autoReview;
-          const checker = requiresMandatoryApproval ? undefined : resolveAutoReviewChecker();
+            : approvalResolved;
+          const autoReviewPref =
+            requiresMandatoryApproval || run.unattended ? false : await loadAutoReviewPreference();
+          const injectedReview =
+            requiresMandatoryApproval || run.unattended ? undefined : deps.autoReview;
+          const checker =
+            requiresMandatoryApproval || run.unattended ? undefined : resolveAutoReviewChecker();
           const checkerConfigured =
             autoReviewPref &&
             (Boolean(injectedReview) ||
@@ -4021,10 +4097,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (scheduleCard !== undefined && approvalResolved.source !== "always_allow")
               ? "ask"
               : planActionGate({
-                  resolved: approvalResolved,
+                  resolved: gateResolved,
                   consequential: requiresApprovalByDefault,
                   autoReviewEnabled: autoReviewPref,
                   checkerConfigured,
+                  unattended: run.unattended,
                 });
           let reviewReason: string | undefined;
           let gateDecision: "ask" | "allow" = plan === "ask" ? "ask" : "allow";
@@ -4214,6 +4291,32 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (context.signal.aborted) return pauseForApproval();
 
           const needsApproval = gateDecision === "ask";
+          // One plain line on the card, only for a background, tainted or rule-caused ask.
+          const approvalCardReason = requiresUnattendedApproval
+            ? "Asked because this ran in the background."
+            : externalTaintedCall
+              ? EXTERNAL_REQUEST_REASON
+              : approvalResolved.source === "require_approval" && actionType
+                ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
+                : undefined;
+          // Record each decision once; a replay of the same effect already has its event.
+          if (
+            !applied?.duplicate &&
+            (requiresApprovalByDefault ||
+              requiresMandatoryApproval ||
+              approvalResolved.matchingRules.length > 0)
+          ) {
+            await recordDecision(
+              gateDecision,
+              requiresUnattendedApproval
+                ? "unattended"
+                : externalTaintedCall
+                  ? "external_taint"
+                  : requiresMandatoryApproval
+                    ? "mandatory"
+                    : approvalResolved.source,
+            );
+          }
           const bypassApproval = gateDecision === "allow" && requiresApprovalByDefault;
           let claimedEffect = false;
           if (
@@ -4351,8 +4454,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 (name === "company_fact_upsert" || name === "company_import_start") &&
                 COMPANY_TOOL_NAMES.has(name),
               integrationWriteTool,
+              approvalReason: approvalCardReason,
               noAlwaysAllow:
-                meetingTaintedCall || externalTaintedCall || COMPANY_TOOL_NAMES.has(name),
+                meetingTaintedCall ||
+                externalTaintedCall ||
+                requiresUnattendedApproval ||
+                runTainted ||
+                COMPANY_TOOL_NAMES.has(name),
               serviceName: callRoute?.serverName,
               mailAccount:
                 meetingTaintedCall || externalTaintedCall ? undefined : await approvalMailAccount(),
@@ -7583,6 +7691,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 threadId: thread.id,
               });
               return;
+            } else if (event.type === "takeover" && run.unattended) {
+              // Nobody is watching: tell the owner instead of pausing on a card no one sees.
+              await notifyRun(deps, run, {
+                kind: "help",
+                title: `${bot.name} needs you to sign in`,
+                body: redactSecrets(event.reason, runSecrets),
+                botId: bot.id,
+                threadId: thread.id,
+              });
             } else if (event.type === "takeover") {
               if (!(await renew())) return;
               const safeReason = redactSecrets(event.reason, runSecrets);
@@ -8322,7 +8439,17 @@ const OWNER_PEER_WRITE_TOOLS = new Set([
  * (private reads, writes, the network) shows a card with no "Always allow". Smaller than the
  * meeting list: history reads return private text.
  */
-export const EXTERNAL_TAINT_FREE_TOOLS = new Set(["ask_user", "skill_read"]);
+const ACTION_TYPE_LABELS: Record<NonNullable<ReturnType<typeof actionTypeForTool>>, string> = {
+  send_email: "Send email",
+  spend_money: "Spend money",
+  connected_apps_write: "Connected apps (write)",
+  calendar_changes: "Calendar changes",
+  files_and_commands: "Edit files and run commands",
+  use_computer: "Use the computer",
+  delete_data: "Delete data",
+  message_outside: "Message people outside Praci",
+  use_credentials: "Use saved credentials",
+};
 
 /** First line of the reason on a card for a call in a run that began with an external bot. */
 export const EXTERNAL_REQUEST_REASON = "Requested by an external bot";
