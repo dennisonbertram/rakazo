@@ -1079,6 +1079,8 @@ function botSecretMetadataDto(row: {
   auth: unknown;
   createdAt: Date;
   updatedAt: Date;
+  lastUsedAt: Date | null;
+  needsAttentionAt: Date | null;
 }): BotSecretMetadata {
   // Unreadable or no-longer-storable destinations become auth:null so the owner UI stays remove-only.
   const parsed = BotSecretAuth.safeParse(row.auth);
@@ -1097,6 +1099,8 @@ function botSecretMetadataDto(row: {
     auth,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+    needsAttentionAt: row.needsAttentionAt?.toISOString() ?? null,
   };
 }
 

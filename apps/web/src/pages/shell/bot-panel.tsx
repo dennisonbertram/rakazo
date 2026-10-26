@@ -646,6 +646,7 @@ export function BotSettings({
             refreshKey={skillsRefreshKey}
             onSkillsChange={onSkillsChange}
           />
+          <BotCredentialsSection botId={bot.id} />
           <section data-testid="bot-approvals" className="mt-6">
             <div className="mb-2 text-[13.5px] font-medium text-foreground">
               <Trans>Approvals</Trans>
@@ -864,7 +865,6 @@ export function BotSettings({
                   />
                 </label>
               ))}
-              {advancedOpened ? <BotCredentialsSection botId={bot.id} /> : null}
             </div>
           </details>
           {error ? <p className="mt-2 text-[13px] text-destructive">{error}</p> : null}
