@@ -131,7 +131,8 @@ function stackEnv(): NodeJS.ProcessEnv {
     DATABASE_URL,
     REALTIME_DATABASE_URL: DATABASE_URL,
     WAKEUP_DRIVER: "memory",
-    SANDBOX_PROVIDER: "fake",
+    // DEMO_SANDBOX_PROVIDER=docker gives bots a real computer in the demo.
+    SANDBOX_PROVIDER: process.env.DEMO_SANDBOX_PROVIDER || "fake",
     TICKET_BOARD_ENABLED: "true",
     CLOUD_AGENT_PROVIDER: "emulator",
     COMPOSIO_API_KEY: "",
