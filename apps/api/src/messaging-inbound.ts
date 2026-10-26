@@ -19,8 +19,8 @@ import type {
 import {
   claimInboundMessage,
   createThreadMessage,
-  messagingInboundKey,
   crossSpaceCommunicationAllowed,
+  messagingInboundKey,
   normalizeMessagingLinkCode,
   redeemMessagingLinkCode,
   releaseInboundMessage,
