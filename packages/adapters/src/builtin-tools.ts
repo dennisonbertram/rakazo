@@ -1777,7 +1777,8 @@ export const builtinAgentTools: ConnectorTool[] = [
         waitingOn: {
           type: "string",
           maxLength: 120,
-          description: "Who or what the item waits on, for example 'Acme legal'.",
+          description:
+            "Who or what the item waits on. Write exactly 'you' when it waits on the owner, otherwise the other party's name, for example 'Acme legal'.",
         },
       },
       required: ["title"],
@@ -1802,7 +1803,12 @@ export const builtinAgentTools: ConnectorTool[] = [
           type: ["string", "null"],
           description: "ISO date or datetime with timezone; null clears.",
         },
-        waitingOn: { type: "string", maxLength: 120 },
+        waitingOn: {
+          type: "string",
+          maxLength: 120,
+          description:
+            "What the item waits on. Write exactly 'you' when it waits on the owner, otherwise the other party's name, for example 'Acme legal'.",
+        },
       },
       required: ["itemId"],
       additionalProperties: false,
