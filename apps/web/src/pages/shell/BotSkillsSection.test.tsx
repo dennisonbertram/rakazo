@@ -309,6 +309,32 @@ it("shows agent drafts with their content and approves one", async () => {
   expect(view.container.querySelector('[data-testid="bot-skills-drafts"]')).toBeNull();
 });
 
+it("shows a tool draft's lines, test run and script, and approves it with the shown hash", async () => {
+  api.drafts
+    .mockResolvedValueOnce([
+      {
+        ...draftSkill,
+        tool: {
+          source: "function run(i) { return i; }",
+          hash: "abc",
+          reads: "Numbers you pass in",
+          writes: "nothing",
+          sampleInput: { n: 1 },
+          sampleOutput: { n: 1 },
+        },
+      },
+    ])
+    .mockResolvedValue([]);
+  api.approveDraft.mockResolvedValue({});
+  const view = await mount();
+  const tool = view.container.querySelector('[data-testid="bot-skill-draft-tool"]');
+  expect(tool?.textContent).toContain("Reads: Numbers you pass in");
+  expect(tool?.textContent).toContain("Writes: nothing");
+  expect(tool?.textContent).toContain("function run(i)");
+  await act(async () => view.button("Approve").click());
+  expect(api.approveDraft).toHaveBeenCalledWith({ skillId: "draft-1", toolHash: "abc" });
+});
+
 it("opens a draft by default with a count, one description and a primary Approve", async () => {
   api.drafts.mockResolvedValueOnce([draftSkill]).mockResolvedValue([]);
   const view = await mount();

@@ -115,6 +115,7 @@ import {
   ApprovalChoiceSchema,
   ApprovalTableRowSchema,
   ArtifactSchema,
+  ArtifactShareSchema,
   ArtifactVersionSchema,
   ArtifactWithContentSchema,
   AvatarStyleSchema,
@@ -1004,7 +1005,9 @@ export const appContract = {
     remove: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
     /** Agent-written skills and revisions waiting for the owner. */
     drafts: oc.output(z.array(AgentSkillDraftSchema)),
-    approveDraft: oc.input(z.object({ skillId: Id })).output(AgentSkillSchema),
+    approveDraft: oc
+      .input(z.object({ skillId: Id, toolHash: z.string().optional() }))
+      .output(AgentSkillSchema),
     discardDraft: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
     /** The catalog with this bot's on/off switch per skill. */
     forBot: oc.input(botId).output(z.array(BotAgentSkillSchema)),
@@ -1322,6 +1325,14 @@ export const appContract = {
     get: oc.input(threadTarget.and(z.object({ artifactId: Id }))).output(ArtifactWithContentSchema),
     getById: oc.input(z.object({ artifactId: Id })).output(ArtifactWithContentSchema),
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  artifactShares: {
+    get: oc.input(z.object({ artifactId: Id })).output(ArtifactShareSchema.nullable()),
+    /** The link is in the answer once; only its hash is stored. A live link of the same artifact ends. */
+    create: oc
+      .input(z.object({ artifactId: Id }))
+      .output(z.object({ url: z.string(), share: ArtifactShareSchema })),
+    revoke: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   files: {
     /** One page of a spreadsheet (.xlsx, .xlsm, .csv, .tsv) from an artifact or a Data room item. */

@@ -96,6 +96,44 @@ export const AgentDrafts: Story = {
     }),
 };
 
+const toolSource =
+  "function run(input) {\n  const total = input.transactions.reduce((sum, t) => sum + t.amount, 0);\n  return { total, perWeek: total / 4 };\n}";
+
+/** A bot-built tool waiting for approval: its two plain lines, the test run and the script. */
+export const ToolDraft: Story = {
+  beforeEach: () =>
+    mockRpc({
+      ...loaded,
+      "agentSkills.drafts": [
+        {
+          id: "draft_tool",
+          name: "weekly_burn",
+          description: "Total spend and average per week from a list of transactions.",
+          content:
+            "---\nname: weekly_burn\ndescription: Total spend and average per week from a list of transactions.\n---\n\nFetch the transactions, then call tool_run.\n",
+          revision: false,
+          tool: {
+            source: toolSource,
+            hash: "0".repeat(64),
+            reads: "The transactions you pass in",
+            writes: "nothing",
+            sampleInput: { transactions: [{ amount: 120, date: "2026-01-02" }] },
+            sampleOutput: { total: 120, perWeek: 30 },
+          },
+        },
+      ],
+    }),
+};
+
+/** An approved tool carries a small Tool label in the list. */
+export const ActiveTool: Story = {
+  beforeEach: () =>
+    mockRpc({
+      ...loaded,
+      "agentSkills.forBot": [{ ...entry("skill_9", "weekly_burn", "user"), tool: true }, ...skills],
+    }),
+};
+
 export const AddSkill: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(await within(canvasElement).findByRole("button", { name: "Add skill" }));

@@ -710,6 +710,13 @@ describe("buildApprovalTable", () => {
   });
 });
 
+describe("tool_run", () => {
+  it("runs without a card in unattended and tainted runs", () => {
+    expect(unattendedToolRequiresApproval(true, "tool_run", false)).toBe(false);
+    expect(externalTaintAllowsTool("tool_run")).toBe(true);
+  });
+});
+
 describe("external taint safe tools", () => {
   it("excludes tools that can carry private data out", () => {
     for (const name of ["web_fetch", "web_search", "search_data_room", "company_get", "shell"]) {

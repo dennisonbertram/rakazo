@@ -967,6 +967,10 @@ msgstr ""
 msgid "Add a model"
 msgstr ""
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add a name."
+msgstr ""
+
 #: src/components/gtm/EmailItemCard.tsx
 msgid "Add a postal address"
 msgstr ""
@@ -1092,6 +1096,26 @@ msgstr ""
 
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Add skill"
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the header name."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the site and the value."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the username and password."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the username."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the value."
 msgstr ""
 
 #: src/components/inbox/MailAttachments.tsx
@@ -1427,6 +1451,10 @@ msgstr ""
 
 #: src/components/integrations/IMessageSection.tsx
 msgid "Anyone who can reach this address can talk to your Mac's server. Use a private network or a tunnel."
+msgstr ""
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Anyone with this link can view this version until you stop sharing or for 30 days."
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
@@ -1835,10 +1863,6 @@ msgstr ""
 msgid "Available after the routine is saved"
 msgstr "Disponible después de guardar la rutina"
 
-#: src/pages/shell/bot-credentials.tsx
-msgid "Available to this bot's shell commands as {commandVariable}"
-msgstr "Disponible para los comandos de shell de este bot como {commandVariable}"
-
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Avatar Studio"
 msgstr "Estudio de avatares"
@@ -2187,6 +2211,7 @@ msgid "Can't reach the server."
 msgstr "No se puede alcanzar el servidor."
 
 #: src/components/AccountAccess.tsx
+#: src/components/ArtifactShareDialog.tsx
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
@@ -2802,6 +2827,7 @@ msgid "Cloud"
 msgstr "Nube"
 
 #: src/components/AskCard.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 msgid "Code"
 msgstr "Código"
 
@@ -3520,6 +3546,10 @@ msgstr ""
 msgid "Could not create the Legal agent"
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "Could not create the link."
+msgstr ""
+
 #: src/pages/Onboarding.tsx
 msgid "Could not create your bot"
 msgstr "No se pudo crear tu bot"
@@ -4035,6 +4065,10 @@ msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Could not start the draft"
+msgstr ""
+
+#: src/pages/Artifacts.tsx
+msgid "Could not stop sharing."
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -6740,6 +6774,7 @@ msgstr ""
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/PeerMessagesOverlay.tsx
 #: src/pages/RoutineRunHistory.tsx
+#: src/pages/SharedArtifact.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Loading…"
 msgstr "Cargando…"
@@ -7441,6 +7476,10 @@ msgstr ""
 msgid "Needs approval"
 msgstr ""
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Needs attention"
+msgstr ""
+
 #: src/lib/devin-format.ts
 msgid "Needs input"
 msgstr "Necesita entrada"
@@ -8122,6 +8161,10 @@ msgstr ""
 msgid "Not tagged. Praci can't read your documents."
 msgstr ""
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Not used yet"
+msgstr ""
+
 #: src/components/MailApprovalCard.tsx
 msgid "Not waiting for approval"
 msgstr ""
@@ -8132,6 +8175,10 @@ msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Notetaker meetings, notes and tasks"
+msgstr ""
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "nothing"
 msgstr ""
 
 #: src/pages/Finance.tsx
@@ -9283,6 +9330,10 @@ msgstr ""
 msgid "Reads document text"
 msgstr ""
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Reads:"
+msgstr ""
+
 #: src/components/data-room/DataRoomStats.tsx
 #: src/pages/gtm/GtmChannels.tsx
 msgid "Ready"
@@ -9858,6 +9909,10 @@ msgstr "Restaurar el último espacio de trabajo guardado."
 #: src/components/ComputerMaintenanceActions.tsx
 msgid "Restore the last saved workspace. Unsaved work on the computer is lost."
 msgstr "Restaura el último espacio de trabajo guardado. Se pierde el trabajo sin guardar en la computadora."
+
+#: src/pages/Artifacts.tsx
+msgid "Restore this version"
+msgstr ""
 
 #: src/lib/use-contact-notices.ts
 msgid "Restored {name}"
@@ -10682,12 +10737,17 @@ msgstr "Forma"
 #: src/components/AskCard.tsx
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/data-room/ItemMenu.tsx
+#: src/pages/Artifacts.tsx
 msgid "Share"
 msgstr ""
 
 #. placeholder {0}: item.name
 #: src/components/data-room/ItemDialogs.tsx
 msgid "Share {0}"
+msgstr ""
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Share link"
 msgstr ""
 
 #: src/pages/CompanyFactDetail.tsx
@@ -10716,6 +10776,10 @@ msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Shared chat with 2-6 bots. They all reply in the same thread."
+msgstr ""
+
+#: src/pages/SharedArtifact.tsx
+msgid "Shared from Praci"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
@@ -11320,6 +11384,14 @@ msgstr "Detener"
 msgid "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 msgstr ""
 
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing"
+msgstr ""
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing this link?"
+msgstr ""
+
 #: src/pages/shell/transcript.tsx
 msgid "Stop speaking"
 msgstr "Dejar de hablar"
@@ -11592,6 +11664,14 @@ msgstr ""
 msgid "The API did not come back. Refresh this page."
 msgstr "La API no volvió. Actualiza esta página."
 
+#: src/components/AskCard.tsx
+msgid "The bot can read this value."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "The bot can read this value. Shell commands get it as {commandVariable}."
+msgstr "El bot puede leer este valor. Los comandos de shell lo reciben como {commandVariable}."
+
 #: src/pages/shell/bot-pins.tsx
 msgid "The bot changed this list. Your last edit wasn't saved."
 msgstr ""
@@ -11744,6 +11824,10 @@ msgstr ""
 msgid "This also removes the Legal contract {contractTitle}, its {deadlineCount} (including ones added by hand) and its links in the Legal graph. This can't be undone."
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "This also stops its link."
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
 msgstr "Este bot se ejecuta en esta computadora, no en un escritorio Linux. El shell y los archivos usan tu carpeta de inicio."
@@ -11796,6 +11880,10 @@ msgstr ""
 
 #: src/components/data-room/DropZone.tsx
 msgid "This folder no longer exists"
+msgstr ""
+
+#: src/pages/SharedArtifact.tsx
+msgid "This link is not available."
 msgstr ""
 
 #: src/pages/NotFound.tsx
@@ -11994,6 +12082,10 @@ msgstr ""
 
 #: src/components/data-room/Preview.tsx
 msgid "Too large to search inside"
+msgstr ""
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Tool"
 msgstr ""
 
 #: src/lib/run-phase.ts
@@ -12355,6 +12447,10 @@ msgstr "Falló la actualización"
 msgid "Update finished with errors"
 msgstr "La actualización terminó con errores"
 
+#: src/pages/Artifacts.tsx
+msgid "Update link"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Update options"
 msgstr ""
@@ -12549,6 +12645,11 @@ msgstr ""
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Use your own key"
 msgstr "Usar tu propia clave"
+
+#. placeholder {0}: formatRelativeTime(secret.lastUsedAt)
+#: src/pages/shell/bot-credentials.tsx
+msgid "Used {0}"
+msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationAgentSection.tsx
@@ -12996,6 +13097,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Write what this routine should do each time it runs."
+msgstr ""
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Writes:"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx
