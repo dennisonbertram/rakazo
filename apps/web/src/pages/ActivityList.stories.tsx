@@ -53,7 +53,8 @@ const meta = {
     layout: "padded",
     docs: {
       description: {
-        component: "Also shows: ActivityError, ActivityFilters, FilterChip, WaitingRow, ActivityRow",
+        component:
+          "Also shows: ActivityError, ActivityFilters, FilterChip, WaitingRow, ActivityRow",
       },
     },
   },
@@ -138,40 +139,29 @@ export const ErrorOnly: Story = {
     }),
 };
 
-/** Opens the filter popover and its "More filters" fields. */
+/** Opens the filter popover. */
 async function openFilters(canvasElement: HTMLElement) {
-  const canvas = within(canvasElement);
-  await userEvent.click(await canvas.findByTestId("activity-show-filters"));
-  await userEvent.click(await within(document.body).findByText("More filters"));
+  await userEvent.click(await within(canvasElement).findByTestId("activity-show-filters"));
 }
 
 export const FilterOpen: Story = {
   beforeEach: () => mockRpc({ "runs.list": byFilter }),
-  play: async ({ canvasElement }) => {
-    await userEvent.click(await within(canvasElement).findByTestId("activity-show-filters"));
-  },
+  play: async ({ canvasElement }) => openFilters(canvasElement),
 };
 
 export const FilteredToNothing: Story = {
   beforeEach: () => mockRpc({ "runs.list": byFilter }),
   play: async ({ canvasElement }) => {
     await openFilters(canvasElement);
-    const search = await within(document.body).findByTestId("activity-search");
-    await userEvent.type(search, "zzz-no-match");
+    await userEvent.type(await within(document.body).findByRole("searchbox"), "zzz-no-match");
   },
 };
 
-export const WithFilterChips: Story = {
+/** A search, a status and the sort bot name, all set in the URL. */
+export const WithFilters: Story = {
   beforeEach: () => mockRpc({ "runs.list": byFilter }),
-  play: async ({ canvasElement }) => {
-    await openFilters(canvasElement);
-    const search = await within(document.body).findByTestId("activity-search");
-    await userEvent.type(search, "sample");
-    await userEvent.selectOptions(
-      within(document.body).getByTestId("activity-status-filter"),
-      "failed",
-    );
-  },
+  parameters: { initialEntries: ["/?activity-q=sample&activity-status=failed&activity-sort=bot"] },
+  play: async ({ canvasElement }) => openFilters(canvasElement),
 };
 
 /** Inside the sidebar's scrolling column the section keeps its height next to a tall sibling. */

@@ -1282,10 +1282,6 @@ msgstr ""
 msgid "All public channels"
 msgstr ""
 
-#: src/pages/ActivityList.tsx
-msgid "All statuses"
-msgstr ""
-
 #: src/pages/CompanyImport.tsx
 #: src/pages/CompanyImportScope.tsx
 msgid "All time"
@@ -2057,6 +2053,7 @@ msgstr "Démarrage de l'ordinateur de {0}"
 msgid "bot"
 msgstr "bot"
 
+#: src/pages/ActivityList.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
@@ -2535,6 +2532,7 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 #: src/pages/ContactDetail.tsx
+#: src/pages/Investors.tsx
 msgid "Check size"
 msgstr ""
 
@@ -2695,14 +2693,14 @@ msgstr "Effacer la conversation"
 msgid "Clear filter"
 msgstr ""
 
-#: src/pages/ActivityList.tsx
-msgid "Clear filter {label}"
-msgstr ""
-
+#: src/components/cap-table/HoldingsTable.tsx
 #: src/components/data-room/DataRoomStats.tsx
+#: src/components/finance/ui.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/DataRoom.tsx
+#: src/pages/devin/DevinSessions.tsx
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
@@ -4499,6 +4497,7 @@ msgstr ""
 msgid "Decline"
 msgstr "Refuser"
 
+#: src/components/cap-table/HoldingsTable.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Default"
@@ -5700,11 +5699,6 @@ msgstr ""
 #: src/pages/CompanyImportScope.tsx
 #: src/pages/investors/UpdateEditor.tsx
 msgid "From"
-msgstr ""
-
-#. placeholder {0}: filters.dateRange.from
-#: src/pages/ActivityList.tsx
-msgid "From {0}"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
@@ -7442,10 +7436,6 @@ msgstr ""
 msgid "More computer actions"
 msgstr "Plus d'actions pour l'ordinateur"
 
-#: src/pages/ActivityList.tsx
-msgid "More filters"
-msgstr ""
-
 #: src/pages/CompanyImportScope.tsx
 msgid "More private channels"
 msgstr ""
@@ -7538,6 +7528,7 @@ msgstr "Couper le micro"
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/GroupPanel.tsx
+#: src/pages/Investors.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -7949,8 +7940,12 @@ msgstr ""
 msgid "No mail matches this filter"
 msgstr ""
 
+#: src/components/cap-table/HoldingsTable.tsx
+#: src/components/finance/ui.tsx
 #: src/pages/AccountSettingsOverlay.tsx
+#: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
+#: src/pages/devin/DevinSessions.tsx
 #: src/pages/Investors.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/legal/LegalContracts.tsx
@@ -8639,6 +8634,7 @@ msgstr ""
 #: src/components/ContactDialog.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
+#: src/pages/Investors.tsx
 msgid "Organization"
 msgstr ""
 
@@ -10524,6 +10520,7 @@ msgstr ""
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
 #: src/pages/shell/command-palette.tsx
@@ -10579,6 +10576,10 @@ msgstr ""
 msgid "Search Drive"
 msgstr ""
 
+#: src/components/cap-table/HoldingsTable.tsx
+msgid "Search holders"
+msgstr ""
+
 #: src/components/integrations/ConnectAppsStep.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
@@ -10626,13 +10627,16 @@ msgstr "Rechercher des fournisseurs"
 msgid "Search runs"
 msgstr ""
 
+#: src/pages/devin/DevinSessions.tsx
+msgid "Search sessions"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Search the directory"
 msgstr ""
 
-#. placeholder {0}: filters.query.trim()
-#: src/pages/ActivityList.tsx
-msgid "Search: {0}"
+#: src/components/finance/ui.tsx
+msgid "Search transactions"
 msgstr ""
 
 #: src/pages/DataRoom.tsx
@@ -11362,6 +11366,7 @@ msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/Preview.tsx
+#: src/pages/Company.tsx
 #: src/pages/devin/DevinSessions.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Source"
@@ -11469,6 +11474,7 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 #: src/pages/ContactDetail.tsx
+#: src/pages/Investors.tsx
 msgid "Stage"
 msgstr ""
 
@@ -12256,11 +12262,6 @@ msgstr ""
 msgid "To"
 msgstr ""
 
-#. placeholder {0}: filters.dateRange.to
-#: src/pages/ActivityList.tsx
-msgid "To {0}"
-msgstr ""
-
 #: src/components/inbox/InboxRow.tsx
 #: src/components/inbox/TodoCard.tsx
 #: src/lib/ticket-status.ts
@@ -12713,6 +12714,7 @@ msgid "Update progress"
 msgstr "Progression de la mise à jour"
 
 #: src/components/SoftwareUpdateSection.tsx
+#: src/pages/ActivityList.tsx
 #: src/pages/devin/DevinSessions.tsx
 msgid "Updated"
 msgstr "Mis à jour"

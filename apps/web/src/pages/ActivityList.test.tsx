@@ -4,6 +4,7 @@ import type { RunActivityRow } from "@rakazo/contracts";
 import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -42,7 +43,16 @@ vi.mock("@rakazo/ui-web", async (importOriginal) => ({
 
 import { ActivityList } from "./ActivityList";
 
-const view = () => <ActivityList onOpenRun={() => {}} />;
+function Where() {
+  return <output data-testid="where">{useLocation().search}</output>;
+}
+const inRouter = (node: ReactNode, path = "/") => (
+  <MemoryRouter initialEntries={[path]}>
+    <Where />
+    {node}
+  </MemoryRouter>
+);
+const view = (path?: string) => inRouter(<ActivityList onOpenRun={() => {}} />, path);
 
 const run = (runId: string, status: RunActivityRow["status"]): RunActivityRow =>
   ({
@@ -82,7 +92,7 @@ it("lists items waiting on the person after Needs you, opens the bot, and hides 
   document.body.append(container);
   const root = createRoot(container);
   await act(async () =>
-    root.render(<ActivityList onOpenRun={() => {}} onOpenWaitingItem={onOpen} />),
+    root.render(inRouter(<ActivityList onOpenRun={() => {}} onOpenWaitingItem={onOpen} />)),
   );
 
   expect(container.querySelector("#activity-waiting-heading")?.textContent).toBe("Waiting on you");
@@ -116,23 +126,64 @@ it("reports only the bots whose runs the filters leave listed", async () => {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  await act(async () => root.render(<ActivityList onOpenRun={() => {}} onListedBots={listed} />));
+  await act(async () =>
+    root.render(inRouter(<ActivityList onOpenRun={() => {}} onListedBots={listed} />)),
+  );
   expect(listed).toHaveBeenLastCalledWith(new Set(["bot-1"]));
+  await act(async () => root.unmount());
 
+  // The same filter, set in the URL, leaves no bot listed.
+  const second = createRoot(container);
+  await act(async () =>
+    second.render(
+      inRouter(
+        <ActivityList onOpenRun={() => {}} onListedBots={listed} />,
+        "/?activity-status=running",
+      ),
+    ),
+  );
+  expect(listed).toHaveBeenLastCalledWith(new Set());
+  await act(async () => second.unmount());
+});
+
+it("keeps the search, status, dates and sort in the URL under their own names", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  api.runs.list.mockImplementation(async ({ filter }: { filter: string }) => ({
+    runs:
+      filter === "active"
+        ? [
+            { ...run("a", "running"), botName: "Zed", updatedAt: "2026-01-02T00:00:00.000Z" },
+            { ...run("b", "running"), botName: "Ann", updatedAt: "2026-01-01T00:00:00.000Z" },
+          ]
+        : [],
+  }));
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const order = () =>
+    [...container.querySelectorAll("[data-activity-row]")].map((r) =>
+      r.getAttribute("aria-label")?.includes("Zed") ? "Zed" : "Ann",
+    );
+  await act(async () => root.render(view("/?q=keep&activity-sort=bot&activity-dir=asc")));
+  const where = () => container.querySelector("[data-testid='where']")?.textContent;
+  // Sorted by bot name from the URL; the page's own ?q= is left alone.
+  expect(order()).toEqual(["Ann", "Zed"]);
   await act(async () =>
     container.querySelector<HTMLButtonElement>('[data-testid="activity-show-filters"]')?.click(),
   );
-  const status = document.querySelector<HTMLSelectElement>(
-    '[data-testid="activity-status-filter"]',
-  );
+  const search = document.querySelector<HTMLInputElement>("input[type='search']");
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(
-      status,
-      "running",
-    );
-    status?.dispatchEvent(new Event("change", { bubbles: true }));
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(search, "zed");
+    search?.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  expect(listed).toHaveBeenLastCalledWith(new Set());
+  expect(where()).toContain("activity-q=zed");
+  expect(where()).toContain("q=keep");
+  expect(order()).toEqual(["Zed"]);
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-testid="activity-reset-filters"]')?.click(),
+  );
+  expect(where()).not.toContain("activity-q");
+  expect(order()).toEqual(["Ann", "Zed"]);
   await act(async () => root.unmount());
 });
 
@@ -219,7 +270,7 @@ it("opens the filter form in a popover so it never takes the list's space", asyn
   const toggle = () =>
     container.querySelector<HTMLButtonElement>('[data-testid="activity-show-filters"]');
   await act(async () => toggle()?.click());
-  const status = document.querySelector('[data-testid="activity-status-filter"]');
+  const status = document.querySelector("input[type='search']");
   expect(status).not.toBeNull();
   // The form lives outside the activity list, so the rows keep their whole window.
   expect(container.contains(status)).toBe(false);
@@ -286,7 +337,9 @@ it("shows the active runs before the finished runs arrive, and reports their bot
   const container = document.createElement("div");
   document.body.append(container);
   await act(async () =>
-    createRoot(container).render(<ActivityList onOpenRun={() => {}} onListedBots={listed} />),
+    createRoot(container).render(
+      inRouter(<ActivityList onOpenRun={() => {}} onListedBots={listed} />),
+    ),
   );
 
   expect(container.querySelector('button[aria-label$=", Needs your answer"]')).not.toBeNull();
