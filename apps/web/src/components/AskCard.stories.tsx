@@ -134,6 +134,20 @@ export const Approval: Story = {
   },
 };
 
+export const ApprovalWithReason: Story = {
+  args: {
+    block: ask({
+      text: "Allow the bot to send this email?",
+      approvalEffectId: "effect_demo",
+      approvalReason: "Asked because this ran in the background",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
 export const ApprovalAllowed: Story = {
   args: {
     block: ask({
