@@ -53,9 +53,14 @@ describe("queued run supersession", () => {
   it("only cancels queued runs started by user messages or reactions", async () => {
     const tx = {
       run: {
-        findMany: vi.fn().mockResolvedValue([{ id: "run-old", taskId: "task-old" }]),
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "run-old", taskId: "task-old", userId: "user-1", spaceId: "space-1" },
+          ]),
         updateMany: vi.fn(),
       },
+      secret: { deleteMany: vi.fn() },
       task: { updateMany: vi.fn() },
     };
     await cancelSupersededQueuedRuns(tx as never, {
@@ -76,6 +81,10 @@ describe("queued run supersession", () => {
     expect(tx.task.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["task-old"] } },
       data: { status: "cancelled" },
+    });
+    // A superseded run never reads a waiting one-time answer.
+    expect(tx.secret.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ userId: "user-1", spaceId: "space-1", kind: "run-secret:run-old" }] },
     });
   });
 });
@@ -3343,12 +3352,14 @@ describe("stopThreadRuns", () => {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
       },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([
           { id: "run-a", botId: "bot-a" },
           { id: "run-b", botId: "bot-b" },
         ]),
         findUnique: vi.fn().mockResolvedValue({ status: "cancelled" }),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: {
         // Production team ownership is lease-only: Computer.executionRunId stays null.
@@ -3482,9 +3493,11 @@ describe("stopThreadRuns", () => {
         update: vi.fn().mockResolvedValue({ nextEventSeq: 5 }),
       },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([{ id: "run-a", botId: "bot-a" }]),
         findUnique: vi.fn().mockResolvedValue({ status: "cancelled" }),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: {
         // Selected via lease for cancelled run A, but legacy columns still name
@@ -3589,6 +3602,7 @@ describe("stopThreadRuns", () => {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
       },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([
           { id: "run-a", botId: "bot-a" },
           { id: "run-b", botId: "bot-b" },
@@ -3596,6 +3610,7 @@ describe("stopThreadRuns", () => {
         // appendEventInTransaction re-reads the run after the flip.
         findUnique: vi.fn().mockResolvedValue({ status: "cancelled" }),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: { findMany: vi.fn().mockResolvedValue([]) },
       computerExecutionLease: { findMany: vi.fn().mockResolvedValue([]) },
@@ -3678,9 +3693,11 @@ describe("stopThreadRuns", () => {
       $queryRaw: vi.fn(),
       thread: { update: vi.fn() },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn(),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: { findMany: vi.fn() },
       computerExecutionLease: { findMany: vi.fn() },

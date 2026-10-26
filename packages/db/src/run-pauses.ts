@@ -2,6 +2,7 @@ import type { RealtimeFanout } from "@rakazo/adapter-kit";
 import {
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
+  BOT_SECRET_VALUE_MAX_LENGTH,
   encodeLoginSecret,
   LoginSecretValue,
   MessageBlock as MessageBlockSchema,
@@ -32,6 +33,7 @@ import {
   notifyRealtime,
 } from "./events.js";
 import { createThreadMessageInTransaction } from "./messages.js";
+import { AnswerTooLongError } from "./run-secrets.js";
 
 const CHOICE_ASK_CHECKPOINT_KIND = "choice_ask_v1";
 
@@ -443,6 +445,8 @@ async function commitAnswerRunInput(
     ? LoginSecretValue.safeParse({ username: input.username!.trim(), password: input.answer })
     : undefined;
   if (login && !login.success) return null;
+  if (secretAsk && input.answer.length > BOT_SECRET_VALUE_MAX_LENGTH)
+    throw new AnswerTooLongError();
   let approvalEffect: { id: string; kind: string; request?: unknown } | null = null;
   let approvalUserId: string | null = null;
   if (input.mailDenial && (!approvalAsk || input.answer !== "deny")) return null;

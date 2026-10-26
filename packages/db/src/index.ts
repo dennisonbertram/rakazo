@@ -14,10 +14,10 @@ export * from "./company-import.js";
 export * from "./computers.js";
 export * from "./contacts.js";
 export * from "./credential-secrets.js";
+export * from "./cross-space-communication.js";
 export * from "./data-room.js";
 export * from "./data-room-autosort.js";
 export * from "./data-room-imports.js";
-export * from "./cross-space-communication.js";
 export * from "./events.js";
 export * from "./expire-stuck-run.js";
 export * from "./external-conversations.js";
@@ -48,6 +48,7 @@ export {
   delegatePendingAgents,
   delegatePendingIds,
 } from "./run-pauses.js";
+export * from "./run-secrets.js";
 export * from "./safes.js";
 export * from "./scope.js";
 export * from "./scratchpad-waiting.js";

@@ -13,6 +13,7 @@ import { ACTIVE_RUN_STATUSES, chainedRunMode } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
 import {
   cancelRunsInTransaction,
+  clearEndedRunState,
   computerScopeKey,
   createRepos,
   createThreadMessageInTransaction,
@@ -370,6 +371,7 @@ export async function archiveBot(
       where: { id: { in: runIds } },
       data: { status: "cancelled", completedAt: now },
     });
+    await clearEndedRunState(tx, runIds);
     await tx.task.updateMany({
       where: { runs: { some: { id: { in: runIds } } } },
       data: { status: "cancelled" },
@@ -449,6 +451,7 @@ export async function destroyBot(
     where: { id: { in: runIds } },
     data: { status: "cancelled", completedAt: new Date() },
   });
+  await clearEndedRunState(deps.prisma, runIds);
   await Promise.allSettled([
     ...activeRuns.map((run) => deps.jobs.cancel(runJobKey(run.id))),
     ...routines.map((routine) => deps.jobs.cancel(routineJobKey(routine.id))),

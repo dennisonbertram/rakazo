@@ -411,6 +411,7 @@ describe("destroyBot", () => {
           findMany: findRuns,
           updateMany: cancelRuns,
         },
+        secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         attempt: { updateMany: cancelAttempts },
         task: { updateMany: cancelTasks },
         chatGroupMember: { deleteMany: deleteMemberships },
@@ -1731,7 +1732,13 @@ describe("archiveBot", () => {
     const transaction = vi.fn(async (callback: (tx: unknown) => Promise<void>) =>
       callback({
         ...groupCleanup,
-        run: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        run: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findMany: vi
+            .fn()
+            .mockResolvedValue([{ id: "run-1", userId: "user-1", spaceId: "workspace-1" }]),
+        },
+        secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
         task: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
         routine: { updateMany: disableRoutines },
         computerExecutionLease: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
