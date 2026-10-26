@@ -222,6 +222,7 @@ export * from "./ticket-tools.js";
 export * from "./voice-agent-tools.js";
 export * from "./voice-factory.js";
 export * from "./wakeup.js";
+export * from "./watch-probe.js";
 export * from "./web-limits.js";
 export * from "./web-provider-factory.js";
 export * from "./web-ssrf.js";

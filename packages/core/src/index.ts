@@ -96,6 +96,7 @@ export * from "./thread-subscription.js";
 export * from "./time-separators.js";
 export * from "./tool-activity.js";
 export * from "./ui-locale.js";
+export * from "./untrusted-data.js";
 export * from "./user-error.js";
 export * from "./voice-agent.js";
 export * from "./voice-chat-groups.js";

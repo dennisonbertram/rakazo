@@ -1897,8 +1897,31 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "schedule_create",
     description:
-      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone.',
+      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone. For "tell me if X changes" or "let me know when this page updates", use watch_create instead: a cron job that reports "no change" wastes a run and a message every time.',
     inputSchema: scheduleCreateInputSchema,
+  },
+  {
+    name: "watch_create",
+    description:
+      'Watch a web page and wake this bot only when its text changes. Use for "tell me if the pricing page changes" or "let me know when X is published". The page is checked without a model; a change starts a run with a short before/after diff, so the instruction says what to do on a change ("tell me what changed in a sentence"), never "report that nothing changed". The first check only records the page. Pauses for the user to approve a card. At most 5 watches per bot. Use schedule_list, schedule_update (watch: { url, intervalMinutes }) and schedule_cancel to see, change or stop it.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The http or https address of the page." },
+        intervalMinutes: {
+          type: "number",
+          enum: [15, 60, 1440],
+          description: "How often to check: 15, 60 (default) or 1440 minutes.",
+        },
+        name: { type: "string", description: "Short name, e.g. “Pricing page”." },
+        instruction: {
+          type: "string",
+          description: "What to do when the page changes. Say when to stop.",
+        },
+      },
+      required: ["url", "name", "instruction"],
+      additionalProperties: false,
+    },
   },
   {
     name: "schedule_list",
@@ -1933,6 +1956,15 @@ export const builtinAgentTools: ConnectorTool[] = [
         },
         timezone: { type: "string", description: "IANA timezone for cron times." },
         enabled: { type: "boolean" },
+        watch: {
+          type: "object",
+          description: "For a watch: the new page address and/or check interval.",
+          properties: {
+            url: { type: "string" },
+            intervalMinutes: { type: "number", enum: [15, 60, 1440] },
+          },
+          additionalProperties: false,
+        },
       },
       required: ["id"],
       additionalProperties: false,

@@ -13,6 +13,8 @@ import {
   SPACE_WATCH_WAKES_PER_DAY,
   shouldPauseForErrors,
   truncateSnapshot,
+  WATCHES_PER_BOT,
+  WATCHES_PER_SPACE,
   wakeBudget,
   watchDay,
 } from "@rakazo/core";
@@ -106,6 +108,14 @@ export async function countWatches(db: Db, input: { spaceId: string; botId: stri
     db.routine.count({ where: { ...where, botId: input.botId } }),
   ]);
   return { bot, space };
+}
+
+/** The message to show when the bot or space is at its watch limit, else null. One rule for the router and watch_create. */
+export async function watchLimitError(db: Db, input: { spaceId: string; botId: string }) {
+  const count = await countWatches(db, input);
+  return count.bot >= WATCHES_PER_BOT || count.space >= WATCHES_PER_SPACE
+    ? `A bot can watch ${WATCHES_PER_BOT} pages and a space ${WATCHES_PER_SPACE}.`
+    : null;
 }
 
 /**

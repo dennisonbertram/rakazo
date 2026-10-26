@@ -61,6 +61,7 @@ import { renderPdfPages } from "./pdf-render.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
 import { expireTaughtSkillTeaching } from "./teaching-session.js";
 import { renderThumbnail } from "./thumbnail-render.js";
+import { runWatchProbeTick } from "./watch-probe.js";
 
 export function createBackgroundJobHandlers(deps: {
   executor: ReturnType<typeof createRunExecutor>;
@@ -389,6 +390,14 @@ export function createBackgroundJobHandlers(deps: {
     "company.refresh.tick": async () => {
       if (!deps.companyImport) throw new Error("Company import engine is not configured");
       await deps.companyImport.refreshTick();
+    },
+    "watch.probe": async () => {
+      await runWatchProbeTick({
+        prisma: deps.prisma,
+        jobs: deps.jobs,
+        events: deps.events,
+        notificationEvents: deps.notificationEvents,
+      });
     },
     "history.compact": async (payload) => {
       // Retrieval policies use stored context without paid message-count compaction.

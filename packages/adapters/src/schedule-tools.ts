@@ -1,5 +1,7 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
 import { routineJobKey, routineWakeupJob } from "@rakazo/adapter-kit";
+import type { WatchSpec } from "@rakazo/contracts";
+import { WatchSpecSchema } from "@rakazo/contracts";
 import {
   cronFromPreset,
   extractForcedSkillName,
@@ -12,12 +14,14 @@ import {
   ONCE_ROUTINE_CRON,
 } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+import { resumeWatch, syncWatchState, watchLimitError } from "@rakazo/db";
 import { OWNER_INITIATED_TRIGGERS } from "./mail-tools.js";
 
 export { isOneShotRoutineCron, ONCE_ROUTINE_CRON };
 
 export const SCHEDULE_TOOL_NAMES = new Set([
   "schedule_create",
+  "watch_create",
   "schedule_list",
   "schedule_cancel",
   "schedule_update",
@@ -28,11 +32,17 @@ export function filterBuiltinToolsForRun<T extends { name: string }>(
   tools: T[],
   runTrigger: string,
 ): T[] {
+  // A watch is a saved prompt too, so it follows the same rule.
   // A saved prompt later fires as an owner routine run with the owner's mail, calendar and Drive,
   // so only a run the owner started may create one (routine runs never chain a new schedule).
   return OWNER_INITIATED_TRIGGERS.has(runTrigger) && runTrigger !== "routine"
     ? tools
-    : tools.filter((tool) => tool.name !== "schedule_create" && tool.name !== "schedule_update");
+    : tools.filter(
+        (tool) =>
+          tool.name !== "schedule_create" &&
+          tool.name !== "watch_create" &&
+          tool.name !== "schedule_update",
+      );
 }
 
 /** Keep cross-bot messaging thread-specific while exposing schedules in DMs and groups. */
@@ -295,6 +305,138 @@ export async function createScheduleFromTool(
   };
 }
 
+const WATCH_EVERY: Record<number, string> = {
+  15: "every 15 minutes",
+  60: "every hour",
+  1440: "every day",
+};
+
+/** "example.com/pricing": the address without scheme, query or a bare "/". */
+function watchTarget(url: string): string {
+  const { host, pathname } = new URL(url);
+  return `${host}${pathname === "/" ? "" : pathname}`;
+}
+
+/** What a watch does in plain words, e.g. "Checks example.com/pricing every hour and tells you only when it changes". */
+export function describeWatch(watch: WatchSpec): string {
+  return `Checks ${watchTarget(watch.url)} ${WATCH_EVERY[watch.intervalMinutes]} and tells you only when it changes`;
+}
+
+function describeRoutine(row: {
+  watch: unknown;
+  crons: string[];
+  timezone: string;
+  nextRunAt: Date | null;
+}) {
+  const watch = WatchSpecSchema.safeParse(row.watch);
+  return watch.success
+    ? describeWatch(watch.data)
+    : describeSchedule(row.crons, row.timezone, row.nextRunAt);
+}
+
+/** The watch spec and its state for the tool output; empty for a routine that is not a watch. */
+function watchFields(row: {
+  watch: unknown;
+  watchState?: {
+    lastCheckedAt: Date | null;
+    lastChangedAt: Date | null;
+    pausedReason: string | null;
+  } | null;
+}) {
+  const watch = WatchSpecSchema.safeParse(row.watch);
+  if (!watch.success) return {};
+  return {
+    watch: watch.data,
+    lastCheckedAt: row.watchState?.lastCheckedAt?.toISOString() ?? null,
+    lastChangedAt: row.watchState?.lastChangedAt?.toISOString() ?? null,
+    pausedReason: row.watchState?.pausedReason ?? null,
+  };
+}
+
+function parseWatchArgs(input: { url?: unknown; intervalMinutes?: unknown }) {
+  const interval = isScheduleValueProvided(input.intervalMinutes)
+    ? Number(input.intervalMinutes)
+    : 60;
+  const parsed = WatchSpecSchema.safeParse({
+    kind: "page",
+    url: String(input.url ?? "").trim(),
+    intervalMinutes: interval,
+  });
+  return parsed.success
+    ? { ok: true as const, watch: parsed.data }
+    : {
+        ok: false as const,
+        error: "url must be an http or https address and intervalMinutes one of 15, 60 or 1440.",
+      };
+}
+
+/** Persist a quiet routine that checks a page and wakes the bot only when it changes. */
+export async function createWatchFromTool(
+  deps: ScheduleToolDeps,
+  input: {
+    spaceId: string;
+    botId: string;
+    userId: string;
+    threadId: string;
+    name: string;
+    instruction: string;
+    url: unknown;
+    intervalMinutes?: unknown;
+  },
+) {
+  const name = input.name.trim();
+  const prompt = input.instruction.trim();
+  if (!name) return { error: "name is required." };
+  if (!prompt) return { error: "instruction is required." };
+  const spec = parseWatchArgs(input);
+  if (!spec.ok) return { error: spec.error };
+  const limit = await watchLimitError(deps.prisma, input);
+  if (limit) return { error: limit };
+
+  const timezone = (await loadUserTimezone(deps.prisma, input.userId)) || "UTC";
+  const row = await deps.prisma.routine.create({
+    data: {
+      spaceId: input.spaceId,
+      botId: input.botId,
+      userId: input.userId,
+      threadId: input.threadId,
+      name,
+      prompt,
+      crons: [],
+      timezone,
+      notify: true,
+      active: true,
+      quiet: true,
+      watch: spec.watch,
+    },
+  });
+  await syncWatchState(deps.prisma, {
+    routineId: row.id,
+    spaceId: row.spaceId,
+    watch: spec.watch,
+    watchChanged: true,
+    now: new Date(),
+  });
+  try {
+    await deps.events.append({
+      spaceId: input.spaceId,
+      threadId: input.threadId,
+      botId: input.botId,
+      type: "routine.created",
+      payload: { name: row.name },
+    });
+  } catch {
+    // The watch is live even if the thread signal fails.
+  }
+  return {
+    ok: true as const,
+    routineId: row.id,
+    name: row.name,
+    watch: spec.watch,
+    schedule: describeWatch(spec.watch),
+  };
+}
+
 /** List bot routines, optionally restricted to the current group thread. */
 export async function listSchedulesFromTool(
   deps: Pick<ScheduleToolDeps, "prisma">,
@@ -308,16 +450,20 @@ export async function listSchedulesFromTool(
       ...(input.threadId ? { threadId: input.threadId } : {}),
     },
     orderBy: { createdAt: "desc" },
+    include: {
+      watchState: { select: { lastCheckedAt: true, lastChangedAt: true, pausedReason: true } },
+    },
   });
   return {
     routines: rows.map((row) => ({
+      ...watchFields(row),
       routineId: row.id,
       name: row.name,
       prompt: row.prompt,
       crons: row.crons,
       active: row.active,
       timezone: row.timezone,
-      schedule: describeSchedule(row.crons, row.timezone, row.nextRunAt),
+      schedule: describeRoutine(row),
       nextRunAt: row.nextRunAt?.toISOString() ?? null,
       oneShot: isOneShotRoutineCrons(row.crons),
     })),
@@ -435,12 +581,27 @@ export async function updateScheduleFromTool(
     schedule?: unknown;
     timezone?: unknown;
     enabled?: unknown;
+    /** For a watch: the new url and/or intervalMinutes. */
+    watch?: unknown;
   },
 ) {
   const id = input.id.trim();
   if (!id) return { error: "id is required." };
   const existing = await deps.prisma.routine.findFirst({ where: ownedRoutine(input, id) });
   if (!existing) return { error: "Schedule not found." };
+
+  let watch: WatchSpec | undefined;
+  if (input.watch && typeof input.watch === "object") {
+    const current = WatchSpecSchema.safeParse(existing.watch);
+    if (!current.success) return { error: "This schedule does not watch a page." };
+    const patch = compactScheduleInput(input.watch as Record<string, unknown>);
+    const spec = parseWatchArgs({
+      url: patch.url ?? current.data.url,
+      intervalMinutes: patch.intervalMinutes ?? current.data.intervalMinutes,
+    });
+    if (!spec.ok) return { error: spec.error };
+    watch = spec.watch;
+  }
 
   const hasPrompt = isScheduleValueProvided(input.prompt);
   const prompt = hasPrompt ? String(input.prompt).trim() : existing.prompt;
@@ -476,8 +637,29 @@ export async function updateScheduleFromTool(
 
   const row = await deps.prisma.routine.update({
     where: { id: existing.id },
-    data: { prompt, timezone, crons, active: enabled, nextRunAt: enabled ? nextRunAt : null },
+    data: {
+      prompt,
+      timezone,
+      crons,
+      active: enabled,
+      nextRunAt: enabled ? nextRunAt : null,
+      ...(watch ? { watch } : {}),
+    },
+    include: { watchState: true },
   });
+  if (watch) {
+    await syncWatchState(deps.prisma, {
+      routineId: row.id,
+      spaceId: row.spaceId,
+      watch,
+      watchChanged: JSON.stringify(watch) !== JSON.stringify(existing.watch),
+      now: new Date(),
+    });
+  }
+  // Turning a paused watch back on checks the page again now.
+  if (row.watch && row.active && !existing.active) {
+    await resumeWatch(deps.prisma, { routineId: row.id, spaceId: row.spaceId, now: new Date() });
+  }
   if (row.active && row.nextRunAt) {
     await deps.jobs.enqueue(routineWakeupJob(row.id, row.nextRunAt));
   } else {
@@ -497,11 +679,12 @@ export async function updateScheduleFromTool(
     }
   }
   return {
+    ...watchFields(row),
     ok: true as const,
     routineId: row.id,
     name: row.name,
     prompt: row.prompt,
-    schedule: describeSchedule(row.crons, row.timezone, row.nextRunAt),
+    schedule: describeRoutine(row),
     crons: row.crons,
     timezone: row.timezone,
     enabled: row.active,
@@ -589,6 +772,16 @@ export async function scheduleApproval(
   args: Record<string, unknown>,
   userTimezone: string | null,
 ): Promise<ScheduleApproval | undefined> {
+  if (toolName === "watch_create") {
+    const spec = parseWatchArgs(args);
+    if (!spec.ok || !String(args.name ?? "").trim() || !String(args.instruction ?? "").trim()) {
+      return undefined;
+    }
+    return {
+      summary: describeWatch(spec.watch),
+      detail: `instruction: ${String(args.instruction).trim()}`,
+    };
+  }
   if (toolName !== "schedule_create" && toolName !== "schedule_update") return undefined;
   const create = toolName === "schedule_create";
   const existing = create
@@ -607,13 +800,27 @@ export async function scheduleApproval(
   const resolved = Object.keys(timing).length > 0 ? resolveScheduleTiming(timing, timezone) : null;
   if (resolved && !resolved.ok) return undefined;
   const newlyRepeats = resolved?.ok === true && !resolved.oneShot;
-  const promptChanges = !create && isScheduleValueProvided(args.prompt);
+  // Pointing a watch at another page changes what the saved prompt reads on every check.
+  const promptChanges =
+    !create &&
+    (isScheduleValueProvided(args.prompt) || (Boolean(args.watch) && Boolean(existing?.watch)));
   const existingRepeats = Boolean(existing) && !isOneShotRoutineCrons(existing?.crons ?? []);
   if (!newlyRepeats && !(promptChanges && existingRepeats)) return undefined;
 
   const name = create ? String(args.name ?? "").trim() : (existing?.name ?? "");
   const crons = resolved?.ok ? [resolved.cron] : (existing?.crons ?? []);
-  const when = crons.map(formatCron).join("; ");
+  const currentWatch = WatchSpecSchema.safeParse(existing?.watch);
+  const nextWatch =
+    currentWatch.success && args.watch && typeof args.watch === "object"
+      ? parseWatchArgs({
+          url: (args.watch as Record<string, unknown>).url ?? currentWatch.data.url,
+          intervalMinutes:
+            (args.watch as Record<string, unknown>).intervalMinutes ??
+            currentWatch.data.intervalMinutes,
+        })
+      : null;
+  if (nextWatch && !nextWatch.ok) return undefined;
+  const when = nextWatch?.ok ? describeWatch(nextWatch.watch) : crons.map(formatCron).join("; ");
   const lines: string[] = [`time zone: ${timezone}`];
   if (resolved?.ok) lines.push(`next run: ${formatLocal(resolved.nextRunAt, timezone)}`);
   if (isScheduleValueProvided(args.prompt)) lines.push(`prompt: ${String(args.prompt).trim()}`);

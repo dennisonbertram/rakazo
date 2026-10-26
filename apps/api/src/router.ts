@@ -201,8 +201,6 @@ import {
   newRunUnattended,
   nextCronDateAcrossStrict,
   splitPage,
-  WATCHES_PER_BOT,
-  WATCHES_PER_SPACE,
   withAppDirectory,
 } from "@rakazo/core";
 import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
@@ -229,7 +227,6 @@ import {
   closeRound,
   companyForActor,
   companyWriter,
-  countWatches,
   createExternalConversationRepos,
   createGroupRepos,
   createRepos,
@@ -342,6 +339,7 @@ import {
   unshareDocument,
   updateNotificationPreferences,
   upsertCheckInRoutine,
+  watchLimitError,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { createAgentSkillsService } from "./agent-skills.js";
@@ -9571,12 +9569,8 @@ function nextRoutineDate(crons: string[], timezone: string): Date {
 }
 
 async function assertWatchLimits(prisma: PrismaClient, spaceId: string, botId: string) {
-  const count = await countWatches(prisma, { spaceId, botId });
-  if (count.bot >= WATCHES_PER_BOT || count.space >= WATCHES_PER_SPACE) {
-    throw new ORPCError("BAD_REQUEST", {
-      message: `A bot can watch ${WATCHES_PER_BOT} pages and a space ${WATCHES_PER_SPACE}.`,
-    });
-  }
+  const message = await watchLimitError(prisma, { spaceId, botId });
+  if (message) throw new ORPCError("BAD_REQUEST", { message });
 }
 
 /** A routine may only name a model the space has connected. */

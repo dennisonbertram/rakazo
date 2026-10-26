@@ -518,6 +518,7 @@ import {
   cancelScheduleFromTool,
   compactScheduleInput,
   createScheduleFromTool,
+  createWatchFromTool,
   filterBuiltinToolsForRun,
   filterBuiltinToolsForThread,
   keepForcedSkill,
@@ -5920,6 +5921,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
             });
             return finish(created);
           }
+          if (name === "watch_create") {
+            return finish(
+              await createWatchFromTool(deps, {
+                spaceId: run.spaceId,
+                botId: bot.id,
+                userId: run.userId,
+                threadId: thread.id,
+                name: String(args.name ?? ""),
+                instruction: String(args.instruction ?? ""),
+                url: args.url,
+                intervalMinutes: args.intervalMinutes,
+              }),
+            );
+          }
           if (name === "schedule_list") {
             return listSchedulesFromTool(deps, {
               spaceId: run.spaceId,
@@ -5937,6 +5952,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 schedule: args.schedule,
                 timezone: args.timezone,
                 enabled: args.enabled,
+                watch: args.watch,
               }),
             );
           }
