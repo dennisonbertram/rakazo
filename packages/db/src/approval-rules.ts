@@ -4,7 +4,7 @@ import type { Prisma, PrismaClient } from "./client.js";
 import { isUniqueViolation } from "./prisma-errors.js";
 
 export type ApprovalRuleEffect = "always_allow" | "require_approval" | "block";
-export type ApprovalRuleKind = "tool" | "connector" | "category";
+export type ApprovalRuleKind = "tool" | "connector" | "category" | "site";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 type Scope = { spaceId: string; userId: string; botId?: string | null };

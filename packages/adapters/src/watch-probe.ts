@@ -85,6 +85,22 @@ type Wake = {
   connector?: boolean;
 };
 
+const WATCHED_APP = "result of the watched app";
+const WATCHED_PAGE = "watched page";
+/** Starts the note a watch wake appends to a routine's instruction; what follows is not the owner's. */
+const WATCH_NOTE_START = (what: string) => `\n\nThe ${what} changed (`;
+
+/**
+ * The owner's part of a watch wake's task prompt: the routine's instruction without the note,
+ * whose url and diff come from what the watch read.
+ */
+export function watchWakeInstruction(taskPrompt: string): string {
+  const cuts = [WATCHED_PAGE, WATCHED_APP]
+    .map((what) => taskPrompt.indexOf(WATCH_NOTE_START(what)))
+    .filter((index) => index !== -1);
+  return cuts.length > 0 ? taskPrompt.slice(0, Math.min(...cuts)) : taskPrompt;
+}
+
 /** The prompt of a watch wake: the routine's own instruction, then the change fenced as untrusted data. */
 export function watchWakePrompt(
   instruction: string,
@@ -92,8 +108,8 @@ export function watchWakePrompt(
   diff: string,
   connector = false,
 ): string {
-  const what = connector ? "result of the watched app" : "watched page";
-  return `${instruction}\n\nThe ${what} changed (${url}). Changes since you last saw it:\n\n${formatUntrustedDeliveryPayload(
+  const what = connector ? WATCHED_APP : WATCHED_PAGE;
+  return `${instruction}${WATCH_NOTE_START(what)}${url}). Changes since you last saw it:\n\n${formatUntrustedDeliveryPayload(
     connector ? "[App Changes]" : "[Page Changes]",
     { diff: diff.split("\n") },
   )}`;

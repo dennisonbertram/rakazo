@@ -913,7 +913,7 @@ export const ActionApprovalEffectSchema = z.enum(["always_allow", "require_appro
 export const ActionApprovalRuleSchema = z.object({
   id: Id,
   effect: ActionApprovalEffectSchema,
-  matchKind: z.enum(["tool", "connector", "category"]),
+  matchKind: z.enum(["tool", "connector", "category", "site"]),
   matchValue: z.string(),
   /** null for a space-wide rule; a bot id for that bot's override. */
   botId: Id.nullable().optional(),

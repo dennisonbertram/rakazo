@@ -71,6 +71,7 @@ function approvalActionLabel(
   outcome?: "created" | "cancelled",
   consent?: boolean,
   share?: boolean,
+  site?: string,
 ): string {
   if (share && id === "allow") return t`Share`;
   if (share && id === "deny") return t`Don't share`;
@@ -81,7 +82,7 @@ function approvalActionLabel(
   // A payment's label already carries the amount ("Send $300.00"): keep it.
   if (id === "allow")
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
-  if (id === "always") return t`Always allow this`;
+  if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
   if (id === "deny") return t`Deny`;
   return fallback;
 }
@@ -324,7 +325,14 @@ export function AskCard({
                     {pendingAction === action.id ? (
                       <Trans>Sending…</Trans>
                     ) : (
-                      approvalActionLabel(action.id, action.label)
+                      approvalActionLabel(
+                        action.id,
+                        action.label,
+                        undefined,
+                        undefined,
+                        undefined,
+                        block.site,
+                      )
                     )}
                   </Button>
                   <span className="text-[13px] text-muted-foreground">
@@ -348,6 +356,7 @@ export function AskCard({
                       action.outcome,
                       Boolean(block.consent),
                       Boolean(block.share),
+                      block.site,
                     )
                   ) : (
                     action.label
