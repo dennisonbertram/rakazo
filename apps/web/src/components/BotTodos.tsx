@@ -6,6 +6,9 @@ import { Link } from "react-router-dom";
 import { rpc } from "../lib/rpc";
 import { ScratchpadItemMeta } from "../pages/ScratchpadSection";
 
+/** How a to-do names the person themselves (matches the server's waiting-on-you rule). */
+const ONE_SELF = ["you", "me", "user"];
+
 /**
  * Open to-dos the person's bots saved for them, or that are past due. Hidden when there are none
  * or loading fails. `hideDueBetween` leaves out items already drawn on a calendar grid.
@@ -68,7 +71,15 @@ export function BotTodos({ hideDueBetween }: { hideDueBetween?: { from: Date; to
                 {item.title}
               </Link>
               <span className="ms-2 text-xs text-muted-foreground/80">{item.botName}</span>
-              <ScratchpadItemMeta item={item} />
+              {/* The heading already says it waits on the person; only someone else is named. */}
+              <ScratchpadItemMeta
+                item={{
+                  dueAt: item.dueAt,
+                  waitingOn: ONE_SELF.includes(item.waitingOn?.toLowerCase() ?? "")
+                    ? null
+                    : item.waitingOn,
+                }}
+              />
             </div>
           </li>
         ))}
