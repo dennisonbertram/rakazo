@@ -231,6 +231,7 @@ function Editor({
   webhook = { path: "/hooks/bot_demo/abc123", secret: null, configured: false },
   messageProviders = ["slack"],
   skills = [],
+  taughtSkills = [],
   saving = false,
   running = false,
   error = null,
@@ -240,6 +241,7 @@ function Editor({
   webhook?: { path: string; secret: string | null; configured: boolean };
   messageProviders?: string[];
   skills?: AgentSkillCatalogEntry[];
+  taughtSkills?: { id: string; name: string }[];
   saving?: boolean;
   running?: boolean;
   error?: string | null;
@@ -255,6 +257,7 @@ function Editor({
       githubPath="/hooks/github/bot_demo"
       messageProviders={messageProviders}
       skills={skills}
+      taughtSkills={taughtSkills}
       saving={saving}
       running={running}
       error={error}
@@ -297,6 +300,40 @@ export const WithForcedSkill: Story = {
       editing={null}
       initial={{ ...emptyRoutineDraft(), prompt: "@Weekly cash check Post the note." }}
       skills={skillOptions}
+    />
+  ),
+};
+
+const taughtOptions = [
+  { id: "taught_1", name: "Export the weekly report" },
+  { id: "taught_2", name: "File sample invoices" },
+];
+
+/** The picker lists taught skills in their own group. */
+export const WithTaughtSkills: Story = {
+  render: () => (
+    <Editor
+      editing={null}
+      initial={emptyRoutineDraft()}
+      skills={skillOptions}
+      taughtSkills={taughtOptions}
+    />
+  ),
+};
+
+/** A taught skill is stored by reference, so the instruction can stay empty. */
+export const RunsTaughtSkill: Story = {
+  render: () => (
+    <Editor
+      editing={null}
+      initial={{
+        ...emptyRoutineDraft(),
+        name: "Export the weekly report",
+        taughtSkill: taughtOptions[0] ?? null,
+        schedules: [],
+      }}
+      skills={skillOptions}
+      taughtSkills={taughtOptions}
     />
   ),
 };

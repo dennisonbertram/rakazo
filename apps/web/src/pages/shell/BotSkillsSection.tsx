@@ -4,11 +4,37 @@ import type {
   AgentSkillCatalogEntry,
   AgentSkillDraft,
   BotAgentSkill,
+  TaughtSkill,
+  TaughtSkillSummary,
 } from "@rakazo/contracts";
 import { buildSkillMd } from "@rakazo/core";
-import { Badge, Button, Input, Skeleton, Switch, Textarea } from "@rakazo/ui-web";
-import { ChevronRight } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+  Skeleton,
+  Switch,
+  Textarea,
+} from "@rakazo/ui-web";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { SkillDraftCard } from "../../components/teach/SkillDraftCard";
+import { formatRelativeTime } from "../../lib/relative-time";
 import { rpc } from "../../lib/rpc";
 import { isHiddenBuiltinSkill, slashSkillLabel } from "../../lib/slash-skills";
 import { errorText } from "../../lib/user-error";
@@ -130,6 +156,13 @@ export function BotSkillsSection({
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [newId, setNewId] = useState<string | null>(null);
+  const [taught, setTaught] = useState<TaughtSkillSummary[]>([]);
+  const [taughtOpen, setTaughtOpen] = useState<TaughtSkill | null>(null);
+  // The taught skill awaiting delete confirmation, and the names of routines that run it.
+  const [taughtDelete, setTaughtDelete] = useState<{
+    skill: TaughtSkillSummary;
+    routines: number;
+  } | null>(null);
   const knownIds = useRef<Set<string> | null>(null);
   const generation = useRef(0);
   const selection = useRef(0);
@@ -150,6 +183,12 @@ export function BotSkillsSection({
       document.querySelector(`[data-skill-id="${newId}"]`)?.scrollIntoView?.({ block: "nearest" });
   }, [newId]);
 
+  const loadTaught = () =>
+    rpc.taughtSkills
+      .list({ botId })
+      .then(setTaught)
+      .catch(() => setTaught([]));
+
   async function refresh() {
     const current = ++generation.current;
     const [list, pending] = await Promise.all([
@@ -161,6 +200,14 @@ export function BotSkillsSection({
     setDrafts(pending);
     onChange.current(list.filter((skill) => skill.enabled));
   }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey reloads the list on demand
+  useEffect(() => {
+    void rpc.taughtSkills
+      .list({ botId })
+      .then(setTaught)
+      .catch(() => setTaught([]));
+  }, [botId, refreshKey]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey reloads the list on demand
   useEffect(() => {
@@ -234,6 +281,42 @@ export function BotSkillsSection({
     } catch {
       if (current !== selection.current) return;
       setError(t`Could not load skill`);
+    }
+  }
+
+  async function openTaught(entry: TaughtSkillSummary) {
+    setError(null);
+    try {
+      setTaughtOpen(await rpc.skills.get({ skillId: entry.id }));
+    } catch {
+      setError(t`Could not load skill`);
+    }
+  }
+
+  async function askDeleteTaught(entry: TaughtSkillSummary) {
+    let routines = 0;
+    try {
+      routines = (await rpc.routines.list({ botId })).filter(
+        (routine) => routine.taughtSkill?.id === entry.id,
+      ).length;
+    } catch {
+      // Delete still works; the note about routines is just left out.
+    }
+    setTaughtDelete({ skill: entry, routines });
+  }
+
+  async function deleteTaught() {
+    if (!taughtDelete) return;
+    setBusy(true);
+    try {
+      await rpc.taughtSkills.delete({ skillId: taughtDelete.skill.id });
+      setTaughtDelete(null);
+      await loadTaught();
+    } catch {
+      setTaughtDelete(null);
+      setError(t`Could not delete skill`);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -475,6 +558,56 @@ export function BotSkillsSection({
       {!editorOpen && !urlOpen ? (
         <div data-testid="bot-skills-list">
           {skills.filter((entry) => entry.source !== "builtin").map(renderSkill)}
+          {taught.length > 0 ? (
+            <div className="mt-2" data-testid="bot-skills-taught">
+              <h4 className="px-2.5 text-[12.5px] text-muted-foreground">
+                <Trans>Taught</Trans>
+              </h4>
+              {taught.map((entry) => (
+                <div key={entry.id} data-taught-skill-id={entry.id} className="flex items-center">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => void openTaught(entry)}
+                    className="h-auto min-w-0 flex-1 justify-start whitespace-normal px-2.5 py-2.5 text-start block"
+                  >
+                    <span className="block truncate text-[14px] text-foreground" dir="auto">
+                      {entry.name}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">
+                      {entry.lastRunAt ? (
+                        <Trans>Last run {formatRelativeTime(entry.lastRunAt)}</Trans>
+                      ) : (
+                        <Trans>Not run yet</Trans>
+                      )}
+                    </span>
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground"
+                          aria-label={t`Actions for ${entry.name}`}
+                        />
+                      }
+                    >
+                      <MoreHorizontal size={16} strokeWidth={1.8} />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => void askDeleteTaught(entry)}
+                      >
+                        <Trans>Delete</Trans>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {builtins.length > 0 ? (
             <details className="group">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-[13px] text-muted-foreground">
@@ -628,6 +761,53 @@ export function BotSkillsSection({
           </div>
         </div>
       ) : null}
+      <Dialog open={taughtOpen !== null} onOpenChange={(next) => !next && setTaughtOpen(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-170">
+          <DialogTitle className="sr-only">{taughtOpen?.name}</DialogTitle>
+          {taughtOpen ? (
+            <SkillDraftCard
+              block={{
+                kind: "skill_draft",
+                skillId: taughtOpen.id,
+                name: taughtOpen.name,
+                goal: taughtOpen.goal,
+                playbook: taughtOpen.playbook,
+                status: "saved",
+              }}
+              onRefresh={loadTaught}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={taughtDelete !== null}
+        onOpenChange={(next) => !next && setTaughtDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="break-words">
+              <Trans>Delete {taughtDelete?.skill.name}?</Trans>
+            </AlertDialogTitle>
+            {taughtDelete?.routines ? (
+              <AlertDialogDescription>
+                <Trans>Routines that use it will stop using it.</Trans>
+              </AlertDialogDescription>
+            ) : null}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>
+              <Trans>Cancel</Trans>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={busy}
+              onClick={() => void deleteTaught()}
+            >
+              <Trans>Delete</Trans>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

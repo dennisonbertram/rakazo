@@ -470,6 +470,7 @@ app.post("/computers/:id/browser", async (c) => {
           }),
       }),
       z.object({ command: z.literal("snapshot") }),
+      z.object({ command: z.literal("focus") }),
       z.object({
         command: z.literal("act"),
         actions: z

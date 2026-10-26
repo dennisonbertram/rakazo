@@ -952,6 +952,9 @@ model Routine {
   watch           Json?
   /// "check_in" marks the one managed check-in routine per bot; its crons/active are the bot's check-in setting.
   managedKind     String?
+  /// Runs the skill's current playbook instead of `prompt`; null when the skill is deleted.
+  taughtSkillId   String?
+  taughtSkill     TaughtSkill? @relation(fields: [taughtSkillId], references: [id], onDelete: SetNull)
   watchState      RoutineWatchState?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -959,6 +962,7 @@ model Routine {
 
   @@index([active, nextRunAt])
   @@index([spaceId, botId])
+  @@index([taughtSkillId])
   @@map("routines")
 }
 
@@ -1054,14 +1058,43 @@ model TaughtSkill {
   startedAt DateTime?
   expiresAt DateTime?
   stoppedAt DateTime?
+  /// Stamped when a chat, routine or test run uses the skill.
+  lastRunAt DateTime?
+  /// The card's latest Test run, and its outcome ("worked" | "stopped") once that run has ended.
+  lastTestRunId   String?
+  lastTestOutcome String?
+  lastTestNote    String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  routines   Routine[]
+  heldValues TeachHeldValue[]
 
   @@index([spaceId, botId])
   @@index([spaceId, botId, status])
   // Partial unique index taught_skills_botId_recording_key is created in SQL:
   // one recording session per bot.
   @@map("taught_skills")
+}
+
+/// A value typed into a password field while teaching, held (encrypted like a BotSecret) until
+/// the user saves it as a login or skips it. Deleted on save, skip, cancel, delete and after 30 minutes.
+model TeachHeldValue {
+  id         String      @id @default(cuid())
+  skillId    String
+  skill      TaughtSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  spaceId    String
+  userId     String
+  segment    Int
+  /// The playbook step that stands for this value; set when recording stops.
+  stepIndex  Int?
+  field      String      @default("")
+  ciphertext String
+  expiresAt  DateTime
+  createdAt  DateTime    @default(now())
+
+  @@unique([skillId, segment])
+  @@index([expiresAt])
+  @@map("teach_held_values")
 }
 
 /// Claude Agent Skills: SKILL.md recipes shared across assistants (not per-bot).

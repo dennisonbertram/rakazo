@@ -49,7 +49,9 @@ function createDeps(
       modelProvider?: string | null;
       modelId?: string | null;
       thinkingLevel?: string | null;
+      taughtSkillId?: string | null;
     }>;
+    taughtSkill?: { name: string; goal: string; playbook: unknown } | null;
   } = {},
 ): WebhookDeps & {
   sendUserMessage: ReturnType<typeof vi.fn>;
@@ -95,6 +97,10 @@ function createDeps(
       },
       routine: {
         findMany: findRoutines,
+      },
+      taughtSkill: {
+        findFirst: vi.fn(async () => overrides.taughtSkill ?? null),
+        update: vi.fn(async () => ({})),
       },
     } as unknown as WebhookDeps["prisma"],
     secrets: {
@@ -366,6 +372,33 @@ describe("inbound webhook HTTP route", () => {
     const sent = deps.sendUserMessage.mock.calls[0]?.[0];
     expect(sent.blocks).toEqual([{ kind: "text", text: "Routine: Billing events" }]);
     expect(sent.prompt).toContain("<untrusted_delivery_payload>");
+  });
+
+  it("sends a taught skill's playbook for a routine that has no prompt of its own", async () => {
+    const deps = createDeps({
+      routines: [{ id: "routine-1", name: "Export", prompt: "", taughtSkillId: "skill-1" }],
+      taughtSkill: {
+        name: "Export the report",
+        goal: "Export the report",
+        playbook: {
+          whenToUse: "",
+          inputs: [],
+          steps: ["Open the dashboard", "Click Export"],
+          howToCheck: "",
+          whatToReturn: "",
+          approvalBoundaries: "",
+          failureHandling: "",
+        },
+      },
+    });
+    const res = await mount(deps).request("/api/v1/bots/bot-1/webhook", {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}`, "content-type": "application/json" },
+      body: JSON.stringify({ event: "ping" }),
+    });
+    expect(res.status).toBe(200);
+    const sent = deps.sendUserMessage.mock.calls[0]?.[0];
+    expect(sent.prompt).toContain("Click Export");
   });
 
   it("keeps the bot model when matching routines chose different models", async () => {

@@ -56,6 +56,8 @@ import {
   createSecretStore,
   createTicketChangeNotifier,
   createWebProvider,
+  deleteExpiredTeachData,
+  describeTeachSteps,
   destroyBot,
   EmailEmulator,
   ExpoPushProvider,
@@ -676,6 +678,7 @@ export async function createApp(
         reconcileComputerUpdates: () => reconcileComputerUpdates({ prisma, jobs }),
         reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
         reconcileCompanyImports: () => companyImport.recoveryJob(),
+        reconcileTeachHeldValues: () => deleteExpiredTeachData(prisma),
         // Graphile mode runs watch.probe from RECURRING_JOBS in apps/worker; memory mode has no cron.
         runWatchProbes: () => runWatchProbeTick({ prisma, jobs, events, notificationEvents }),
       })
@@ -684,6 +687,8 @@ export async function createApp(
 
   const router = createRouter({
     email,
+    describeTeachSteps: (input) =>
+      describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
     unsubscriber: createMailUnsubscriber(),
     proposeSort: (model, input, context) =>
       new LlmDataRoomClassifier({

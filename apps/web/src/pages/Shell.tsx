@@ -153,7 +153,11 @@ import { ROOT_CONTAINER } from "../components/sidebar-folders/drop-target";
 import { SidebarUndoNotice } from "../components/sidebar-folders/SidebarUndoNotice";
 import { TeachCaptureOverlay } from "../components/teach/TeachCaptureOverlay";
 import { TeachComputerOverlayControl } from "../components/teach/TeachComputerOverlay";
-import { TeachRecordingChrome, TeachStopButton } from "../components/teach/TeachRecordingChrome";
+import {
+  TeachCancelButton,
+  TeachRecordingChrome,
+  TeachStopButton,
+} from "../components/teach/TeachRecordingChrome";
 import { focusQuestionOpen } from "../components/tour/connect-cards";
 import { tourInProgress } from "../components/tour/TourPopover";
 import { useAgentApp } from "../lib/agent-app";
@@ -1020,6 +1024,9 @@ export function ShellPage() {
   }, [panel, releaseComputerRecovery]);
   useEffect(() => () => window.clearTimeout(recoveryHoldTimer.current), []);
   const [routineDraft, setRoutineDraft] = useState<RoutineDraftState>(emptyRoutineDraft());
+  const [routineTaughtSkills, setRoutineTaughtSkills] = useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [routineWebhookSecret, setRoutineWebhookSecret] = useState<string | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState<Routine | null>(null);
@@ -1758,6 +1765,13 @@ export function ShellPage() {
   useEffect(() => {
     if (panel === "routine") refreshAgentSkills();
   }, [panel, refreshAgentSkills]);
+  useEffect(() => {
+    if (panel !== "routine" || !slashBotId) return;
+    void rpc.taughtSkills
+      .list({ botId: slashBotId })
+      .then((list) => setRoutineTaughtSkills(list.map(({ id, name }) => ({ id, name }))))
+      .catch(() => setRoutineTaughtSkills([]));
+  }, [panel, slashBotId]);
 
   useEffect(() => {
     void rpc.voice
@@ -3325,6 +3339,23 @@ export function ShellPage() {
       setTeachBusy(false);
     }
   }, [teachBusy, taughtSkills, taughtSkillsBotId]);
+  const cancelTeaching = useCallback(async () => {
+    const id = activeBotId.current;
+    if (!id || teachBusy) return;
+    const recording = taughtSkills.find(
+      (skill) => skill.status === "recording" && taughtSkillsBotId === id,
+    );
+    if (!recording) return;
+    setTeachBusy(true);
+    try {
+      await rpc.taughtSkills.cancel({ skillId: recording.id });
+      await refreshThreadRef.current(id);
+      const skills = await rpc.skills.list({ botId: id });
+      if (activeBotId.current === id) setTaughtSkills(skills);
+    } finally {
+      setTeachBusy(false);
+    }
+  }, [teachBusy, taughtSkills, taughtSkillsBotId]);
   // Transcript and MessageView are memoized; these must stay referentially stable or every
   // Shell state change re-renders the whole transcript.
   const refreshActiveThread = useCallback(async () => {
@@ -3349,8 +3380,8 @@ export function ShellPage() {
     setTaughtSkills(skills);
     setTaughtSkillsBotId(id);
   }, []);
-  const addSkillRoutine = useCallback((name: string, prompt: string) => {
-    setRoutineDraft({ ...emptyRoutineDraft(), name, prompt });
+  const addSkillRoutine = useCallback((skill: { id: string; name: string }) => {
+    setRoutineDraft({ ...emptyRoutineDraft(), name: skill.name, taughtSkill: skill });
     setRoutineWebhookSecret(null);
     setEditingRoutine(null);
     setPanel("routine");
@@ -4430,8 +4461,18 @@ export function ShellPage() {
             </div>
           ))}
           {recordingSkill ? (
-            <div className="px-6 pb-2 text-center text-[13px] text-destructive">
+            <div className="flex flex-wrap items-center justify-center gap-2 px-6 pb-2 text-center text-[13px] text-destructive">
               <Trans>Teaching in progress. Stop teaching before sending a new message.</Trans>
+              {computerOpen ? null : (
+                <>
+                  <TeachStopButton busy={teachBusy} onStop={stopTeaching} />
+                  <TeachCancelButton
+                    recording={recordingSkill}
+                    busy={teachBusy}
+                    onCancel={cancelTeaching}
+                  />
+                </>
+              )}
             </div>
           ) : null}
           {active || activeGroup ? (
@@ -5476,6 +5517,7 @@ export function ShellPage() {
                 }
                 messageProviders={messagingProviders}
                 skills={agentSkills}
+                taughtSkills={routineTaughtSkills}
                 saving={savingRoutine}
                 // Stays on until the run itself finishes, not just until the request returns.
                 running={
@@ -5514,7 +5556,7 @@ export function ShellPage() {
                     setRoutineError(t`Enter the page address, starting with http:// or https://`);
                     return;
                   }
-                  if (!routineDraft.prompt.trim()) {
+                  if (!routineDraft.prompt.trim() && !routineDraft.taughtSkill) {
                     setRoutineError(t`Write what this routine should do each time it runs.`);
                     return;
                   }
@@ -5561,6 +5603,7 @@ export function ShellPage() {
                         routineId: targetRoutine.id,
                         name: routineDraft.name || t`Routine`,
                         prompt: routineDraft.prompt.trim(),
+                        taughtSkillId: routineDraft.taughtSkill?.id ?? null,
                         crons,
                         active: armOneShot ? true : routineDraft.active,
                         webhookEnabled: routineDraft.webhookEnabled,
@@ -5585,6 +5628,7 @@ export function ShellPage() {
                         botId: targetBotId,
                         name: routineDraft.name || t`Routine`,
                         prompt: routineDraft.prompt.trim(),
+                        taughtSkillId: routineDraft.taughtSkill?.id ?? null,
                         crons,
                         timezone: routineDraft.timezone || accountTimezone(bootstrapMe),
                         active: routineDraft.active,
@@ -6200,6 +6244,7 @@ export function ShellPage() {
                     botId={computerBot.id}
                     busy={teachBusy}
                     onStop={stopTeaching}
+                    onCancel={cancelTeaching}
                     variant="overlay"
                   />
                 ) : (
@@ -6234,7 +6279,14 @@ export function ShellPage() {
                   </Button>
                 ) : null}
                 {recordingSkill ? (
-                  <TeachStopButton busy={teachBusy} onStop={stopTeaching} />
+                  <>
+                    <TeachStopButton busy={teachBusy} onStop={stopTeaching} />
+                    <TeachCancelButton
+                      recording={recordingSkill}
+                      busy={teachBusy}
+                      onCancel={cancelTeaching}
+                    />
+                  </>
                 ) : hasControl ? (
                   <ComputerReleaseActions
                     takeoverRequested={Boolean(computer?.takeoverRequested)}
@@ -6294,7 +6346,8 @@ export function ShellPage() {
                 botId={computerBot.id}
                 computer={computer}
                 hasControl={hasControl}
-                dock={!recordingSkill}
+                dock
+                recordingSkillId={recordingSkill?.id}
                 onTakeControl={
                   computer?.state === "running" &&
                   !hasControl &&
