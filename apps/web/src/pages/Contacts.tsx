@@ -4,7 +4,6 @@ import type { Contact, ContactKind } from "@rakazo/contracts";
 import { ContactKindSchema } from "@rakazo/contracts";
 import {
   Button,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -22,6 +21,7 @@ import { PickFilter, SearchField } from "../components/ListControls";
 import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
+import { sortBy, useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import {
   CONTACT_RESTORED_EVENT,
@@ -29,6 +29,8 @@ import {
   useContactNotices,
 } from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
+
+const CONTACT_SORTS = ["default", "name", "email", "organization", "kind"] as const;
 
 const matches = (contact: Contact, needle: string, kindName: string) =>
   [contact.name, contact.email, contact.organization, contact.notes, kindName].some((field) =>
@@ -45,20 +47,12 @@ export function ContactsPage({
 }) {
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [error, setError] = useState("");
-  const [params, setParams] = useSearchParams();
+  // Search, kind and sort live in the URL: ?q=, kind, sort, dir. "default" is the server's order.
+  const list = useListParams(CONTACT_SORTS, { field: "default", dir: "asc" });
+  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (current) => {
-        const updated = new URLSearchParams(current);
-        if (value) updated.set(key, value);
-        else updated.delete(key);
-        return updated;
-      },
-      { replace: true },
-    );
-  const query = params.get("q") ?? "";
-  const parsedKind = ContactKindSchema.safeParse(params.get("kind"));
+  const query = list.param("q") ?? "";
+  const parsedKind = ContactKindSchema.safeParse(list.param("kind"));
   const kind = parsedKind.success ? parsedKind.data : undefined;
   const [editing, setEditing] = useState<Contact | "new" | null>(null);
   const names = contactKindNames();
@@ -95,11 +89,20 @@ export function ContactsPage({
   }, [load, setSavedId, setFocusId]);
 
   const needle = query.trim().toLowerCase();
-  const shown = (contacts ?? []).filter(
+  const found = (contacts ?? []).filter(
     (contact) =>
       (!kind || contact.kind === kind) &&
       (!needle || matches(contact, needle, names[contact.kind])),
   );
+  const { field, dir } = list.sort;
+  const shown =
+    field === "default"
+      ? found
+      : sortBy(found, (c) => (field === "kind" ? names[c.kind] : c[field]) || null, dir);
+  const sortHead = (target: (typeof CONTACT_SORTS)[number]) => ({
+    sortDirection: field === target ? dir : null,
+    onSort: () => list.toggleSort(target),
+  });
 
   return (
     <div className="@container/bd flex min-h-0 min-w-0 flex-1 flex-col">
@@ -153,7 +156,7 @@ export function ContactsPage({
               <SearchField
                 className="w-full @md:w-72"
                 value={query}
-                onChange={(next) => setParam("q", next)}
+                onChange={(next) => list.setParam("q", next)}
                 placeholder={t`Search`}
                 label={t`Search`}
                 name="contacts-search"
@@ -165,7 +168,7 @@ export function ContactsPage({
                   value,
                   names[value],
                 ])}
-                onChange={(next) => setParam("kind", next)}
+                onChange={(next) => list.setParam("kind", next)}
               />
             </div>
             {shown.length === 0 ? (
@@ -177,15 +180,7 @@ export function ContactsPage({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setParams(
-                      (current) => {
-                        const updated = new URLSearchParams(current);
-                        updated.delete("q");
-                        updated.delete("kind");
-                        return updated;
-                      },
-                      { replace: true },
-                    );
+                    list.clear("q", "kind");
                     container.current
                       ?.querySelector<HTMLInputElement>("input[name=contacts-search]")
                       ?.focus();
@@ -199,16 +194,19 @@ export function ContactsPage({
                 <Table compact className="table-fixed">
                   <TableHeader>
                     <TableHeadRow>
-                      <TableHead className="ps-2">
+                      <TableHead className="ps-2" {...sortHead("name")}>
                         <Trans>Name</Trans>
                       </TableHead>
-                      <TableHead className="hidden w-[34%] @md:table-cell">
+                      <TableHead className="hidden w-[34%] @md:table-cell" {...sortHead("email")}>
                         <Trans>Email</Trans>
                       </TableHead>
-                      <TableHead className="hidden w-[26%] @lg:table-cell">
+                      <TableHead
+                        className="hidden w-[26%] @lg:table-cell"
+                        {...sortHead("organization")}
+                      >
                         <Trans>Organization</Trans>
                       </TableHead>
-                      <TableHead className="w-28">
+                      <TableHead className="w-28" {...sortHead("kind")}>
                         <Trans>Kind</Trans>
                       </TableHead>
                     </TableHeadRow>

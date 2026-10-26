@@ -291,3 +291,29 @@ it("keeps the header out of the scrolling list", async () => {
   expect(scroller?.querySelector("[data-page-header]")).toBeNull();
   expect(scroller?.querySelector("table")).not.toBeNull();
 });
+
+const names = () =>
+  [...container.querySelectorAll("tbody [data-row-open]")].map((b) => b.textContent);
+const head = (label: string) =>
+  [...container.querySelectorAll<HTMLElement>("thead th button")].find(
+    (b) => b.textContent === label,
+  );
+
+it("sorts by a column header, keeps the order unless asked, and carries the sort to the detail page", async () => {
+  rpcMock.list.mockResolvedValue([
+    contact("c1", "Cy", "vendor"),
+    contact("c2", "Ada", "customer"),
+    contact("c3", "Bo", "advisor"),
+  ]);
+  await show();
+  expect(names()).toEqual(["Cy", "Ada", "Bo"]);
+  await click(head("Name"));
+  expect(names()).toEqual(["Ada", "Bo", "Cy"]);
+  expect(search).toBe("?sort=name&dir=asc");
+  await click(head("Name"));
+  expect(names()).toEqual(["Cy", "Bo", "Ada"]);
+  await click(head("Kind"));
+  expect(names()).toEqual(["Bo", "Ada", "Cy"]); // Advisor, Customer, Vendor
+  await click(container.querySelector("[data-contact-id=c2] [data-row-open]") ?? undefined);
+  expect(path).toBe("/app/contacts/c2?sort=kind&dir=asc");
+});
