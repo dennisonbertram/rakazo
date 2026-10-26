@@ -6,7 +6,7 @@ import type {
 } from "@rakazo/adapter-kit";
 import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
-import { botMessageHopExhausted, nextBotMessageHop } from "@rakazo/core";
+import { botMessageHopExhausted, nextBotMessageHop, uiBlockText } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import {
   appendEventInTransaction,
@@ -110,7 +110,7 @@ async function mirrorRun(deps: MessagingDeliveryDeps, runId: string): Promise<vo
   if (!identity) return;
 
   // bot_message runs can carry the bot's user-facing reply after a delegate wake.
-  // extractText only keeps kind:"text", so inter-bot chatter blocks never leak out.
+  // extractText only keeps text and ui blocks, so inter-bot chatter blocks never leak out.
 
   const messages = await deps.prisma.message.findMany({
     where: { runId: run.id, role: "bot" },
@@ -572,15 +572,13 @@ export async function applyMessagingOutboundStatus(
 
 function extractText(blocks: unknown): string {
   if (!Array.isArray(blocks)) return "";
-  return blocks
-    .filter(
-      (block): block is { kind: string; text: string } =>
-        typeof block === "object" &&
-        block !== null &&
-        (block as { kind?: string }).kind === "text" &&
-        typeof (block as { text?: string }).text === "string",
-    )
-    .map((block) => block.text)
+  return (blocks as MessageBlock[])
+    .flatMap((block) => {
+      if (typeof block !== "object" || block === null) return [];
+      if (block.kind === "text" && typeof block.text === "string") return [block.text];
+      if (block.kind === "ui" && block.block) return [uiBlockText(block.block)];
+      return [];
+    })
     .join("\n")
     .trim();
 }

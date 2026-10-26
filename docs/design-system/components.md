@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 299 of 299
-- Web and shared components: 772
+- Web and shared component files with stories: 301 of 301
+- Web and shared components: 775
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -125,6 +125,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SubscriptionGate | [apps/web/src/components/SubscriptionGate.tsx](../../apps/web/src/components/SubscriptionGate.tsx) | [SubscriptionGate.stories.tsx](../../apps/web/src/components/SubscriptionGate.stories.tsx) | web |
 | ToolSteps, ToolActivityDisclosure, StandaloneToolActivity, ToolOnlyNarration | [apps/web/src/components/ToolActivityDisclosure.tsx](../../apps/web/src/components/ToolActivityDisclosure.tsx) | [ToolActivityDisclosure.stories.tsx](../../apps/web/src/components/ToolActivityDisclosure.stories.tsx) | web |
 | UiArtifactView, Unsupported, BlockView, ChartView | [apps/web/src/components/UiArtifactView.tsx](../../apps/web/src/components/UiArtifactView.tsx) | [UiArtifactView.stories.tsx](../../apps/web/src/components/UiArtifactView.stories.tsx) | web |
+| UiBlockView | [apps/web/src/components/UiBlockView.tsx](../../apps/web/src/components/UiBlockView.tsx) | [UiBlockView.stories.tsx](../../apps/web/src/components/UiBlockView.stories.tsx) | web |
 | UserTextBubble | [apps/web/src/components/UserTextBubble.tsx](../../apps/web/src/components/UserTextBubble.tsx) | [UserTextBubble.stories.tsx](../../apps/web/src/components/UserTextBubble.stories.tsx) | web |
 
 ## Web components/ai
@@ -326,6 +327,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BillingSettingsPanel | [apps/web/src/pages/BillingSettingsPanel.tsx](../../apps/web/src/pages/BillingSettingsPanel.tsx) | [BillingSettingsPanel.stories.tsx](../../apps/web/src/pages/BillingSettingsPanel.stories.tsx) | web |
 | BoardPage, TicketDialog | [apps/web/src/pages/Board.tsx](../../apps/web/src/pages/Board.tsx) | [Board.stories.tsx](../../apps/web/src/pages/Board.stories.tsx) | web |
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
+| CalendarPage | [apps/web/src/pages/Calendar.tsx](../../apps/web/src/pages/Calendar.tsx) | [Calendar.stories.tsx](../../apps/web/src/pages/Calendar.stories.tsx) | web |
 | CompanyPage | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
 | CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |
 | CompanyFactDetail | [apps/web/src/pages/CompanyFactDetail.tsx](../../apps/web/src/pages/CompanyFactDetail.tsx) | [CompanyFactDetail.stories.tsx](../../apps/web/src/pages/CompanyFactDetail.stories.tsx) | web |
@@ -406,7 +408,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ResultCard, ChoiceCard, OnboardingFocusQuestion, OnboardingFocusOptionHint, OnboardingFocusOptionLabel, AppConnectCard, ChartCanvas, ChartCanvasPlot, McpApprovalCard, ChartBlockView, ArtifactImage, ArtifactImageGrid | [apps/web/src/pages/shell/message-cards.tsx](../../apps/web/src/pages/shell/message-cards.tsx) | [message-cards.stories.tsx](../../apps/web/src/pages/shell/message-cards.stories.tsx) | web |
 | SidebarHeaderRow | [apps/web/src/pages/shell/sidebar-header-row.tsx](../../apps/web/src/pages/shell/sidebar-header-row.tsx) | [sidebar-header-row.stories.tsx](../../apps/web/src/pages/shell/sidebar-header-row.stories.tsx) | web |
 | SpaceSidebar | [apps/web/src/pages/shell/space-sidebar.tsx](../../apps/web/src/pages/shell/space-sidebar.tsx) | [space-sidebar.stories.tsx](../../apps/web/src/pages/shell/space-sidebar.stories.tsx) | web |
-| ThreadMarkdown, UnreadDivider, Transcript, QuoteSelectionButton, MessageHoverActions, SpeakerHeader, MessageView | [apps/web/src/pages/shell/transcript.tsx](../../apps/web/src/pages/shell/transcript.tsx) | [transcript.stories.tsx](../../apps/web/src/pages/shell/transcript.stories.tsx) | web |
+| ThreadMarkdown, ThreadUiBlock, UnreadDivider, Transcript, QuoteSelectionButton, MessageHoverActions, SpeakerHeader, MessageView | [apps/web/src/pages/shell/transcript.tsx](../../apps/web/src/pages/shell/transcript.tsx) | [transcript.stories.tsx](../../apps/web/src/pages/shell/transcript.stories.tsx) | web |
 | VoiceSettingsOverlay | [apps/web/src/pages/VoiceSettingsOverlay.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.tsx) | [VoiceSettingsOverlay.stories.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.stories.tsx) | web |
 | WelcomePage | [apps/web/src/pages/Welcome.tsx](../../apps/web/src/pages/Welcome.tsx) | [Welcome.stories.tsx](../../apps/web/src/pages/Welcome.stories.tsx) | web |
 | WindowChrome | [apps/web/src/pages/WindowChrome.tsx](../../apps/web/src/pages/WindowChrome.tsx) | [WindowChrome.stories.tsx](../../apps/web/src/pages/WindowChrome.stories.tsx) | web |

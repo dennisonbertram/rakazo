@@ -23,7 +23,7 @@ export const CALENDAR_TOOL_NAMES = new Set([
 ]);
 
 export const CALENDAR_APP = "googlecalendar";
-const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
+export const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 const DEFAULT_WINDOW_MS = 7 * 24 * 3_600_000;
 const DEFAULT_MAX_RESULTS = 50;
 const MAX_RESULTS = 250;
@@ -373,8 +373,9 @@ async function resolveAccount(
   return accounts[0];
 }
 
-async function request(
-  deps: CalendarToolDeps,
+/** One Google Calendar API call as a connected account; shared with the agenda. */
+export async function request(
+  deps: Pick<CalendarToolDeps, "connectors" | "google" | "beforeWrite">,
   account: CalendarAccount,
   context: AdapterContext,
   method: "GET" | "POST" | "PATCH" | "DELETE",
@@ -420,7 +421,7 @@ async function request(
 const UNCLEAR_OUTCOME =
   "The request may not have reached Google Calendar and the outcome is unclear. Do not retry; tell the user to check their calendar.";
 
-function errorText(error: unknown): string {
+export function errorText(error: unknown): string {
   if (error instanceof CalendarToolError) return error.message;
   if (!(error instanceof GoogleApiError)) return "Calendar tool failed";
   const response = error.response;
