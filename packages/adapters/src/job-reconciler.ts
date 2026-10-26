@@ -111,6 +111,8 @@ export function createJobReconciler(
     reconcileDataRoom?: () => Promise<unknown>;
     reconcileMeetings?: () => Promise<unknown>;
     reconcileCompanyImports?: () => Promise<void>;
+    /** Deletes typed passwords held for teaching that nobody saved or skipped in time. */
+    reconcileTeachHeldValues?: () => Promise<unknown>;
   },
   options: { intervalMs?: number; batchSize?: number } = {},
 ) {
@@ -136,6 +138,7 @@ export function createJobReconciler(
           deps.reconcileDataRoom,
           deps.reconcileMeetings,
           deps.reconcileCompanyImports,
+          deps.reconcileTeachHeldValues,
         ].map(async (reconcile) => reconcile?.()),
       );
       for (const result of auxiliary) {

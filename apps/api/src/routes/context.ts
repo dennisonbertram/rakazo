@@ -42,6 +42,7 @@ import type { createDataRoomService } from "../data-room.js";
 import type { FinanceCryptoDeps } from "../finance.js";
 import type { ParseStatement } from "../finance-statements.js";
 import type { GtmQueueReader } from "../gtm.js";
+import type { createTaughtSkillsService } from "../taught-skills.js";
 
 export interface RouterDeps {
   /** Transactional email for portal links; absent when the deployment has none. */
@@ -50,6 +51,8 @@ export interface RouterDeps {
   unsubscriber?: MailUnsubscriber;
   /** The model call behind Data room auto-sort; without it only duplicate folders are merged. */
   proposeSort?: Parameters<typeof createDataRoomService>[0]["proposeSort"];
+  /** Rewrites a recording's coordinate steps as plain steps with the bot's model; absent keeps coordinates. */
+  describeTeachSteps?: Parameters<typeof createTaughtSkillsService>[0]["describeSteps"];
   cloudAgent?: CloudAgentConnection | null;
   prisma: PrismaClient;
   events: ThreadEvents;

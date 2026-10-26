@@ -21,7 +21,12 @@ import {
   TicketSchema,
   UpdateTicketInput,
 } from "./board.js";
-import { BotSecretMetadata, BotSecretPutInput, StoredBotSecretName } from "./bot-secrets.js";
+import {
+  BotSecretMetadata,
+  BotSecretName,
+  BotSecretPutInput,
+  StoredBotSecretName,
+} from "./bot-secrets.js";
 import {
   CapTableChangeSourceInputSchema,
   CapTableSaveInputSchema,
@@ -172,6 +177,7 @@ import {
   SpreadsheetPreviewInputSchema,
   SpreadsheetPreviewSchema,
   TaughtSkillSchema,
+  TaughtSkillSummarySchema,
   TeachRecordingEventSchema,
   ThinkingLevelSchema,
   ThreadMessagePageSchema,
@@ -849,6 +855,8 @@ export const appContract = {
             routineId: Id,
             name: z.string().optional(),
             prompt: z.string().optional(),
+            /** A saved taught skill on this bot; null returns the routine to its own prompt. */
+            taughtSkillId: Id.nullable().optional(),
             crons: z.array(z.string().min(1)).optional(),
             timezone: z.string().optional(),
             active: z.boolean().optional(),
@@ -980,6 +988,30 @@ export const appContract = {
       .input(z.object({ skillId: Id, prompt: z.string().optional() }))
       .output(z.object({ runId: Id })),
     remove: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  /** Saved taught skills and the login steps of a fresh recording. Recording itself stays under `skills`. */
+  taughtSkills: {
+    list: oc.input(botId).output(z.array(TaughtSkillSummarySchema)),
+    delete: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Saves the held password as a login for `site` and rewrites the step to fill it. */
+    saveLogin: oc
+      .input(
+        z.object({
+          skillId: Id,
+          stepIndex: z.number().int().min(0),
+          name: BotSecretName,
+          site: z.string().min(1).max(2048),
+          /** Only needed when the step before the password is not the typed username. */
+          username: z.string().min(1).max(512).optional(),
+        }),
+      )
+      .output(TaughtSkillSchema),
+    /** Deletes the held password; the step becomes "Ask the user to sign in". */
+    skipLogin: oc
+      .input(z.object({ skillId: Id, stepIndex: z.number().int().min(0) }))
+      .output(TaughtSkillSchema),
+    /** Ends the recording and keeps nothing: no recording, held values or skill. */
+    cancel: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   /** Claude Agent Skills (SKILL.md recipes) shared across assistants (not taught/demo skills). Pi already understands this format; we persist and inject them. */
   agentSkills: {

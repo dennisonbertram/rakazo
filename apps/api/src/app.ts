@@ -56,6 +56,8 @@ import {
   createSecretStore,
   createTicketChangeNotifier,
   createWebProvider,
+  deleteExpiredHeldValues,
+  describeTeachSteps,
   destroyBot,
   EmailEmulator,
   ExpoPushProvider,
@@ -674,12 +676,15 @@ export async function createApp(
         reconcileComputerUpdates: () => reconcileComputerUpdates({ prisma, jobs }),
         reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
         reconcileCompanyImports: () => companyImport.recoveryJob(),
+        reconcileTeachHeldValues: () => deleteExpiredHeldValues(prisma),
       })
     : undefined;
   reconciler?.start();
 
   const router = createRouter({
     email,
+    describeTeachSteps: (input) =>
+      describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
     unsubscriber: createMailUnsubscriber(),
     proposeSort: (model, input, context) =>
       new LlmDataRoomClassifier({

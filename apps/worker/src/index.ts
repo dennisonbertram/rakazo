@@ -36,6 +36,7 @@ import {
   createTicketChangeNotifier,
   createWebProvider,
   databaseCapacityBackoffMs,
+  deleteExpiredHeldValues,
   ExpoPushProvider,
   GraphileJobPublisher,
   GraphileJobWorkerHost,
@@ -352,6 +353,7 @@ async function main() {
     reconcileDataRoom: () => reconcileDataRoom({ prisma, jobs }),
     reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
     reconcileCompanyImports: () => companyImport.recoveryJob(),
+    reconcileTeachHeldValues: () => deleteExpiredHeldValues(prisma),
   });
   reconciler.start();
 

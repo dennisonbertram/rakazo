@@ -39,6 +39,18 @@ Fake computers and explicit `BROWSER_PROVIDER=fake|emulator` use an in-process s
 
 Human input and agent input may coexist on distinct Team screens. “Take control” grants the user an exclusive control lease on that bot’s screen so the embedded viewer accepts input. For a Team bot, takeover is refused with HTTP 409 (“Stop the bot first”) while that bot holds a live computer execution lease or an active run, unless the run is `waiting_takeover` (the bot asked for protected input). Stop the bot first, then take control; after release, the agent may continue. `request_takeover` remains available when the model explicitly needs protected input or human judgment.
 
+## What teaching records
+
+Teaching sees what passes through the API, with no extra access to the computer:
+
+- Clicks, keys, pastes and scrolls the user sends to the screen, each with an optional `field` label from the client. A value typed into a field labelled like a password, PIN, token or code, or sent as Protected input, is never stored in the recording, snapshots, playbook or model prompt. The API holds it encrypted in `teach_held_values` (the same store as bot credentials, local only) for 30 minutes until the user saves it as a login or skips it.
+- The foreground window title, sampled after a click, Enter or Tab (at most every 3 seconds, and only when it changed). The app name is the text after the last " - " in the title, when there is one. The sandbox reports no process name.
+- Files the user uploads in the Files window: the path, never the content.
+- Commands: not observed. The interactive shell is a direct websocket between the browser and the computer, so the API does not see what is typed there. `skills.appendEvent` accepts `command` events from a client that does see them; the server removes tokens and passwords from the command line.
+- Not observed: files an app or shell writes by itself, apps launched from the dock, clipboard text the user did not paste through the screen, and anything inside a page.
+
+Raw events are deleted when the skill is saved; the saved skill keeps only its playbook.
+
 ## Terminal and files
 
 The web and desktop computer view opens a terminal and a file browser from a dock over the screen. The dock's browser button hides those windows, keeping their sessions, so the whole screen is visible again.

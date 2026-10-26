@@ -12,6 +12,7 @@ import { claimDueWatchChecks, createNotification, recordWatchCheck } from "@raka
 import { getLogger } from "@rakazo/logging";
 import { routineRunModelPin } from "./model-selection.js";
 import { listAgentSkillRecords } from "./skill-tools.js";
+import { taughtSkillPromptForRoutine } from "./taught-skill-prompt.js";
 import type { ResolveHostname } from "./web-ssrf.js";
 import { fetchSafeWebText } from "./web-ssrf.js";
 
@@ -114,7 +115,10 @@ export async function createWatchWakeRun(deps: WatchProbeDeps, wake: Wake) {
     botId: routine.botId,
   });
   const prompt = watchWakePrompt(
-    expandSkillReferencesInPrompt(routine.prompt, skills),
+    expandSkillReferencesInPrompt(
+      (await taughtSkillPromptForRoutine(deps.prisma, routine)) ?? routine.prompt,
+      skills,
+    ),
     wake.url,
     wake.diff,
   );
