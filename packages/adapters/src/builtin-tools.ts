@@ -1957,6 +1957,19 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "calendar_agenda",
+    description:
+      "Read-only. One time-ordered list of what is coming up for the owner: Google Calendar events from every connected account, open to-dos with a due time (scratchpad_add with dueAt) from every bot, and routines and check-backs (schedule_create with runAt) with their next run. Defaults to now through the next 7 days; pass from and to (ISO 8601, at most 93 days apart) for another window. Use it to see what is due or scheduled; use schedule_create with runAt to set a check-back and scratchpad_add with dueAt for a to-do.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "ISO 8601 start. Default now." },
+        to: { type: "string", description: "ISO 8601 end. Default 7 days after from." },
+      },
+    },
+    readOnly: true,
+  },
+  {
     name: "schedule_list",
     description:
       "List this bot's active and inactive schedules (routines) with their ids, prompts, and plain-words schedules.",
