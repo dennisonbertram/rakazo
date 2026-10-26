@@ -264,13 +264,13 @@ export const ACTION_TYPES: ReadonlyArray<{
 }> = [
   { id: "send_email", defaultEffect: "ask", primary: true },
   { id: "spend_money", defaultEffect: "ask", primary: true },
-  { id: "connected_apps_write", defaultEffect: "ask", primary: true },
-  { id: "calendar_changes", defaultEffect: "ask", primary: true },
+  { id: "connected_apps_write", defaultEffect: "allow", primary: true },
+  { id: "calendar_changes", defaultEffect: "allow", primary: true },
   { id: "files_and_commands", defaultEffect: "allow", primary: true },
   { id: "use_computer", defaultEffect: "allow", primary: false },
-  { id: "delete_data", defaultEffect: "ask", primary: false },
-  { id: "message_outside", defaultEffect: "ask", primary: false },
-  { id: "use_credentials", defaultEffect: "ask", primary: false },
+  { id: "delete_data", defaultEffect: "allow", primary: false },
+  { id: "message_outside", defaultEffect: "allow", primary: false },
+  { id: "use_credentials", defaultEffect: "allow", primary: false },
 ];
 
 const ACTION_TYPE_IDS = new Set<string>(APPROVAL_ACTION_TYPE_IDS);
