@@ -16,6 +16,7 @@ import {
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { BotTodos } from "../components/BotTodos";
 import { PickFilter, SearchField } from "../components/ListControls";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { useListParams } from "../lib/list-params";
@@ -704,6 +705,9 @@ export function CalendarPage({
           <Trans>Couldn't load {account}</Trans>
         </p>
       ))}
+      <div className={PAGE_GUTTER_X}>
+        <BotTodos hideDueBetween={{ from: startOf(start), to: startOf(end) }} />
+      </div>
       <div
         ref={scroller}
         className={`rk-scroll min-h-0 flex-1 overflow-auto ${PAGE_GUTTER_X} pb-6`}
