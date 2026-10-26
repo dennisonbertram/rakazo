@@ -32,7 +32,7 @@ import { DEFAULT_CONTEXT_STRATEGY } from "@rakazo/adapter-kit";
 import { MISSING_TOOL_FINAL_RESPONSE_ERROR, usableModelId } from "@rakazo/contracts";
 import { abortableDelay, humanizeToolName, toolPhrase } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
-import { isToolPauseResult } from "./approval-effect.js";
+import { isToolPauseResult, isUnattendedEndResult } from "./approval-effect.js";
 import { connectionIdArgument, credentialArgument } from "./bot-secrets.js";
 import { DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
 import { withCloudflareGatewayAuth } from "./cloudflare-ai-gateway.js";
@@ -1225,7 +1225,7 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
             if (host.request.executeTool) {
               const result = await host.request.executeTool(tool.name, args, executionId);
               if (isAgentToolExecutionResult(result)) {
-                if (isToolPauseResult(result)) host.pausePending = true;
+                if (isToolPauseResult(result) || isUnattendedEndResult(result)) host.pausePending = true;
                 return result;
               }
               return {
@@ -1272,7 +1272,7 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
               },
             );
             if (isAgentToolExecutionResult(result)) {
-              if (isToolPauseResult(result)) host.pausePending = true;
+              if (isToolPauseResult(result) || isUnattendedEndResult(result)) host.pausePending = true;
               return boundAgentToolResult(result);
             }
             return {

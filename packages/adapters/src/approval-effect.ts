@@ -332,6 +332,27 @@ export function approvalPausedToolResult(): ApprovalPausedToolResult {
   };
 }
 
+/** An unattended run asked for the owner: the tool ends the turn without a pause card. */
+export function unattendedEndedToolResult() {
+  return {
+    kind: "agent_tool_result" as const,
+    content: [
+      {
+        type: "text" as const,
+        text: "The user is not here to answer. The owner was notified. Stop now.",
+      },
+    ],
+    details: { unattended: "ended" },
+    terminate: true as const,
+  };
+}
+
+export function isUnattendedEndResult(result: unknown): boolean {
+  if (!result || typeof result !== "object") return false;
+  const record = result as { kind?: unknown; details?: { unattended?: unknown } };
+  return record.kind === "agent_tool_result" && record.details?.unattended === "ended";
+}
+
 export function isToolPauseResult(result: unknown): result is ApprovalPausedToolResult {
   if (!result || typeof result !== "object") return false;
   const record = result as ApprovalPausedToolResult;

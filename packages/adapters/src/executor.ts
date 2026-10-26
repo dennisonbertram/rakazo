@@ -204,6 +204,7 @@ import {
 } from "./approval-ask.js";
 import {
   approvalPausedToolResult,
+  unattendedEndedToolResult,
   approvalReplayPathError,
   approvalReplayResourceError,
   approvalRoutesMatch,
@@ -612,6 +613,9 @@ const NO_FRAGMENT_TOOLS = new Set([
   "show_image",
   "render_plot",
 ]);
+
+/** Final note of an unattended run that stopped because it needs the owner. */
+const UNATTENDED_NEEDS_OWNER_NOTE = "Stopped. I sent you a note about what I need.";
 
 export const READ_ONLY_AGENT_TOOLS = new Set([
   "imessage_list_conversations",
@@ -3318,6 +3322,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let unchangedVisualStreak: UnchangedVisualStreak = { count: 0 };
         let terminalCheckpointComplete = false;
         let approvalPausePending = false;
+        // An unattended run asked for the owner; it ends with a short note instead of pausing.
+        let unattendedNeedsOwner = false;
         /** The one consent card of this run attempt, shared by parallel mail calls. */
         let consentAsk: Promise<unknown> | undefined;
         let handedOff = false;
@@ -4034,10 +4040,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               botId: bot.id,
               threadId: thread.id,
             });
-            return {
-              error:
-                "The user is not here to answer. Do not ask again; finish what you can without it and say what is missing.",
-            };
+            unattendedNeedsOwner = true;
+            return unattendedEndedToolResult();
           }
           // Only a repeating schedule asks; a one-off reminder fires once and stays free.
           const scheduleScope = {
@@ -4152,8 +4156,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ? approvalEffectKey(runId, replayEffectToolName, args)
               : toolEffectIdempotencyKey(runId, replayEffectToolName, args, occurrence);
           // Connector read-only hints must not bypass approval, review, or replay decisions.
+          // A read-only built-in skips the effect only when it simply runs; an ask needs the
+          // effect so the card can be shown and later approved.
           const applied =
-            READ_ONLY_AGENT_TOOLS.has(name) && !meetingTaintedCall && !externalTaintedCall
+            READ_ONLY_AGENT_TOOLS.has(name) &&
+            !meetingTaintedCall &&
+            !externalTaintedCall &&
+            plan !== "ask" &&
+            plan !== "judge"
               ? undefined
               : await recordEffect(
                   deps,
@@ -4347,11 +4357,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           const bypassApproval = gateDecision === "allow" && requiresApprovalByDefault;
           let claimedEffect = false;
-          if (
-            applied &&
-            READ_ONLY_AGENT_TOOLS.has(name) &&
-            (meetingTaintedCall || externalTaintedCall)
-          ) {
+          if (applied && READ_ONLY_AGENT_TOOLS.has(name)) {
             settleReadEffect.set(executionId, (result) =>
               completeEffect(
                 deps,
@@ -7679,6 +7685,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ...(event.activity ? { activity: true } : {}),
                 },
               });
+            } else if (event.type === "ask" && run.unattended) {
+              // Nobody is watching: tell the owner the question and end, instead of pausing.
+              unattendedNeedsOwner = true;
+              await notifyRun(deps, run, {
+                kind: "help",
+                title: `${bot.name} needs an answer`,
+                body: redactSecrets(event.text, runSecrets),
+                botId: bot.id,
+                threadId: thread.id,
+              });
             } else if (event.type === "ask") {
               if (!(await renew())) return;
               const safeText = redactSecrets(event.text, runSecrets);
@@ -7720,6 +7736,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
               return;
             } else if (event.type === "takeover" && run.unattended) {
+              unattendedNeedsOwner = true;
               // Nobody is watching: tell the owner instead of pausing on a card no one sees.
               await notifyRun(deps, run, {
                 kind: "help",
@@ -8013,6 +8030,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           await workspaceCheckpoint.flush();
           terminalCheckpointComplete = true;
 
+          if (unattendedNeedsOwner && !assembled.trim()) {
+            assembled = UNATTENDED_NEEDS_OWNER_NOTE;
+            messageSegments = [...messageSegments, { kind: "text", text: assembled }];
+          }
           flushPendingTools();
           // Only routine runs are instructed to emit NO_RESPONSE. Other
           // allowSilentEmpty wakes (FYI, messaging) may finish truly empty.
