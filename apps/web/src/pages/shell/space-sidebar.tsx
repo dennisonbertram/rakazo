@@ -103,9 +103,8 @@ import type { ContextMenuPosition } from "../BotContextMenu";
 import type { SettingsSection } from "../SettingsOverlay";
 import { BotCreatePicker, pickerInitialFocus } from "./bot-picker";
 import { moveRosterFocus, rosterRowId, syncRosterTabStops } from "./roster-tab-stops";
-import { moreBarHeight, rowsBelow, scrollingList } from "./rows-below";
+import { moreBarHeight, rowsBelow } from "./rows-below";
 import { SidebarHeaderRow } from "./sidebar-header-row";
-import { endOnWholeRow } from "./whole-rows";
 
 type SidebarChat = {
   id: string;
@@ -592,31 +591,8 @@ export function SpaceSidebar({
   }, [mobileSidebarOpen]);
   const rosterStopId = useRef<string | null>(null);
   useEffect(() => syncRosterTabStops(sidebarRef.current, rosterStopId.current));
-  useEffect(() => {
-    const scrollers = [sidebarPaneRef.current, sidebarScrollRef.current];
-    let frame = 0;
-    const trim = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => endOnWholeRow(scrollers));
-    };
-    trim();
-    const resize = new ResizeObserver(trim);
-    const mutate = new MutationObserver(trim);
-    for (const el of scrollers) {
-      if (!el) continue;
-      resize.observe(el);
-      mutate.observe(el, { childList: true, subtree: true });
-    }
-    return () => {
-      cancelAnimationFrame(frame);
-      resize.disconnect();
-      mutate.disconnect();
-    };
-  }, [mobileSidebarOpen]);
   // "+N more" over the foot of the list while rows remain below the fold.
   const [hiddenRows, setHiddenRows] = useState(0);
-  // The bar fills the margin left below the last whole row.
-  const [moreBarFill, setMoreBarFill] = useState(0);
   useEffect(() => {
     const scrollers = [sidebarPaneRef.current, sidebarScrollRef.current];
     let frame = 0;
@@ -624,7 +600,6 @@ export function SpaceSidebar({
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         setHiddenRows(rowsBelow(scrollers));
-        setMoreBarFill(Number.parseFloat(scrollingList(scrollers)?.style.marginBottom ?? "") || 0);
       });
     };
     measure();
@@ -1845,15 +1820,17 @@ export function SpaceSidebar({
       </div>
       {hiddenRows > 0 && !rail ? (
         <div className="relative h-0 shrink-0">
+          {/* A short fade, so a partly hidden row reads as continuing below. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 z-10 h-4 bg-linear-to-t from-sidebar to-transparent"
+            style={{ bottom: moreBarHeight() }}
+          />
           <button
             type="button"
             data-testid="sidebar-more-rows"
-            className="absolute inset-x-0 z-10 flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            style={{
-              height: moreBarHeight(),
-              // Sit directly under the last whole row; any leftover margin stays blank below the bar.
-              bottom: Math.max(0, moreBarFill - moreBarHeight()),
-            }}
+            className="absolute inset-x-0 bottom-0 z-10 flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            style={{ height: moreBarHeight() }}
             onClick={() => {
               const pane = sidebarPaneRef.current;
               const list = sidebarScrollRef.current;
