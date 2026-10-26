@@ -998,6 +998,22 @@ export const ArtifactVersionSchema = z.object({
 
 export type ArtifactVersion = z.infer<typeof ArtifactVersionSchema>;
 
+/** The live link of an artifact: which version it shows and when it stops working. Never the token. */
+export const ArtifactShareSchema = z.object({
+  artifactId: z.string(),
+  version: z.number().int(),
+  expiresAt: z.string(),
+});
+export type ArtifactShare = z.infer<typeof ArtifactShareSchema>;
+
+/** What the public share endpoint returns: one artifact version, nothing about its owner. */
+export const SharedArtifactSchema = z.object({
+  name: z.string(),
+  mimeType: z.string(),
+  contentBase64: z.string(),
+});
+export type SharedArtifact = z.infer<typeof SharedArtifactSchema>;
+
 export const ArtifactWithContentSchema = ArtifactSchema.extend({
   contentBase64: z.string(),
 });

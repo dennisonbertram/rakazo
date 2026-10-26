@@ -1454,6 +1454,10 @@ msgstr ""
 msgid "Anyone who can reach this address can talk to your Mac's server. Use a private network or a tunnel."
 msgstr ""
 
+#: src/components/ArtifactShareDialog.tsx
+msgid "Anyone with this link can view this version until you stop sharing or for 30 days."
+msgstr ""
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Anything else"
 msgstr ""
@@ -2223,6 +2227,7 @@ msgid "Can't reach the server."
 msgstr "No se puede alcanzar el servidor."
 
 #: src/components/AccountAccess.tsx
+#: src/components/ArtifactShareDialog.tsx
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
@@ -3528,6 +3533,10 @@ msgstr ""
 msgid "Could not create the Legal agent"
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "Could not create the link."
+msgstr ""
+
 #: src/pages/Onboarding.tsx
 msgid "Could not create your bot"
 msgstr "No se pudo crear tu bot"
@@ -4035,6 +4044,10 @@ msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Could not start the draft"
+msgstr ""
+
+#: src/pages/Artifacts.tsx
+msgid "Could not stop sharing."
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -6700,6 +6713,7 @@ msgstr ""
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/PeerMessagesOverlay.tsx
 #: src/pages/RoutineRunHistory.tsx
+#: src/pages/SharedArtifact.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Loading…"
 msgstr "Cargando…"
@@ -9775,6 +9789,10 @@ msgstr "Restaurar el último espacio de trabajo guardado."
 msgid "Restore the last saved workspace. Unsaved work on the computer is lost."
 msgstr "Restaura el último espacio de trabajo guardado. Se pierde el trabajo sin guardar en la computadora."
 
+#: src/pages/Artifacts.tsx
+msgid "Restore this version"
+msgstr ""
+
 #: src/lib/use-contact-notices.ts
 msgid "Restored {name}"
 msgstr ""
@@ -10590,12 +10608,17 @@ msgstr "Forma"
 #: src/components/AskCard.tsx
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/data-room/ItemMenu.tsx
+#: src/pages/Artifacts.tsx
 msgid "Share"
 msgstr ""
 
 #. placeholder {0}: item.name
 #: src/components/data-room/ItemDialogs.tsx
 msgid "Share {0}"
+msgstr ""
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Share link"
 msgstr ""
 
 #: src/pages/CompanyFactDetail.tsx
@@ -10624,6 +10647,10 @@ msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Shared chat with 2-6 bots. They all reply in the same thread."
+msgstr ""
+
+#: src/pages/SharedArtifact.tsx
+msgid "Shared from Praci"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
@@ -11224,6 +11251,14 @@ msgstr "Detener"
 msgid "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 msgstr ""
 
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing"
+msgstr ""
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing this link?"
+msgstr ""
+
 #: src/pages/shell/transcript.tsx
 msgid "Stop speaking"
 msgstr "Dejar de hablar"
@@ -11648,6 +11683,10 @@ msgstr ""
 msgid "This also removes the Legal contract {contractTitle}, its {deadlineCount} (including ones added by hand) and its links in the Legal graph. This can't be undone."
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "This also stops its link."
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
 msgstr "Este bot se ejecuta en esta computadora, no en un escritorio Linux. El shell y los archivos usan tu carpeta de inicio."
@@ -11700,6 +11739,10 @@ msgstr ""
 
 #: src/components/data-room/DropZone.tsx
 msgid "This folder no longer exists"
+msgstr ""
+
+#: src/pages/SharedArtifact.tsx
+msgid "This link is not available."
 msgstr ""
 
 #: src/pages/NotFound.tsx
@@ -12257,6 +12300,10 @@ msgstr "Falló la actualización"
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Update finished with errors"
 msgstr "La actualización terminó con errores"
+
+#: src/pages/Artifacts.tsx
+msgid "Update link"
+msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Update options"
