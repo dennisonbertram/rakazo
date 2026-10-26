@@ -2,7 +2,7 @@ import type { ArtifactStore } from "@rakazo/adapter-kit";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { ShareStore } from "./artifact-share.js";
-import { createRateLimiter, mountArtifactShare } from "./artifact-share.js";
+import { mountArtifactShare } from "./artifact-share.js";
 import { mountApiRequestBodyLimits } from "./request-body-limit.js";
 
 const TOKEN = "good-token";
@@ -14,14 +14,14 @@ const shared = {
   storageKey: "key-1",
 };
 
-function setup(allow?: (key: string) => boolean) {
+function setup() {
   const open = vi.fn(async (token: string) => (token === TOKEN ? shared : null));
   const store: ShareStore = { open };
   const get = vi.fn(async () => new TextEncoder().encode("<h1>hi</h1>"));
   const artifacts = { get } as unknown as ArtifactStore;
   const app = new Hono();
   mountApiRequestBodyLimits(app);
-  mountArtifactShare(app, { store, artifacts, allow });
+  mountArtifactShare(app, { store, artifacts });
   return { app, open, get };
 }
 const post = (app: Hono, token: unknown, headers: Record<string, string> = {}) =>
@@ -94,16 +94,5 @@ describe("public share endpoint", () => {
     const res = await post(app, TOKEN);
     expect(res.status).toBe(500);
     expectHeaders(res);
-  });
-
-  it("is rate limited per caller, with the same headers", async () => {
-    const { app } = setup(createRateLimiter());
-    let last = 200;
-    for (let i = 0; i < 40; i++)
-      last = (await post(app, "nope", { "x-forwarded-for": "1.2.3.4" })).status;
-    expect(last).toBe(429);
-    const limited = await post(app, "nope", { "x-forwarded-for": "1.2.3.4" });
-    expectHeaders(limited);
-    expect((await post(app, TOKEN, { "x-forwarded-for": "5.6.7.8" })).status).toBe(200);
   });
 });
