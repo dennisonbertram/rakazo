@@ -308,7 +308,7 @@ export async function expireDelegatedApprovalsInTransaction(
 }
 
 /** Tells the thread that sent work to a delegate which of its requests wait for approval. */
-async function announceDelegatePending(
+export async function announceDelegatePending(
   prisma: PrismaClient,
   realtime: RealtimeFanout | undefined,
   delegateRunId: string,

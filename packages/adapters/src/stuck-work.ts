@@ -13,7 +13,9 @@ import {
 } from "@rakazo/core";
 import type { NotificationEvents, Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
 import {
+  announceDelegatePending,
   appendEventInTransaction,
+  closeApprovalCardsInTransaction,
   expireStuckRun,
   externalChannels,
   withTransactionRetry,
@@ -32,6 +34,7 @@ type StuckCandidate = {
   botId: string;
   userId: string;
   taskId: string;
+  unattended: boolean;
   bot: { name: string; notifyOnFinish: boolean };
   thread: { groupId: string | null };
 };
@@ -86,6 +89,7 @@ export async function reconcileStuckWork(deps: {
       botId: true,
       userId: true,
       taskId: true,
+      unattended: true,
       bot: { select: { name: true, notifyOnFinish: true } },
       thread: { select: { groupId: true } },
     },
@@ -145,6 +149,7 @@ function readyStuckRun(
     botId: run.botId,
     userId: run.userId,
     taskId: run.taskId,
+    unattended: run.unattended ?? false,
     bot: run.bot,
     thread: run.thread,
   };
@@ -312,17 +317,50 @@ async function expireOne(
   run: StuckCandidate,
 ) {
   const expired = await withTransactionRetry(() =>
-    deps.prisma.$transaction((tx) =>
-      expireStuckRun(tx, {
+    deps.prisma.$transaction(async (tx) => {
+      // A background run's unanswered approval card shows "Expired" and its pending effects can
+      // never run. Closed first, because a cancelled run can no longer write to the thread.
+      // Attended runs and plain questions keep today's behaviour.
+      if (run.status === "waiting_input" && run.unattended) {
+        await tx.$queryRaw`SELECT id FROM threads WHERE id = ${run.threadId} FOR UPDATE`;
+        const current = await tx.run.findUnique({
+          where: { id: run.id },
+          select: { status: true, updatedAt: true },
+        });
+        if (
+          current?.status !== run.status ||
+          current.updatedAt.getTime() !== run.updatedAt.getTime()
+        ) {
+          return null;
+        }
+        const closed = await closeApprovalCardsInTransaction(tx, {
+          spaceId: run.spaceId,
+          threadId: run.threadId,
+          botId: run.botId,
+          runIds: [run.id],
+          answer: "expired",
+        });
+        if (closed > 0) {
+          await tx.externalEffect.updateMany({
+            where: { runId: run.id, spaceId: run.spaceId, status: "intended" },
+            data: { status: "expired" },
+          });
+        }
+      }
+      return expireStuckRun(tx, {
         runId: run.id,
         threadId: run.threadId,
         status: run.status,
         updatedAt: run.updatedAt,
         now: deps.now,
-      }),
-    ),
+      });
+    }),
   );
   if (!expired) return;
+  if (run.unattended) {
+    // A chat that sent this work shows a link to the card; it must drop the closed one.
+    await announceDelegatePending(deps.prisma, undefined, run.id).catch(() => undefined);
+  }
   await deps.events?.notify(run.threadId, expired.seq).catch((error) => {
     getLogger().error("stuck work realtime notification", error);
   });
