@@ -518,6 +518,30 @@ export interface ArtifactStore {
   ): Promise<ReadableStream<Uint8Array>>;
 }
 
+/** A contact's photo: the addresses it belongs to and where to download it. */
+export interface ContactPhotoRef {
+  /** Lower-cased. */
+  emails: string[];
+  url: string;
+}
+
+/**
+ * Profile photos of the people in a connected account's address book. Placeholder photos the
+ * provider generates are never listed. The URLs are for `download` only; they never reach a client.
+ */
+export interface ContactPhotoSource {
+  list(
+    account: { connectorId: string; app: string; accountRef: string },
+    context: AdapterContext,
+  ): AsyncIterable<ContactPhotoRef>;
+  /** The image bytes, or null when the URL is not one the provider serves photos from or the image is over `maxBytes`. */
+  download(
+    url: string,
+    maxBytes: number,
+    context: AdapterContext,
+  ): Promise<{ bytes: Uint8Array; contentType: string } | null>;
+}
+
 export interface SecretStore {
   describe(): AdapterDescriptor<{ rotate: boolean; degraded?: boolean }>;
   put(

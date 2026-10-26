@@ -266,6 +266,18 @@ export const TransactionsCard: Story = {
   render: () => <TransactionsSection title="Transactions" rows={repeatVendor} />,
 };
 
+export const TransactionsFiltered: Story = {
+  name: "Transactions card with search, filters and sort",
+  render: () => <TransactionsSection title="Transactions" rows={repeatVendor} />,
+  parameters: { initialEntries: ["/?q=a&category=Software&sort=amount&dir=asc"] },
+};
+
+export const TransactionsNoMatches: Story = {
+  name: "Transactions card, no matches",
+  render: () => <TransactionsSection title="Transactions" rows={repeatVendor} />,
+  parameters: { initialEntries: ["/?q=nothing-like-this"] },
+};
+
 export const TransactionsEmpty: Story = {
   render: () => <TransactionTable rows={[]} />,
 };

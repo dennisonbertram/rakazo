@@ -92,6 +92,29 @@ export async function roundIdForStage(
   return open?.id ?? null;
 }
 
+export const contactPhotoPath = (email: string) =>
+  `/api/contacts/photo?email=${encodeURIComponent(email)}`;
+
+/** Adds `photoUrl` to the contacts whose email has a stored photo of this user's. */
+export async function withContactPhotos<T extends Contact>(
+  prisma: Pick<PrismaClient, "contactPhoto">,
+  actor: Scope,
+  contacts: T[],
+): Promise<T[]> {
+  const emails = [...new Set(contacts.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])))];
+  if (emails.length === 0) return contacts;
+  const rows = await prisma.contactPhoto.findMany({
+    where: { ...ownerOf(actor), email: { in: emails } },
+    select: { email: true },
+  });
+  const have = new Set(rows.map((row) => row.email));
+  return contacts.map((c) =>
+    c.email && have.has(c.email.toLowerCase())
+      ? { ...c, photoUrl: contactPhotoPath(c.email.toLowerCase()) }
+      : c,
+  );
+}
+
 /**
  * Updates the contact with `id`, keeping omitted fields; without `id`, creates one.
  * Throws IsolationError for an `id` that is not the user's.

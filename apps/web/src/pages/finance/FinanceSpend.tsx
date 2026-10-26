@@ -145,7 +145,7 @@ export function FinanceSpendPage({
               </Chip>
             ))}
           </div>
-          <TransactionsSection rows={data.transactions} />
+          <TransactionsSection rows={data.transactions} fixedCategory={category !== null} />
         </>
       ) : null}
     </DetailPage>
@@ -242,7 +242,7 @@ export function FinanceCategoryPage({ slug, window }: { slug: string; window?: C
             </Section>
           )}
           {/* The headline card above already names the window. */}
-          <TransactionsSection rows={data.recent} />
+          <TransactionsSection rows={data.recent} fixedCategory />
         </>
       ) : null}
     </DetailPage>
