@@ -101,6 +101,7 @@ import {
   renderPageChartSvg,
   replaceComputer,
   requestAccountExport,
+  requestContactPhotos,
   resolveAutoReviewChecker,
   resolveBotUploadPath,
   resolveBotWorkspaceCwd,
@@ -350,6 +351,7 @@ import {
   updateNotificationPreferences,
   upsertCheckInRoutine,
   watchLimitError,
+  withContactPhotos,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { createAgentSkillsService } from "./agent-skills.js";
@@ -1373,6 +1375,14 @@ export function createRouter(deps: RouterDeps) {
     prisma: deps.prisma,
     mcpOAuth,
     ...(deps.safeCallToolFor ? { safeCallToolFor: deps.safeCallToolFor } : {}),
+  };
+  // A failed enqueue only delays the photos to the next visit, so it must not fail the page.
+  const queueContactPhotos = (scope: { spaceId: string; userId: string }) => {
+    requestContactPhotos({ prisma: deps.prisma, jobs: deps.jobs }, scope).catch((error) =>
+      getLogger().warn("contact photos enqueue failed", {
+        reason: error instanceof Error ? error.name : "error",
+      }),
+    );
   };
   const financeDeps = {
     prisma: deps.prisma,
@@ -8224,12 +8234,18 @@ export function createRouter(deps: RouterDeps) {
       ),
     },
     contacts: {
-      list: authed.contacts.list.handler(({ context, input }) =>
-        listContacts(deps.prisma, actorScope(context.actor), input),
-      ),
-      detail: authed.contacts.detail.handler(({ context, input }) =>
-        contactDetail(deps.prisma, actorScope(context.actor), input.id).catch(contactNotFound),
-      ),
+      list: authed.contacts.list.handler(async ({ context, input }) => {
+        const scope = actorScope(context.actor);
+        queueContactPhotos(scope);
+        return withContactPhotos(deps.prisma, scope, await listContacts(deps.prisma, scope, input));
+      }),
+      detail: authed.contacts.detail.handler(async ({ context, input }) => {
+        const scope = actorScope(context.actor);
+        queueContactPhotos(scope);
+        const detail = await contactDetail(deps.prisma, scope, input.id).catch(contactNotFound);
+        const [contact] = await withContactPhotos(deps.prisma, scope, [detail.contact]);
+        return { ...detail, contact: contact! };
+      }),
       save: authed.contacts.save.handler(({ context, input }) =>
         saveContact(deps.prisma, actorScope(context.actor), input).catch(contactNotFound),
       ),
