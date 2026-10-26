@@ -229,6 +229,9 @@ export function AskCard({
           {block.detail.trim()}
         </p>
       ) : null}
+      {block.approvalReason ? (
+        <p className="mt-2 text-[13px] text-muted-foreground">{block.approvalReason}</p>
+      ) : null}
       {block.status === "answered" ? (
         (() => {
           const outcome = approvalActions?.find((action) => action.id === block.answer)?.outcome;

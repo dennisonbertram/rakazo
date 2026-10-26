@@ -887,10 +887,6 @@ msgstr ""
 msgid "Action"
 msgstr ""
 
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Action confirmations"
-msgstr "İşlem onayları"
-
 #: src/components/investors/ActionItems.tsx
 msgid "Action items"
 msgstr ""
@@ -1260,31 +1256,18 @@ msgid "All time"
 msgstr ""
 
 #: src/components/AiDataSharing.tsx
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
 #: src/components/AskCard.tsx
 #: src/pages/shell/composer-error.tsx
 msgid "Allow"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} actions without asking"
-msgstr "{0} işlemlerine sormadan izin ver"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} connector without asking"
-msgstr "{0} bağlayıcısına sormadan izin ver"
 
 #. placeholder {0}: source.label
 #. placeholder {1}: current?.recipient?.name ?? "model"
 #: src/pages/CompanyImport.tsx
 msgid "Allow {0} to {1}"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow {0} without asking"
-msgstr "{0} için sormadan izin ver"
 
 #: src/pages/Shell.tsx
 msgid "Allow access on the page to ask"
@@ -1312,10 +1295,6 @@ msgstr ""
 msgid "Allow changes in {service}?"
 msgstr ""
 
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow email actions without asking"
-msgstr "E-posta işlemlerine sormadan izin ver"
-
 #: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "Bir kez izin ver"
@@ -1323,10 +1302,6 @@ msgstr "Bir kez izin ver"
 #: src/components/integrations/SignInStep.tsx
 msgid "Allow pop-ups for this site, or open the sign-in page directly."
 msgstr ""
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Allow purchase actions without asking"
-msgstr "Satın alma işlemlerine sormadan izin ver"
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Allow writing"
@@ -1521,6 +1496,11 @@ msgstr ""
 msgid "Approval boundaries"
 msgstr "Onay sınırları"
 
+#: src/components/ApprovalRulesSettings.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "Approvals"
+msgstr ""
+
 #: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -1647,6 +1627,8 @@ msgstr ""
 msgid "Artifacts"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
 #: src/components/AskBotButton.tsx
 msgid "Ask"
 msgstr ""
@@ -1679,37 +1661,6 @@ msgstr ""
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Ask agent about {name}"
 msgstr ""
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0}"
-msgstr "{0} öncesinde sor"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0} actions"
-msgstr "{0} işlemlerinden önce sor"
-
-#. placeholder {0}: rule.matchValue
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before {0} connector"
-msgstr "{0} bağlayıcısından önce sor"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before email actions"
-msgstr "E-posta işlemlerinden önce sor"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before purchase actions"
-msgstr "Satın alma işlemlerinden önce sor"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before purchases"
-msgstr "Satın almadan önce sor"
-
-#: src/components/ApprovalRulesSettings.tsx
-msgid "Ask before sending external email"
-msgstr "Dışarıya e-posta göndermeden önce sor"
 
 #: src/components/tour/FirstRunTour.tsx
 msgid "Ask Chief"
@@ -1943,6 +1894,10 @@ msgstr ""
 msgid "Back to sign in"
 msgstr "Oturum açmaya geri dön"
 
+#: src/components/ApprovalRulesSettings.tsx
+msgid "Background runs always ask before they send, change or run anything."
+msgstr ""
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Backup models"
 msgstr "Yedek modeller"
@@ -2021,6 +1976,11 @@ msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Bills"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+#: src/components/ApprovalRulesSettings.tsx
+msgid "Block"
 msgstr ""
 
 #: src/lib/ticket-status.ts
@@ -2204,6 +2164,10 @@ msgstr ""
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/Gtm.tsx
 msgid "Calendar"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Calendar changes"
 msgstr ""
 
 #: src/pages/shell/composer.tsx
@@ -3255,6 +3219,10 @@ msgstr "{0} bağlandı."
 msgid "Connected and using {0}."
 msgstr "Bağlandı, {0} kullanılıyor."
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Connected apps (write)"
+msgstr ""
+
 #: src/pages/CompanyRefresh.tsx
 msgid "Connected Data Room sources require manual re-import."
 msgstr ""
@@ -3667,6 +3635,10 @@ msgstr ""
 msgid "Could not load approval rules"
 msgstr "Onay kuralları yüklenemedi"
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Could not load approvals"
+msgstr ""
+
 #: src/pages/Artifacts.tsx
 msgid "Could not load artifacts."
 msgstr ""
@@ -3946,6 +3918,10 @@ msgstr ""
 #: src/pages/shell/bot-panel.tsx
 msgid "Could not save"
 msgstr "Kaydedilemedi"
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Could not save approvals"
+msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Could not save backup models"
@@ -4524,6 +4500,10 @@ msgstr ""
 msgid "Delete chart"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Delete data"
+msgstr ""
+
 #: src/components/sidebar-folders/FolderHeader.tsx
 msgid "Delete folder"
 msgstr ""
@@ -5048,6 +5028,10 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 msgid "Edit contact"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Edit files and run commands"
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -7127,6 +7111,10 @@ msgstr ""
 msgid "Message from {peer}"
 msgstr "{peer} botundan mesaj"
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Message people outside Praci"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Message the board"
 msgstr ""
@@ -7288,6 +7276,10 @@ msgstr ""
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "More {0} actions"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "More actions"
 msgstr ""
 
 #. placeholder {0}: attachment.filename
@@ -10092,6 +10084,10 @@ msgstr ""
 msgid "SAFEs, if converted at cap"
 msgstr ""
 
+#: src/components/ApprovalActionsTable.tsx
+msgid "Same as all bots"
+msgstr ""
+
 #: src/pages/CompanyReview.tsx
 msgid "Same person?"
 msgstr ""
@@ -10529,6 +10525,10 @@ msgstr ""
 #: src/components/AccountAccess.tsx
 msgid "Send deletion code"
 msgstr "Silme kodu gönder"
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Send email"
+msgstr ""
 
 #: src/components/AiDataSharing.tsx
 msgid "Send files and contracts"
@@ -11157,6 +11157,10 @@ msgstr "Konuşma modeli"
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Spend"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Spend money"
 msgstr ""
 
 #: src/lib/slash-skills.ts
@@ -12524,6 +12528,14 @@ msgstr ""
 
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Use Protected input for passwords."
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Use saved credentials"
+msgstr ""
+
+#: src/components/ApprovalActionsTable.tsx
+msgid "Use the computer"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx

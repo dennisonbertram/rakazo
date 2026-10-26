@@ -233,6 +233,7 @@ import {
   replaceCompletedExternalEffectResult,
   resolveDuplicateEffectGate,
   settleUncertainEffect,
+  unattendedEndedToolResult,
   uncertainEffectResult,
 } from "./approval-effect.js";
 import {
@@ -617,6 +618,9 @@ const NO_FRAGMENT_TOOLS = new Set([
   "show_image",
   "render_plot",
 ]);
+
+/** Final note of an unattended run that stopped because it needs the owner. */
+const UNATTENDED_NEEDS_OWNER_NOTE = "Stopped. I sent you a note about what I need.";
 
 export const READ_ONLY_AGENT_TOOLS = new Set([
   "imessage_list_conversations",
@@ -3332,6 +3336,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let unchangedVisualStreak: UnchangedVisualStreak = { count: 0 };
         let terminalCheckpointComplete = false;
         let approvalPausePending = false;
+        // An unattended run asked for the owner; it ends with a short note instead of pausing.
+        let unattendedNeedsOwner = false;
         /** The one consent card of this run attempt, shared by parallel mail calls. */
         let consentAsk: Promise<unknown> | undefined;
         let handedOff = false;
@@ -3569,6 +3575,34 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (name === GTM_POST_TOOL) {
             if (!offeredToolNames.has(name)) {
               return { error: `Tool ${name} is not available to this bot.` };
+            }
+            // This branch returns before the common gate, so a Block rule is checked here too.
+            const blockedGtm = resolveActionApprovalDetail({
+              toolName: name,
+              viaConnector: false,
+              rules: await loadApprovalRules(),
+              botId: bot.id,
+            });
+            if (blockedGtm.decision === "block") {
+              try {
+                await deps.events.append({
+                  spaceId: run.spaceId,
+                  threadId: thread.id,
+                  botId: bot.id,
+                  runId: run.id,
+                  type: "approval.decided",
+                  payload: {
+                    tool: name,
+                    decision: "block",
+                    source: "block",
+                    unattended: run.unattended === true,
+                    tainted: run.externalTaint === true || externalTaint(),
+                  },
+                });
+              } catch (error) {
+                getLogger().warn("approval decision not recorded", { runId: run.id, error });
+              }
+              return { error: BLOCKED_ACTION_MESSAGE };
             }
             const parsed = GtmPostInputSchema.safeParse(args);
             if (!parsed.success) return { error: "Invalid approved-post input." };
@@ -4020,10 +4054,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               botId: bot.id,
               threadId: thread.id,
             });
-            return {
-              error:
-                "The user is not here to answer. Do not ask again; finish what you can without it and say what is missing.",
-            };
+            unattendedNeedsOwner = true;
+            return unattendedEndedToolResult();
           }
           // Only a repeating schedule asks; a one-off reminder fires once and stays free.
           const scheduleScope = {
@@ -4138,8 +4170,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ? approvalEffectKey(runId, replayEffectToolName, args)
               : toolEffectIdempotencyKey(runId, replayEffectToolName, args, occurrence);
           // Connector read-only hints must not bypass approval, review, or replay decisions.
+          // A read-only built-in skips the effect only when it simply runs; an ask needs the
+          // effect so the card can be shown and later approved.
           const applied =
-            READ_ONLY_AGENT_TOOLS.has(name) && !meetingTaintedCall && !externalTaintedCall
+            READ_ONLY_AGENT_TOOLS.has(name) &&
+            !meetingTaintedCall &&
+            !externalTaintedCall &&
+            plan !== "ask" &&
+            plan !== "judge"
               ? undefined
               : await recordEffect(
                   deps,
@@ -4333,11 +4371,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           const bypassApproval = gateDecision === "allow" && requiresApprovalByDefault;
           let claimedEffect = false;
-          if (
-            applied &&
-            READ_ONLY_AGENT_TOOLS.has(name) &&
-            (meetingTaintedCall || externalTaintedCall)
-          ) {
+          if (applied && READ_ONLY_AGENT_TOOLS.has(name)) {
             settleReadEffect.set(executionId, (result) =>
               completeEffect(
                 deps,
@@ -4460,9 +4494,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? undefined
                 : await resolveMoneyNames(callRoute?.toolName ?? name, args, readApprovalName);
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
-              reviewReason: externalTaintedCall
-                ? [EXTERNAL_REQUEST_REASON, reviewReason].filter(Boolean).join("\n")
-                : reviewReason,
+              // The card's reason line already says "Requested by an external bot".
+              reviewReason:
+                externalTaintedCall && approvalCardReason !== EXTERNAL_REQUEST_REASON
+                  ? [EXTERNAL_REQUEST_REASON, reviewReason].filter(Boolean).join("\n")
+                  : reviewReason,
               fullMail: isCartaMailSend(bot.spawnKey, name),
               fullCompany:
                 (name === "company_fact_upsert" || name === "company_import_start") &&
@@ -7411,6 +7447,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
               history: runtimeHistory,
               currentTurnImages,
               tools,
+              // pi-runtime starts helpers itself, before the approval gate: apply the Block rules
+              // and the outside-content mark here. Child tools still pass the gate one by one.
+              subagentDenial: async () => {
+                if (
+                  run.externalTaint === true ||
+                  externalTaint() ||
+                  (!meetingAgent && (meetingTaint || (await threadMarkedNow())))
+                ) {
+                  return "Helpers are not available in a run that read outside content.";
+                }
+                const blocked = resolveActionApprovalDetail({
+                  toolName: "run_subagent",
+                  viaConnector: false,
+                  rules: await loadApprovalRules(),
+                  botId: bot.id,
+                });
+                return blocked.decision === "block" ? BLOCKED_ACTION_MESSAGE : undefined;
+              },
               ...(companyImporter
                 ? {
                     subagentToolNames: new Set([
@@ -7704,6 +7758,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ...(event.activity ? { activity: true } : {}),
                 },
               });
+            } else if (event.type === "ask" && run.unattended) {
+              // Nobody is watching: tell the owner the question and end, instead of pausing.
+              unattendedNeedsOwner = true;
+              await notifyRun(deps, run, {
+                kind: "help",
+                title: `${bot.name} needs an answer`,
+                body: redactSecrets(event.text, runSecrets),
+                botId: bot.id,
+                threadId: thread.id,
+              });
             } else if (event.type === "ask") {
               if (!(await renew())) return;
               const safeText = redactSecrets(event.text, runSecrets);
@@ -7745,6 +7809,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
               return;
             } else if (event.type === "takeover" && run.unattended) {
+              unattendedNeedsOwner = true;
               // Nobody is watching: tell the owner instead of pausing on a card no one sees.
               await notifyRun(deps, run, {
                 kind: "help",
@@ -8038,6 +8103,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           await workspaceCheckpoint.flush();
           terminalCheckpointComplete = true;
 
+          if (unattendedNeedsOwner && !assembled.trim()) {
+            assembled = UNATTENDED_NEEDS_OWNER_NOTE;
+            messageSegments = [...messageSegments, { kind: "text", text: assembled }];
+          }
           flushPendingTools();
           // Only routine runs are instructed to emit NO_RESPONSE. Other
           // allowSilentEmpty wakes (FYI, messaging) may finish truly empty.

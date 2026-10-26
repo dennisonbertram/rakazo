@@ -35,6 +35,7 @@ import {
 import { ModelPicker } from "@rakazo/ui-web/components/ui/model-picker";
 import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { ApprovalActionsTable } from "../../components/ApprovalActionsTable";
 import { SuccessPop } from "../../components/ai/primitives";
 import { ErrorBoundary, SectionLoadFailed } from "../../components/ErrorBoundary";
 import { RunsOnPicker } from "../../components/RunsOnPicker";
@@ -712,6 +713,12 @@ export function BotSettings({
             refreshKey={skillsRefreshKey}
             onSkillsChange={onSkillsChange}
           />
+          <section data-testid="bot-approvals" className="mt-6">
+            <div className="mb-2 text-[13.5px] font-medium text-foreground">
+              <Trans>Approvals</Trans>
+            </div>
+            <ApprovalActionsTable botId={bot.id} />
+          </section>
           <details
             data-testid="bot-settings-advanced"
             className="group mt-5 open:pb-3"
