@@ -313,3 +313,45 @@ export const MailApprovalThenMessage: Story = {
     </div>
   ),
 };
+
+const sentMailMessage = (): ThreadMessage => ({
+  ...message(1, "bot", ""),
+  blocks: [
+    {
+      kind: "ask",
+      text: "Send this email?",
+      status: "answered",
+      answer: "allow",
+      mail: {
+        tool: "mail_send",
+        account: "me@example.test",
+        to: ["sam@example.test"],
+        cc: [],
+        bcc: [],
+        subject: "Re: Sample update",
+        body: "Hi Sam, here is the sample update.",
+        outcome: "sent",
+      },
+    },
+  ],
+});
+
+const SentMailThenWorking = ({ width }: { width: number }) => (
+  <div className="h-[420px]" style={{ width }}>
+    <Transcript
+      {...baseProps}
+      running
+      workingBots={[{ botId: "bot_demo", name: "Ada", color: "#888888" }]}
+      messages={[sentMailMessage()]}
+      lastReadSeq={1}
+    />
+  </div>
+);
+
+/** Hovering a sent mail card: its rail ends above the bot's working row. */
+export const SentMailThenWorkingWide: Story = { render: () => <SentMailThenWorking width={760} /> };
+
+/** The same in a narrow transcript, such as the Inbox agent panel. */
+export const SentMailThenWorkingNarrow: Story = {
+  render: () => <SentMailThenWorking width={360} />,
+};
