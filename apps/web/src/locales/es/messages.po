@@ -967,6 +967,10 @@ msgstr ""
 msgid "Add a model"
 msgstr ""
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add a name."
+msgstr ""
+
 #: src/components/gtm/EmailItemCard.tsx
 msgid "Add a postal address"
 msgstr ""
@@ -1092,6 +1096,26 @@ msgstr ""
 
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Add skill"
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the header name."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the site and the value."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the username and password."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the username."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Add the value."
 msgstr ""
 
 #: src/components/inbox/MailAttachments.tsx
@@ -1838,10 +1862,6 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 msgid "Available after the routine is saved"
 msgstr "Disponible después de guardar la rutina"
-
-#: src/pages/shell/bot-credentials.tsx
-msgid "Available to this bot's shell commands as {commandVariable}"
-msgstr "Disponible para los comandos de shell de este bot como {commandVariable}"
 
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Avatar Studio"
@@ -7400,6 +7420,10 @@ msgstr ""
 msgid "Needs approval"
 msgstr ""
 
+#: src/pages/shell/bot-credentials.tsx
+msgid "Needs attention"
+msgstr ""
+
 #: src/lib/devin-format.ts
 msgid "Needs input"
 msgstr "Necesita entrada"
@@ -8075,6 +8099,10 @@ msgstr ""
 
 #: src/components/data-room/Preview.tsx
 msgid "Not tagged. Praci can't read your documents."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "Not used yet"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx
@@ -11544,6 +11572,14 @@ msgstr ""
 msgid "The API did not come back. Refresh this page."
 msgstr "La API no volvió. Actualiza esta página."
 
+#: src/components/AskCard.tsx
+msgid "The bot can read this value."
+msgstr ""
+
+#: src/pages/shell/bot-credentials.tsx
+msgid "The bot can read this value. Shell commands get it as {commandVariable}."
+msgstr "El bot puede leer este valor. Los comandos de shell lo reciben como {commandVariable}."
+
 #: src/pages/shell/bot-pins.tsx
 msgid "The bot changed this list. Your last edit wasn't saved."
 msgstr ""
@@ -12516,6 +12552,11 @@ msgstr ""
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Use your own key"
 msgstr "Usar tu propia clave"
+
+#. placeholder {0}: formatRelativeTime(secret.lastUsedAt)
+#: src/pages/shell/bot-credentials.tsx
+msgid "Used {0}"
+msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationAgentSection.tsx

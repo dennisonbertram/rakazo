@@ -1832,6 +1832,10 @@ model BotSecret {
   ciphertext String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  // Stamped on each successful use (secret_request, login fill). Not a counter.
+  lastUsedAt DateTime?
+  // Set when the saved origin answered 401/403; cleared on a later success or on replace.
+  needsAttentionAt DateTime?
 
   @@unique([userId, spaceId, botId, name])
   @@index([botId])

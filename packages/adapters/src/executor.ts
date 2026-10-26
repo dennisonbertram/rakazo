@@ -5789,7 +5789,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       });
                       if ("error" in resolved) return resolved;
                       registerRunSecrets(resolved.redactions);
-                      return { text: resolved.text, origin: resolved.origin };
+                      return {
+                        text: resolved.text,
+                        origin: resolved.origin,
+                        markUsed: resolved.markUsed,
+                      };
                     },
                   });
               unchangedVisualStreak = unchangedVisualStreakAfterPageBrowser(
