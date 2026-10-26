@@ -57,6 +57,7 @@ import {
 } from "./executor.js";
 import { UnavailableModelForAuthError } from "./model-selection.js";
 import { RetiredModelCredentialError, serializeModelSecret } from "./pi-oauth.js";
+import { UI_BLOCKS_GUIDANCE } from "./ui-blocks-tool.js";
 
 const gtmAgentBuiltinToolSet = new Set<string>(GTM_AGENT_BUILTIN_TOOLS);
 
@@ -2699,6 +2700,7 @@ describe("userTurnInstructions", () => {
   const stableTail = [
     "Use read_spreadsheet for Excel (.xlsx, .xlsm) and CSV files, and cite the sheet name and cells (for example Revenue!B4:B9) for every figure you quote.",
     "For a dashboard, summary, report or table, call create_ui_artifact (read-only cards, metrics, tables, lists and charts that follow the app's look). Use an HTML page with attach_file only when you need a free-form page it cannot express.",
+    UI_BLOCKS_GUIDANCE,
     "To show the user an image, call show_image; never paste image URLs.",
     'For charts and data visualization, use the render_plot tool: it renders bar, line, scatter, histogram, heatmap, faceted and many more chart types from a JSON spec and attaches the PNG to the chat. Call render_plot with {"help": true} before your first chart to read the full guide.',
     'You have one persistent page. Put durable output the user will revisit there (a summary, tracker, or dashboard); keep ordinary replies in chat. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order.',

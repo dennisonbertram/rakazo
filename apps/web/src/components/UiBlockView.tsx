@@ -124,7 +124,7 @@ export function UiBlockView({ block, onNavigate }: Props) {
       break;
     case "stats":
       content = (
-        <dl className="grid grid-cols-2 gap-2 @md:grid-cols-3">
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {block.stats.map((stat, i) => (
             <div
               key={i}
@@ -142,7 +142,7 @@ export function UiBlockView({ block, onNavigate }: Props) {
       break;
     case "cards":
       content = (
-        <ul className="grid gap-2 @md:grid-cols-2">
+        <ul className="grid gap-2 sm:grid-cols-2">
           {block.cards.map((card, i) => {
             const external = card.href?.startsWith("https://");
             return (
@@ -199,7 +199,7 @@ export function UiBlockView({ block, onNavigate }: Props) {
     }
   }
   return (
-    <div data-testid="ui-block" className="@container w-full max-w-2xl min-w-0 py-1">
+    <div data-testid="ui-block" className="w-full max-w-2xl min-w-0 py-1">
       {content}
     </div>
   );
