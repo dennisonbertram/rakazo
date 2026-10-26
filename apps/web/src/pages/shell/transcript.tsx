@@ -1889,6 +1889,10 @@ const MessageView = memo(function MessageView({
                   answer={block.answer}
                   canAnswer={canAnswer}
                   botName={botToolControls?.editableBotName(message.botId)}
+                  canSend={botToolControls?.canSend(message.botId) ?? false}
+                  onSendDraft={
+                    botToolControls ? () => botToolControls.sendDraft(message) : undefined
+                  }
                   onAnswer={(text, username, mail) => onAnswer(message, text, username, mail)}
                   onOpenComposer={
                     botToolControls

@@ -110,6 +110,15 @@ export function EmailAgentPanel({
     () => ({
       editableBotName: (id: string | undefined) => outer?.editableBotName(id),
       disableTool: async (id: string, tool: string) => outer?.disableTool(id, tool),
+      canSend: (id: string | undefined) => outer?.canSend(id) ?? false,
+      sendDraft: async (message: { id: string; runId?: string | null }) => {
+        await rpc.threads.sendDraft({
+          botId: bot.id,
+          runId: message.runId ?? "",
+          messageId: message.id,
+        });
+        await load();
+      },
       openComposer: (failed: ComposerDraft) => onReplyWithDraft(failed.body, failed),
     }),
     [outer, onReplyWithDraft],

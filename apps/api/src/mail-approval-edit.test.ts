@@ -15,7 +15,12 @@ const stored = {
 
 /** A stand-in for the database's atomic claim: only one answer moves an "intended" effect. */
 function setup(
-  options: { kind?: "mail_send" | "mail_draft"; request?: object; write?: boolean } = {},
+  options: {
+    kind?: "mail_send" | "mail_draft";
+    request?: object;
+    write?: boolean;
+    disabledTools?: string[];
+  } = {},
 ) {
   const effect = { status: "intended", result: undefined as unknown };
   const answers: Array<{ answer: string; mailDenial?: unknown }> = [];
@@ -46,7 +51,15 @@ function setup(
     events,
     mailWritesDisabled: options.write === false,
     mail: { listAccounts: async () => [{ id: "conn-1", address: "me@example.test" }] },
-    prisma: { cachedMailMessage: { findFirst: async () => null } },
+    prisma: {
+      cachedMailMessage: { findFirst: async () => null },
+      run: {
+        findFirst: async (args: { where: { userId: string } }) =>
+          args.where.userId === "user-1"
+            ? { bot: { disabledBuiltinTools: options.disabledTools ?? [] } }
+            : null,
+      },
+    },
   } as unknown as MailApprovalEditDeps;
   const sent: ComposeFields[] = [];
   const saved: ComposeFields[] = [];
@@ -186,6 +199,61 @@ describe("answerEditedMailApproval", () => {
     expect(t.compose.draftSave).toHaveBeenCalledTimes(1);
     expect(t.compose.send).not.toHaveBeenCalled();
     expect(t.outcomes).toEqual(["saved"]);
+  });
+
+  it("sends a draft now: one send, not a draft save, and the card becomes a sent email", async () => {
+    const t = setup({ kind: "mail_draft" });
+    await t.edit({ send: true });
+    expect(t.compose.send).toHaveBeenCalledTimes(1);
+    expect(t.compose.draftSave).not.toHaveBeenCalled();
+    expect(t.sent[0]).toMatchObject({ clientId: "approval_effect-1", connectionId: "conn-1" });
+    expect(t.outcomes).toEqual(["sent"]);
+    expect(t.effect.status).toBe("denied");
+    expect(t.answers[0]?.mailDenial).toMatchObject({ mail: { tool: "mail_send" } });
+    expect(t.answers[0]?.mailDenial).toMatchObject({
+      note: expect.stringContaining("check Sent"),
+    });
+    // A repeat of the same click finds the call already claimed.
+    expect(await code(t.edit({ send: true }))).toBe("CONFLICT");
+    expect(t.compose.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the agent the person sent it, not edited it, when Send now changed nothing", async () => {
+    const plain = setup({ kind: "mail_draft" });
+    await plain.edit({ send: true });
+    expect((plain.effect.result as { note: string }).note).toBe(
+      "The user sent this email themselves from the approval card. Do not send it again.",
+    );
+    expect(plain.answers[0]?.mailDenial).toMatchObject({
+      note: expect.not.stringContaining("edited"),
+    });
+    const changed = setup({ kind: "mail_draft" });
+    await changed.edit({ send: true, subject: "Monday" });
+    expect((changed.effect.result as { note: string }).note).toContain("edited this email");
+  });
+
+  it("sends a draft now with the person's edits and records an unclear outcome", async () => {
+    const t = setup({ kind: "mail_draft" });
+    t.compose.send.mockResolvedValueOnce({ status: "unknown" } as never);
+    await t.edit({ send: true, subject: "Monday" });
+    expect(t.sent).toHaveLength(0);
+    expect(t.compose.send.mock.calls[0]?.[2]).toMatchObject({ subject: "Monday" });
+    expect(t.outcomes).toEqual(["unknown"]);
+    expect((t.effect.result as { note: string }).note).toContain("Do not send it again");
+  });
+
+  it("does not send a draft now when sending is off for the bot or mail writes are off", async () => {
+    const off = setup({ kind: "mail_draft", disabledTools: ["mail_send"] });
+    expect(await code(off.edit({ send: true }))).toBe("PRECONDITION_FAILED");
+    const writes = setup({ kind: "mail_draft", write: false });
+    expect(await code(writes.edit({ send: true }))).toBe("PRECONDITION_FAILED");
+    // Saving the draft is still allowed while sending is off.
+    await off.edit({ subject: "Monday" });
+    expect(off.compose.draftSave).toHaveBeenCalledTimes(1);
+    for (const t of [writes]) {
+      expect(t.effect.status).toBe("intended");
+      expect(t.compose.send).not.toHaveBeenCalled();
+    }
   });
 
   it("does not send again when the same answer is repeated", async () => {

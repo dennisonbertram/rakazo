@@ -517,6 +517,7 @@ import {
   legalUpdateDeadline,
 } from "./legal.js";
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
+import { sendSavedMailDraft } from "./mail-draft-send.js";
 import {
   dismissMcpServerApprovals,
   resolveMcpApprovalCards,
@@ -3221,6 +3222,15 @@ export function createRouter(deps: RouterDeps) {
           getLogger().error("call end enqueue", error);
         });
         return { ok: true as const };
+      }),
+      sendDraft: authed.threads.sendDraft.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return sendSavedMailDraft(
+          { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
+          context.actor,
+          target,
+          input,
+        );
       }),
       answer: authed.threads.answer.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
