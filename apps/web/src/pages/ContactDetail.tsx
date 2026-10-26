@@ -2,7 +2,7 @@ import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { Contact, ContactDetail } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import { Button, ContactAvatar } from "@rakazo/ui-web";
 import { Pencil } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -108,8 +108,12 @@ export function ContactDetailPage({ id, spaceName }: { id: string; spaceName?: s
       <div className={`${PAGE_GUTTER_X} pt-2`}>
         <PageHeader
           className="max-sm:[&_[data-page-header-meta]]:hidden"
-          // A flex row so the shared Avatar can sit before the name.
-          title={<span className="flex min-w-0 items-center gap-3">{contact?.name ?? ""}</span>}
+          title={
+            <span className="flex min-w-0 items-center gap-3">
+              {contact ? <ContactAvatar name={contact.name} size="lg" /> : null}
+              <span className="truncate">{contact?.name ?? ""}</span>
+            </span>
+          }
           spaceName={spaceName}
           onBack={back}
           actions={
