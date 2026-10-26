@@ -186,4 +186,33 @@ describe("calendarAgenda", () => {
     });
     expect(prisma.routine.findMany.mock.calls[0]?.[0].where.watch).toBeDefined();
   });
+
+  it("returns the local items without waiting for a hanging Google account, then reports it", async () => {
+    const { deps, request } = setup(() => ({}));
+    request.mockImplementation(() => new Promise(() => {}));
+    const google = { accounts: [accountA], context };
+    const local = await calendarAgenda(deps, scope, range, google, { sources: "local" });
+    expect(request).not.toHaveBeenCalled();
+    expect(local.items).toHaveLength(4);
+    expect(local.googleConnected).toBe(true);
+    const remote = await calendarAgenda(deps, scope, range, google, {
+      sources: "google",
+      accountTimeoutMs: 20,
+    });
+    expect(remote.items).toEqual([]);
+    expect(remote.errors).toEqual([{ account: "Work", message: "Couldn't load Work" }]);
+  });
+
+  it("follows calendarList pages", async () => {
+    const { deps, request } = setup((url) =>
+      url.includes("calendarList")
+        ? url.includes("pageToken=p2")
+          ? { items: [{ id: "second", selected: true }] }
+          : { items: [{ id: "primary", selected: true }], nextPageToken: "p2" }
+        : { items: [] },
+    );
+    await calendarAgenda(deps, scope, range, { accounts: [accountA], context });
+    const urls = request.mock.calls.map(([call]) => call.url);
+    expect(urls.some((u) => u.includes("/calendars/second/events"))).toBe(true);
+  });
 });
