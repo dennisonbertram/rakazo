@@ -11,7 +11,7 @@ export function ScratchpadItemMeta({
   item,
   now = new Date(),
 }: {
-  item: ScratchpadItem;
+  item: Pick<ScratchpadItem, "waitingOn" | "dueAt">;
   now?: Date;
 }) {
   const { t, i18n } = useLingui();

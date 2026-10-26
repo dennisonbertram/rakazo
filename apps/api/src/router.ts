@@ -150,7 +150,6 @@ import type {
 import {
   ATTACHMENT_MAX_BYTES,
   actorScope,
-  isShareableArtifactMimeType,
   BotSecretAuth,
   botAudienceEditable,
   ComputerCommandSchema,
@@ -176,6 +175,7 @@ import {
   isLegalAgentSpawnKey,
   isMailThreadAgentSpawnKey,
   isRetiredVoiceAgentSpawnKey,
+  isShareableArtifactMimeType,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
   NOTIFICATION_HEARTBEAT_ID,
@@ -214,9 +214,6 @@ import {
   approvalTable,
   assignSafe,
   autoGroupSidebar,
-  createArtifactShare,
-  getArtifactShare,
-  revokeArtifactShare,
   BotSectionNameConflictError,
   CannotDeleteDefaultSpaceError,
   CannotDeleteLastSpaceError,
@@ -233,6 +230,7 @@ import {
   closeRound,
   companyForActor,
   companyWriter,
+  createArtifactShare,
   createExternalConversationRepos,
   createGroupRepos,
   createRepos,
@@ -254,6 +252,7 @@ import {
   findSpaceMemoryConfig,
   findTicket,
   formatMessagingLinkCode,
+  getArtifactShare,
   getAuditRequest,
   getCapTableSnapshot,
   getCheckInCadence,
@@ -279,6 +278,7 @@ import {
   listSidebarPages,
   listSpaceBackupModels,
   listTicketComments,
+  listWaitingOnYouItems,
   lockOwnedGroup,
   markInvestorUpdateDelivered,
   markSafe,
@@ -309,6 +309,7 @@ import {
   restoreBotUnderComputerQuota,
   restoreSidebar,
   resumeWatch,
+  revokeArtifactShare,
   revokePortal,
   SafeActiveError,
   SafeCapRequiredError,
@@ -337,9 +338,9 @@ import {
   toTicketCommentDto,
   toTicketDto,
   touchGroupUpdatedAt,
+  UnshareableArtifactError,
   unassignSafe,
   unblockPortal,
-  UnshareableArtifactError,
   undoCapTableSource,
   unseenBotKinds,
   unseenCounts,
@@ -4619,6 +4620,20 @@ export function createRouter(deps: RouterDeps) {
       }),
     },
     scratchpad: {
+      waitingOnYou: authed.scratchpad.waitingOnYou.handler(async ({ context }) => {
+        const items = await listWaitingOnYouItems(deps.prisma, {
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+        });
+        return items.map((item) => ({
+          id: item.id,
+          botId: item.botId,
+          botName: item.botName,
+          title: item.title,
+          waitingOn: item.waitingOn,
+          dueAt: item.dueAt?.toISOString() ?? null,
+        }));
+      }),
       list: authed.scratchpad.list.handler(async ({ context, input }) => {
         await repos.getBot(context.actor, input.botId);
         return listScratchpadItems(

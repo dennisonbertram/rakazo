@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 293 of 293
-- Web and shared components: 758
+- Web and shared components: 759
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -316,7 +316,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
 | GeneralSettingsPanels, PrivacySettingsPanels, UsageSettingsPanel, ComputerSettingsPanel, UpdatesSettingsPanel, ChangePasswordSection, SettingsPasswordInput, AppearancePicker, TimezonePicker, UiLocalePicker | [apps/web/src/pages/AccountSettingsOverlay.tsx](../../apps/web/src/pages/AccountSettingsOverlay.tsx) | [AccountSettingsOverlay.stories.tsx](../../apps/web/src/pages/AccountSettingsOverlay.stories.tsx) | web |
-| ActivityList, ActivitySection, ActivityError, ActivityFilters, FilterChip, ActivityRow | [apps/web/src/pages/ActivityList.tsx](../../apps/web/src/pages/ActivityList.tsx) | [ActivityList.stories.tsx](../../apps/web/src/pages/ActivityList.stories.tsx) | web |
+| ActivityList, ActivitySection, ActivityError, ActivityFilters, FilterChip, WaitingRow, ActivityRow | [apps/web/src/pages/ActivityList.tsx](../../apps/web/src/pages/ActivityList.tsx) | [ActivityList.stories.tsx](../../apps/web/src/pages/ActivityList.stories.tsx) | web |
 | ArtifactsPage, BrowsingPane, ArtifactTable, LoadMoreButton, EmptyArtifacts, IndexPane, ArtifactCard, ArtifactRow, ArtifactMimeIcon, PreviewPane | [apps/web/src/pages/Artifacts.tsx](../../apps/web/src/pages/Artifacts.tsx) | [Artifacts.stories.tsx](../../apps/web/src/pages/Artifacts.stories.tsx) | web |
 | AuthPage, PasswordResetPage, AuthFrame, PasswordField | [apps/web/src/pages/Auth.tsx](../../apps/web/src/pages/Auth.tsx) | [Auth.stories.tsx](../../apps/web/src/pages/Auth.stories.tsx) | web |
 | BillingSettingsPanel | [apps/web/src/pages/BillingSettingsPanel.tsx](../../apps/web/src/pages/BillingSettingsPanel.tsx) | [BillingSettingsPanel.stories.tsx](../../apps/web/src/pages/BillingSettingsPanel.stories.tsx) | web |

@@ -86,6 +86,7 @@ import { desktopBridge } from "../../lib/desktop";
 import { maskCurrencyWhenHidden } from "../../lib/hide-amounts-preference";
 import { isUnclaimedFileDrag } from "../../lib/pending-attachments";
 import type { Panel } from "../../lib/right-panel-state";
+import { rightPanelStorageKey, writeRightPanelState } from "../../lib/right-panel-state";
 import {
   compactRosterStatusLabel,
   rosterHasUndismissedRunError,
@@ -1058,6 +1059,17 @@ export function SpaceSidebar({
           {activityMode && !rail ? (
             <ActivityList
               onListedBots={setActivityBotIds}
+              onOpenWaitingItem={(item) => {
+                setMobileSidebarOpen(false);
+                // The bot page restores this panel on wide screens; Open work is in it.
+                if (userId && bootstrapMe?.spaceId) {
+                  writeRightPanelState(
+                    rightPanelStorageKey(userId, bootstrapMe.spaceId, "bot", item.botId),
+                    "settings",
+                  );
+                }
+                navigate(`/app/${item.botId}`);
+              }}
               onOpenRun={(run) => {
                 setMobileSidebarOpen(false);
                 if (run.groupId) navigate(`/app/g/${run.groupId}`);

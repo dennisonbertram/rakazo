@@ -594,6 +594,17 @@ export const ScratchpadItemSchema = z.object({
 });
 export type ScratchpadItem = z.infer<typeof ScratchpadItemSchema>;
 
+/** An open item, across the user's bots, that waits on the user or is past due. */
+export const WaitingOnYouItemSchema = z.object({
+  id: Id,
+  botId: Id,
+  botName: z.string(),
+  title: z.string(),
+  waitingOn: z.string().nullable(),
+  dueAt: ScratchpadDateTimeSchema.nullable(),
+});
+export type WaitingOnYouItem = z.infer<typeof WaitingOnYouItemSchema>;
+
 export const CreateScratchpadItemInput = z.object({
   botId: Id,
   title: z.string().min(1).max(200),

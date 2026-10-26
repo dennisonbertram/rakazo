@@ -53,11 +53,12 @@ const meta = {
     layout: "padded",
     docs: {
       description: {
-        component: "Also shows: ActivityError, ActivityFilters, FilterChip, ActivityRow",
+        component: "Also shows: ActivityError, ActivityFilters, FilterChip, WaitingRow, ActivityRow",
       },
     },
   },
-  args: { onOpenRun: () => {} },
+  args: { onOpenRun: () => {}, onOpenWaitingItem: () => {} },
+  beforeEach: () => mockRpc({ "scratchpad.waitingOnYou": [] }),
   decorators: [
     (Story) => (
       <div className="w-80">
@@ -70,6 +71,32 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = { beforeEach: () => mockRpc({ "runs.list": byFilter }) };
+
+/** Open items that wait on the person, or are past due, sit right after Needs you. */
+export const WaitingOnYou: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "runs.list": byFilter,
+      "scratchpad.waitingOnYou": [
+        {
+          id: "item_1",
+          botId: "bot_ada",
+          botName: "Ada",
+          title: "Sign the sample vendor form",
+          waitingOn: "you",
+          dueAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+        },
+        {
+          id: "item_2",
+          botId: "bot_ben",
+          botName: "Ben",
+          title: "Review the sample budget",
+          waitingOn: null,
+          dueAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+        },
+      ],
+    }),
+};
 
 /** A quiet check-in that said nothing: dimmed, not counted under Finished. */
 export const WithQuietRun: Story = {
