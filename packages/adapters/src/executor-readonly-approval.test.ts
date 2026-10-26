@@ -76,7 +76,9 @@ vi.mock("./inbox-triage.js", async (importOriginal) => ({
       : { ready: {}, blocked: null },
 }));
 
-const notices = vi.hoisted(() => ({ sent: [] as { kind?: string; title: string; body: string }[] }));
+const notices = vi.hoisted(() => ({
+  sent: [] as { kind?: string; title: string; body: string }[],
+}));
 vi.mock("./run-notification.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   notifyThreadEvent: async (_p: unknown, _e: unknown, _r: unknown, message: never) => {
@@ -4098,12 +4100,34 @@ describe("unattended runs and block rules", () => {
       builtin: true,
       unattended: false,
       rules: [
-        { effect: "require_approval", matchKind: "tool", matchValue: "read_file" } as ActionApprovalRule,
+        {
+          effect: "require_approval",
+          matchKind: "tool",
+          matchValue: "read_file",
+        } as ActionApprovalRule,
       ],
     });
     f.setCalls([{ args: { path: "a.txt" }, executionId: "c1" }]);
     await f.run({ expectFailure: true });
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("refuses run_subagent in a run with stored outside content, and under a Block rule", async () => {
+    const tainted = fixture({ name: "recall_memory", builtin: true, externalTaint: true });
+    await tainted.run();
+    await expect(tainted.request()!.subagentDenial!()).resolves.toEqual(expect.any(String));
+
+    const blocked = fixture({
+      name: "recall_memory",
+      builtin: true,
+      rules: [blockRule("run_subagent")],
+    });
+    await blocked.run();
+    await expect(blocked.request()!.subagentDenial!()).resolves.toBe(BLOCKED_ACTION_MESSAGE);
+
+    const clean = fixture({ name: "recall_memory", builtin: true });
+    await clean.run();
+    await expect(clean.request()!.subagentDenial!()).resolves.toBeUndefined();
   });
 
   it("a block rule beats a mandatory ask", async () => {

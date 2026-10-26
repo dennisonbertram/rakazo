@@ -204,7 +204,6 @@ import {
 } from "./approval-ask.js";
 import {
   approvalPausedToolResult,
-  unattendedEndedToolResult,
   approvalReplayPathError,
   approvalReplayResourceError,
   approvalRoutesMatch,
@@ -231,6 +230,7 @@ import {
   replaceCompletedExternalEffectResult,
   resolveDuplicateEffectGate,
   settleUncertainEffect,
+  unattendedEndedToolResult,
   uncertainEffectResult,
 } from "./approval-effect.js";
 import {
@@ -7392,6 +7392,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
               history: runtimeHistory,
               currentTurnImages,
               tools,
+              // pi-runtime starts helpers itself, before the approval gate: apply the Block rules
+              // and the outside-content mark here. Child tools still pass the gate one by one.
+              subagentDenial: async () => {
+                if (
+                  run.externalTaint === true ||
+                  externalTaint() ||
+                  (!meetingAgent && (meetingTaint || (await threadMarkedNow())))
+                ) {
+                  return "Helpers are not available in a run that read outside content.";
+                }
+                const blocked = resolveActionApprovalDetail({
+                  toolName: "run_subagent",
+                  viaConnector: false,
+                  rules: await loadApprovalRules(),
+                  botId: bot.id,
+                });
+                return blocked.decision === "block" ? BLOCKED_ACTION_MESSAGE : undefined;
+              },
               ...(companyImporter
                 ? {
                     subagentToolNames: new Set([

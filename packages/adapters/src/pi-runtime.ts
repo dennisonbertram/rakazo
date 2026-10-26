@@ -1225,7 +1225,8 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
             if (host.request.executeTool) {
               const result = await host.request.executeTool(tool.name, args, executionId);
               if (isAgentToolExecutionResult(result)) {
-                if (isToolPauseResult(result) || isUnattendedEndResult(result)) host.pausePending = true;
+                if (isToolPauseResult(result) || isUnattendedEndResult(result))
+                  host.pausePending = true;
                 return result;
               }
               return {
@@ -1251,6 +1252,10 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
             };
           }
           if (tool.name === "run_subagent") {
+            const denial = await host.request.subagentDenial?.();
+            if (denial) {
+              return { content: [{ type: "text", text: denial }], details: { error: denial } };
+            }
             const result = await executeSubagent(host, executionId, args);
             return {
               content: [{ type: "text", text: result }],
@@ -1272,7 +1277,8 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
               },
             );
             if (isAgentToolExecutionResult(result)) {
-              if (isToolPauseResult(result) || isUnattendedEndResult(result)) host.pausePending = true;
+              if (isToolPauseResult(result) || isUnattendedEndResult(result))
+                host.pausePending = true;
               return boundAgentToolResult(result);
             }
             return {
