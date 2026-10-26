@@ -75,7 +75,7 @@ import { runWatchProbeTick } from "./watch-probe.js";
 type Tenant = { spaceId: string; userId: string };
 
 /**
- * A job that acts for one run, routine, computer, skill, thread, cloud agent or export
+ * A job that acts for one run, routine, computer, skill, thread or cloud agent
  * runs as that row's tenant, so row-level security keeps it, and every tool it runs, in
  * the owner's Space even where a query forgets to filter. The owner comes from one
  * narrow system read; when the row is gone there is nothing left to act on.
@@ -177,8 +177,6 @@ export function createBackgroundJobHandlers(deps: {
     deps.prisma.cloudAgent.findUnique({ where: { id: agentId }, select: OWNER });
   const mailSearch = ({ searchId }: { searchId: string }) =>
     deps.prisma.mailSearch.findUnique({ where: { id: searchId }, select: OWNER });
-  const accountExport = ({ exportId }: { exportId: string }) =>
-    deps.prisma.accountExport.findUnique({ where: { id: exportId }, select: OWNER });
   const updatedComputer = async ({ updateId }: { updateId: string }) =>
     (
       await deps.prisma.computerUpdate.findUnique({
@@ -264,10 +262,11 @@ export function createBackgroundJobHandlers(deps: {
     "notifications.retention": async () => {
       await deleteExpiredNotifications(deps.prisma);
     },
-    "account.export": asOwner(accountExport, async (payload) => {
+    // An export gathers the user's rows from every Space they belong to, so it runs as system.
+    "account.export": async (payload) => {
       if (!deps.artifacts) throw new Error("Data export is not configured");
       await runAccountExport({ prisma: deps.prisma, artifacts: deps.artifacts }, payload.exportId);
-    }),
+    },
     "account.export.cleanup": async () => {
       if (!deps.artifacts) throw new Error("Data export is not configured");
       await cleanupAccountExports({ prisma: deps.prisma, artifacts: deps.artifacts });
