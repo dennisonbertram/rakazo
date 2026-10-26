@@ -52,7 +52,7 @@ function ToolBadge() {
   );
 }
 
-const sampleText = (value: unknown) => JSON.stringify(value, null, 2) ?? "";
+const sampleText = (value: unknown) => JSON.stringify(value) ?? "";
 
 /** What the owner approves for a tool: the bot's two plain lines, its test run, and the script. */
 function DraftTool({ tool }: { tool: NonNullable<AgentSkillDraft["tool"]> }) {
