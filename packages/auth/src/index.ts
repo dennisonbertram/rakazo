@@ -18,15 +18,19 @@ import {
   createAuthMiddleware,
   getOAuthState,
 } from "better-auth/api";
-import { bearer, organization } from "better-auth/plugins";
+import { parseSetCookieHeader } from "better-auth/cookies";
+import { organization } from "better-auth/plugins";
 import {
   accountSecurity,
   OIDC_FRESH_AGE,
   oidcProofKey,
   sessionForAuthHook,
+  signedBearer,
 } from "./account-security.js";
 import type { OidcConfig } from "./oidc.js";
 import { oidcDiscovery } from "./oidc.js";
+import type { TokenKey } from "./token-storage.js";
+import { encryptStoredOAuthTokens, openIdToken, sealIdToken } from "./token-storage.js";
 
 export type { OidcConfig } from "./oidc.js";
 
@@ -262,6 +266,9 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
   if (env.passwordAuth === false && !env.oidc)
     throw new Error("Password auth requires OIDC when disabled");
   const discovery = env.oidc ? oidcDiscovery(env.oidc) : undefined;
+  // Better Auth's own token key, so every stored token shares one cipher and key.
+  let authContext: Promise<{ secretConfig: TokenKey }> | undefined;
+  const tokenKey = async () => (await authContext!).secretConfig;
   const auth = betterAuth({
     appName: "Praci",
     secret: env.secret,
@@ -269,6 +276,15 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
     trustedOrigins: [...buildTrustedOrigins(env), "rakazo://"],
     account: {
       accountLinking: { enabled: true, disableImplicitLinking: true, trustedProviders: [] },
+      encryptOAuthTokens: true,
+    },
+    // Store only a hash of identifiers that carry an emailed token. Other
+    // identifiers hold no secret and stay readable.
+    verification: {
+      storeIdentifier: {
+        default: "plain",
+        overrides: { "reset-password:": "hashed", "delete-account-": "hashed" },
+      },
     },
     rateLimit: authRateLimitOptions(),
     database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -413,7 +429,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
       },
     },
     plugins: [
-      bearer(),
+      signedBearer,
       expo(),
       accountSecurity(env.email, env.oidc?.name, env.oidc?.issuer, env.passwordAuth !== false),
       ...(discovery ? [discovery.plugin] : []),
@@ -523,11 +539,41 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
         if (ctx.path === "/sign-up/email") {
           await releaseSignupGate(String(ctx.body?.email ?? ""));
         }
-        const redacted = withoutSessionTokens(ctx.path, ctx.context.returned);
+        const returned = ctx.context.returned;
+        // These routes fall back to the stored ID token, which is sealed at rest.
+        if (
+          (ctx.path === "/get-access-token" || ctx.path === "/refresh-token") &&
+          isRecord(returned) &&
+          typeof returned.idToken === "string"
+        ) {
+          const idToken = await openIdToken(ctx.context.secretConfig, returned.idToken);
+          return ctx.json({ ...returned, idToken: idToken ?? undefined });
+        }
+        const redacted = withoutSessionTokens(ctx.path, returned);
         if (redacted) return ctx.json(redacted);
+        const signed = withSignedSessionToken(ctx.context, returned);
+        if (signed) return ctx.json(signed);
       }),
     },
     databaseHooks: {
+      account: {
+        create: {
+          before: async (account) => ({
+            data: { ...account, idToken: await sealIdToken(await tokenKey(), account.idToken) },
+          }),
+        },
+        update: {
+          before: async (account) =>
+            account.idToken === undefined
+              ? undefined
+              : {
+                  data: {
+                    ...account,
+                    idToken: await sealIdToken(await tokenKey(), account.idToken),
+                  },
+                },
+        },
+      },
       session: {
         create: {
           before: async (session, ctx) => {
@@ -605,7 +651,10 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
       },
     },
   });
+  authContext = auth.$context;
   return Object.assign(auth, {
+    /** Encrypts OAuth tokens stored before encryption was enabled. Safe to rerun. */
+    encryptStoredOAuthTokens: async () => encryptStoredOAuthTokens(prisma, await tokenKey()),
     ssoAvailability: () => discovery?.availability(),
     disposeOidcDiscovery: () => discovery?.dispose(),
   });
@@ -680,6 +729,34 @@ function withoutSessionTokens(
     isRecord(returned.session)
   ) {
     return { ...returned, session: withoutToken(returned.session) };
+  }
+  return undefined;
+}
+
+/**
+ * A sign-in body carries the new session's raw token, which the bearer plugin
+ * refuses. Swap in the signed value from the session cookie, so a native client
+ * that keeps the body token stores a bearer that works.
+ */
+function withSignedSessionToken(
+  context: {
+    newSession: { session: { token: string } } | null;
+    responseHeaders?: Headers;
+    authCookies: { sessionToken: { name: string } };
+  },
+  returned: unknown,
+): Record<string, unknown> | undefined {
+  const token = context.newSession?.session.token;
+  if (!token || !isRecord(returned)) return undefined;
+  const cookie = parseSetCookieHeader(context.responseHeaders?.get("set-cookie") ?? "").get(
+    context.authCookies.sessionToken.name,
+  );
+  if (!cookie?.value || cookie["max-age"] === 0) return undefined;
+  const signed = decodeURIComponent(cookie.value);
+  if (!signed.startsWith(`${token}.`)) return undefined;
+  if (returned.token === token) return { ...returned, token: signed };
+  if (isRecord(returned.session) && returned.session.token === token) {
+    return { ...returned, session: { ...returned.session, token: signed } };
   }
   return undefined;
 }

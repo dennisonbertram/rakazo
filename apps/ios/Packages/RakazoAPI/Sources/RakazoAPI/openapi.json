@@ -3654,7 +3654,8 @@
                             "enum": [
                               "tool",
                               "connector",
-                              "category"
+                              "category",
+                              "site"
                             ]
                           },
                           "matchValue": {
@@ -3973,7 +3974,8 @@
                         "enum": [
                           "tool",
                           "connector",
-                          "category"
+                          "category",
+                          "site"
                         ]
                       },
                       "matchValue": {
@@ -4030,7 +4032,8 @@
                           "enum": [
                             "tool",
                             "connector",
-                            "category"
+                            "category",
+                            "site"
                           ]
                         },
                         "matchValue": {
@@ -8508,6 +8511,9 @@
                                                     "auth"
                                                   ],
                                                   "additionalProperties": false
+                                                },
+                                                "site": {
+                                                  "type": "string"
                                                 },
                                                 "status": {
                                                   "type": "string",
@@ -42848,6 +42854,9 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "site": {
+                                          "type": "string"
+                                        },
                                         "status": {
                                           "type": "string",
                                           "enum": [
@@ -59264,6 +59273,9 @@
                                             "auth"
                                           ],
                                           "additionalProperties": false
+                                        },
+                                        "site": {
+                                          "type": "string"
                                         },
                                         "status": {
                                           "type": "string",
@@ -109112,6 +109124,9 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "site": {
+                                          "type": "string"
+                                        },
                                         "status": {
                                           "type": "string",
                                           "enum": [
@@ -111312,6 +111327,9 @@
                                             "auth"
                                           ],
                                           "additionalProperties": false
+                                        },
+                                        "site": {
+                                          "type": "string"
                                         },
                                         "status": {
                                           "type": "string",

@@ -1310,7 +1310,7 @@ export const appContract = {
       .input(
         z.object({
           effect: ActionApprovalEffectSchema,
-          matchKind: z.enum(["tool", "connector", "category"]),
+          matchKind: z.enum(["tool", "connector", "category", "site"]),
           matchValue: z.string().min(1),
           botId: Id.optional(),
         }),

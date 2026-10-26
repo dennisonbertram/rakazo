@@ -45,6 +45,7 @@ export * from "./finance/vendor.js";
 export * from "./format-file-size.js";
 export * from "./group-mentions.js";
 export * from "./http-response.js";
+export * from "./inbound-routine.js";
 export * from "./inbox-groups.js";
 export * from "./inbox-label.js";
 export * from "./inbox-sender-groups.js";

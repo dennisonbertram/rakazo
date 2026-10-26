@@ -583,6 +583,61 @@ describe("thread answer delivery", () => {
     expect(sink.events.some((event) => event.message === "thread answer enqueue")).toBe(true);
     installLogger(createLogger({ service: "rakazo-api", level: "off", sinks: [] }));
   });
+
+  it.each([
+    [
+      "a credential its destination cannot carry",
+      "Credential cannot be used with this authentication method",
+      400,
+    ],
+    ["an unexpected failure", "database unavailable", 500],
+  ])("maps %s to the right status without echoing the answer", async (_name, message, status) => {
+    const answerRunInput = vi.fn().mockRejectedValue(new Error(message));
+    const prisma = {
+      bot: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "bot-1", thread: { id: "thread-1" }, computer: null }),
+      },
+      message: { findFirst: vi.fn().mockResolvedValue(null) },
+    } as unknown as PrismaClient;
+    const deps = {
+      prisma,
+      events: { answerRunInput },
+      jobs: { enqueue: vi.fn() },
+      env: {
+        defaultProvider: "fake",
+        defaultModel: "fake-model",
+        webOrigin: "http://127.0.0.1:5173",
+        screenProxySecret: "fake-test-secret",
+        sandboxProvider: "fake",
+      },
+      dataDir: "/tmp/rakazo-router-test",
+    } as unknown as RouterDeps;
+    const actor = {
+      spaceId: "workspace-1",
+      userId: "user-1",
+      email: "user@rakazo.test",
+      isDeploymentOwner: true,
+    } satisfies Actor;
+    const { response } = await new RPCHandler(createRouter(deps)).handle(
+      new Request("http://127.0.0.1/rpc/threads/answer", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          json: {
+            botId: "bot-1",
+            runId: "run-1",
+            messageId: "message-1",
+            answer: "example\nvalue",
+          },
+        }),
+      }),
+      { prefix: "/rpc", context: { actor } },
+    );
+    expect(response.status).toBe(status);
+    expect(JSON.stringify(await response.json())).not.toContain("example");
+  });
 });
 
 describe("thread stream authorization", () => {

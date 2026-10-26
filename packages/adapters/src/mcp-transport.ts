@@ -9,7 +9,7 @@ import type { CallToolResult, ListToolsResult } from "@modelcontextprotocol/sdk/
 import { isLocalMcpHost } from "@rakazo/contracts";
 import { combineSignals } from "./connector-safety.js";
 import type { RemoteTransportDependencies, SafeRemoteFetch } from "./remote-mcp.js";
-import { createSafeRemoteFetch } from "./remote-mcp.js";
+import { createSafeRemoteFetch, listMcpTools } from "./remote-mcp.js";
 
 export type McpRemoteTransport = "streamable-http" | "sse";
 
@@ -42,8 +42,13 @@ export interface McpRemoteOptions {
   allowLegacySse?: boolean;
   /** Fall back to SSE only after a fresh Streamable HTTP client fails. */
   fallbackToSse?: boolean;
-  /** Let the official SDK own token refresh, re-authentication, and request retry. */
-  authProvider?: OAuthClientProvider;
+  /**
+   * Let the official SDK own re-authentication and request retry. `wrapFetch`
+   * lets the provider serve the SDK's token refresh itself.
+   */
+  authProvider?: OAuthClientProvider & {
+    wrapFetch?: (fetch: typeof globalThis.fetch) => typeof globalThis.fetch;
+  };
   network?: RemoteTransportDependencies;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -275,7 +280,8 @@ export class McpSession {
       options.network,
     );
     this.remoteFetch = safeFetch;
-    const fetch = withEndpointOriginFallback(url.origin, safeFetch);
+    const originFetch = withEndpointOriginFallback(url.origin, safeFetch);
+    const fetch = options.authProvider?.wrapFetch?.(originFetch) ?? originFetch;
     const signal = combineSignals(options.signal, AbortSignal.timeout(options.timeoutMs ?? 15_000));
     let usedFallback = false;
     const connect = async (kind: McpRemoteTransport): Promise<void> => {
@@ -353,7 +359,7 @@ export class McpSession {
 
   async listTools(options?: { signal?: AbortSignal }): Promise<ListToolsResult> {
     this.assertConnected();
-    return this.client.listTools({}, { signal: options?.signal });
+    return { tools: await listMcpTools(this.client, { signal: options?.signal }) };
   }
 
   async callTool(

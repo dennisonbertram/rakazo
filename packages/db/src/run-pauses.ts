@@ -15,6 +15,7 @@ import {
   isSecretAskBlock,
   resolveAskChoice,
 } from "@rakazo/core";
+import { urlSite } from "@rakazo/core/egress";
 import { setApprovalRule } from "./approval-rules.js";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import type { Prisma, PrismaClient } from "./client.js";
@@ -568,13 +569,15 @@ async function commitAnswerRunInput(
         update: {},
       });
     }
-    if (input.answer === "always") {
-      // A card's "Always allow" is a space-wide per-tool rule; it replaces any rule for that tool.
+    // "Always" on a fetch card allows that site, never every site the tool can reach.
+    const site = alwaysAllowedSite(approvalEffect!);
+    if (input.answer === "always" && (site || approvalEffect!.kind !== "web_fetch")) {
+      // A card's "Always allow" is a space-wide rule; it replaces any rule for that target.
       await setApprovalRule(tx, {
         spaceId: input.spaceId,
         userId: approvalUserId!,
-        matchKind: "tool",
-        matchValue: approvalEffect!.kind,
+        matchKind: site ? "site" : "tool",
+        matchValue: site ?? approvalEffect!.kind,
         effect: "always_allow",
       });
     }
@@ -880,4 +883,10 @@ export async function pauseRunForTakeover(
   if (!committed) return false;
   await notifyRealtime(realtime, committed.threadId, committed.seq);
   return true;
+}
+
+function alwaysAllowedSite(effect: { kind: string; request?: unknown }): string | undefined {
+  if (effect.kind !== "web_fetch") return undefined;
+  const request = effect.request as { url?: unknown } | null;
+  return typeof request?.url === "string" ? urlSite(request.url) : undefined;
 }
