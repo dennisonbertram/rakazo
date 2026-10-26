@@ -1,10 +1,41 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ScratchpadItem } from "@rakazo/contracts";
-import { Button, Checkbox, Input } from "@rakazo/ui-web";
-import { X } from "lucide-react";
+import { Button, Checkbox, enqueueNotificationToast, Input } from "@rakazo/ui-web";
+import { ChevronDown, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { rpc } from "../lib/rpc";
+
+/** "Waiting on Acme legal · due Fri"; a past-due date shows in the destructive colour. */
+export function ScratchpadItemMeta({
+  item,
+  now = new Date(),
+}: {
+  item: ScratchpadItem;
+  now?: Date;
+}) {
+  const { t, i18n } = useLingui();
+  if (!item.waitingOn && !item.dueAt) return null;
+  const due = item.dueAt ? new Date(item.dueAt) : null;
+  const days = due ? Math.abs(due.getTime() - now.getTime()) / 86_400_000 : 0;
+  const dueText = due
+    ? due.toLocaleDateString(
+        i18n.locale || "en",
+        days < 6 ? { weekday: "short" } : { month: "short", day: "numeric" },
+      )
+    : null;
+  const waitingOn = item.waitingOn;
+  const pastDue = due !== null && due.getTime() < now.getTime();
+  return (
+    <div className="mt-0.5 text-[12.5px] text-muted-foreground/80" dir="auto">
+      {item.waitingOn ? t`Waiting on ${waitingOn}` : null}
+      {item.waitingOn && dueText ? " · " : null}
+      {dueText ? (
+        <span className={pastDue ? "text-destructive" : undefined}>{t`due ${dueText}`}</span>
+      ) : null}
+    </div>
+  );
+}
 
 export function ScratchpadSection({ botId }: { botId: string }) {
   const { t } = useLingui();
@@ -16,7 +47,7 @@ export function ScratchpadSection({ botId }: { botId: string }) {
 
   async function refresh() {
     const generation = ++listGeneration.current;
-    const list = await rpc.scratchpad.list({ botId });
+    const list = await rpc.scratchpad.list({ botId, includeDone: true });
     if (generation !== listGeneration.current) return;
     setItems(list);
   }
@@ -24,7 +55,7 @@ export function ScratchpadSection({ botId }: { botId: string }) {
   useEffect(() => {
     const generation = ++listGeneration.current;
     void rpc.scratchpad
-      .list({ botId })
+      .list({ botId, includeDone: true })
       .then((list) => {
         if (generation !== listGeneration.current) return;
         setItems(list);
@@ -65,10 +96,23 @@ export function ScratchpadSection({ botId }: { botId: string }) {
     setError(null);
     try {
       const updated = await rpc.scratchpad.update({ itemId: item.id, status });
-      setItems((current) => {
-        const next = current.map((entry) => (entry.id === updated.id ? updated : entry));
-        return status === "done" ? next.filter((entry) => entry.status !== "done") : next;
-      });
+      setItems((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+      if (status === "done") {
+        const title = item.title;
+        enqueueNotificationToast({
+          id: `scratchpad-${item.id}-${Date.now()}`,
+          title: t`Completed ${title}`,
+          action: {
+            label: t`Undo`,
+            onClick: () => {
+              void rpc.scratchpad
+                .update({ itemId: item.id, status: item.status })
+                .then(() => refresh())
+                .catch(() => setError(t`Could not update`));
+            },
+          },
+        });
+      }
       try {
         await refresh();
       } catch {
@@ -100,35 +144,37 @@ export function ScratchpadSection({ botId }: { botId: string }) {
     }
   }
 
+  const openItems = items.filter((item) => item.status !== "done");
+  const doneItems = items.filter((item) => item.status === "done");
+  const doneCount = doneItems.length;
+
   return (
     <div className="mt-6" data-testid="bot-scratchpad">
       <div className="mb-3 text-[13.5px] font-medium text-foreground">
         <Trans>Open work</Trans>
       </div>
-      {items.length === 0 ? (
+      {openItems.length === 0 ? (
         <div className="py-1 text-[13.5px] text-muted-foreground/80">
           <Trans>None yet</Trans>
         </div>
       ) : (
-        items.map((item) => (
+        openItems.map((item) => (
           <div
             key={item.id}
             className="flex w-full items-start gap-2 rounded-xl px-2.5 py-2.5 hover:bg-accent"
           >
             <Checkbox
-              aria-label={item.status === "done" ? t`Reopen` : t`Complete`}
-              checked={item.status === "done"}
+              aria-label={t`Complete`}
+              checked={false}
               disabled={busy}
-              onCheckedChange={(checked) => void setStatus(item, checked ? "done" : "open")}
+              onCheckedChange={() => void setStatus(item, "done")}
               className="mt-0.5"
             />
             <div className="min-w-0 flex-1">
-              <div
-                className={`text-start text-[14.5px] ${item.status === "done" ? "text-muted-foreground/80 line-through" : "text-foreground"}`}
-                dir="auto"
-              >
+              <div className="text-start text-[14.5px] text-foreground" dir="auto">
                 {item.title}
               </div>
+              <ScratchpadItemMeta item={item} />
               {item.notes ? (
                 <div className="mt-0.5 text-[12.5px] text-muted-foreground/80" dir="auto">
                   {item.notes}
@@ -156,7 +202,7 @@ export function ScratchpadSection({ botId }: { botId: string }) {
                 onClick={() => void setStatus(item, "open")}
                 className="shrink-0 text-muted-foreground/70"
               >
-                <Trans>Open</Trans>
+                <Trans>Reopen</Trans>
               </Button>
             ) : null}
             <Button
@@ -172,6 +218,40 @@ export function ScratchpadSection({ botId }: { botId: string }) {
           </div>
         ))
       )}
+      {doneItems.length > 0 ? (
+        <details className="group mt-3" data-testid="bot-scratchpad-done">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg text-[13px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Trans>Done ({doneCount})</Trans>
+            <ChevronDown
+              aria-hidden
+              className="size-3.5 transition-transform group-open:rotate-180"
+            />
+          </summary>
+          {doneItems.map((item) => (
+            <div key={item.id} className="flex w-full items-start gap-2 px-2.5 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] text-muted-foreground line-through" dir="auto">
+                  {item.title}
+                </div>
+                {item.resolvedReason ? (
+                  <div className="mt-0.5 text-[12.5px] text-muted-foreground/80" dir="auto">
+                    {item.resolvedReason}
+                  </div>
+                ) : null}
+              </div>
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={busy}
+                onClick={() => void setStatus(item, "open")}
+                className="shrink-0 text-muted-foreground/70"
+              >
+                <Trans>Reopen</Trans>
+              </Button>
+            </div>
+          ))}
+        </details>
+      ) : null}
       <form
         className="mt-2 flex items-center gap-2"
         onSubmit={(event) => {

@@ -14,6 +14,10 @@ vi.mock("../../lib/rpc", () => ({
       credentials: vi.fn(async () => []),
       list: vi.fn(async () => []),
     },
+    checkIn: {
+      get: vi.fn(async () => ({ cadence: "off" })),
+      set: vi.fn(async (input: { cadence: string }) => ({ cadence: input.cadence })),
+    },
     me: vi.fn(async () => ({})),
   },
 }));
@@ -64,6 +68,7 @@ vi.mock("./avatar-studio-popover", () => ({ AvatarStudioPopover: () => null }));
 vi.mock("./bot-credentials", () => ({ BotCredentialsSection: () => null }));
 vi.mock("./BotSkillsSection", () => ({ BotSkillsSection: () => null }));
 
+import { rpc } from "../../lib/rpc";
 import { BotSettings } from "./bot-panel";
 
 const bot = {
@@ -186,6 +191,20 @@ describe("BotSettings identity fields", () => {
     const labels = [...container.querySelectorAll("label")].map((label) => label.textContent);
     expect(labels.some((text) => text?.startsWith("Description"))).toBe(true);
     expect(labels.some((text) => text?.startsWith("Title"))).toBe(false);
+  });
+});
+
+describe("BotSettings check in", () => {
+  it("saves the chosen cadence as soon as it changes", async () => {
+    await renderSettings(async () => undefined);
+    const select = container.querySelector<HTMLSelectElement>('[id$="-check-in"]');
+    expect(select?.value).toBe("off");
+    await act(async () => {
+      if (select) select.value = "every_4h";
+      select?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(rpc.checkIn.set).toHaveBeenCalledWith({ botId: "bot-1", cadence: "every_4h" });
   });
 });
 
