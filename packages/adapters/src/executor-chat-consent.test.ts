@@ -176,6 +176,7 @@ async function runChat(
     agentSkill: { findMany: vi.fn(async () => []) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
     scratchpadItem: { findMany: vi.fn(async () => []) },
+    actionApprovalRule: { findMany: vi.fn(async () => []) },
     externalEffect: {
       update: vi.fn(async () => ({})),
       findMany: vi.fn(async () => []),

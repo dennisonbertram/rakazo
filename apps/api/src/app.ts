@@ -32,6 +32,12 @@ import {
   createBackgroundJobHandlers,
   createBlueBubblesPollState,
   createCloudAgentConnection,
+  createCompanyConnectionReader,
+  createCompanyDocumentReader,
+  createCompanyImportEngine,
+  createCompanySlackReader,
+  createCompanySourceWorker,
+  createCompanyTrackerReader,
   createConnectorStack,
   createDevinCallTool,
   createFinanceCallToolFor,
@@ -50,6 +56,8 @@ import {
   createSecretStore,
   createTicketChangeNotifier,
   createWebProvider,
+  deleteExpiredTeachData,
+  describeTeachSteps,
   destroyBot,
   EmailEmulator,
   ExpoPushProvider,
@@ -63,6 +71,7 @@ import {
   isComposioEnabled,
   isMessagingSurfaceEnabled,
   isPipedreamEnabled,
+  LlmCompanyExtractor,
   LlmDataRoomClassifier,
   McpConnector,
   McpOAuthBroker,
@@ -81,6 +90,7 @@ import {
   removeAccountExportBlobs,
   removePiUserSessions,
   resolveEnsName,
+  runWatchProbeTick,
   ScriptedAgentRuntime,
   SmtpEmailProvider,
   SpaceMemoryProviderResolver,
@@ -124,8 +134,10 @@ import { MarkdownMemoryStore } from "@rakazo/memory";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { mountAccountExportDownload } from "./account-export.js";
+import { mountArtifactShare, prismaShareStore } from "./artifact-share.js";
 import { createBillingService } from "./billing.js";
 import { mountBillingRoutes } from "./billing-webhook.js";
+import { createCompanyImportPage } from "./company-import-page.js";
 import { mountDataRoomRoutes } from "./data-room.js";
 import { mountEmailImageProxy } from "./email-image-proxy.js";
 import type { AppEnv } from "./env.js";
@@ -538,6 +550,7 @@ export async function createApp(
   // One cache serves models.list, selection validation, and run-time model
   // resolution alike, so a list call warms the run path in this process.
   const codexCatalog = new CodexCatalogCache();
+  let companyImport: ReturnType<typeof createCompanyImportEngine> | undefined;
   const executor = createRunExecutor({
     notificationEvents,
     contextStrategy,
@@ -586,8 +599,39 @@ export async function createApp(
     mail,
     mailWritesDisabled: env.mailWritesDisabled,
     shutdownSignal: shutdown.signal,
+    companyImport: () => {
+      if (!companyImport) throw new Error("Company import engine is not initialized.");
+      return companyImport;
+    },
   });
 
+  const companyReader = createCompanyConnectionReader({ prisma, connectors: stack.connector, mcp });
+  const documentReader = createCompanyDocumentReader(companyReader);
+  const slackReader = createCompanySlackReader(companyReader);
+  const trackerReader = createCompanyTrackerReader(companyReader);
+  companyImport = createCompanyImportEngine({
+    prisma,
+    jobs,
+    realtime,
+    resolveModel: executor.resolveModel,
+    notificationEvents,
+    worker: createCompanySourceWorker({
+      prisma,
+      mail,
+      extractor: new LlmCompanyExtractor(),
+      slack: slackReader,
+      tracker: trackerReader,
+      documents: documentReader,
+    }),
+  });
+  const companyImportPage = createCompanyImportPage({
+    prisma,
+    engine: companyImport,
+    reader: companyReader,
+    slack: slackReader,
+    tracker: trackerReader,
+    documents: documentReader,
+  });
   const jobHandlers = createBackgroundJobHandlers({
     executor,
     prisma,
@@ -607,6 +651,7 @@ export async function createApp(
     notificationEvents,
     financeCallToolFor: financeCallToolOverride ?? createFinanceCallToolFor(prisma, mcp),
     artifacts,
+    connector: stack.connector,
     connectors: stack.connector,
     boxAccessToken: boxAccessToken(mcpOAuth),
     notificationChannels: [
@@ -619,6 +664,7 @@ export async function createApp(
     mailWritesDisabled: env.mailWritesDisabled,
     gmailPush,
     ...(meetingSources ? { meetingSources } : {}),
+    companyImport,
   });
   if (inMemoryJobs) {
     await inMemoryJobs.start(jobHandlers);
@@ -632,12 +678,25 @@ export async function createApp(
         reconcileCloudAgents: () => reconcileCloudAgents({ prisma, jobs, cloudAgent }),
         reconcileComputerUpdates: () => reconcileComputerUpdates({ prisma, jobs }),
         reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
+        reconcileCompanyImports: () => companyImport.recoveryJob(),
+        reconcileTeachHeldValues: () => deleteExpiredTeachData(prisma),
+        // Graphile mode runs watch.probe from RECURRING_JOBS in apps/worker; memory mode has no cron.
+        runWatchProbes: () =>
+          runWatchProbeTick({
+            prisma,
+            jobs,
+            events,
+            notificationEvents,
+            connector: stack.connector,
+          }),
       })
     : undefined;
   reconciler?.start();
 
   const router = createRouter({
     email,
+    describeTeachSteps: (input) =>
+      describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
     unsubscriber: createMailUnsubscriber(),
     proposeSort: (model, input, context) =>
       new LlmDataRoomClassifier({
@@ -652,6 +711,8 @@ export async function createApp(
     ticketChanges,
     boardEvents,
     notificationEvents,
+    companyImport,
+    companyImportPage,
     auth,
     jobs,
     sandbox,
@@ -859,6 +920,7 @@ export async function createApp(
     artifacts,
     isTrustedOrigin: (origin) => isTrustedOrigin(origin, env),
   });
+  mountArtifactShare(app, { store: prismaShareStore(prisma), artifacts });
   mountAccountExportDownload(app, { prisma, artifacts }, loggedActor);
   mountVoiceHttpRoutes(app, { prisma, secrets, ticketBoardEnabled }, (c) => loggedActor(c.req.raw));
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });

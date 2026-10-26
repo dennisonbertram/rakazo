@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   AdapterContext,
   AgentRunRequest,
@@ -13,7 +14,11 @@ import {
   integrationAgentSpawnKey,
 } from "@rakazo/contracts";
 import type { ActionApprovalRule } from "@rakazo/core";
-import { buildBotMessageWakePrompt, externalOriginNotice } from "@rakazo/core";
+import {
+  BLOCKED_ACTION_MESSAGE,
+  buildBotMessageWakePrompt,
+  externalOriginNotice,
+} from "@rakazo/core";
 import { approvalEffectKey, toolEffectIdempotencyKey } from "@rakazo/core/node/approval-effect-key";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as AiConsentModule from "./ai-consent.js";
@@ -30,7 +35,6 @@ import {
   createRunExecutor,
   EXTERNAL_BOT_PROMPT,
   EXTERNAL_REQUEST_REASON,
-  EXTERNAL_TAINT_FREE_TOOLS,
   MAIL_CONSENT_DECLINED,
   MAIL_CONSENT_OFF,
   MEETING_TAINT_FREE_TOOLS,
@@ -73,7 +77,9 @@ vi.mock("./inbox-triage.js", async (importOriginal) => ({
       : { ready: {}, blocked: null },
 }));
 
-const notices = vi.hoisted(() => ({ sent: [] as { title: string; body: string }[] }));
+const notices = vi.hoisted(() => ({
+  sent: [] as { kind?: string; title: string; body: string }[],
+}));
 vi.mock("./run-notification.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   notifyThreadEvent: async (_p: unknown, _e: unknown, _r: unknown, message: never) => {
@@ -152,8 +158,14 @@ function fixture({
   catalog = false,
   readOnly = true,
   rules = [] as ActionApprovalRule[],
+  askText,
   autoReview = false,
   trigger = "user",
+  unattended = trigger === "webhook",
+  externalTaint = false,
+  routineManagedKind,
+  scratchpadItem,
+  skillRows = [] as Record<string, unknown>[],
   secrets = [] as string[],
   prompt = "Read the item",
   bot = {
@@ -241,8 +253,19 @@ function fixture({
   catalog?: boolean;
   readOnly?: boolean;
   rules?: ActionApprovalRule[];
+  /** The runtime ends its turn with an ask_user question. */
+  askText?: string;
   autoReview?: boolean;
   trigger?: string;
+  /** Stored run mode; defaults to unattended for webhook runs only. */
+  unattended?: boolean;
+  externalTaint?: boolean;
+  /** Makes the run a routine run; the routine's managedKind. */
+  routineManagedKind?: string | null;
+  /** The stored scratchpad item the gate looks up for scratchpad_update/complete. */
+  scratchpadItem?: { category: string | null } | null;
+  /** Stored skill rows the skill and tool lookups find. */
+  skillRows?: Record<string, unknown>[];
   secrets?: string[];
   prompt?: string;
   bot?: { name: string; title: string; description: string };
@@ -293,6 +316,10 @@ function fixture({
     userId: "user-1",
     status: "queued",
     trigger,
+    // Webhook runs are created unattended; the other fixtures model an attended run.
+    unattended,
+    externalTaint,
+    routineId: routineManagedKind === undefined ? null : "routine-1",
     leaseFence: 0,
     ...(peer ? { sourceMessageId: "msg-1" } : {}),
   };
@@ -339,12 +366,14 @@ function fixture({
   };
   const prisma = {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
+    routine: { findUnique: vi.fn(async () => ({ managedKind: routineManagedKind ?? null })) },
     run: {
       findFirst: vi.fn(async () => ({
         bot: { notifyOnFinish: true },
         thread: { groupId: null },
       })),
       findUnique: vi.fn(async () => run),
+      findMany: vi.fn(async () => []),
       findUniqueOrThrow: vi.fn(async () => run),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
@@ -524,9 +553,12 @@ function fixture({
     taughtSkill: { findMany: vi.fn(async () => []) },
     agentSecret: { findMany: vi.fn(async () => []) },
     botSecret: { findMany: vi.fn(async () => []) },
-    agentSkill: { findMany: vi.fn(async () => []) },
+    agentSkill: { findMany: vi.fn(async () => skillRows) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
-    scratchpadItem: { findMany: vi.fn(async () => []) },
+    scratchpadItem: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => scratchpadItem ?? null),
+    },
     actionApprovalRule: { findMany: vi.fn(async () => rules) },
     actionAutoReviewPreference: { findUnique: vi.fn(async () => ({ enabled: autoReview })) },
     externalEffect,
@@ -535,6 +567,7 @@ function fixture({
     run.status = "waiting_input";
     return true;
   });
+  const appendEvent = vi.fn(async (_event: unknown) => undefined);
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
   const execute = vi.fn(async function* (call: ConnectorCall) {
     yield { type: "result" as const, data: { item: call.args.id } };
@@ -565,6 +598,16 @@ function fixture({
       results.push(result);
       await afterCall?.(results.length - 1);
       if (isApprovalPausedResult(result)) return;
+    }
+    if (askText) {
+      yield {
+        type: "ask" as const,
+        text: askText,
+        actions: [
+          { id: "choice-1", label: "A" },
+          { id: "choice-2", label: "B" },
+        ],
+      };
     }
     yield { type: "done" as const, text: "Done" };
   });
@@ -621,7 +664,7 @@ function fixture({
     },
     memoryProviders: { resolve: async () => null },
     events: {
-      append: vi.fn(async () => undefined),
+      append: appendEvent,
       pauseRunForInput,
       finalizeRun,
       claimSteering: claimSteeringSpy.mockImplementation(async () =>
@@ -643,6 +686,9 @@ function fixture({
     ...(googleConnectors ? { connectors: {} } : {}),
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return {
+    rules,
+    finalizeRun,
+    events: { append: appendEvent },
     offeredTools,
     claimSteeringCalls: () => claimSteeringSpy.mock.calls.map(([input]) => input),
     request: () => lastRequest,
@@ -1043,6 +1089,48 @@ describe("connector read-only metadata and approval enforcement", () => {
       expect(f.execute).not.toHaveBeenCalled();
       expect(f.results.at(-1)).toEqual({ error: DENIED_ACTION_MESSAGE });
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("refuses the same tool with different arguments after a denial in the same run", async () => {
+      const f = fixture({
+        catalog,
+        rules: [{ effect: "require_approval", matchKind: "tool", matchValue: "demo_get_item" }],
+      });
+      await f.run();
+      f.effects[0]!.status = "denied";
+      f.setCalls([{ args: { id: "item-2" }, executionId: "call-2" }]);
+      await f.run();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.results.at(-1)).toEqual({ error: DENIED_ACTION_MESSAGE });
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("resolves the other parallel calls of a denied tool to the denial, with no new card", async () => {
+      const f = fixture({
+        catalog,
+        rules: [{ effect: "require_approval", matchKind: "tool", matchValue: "demo_get_item" }],
+      });
+      const calls = [
+        { args: { id: "item-1" }, executionId: "call-1" },
+        { args: { id: "item-2" }, executionId: "call-2" },
+        { args: { id: "item-3" }, executionId: "call-3" },
+      ];
+      f.setCalls(calls);
+      await f.run();
+      const cardsBefore = f.pauseRunForInput.mock.calls.length;
+      // The model made all three calls in one turn; each recorded its own pending effect.
+      for (const [index, call] of calls.slice(1).entries()) {
+        f.effects.push({
+          ...f.effects[0]!,
+          id: `effect-${index + 2}`,
+          idempotencyKey: approvalEffectKey("run-1", f.effects[0]!.kind, call.args),
+        });
+      }
+      f.effects[0]!.status = "denied";
+      await f.run();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.pauseRunForInput.mock.calls.length).toBe(cardsBefore);
+      expect(f.results.slice(-3)).toEqual(Array(3).fill({ error: DENIED_ACTION_MESSAGE }));
     });
 
     it("allows a new card when the user asks again in a new run", async () => {
@@ -1809,6 +1897,30 @@ describe("Google agents and linked accounts", () => {
     expect(isApprovalPausedResult(f.results[0])).toBe(true);
   });
 
+  it("asks for a routine run's mail_send on a card with no Always allow", async () => {
+    const f = fixture({
+      name: "mail_send",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      spawnKey: inboxAgentSpawnKey("user-1"),
+      mail: mailStub(),
+      connectionRows: [
+        account({
+          allAgents: false,
+          agentBotId: "bot-1",
+          writesEnabled: true,
+          botAccess: [{ botId: "bot-1" }],
+        }),
+      ],
+    });
+    f.setCalls([{ args: mailSend, executionId: "call-1" }]);
+    await f.run();
+    const [{ blocks }] = f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: any[] }];
+    expect(blocks[0].actions.map((a: { id: string }) => a.id)).toEqual(["allow", "deny"]);
+    expect(blocks[0].approvalReason).toBe("Asked because this ran in the background.");
+  });
+
   it("refuses the same send once changes are off on the linked Gmail", async () => {
     const f = fixture({
       name: "mail_send",
@@ -2249,6 +2361,7 @@ describe("connected app integration agent tools", () => {
       spawnKey: null,
       connectionRows: [connection({ agentBotId: null, writesEnabled: false })],
       availableTools: [read, write],
+      rules: [{ effect: "always_allow", matchKind: "tool", matchValue: write.name }],
     });
     await ordinary.run();
     expect(ordinary.offeredTools).toContain(write.name);
@@ -2691,7 +2804,7 @@ describe("Mercury agent writes, offline end to end", () => {
     expect(mercury.sendMoneyRequests).toHaveLength(0);
     f.effects[0]!.status = "denied";
     await f.run();
-    expect(f.results.at(-1)).toMatchObject({ error: expect.stringContaining("denied") });
+    expect(f.results.at(-1)).toMatchObject({ error: expect.stringContaining("declined") });
     expect(mercury.sendMoneyRequests).toHaveLength(0);
   });
 
@@ -3734,6 +3847,7 @@ describe("runs that began with an external bot", () => {
   const askBlock = (f: ReturnType<typeof fixture>) =>
     (f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: unknown[] }])[0].blocks[0] as {
       detail?: string;
+      approvalReason?: string;
       actions: { id: string }[];
     };
 
@@ -3748,7 +3862,9 @@ describe("runs that began with an external bot", () => {
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     const card = askBlock(f);
-    expect(card.detail).toContain(EXTERNAL_REQUEST_REASON);
+    // Shown once, on the reason line, not again in the detail.
+    expect(card.approvalReason).toBe(EXTERNAL_REQUEST_REASON);
+    expect(card.detail ?? "").not.toContain(EXTERNAL_REQUEST_REASON);
     expect(card.actions.map((action) => action.id)).not.toContain("always");
     expect(JSON.stringify(card.actions)).not.toMatch(/always/i);
   });
@@ -3795,7 +3911,6 @@ describe("runs that began with an external bot", () => {
   });
 
   it("the free-list tools do not ask", async () => {
-    expect([...EXTERNAL_TAINT_FREE_TOOLS].sort()).toEqual(["ask_user", "skill_read"]);
     const f = fixture({ name: "skill_read", builtin: true, history: [{ blocks: [marked] }] });
     f.setCalls([{ args: { name: "nothing" }, executionId: "c1" }]);
     await f.run();
@@ -3878,8 +3993,13 @@ describe("runs that began with an external bot", () => {
   });
 
   it("finishes a read-only effect that a marked run's gate recorded, so a retry returns it", async () => {
-    const f = fixture({ name: "scratchpad_list", builtin: true, history: [{ blocks: [marked] }] });
-    f.setCalls([{ args: {}, executionId: "c1" }]);
+    const f = fixture({
+      name: "mail_search",
+      builtin: true,
+      mail: { listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]) },
+      history: [{ blocks: [marked] }],
+    });
+    f.setCalls([{ args: { queries: ["from:investor"] }, executionId: "c1" }]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     f.effects[0]!.status = "approved";
@@ -3887,7 +4007,7 @@ describe("runs that began with an external bot", () => {
     expect(f.effects).toHaveLength(1);
     expect(f.effects[0]!.status).toBe("completed");
     // The model retries the same call (a lost response): it gets the stored result, not "uncertain".
-    f.setCalls([{ args: {}, executionId: "c2" }]);
+    f.setCalls([{ args: { queries: ["from:investor"] }, executionId: "c2" }]);
     await f.run();
     expect(JSON.stringify(f.results.at(-1))).not.toMatch(/uncertain/i);
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
@@ -4001,5 +4121,412 @@ describe("what a run read is checked before it reaches an external bot", () => {
     };
     expect(await run(false)).not.toEqual([]);
     expect(await run(true)).toEqual([]);
+  });
+});
+
+describe("unattended runs and block rules", () => {
+  const blockRule = (matchValue: string) =>
+    ({ effect: "block", matchKind: "tool", matchValue }) as ActionApprovalRule;
+  const decisions = (f: ReturnType<typeof fixture>) =>
+    f.events.append.mock.calls
+      .map(([e]) => e as { type: string; payload: Record<string, unknown> })
+      .filter((e) => e.type === "approval.decided")
+      .map((e) => e.payload);
+
+  it.each([false, true])(
+    "a block rule refuses with no card (unattended=%s)",
+    async (unattended) => {
+      const f = fixture({ name: "shell", builtin: true, unattended, rules: [blockRule("shell")] });
+      f.setCalls([{ args: { command: "ls" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.effects).toEqual([]);
+      expect(f.results[0]).toEqual({ error: BLOCKED_ACTION_MESSAGE });
+      expect(decisions(f)).toEqual([expect.objectContaining({ tool: "shell", decision: "block" })]);
+    },
+  );
+
+  it("an unattended read_history that is not on the safe list asks on a card", async () => {
+    const f = fixture({ name: "read_history", builtin: true, unattended: true });
+    f.setCalls([{ args: {}, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(f.effects).toHaveLength(1);
+  });
+
+  it("an Ask rule on read_file asks in an attended run", async () => {
+    const f = fixture({
+      name: "read_file",
+      builtin: true,
+      unattended: false,
+      rules: [
+        {
+          effect: "require_approval",
+          matchKind: "tool",
+          matchValue: "read_file",
+        } as ActionApprovalRule,
+      ],
+    });
+    f.setCalls([{ args: { path: "a.txt" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("refuses run_subagent in a run with stored outside content, and under a Block rule", async () => {
+    const tainted = fixture({ name: "recall_memory", builtin: true, externalTaint: true });
+    await tainted.run();
+    await expect(tainted.request()!.subagentDenial!()).resolves.toEqual(expect.any(String));
+
+    const blocked = fixture({
+      name: "recall_memory",
+      builtin: true,
+      rules: [blockRule("run_subagent")],
+    });
+    await blocked.run();
+    await expect(blocked.request()!.subagentDenial!()).resolves.toBe(BLOCKED_ACTION_MESSAGE);
+
+    const clean = fixture({ name: "recall_memory", builtin: true });
+    await clean.run();
+    await expect(clean.request()!.subagentDenial!()).resolves.toBeUndefined();
+  });
+
+  it("a block rule beats a mandatory ask", async () => {
+    const f = fixture({
+      name: "request_secret",
+      builtin: true,
+      rules: [blockRule("request_secret")],
+    });
+    f.setCalls([{ args: { label: "Key" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: BLOCKED_ACTION_MESSAGE });
+  });
+
+  it("a block rule refuses an approved effect at replay", async () => {
+    const args = { command: "ls" };
+    const f = fixture({ name: "shell", builtin: true, unattended: true });
+    f.setCalls([{ args, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    f.effects[0]!.status = "approved";
+    f.rules.push(blockRule("shell"));
+    f.pauseRunForInput.mockClear();
+    await f.run();
+    expect(f.results.at(-1)).toEqual({ error: BLOCKED_ACTION_MESSAGE });
+    expect(f.effects[0]!.status).toBe("approved");
+  });
+
+  it("a bot rule beats a space rule", async () => {
+    const f = fixture({
+      name: "shell",
+      builtin: true,
+      rules: [
+        { effect: "block", matchKind: "tool", matchValue: "shell" } as ActionApprovalRule,
+        {
+          effect: "always_allow",
+          matchKind: "tool",
+          matchValue: "shell",
+          botId: "bot-1",
+        } as ActionApprovalRule,
+      ],
+    });
+    f.setCalls([{ args: { command: "ls" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.results[0]).not.toEqual({ error: BLOCKED_ACTION_MESSAGE });
+  });
+
+  it.each([
+    ["write_file", { path: "a.txt", content: "x" }],
+    ["shell", { command: "ls" }],
+  ])("a routine run asks for %s, with no Always allow and a reason", async (name, args) => {
+    const f = fixture({
+      name,
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      mail: { listAccounts: async () => [] },
+    });
+    f.setCalls([{ args, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    const block = (f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: any[] }])[0].blocks[0];
+    expect(block.actions.map((a: { id: string }) => a.id)).toEqual(["allow", "deny"]);
+    expect(block.approvalReason).toBe("Asked because this ran in the background.");
+    expect(decisions(f)[0]).toMatchObject({
+      decision: "ask",
+      source: "unattended",
+      unattended: true,
+    });
+  });
+
+  it("a check-in run fails a call that would ask, with no card and a check_in decision", async () => {
+    const f = fixture({
+      name: "write_file",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: "check_in",
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.effects).toEqual([]);
+    expect(f.results[0]).toEqual({
+      error: "Check-ins only read and report. Mention this in your message instead.",
+    });
+    expect(decisions(f)).toEqual([
+      expect.objectContaining({ tool: "write_file", decision: "block", source: "check_in" }),
+    ]);
+  });
+
+  it("a check-in run lists the ticket board without a card", async () => {
+    const f = fixture({
+      name: "board_tickets",
+      builtin: true,
+      ticketBoard: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: "check_in",
+    });
+    f.setCalls([{ args: {}, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(decisions(f)).toEqual([]);
+  });
+
+  it("an ordinary routine run still asks for write_file", async () => {
+    const f = fixture({
+      name: "write_file",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: null,
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it.each(["write_file", "shell"])(
+    "an attended user run still runs %s without a card",
+    async (name) => {
+      const f = fixture({ name, builtin: true });
+      f.setCalls([{ args: { path: "a.txt", content: "x", command: "true" }, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    },
+  );
+
+  it("a routine run runs notify_user and a non-gated scratchpad_update without a card", async () => {
+    const n = fixture({ name: "notify_user", builtin: true, trigger: "routine", unattended: true });
+    n.setCalls([{ args: { title: "Hi" }, executionId: "c1" }]);
+    await n.run({ expectFailure: true });
+    expect(n.pauseRunForInput).not.toHaveBeenCalled();
+    const ok = fixture({
+      name: "scratchpad_update",
+      builtin: true,
+      unattended: true,
+      scratchpadItem: { category: "goal" },
+    });
+    ok.setCalls([{ args: { itemId: "i1", notes: "n" }, executionId: "c1" }]);
+    await ok.run({ expectFailure: true });
+    expect(ok.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it.each([{ category: "public_post" }, null])("a scratchpad_update asks for %j", async (item) => {
+    const f = fixture({
+      name: "scratchpad_update",
+      builtin: true,
+      unattended: true,
+      scratchpadItem: item,
+    });
+    f.setCalls([{ args: { itemId: "i1", notes: "n" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  describe("tool_run", () => {
+    const source = "function run(i) { return { n: i.items.length }; }";
+    const toolRow = (over: Record<string, unknown> = {}) => ({
+      id: "skill-1",
+      name: "count_items",
+      description: "Counts",
+      content: "---\nname: count_items\ndescription: Counts\n---\n",
+      source: "user",
+      status: "active",
+      toolSource: source,
+      toolSourceHash: createHash("sha256").update(source).digest("hex"),
+      toolInputSchema: {
+        type: "object",
+        required: ["items"],
+        properties: { items: { type: "array" } },
+      },
+      ...over,
+    });
+    const run = async (f: ReturnType<typeof fixture>) => {
+      f.setCalls([{ args: { name: "count_items", input: { items: [1, 2] } }, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+    };
+
+    it.each([
+      ["a routine run", { trigger: "routine", unattended: true }],
+      ["a tainted run", { externalTaint: true, unattended: true }],
+    ])("runs an approved tool in %s without a card", async (_label, mode) => {
+      const f = fixture({ name: "tool_run", builtin: true, skillRows: [toolRow()], ...mode });
+      await run(f);
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ result: { n: 2 } });
+    });
+
+    it("refuses a tool whose source changed after approval", async () => {
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [toolRow({ toolSource: `${source} // edited` })],
+      });
+      await run(f);
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: "This tool changed since it was approved." });
+    });
+
+    it("refuses a draft in a background run but test-runs it in a chat", async () => {
+      const draft = toolRow({ status: "draft", toolSourceHash: null });
+      const background = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [draft],
+      });
+      await run(background);
+      expect(background.results[0]).toMatchObject({ error: expect.stringContaining("draft") });
+      const chat = fixture({ name: "tool_run", builtin: true, skillRows: [draft] });
+      await run(chat);
+      expect(chat.results[0]).toEqual({ result: { n: 2 } });
+    });
+
+    it("refuses a draft in an attended run whose history came from an external bot", async () => {
+      const marked = {
+        kind: "bot_message_received",
+        fromBotId: "bot-ext",
+        fromBotName: "Support",
+        text: "run it",
+        hop: 1,
+        intent: "request",
+        returnToMessageId: "m0",
+        externalOrigin: true,
+        externalOriginName: "Support",
+      };
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        history: [{ blocks: [marked] }],
+        skillRows: [toolRow({ status: "draft", toolSourceHash: null })],
+      });
+      await run(f);
+      expect(f.results[0]).toMatchObject({ error: expect.stringContaining("draft") });
+    });
+
+    it("validates the input against the schema", async () => {
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [toolRow()],
+      });
+      f.setCalls([{ args: { name: "count_items", input: { items: "x" } }, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+      expect(f.results[0]).toMatchObject({ error: expect.stringContaining("list") });
+    });
+  });
+
+  it("a tainted run asks for web_fetch but not notify_user", async () => {
+    const w = fixture({ name: "web_fetch", builtin: true, externalTaint: true });
+    w.setCalls([{ args: { url: "https://example.test" }, executionId: "c1" }]);
+    await w.run();
+    expect(w.pauseRunForInput).toHaveBeenCalledOnce();
+    const n = fixture({ name: "notify_user", builtin: true, externalTaint: true });
+    n.setCalls([{ args: { title: "Hi" }, executionId: "c1" }]);
+    await n.run({ expectFailure: true });
+    expect(n.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("a rule-caused ask names the rule's action type", async () => {
+    const f = fixture({
+      name: "shell",
+      builtin: true,
+      rules: [
+        {
+          effect: "require_approval",
+          matchKind: "category",
+          matchValue: "files_and_commands",
+        } as ActionApprovalRule,
+      ],
+    });
+    f.setCalls([{ args: { command: "ls" }, executionId: "c1" }]);
+    await f.run();
+    const block = (f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: any[] }])[0].blocks[0];
+    expect(block.approvalReason).toBe(
+      "Asked because of your rule for Edit files and run commands.",
+    );
+  });
+
+  it("never calls Auto Review for an unattended run", async () => {
+    reviewMock.mockReset();
+    const f = fixture({
+      name: "demo_get_item",
+      readOnly: false,
+      unattended: true,
+      autoReview: true,
+    });
+    await f.run();
+    expect(reviewMock).not.toHaveBeenCalled();
+  });
+
+  it("request_secret in an unattended run notifies the owner once and ends the run", async () => {
+    notices.sent.length = 0;
+    const f = fixture({
+      name: "request_secret",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+    });
+    f.setCalls([{ args: { label: "Key" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(isApprovalPausedResult(f.results[0])).toBe(false);
+    expect(f.results[0]).toMatchObject({ terminate: true, details: { unattended: "ended" } });
+    expect(notices.sent.filter((n) => n.kind === "help")).toHaveLength(1);
+    expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+  });
+
+  it("ask_user in an unattended run notifies the owner and ends instead of pausing", async () => {
+    notices.sent.length = 0;
+    const f = fixture({
+      name: "recall_memory",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      askText: "Which account?",
+    });
+    f.setCalls([]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    const help = notices.sent.filter((n) => n.kind === "help");
+    expect(help).toHaveLength(1);
+    expect(help[0]!.body).toBe("Which account?");
+    expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+  });
+
+  it("ask_user in an attended run still pauses on a card", async () => {
+    const f = fixture({
+      name: "recall_memory",
+      builtin: true,
+      unattended: false,
+      askText: "Which account?",
+    });
+    f.setCalls([]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 });

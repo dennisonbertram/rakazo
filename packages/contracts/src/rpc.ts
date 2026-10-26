@@ -21,13 +21,50 @@ import {
   TicketSchema,
   UpdateTicketInput,
 } from "./board.js";
-import { BotSecretMetadata, BotSecretPutInput, StoredBotSecretName } from "./bot-secrets.js";
+import {
+  BotSecretMetadata,
+  BotSecretName,
+  BotSecretPutInput,
+  StoredBotSecretName,
+} from "./bot-secrets.js";
 import {
   CapTableChangeSourceInputSchema,
   CapTableSaveInputSchema,
   CapTableSourceRefSchema,
   CapTableStateSchema,
 } from "./carta.js";
+import {
+  CompanyEdgeEditInputSchema,
+  CompanyEntityEditInputSchema,
+  CompanyEventEditInputSchema,
+} from "./company.js";
+import { CompanyCalendarInputSchema, CompanyCalendarSchema } from "./company-calendar.js";
+import {
+  CompanyImportActionInputSchema,
+  CompanyImportCatalogSchema,
+  CompanyImportChannelsInputSchema,
+  CompanyImportChannelsSchema,
+  CompanyImportConsentInputSchema,
+  CompanyImportCreateInputSchema,
+  CompanyImportEventSchema,
+  CompanyImportGrantConsentInputSchema,
+  CompanyImportModelConsentStatusSchema,
+  CompanyImportProgressSchema,
+  CompanyImportRunIdInputSchema,
+  CompanyImportSampleSchema,
+  CompanyImportSessionInputSchema,
+  CompanyImportSessionSchema,
+  CompanyRefreshStartInputSchema,
+  CompanyRefreshStatusSchema,
+} from "./company-import.js";
+import { CompanyFactRefSchema, CompanyFactSchema, CompanyPageSchema } from "./company-page.js";
+import {
+  CompanyExportSchema,
+  CompanyPrivacySchema,
+  CompanySourceControlSchema,
+  CompanyVisibilityInputSchema,
+} from "./company-privacy.js";
+import { CompanyReviewResolveSchema, CompanyReviewSchema } from "./company-review.js";
 import {
   ContactLinkedSchema,
   ContactListInputSchema,
@@ -70,6 +107,7 @@ import {
 } from "./data-room-autosort.js";
 import { DevinAgentOutputSchema, DevinKeyInputSchema, DevinSessionsOutputSchema } from "./devin.js";
 import {
+  ActionApprovalEffectSchema,
   ActionApprovalRuleSchema,
   ActionAutoReviewSettingsSchema,
   AgentSecretInputSchema,
@@ -78,7 +116,11 @@ import {
   AgentSkillDraftSchema,
   AgentSkillSchema,
   AppBootstrapSchema,
+  ApprovalActionTypeSchema,
+  ApprovalChoiceSchema,
+  ApprovalTableRowSchema,
   ArtifactSchema,
+  ArtifactShareSchema,
   ArtifactVersionSchema,
   ArtifactWithContentSchema,
   AvatarStyleSchema,
@@ -136,6 +178,7 @@ import {
   SpreadsheetPreviewInputSchema,
   SpreadsheetPreviewSchema,
   TaughtSkillSchema,
+  TaughtSkillSummarySchema,
   TeachRecordingEventSchema,
   ThinkingLevelSchema,
   ThreadMessagePageSchema,
@@ -149,6 +192,7 @@ import {
   VoiceCredentialSchema,
   VoiceInfoSchema,
   VoiceStatusSchema,
+  WaitingOnYouItemSchema,
 } from "./domain.js";
 import { ComputerCommandSchema, MailEditsSchema, ProductEventSchema } from "./events.js";
 import {
@@ -299,6 +343,7 @@ import {
   BotPinsSchema,
 } from "./pins.js";
 import { MessageReactionSchema } from "./reactions.js";
+import { CheckInGetInput, CheckInSchema, CheckInSetInput, WatchSpecSchema } from "./routines.js";
 import { RoutineHistorySchema, RoutineRunCursorSchema, RunsListOutputSchema } from "./runs.js";
 import { SearchQueryOutputSchema } from "./search.js";
 import {
@@ -812,6 +857,8 @@ export const appContract = {
             routineId: Id,
             name: z.string().optional(),
             prompt: z.string().optional(),
+            /** A saved taught skill on this bot; null returns the routine to its own prompt. */
+            taughtSkillId: Id.nullable().optional(),
             crons: z.array(z.string().min(1)).optional(),
             timezone: z.string().optional(),
             active: z.boolean().optional(),
@@ -831,11 +878,15 @@ export const appContract = {
             thinkingLevel: ThinkingLevelSchema.nullable().optional(),
             /** ISO datetime to arm a never-run one-shot. */
             runAt: IsoDate.optional(),
+            quiet: z.boolean().optional(),
+            /** Null removes the watch. A connected-app watch is accepted only unchanged (the editor sends it back). */
+            watch: WatchSpecSchema.nullable().optional(),
           })
           .superRefine((value, ctx) => {
             if (
               value.crons &&
               value.crons.length === 0 &&
+              !value.watch &&
               value.webhookEnabled === false &&
               value.githubEnabled === false &&
               value.messageProvider === null
@@ -859,6 +910,10 @@ export const appContract = {
       )
       .output(z.object({ runId: Id })),
   },
+  checkIn: {
+    get: oc.input(CheckInGetInput).output(CheckInSchema),
+    set: oc.input(CheckInSetInput).output(CheckInSchema),
+  },
   scratchpad: {
     list: oc
       .input(
@@ -869,6 +924,8 @@ export const appContract = {
         }),
       )
       .output(z.array(ScratchpadItemSchema)),
+    /** Open items across the caller's bots that wait on them or are past due. */
+    waitingOnYou: oc.input(z.object({})).output(z.array(WaitingOnYouItemSchema)),
     create: oc.input(CreateScratchpadItemInput).output(ScratchpadItemSchema),
     update: oc
       .input(
@@ -880,6 +937,10 @@ export const appContract = {
             notes: z.string().max(4_000).optional(),
             target: z.string().max(200).optional(),
             scheduledFor: z.iso.datetime({ offset: true }).optional(),
+            /** Null clears. */
+            dueAt: z.iso.datetime({ offset: true }).nullable().optional(),
+            waitingOn: z.string().max(200).nullable().optional(),
+            resolvedReason: z.string().max(500).nullable().optional(),
             proof: z.string().max(2_000).optional(),
             updatedAt: z.iso.datetime({ offset: true }).optional(),
             reapprove: z.boolean().optional(),
@@ -932,6 +993,30 @@ export const appContract = {
       .output(z.object({ runId: Id })),
     remove: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
   },
+  /** Saved taught skills and the login steps of a fresh recording. Recording itself stays under `skills`. */
+  taughtSkills: {
+    list: oc.input(botId).output(z.array(TaughtSkillSummarySchema)),
+    delete: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Saves the held password as a login for `site` and rewrites the step to fill it. */
+    saveLogin: oc
+      .input(
+        z.object({
+          skillId: Id,
+          stepIndex: z.number().int().min(0),
+          name: BotSecretName,
+          site: z.string().min(1).max(2048),
+          /** The username the user confirmed; the server never guesses it. */
+          username: z.string().min(1).max(512),
+        }),
+      )
+      .output(TaughtSkillSchema),
+    /** Deletes the held password; the step becomes "Ask the user to sign in". */
+    skipLogin: oc
+      .input(z.object({ skillId: Id, stepIndex: z.number().int().min(0) }))
+      .output(TaughtSkillSchema),
+    /** Ends the recording and keeps nothing: no recording, held values or skill. */
+    cancel: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
   /** Claude Agent Skills (SKILL.md recipes) shared across assistants (not taught/demo skills). Pi already understands this format; we persist and inject them. */
   agentSkills: {
     list: oc.output(z.array(AgentSkillCatalogEntrySchema)),
@@ -955,7 +1040,9 @@ export const appContract = {
     remove: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
     /** Agent-written skills and revisions waiting for the owner. */
     drafts: oc.output(z.array(AgentSkillDraftSchema)),
-    approveDraft: oc.input(z.object({ skillId: Id })).output(AgentSkillSchema),
+    approveDraft: oc
+      .input(z.object({ skillId: Id, toolHash: z.string().optional() }))
+      .output(AgentSkillSchema),
     discardDraft: oc.input(z.object({ skillId: Id })).output(z.object({ ok: z.literal(true) })),
     /** The catalog with this bot's on/off switch per skill. */
     forBot: oc.input(botId).output(z.array(BotAgentSkillSchema)),
@@ -1212,12 +1299,27 @@ export const appContract = {
     set: oc
       .input(
         z.object({
-          effect: z.enum(["always_allow", "require_approval"]),
+          effect: ActionApprovalEffectSchema,
           matchKind: z.enum(["tool", "connector", "category"]),
           matchValue: z.string().min(1),
+          botId: Id.optional(),
         }),
       )
       .output(ActionApprovalRuleSchema),
+    /** The action-type table; with a botId, rows also show that bot's override. */
+    table: oc
+      .input(z.object({ botId: Id.optional() }))
+      .output(z.object({ rows: z.array(ApprovalTableRowSchema) })),
+    /** effect null clears the bot override, or resets the space row to its default. */
+    setActionType: oc
+      .input(
+        z.object({
+          actionType: ApprovalActionTypeSchema,
+          botId: Id.optional(),
+          effect: ApprovalChoiceSchema.nullable(),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
   },
   autoReview: {
@@ -1258,6 +1360,14 @@ export const appContract = {
     get: oc.input(threadTarget.and(z.object({ artifactId: Id }))).output(ArtifactWithContentSchema),
     getById: oc.input(z.object({ artifactId: Id })).output(ArtifactWithContentSchema),
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  artifactShares: {
+    get: oc.input(z.object({ artifactId: Id })).output(ArtifactShareSchema.nullable()),
+    /** The link is in the answer once; only its hash is stored. A live link of the same artifact ends. */
+    create: oc
+      .input(z.object({ artifactId: Id }))
+      .output(z.object({ url: z.string(), share: ArtifactShareSchema })),
+    revoke: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   files: {
     /** One page of a spreadsheet (.xlsx, .xlsm, .csv, .tsv) from an artifact or a Data room item. */
@@ -1470,6 +1580,53 @@ export const appContract = {
       list: oc.input(InboxScopeInputSchema).output(InboxTodosOutputSchema),
       setDone: oc.input(z.object({ id: Id, done: z.boolean() })).output(InboxTodoSchema),
     },
+  },
+  company: {
+    /** Idempotent: creates the Company agent; returns the bot to open in the side panel. */
+    agent: oc.output(BotSchema),
+    privacy: oc.output(CompanyPrivacySchema),
+    sourceControl: oc.input(CompanySourceControlSchema).output(z.object({ ok: z.literal(true) })),
+    excludePerson: oc.input(z.object({ entityId: Id })).output(z.object({ ok: z.literal(true) })),
+    erase: oc.output(z.object({ ok: z.literal(true) })),
+    export: oc.output(CompanyExportSchema),
+    visibility: oc.input(CompanyVisibilityInputSchema).output(z.object({ ok: z.literal(true) })),
+    page: oc.output(CompanyPageSchema),
+    calendar: oc.input(CompanyCalendarInputSchema).output(CompanyCalendarSchema),
+    review: oc.output(CompanyReviewSchema),
+    resolveCandidate: oc
+      .input(CompanyReviewResolveSchema)
+      .output(z.object({ ok: z.literal(true) })),
+    fact: oc.input(CompanyFactRefSchema).output(CompanyFactSchema.nullable()),
+    confirm: oc.input(CompanyFactRefSchema).output(z.object({ ok: z.literal(true) })),
+    reject: oc.input(CompanyFactRefSchema).output(z.object({ ok: z.literal(true) })),
+    editEntity: oc.input(CompanyEntityEditInputSchema).output(z.object({ ok: z.literal(true) })),
+    editEdge: oc.input(CompanyEdgeEditInputSchema).output(z.object({ ok: z.literal(true) })),
+    editEvent: oc.input(CompanyEventEditInputSchema).output(z.object({ ok: z.literal(true) })),
+  },
+  companyImport: {
+    /** Idempotent: creates the Company importer; returns the bot to open in the side panel. */
+    agent: oc.output(BotSchema),
+    catalog: oc.output(CompanyImportCatalogSchema),
+    channels: oc.input(CompanyImportChannelsInputSchema).output(CompanyImportChannelsSchema),
+    session: oc
+      .input(CompanyImportSessionInputSchema)
+      .output(CompanyImportSessionSchema.nullable()),
+    sample: oc.input(CompanyImportRunIdInputSchema).output(CompanyImportSampleSchema),
+    create: oc.input(CompanyImportCreateInputSchema).output(CompanyImportProgressSchema),
+    progress: oc.input(CompanyImportRunIdInputSchema).output(CompanyImportProgressSchema),
+    consentStatus: oc
+      .input(CompanyImportConsentInputSchema)
+      .output(CompanyImportModelConsentStatusSchema),
+    grantConsent: oc
+      .input(CompanyImportGrantConsentInputSchema)
+      .output(CompanyImportModelConsentStatusSchema),
+    start: oc.input(CompanyImportRunIdInputSchema).output(CompanyImportProgressSchema),
+    action: oc.input(CompanyImportActionInputSchema).output(CompanyImportProgressSchema),
+    refreshStatus: oc.output(z.array(CompanyRefreshStatusSchema)),
+    refresh: oc.input(CompanyRefreshStartInputSchema).output(CompanyImportProgressSchema),
+    subscribe: oc
+      .input(CompanyImportRunIdInputSchema)
+      .output(eventIterator(CompanyImportEventSchema)),
   },
   dataRoom: {
     /** Idempotent: creates the Data room agent; returns the bot to open in the side panel. */

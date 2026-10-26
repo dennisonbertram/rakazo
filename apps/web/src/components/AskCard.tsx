@@ -208,6 +208,11 @@ export function AskCard({
             : block.credential.origin}
         </div>
       ) : null}
+      {secretInput && block.credential?.auth.type === "command" ? (
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          <Trans>The bot can read this value.</Trans>
+        </p>
+      ) : null}
       {block.detail && block.consent ? (
         <details className="mt-2 text-[13px] text-muted-foreground">
           <summary className="w-fit cursor-pointer">
@@ -228,6 +233,9 @@ export function AskCard({
         <p className="mt-3 whitespace-pre-wrap break-words text-[13.5px] leading-[1.5] text-muted-foreground">
           {block.detail.trim()}
         </p>
+      ) : null}
+      {block.approvalReason ? (
+        <p className="mt-2 text-[13px] text-muted-foreground">{block.approvalReason}</p>
       ) : null}
       {block.status === "answered" ? (
         (() => {

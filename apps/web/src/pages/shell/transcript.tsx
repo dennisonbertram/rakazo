@@ -222,7 +222,7 @@ export const Transcript = memo(function Transcript({
   peerBot: (botId: string) => { name?: string; color: string; status?: string } | undefined;
   onRefresh: () => Promise<void>;
   onBotChanged: () => Promise<void>;
-  onAddRoutine: (name: string, prompt: string) => void;
+  onAddRoutine: (skill: { id: string; name: string }) => void;
   voiceReady: boolean;
   speakingMessageId: string | null;
   onSpeak: (message: ThreadMessage) => void;
@@ -804,7 +804,7 @@ export const Transcript = memo(function Transcript({
               {showDividerId === message.id ? <UnreadDivider /> : null}
               {message.routineName ? (
                 <p
-                  className="mb-1 truncate text-xs text-muted-foreground"
+                  className="mb-1 shrink-0 truncate text-xs text-muted-foreground"
                   data-testid="routine-label"
                 >
                   {t`From routine: ${message.routineName}`}
@@ -1475,7 +1475,7 @@ const MessageView = memo(function MessageView({
   onJumpToMessage?: (messageId: string) => void;
   onRefresh: () => Promise<void>;
   onBotChanged: () => Promise<void>;
-  onAddRoutine: (name: string, prompt: string) => void;
+  onAddRoutine: (skill: { id: string; name: string }) => void;
   voiceReady: boolean;
   speaking: boolean;
   onSpeak: () => void;
@@ -1879,6 +1879,7 @@ const MessageView = memo(function MessageView({
               <div key={i} className={gap}>
                 <MailApprovalCard
                   mail={block.mail}
+                  reason={block.approvalReason}
                   accounts={mailAccounts.accounts}
                   accountsStatus={mailAccounts.status}
                   onRetryAccounts={mailAccounts.retry}

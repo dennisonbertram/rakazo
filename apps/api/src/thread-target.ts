@@ -24,6 +24,7 @@ import {
   dataRoomReferenceLine,
   isActive,
   isConversationalRun,
+  newRunUnattended,
   projectMessages,
   resolveGroupTargetBotIds,
   runFailureError,
@@ -942,6 +943,7 @@ export async function sendThreadMessage(
             userId: actor.userId,
             status: "queued",
             trigger: "user",
+            unattended: newRunUnattended({ trigger: "user" }),
             // The message keeps its first nonce; a retry's own nonce is recorded on its run so a
             // repeat of either request replays this send.
             clientNonce: retried
@@ -1095,6 +1097,7 @@ export async function sendThreadMessage(
             userId: actor.userId,
             status: "queued",
             trigger: "user",
+            unattended: newRunUnattended({ trigger: "user" }),
             clientNonce: sendRunClientNonce(input.clientNonce, message.id, botId),
             sourceMessageId: message.id,
           },

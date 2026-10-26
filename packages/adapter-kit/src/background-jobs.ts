@@ -72,6 +72,20 @@ const payloadSchemas = {
     /** Set on the last job of a batch: when it ends, the rest of the backlog is queued. */
     continue: z.boolean().optional(),
   }),
+  "company.import.run": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    runId: z.string().min(1),
+  }),
+  "company.import.unit": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    runId: z.string().min(1),
+    unitId: z.string().min(1),
+  }),
+  "company.import.recover": z.object({}),
+  "company.refresh.tick": z.object({}),
+  "watch.probe": z.object({}),
   "finance.sync": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
   "dataroom.blob.delete": z.object({ spaceId: z.string().min(1), storageKey: z.string().min(1) }),
   "dataroom.ingest": dataRoomStepPayload,
@@ -199,6 +213,11 @@ export function runContinueJob(runId: string): BackgroundJob {
     payload: { runId },
     replaceKey: runJobKey(runId),
   };
+}
+
+/** One tick of the page-watch probe; the cron runs it every minute, this queues one on demand. */
+export function watchProbeJob(): BackgroundJob {
+  return { name: "watch.probe", payload: {}, replaceKey: "watch.probe" };
 }
 
 export function routineWakeupJob(routineId: string, scheduledFor: Date): BackgroundJob {

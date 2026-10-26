@@ -15,6 +15,7 @@ import {
   isSecretAskBlock,
   resolveAskChoice,
 } from "@rakazo/core";
+import { setApprovalRule } from "./approval-rules.js";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import type { Prisma, PrismaClient } from "./client.js";
 import type {
@@ -307,7 +308,7 @@ export async function expireDelegatedApprovalsInTransaction(
 }
 
 /** Tells the thread that sent work to a delegate which of its requests wait for approval. */
-async function announceDelegatePending(
+export async function announceDelegatePending(
   prisma: PrismaClient,
   realtime: RealtimeFanout | undefined,
   delegateRunId: string,
@@ -568,24 +569,13 @@ async function commitAnswerRunInput(
       });
     }
     if (input.answer === "always") {
-      await tx.actionApprovalRule.upsert({
-        where: {
-          spaceId_createdByUserId_effect_matchKind_matchValue: {
-            spaceId: input.spaceId,
-            createdByUserId: approvalUserId!,
-            effect: "always_allow",
-            matchKind: "tool",
-            matchValue: approvalEffect!.kind,
-          },
-        },
-        create: {
-          spaceId: input.spaceId,
-          createdByUserId: approvalUserId!,
-          effect: "always_allow",
-          matchKind: "tool",
-          matchValue: approvalEffect!.kind,
-        },
-        update: {},
+      // A card's "Always allow" is a space-wide per-tool rule; it replaces any rule for that tool.
+      await setApprovalRule(tx, {
+        spaceId: input.spaceId,
+        userId: approvalUserId!,
+        matchKind: "tool",
+        matchValue: approvalEffect!.kind,
+        effect: "always_allow",
       });
     }
   } else if (secretAsk) {

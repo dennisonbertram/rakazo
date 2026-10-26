@@ -28,7 +28,10 @@ export function buildApprovalAskBlock(
   secrets: string[],
   options?: {
     reviewReason?: string;
+    /** One plain sentence under the card: the call asked because of a background run or a rule. */
+    approvalReason?: string;
     fullMail?: boolean;
+    fullCompany?: boolean;
     integrationWriteTool?: string;
     /** Never offer "Always allow": the call asks every time (a run holding untrusted meeting text). */
     noAlwaysAllow?: boolean;
@@ -54,6 +57,7 @@ export function buildApprovalAskBlock(
     );
   const fullDetail =
     options?.fullMail ||
+    options?.fullCompany ||
     options?.integrationWriteTool !== undefined ||
     options?.imessage ||
     options?.schedule;
@@ -66,14 +70,16 @@ export function buildApprovalAskBlock(
         ? fullMailDetail(args, options.reviewReason)
         : isSendMoney(toolName)
           ? moneyDetail(args, options?.moneyNames, options?.reviewReason)
-          : options?.integrationWriteTool !== undefined
-            ? integrationWriteDetail(
-                toolName,
-                options.integrationWriteTool,
-                args,
-                options.reviewReason,
-              )
-            : formatApprovalDetail(toolName, args, options?.reviewReason);
+          : options?.fullCompany
+            ? JSON.stringify(args, null, 2)
+            : options?.integrationWriteTool !== undefined
+              ? integrationWriteDetail(
+                  toolName,
+                  options.integrationWriteTool,
+                  args,
+                  options.reviewReason,
+                )
+              : formatApprovalDetail(toolName, args, options?.reviewReason);
   const safeDetail = detail ? redactSecrets(detail, secrets) : undefined;
   return {
     kind: "ask",
@@ -109,6 +115,7 @@ export function buildApprovalAskBlock(
         : args,
       secrets,
     ),
+    approvalReason: options?.approvalReason,
     status: "pending",
     actions:
       toolName === "create_space"
@@ -125,6 +132,7 @@ export function buildApprovalAskBlock(
                   : "Allow once",
             },
             ...(options?.fullMail ||
+            options?.fullCompany ||
             options?.integrationWriteTool !== undefined ||
             options?.noAlwaysAllow ||
             toolName === "imessage_send"

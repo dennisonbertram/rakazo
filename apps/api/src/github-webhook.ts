@@ -210,6 +210,7 @@ export function mountGithubWebhookRoute(
         modelProvider: true,
         modelId: true,
         thinkingLevel: true,
+        taughtSkillId: true,
       },
       orderBy: { updatedAt: "desc" },
       take: 5,

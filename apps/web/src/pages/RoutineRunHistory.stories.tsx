@@ -92,3 +92,14 @@ export const LoadFailed: Story = {
       },
     }),
 };
+
+export const SilentRun: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "routines.history": {
+        runs: [{ ...run(5, "completed", false), silent: true }, run(4, "completed")],
+        nextCursor: null,
+      },
+    }),
+  play: expand,
+};

@@ -1,6 +1,7 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
 import { runContinueJob } from "@rakazo/adapter-kit";
 import { isTicketCompletedStatus, TicketStatusSchema } from "@rakazo/contracts";
+import { newRunUnattended } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 
@@ -41,6 +42,7 @@ export async function wakeTicketAssignee(
         userId: bot.userId,
         taskId: task.id,
         trigger: "tickets",
+        unattended: newRunUnattended({ trigger: "tickets" }),
         status: "queued",
       },
     });

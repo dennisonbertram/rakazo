@@ -3,9 +3,9 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 279 of 279
-- Web and shared components: 737
-- Mobile components: 138 in 95 files, mobile — native story pending
+- Web and shared component files with stories: 293 of 293
+- Web and shared components: 759
+- Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
@@ -35,6 +35,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Input | [packages/ui-web/src/components/ui/input.tsx](../../packages/ui-web/src/components/ui/input.tsx) | [field.stories.tsx](../../packages/ui-web/src/components/ui/field.stories.tsx), [input.stories.tsx](../../packages/ui-web/src/components/ui/input.stories.tsx), [label.stories.tsx](../../packages/ui-web/src/components/ui/label.stories.tsx) | shared |
 | Kbd, KbdGroup | [packages/ui-web/src/components/ui/kbd.tsx](../../packages/ui-web/src/components/ui/kbd.tsx) | [kbd.stories.tsx](../../packages/ui-web/src/components/ui/kbd.stories.tsx) | shared |
 | Label | [packages/ui-web/src/components/ui/label.tsx](../../packages/ui-web/src/components/ui/label.tsx) | [label.stories.tsx](../../packages/ui-web/src/components/ui/label.stories.tsx) | shared |
+| ModelPicker | [packages/ui-web/src/components/ui/model-picker.tsx](../../packages/ui-web/src/components/ui/model-picker.tsx) | [model-picker.stories.tsx](../../packages/ui-web/src/components/ui/model-picker.stories.tsx) | shared |
 | NativeSelect, NativeSelectOption, NativeSelectOptGroup | [packages/ui-web/src/components/ui/native-select.tsx](../../packages/ui-web/src/components/ui/native-select.tsx) | [native-select.stories.tsx](../../packages/ui-web/src/components/ui/native-select.stories.tsx) | shared |
 | ToastBody, ToastList, NotificationToaster | [packages/ui-web/src/components/ui/notification-toaster.tsx](../../packages/ui-web/src/components/ui/notification-toaster.tsx) | [notification-toaster.stories.tsx](../../packages/ui-web/src/components/ui/notification-toaster.stories.tsx) | shared |
 | Popover, PopoverTrigger, PopoverContent, PopoverHeader, PopoverTitle, PopoverDescription | [packages/ui-web/src/components/ui/popover.tsx](../../packages/ui-web/src/components/ui/popover.tsx) | [popover.stories.tsx](../../packages/ui-web/src/components/ui/popover.stories.tsx) | shared |
@@ -67,10 +68,12 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | AddSidebarPage | [apps/web/src/components/AddSidebarPage.tsx](../../apps/web/src/components/AddSidebarPage.tsx) | [AddSidebarPage.stories.tsx](../../apps/web/src/components/AddSidebarPage.stories.tsx) | web |
 | AgentPanelIntro | [apps/web/src/components/AgentPanelIntro.tsx](../../apps/web/src/components/AgentPanelIntro.tsx) | [AgentPanelIntro.stories.tsx](../../apps/web/src/components/AgentPanelIntro.stories.tsx) | web |
 | ConsentCard, DocumentsConsentCard, InboxConsentPrompt, SwitchRow, AiDataSharingSection | [apps/web/src/components/AiDataSharing.tsx](../../apps/web/src/components/AiDataSharing.tsx) | [AiDataSharing.stories.tsx](../../apps/web/src/components/AiDataSharing.stories.tsx) | web |
+| ApprovalActionsTable | [apps/web/src/components/ApprovalActionsTable.tsx](../../apps/web/src/components/ApprovalActionsTable.tsx) | [ApprovalActionsTable.stories.tsx](../../apps/web/src/components/ApprovalActionsTable.stories.tsx) | web |
 | ApprovalRulesSettings | [apps/web/src/components/ApprovalRulesSettings.tsx](../../apps/web/src/components/ApprovalRulesSettings.tsx) | [ApprovalRulesSettings.stories.tsx](../../apps/web/src/components/ApprovalRulesSettings.stories.tsx) | web |
 | AppToaster | [apps/web/src/components/AppToaster.tsx](../../apps/web/src/components/AppToaster.tsx) | [AppToaster.stories.tsx](../../apps/web/src/components/AppToaster.stories.tsx) | web |
 | ArtifactFileCard, FilePreview, DownloadError | [apps/web/src/components/ArtifactFileCard.tsx](../../apps/web/src/components/ArtifactFileCard.tsx) | [ArtifactFileCard.stories.tsx](../../apps/web/src/components/ArtifactFileCard.stories.tsx) | web |
 | ArtifactPreview, ImagePreview | [apps/web/src/components/ArtifactPreview.tsx](../../apps/web/src/components/ArtifactPreview.tsx) | [ArtifactPreview.stories.tsx](../../apps/web/src/components/ArtifactPreview.stories.tsx) | web |
+| ArtifactShareDialog | [apps/web/src/components/ArtifactShareDialog.tsx](../../apps/web/src/components/ArtifactShareDialog.tsx) | [ArtifactShareDialog.stories.tsx](../../apps/web/src/components/ArtifactShareDialog.stories.tsx) | web |
 | AskBotButton | [apps/web/src/components/AskBotButton.tsx](../../apps/web/src/components/AskBotButton.tsx) | [AskBotButton.stories.tsx](../../apps/web/src/components/AskBotButton.stories.tsx) | web |
 | AskCard | [apps/web/src/components/AskCard.tsx](../../apps/web/src/components/AskCard.tsx) | [AskCard.stories.tsx](../../apps/web/src/components/AskCard.stories.tsx) | web |
 | AutoFileEmailSetting | [apps/web/src/components/AutoFileEmailSetting.tsx](../../apps/web/src/components/AutoFileEmailSetting.tsx) | [AutoFileEmailSetting.stories.tsx](../../apps/web/src/components/AutoFileEmailSetting.stories.tsx) | web |
@@ -296,10 +299,10 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
-| SkillDraftCard | [apps/web/src/components/teach/SkillDraftCard.tsx](../../apps/web/src/components/teach/SkillDraftCard.tsx) | [SkillDraftCard.stories.tsx](../../apps/web/src/components/teach/SkillDraftCard.stories.tsx) | web |
+| LoginPromptRow, SkillDraftCard | [apps/web/src/components/teach/SkillDraftCard.tsx](../../apps/web/src/components/teach/SkillDraftCard.tsx) | [SkillDraftCard.stories.tsx](../../apps/web/src/components/teach/SkillDraftCard.stories.tsx) | web |
 | TeachCaptureOverlay | [apps/web/src/components/teach/TeachCaptureOverlay.tsx](../../apps/web/src/components/teach/TeachCaptureOverlay.tsx) | [TeachCaptureOverlay.stories.tsx](../../apps/web/src/components/teach/TeachCaptureOverlay.stories.tsx) | web |
 | TeachComputerOverlayControl | [apps/web/src/components/teach/TeachComputerOverlay.tsx](../../apps/web/src/components/teach/TeachComputerOverlay.tsx) | [TeachComputerOverlay.stories.tsx](../../apps/web/src/components/teach/TeachComputerOverlay.stories.tsx) | web |
-| TeachRecordingChrome, ProtectedTeachInput, TeachStopButton | [apps/web/src/components/teach/TeachRecordingChrome.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.tsx) | [TeachRecordingChrome.stories.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.stories.tsx) | web |
+| TeachRecordingChrome, ProtectedTeachInput, TeachStopButton, TeachCancelButton | [apps/web/src/components/teach/TeachRecordingChrome.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.tsx) | [TeachRecordingChrome.stories.tsx](../../apps/web/src/components/teach/TeachRecordingChrome.stories.tsx) | web |
 
 ## Web components/tour
 
@@ -313,12 +316,21 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
 | GeneralSettingsPanels, PrivacySettingsPanels, UsageSettingsPanel, ComputerSettingsPanel, UpdatesSettingsPanel, ChangePasswordSection, SettingsPasswordInput, AppearancePicker, TimezonePicker, UiLocalePicker | [apps/web/src/pages/AccountSettingsOverlay.tsx](../../apps/web/src/pages/AccountSettingsOverlay.tsx) | [AccountSettingsOverlay.stories.tsx](../../apps/web/src/pages/AccountSettingsOverlay.stories.tsx) | web |
-| ActivityList, ActivitySection, ActivityError, ActivityFilters, FilterChip, ActivityRow | [apps/web/src/pages/ActivityList.tsx](../../apps/web/src/pages/ActivityList.tsx) | [ActivityList.stories.tsx](../../apps/web/src/pages/ActivityList.stories.tsx) | web |
+| ActivityList, ActivitySection, ActivityError, ActivityFilters, FilterChip, WaitingRow, ActivityRow | [apps/web/src/pages/ActivityList.tsx](../../apps/web/src/pages/ActivityList.tsx) | [ActivityList.stories.tsx](../../apps/web/src/pages/ActivityList.stories.tsx) | web |
 | ArtifactsPage, BrowsingPane, ArtifactTable, LoadMoreButton, EmptyArtifacts, IndexPane, ArtifactCard, ArtifactRow, ArtifactMimeIcon, PreviewPane | [apps/web/src/pages/Artifacts.tsx](../../apps/web/src/pages/Artifacts.tsx) | [Artifacts.stories.tsx](../../apps/web/src/pages/Artifacts.stories.tsx) | web |
 | AuthPage, PasswordResetPage, AuthFrame, PasswordField | [apps/web/src/pages/Auth.tsx](../../apps/web/src/pages/Auth.tsx) | [Auth.stories.tsx](../../apps/web/src/pages/Auth.stories.tsx) | web |
 | BillingSettingsPanel | [apps/web/src/pages/BillingSettingsPanel.tsx](../../apps/web/src/pages/BillingSettingsPanel.tsx) | [BillingSettingsPanel.stories.tsx](../../apps/web/src/pages/BillingSettingsPanel.stories.tsx) | web |
 | BoardPage, TicketDialog | [apps/web/src/pages/Board.tsx](../../apps/web/src/pages/Board.tsx) | [Board.stories.tsx](../../apps/web/src/pages/Board.stories.tsx) | web |
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
+| CompanyPage | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
+| CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |
+| CompanyFactDetail | [apps/web/src/pages/CompanyFactDetail.tsx](../../apps/web/src/pages/CompanyFactDetail.tsx) | [CompanyFactDetail.stories.tsx](../../apps/web/src/pages/CompanyFactDetail.stories.tsx) | web |
+| CompanyHistory | [apps/web/src/pages/CompanyHistory.tsx](../../apps/web/src/pages/CompanyHistory.tsx) | [CompanyHistory.stories.tsx](../../apps/web/src/pages/CompanyHistory.stories.tsx) | web |
+| CompanyImportPage | [apps/web/src/pages/CompanyImport.tsx](../../apps/web/src/pages/CompanyImport.tsx) | [CompanyImport.stories.tsx](../../apps/web/src/pages/CompanyImport.stories.tsx) | web |
+| CompanyImportScope | [apps/web/src/pages/CompanyImportScope.tsx](../../apps/web/src/pages/CompanyImportScope.tsx) | [CompanyImportScope.stories.tsx](../../apps/web/src/pages/CompanyImportScope.stories.tsx) | web |
+| CompanyPrivacy | [apps/web/src/pages/CompanyPrivacy.tsx](../../apps/web/src/pages/CompanyPrivacy.tsx) | [CompanyPrivacy.stories.tsx](../../apps/web/src/pages/CompanyPrivacy.stories.tsx) | web |
+| CompanyRefresh | [apps/web/src/pages/CompanyRefresh.tsx](../../apps/web/src/pages/CompanyRefresh.tsx) | [CompanyRefresh.stories.tsx](../../apps/web/src/pages/CompanyRefresh.stories.tsx) | web |
+| CompanyReview, ReviewItem, CandidateSubjects | [apps/web/src/pages/CompanyReview.tsx](../../apps/web/src/pages/CompanyReview.tsx) | [CompanyReview.stories.tsx](../../apps/web/src/pages/CompanyReview.stories.tsx) | web |
 | ConnectedCallbackPage | [apps/web/src/pages/ConnectedCallback.tsx](../../apps/web/src/pages/ConnectedCallback.tsx) | [ConnectedCallback.stories.tsx](../../apps/web/src/pages/ConnectedCallback.stories.tsx) | web |
 | ContactsPage | [apps/web/src/pages/Contacts.tsx](../../apps/web/src/pages/Contacts.tsx) | [Contacts.stories.tsx](../../apps/web/src/pages/Contacts.stories.tsx) | web |
 | FileInputButton, DataRoomPage | [apps/web/src/pages/DataRoom.tsx](../../apps/web/src/pages/DataRoom.tsx) | [DataRoom.stories.tsx](../../apps/web/src/pages/DataRoom.stories.tsx) | web |
@@ -354,7 +366,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ScopePicker, MemorySettingsOverlay | [apps/web/src/pages/MemorySettingsOverlay.tsx](../../apps/web/src/pages/MemorySettingsOverlay.tsx) | [MemorySettingsOverlay.stories.tsx](../../apps/web/src/pages/MemorySettingsOverlay.stories.tsx) | web |
 | MessagingSettingsOverlay | [apps/web/src/pages/MessagingSettingsOverlay.tsx](../../apps/web/src/pages/MessagingSettingsOverlay.tsx) | [MessagingSettingsOverlay.stories.tsx](../../apps/web/src/pages/MessagingSettingsOverlay.stories.tsx) | web |
 | ModelBackupsSettings | [apps/web/src/pages/ModelBackupsSettings.tsx](../../apps/web/src/pages/ModelBackupsSettings.tsx) | [ModelBackupsSettings.stories.tsx](../../apps/web/src/pages/ModelBackupsSettings.stories.tsx) | web |
-| DisclosureChevron, ModelSettingsOverlay, EmbeddingModelField, ModelPicker, ModelOption | [apps/web/src/pages/ModelSettingsOverlay.tsx](../../apps/web/src/pages/ModelSettingsOverlay.tsx) | [ModelSettingsOverlay.stories.tsx](../../apps/web/src/pages/ModelSettingsOverlay.stories.tsx) | web |
+| DisclosureChevron, ModelSettingsOverlay, EmbeddingModelField | [apps/web/src/pages/ModelSettingsOverlay.tsx](../../apps/web/src/pages/ModelSettingsOverlay.tsx) | [ModelSettingsOverlay.stories.tsx](../../apps/web/src/pages/ModelSettingsOverlay.stories.tsx) | web |
 | NotFoundPage | [apps/web/src/pages/NotFound.tsx](../../apps/web/src/pages/NotFound.tsx) | [NotFound.stories.tsx](../../apps/web/src/pages/NotFound.stories.tsx) | web |
 | OnboardingPage | [apps/web/src/pages/Onboarding.tsx](../../apps/web/src/pages/Onboarding.tsx) | [Onboarding.stories.tsx](../../apps/web/src/pages/Onboarding.stories.tsx) | web |
 | PaywallPage | [apps/web/src/pages/Paywall.tsx](../../apps/web/src/pages/Paywall.tsx) | [Paywall.stories.tsx](../../apps/web/src/pages/Paywall.stories.tsx) | web |
@@ -363,19 +375,20 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | UpdateBody, EarlierUpdate, DocumentRow, PortalHome | [apps/web/src/pages/portal/PortalHome.tsx](../../apps/web/src/pages/portal/PortalHome.tsx) | [PortalHome.stories.tsx](../../apps/web/src/pages/portal/PortalHome.stories.tsx) | web |
 | PortalOpen | [apps/web/src/pages/portal/PortalOpen.tsx](../../apps/web/src/pages/portal/PortalOpen.tsx) | [PortalOpen.stories.tsx](../../apps/web/src/pages/portal/PortalOpen.stories.tsx) | web |
 | ResizableSidePanel | [apps/web/src/pages/ResizableSidePanel.tsx](../../apps/web/src/pages/ResizableSidePanel.tsx) | [ResizableSidePanel.stories.tsx](../../apps/web/src/pages/ResizableSidePanel.stories.tsx) | web |
-| RoutineListHeader, RoutineListRow, RoutineEditor, MessageTriggerCard, InboundTriggerCard | [apps/web/src/pages/RoutineEditor.tsx](../../apps/web/src/pages/RoutineEditor.tsx) | [RoutineEditor.stories.tsx](../../apps/web/src/pages/RoutineEditor.stories.tsx) | web |
+| RoutineListHeader, RoutineListRow, RoutineEditor, MessageTriggerCard, WatchTriggerCard, InboundTriggerCard | [apps/web/src/pages/RoutineEditor.tsx](../../apps/web/src/pages/RoutineEditor.tsx) | [RoutineEditor.stories.tsx](../../apps/web/src/pages/RoutineEditor.stories.tsx) | web |
 | RoutineRunHistory | [apps/web/src/pages/RoutineRunHistory.tsx](../../apps/web/src/pages/RoutineRunHistory.tsx) | [RoutineRunHistory.stories.tsx](../../apps/web/src/pages/RoutineRunHistory.stories.tsx) | web |
 | RoutineSchedule | [apps/web/src/pages/RoutineSchedule.tsx](../../apps/web/src/pages/RoutineSchedule.tsx) | [RoutineSchedule.stories.tsx](../../apps/web/src/pages/RoutineSchedule.stories.tsx) | web |
-| ScratchpadSection | [apps/web/src/pages/ScratchpadSection.tsx](../../apps/web/src/pages/ScratchpadSection.tsx) | [ScratchpadSection.stories.tsx](../../apps/web/src/pages/ScratchpadSection.stories.tsx) | web |
+| ScratchpadItemMeta, ScratchpadSection | [apps/web/src/pages/ScratchpadSection.tsx](../../apps/web/src/pages/ScratchpadSection.tsx) | [ScratchpadSection.stories.tsx](../../apps/web/src/pages/ScratchpadSection.stories.tsx) | web |
 | SettingsOverlay | [apps/web/src/pages/SettingsOverlay.tsx](../../apps/web/src/pages/SettingsOverlay.tsx) | [SettingsOverlay.stories.tsx](../../apps/web/src/pages/SettingsOverlay.stories.tsx) | web |
+| SharedArtifactPage | [apps/web/src/pages/SharedArtifact.tsx](../../apps/web/src/pages/SharedArtifact.tsx) | [SharedArtifact.stories.tsx](../../apps/web/src/pages/SharedArtifact.stories.tsx) | web |
 | ShellPage, ComputerReleaseActions, DesktopKindEmptyState | [apps/web/src/pages/Shell.tsx](../../apps/web/src/pages/Shell.tsx) | [Shell.stories.tsx](../../apps/web/src/pages/Shell.stories.tsx) | web |
 | AvatarStudioPopover | [apps/web/src/pages/shell/avatar-studio-popover.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.tsx) | [avatar-studio-popover.stories.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.stories.tsx) | web |
 | BotCredentialsSection | [apps/web/src/pages/shell/bot-credentials.tsx](../../apps/web/src/pages/shell/bot-credentials.tsx) | [bot-credentials.stories.tsx](../../apps/web/src/pages/shell/bot-credentials.stories.tsx) | web |
 | ChartView, GtmView, BotPagePanel | [apps/web/src/pages/shell/bot-page-panel.tsx](../../apps/web/src/pages/shell/bot-page-panel.tsx) | [bot-page-panel.stories.tsx](../../apps/web/src/pages/shell/bot-page-panel.stories.tsx) | web |
-| ComputerModePicker, BotSettings | [apps/web/src/pages/shell/bot-panel.tsx](../../apps/web/src/pages/shell/bot-panel.tsx) | [bot-panel.stories.tsx](../../apps/web/src/pages/shell/bot-panel.stories.tsx) | web |
+| ComputerModePicker, CheckInSetting, BotSettings | [apps/web/src/pages/shell/bot-panel.tsx](../../apps/web/src/pages/shell/bot-panel.tsx) | [bot-panel.stories.tsx](../../apps/web/src/pages/shell/bot-panel.stories.tsx) | web |
 | BotCreatePicker | [apps/web/src/pages/shell/bot-picker.tsx](../../apps/web/src/pages/shell/bot-picker.tsx) | [bot-picker.stories.tsx](../../apps/web/src/pages/shell/bot-picker.stories.tsx) | web |
 | PinsStrip, ItemRow, PinsList | [apps/web/src/pages/shell/bot-pins.tsx](../../apps/web/src/pages/shell/bot-pins.tsx) | [bot-pins.stories.tsx](../../apps/web/src/pages/shell/bot-pins.stories.tsx) | web |
-| SkillSourceBadge, BotSkillsSection | [apps/web/src/pages/shell/BotSkillsSection.tsx](../../apps/web/src/pages/shell/BotSkillsSection.tsx) | [BotSkillsSection.stories.tsx](../../apps/web/src/pages/shell/BotSkillsSection.stories.tsx) | web |
+| SkillSourceBadge, ToolBadge, DraftTool, BotSkillsSection | [apps/web/src/pages/shell/BotSkillsSection.tsx](../../apps/web/src/pages/shell/BotSkillsSection.tsx) | [BotSkillsSection.stories.tsx](../../apps/web/src/pages/shell/BotSkillsSection.stories.tsx) | web |
 | ReplyThumbnail, TimeSeparator, ComposerReplyPreview, ReplyLine | [apps/web/src/pages/shell/chat-context.tsx](../../apps/web/src/pages/shell/chat-context.tsx) | [chat-context.stories.tsx](../../apps/web/src/pages/shell/chat-context.stories.tsx) | web |
 | Highlight, CommandPalette | [apps/web/src/pages/shell/command-palette.tsx](../../apps/web/src/pages/shell/command-palette.tsx) | [command-palette.stories.tsx](../../apps/web/src/pages/shell/command-palette.stories.tsx) | web |
 | ComposerError | [apps/web/src/pages/shell/composer-error.tsx](../../apps/web/src/pages/shell/composer-error.tsx) | [composer-error.stories.tsx](../../apps/web/src/pages/shell/composer-error.stories.tsx) | web |
@@ -386,6 +399,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | MentionIcon | [apps/web/src/pages/shell/mention-icon.tsx](../../apps/web/src/pages/shell/mention-icon.tsx) | [mention-icon.stories.tsx](../../apps/web/src/pages/shell/mention-icon.stories.tsx) | web |
 | ResultCard, ChoiceCard, OnboardingFocusQuestion, OnboardingFocusOptionHint, OnboardingFocusOptionLabel, AppConnectCard, ChartCanvas, ChartCanvasPlot, McpApprovalCard, ChartBlockView, ArtifactImage, ArtifactImageGrid | [apps/web/src/pages/shell/message-cards.tsx](../../apps/web/src/pages/shell/message-cards.tsx) | [message-cards.stories.tsx](../../apps/web/src/pages/shell/message-cards.stories.tsx) | web |
 | SidebarHeaderRow | [apps/web/src/pages/shell/sidebar-header-row.tsx](../../apps/web/src/pages/shell/sidebar-header-row.tsx) | [sidebar-header-row.stories.tsx](../../apps/web/src/pages/shell/sidebar-header-row.stories.tsx) | web |
+| SpaceSidebar | [apps/web/src/pages/shell/space-sidebar.tsx](../../apps/web/src/pages/shell/space-sidebar.tsx) | [space-sidebar.stories.tsx](../../apps/web/src/pages/shell/space-sidebar.stories.tsx) | web |
 | ThreadMarkdown, UnreadDivider, Transcript, QuoteSelectionButton, MessageHoverActions, SpeakerHeader, MessageView | [apps/web/src/pages/shell/transcript.tsx](../../apps/web/src/pages/shell/transcript.tsx) | [transcript.stories.tsx](../../apps/web/src/pages/shell/transcript.stories.tsx) | web |
 | VoiceSettingsOverlay | [apps/web/src/pages/VoiceSettingsOverlay.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.tsx) | [VoiceSettingsOverlay.stories.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.stories.tsx) | web |
 | WelcomePage | [apps/web/src/pages/Welcome.tsx](../../apps/web/src/pages/Welcome.tsx) | [Welcome.stories.tsx](../../apps/web/src/pages/Welcome.stories.tsx) | web |
@@ -416,7 +430,11 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ArtifactDetailScreen, ArtifactPreview | [apps/mobile/app/artifact.tsx](../../apps/mobile/app/artifact.tsx) | mobile — native story pending | mobile |
 | ArtifactsScreen, Chip, ArtifactRow | [apps/mobile/app/artifacts.tsx](../../apps/mobile/app/artifacts.tsx) | mobile — native story pending | mobile |
 | BotSettingsScreen | [apps/mobile/app/bot-settings.tsx](../../apps/mobile/app/bot-settings.tsx) | mobile — native story pending | mobile |
+| CompanyFactScreen, FactDetail, CandidateDetail | [apps/mobile/app/company-fact.tsx](../../apps/mobile/app/company-fact.tsx) | mobile — native story pending | mobile |
+| CompanyScreen, CompanyMap, CompanyAgenda, CompanyReviewList, CompanyProgress, QueryStatus | [apps/mobile/app/company.tsx](../../apps/mobile/app/company.tsx) | mobile — native story pending | mobile |
 | Computer, ComputerReleaseActions, ScreenWebView | [apps/mobile/app/computer.tsx](../../apps/mobile/app/computer.tsx) | mobile — native story pending | mobile |
+| DataRoomItemScreen | [apps/mobile/app/data-room-item.tsx](../../apps/mobile/app/data-room-item.tsx) | mobile — native story pending | mobile |
+| DataRoomScreen | [apps/mobile/app/data-room.tsx](../../apps/mobile/app/data-room.tsx) | mobile — native story pending | mobile |
 | GroupSettingsScreen | [apps/mobile/app/group-settings.tsx](../../apps/mobile/app/group-settings.tsx) | mobile — native story pending | mobile |
 | ImageScreen | [apps/mobile/app/image.tsx](../../apps/mobile/app/image.tsx) | mobile — native story pending | mobile |
 | InboxAttachmentScreen | [apps/mobile/app/inbox-attachment.tsx](../../apps/mobile/app/inbox-attachment.tsx) | mobile — native story pending | mobile |
@@ -447,6 +465,8 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BotOrganizeModal, SectionOption | [apps/mobile/components/bot-organize-modal.tsx](../../apps/mobile/components/bot-organize-modal.tsx) | mobile — native story pending | mobile |
 | CallCard, RoundButton, Waveform | [apps/mobile/components/CallCard.tsx](../../apps/mobile/components/CallCard.tsx) | mobile — native story pending | mobile |
 | ChoiceCard | [apps/mobile/components/ChoiceCard.tsx](../../apps/mobile/components/ChoiceCard.tsx) | mobile — native story pending | mobile |
+| CompanyList | [apps/mobile/components/company-list.ios.tsx](../../apps/mobile/components/company-list.ios.tsx) | mobile — native story pending | mobile |
+| CompanyList | [apps/mobile/components/company-list.tsx](../../apps/mobile/components/company-list.tsx) | mobile — native story pending | mobile |
 | ComposerReplyPreview | [apps/mobile/components/composer-reply-preview.tsx](../../apps/mobile/components/composer-reply-preview.tsx) | mobile — native story pending | mobile |
 | ComputerKeyboardBar | [apps/mobile/components/computer-keyboard-bar.tsx](../../apps/mobile/components/computer-keyboard-bar.tsx) | mobile — native story pending | mobile |
 | ComputerMaintenanceActions | [apps/mobile/components/computer-maintenance-actions.tsx](../../apps/mobile/components/computer-maintenance-actions.tsx) | mobile — native story pending | mobile |

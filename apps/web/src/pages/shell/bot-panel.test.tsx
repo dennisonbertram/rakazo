@@ -14,6 +14,10 @@ vi.mock("../../lib/rpc", () => ({
       credentials: vi.fn().mockResolvedValue([]),
       list: vi.fn().mockResolvedValue([]),
     },
+    checkIn: {
+      get: vi.fn().mockResolvedValue({ cadence: "off" }),
+      set: vi.fn(async (input: { cadence: string }) => ({ cadence: input.cadence })),
+    },
     me: vi.fn().mockResolvedValue(null),
     connections: {
       list: vi.fn().mockResolvedValue([]),
@@ -35,6 +39,7 @@ vi.mock("@rakazo/ui-web", () => ({
     <button type="button" {...props} />
   ),
   Input: (props: ComponentProps<"input">) => <input {...props} />,
+  Skeleton: (props: ComponentProps<"div">) => <div {...props} />,
   Textarea: (props: ComponentProps<"textarea">) => <textarea {...props} />,
   NativeSelect: (props: ComponentProps<"select">) => <select {...props} />,
   NativeSelectOption: (props: ComponentProps<"option">) => <option {...props} />,
@@ -121,6 +126,7 @@ function bot(description = "Billing"): Bot {
 
 let container: HTMLDivElement;
 let root: Root;
+let scrollIntoViewDescriptor: PropertyDescriptor | undefined;
 const onSave = vi.fn(
   async (_patch: Parameters<ComponentProps<typeof BotSettings>["onSave"]>[0]) => undefined,
 );
@@ -174,8 +180,53 @@ async function clickSave() {
   if (onSave.mock.calls.length === before) throw new Error("save did not run");
 }
 
+function modelPickerTrigger(): HTMLButtonElement {
+  const trigger = container.querySelector<HTMLButtonElement>(
+    '[role="combobox"][aria-label="Model"]',
+  );
+  if (!trigger) throw new Error("Missing model picker");
+  return trigger;
+}
+
+async function flush() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function chooseModel(label: string) {
+  const advanced = [...container.querySelectorAll("summary")].find(
+    (item) => item.textContent?.trim() === "Advanced",
+  );
+  if (!advanced) throw new Error("Missing Advanced section");
+  await act(async () => advanced.click());
+  await act(async () => modelPickerTrigger().click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) =>
+    item.textContent?.includes(label),
+  );
+  if (!option) throw new Error(`Missing model option: ${label}`);
+  await act(async () => option.click());
+  await flush();
+}
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    configurable: true,
+    value: vi.fn(),
+  });
   onSave.mockReset().mockResolvedValue(undefined);
   container = document.createElement("div");
   document.body.append(container);
@@ -185,11 +236,16 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  if (scrollIntoViewDescriptor) {
+    Object.defineProperty(Element.prototype, "scrollIntoView", scrollIntoViewDescriptor);
+  } else {
+    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  }
   vi.unstubAllGlobals();
 });
 
 describe("BotSettings model choices", () => {
-  it("submits DeepSeek API ids and does not offer a display label", async () => {
+  it("saves the DeepSeek API id instead of its display label", async () => {
     vi.mocked(rpc.models.credentials).mockResolvedValueOnce([
       {
         id: "cred-deepseek",
@@ -217,16 +273,14 @@ describe("BotSettings model choices", () => {
       },
     ]);
     await render();
-    await act(async () => {
-      await Promise.resolve();
+    await flush();
+    await chooseModel("DeepSeek V4.1 Flash");
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0]?.[0]).toMatchObject({
+      modelProvider: "deepseek",
+      modelId: "deepseek-flash",
     });
-    const model = container.querySelector("select");
-    if (!(model instanceof HTMLSelectElement)) throw new Error("Missing model select");
-    const values = [...model.options].map((option) => option.value);
-    expect(values).toContain("deepseek::deepseek-flash");
-    expect(values).toContain("deepseek::deepseek-v4-pro");
-    expect(values).not.toContain("deepseek::DeepSeek-V4.1-Flash");
-    expect(values.some((value) => value.includes("DeepSeek"))).toBe(false);
+    expect(onSave.mock.calls[0]?.[0].modelId).not.toBe("DeepSeek V4.1 Flash");
   });
 });
 
@@ -432,7 +486,7 @@ describe("BotSettings audience", () => {
 
   it("offers the system model on a page agent", async () => {
     await renderWith({ spawnKey: "legal-agent:user-1" });
-    const model = container.querySelector("select");
+    const model = container.querySelector('[role="combobox"][aria-label="Model"]');
     expect(model?.textContent).toContain("System model");
   });
 
@@ -454,7 +508,10 @@ describe("BotSettings audience", () => {
     });
     await act(async () => {
       await Promise.resolve();
+      await Promise.resolve();
     });
+    const model = container.querySelector('[role="combobox"][aria-label="Model"]');
+    expect(model?.textContent).toContain("Muse Wonder");
     expect(container.textContent).toContain("Using the system model: Muse Wonder isn't available");
   });
 

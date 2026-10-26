@@ -1,6 +1,7 @@
 import { t as translate } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Artifact, ArtifactVersion, Bot } from "@rakazo/contracts";
+import type { Artifact, ArtifactShare, ArtifactVersion, Bot } from "@rakazo/contracts";
+import { isShareableArtifactMimeType } from "@rakazo/contracts";
 
 import { matchesArtifactQuery, mimeBadgeLabel } from "@rakazo/core";
 import {
@@ -36,11 +37,13 @@ import {
   Lock,
   Maximize2,
   Minimize2,
+  Share2,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArtifactPreview } from "../components/ArtifactPreview";
+import { ArtifactShareDialog } from "../components/ArtifactShareDialog";
 import { AskBotButton } from "../components/AskBotButton";
 import { Tip } from "../components/data-room/FilterBar";
 import { PickFilter, SearchField } from "../components/ListControls";
@@ -48,7 +51,7 @@ import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { StillLoading } from "../components/ShellSkeleton";
 import { artifactDisplayName as displayName } from "../lib/artifact-name";
-import { decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
+import { bytesToBase64, decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
 import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { canPreviewSpreadsheet } from "../lib/spreadsheet";
@@ -145,6 +148,20 @@ export function ArtifactsPage({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // The dialog names the artifact as the list does, without the extension.
   const deleteTitle = pendingDelete ? displayName(pendingDelete.name) : "";
+  // Deleting also ends a live share link; the dialog says so only when there is one.
+  const [deleteShared, setDeleteShared] = useState(false);
+  useEffect(() => {
+    setDeleteShared(false);
+    if (!pendingDelete) return;
+    let cancelled = false;
+    void rpc.artifactShares
+      .get({ artifactId: pendingDelete.id })
+      .then((share) => !cancelled && setDeleteShared(share !== null))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingDelete]);
 
   useEffect(() => {
     let cancelled = false;
@@ -435,6 +452,12 @@ export function ArtifactsPage({
                 ) : (
                   <Trans>This can't be undone.</Trans>
                 )}
+                {deleteShared ? (
+                  <>
+                    {" "}
+                    <Trans>This also stops its link.</Trans>
+                  </>
+                ) : null}
               </AlertDialogDescription>
             </AlertDialogHeader>
             {deleteError ? <p className="text-[13.5px] text-destructive">{deleteError}</p> : null}
@@ -1012,6 +1035,73 @@ function PreviewPane({
     | { status: "ready"; artifact: Artifact; bytes: Uint8Array }
     | { status: "error"; message: string }
   >({ status: "loading" });
+  // The family's live share link (which version it shows), and the dialog around a new one.
+  const [share, setShare] = useState<ArtifactShare | null>(null);
+  const [shareDialog, setShareDialog] = useState<{ url: string | null } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setShare(null);
+    void rpc.artifactShares
+      .get({ artifactId })
+      .then((live) => !cancelled && setShare(live))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [artifactId]);
+
+  async function createShare(versionId: string) {
+    setShareBusy(true);
+    setShareError(null);
+    try {
+      const created = await rpc.artifactShares.create({ artifactId: versionId });
+      setShare(created.share);
+      setShareDialog({ url: created.url });
+    } catch (error) {
+      setShareError(errorText(error, t`Could not create the link.`));
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function stopShare(versionId: string) {
+    setShareBusy(true);
+    setShareError(null);
+    try {
+      await rpc.artifactShares.revoke({ artifactId: versionId });
+      setShare(null);
+      setShareDialog(null);
+    } catch (error) {
+      setShareError(errorText(error, t`Could not stop sharing.`));
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  // A new latest version made from the selected old one; the old version stays.
+  async function restoreVersion(artifact: Artifact, bytes: Uint8Array) {
+    setRestoring(true);
+    try {
+      const target = artifact.groupId ? { groupId: artifact.groupId } : { botId: artifact.botId! };
+      const created = await rpc.artifacts.create({
+        ...target,
+        name: artifact.name,
+        description: artifact.description ?? undefined,
+        mimeType: artifact.mimeType,
+        contentBase64: bytesToBase64(bytes),
+      });
+      setVersions(await rpc.artifacts.listVersions({ familyId: artifactId }));
+      setSelectedVersionId(created.id);
+    } catch {
+      /* the version select still shows what exists */
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1062,7 +1152,7 @@ function PreviewPane({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="flex items-center gap-2 border-b border-border px-3 py-3 md:gap-3 md:px-6">
+      <header className="flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-border px-3 py-3 md:gap-x-3 md:px-6">
         <Button
           variant="ghost"
           size="icon"
@@ -1072,7 +1162,7 @@ function PreviewPane({
         >
           <ArrowLeft size={18} strokeWidth={1.9} />
         </Button>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-40 flex-1">
           {state.status === "loading" ? (
             <Skeleton className="h-5 w-48 max-w-full" />
           ) : (
@@ -1086,62 +1176,114 @@ function PreviewPane({
             </p>
           ) : null}
         </div>
-        {versions && versions.length > 1 && selectedVersionId ? (
-          <NativeSelect
-            aria-label={t`Version`}
-            className="w-auto shrink-0 text-[13px]"
-            value={selectedVersionId}
-            onChange={(event) => setSelectedVersionId(event.target.value)}
-          >
-            {versions.map((entry) => (
-              <NativeSelectOption key={entry.id} value={entry.id}>
-                {`v${entry.version} · ${formatRelativeTime(entry.createdAt)}`}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        ) : null}
-        {state.status === "ready" ? (
-          <>
-            {state.artifact.mimeType === "text/html" ? (
-              <Tip label={t`Isolated preview — no access to your account`}>
-                <button
-                  type="button"
-                  aria-label={t`Isolated preview — no access to your account`}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  <Lock size={15} strokeWidth={1.9} aria-hidden="true" />
-                </button>
-              </Tip>
-            ) : null}
+        <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3">
+          {versions && versions.length > 1 && selectedVersionId ? (
+            <NativeSelect
+              aria-label={t`Version`}
+              className="w-auto shrink-0 text-[13px]"
+              value={selectedVersionId}
+              onChange={(event) => setSelectedVersionId(event.target.value)}
+            >
+              {versions.map((entry) => (
+                <NativeSelectOption key={entry.id} value={entry.id}>
+                  {`v${entry.version} · ${formatRelativeTime(entry.createdAt)}`}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          ) : null}
+          {state.status === "ready" &&
+          versions &&
+          versions.length > 1 &&
+          selectedVersionId !== versions[0]?.id ? (
             <Button
               variant="outline"
               size="sm"
-              aria-label={t`Download`}
-              onClick={() =>
-                downloadArtifactBytes(state.artifact.name, state.artifact.mimeType, state.bytes)
-              }
+              disabled={restoring}
+              onClick={() => void restoreVersion(state.artifact, state.bytes)}
             >
-              <Download className="sm:me-1.5" size={15} strokeWidth={1.9} />
-              <span className="hidden sm:inline">
-                <Trans>Download</Trans>
-              </span>
+              <Trans>Restore this version</Trans>
             </Button>
-            <button
-              type="button"
-              aria-label={maximized ? t`Show list` : t`Maximize`}
-              title={maximized ? t`Show list` : t`Maximize`}
-              onClick={onToggleMaximize}
-              className="hidden h-8 w-8 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-accent md:grid"
-            >
-              {maximized ? (
-                <Minimize2 size={15} strokeWidth={1.9} />
-              ) : (
-                <Maximize2 size={15} strokeWidth={1.9} />
-              )}
-            </button>
-          </>
-        ) : null}
+          ) : null}
+          {state.status === "ready" ? (
+            <>
+              {state.artifact.mimeType === "text/html" ? (
+                <Tip label={t`Isolated preview — no access to your account`}>
+                  <button
+                    type="button"
+                    aria-label={t`Isolated preview — no access to your account`}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <Lock size={15} strokeWidth={1.9} aria-hidden="true" />
+                  </button>
+                </Tip>
+              ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={t`Download`}
+                onClick={() =>
+                  downloadArtifactBytes(state.artifact.name, state.artifact.mimeType, state.bytes)
+                }
+              >
+                <Download className="sm:me-1.5" size={15} strokeWidth={1.9} />
+                <span className="hidden sm:inline">
+                  <Trans>Download</Trans>
+                </span>
+              </Button>
+              {isShareableArtifactMimeType(state.artifact.mimeType) ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={shareBusy}
+                  onClick={() =>
+                    share && share.artifactId === state.artifact.id
+                      ? setShareDialog({ url: null })
+                      : void createShare(state.artifact.id)
+                  }
+                >
+                  <Share2 className="sm:me-1.5" size={15} strokeWidth={1.9} />
+                  <span className="hidden sm:inline">
+                    {share && share.artifactId !== state.artifact.id ? (
+                      <Trans>Update link</Trans>
+                    ) : (
+                      <Trans>Share</Trans>
+                    )}
+                  </span>
+                </Button>
+              ) : null}
+              <button
+                type="button"
+                aria-label={maximized ? t`Show list` : t`Maximize`}
+                title={maximized ? t`Show list` : t`Maximize`}
+                onClick={onToggleMaximize}
+                className="hidden h-8 w-8 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-accent md:grid"
+              >
+                {maximized ? (
+                  <Minimize2 size={15} strokeWidth={1.9} />
+                ) : (
+                  <Maximize2 size={15} strokeWidth={1.9} />
+                )}
+              </button>
+            </>
+          ) : null}
+        </div>
       </header>
+
+      {shareError ? (
+        <p role="alert" className="px-6 pt-2 text-[13.5px] text-destructive">
+          {shareError}
+        </p>
+      ) : null}
+      {shareDialog && state.status === "ready" ? (
+        <ArtifactShareDialog
+          name={displayName(state.artifact.name)}
+          url={shareDialog.url}
+          busy={shareBusy}
+          error={shareError}
+          onStop={() => void stopShare(state.artifact.id)}
+          onClose={() => setShareDialog(null)}
+        />
+      ) : null}
 
       <div className="min-h-0 flex-1 p-3 md:p-5">
         {state.status === "loading" ? (

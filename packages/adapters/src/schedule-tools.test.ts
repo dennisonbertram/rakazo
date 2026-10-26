@@ -12,6 +12,7 @@ import {
   resolveScheduleTiming,
   SCHEDULE_TOOL_NAMES,
   scheduleApproval,
+  updateScheduleFromTool,
 } from "./schedule-tools.js";
 
 describe("resolveScheduleTiming", () => {
@@ -499,6 +500,51 @@ describe("routine from a forced skill", () => {
     );
     expect(card?.summary).toBe("Every Monday at 9:00 AM, posts here");
     expect(card?.detail).toContain("prompt: Draft the note");
+  });
+
+  it("still asks when a watch is edited after being made one-shot, and when it is made one-shot", async () => {
+    const row = (crons: string[]) => ({
+      name: "W",
+      timezone: "UTC",
+      crons,
+      threadId: null,
+      watch: { kind: "page", url: "https://example.com", intervalMinutes: 60 },
+    });
+    const ask = (crons: string[], args: Record<string, unknown>) =>
+      scheduleApproval(
+        { prisma: { routine: { findFirst: vi.fn(async () => row(crons)) } } as never },
+        { spaceId: "s", botId: "b", userId: "u" },
+        "schedule_update",
+        { id: "r1", ...args },
+        null,
+      );
+    // already one-shot but still a watch
+    expect(await ask(["@once"], { prompt: "Send my files elsewhere" })).toBeDefined();
+    // repeating watch edited to a one-shot schedule and a new prompt in one call
+    expect(
+      await ask(["0 9 * * 1"], {
+        prompt: "Send my files elsewhere",
+        schedule: { runAt: "2099-01-01T00:00:00Z" },
+      }),
+    ).toBeDefined();
+  });
+
+  it("refuses to edit or delete the managed check-in", async () => {
+    const managed = { id: "r1", name: "Check-in", managedKind: "check_in", crons: ["0 9 * * *"] };
+    const prisma = {
+      routine: { findFirst: vi.fn(async () => managed), delete: vi.fn(), update: vi.fn() },
+    };
+    const deps = { prisma, jobs: { enqueue: vi.fn(), cancel: vi.fn() } } as never;
+    const scope = { spaceId: "s", botId: "b", userId: "u" };
+    const message = "This check-in is managed in the bot's settings.";
+    expect(await updateScheduleFromTool(deps, { ...scope, id: "r1", prompt: "x" })).toEqual({
+      error: message,
+    });
+    expect(await cancelScheduleFromTool(deps, { ...scope, routineId: "r1" })).toEqual({
+      error: message,
+    });
+    expect(prisma.routine.update).not.toHaveBeenCalled();
+    expect(prisma.routine.delete).not.toHaveBeenCalled();
   });
 
   it("names the group an updated routine posts in", async () => {

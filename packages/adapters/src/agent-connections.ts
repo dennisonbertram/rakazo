@@ -364,6 +364,7 @@ export async function messageConnectedAgent(
           status: "queued",
         },
       });
+      // The run is for the peer's owner, who is not watching, and carries an external bot's words.
       const nextRun = await tx.run.create({
         data: {
           spaceId: targetIdentity.spaceId,
@@ -373,6 +374,8 @@ export async function messageConnectedAgent(
           userId: targetIdentity.userId,
           status: "queued",
           trigger: "bot_message",
+          unattended: true,
+          externalTaint: true,
           sourceMessageId: inbound.id,
         },
         select: { id: true },

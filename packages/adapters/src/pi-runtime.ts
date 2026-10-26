@@ -32,7 +32,7 @@ import { DEFAULT_CONTEXT_STRATEGY } from "@rakazo/adapter-kit";
 import { MISSING_TOOL_FINAL_RESPONSE_ERROR, usableModelId } from "@rakazo/contracts";
 import { abortableDelay, humanizeToolName, toolPhrase } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
-import { isToolPauseResult } from "./approval-effect.js";
+import { isToolPauseResult, isUnattendedEndResult } from "./approval-effect.js";
 import { connectionIdArgument, credentialArgument } from "./bot-secrets.js";
 import { DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
 import { withCloudflareGatewayAuth } from "./cloudflare-ai-gateway.js";
@@ -900,6 +900,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "skill_create") return `Creating skill: ${detail(record.name ?? "skill")}`;
   if (toolName === "skill_update")
     return `Updating skill: ${detail(record.name ?? record.skillId)}`;
+  if (toolName === "tool_run") return `Running tool: ${detail(record.name)}`;
   if (toolName === "skill_delete")
     return `Deleting skill: ${detail(record.name ?? record.skillId)}`;
   const finance = describeFinanceActivity(toolName, record);
@@ -1225,7 +1226,8 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
             if (host.request.executeTool) {
               const result = await host.request.executeTool(tool.name, args, executionId);
               if (isAgentToolExecutionResult(result)) {
-                if (isToolPauseResult(result)) host.pausePending = true;
+                if (isToolPauseResult(result) || isUnattendedEndResult(result))
+                  host.pausePending = true;
                 return result;
               }
               return {
@@ -1251,6 +1253,10 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
             };
           }
           if (tool.name === "run_subagent") {
+            const denial = await host.request.subagentDenial?.();
+            if (denial) {
+              return { content: [{ type: "text", text: denial }], details: { error: denial } };
+            }
             const result = await executeSubagent(host, executionId, args);
             return {
               content: [{ type: "text", text: result }],
@@ -1272,7 +1278,8 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
               },
             );
             if (isAgentToolExecutionResult(result)) {
-              if (isToolPauseResult(result)) host.pausePending = true;
+              if (isToolPauseResult(result) || isUnattendedEndResult(result))
+                host.pausePending = true;
               return boundAgentToolResult(result);
             }
             return {
@@ -1344,6 +1351,12 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
   const hasBackups = Boolean(host.request.fallbackModels?.length);
   let requestModel = hasBackups ? host.activeModel.config : host.request.model;
   try {
+    if (
+      host.request.subagentModelSelectionAllowed === false &&
+      (requestedProvider || requestedModelId)
+    ) {
+      throw new Error("Helper model selection is unavailable for this agent.");
+    }
     if (Boolean(requestedProvider) !== Boolean(requestedModelId)) {
       throw new Error("model_provider and model_id must both be set");
     }
@@ -1390,7 +1403,11 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
   }
   const subagentModel = modelForCompletion(selectedModel.model, requestModel.maxTokens);
 
-  const childDefs = host.request.tools.filter((tool) => !DELEGATION_TOOL_NAMES.has(tool.name));
+  const childDefs = host.request.tools.filter(
+    (tool) =>
+      !DELEGATION_TOOL_NAMES.has(tool.name) &&
+      (!host.request.subagentToolNames || host.request.subagentToolNames.has(tool.name)),
+  );
   const nestedHost: ToolHost = {
     ...host,
     activeModel: {

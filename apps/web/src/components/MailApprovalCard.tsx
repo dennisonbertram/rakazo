@@ -74,6 +74,7 @@ export function MailApprovalCard({
   accounts = [],
   accountsStatus = "ready",
   onRetryAccounts,
+  reason,
 }: {
   mail: MailApproval;
   status: "pending" | "answered";
@@ -86,6 +87,8 @@ export function MailApprovalCard({
   /** Offered when the person's own edited send did not go out. */
   onOpenComposer?: (mail: MailApproval) => void;
   initialEditing?: boolean;
+  /** One plain line on why the call asked (background run, rule, outside content). */
+  reason?: string;
   allowLabel?: string;
   allowDisabled?: boolean;
   onFieldsChange?: (fields: Required<Omit<MailEdits, "account">>) => void;
@@ -467,6 +470,7 @@ export function MailApprovalCard({
             </fieldset>
           ) : interactive ? (
             <>
+              {reason ? <p className="pt-3 text-[13px] text-muted-foreground">{reason}</p> : null}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-4">
                 <div className="flex items-center gap-2">
                   <Button

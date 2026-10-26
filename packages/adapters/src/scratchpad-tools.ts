@@ -1,5 +1,6 @@
 import type { ScratchpadCategory, ScratchpadChannel } from "@rakazo/contracts";
 import {
+  emailCompliance,
   ScratchpadCategorySchema,
   ScratchpadChannelSchema,
   ScratchpadDateTimeSchema,
@@ -20,10 +21,16 @@ const GATED_CATEGORIES = new Set<ScratchpadCategory>([
   "outbound_email",
 ]);
 const DRAFT_ONLY_CHANNELS = new Set<ScratchpadChannel>(["reddit", "hn", "producthunt"]);
+export const EMAIL_COMPLIANCE_ERROR =
+  "Add an unsubscribe line and a postal address to the email before approving it.";
 const TITLE_MAX = 200;
 const NOTES_MAX = 4_000;
 const TARGET_MAX = 200;
 const PROOF_MAX = 2_000;
+const WAITING_ON_MAX = 200;
+const REASON_MAX = 500;
+/** The completion tool keeps its reasons shorter than the user-facing edit API. */
+const TOOL_REASON_MAX = 200;
 const EFFECT_KEY = /^[^:\s]{1,200}:[^:\s]{1,200}:[a-f0-9]{64}(?::[1-9]\d*)?$/;
 const CONSUME_APPROVED_POST_INPUT_KEYS = new Set([
   "spaceId",
@@ -55,6 +62,9 @@ type ScratchpadRow = {
   proof?: string | null;
   approvedAt?: Date | null;
   approvedBy?: string | null;
+  dueAt?: Date | null;
+  waitingOn?: string | null;
+  resolvedReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -89,6 +99,9 @@ export function mapScratchpadItem(row: ScratchpadRow) {
     proof: row.proof ?? null,
     approvedAt: row.approvedAt?.toISOString() ?? null,
     approvedBy: approvedByValue(row.approvedBy),
+    dueAt: row.dueAt?.toISOString() ?? null,
+    waitingOn: row.waitingOn ?? null,
+    resolvedReason: row.resolvedReason ?? null,
   };
 }
 
@@ -109,6 +122,51 @@ function isGated(
 function parseAbsoluteDateTime(value: unknown): Date | null {
   const parsed = ScratchpadDateTimeSchema.safeParse(value);
   return parsed.success ? new Date(parsed.data) : null;
+}
+
+/** A due date is an ISO datetime with offset, or a plain date (end of that day, UTC). */
+function parseDueAt(value: unknown): Date | null {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}T23:59:59.000Z`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return parseAbsoluteDateTime(value);
+}
+
+/** Validates the open-item fields shared by add and update; null clears (update only). */
+function openItemFields(input: {
+  dueAt?: string | null;
+  waitingOn?: string | null;
+  resolvedReason?: string | null;
+}): { error: string } | { data: Record<string, Date | string | null> } {
+  const data: Record<string, Date | string | null> = {};
+  if (input.dueAt !== undefined) {
+    const dueAt = input.dueAt === null ? null : parseDueAt(input.dueAt);
+    if (input.dueAt !== null && !dueAt) {
+      return { error: "dueAt must be an ISO date or datetime with timezone." };
+    }
+    data.dueAt = dueAt;
+  }
+  if (input.waitingOn !== undefined) {
+    const waitingOn = input.waitingOn === null ? null : input.waitingOn.trim() || null;
+    if (waitingOn && waitingOn.length > WAITING_ON_MAX) {
+      return { error: `waitingOn must be at most ${WAITING_ON_MAX} characters.` };
+    }
+    data.waitingOn = waitingOn;
+  }
+  if (input.resolvedReason !== undefined) {
+    const reason = input.resolvedReason === null ? null : input.resolvedReason.trim() || null;
+    if (reason && reason.length > REASON_MAX) {
+      return { error: `reason must be at most ${REASON_MAX} characters.` };
+    }
+    data.resolvedReason = reason;
+  }
+  return { data };
+}
+
+function emailIsCompliant(body: string): boolean {
+  const checks = emailCompliance(body);
+  return checks.unsubscribe && checks.postalAddress;
 }
 
 function isEffectKey(value: unknown): value is string {
@@ -144,7 +202,7 @@ function isValidActorProof(
   itemId: string,
   founder: boolean,
 ): boolean {
-  if (category === "public_post") return isZernioProof(proof) || isHttpUrl(proof);
+  if (category === "public_post") return isHttpUrl(proof);
   if (category === "create_account") return isHttpUrl(proof);
   if (founder && category === "draft") return isHttpUrl(proof);
   if (founder && category === "outbound_email" && isEmailProof(proof, itemId)) return true;
@@ -159,10 +217,12 @@ function canReplaceActorProof(
   founder: boolean,
 ): boolean {
   if (!isValidActorProof(category, nextProof, itemId, founder)) return false;
-  if (previousProof === null) return true;
-  if (category !== "public_post") return false;
-  if (isEffectKey(previousProof)) return isZernioProof(nextProof) || isHttpUrl(nextProof);
-  return isZernioProof(previousProof) && isHttpUrl(nextProof);
+  // Only server code (gtm-posting) writes effect stamps and zernio: proof; a post's
+  // proof may only move from a server-written zernio:<id> to its live URL.
+  if (category === "public_post") {
+    return isZernioProof(previousProof) && !isEffectKey(previousProof);
+  }
+  return previousProof === null;
 }
 
 function updatedAtAfter(existing: ScratchpadRow, now: Date): Date {
@@ -213,6 +273,8 @@ export async function addScratchpadItemFromTool(
     channel?: string;
     target?: string;
     scheduledFor?: string;
+    dueAt?: string;
+    waitingOn?: string;
   },
 ) {
   if ((input as typeof input & { proof?: unknown }).proof !== undefined) {
@@ -243,6 +305,8 @@ export async function addScratchpadItemFromTool(
   if (input.scheduledFor !== undefined && !scheduledFor) {
     return { error: "scheduledFor must be an absolute ISO datetime." };
   }
+  const open = openItemFields({ dueAt: input.dueAt, waitingOn: input.waitingOn });
+  if ("error" in open) return open;
   if (isGated(category) && channel && DRAFT_ONLY_CHANNELS.has(channel)) {
     return { error: "This channel is draft-only for gated items." };
   }
@@ -267,6 +331,7 @@ export async function addScratchpadItemFromTool(
     ...(channel ? { channel } : {}),
     ...(target !== undefined ? { target } : {}),
     ...(scheduledFor ? { scheduledFor } : {}),
+    ...open.data,
   };
   const create = (client: ScratchpadClient) =>
     client.scratchpadItem.create({ data }) as Promise<ScratchpadRow>;
@@ -291,6 +356,10 @@ type ScratchpadUpdateInput = Scope & {
   notes?: string;
   target?: string;
   scheduledFor?: string;
+  /** ISO date or datetime; null clears. */
+  dueAt?: string | null;
+  waitingOn?: string | null;
+  resolvedReason?: string | null;
   proof?: string;
 };
 
@@ -396,6 +465,9 @@ async function updateScratchpadItem(
     if (!scheduledFor) return { error: "scheduledFor must be an absolute ISO datetime." };
     data.scheduledFor = scheduledFor;
   }
+  const open = openItemFields(input);
+  if ("error" in open) return open;
+  Object.assign(data, open.data);
   if (input.proof !== undefined) {
     if (typeof input.proof !== "string" || input.proof.length > PROOF_MAX) {
       return { error: `proof must be at most ${PROOF_MAX} characters.` };
@@ -412,6 +484,14 @@ async function updateScratchpadItem(
     }
   }
   if (input.status !== undefined) data.status = input.status;
+  // Reopening drops the old reason unless a new one is given.
+  if (
+    (input.status === "open" || input.status === "parked") &&
+    input.resolvedReason === undefined &&
+    existing.status === "done"
+  ) {
+    data.resolvedReason = null;
+  }
 
   const contentWasEdited = contentEdit(data);
   if (founder && gated && (input.reapprove || (input.status === "open" && !contentWasEdited))) {
@@ -432,6 +512,22 @@ async function updateScratchpadItem(
       input.proof !== undefined
     ) {
       return { error: "Re-approve requires the current version of an uncertain post stamp." };
+    }
+    const inFlight = await deps.prisma.externalEffect.findUnique({
+      where: { idempotencyKey: existing.proof },
+      select: { spaceId: true, status: true },
+    });
+    // ponytail: 10 minutes is a fixed ceiling (dispatch takes seconds); a crashed attempt
+    // that left no terminal effect becomes re-approvable after it. Tune if dispatch slows.
+    const stale = (deps.now?.() ?? new Date()).getTime() - existing.updatedAt.getTime() > 600_000;
+    const status = inFlight
+      ? inFlight.spaceId === input.spaceId
+        ? inFlight.status
+        : "other"
+      : null;
+    const settled = status === "uncertain" || status === "failed";
+    if (!settled && !((status === null || status === "intended") && stale)) {
+      return { error: "This post is still being sent; try again shortly." };
     }
     return applyScratchpadUpdate(
       deps.prisma,
@@ -482,6 +578,9 @@ async function updateScratchpadItem(
     if (category === "create_account" && existing.channel === "directory") {
       return approveDirectoryItem(deps, input, existing, true);
     }
+    if (category === "outbound_email" && !emailIsCompliant(existing.notes)) {
+      return { error: EMAIL_COMPLIANCE_ERROR };
+    }
     return applyScratchpadUpdate(
       deps.prisma,
       existing,
@@ -503,6 +602,21 @@ async function updateScratchpadItem(
       category === "outbound_email" ? isEmailProof(proof, existing.id) : isHttpUrl(proof);
     if (!hasCompletionProof) {
       return { error: "A valid proof is required to complete this item." };
+    }
+    if (category === "outbound_email") {
+      const sent = await deps.prisma.composeSend.findUnique({
+        where: {
+          spaceId_userId_clientId: {
+            spaceId: input.spaceId,
+            userId: input.userId,
+            clientId: existing.id,
+          },
+        },
+        select: { state: true },
+      });
+      if (sent?.state !== "sent" && sent?.state !== "unknown") {
+        return { error: "A sent email is required to complete this item." };
+      }
     }
     if (!founder && (existing.status !== "open" || !existing.approvedAt)) {
       return { error: "A gated item must be approved and open before an agent can complete it." };
@@ -540,7 +654,10 @@ async function updateScratchpadItem(
     return { error: "Completed gated items cannot be reopened by an agent." };
   }
   if (Object.keys(data).length === 0) {
-    return { error: "Provide title, status, notes, target, scheduledFor, and/or proof to update." };
+    return {
+      error:
+        "Provide title, status, notes, target, scheduledFor, dueAt, waitingOn, and/or proof to update.",
+    };
   }
 
   const reopenGoal =
@@ -655,9 +772,17 @@ export function updateScratchpadItemFromUser(
 
 export async function completeScratchpadItemFromTool(
   deps: ScratchpadToolDeps & { now?: () => Date },
-  input: Scope & { itemId: string; proof?: string },
+  input: Scope & { itemId: string; proof?: string; reason?: string },
 ) {
-  return updateScratchpadItemFromTool(deps, { ...input, status: "done" });
+  const { reason, ...rest } = input;
+  if (reason !== undefined && reason.trim().length > TOOL_REASON_MAX) {
+    return { error: `reason must be at most ${TOOL_REASON_MAX} characters.` };
+  }
+  return updateScratchpadItemFromTool(deps, {
+    ...rest,
+    status: "done",
+    ...(reason !== undefined ? { resolvedReason: reason } : {}),
+  });
 }
 
 async function removeScratchpadItem(

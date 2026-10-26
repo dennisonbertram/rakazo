@@ -135,6 +135,13 @@ it("starts expanded while pending, with the status and first recipient in the he
   expect(toggle()).toBeNull();
 });
 
+it("shows why a background run asked, above Send and Discard", async () => {
+  await render({ reason: "Asked because this ran in the background." });
+  expect(host.textContent).toContain("Asked because this ran in the background.");
+  await render();
+  expect(host.textContent).not.toContain("Asked because");
+});
+
 const accounts = [
   { connectionId: "c1", label: "Work", address: "work@example.test" },
   { connectionId: "c2", label: "Home", address: "home@example.test" },

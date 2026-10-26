@@ -1,3 +1,5 @@
+export * from "./approval-rules.js";
+export * from "./artifact-shares.js";
 export * from "./artifact-versions.js";
 export * from "./audit-requests.js";
 export * from "./billing.js";
@@ -7,6 +9,8 @@ export * from "./bootstrap-user.js";
 export * from "./cancel-runs.js";
 export * from "./cap-table.js";
 export * from "./client.js";
+export * from "./company.js";
+export * from "./company-import.js";
 export * from "./computers.js";
 export * from "./contacts.js";
 export * from "./credential-secrets.js";
@@ -34,10 +38,18 @@ export * from "./notification-live.js";
 export * from "./notifications.js";
 export * from "./prisma-errors.js";
 export * from "./push-endpoints.js";
+export * from "./realtime-follow.js";
 export * from "./repos.js";
-export { delegatePendingAgents, delegatePendingIds } from "./run-pauses.js";
+export * from "./routine-watch.js";
+export {
+  announceDelegatePending,
+  closeApprovalCardsInTransaction,
+  delegatePendingAgents,
+  delegatePendingIds,
+} from "./run-pauses.js";
 export * from "./safes.js";
 export * from "./scope.js";
+export * from "./scratchpad-waiting.js";
 export * from "./sessions.js";
 export * from "./sidebar-folders.js";
 export * from "./sidebar-pages.js";

@@ -72,6 +72,21 @@ function attachDesktopStackProbe(
   });
 }
 
+/**
+ * The public share page keeps its link token in the URL fragment. These headers stop the page
+ * leaking it through a referrer and stop another site framing it. Production adds the same two in
+ * infra/compose/Caddyfile.prod; this covers `vite dev` and `vite preview`, which serve the app there.
+ */
+function attachSharePageHeaders(server: ViteDevServer | PreviewServer) {
+  server.middlewares.use((req, res, next) => {
+    if (req.url?.split(/[?#]/, 1)[0] === "/s") {
+      res.setHeader("referrer-policy", "no-referrer");
+      res.setHeader("x-frame-options", "DENY");
+    }
+    next();
+  });
+}
+
 function attachNovncProxy(server: ViteDevServer | PreviewServer, secret: string, api: string) {
   server.middlewares.use(async (req, res, next) => {
     if (!req.url?.startsWith("/novnc/")) {
@@ -431,6 +446,11 @@ export default defineConfig(({ mode }) => {
         configureServer: (server) => attachDesktopStackProbe(server, desktopStackToken, imageTag),
         configurePreviewServer: (server) =>
           attachDesktopStackProbe(server, desktopStackToken, imageTag),
+      },
+      {
+        name: "rakazo-share-page-headers",
+        configureServer: attachSharePageHeaders,
+        configurePreviewServer: attachSharePageHeaders,
       },
       {
         name: "rakazo-performance-asset-delay",

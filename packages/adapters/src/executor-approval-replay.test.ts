@@ -454,7 +454,7 @@ describe("denied effect result", () => {
     expect(plain).toMatchObject({
       action: "return",
       result: {
-        error: expect.stringContaining("The person you are talking to denied this action"),
+        error: expect.stringContaining("The user declined this action on its card"),
       },
     });
   });

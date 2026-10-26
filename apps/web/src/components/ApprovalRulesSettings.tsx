@@ -1,86 +1,47 @@
-import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { ActionApprovalRule } from "@rakazo/contracts";
-import { Button, Label, Skeleton, Switch } from "@rakazo/ui-web";
-import { useEffect, useId, useState } from "react";
+import type { ActionApprovalRule, ApprovalChoice } from "@rakazo/contracts";
+import { actionTypeForTool, toolRuleAllowsAllow } from "@rakazo/core";
+import { Button, NativeSelect, NativeSelectOption } from "@rakazo/ui-web";
+import { useEffect, useState } from "react";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
+import { ApprovalActionsTable, useActionTypeLabels } from "./ApprovalActionsTable";
 
-function describeRule(rule: ActionApprovalRule): string {
-  if (rule.effect === "require_approval") {
-    if (rule.matchKind === "category") {
-      if (rule.matchValue === "email") return t`Ask before email actions`;
-      if (rule.matchValue === "purchase") return t`Ask before purchase actions`;
-      return t`Ask before ${rule.matchValue} actions`;
-    }
-    if (rule.matchKind === "connector") return t`Ask before ${rule.matchValue} connector`;
-    return t`Ask before ${rule.matchValue}`;
-  }
-  if (rule.matchKind === "category") {
-    if (rule.matchValue === "email") return t`Allow email actions without asking`;
-    if (rule.matchValue === "purchase") return t`Allow purchase actions without asking`;
-    return t`Allow ${rule.matchValue} actions without asking`;
-  }
-  if (rule.matchKind === "connector") return t`Allow ${rule.matchValue} connector without asking`;
-  return t`Allow ${rule.matchValue} without asking`;
-}
+const EFFECT_TO_CHOICE: Record<ActionApprovalRule["effect"], ApprovalChoice> = {
+  always_allow: "allow",
+  require_approval: "ask",
+  block: "block",
+};
+const CHOICE_TO_EFFECT: Record<ApprovalChoice, ActionApprovalRule["effect"]> = {
+  allow: "always_allow",
+  ask: "require_approval",
+  block: "block",
+};
 
 export function ApprovalRulesSettings() {
   const { t } = useLingui();
-  const emailId = useId();
-  const purchaseId = useId();
+  const labels = useActionTypeLabels();
   const [rules, setRules] = useState<ActionApprovalRule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [savingPreset, setSavingPreset] = useState<"email" | "purchase" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function refresh() {
-    setLoading(true);
-    setError(null);
-    try {
-      setRules(await rpc.approvalRules.list());
-    } catch (err) {
-      setError(errorText(err, t`Could not load approval rules`));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    void refresh();
-  }, []);
+    rpc.approvalRules
+      .list()
+      .then(setRules)
+      .catch((err) => setError(errorText(err, t`Could not load approval rules`)));
+  }, [t]);
 
-  const presetRule = (matchValue: "email" | "purchase") =>
-    rules.find(
-      (rule) =>
-        rule.effect === "require_approval" &&
-        rule.matchKind === "category" &&
-        rule.matchValue === matchValue,
-    );
-
-  async function setPreset(matchValue: "email" | "purchase", on: boolean) {
-    if (loading || savingPreset) return;
-    const existing = presetRule(matchValue);
-    setSavingPreset(matchValue);
+  async function changeRule(rule: ActionApprovalRule, choice: ApprovalChoice) {
     setError(null);
     try {
-      if (!on) {
-        if (existing) {
-          await rpc.approvalRules.remove({ id: existing.id });
-          setRules((current) => current.filter((rule) => rule.id !== existing.id));
-        }
-      } else if (!existing) {
-        const saved = await rpc.approvalRules.set({
-          effect: "require_approval",
-          matchKind: "category",
-          matchValue,
-        });
-        setRules((current) => [...current, saved]);
-      }
+      const saved = await rpc.approvalRules.set({
+        effect: CHOICE_TO_EFFECT[choice],
+        matchKind: rule.matchKind,
+        matchValue: rule.matchValue,
+      });
+      setRules((current) => current.map((item) => (item.id === rule.id ? saved : item)));
     } catch (err) {
-      setError(errorText(err, on ? t`Could not save rule` : t`Could not remove rule`));
-    } finally {
-      setSavingPreset(null);
+      setError(errorText(err, t`Could not save rule`));
     }
   }
 
@@ -94,66 +55,67 @@ export function ApprovalRulesSettings() {
     }
   }
 
-  // The two switches show their own rules; the list holds the rest.
-  const shown = [presetRule("email"), presetRule("purchase")];
-  const listedRules = rules.filter((rule) => !shown.includes(rule));
+  // The table owns category rules and bot overrides; the list holds the per-tool and per-connector rules.
+  const listedRules = rules.filter((rule) => rule.matchKind !== "category" && !rule.botId);
 
   return (
     <div data-testid="action-confirmation-settings">
       <h3 className="text-[15px] font-medium text-foreground">
-        <Trans>Action confirmations</Trans>
+        <Trans>Approvals</Trans>
       </h3>
-      <div className="mt-4 flex flex-col gap-3">
-        {(
-          [
-            ["email", emailId, t`Ask before sending external email`],
-            ["purchase", purchaseId, t`Ask before purchases`],
-          ] as const
-        ).map(([kind, id, label]) => (
-          <div
-            key={kind}
-            className="flex items-start gap-3 pointer-coarse:min-h-11 pointer-coarse:items-center"
-          >
-            {loading ? (
-              <Skeleton className="mt-0.5 h-[18.4px] w-[32px] shrink-0 rounded-full" />
-            ) : (
-              <Switch
-                id={id}
-                data-testid={`approval-preset-${kind}`}
-                className="mt-0.5"
-                checked={presetRule(kind) !== undefined}
-                disabled={savingPreset !== null}
-                onCheckedChange={(checked) => void setPreset(kind, checked)}
-              />
-            )}
-            <Label
-              htmlFor={id}
-              className="text-[14px] font-normal text-foreground/75 pointer-coarse:flex-1 pointer-coarse:self-stretch pointer-coarse:items-center"
-            >
-              {label}
-            </Label>
-          </div>
-        ))}
+      <div className="mt-3">
+        <ApprovalActionsTable />
       </div>
+      <p className="mt-3 text-[13px] text-muted-foreground">
+        <Trans>Background runs always ask before they send, change or run anything.</Trans>
+      </p>
       {error ? <p className="mt-3 text-[13px] text-destructive">{error}</p> : null}
       {listedRules.length > 0 ? (
         <ul className="mt-4 space-y-2">
-          {listedRules.map((rule) => (
-            <li
-              key={rule.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2"
-            >
-              <span className="text-[13.5px] text-foreground/75">{describeRule(rule)}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={() => void removeRule(rule.id)}
+          {listedRules.map((rule) => {
+            const type =
+              rule.matchKind === "tool" ? actionTypeForTool({ toolName: rule.matchValue }) : null;
+            return (
+              <li
+                key={rule.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2"
               >
-                <Trans>Remove</Trans>
-              </Button>
-            </li>
-          ))}
+                <span className="min-w-0 break-words text-[13.5px] text-foreground/75">
+                  {rule.matchValue}
+                  {type ? (
+                    <span className="block text-[12px] text-muted-foreground">{labels[type]}</span>
+                  ) : null}
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <NativeSelect
+                    size="sm"
+                    aria-label={rule.matchValue}
+                    value={EFFECT_TO_CHOICE[rule.effect]}
+                    onChange={(event) =>
+                      void changeRule(rule, event.target.value as ApprovalChoice)
+                    }
+                  >
+                    <NativeSelectOption
+                      value="allow"
+                      disabled={rule.matchKind === "tool" && !toolRuleAllowsAllow(rule.matchValue)}
+                    >
+                      {t`Allow`}
+                    </NativeSelectOption>
+                    <NativeSelectOption value="ask">{t`Ask`}</NativeSelectOption>
+                    <NativeSelectOption value="block">{t`Block`}</NativeSelectOption>
+                  </NativeSelect>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => void removeRule(rule.id)}
+                  >
+                    <Trans>Remove</Trans>
+                  </Button>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>

@@ -1,7 +1,7 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
 import type { Actor, MessageBlock } from "@rakazo/contracts";
 import { actorScope, CapTableSourceRefSchema, investorsAgentSpawnKey } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES, newRunUnattended } from "@rakazo/core";
 import type { createRepos, PrismaClient } from "@rakazo/db";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
 import { ensureInvestorsAgent } from "./investors-agent.js";
@@ -100,6 +100,7 @@ export async function startSheetRead(
         taskId: task.id,
         status: "queued",
         trigger: "routine",
+        unattended: newRunUnattended({ trigger: "routine" }),
       },
       select: { id: true },
     });

@@ -1,5 +1,11 @@
 import type { MessageBlock } from "@rakazo/contracts";
-import { blocksToAgentHistoryText, isConversationalRun, messagingChannelId } from "@rakazo/core";
+import {
+  blocksToAgentHistoryText,
+  isConversationalRun,
+  messagingChannelId,
+  newRunExternalTaint,
+  newRunUnattended,
+} from "@rakazo/core";
 import type { Prisma, PrismaClient } from "./client.js";
 import type { ClaimedSteeringMessage, ClaimSteeringInput } from "./events.js";
 
@@ -121,6 +127,7 @@ export async function createPendingSteeringRun(
       status: "queued",
     },
   });
+  const trigger = origin === "app" ? "follow_up" : "messaging";
   const run = await tx.run.create({
     data: {
       spaceId: input.spaceId,
@@ -129,7 +136,10 @@ export async function createPendingSteeringRun(
       taskId: task.id,
       userId: batch[0]!.userId,
       status: "queued",
-      trigger: origin === "app" ? "follow_up" : "messaging",
+      trigger,
+      // The owner typing in the app is attended; an inbound message is outside content.
+      unattended: newRunUnattended({ trigger }),
+      externalTaint: newRunExternalTaint({ trigger }),
       sourceMessageId: source.message.id,
       ...(modelPin ?? {}),
     },

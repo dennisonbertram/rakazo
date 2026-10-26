@@ -1,5 +1,5 @@
 import type { AdapterContext, ComputerRef } from "@rakazo/adapter-kit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   browserActFromTool,
   browserNavigateFromTool,
@@ -142,6 +142,30 @@ describe("browser tools", () => {
       expect(acted).toMatchObject({ ok: true, completed: 2 });
       expect(JSON.stringify(acted)).not.toContain(values.username);
       expect(JSON.stringify(acted)).not.toContain(values.password);
+    });
+
+    it("marks a login used only after the page action succeeds", async () => {
+      const browser = loginPage("https://login.example.test/signin");
+      const { email } = await refs(browser, "https://login.example.test/signin");
+      const markUsed = vi.fn(async () => undefined);
+      const resolve = async () => ({
+        ...(await resolveSecretFill({ field: "username" })),
+        markUsed,
+      });
+      const fill = (ref: string) => ({
+        actions: [{ kind: "fill_secret", ref, secret: "site_login", field: "username" }],
+      });
+      const failed = await browserActFromTool(browser, computer, context, fill("missing-ref"), {
+        resolveSecretFill: resolve,
+      });
+      expect(failed).toMatchObject({ ok: false });
+      expect(markUsed).not.toHaveBeenCalled();
+      const fresh = await refs(browser, "https://login.example.test/signin");
+      const filled = await browserActFromTool(browser, computer, context, fill(fresh.email), {
+        resolveSecretFill: resolve,
+      });
+      expect(filled).toMatchObject({ ok: true });
+      expect(markUsed).toHaveBeenCalledTimes(1);
     });
 
     it("never reports a login-filled field's value, even when too short to redact", async () => {

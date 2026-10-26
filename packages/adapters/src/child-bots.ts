@@ -8,7 +8,7 @@ import type {
 import { routineJobKey, runContinueJob, runJobKey } from "@rakazo/adapter-kit";
 import type { Actor, Bot, ComputerMode } from "@rakazo/contracts";
 import { GROUP_MEMBER_MIN, isVoiceAgentSpawnKey } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES, chainedRunMode } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
 import {
   cancelRunsInTransaction,
@@ -176,6 +176,14 @@ async function ensureSpawnRun(
           status: "queued",
         },
       });
+      // A sub-agent inherits its parent's mode: it cannot become attended or untainted.
+      const mode = chainedRunMode(
+        "spawn",
+        await tx.run.findUnique({
+          where: { id: input.sourceRunId },
+          select: { unattended: true, externalTaint: true },
+        }),
+      );
       return tx.run.create({
         data: {
           spaceId: input.spaceId,
@@ -185,6 +193,8 @@ async function ensureSpawnRun(
           userId: input.userId,
           status: "queued",
           trigger: "spawn",
+          unattended: mode.unattended,
+          externalTaint: mode.externalTaint,
           clientNonce,
         },
       });

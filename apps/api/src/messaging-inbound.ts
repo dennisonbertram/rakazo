@@ -219,6 +219,7 @@ export async function wakeMessageRoutines(
       modelProvider: true,
       modelId: true,
       thinkingLevel: true,
+      taughtSkillId: true,
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -261,7 +262,7 @@ export async function wakeMessageRoutines(
     mediaUrl: event.mediaUrl,
   });
   await deliverWebhookEvent(
-    { events: deps.events, jobs: deps.jobs },
+    { events: deps.events, jobs: deps.jobs, prisma: deps.prisma },
     {
       bot: { id: target.botId, spaceId: target.spaceId, userId: target.userId },
       threadId: target.threadId,

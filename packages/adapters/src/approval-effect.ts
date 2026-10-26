@@ -332,6 +332,27 @@ export function approvalPausedToolResult(): ApprovalPausedToolResult {
   };
 }
 
+/** An unattended run asked for the owner: the tool ends the turn without a pause card. */
+export function unattendedEndedToolResult() {
+  return {
+    kind: "agent_tool_result" as const,
+    content: [
+      {
+        type: "text" as const,
+        text: "The user is not here to answer. The owner was notified. Stop now.",
+      },
+    ],
+    details: { unattended: "ended" },
+    terminate: true as const,
+  };
+}
+
+export function isUnattendedEndResult(result: unknown): boolean {
+  if (!result || typeof result !== "object") return false;
+  const record = result as { kind?: unknown; details?: { unattended?: unknown } };
+  return record.kind === "agent_tool_result" && record.details?.unattended === "ended";
+}
+
 export function isToolPauseResult(result: unknown): result is ApprovalPausedToolResult {
   if (!result || typeof result !== "object") return false;
   const record = result as ApprovalPausedToolResult;
@@ -362,7 +383,7 @@ export type ExternalEffectStore = {
 };
 
 export const DENIED_ACTION_MESSAGE =
-  'The person you are talking to denied this action. When you tell them, address them as "you" (say "you denied it"), not in the third person. Do not retry it, rephrase it, or try a near-identical variant in this run; any repeat is refused automatically. Tell the user it was not submitted. Do not send them to another agent or page, and do not suggest asking anyone else; ask what they want instead. Try again only if the user asks again in a new message.';
+  'The user declined this action on its card. This was their own decision, not a settings rule or a block. When you tell them, address them as "you" (say "you declined it"), not in the third person. Do not retry it, rephrase it, or try a near-identical variant in this run; any repeat is refused automatically. Tell the user it was not submitted. Do not send them to another agent or page, and do not suggest asking anyone else; ask what they want instead. Try again only if the user asks again in a new message.';
 
 /**
  * Wording for a payment the person approved here. It never claims the payment went through:

@@ -1293,6 +1293,24 @@ export const builtinAgentTools: ConnectorTool[] = [
             required: ["name", "shares", "percent"],
           },
         },
+        ledger: {
+          type: "array",
+          description:
+            "Carta's ledger export rows, if you read them. The tool sums them into each holder's amountUsd by holder name. A conversion row (preferred to common) moves no money.",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: ["issuance", "transfer", "cancellation", "conversion"],
+              },
+              holder: { type: "string" },
+              toHolder: { type: "string", description: "A transfer's new holder." },
+              amountUsd: { type: "number", description: "Cash paid for the certificate." },
+            },
+            required: ["type", "holder", "amountUsd"],
+          },
+        },
         holders: {
           type: "array",
           items: {
@@ -1737,7 +1755,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "scratchpad_add",
     description:
-      "Add an open-work item to this bot's scratchpad. Use for todos or parked work that should outlive this turn. Not a reminder or schedule.",
+      "Add an open-work item to this bot's scratchpad. Use for todos or parked work that should outlive this turn. Not a reminder or schedule. Record who or what the item waits on (waitingOn) and when it is due (dueAt) whenever you know them, so the user is told when it goes past due.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1752,6 +1770,16 @@ export const builtinAgentTools: ConnectorTool[] = [
         channel: { type: "string", enum: ScratchpadChannelSchema.options },
         target: { type: "string", maxLength: 200 },
         scheduledFor: { type: "string", description: "Absolute ISO datetime with timezone." },
+        dueAt: {
+          type: "string",
+          description: "When the item is due: ISO date (2026-11-02) or datetime with timezone.",
+        },
+        waitingOn: {
+          type: "string",
+          maxLength: 120,
+          description:
+            "Who or what the item waits on. Write exactly 'you' when it waits on the owner, otherwise the other party's name, for example 'Acme legal'.",
+        },
       },
       required: ["title"],
       additionalProperties: false,
@@ -1759,7 +1787,8 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "scratchpad_update",
-    description: "Update a scratchpad item's title, status, notes, target, schedule, or proof.",
+    description:
+      "Update a scratchpad item's title, status, notes, target, schedule, proof, due date (dueAt) or what it waits on (waitingOn). Keep waitingOn and dueAt current; send an empty string to clear waitingOn and null to clear dueAt.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1770,6 +1799,16 @@ export const builtinAgentTools: ConnectorTool[] = [
         target: { type: "string", maxLength: 200 },
         scheduledFor: { type: "string", description: "Absolute ISO datetime with timezone." },
         proof: { type: "string", maxLength: 2_000 },
+        dueAt: {
+          type: ["string", "null"],
+          description: "ISO date or datetime with timezone; null clears.",
+        },
+        waitingOn: {
+          type: "string",
+          maxLength: 120,
+          description:
+            "What the item waits on. Write exactly 'you' when it waits on the owner, otherwise the other party's name, for example 'Acme legal'.",
+        },
       },
       required: ["itemId"],
       additionalProperties: false,
@@ -1777,11 +1816,13 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "scratchpad_complete",
-    description: "Mark a scratchpad item done.",
+    description:
+      "Mark a scratchpad item done. Give a short reason when it resolved by itself or for a different reason than you did it.",
     inputSchema: {
       type: "object",
       properties: {
         itemId: { type: "string" },
+        reason: { type: "string", maxLength: 200 },
         proof: { type: "string", maxLength: 2_000 },
       },
       required: ["itemId"],
@@ -1879,8 +1920,41 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "schedule_create",
     description:
-      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone.',
+      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone. For "tell me if X changes" or "let me know when this page updates", use watch_create instead: a cron job that reports "no change" wastes a run and a message every time.',
     inputSchema: scheduleCreateInputSchema,
+  },
+  {
+    name: "watch_create",
+    description:
+      'Watch a web page, or one read-only tool of a connected app, and wake this bot only when its text or result changes. Use for "tell me if the pricing page changes" or "let me know when X is published". To watch a connected app (for example "tell me if the Mercury balance changes"), pass tool (the exact name of a read-only tool you were offered, one that only gets or lists data) and its fixed arguments instead of url; the tool is called without a model on every check and a write tool is refused. The page or tool is checked without a model; a change starts a run with a short before/after diff, so the instruction says what to do on a change ("tell me what changed in a sentence"), never "report that nothing changed". The first check only records the page. A watch keeps running, and wakes the bot on every change, until the user pauses or deletes it, so never promise or write "stop after the first change". Pauses for the user to approve a card. At most 5 watches per bot. Use schedule_list, schedule_update (watch: { url, intervalMinutes }) and schedule_cancel to see, change or stop it.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The http or https address of the page." },
+        tool: {
+          type: "string",
+          description:
+            "Instead of url: the exact name of a read-only connected-app tool you were offered.",
+        },
+        arguments: {
+          type: "object",
+          description: "With tool: the fixed arguments to call it with on every check.",
+        },
+        intervalMinutes: {
+          type: "number",
+          enum: [15, 60, 1440],
+          description: "How often to check: 15, 60 (default) or 1440 minutes.",
+        },
+        name: { type: "string", description: "Short name, e.g. “Pricing page”." },
+        instruction: {
+          type: "string",
+          description:
+            "What to do on each change, e.g. “Tell me what changed in a sentence.” The watch keeps running until the user pauses or deletes it, so do not say to stop monitoring.",
+        },
+      },
+      required: ["name", "instruction"],
+      additionalProperties: false,
+    },
   },
   {
     name: "schedule_list",
@@ -1915,6 +1989,15 @@ export const builtinAgentTools: ConnectorTool[] = [
         },
         timezone: { type: "string", description: "IANA timezone for cron times." },
         enabled: { type: "boolean" },
+        watch: {
+          type: "object",
+          description: "For a watch: the new page address and/or check interval.",
+          properties: {
+            url: { type: "string" },
+            intervalMinutes: { type: "number", enum: [15, 60, 1440] },
+          },
+          additionalProperties: false,
+        },
       },
       required: ["id"],
       additionalProperties: false,
@@ -1968,7 +2051,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "skill_create",
     description:
-      "Create a reusable Claude Agent Skill (generic how-to SKILL.md) shared across assistants. The Pi runtime already understands this format; we persist and inject them. The skill is saved as a draft that the owner must approve before anyone can use it. Use when a multi-step task is worth repeating or the user asks to save a skill. Do not include account names, channels, or inboxes — those belong in a routine.",
+      "Create a reusable Claude Agent Skill (generic how-to SKILL.md) shared across assistants. The Pi runtime already understands this format; we persist and inject them. The skill is saved as a draft that the owner must approve before anyone can use it. Use when a multi-step task is worth repeating or the user asks to save a skill. Do not include account names, channels, or inboxes — those belong in a routine. To make a reusable computation (the same result every time from data you already fetched), add toolSource and toolInputSchema: the tool is pure JavaScript `function run(input)` with no network or files, so gather data with read tools first, then call tool_run. Test-run the draft with tool_run on a small sample before you propose it, and pass what you ran as sampleInput and sampleOutput.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1986,6 +2069,26 @@ export const builtinAgentTools: ConnectorTool[] = [
           description:
             "Optional full SKILL.md (frontmatter + body) instead of name/description/body.",
         },
+        toolSource: {
+          type: "string",
+          description:
+            "Optional. Makes this skill a reusable tool: pure JavaScript that defines `function run(input) { ... return result; }`. It runs in a sandbox with no network, files, timers, require or import, only the input and a JSON return value (2 s, 32 MB, 256 KB result). Gather data with read tools first, then pass it to the tool with tool_run. Max 64 KB.",
+        },
+        toolInputSchema: {
+          type: "object",
+          description:
+            "Required with toolSource. JSON Schema subset for the input: type object, properties (each with type string, number, integer, boolean, array or object, and items for arrays), required, enum, description. No other keywords.",
+        },
+        reads: {
+          type: "string",
+          description: "One plain line shown to the owner: what data the tool works on.",
+        },
+        writes: {
+          type: "string",
+          description: 'One plain line shown to the owner, normally "Nothing".',
+        },
+        sampleInput: { description: "The input you test-ran the draft tool with." },
+        sampleOutput: { description: "What the draft tool returned for sampleInput." },
       },
     },
   },
@@ -2002,8 +2105,42 @@ export const builtinAgentTools: ConnectorTool[] = [
         description: { type: "string" },
         body: { type: "string" },
         content: { type: "string", description: "Optional full replacement SKILL.md." },
+        toolSource: {
+          type: "string",
+          description:
+            "Optional. Makes this skill a reusable tool: pure JavaScript that defines `function run(input) { ... return result; }`. It runs in a sandbox with no network, files, timers, require or import, only the input and a JSON return value (2 s, 32 MB, 256 KB result). Gather data with read tools first, then pass it to the tool with tool_run. Max 64 KB.",
+        },
+        toolInputSchema: {
+          type: "object",
+          description:
+            "Required with toolSource. JSON Schema subset for the input: type object, properties (each with type string, number, integer, boolean, array or object, and items for arrays), required, enum, description. No other keywords.",
+        },
+        reads: {
+          type: "string",
+          description: "One plain line shown to the owner: what data the tool works on.",
+        },
+        writes: {
+          type: "string",
+          description: 'One plain line shown to the owner, normally "Nothing".',
+        },
+        sampleInput: { description: "The input you test-ran the draft tool with." },
+        sampleOutput: { description: "What the draft tool returned for sampleInput." },
       },
     },
+  },
+  {
+    name: "tool_run",
+    description:
+      "Run a saved tool (a skill with a script) on JSON input and return its JSON result. The tool is a pure function: it cannot read data, so fetch the data first and pass it in. Only owner-approved tools run in background runs; a draft you wrote can be test-run only in a chat the owner is in. Saved tools and their input are listed by task_catalog.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Exact tool (skill) name." },
+        input: { type: "object", description: "The input, matching the tool's input schema." },
+      },
+      required: ["name", "input"],
+    },
+    readOnly: true,
   },
   {
     name: "skill_delete",

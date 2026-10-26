@@ -1,6 +1,6 @@
 import { plural, t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { RunActivityRow, RunStatus } from "@rakazo/contracts";
+import type { RunActivityRow, RunStatus, WaitingOnYouItem } from "@rakazo/contracts";
 import { isAgedStuckWork } from "@rakazo/core";
 import {
   Button,
@@ -26,6 +26,7 @@ import { needsAnswerLabel } from "../lib/roster-status";
 import { formatRosterTime } from "../lib/roster-time";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
+import { ScratchpadItemMeta } from "./ScratchpadSection";
 
 export function statusTone(status: RunActivityRow["status"], updatedAt?: string): string {
   if (status === "failed") return "text-destructive";
@@ -41,12 +42,15 @@ type ActivityListProps = {
   onOpenRun: (run: RunActivityRow) => void;
   /** The bots whose active runs are listed here, so the chat list can skip them while this is open. */
   onListedBots?: (botIds: ReadonlySet<string>) => void;
+  /** Opens the bot's panel, where the item sits under Open work. */
+  onOpenWaitingItem?: (item: WaitingOnYouItem) => void;
 };
 
-export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
+export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: ActivityListProps) {
   const { t } = useLingui();
   const [activeRuns, setActiveRuns] = useState<RunActivityRow[]>([]);
   const [recentRuns, setRecentRuns] = useState<RunActivityRow[]>([]);
+  const [waitingItems, setWaitingItems] = useState<WaitingOnYouItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ActivityListFilters>(emptyActivityFilters);
@@ -76,6 +80,9 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
             }),
             rpc.runs.list({ filter: "recent" }).then((result) => {
               if (fresh()) setRecentRuns(result.runs);
+            }),
+            rpc.scratchpad.waitingOnYou({}).then((result) => {
+              if (fresh()) setWaitingItems(result);
             }),
           ]);
           if (fresh()) setError(null);
@@ -118,6 +125,10 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
     [recentRuns, filters],
   );
 
+  // A quiet routine run that said nothing is not "finished work": it stays out of the count and sits last, dimmed.
+  const finishedRuns = useMemo(() => filteredRecent.filter((run) => !run.silent), [filteredRecent]);
+  const quietRuns = useMemo(() => filteredRecent.filter((run) => run.silent), [filteredRecent]);
+
   const filtersOn = activityFiltersActive(filters);
   const [showFilters, setShowFilters] = useState(false);
   const [showFinished, setShowFinished] = useState(false);
@@ -128,14 +139,15 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
   // What needs the person comes first; the rest of the active work follows as "Working".
   const needsYou = filteredActive.filter((run) => NEEDS_YOU.has(run.status));
   const working = filteredActive.filter((run) => !NEEDS_YOU.has(run.status));
-  const hasAnyRuns = activeRuns.length > 0 || recentRuns.length > 0;
+  const hasAnyRuns = activeRuns.length > 0 || recentRuns.length > 0 || waitingItems.length > 0;
   const hasVisibleRuns = filteredActive.length > 0 || filteredRecent.length > 0;
 
   // The list ends on a whole row: its height stops at the bottom of the last row that fits.
   const rowsRef = useRef<HTMLDivElement>(null);
   const layoutKey = [...filteredActive, ...filteredRecent]
     .map((run) => `${run.runId}${run.status}`)
-    .join();
+    .join()
+    .concat(`|${waitingItems.map((item) => item.id).join()}`);
   // biome-ignore lint/correctness/useExhaustiveDependencies: layoutKey, showFinished and error change which rows are drawn
   useLayoutEffect(() => {
     const scroller = rowsRef.current;
@@ -148,7 +160,7 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
       const endOf = (row: Element) => row.getBoundingClientRect().bottom - top + scroller.scrollTop;
       // Everything waiting on the person always shows; the other runs share what is left of 30% of the window.
       const needsRows = scroller.querySelectorAll(
-        '[aria-labelledby="activity-needs-heading"] [data-activity-row]',
+        '[aria-labelledby="activity-needs-heading"] [data-activity-row], [aria-labelledby="activity-waiting-heading"] [data-activity-row]',
       );
       const lastNeeds = needsRows[needsRows.length - 1];
       const limit = Math.max(window.innerHeight * 0.3, lastNeeds ? endOf(lastNeeds) : 0);
@@ -243,18 +255,26 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
             <ActivityRow key={run.runId} run={run} onOpen={() => onOpenRun(run)} />
           ))}
         </ActivitySection>
+        <ActivitySection id="activity-waiting-heading" title={<Trans>Waiting on you</Trans>}>
+          {waitingItems.map((item) => (
+            <WaitingRow key={item.id} item={item} onOpen={() => onOpenWaitingItem?.(item)} />
+          ))}
+        </ActivitySection>
         <ActivitySection id="activity-now-heading" title={<Trans>Working</Trans>}>
           {working.map((run) => (
             <ActivityRow key={run.runId} run={run} onOpen={() => onOpenRun(run)} compact />
           ))}
         </ActivitySection>
-        {needsYou.length === 0 && working.length === 0 && !filtersOn ? (
+        {needsYou.length === 0 &&
+        working.length === 0 &&
+        waitingItems.length === 0 &&
+        !filtersOn ? (
           <p className="px-2.5 py-1 text-[13px] text-muted-foreground/80" role="status">
             <Trans>Nothing needs you right now.</Trans>
           </p>
         ) : null}
         {/* Finished runs need nothing from the person, so they stay folded unless filtering. */}
-        {filteredRecent.length > 0 && !showFinished && !filtersOn ? (
+        {finishedRuns.length > 0 && !showFinished && !filtersOn ? (
           <Button
             type="button"
             variant="ghost"
@@ -264,7 +284,7 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
             aria-expanded={false}
             onClick={() => setShowFinished(true)}
           >
-            {plural(filteredRecent.length, {
+            {plural(finishedRuns.length, {
               one: "Show # finished run",
               other: "Show # finished runs",
             })}
@@ -275,7 +295,7 @@ export function ActivityList({ onOpenRun, onListedBots }: ActivityListProps) {
             title={<Trans>Finished</Trans>}
             headingRef={finishedRef}
           >
-            {filteredRecent.map((run) => (
+            {[...finishedRuns, ...quietRuns].map((run) => (
               <ActivityRow key={run.runId} run={run} onOpen={() => onOpenRun(run)} />
             ))}
           </ActivitySection>
@@ -514,6 +534,38 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
   );
 }
 
+/** An open item that waits on the person; opening it shows the bot's Open work. */
+function WaitingRow({ item, onOpen }: { item: WaitingOnYouItem; onOpen: () => void }) {
+  const { t } = useLingui();
+  const botName = item.botName;
+  const title = item.title;
+  return (
+    <button
+      type="button"
+      aria-label={t`${title}, ${botName}`}
+      onClick={onOpen}
+      data-activity-row=""
+      className="flex w-full gap-3 rounded-xl px-2.5 py-[9px] text-left hover:bg-accent"
+    >
+      <span
+        className="mt-1.5 size-2 shrink-0 rounded-full bg-current text-warning"
+        aria-hidden="true"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="truncate text-sm font-medium text-foreground" dir="auto">
+            {title}
+          </span>
+          <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground/80">
+            {botName}
+          </span>
+        </div>
+        <ScratchpadItemMeta item={item} />
+      </div>
+    </button>
+  );
+}
+
 /** `compact` is one line: the chat list already shows what a working bot is doing. */
 function ActivityRow({
   run,
@@ -526,7 +578,8 @@ function ActivityRow({
 }) {
   const { t } = useLingui();
   const title = run.groupName ? `${run.botName} · ${run.groupName}` : run.botName;
-  const label = statusLabel(run.status, run.needsApproval);
+  const quiet = run.silent === true;
+  const label = quiet ? t`Nothing to report` : statusLabel(run.status, run.needsApproval);
   const activityLabel = t`${title}, ${label}`;
   const tone = statusTone(run.status, run.updatedAt);
   return (
@@ -535,7 +588,7 @@ function ActivityRow({
       aria-label={activityLabel}
       onClick={onOpen}
       data-activity-row=""
-      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent ${compact ? "py-1.5" : "py-[9px]"}`}
+      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent ${compact ? "py-1.5" : "py-[9px]"} ${quiet ? "opacity-60" : ""}`}
     >
       <span
         className={`mt-1.5 size-2 shrink-0 rounded-full bg-current ${tone}`}
@@ -554,7 +607,7 @@ function ActivityRow({
         </div>
         <div hidden={compact} className="mt-0.5">
           <span className={`block text-xs ${tone}`}>{label}</span>
-          {run.promptSnippet ? (
+          {run.promptSnippet && !quiet ? (
             <span className="block truncate text-[13px] text-muted-foreground">
               {run.promptSnippet}
             </span>

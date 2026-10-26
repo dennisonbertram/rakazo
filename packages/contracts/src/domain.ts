@@ -10,6 +10,12 @@ import {
 import { ThreadMessageSchema } from "./events.js";
 import { Id, MemoryScope, RunStatus, SandboxKind } from "./ids.js";
 import { McpHeadersSchema, McpRemoteEndpointSchema, McpTransportSchema } from "./mcp.js";
+import {
+  PageWatchSpecSchema,
+  RoutineManagedKindSchema,
+  RoutineStatusSchema,
+  WatchSpecSchema,
+} from "./routines.js";
 import { RunTriggerSchema } from "./runs.js";
 
 export const ComputerModeSchema = z.enum(["team", "dedicated"]);
@@ -481,6 +487,14 @@ export const RoutineSchema = z.object({
   thinkingLevel: ThinkingLevelSchema.nullable(),
   lastRunAt: z.string().nullable(),
   nextRunAt: z.string().nullable(),
+  /** Only message the user when something needs them; the server adds the silent-reply guidance. */
+  quiet: z.boolean(),
+  watch: WatchSpecSchema.nullable(),
+  /** "check_in" for a bot's managed check-in routine (editable only via Active). */
+  managedKind: RoutineManagedKindSchema.nullable(),
+  /** The taught skill this routine runs (its current playbook), or null. */
+  taughtSkill: z.object({ id: Id, name: z.string() }).nullable().optional(),
+  status: RoutineStatusSchema,
   createdAt: z.string(),
 });
 export type Routine = z.infer<typeof RoutineSchema>;
@@ -489,7 +503,10 @@ export const CreateRoutineInput = z
   .object({
     botId: Id,
     name: z.string().min(1).max(80),
-    prompt: z.string().min(1),
+    /** Required unless `taughtSkillId` is set; then the skill's current playbook is the prompt. */
+    prompt: z.string().default(""),
+    /** A saved taught skill on this bot. */
+    taughtSkillId: Id.nullable().default(null),
     crons: z.array(z.string().min(1)).default([]),
     /** Defaults to the user's stored time zone, then UTC. */
     timezone: z.string().optional(),
@@ -507,11 +524,18 @@ export const CreateRoutineInput = z
     modelProvider: z.string().trim().min(1).max(80).nullable().default(null),
     modelId: z.string().trim().min(1).max(200).nullable().default(null),
     thinkingLevel: ThinkingLevelSchema.nullable().default(null),
+    /** Defaults to on for a watch and off otherwise. */
+    quiet: z.boolean().optional(),
+    watch: PageWatchSpecSchema.nullable().default(null),
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);
+    if (!value.taughtSkillId && !value.prompt.trim()) {
+      ctx.addIssue({ code: "custom", message: "Add an instruction", path: ["prompt"] });
+    }
     if (
       value.crons.length === 0 &&
+      !value.watch &&
       !value.webhookEnabled &&
       !value.githubEnabled &&
       !value.messageProvider
@@ -569,8 +593,22 @@ export const ScratchpadItemSchema = z.object({
   proof: z.string().max(2_000).nullish(),
   approvedAt: ScratchpadDateTimeSchema.nullish(),
   approvedBy: z.enum(["user", "policy"]).nullish(),
+  dueAt: ScratchpadDateTimeSchema.nullish(),
+  waitingOn: z.string().max(200).nullish(),
+  resolvedReason: z.string().max(500).nullish(),
 });
 export type ScratchpadItem = z.infer<typeof ScratchpadItemSchema>;
+
+/** An open item, across the user's bots, that waits on the user or is past due. */
+export const WaitingOnYouItemSchema = z.object({
+  id: Id,
+  botId: Id,
+  botName: z.string(),
+  title: z.string(),
+  waitingOn: z.string().nullable(),
+  dueAt: ScratchpadDateTimeSchema.nullable(),
+});
+export type WaitingOnYouItem = z.infer<typeof WaitingOnYouItemSchema>;
 
 export const CreateScratchpadItemInput = z.object({
   botId: Id,
@@ -581,6 +619,8 @@ export const CreateScratchpadItemInput = z.object({
   channel: ScratchpadChannelSchema.optional(),
   target: z.string().max(200).optional(),
   scheduledFor: ScratchpadDateTimeSchema.optional(),
+  dueAt: ScratchpadDateTimeSchema.optional(),
+  waitingOn: z.string().max(200).optional(),
 });
 
 export const TaughtSkillStatusSchema = z.enum(["recording", "drafting", "draft", "saved"]);
@@ -599,7 +639,7 @@ export type SkillPlaybook = z.infer<typeof SkillPlaybookSchema>;
 
 export const TeachRecordingEventSchema = z.object({
   at: z.string(),
-  kind: z.enum(["pointer", "key", "clipboard", "snapshot", "scroll"]),
+  kind: z.enum(["pointer", "key", "clipboard", "snapshot", "scroll", "window", "file", "command"]),
   x: z.number().optional(),
   y: z.number().optional(),
   button: z.string().optional(),
@@ -608,6 +648,17 @@ export const TeachRecordingEventSchema = z.object({
   text: z.string().optional(),
   summary: z.string().optional(),
   sensitive: z.boolean().optional(),
+  /** Label of the field the input went to (for example "Password"); names a protected step. */
+  field: z.string().max(120).optional(),
+  /** Which protected value this event belongs to; the server sets it. */
+  segment: z.number().int().optional(),
+  /** window: the window title and the app it belongs to. */
+  title: z.string().max(300).optional(),
+  app: z.string().max(120).optional(),
+  /** file: the path that was written, never its content. */
+  path: z.string().max(500).optional(),
+  /** command: the command line, with secrets removed. */
+  command: z.string().max(1000).optional(),
 });
 export type TeachRecordingEvent = z.infer<typeof TeachRecordingEventSchema>;
 
@@ -625,6 +676,18 @@ export const TeachRecordingSchema = z.object({
 });
 export type TeachRecording = z.infer<typeof TeachRecordingSchema>;
 
+export const TeachTestOutcomeSchema = z.enum(["worked", "stopped"]);
+export type TeachTestOutcome = z.infer<typeof TeachTestOutcomeSchema>;
+
+/** A password the user typed while teaching. Until they save or skip it, the server holds the value. */
+export const TeachLoginPromptSchema = z.object({
+  stepIndex: z.number().int().min(0),
+  field: z.string(),
+  /** The username typed just before the password, offered for the user to confirm. */
+  username: z.string().optional(),
+});
+export type TeachLoginPrompt = z.infer<typeof TeachLoginPromptSchema>;
+
 export const TaughtSkillSchema = z.object({
   id: Id,
   botId: Id,
@@ -636,10 +699,27 @@ export const TaughtSkillSchema = z.object({
   startedAt: z.string().nullable(),
   expiresAt: z.string().nullable(),
   stoppedAt: z.string().nullable(),
+  /** When a chat, routine or test run last used this skill. */
+  lastRunAt: z.string().nullable().optional(),
+  /** Result of the latest Test run; null while it runs or before any test. */
+  lastTestOutcome: TeachTestOutcomeSchema.nullable().optional(),
+  lastTestNote: z.string().nullable().optional(),
+  /** Steps that wait for "Save as login" or "Skip". Empty once every value is saved or skipped. */
+  loginPrompts: z.array(TeachLoginPromptSchema).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type TaughtSkill = z.infer<typeof TaughtSkillSchema>;
+
+/** One row of `taughtSkills.list`. */
+export const TaughtSkillSummarySchema = z.object({
+  id: Id,
+  name: z.string(),
+  goal: z.string(),
+  lastRunAt: z.string().nullable(),
+  updatedAt: z.string(),
+});
+export type TaughtSkillSummary = z.infer<typeof TaughtSkillSummarySchema>;
 
 export const AgentSkillSourceSchema = z.enum(["user", "builtin", "plugin"]);
 export type AgentSkillSource = z.infer<typeof AgentSkillSourceSchema>;
@@ -656,6 +736,8 @@ export const AgentSkillSchema = z.object({
   /** Who wrote it. Agent-written skills carry a badge in settings. */
   origin: AgentSkillOriginSchema.optional(),
   readOnly: z.boolean(),
+  /** True when the skill carries a sandboxed tool script (see tool_run). */
+  tool: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -668,12 +750,26 @@ export const AgentSkillCatalogEntrySchema = AgentSkillSchema.pick({
   source: true,
   origin: true,
   readOnly: true,
+  tool: true,
 });
 export type AgentSkillCatalogEntry = z.infer<typeof AgentSkillCatalogEntrySchema>;
 
 /** A catalog entry with this bot's switch. A skill with no stored setting is on. */
 export const BotAgentSkillSchema = AgentSkillCatalogEntrySchema.extend({ enabled: z.boolean() });
 export type BotAgentSkill = z.infer<typeof BotAgentSkillSchema>;
+
+/** The tool a bot proposes with a skill. The owner approves exactly this source, pinned by its hash. */
+export const AgentSkillToolDraftSchema = z.object({
+  source: z.string(),
+  /** sha256 of `source`; approving with this value fails if the source changed since it was shown. */
+  hash: z.string(),
+  /** What the bot says the tool reads and writes. The bot's words, not checked. */
+  reads: z.string().optional(),
+  writes: z.string().optional(),
+  sampleInput: z.unknown().optional(),
+  sampleOutput: z.unknown().optional(),
+});
+export type AgentSkillToolDraft = z.infer<typeof AgentSkillToolDraftSchema>;
 
 /** An agent-written skill (new, or a revision of an active one) waiting for the owner. */
 export const AgentSkillDraftSchema = z.object({
@@ -684,6 +780,7 @@ export const AgentSkillDraftSchema = z.object({
   content: z.string(),
   /** True when it changes an active skill; false when the skill is new. */
   revision: z.boolean(),
+  tool: AgentSkillToolDraftSchema.optional(),
 });
 export type AgentSkillDraft = z.infer<typeof AgentSkillDraftSchema>;
 
@@ -810,14 +907,46 @@ export function preferNativeGoogle(
   );
 }
 
+export const ActionApprovalEffectSchema = z.enum(["always_allow", "require_approval", "block"]);
 export const ActionApprovalRuleSchema = z.object({
   id: Id,
-  effect: z.enum(["always_allow", "require_approval"]),
+  effect: ActionApprovalEffectSchema,
   matchKind: z.enum(["tool", "connector", "category"]),
   matchValue: z.string(),
+  /** null for a space-wide rule; a bot id for that bot's override. */
+  botId: Id.nullable().optional(),
   createdAt: z.string(),
 });
 export type ActionApprovalRule = z.infer<typeof ActionApprovalRuleSchema>;
+
+/** The three choices of the approvals table, as the person sees them: Allow, Ask, Block. */
+export const ApprovalChoiceSchema = z.enum(["allow", "ask", "block"]);
+export type ApprovalChoice = z.infer<typeof ApprovalChoiceSchema>;
+
+export const APPROVAL_ACTION_TYPE_IDS = [
+  "send_email",
+  "spend_money",
+  "connected_apps_write",
+  "calendar_changes",
+  "files_and_commands",
+  "use_computer",
+  "delete_data",
+  "message_outside",
+  "use_credentials",
+] as const;
+export const ApprovalActionTypeSchema = z.enum(APPROVAL_ACTION_TYPE_IDS);
+export type ApprovalActionType = z.infer<typeof ApprovalActionTypeSchema>;
+
+export const ApprovalTableRowSchema = z.object({
+  actionType: ApprovalActionTypeSchema,
+  /** What applies for this scope: the bot override if there is one, else the space row, else the default. */
+  effect: ApprovalChoiceSchema,
+  spaceEffect: ApprovalChoiceSchema,
+  /** null when the bot has no override ("Same as all bots"); always null without a botId. */
+  botEffect: ApprovalChoiceSchema.nullable(),
+  primary: z.boolean(),
+});
+export type ApprovalTableRow = z.infer<typeof ApprovalTableRowSchema>;
 
 export const ActionAutoReviewSettingsSchema = z.object({
   enabled: z.boolean(),
@@ -966,6 +1095,22 @@ export const ArtifactVersionSchema = z.object({
 
 export type ArtifactVersion = z.infer<typeof ArtifactVersionSchema>;
 
+/** The live link of an artifact: which version it shows and when it stops working. Never the token. */
+export const ArtifactShareSchema = z.object({
+  artifactId: z.string(),
+  version: z.number().int(),
+  expiresAt: z.string(),
+});
+export type ArtifactShare = z.infer<typeof ArtifactShareSchema>;
+
+/** What the public share endpoint returns: one artifact version, nothing about its owner. */
+export const SharedArtifactSchema = z.object({
+  name: z.string(),
+  mimeType: z.string(),
+  contentBase64: z.string(),
+});
+export type SharedArtifact = z.infer<typeof SharedArtifactSchema>;
+
 export const ArtifactWithContentSchema = ArtifactSchema.extend({
   contentBase64: z.string(),
 });
@@ -1040,7 +1185,7 @@ export const UsageRecordSchema = z.object({
   callId: z.string().nullable().optional(),
   operationId: z.string().nullable().optional(),
   operationKind: z
-    .enum(["answer", "setup", "retrieval", "subagent", "compaction", "triage"])
+    .enum(["answer", "setup", "retrieval", "subagent", "compaction", "triage", "company_import"])
     .optional(),
   parentRunId: z.string().nullable().optional(),
   agentId: z.string().nullable().optional(),

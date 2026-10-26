@@ -49,6 +49,7 @@ import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
 import { PortalDead } from "./pages/portal/PortalDead";
 import { PortalHome } from "./pages/portal/PortalHome";
 import { PortalOpen } from "./pages/portal/PortalOpen";
+import { SharedArtifactPage } from "./pages/SharedArtifact";
 import { ShellPage } from "./pages/Shell";
 
 const AuthPage = lazy(() =>
@@ -111,6 +112,8 @@ export function App() {
               <SsoCallbackPage />
             ) : window.location.pathname.startsWith("/portal") ? (
               <PortalApp />
+            ) : window.location.pathname === "/s" ? (
+              <SharedArtifactPage />
             ) : window.location.pathname === LOCAL_SETTINGS_PAGE ? (
               <LocalSettingsPage />
             ) : (
@@ -246,6 +249,7 @@ function SessionApp() {
             <Route path="/app/legal" element={<ShellPage />} />
             <Route path="/app/gtm" element={<ShellPage />} />
             <Route path="/app/devin" element={<ShellPage />} />
+            <Route path="/app/company/*" element={<ShellPage />} />
             <Route path="/app/data-room" element={<ShellPage />} />
             <Route path="/app/investors/*" element={<ShellPage />} />
             <Route path="/app/fundraising" element={<ShellPage />} />

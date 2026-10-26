@@ -14,7 +14,6 @@ import type {
 import {
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
-  BOT_TITLE_MAX_LENGTH,
   BUILTIN_TOOL_NAMES,
   botAudienceEditable,
 } from "@rakazo/contracts";
@@ -33,8 +32,10 @@ import {
   Textarea,
   Toggle,
 } from "@rakazo/ui-web";
+import { ModelPicker } from "@rakazo/ui-web/components/ui/model-picker";
 import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { ApprovalActionsTable } from "../../components/ApprovalActionsTable";
 import { SuccessPop } from "../../components/ai/primitives";
 import { ErrorBoundary, SectionLoadFailed } from "../../components/ErrorBoundary";
 import { RunsOnPicker } from "../../components/RunsOnPicker";
@@ -104,10 +105,69 @@ function ComputerModePicker({
   );
 }
 
+const CHECK_IN_CADENCES = ["off", "daily", "every_4h"] as const;
+
+export function CheckInSetting({ botId, onChange }: { botId: string; onChange?: () => void }) {
+  const { t } = useLingui();
+  const id = useId();
+  const [cadence, setCadence] = useState<(typeof CHECK_IN_CADENCES)[number]>("off");
+  const [error, setError] = useState(false);
+  const request = useRef(0);
+  useEffect(() => {
+    const current = ++request.current;
+    void rpc.checkIn
+      .get({ botId })
+      .then((value) => {
+        if (current === request.current) setCadence(value.cadence);
+      })
+      .catch(() => undefined);
+  }, [botId]);
+  const labels = { off: t`Off`, daily: t`Daily`, every_4h: t`Every 4 hours` };
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/20 pt-4">
+      <label htmlFor={`${id}-check-in`} className="text-[13.5px] font-medium text-foreground">
+        <Trans>Check in</Trans>
+      </label>
+      <NativeSelect
+        id={`${id}-check-in`}
+        className="w-40"
+        value={cadence}
+        onChange={(event) => {
+          const next = event.target.value as (typeof CHECK_IN_CADENCES)[number];
+          const previous = cadence;
+          const current = ++request.current;
+          setCadence(next);
+          setError(false);
+          rpc.checkIn
+            .set({ botId, cadence: next })
+            .then(() => onChange?.())
+            .catch(() => {
+              if (current !== request.current) return;
+              setCadence(previous);
+              setError(true);
+            });
+        }}
+      >
+        {CHECK_IN_CADENCES.map((value) => (
+          <NativeSelectOption key={value} value={value}>
+            {labels[value]}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      {error ? (
+        <span role="alert" className="basis-full text-[13px] text-destructive">
+          <Trans>Could not save</Trans>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function BotSettings({
   bot,
   memoryProviderConfigured,
   onSkillsChange,
+  onCheckInChange,
   skillsRefreshKey,
   onSave,
   onExport,
@@ -129,7 +189,9 @@ export function BotSettings({
   /** A bot just created as "New bot": focus and select its name so it gets named first. */
   focusName?: boolean;
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
-  /** Changes when the agent may have created a skill, so the list reloads. */
+  /** The check-in setting changed, so its managed routine appeared, changed or went away. */
+  onCheckInChange?: () => void;
+  /** Changes when a run ends, so skills and open work the agent added reload. */
   skillsRefreshKey?: number;
   memoryProviderConfigured: boolean;
   onSave: (
@@ -237,7 +299,6 @@ export function BotSettings({
     const timer = setTimeout(() => setSaved(false), 2000);
     return () => clearTimeout(timer);
   }, [saved]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs only when a choice changes, and enqueueSave reads the latest values through a ref
   useEffect(() => {
     if (saveTick > 0) void enqueueSave();
   }, [saveTick]);
@@ -560,6 +621,12 @@ export function BotSettings({
               }}
             />
           </label>
+          <CheckInSetting botId={bot.id} onChange={onCheckInChange} />
+          <ErrorBoundary fallback={<SectionLoadFailed />}>
+            <Suspense fallback={null}>
+              <ScratchpadSection botId={bot.id} refreshKey={skillsRefreshKey} />
+            </Suspense>
+          </ErrorBoundary>
           {botAudienceEditable(bot.spawnKey) ? (
             <div data-testid="bot-audience" className="mt-6 border-t border-border/20 pt-4">
               <div className="text-[13.5px] font-medium text-foreground">
@@ -646,6 +713,13 @@ export function BotSettings({
             refreshKey={skillsRefreshKey}
             onSkillsChange={onSkillsChange}
           />
+          <BotCredentialsSection botId={bot.id} />
+          <section data-testid="bot-approvals" className="mt-6">
+            <div className="mb-2 text-[13.5px] font-medium text-foreground">
+              <Trans>Approvals</Trans>
+            </div>
+            <ApprovalActionsTable botId={bot.id} />
+          </section>
           <details
             data-testid="bot-settings-advanced"
             className="group mt-5 open:pb-3"
@@ -682,11 +756,6 @@ export function BotSettings({
                   />
                 </div>
               ) : null}
-              <ErrorBoundary fallback={<SectionLoadFailed />}>
-                <Suspense fallback={null}>
-                  <ScratchpadSection botId={bot.id} />
-                </Suspense>
-              </ErrorBoundary>
               {advancedOpened ? (
                 <ErrorBoundary fallback={<SectionLoadFailed />}>
                   <Suspense fallback={null}>
@@ -696,35 +765,49 @@ export function BotSettings({
               ) : null}
               <label htmlFor={`${ids}-model`} className={advancedLabelClass}>
                 <Trans>Model</Trans>
-                <NativeSelect
+                <ModelPicker
                   id={`${ids}-model`}
                   className="mt-2 w-full"
+                  label={t`Model`}
+                  searchLabel={t`Search models`}
+                  emptyLabel={t`No matching models`}
+                  loadingLabel={t`Loading models…`}
+                  loading={!modelMetaReady}
                   value={selectedModelKey}
-                  onChange={(event) => {
+                  options={[
+                    {
+                      value: "",
+                      label:
+                        t`System model` +
+                        (me?.defaultModel
+                          ? ` (${catalogLabel(catalog, me.defaultProvider, me.defaultModel) ?? me.defaultModel})`
+                          : ""),
+                    },
+                    ...(selectedModelKey &&
+                    !connectedOptions.some((option) => option.key === selectedModelKey)
+                      ? [
+                          {
+                            value: selectedModelKey,
+                            label: unavailableModel ?? selectedModel?.modelId ?? selectedModelKey,
+                            provider: selectedModel?.provider,
+                          },
+                        ]
+                      : []),
+                    ...connectedOptions.map((option) => ({
+                      ...option,
+                      value: option.key,
+                      id: option.modelId,
+                      providerName: catalog.find((entry) => entry.provider === option.provider)
+                        ?.providerName,
+                    })),
+                  ]}
+                  onChange={(value) => {
                     saveOnChange(() => {
-                      setModelKey(event.target.value);
+                      setModelKey(value);
                       setThinkingLevel("");
                     });
                   }}
-                >
-                  <NativeSelectOption value="">
-                    {t`System model`}
-                    {me?.defaultModel
-                      ? ` (${catalogLabel(catalog, me.defaultProvider, me.defaultModel) ?? me.defaultModel})`
-                      : ""}
-                  </NativeSelectOption>
-                  {selectedModelKey &&
-                  !connectedOptions.some((option) => option.key === selectedModelKey) ? (
-                    <NativeSelectOption value={selectedModelKey}>
-                      {unavailableModel ?? selectedModel?.modelId ?? selectedModelKey}
-                    </NativeSelectOption>
-                  ) : null}
-                  {connectedOptions.map((option) => (
-                    <NativeSelectOption key={option.key} value={option.key}>
-                      {option.label}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
+                />
                 {unavailableModel ? (
                   <span className="mt-1.5 block text-[12.5px] font-normal text-muted-foreground">
                     {t`Using the system model: ${unavailableModel} isn't available`}
@@ -844,7 +927,6 @@ export function BotSettings({
                   />
                 </label>
               ))}
-              {advancedOpened ? <BotCredentialsSection botId={bot.id} /> : null}
             </div>
           </details>
           {error ? <p className="mt-2 text-[13px] text-destructive">{error}</p> : null}

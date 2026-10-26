@@ -1,7 +1,12 @@
 import { runContinueJob } from "@rakazo/adapter-kit";
 import { MessageBlock } from "@rakazo/contracts";
 import type { PrivateFragments } from "@rakazo/core";
-import { botMessageHopExhausted, nextBotMessageHop, renderGroupMembersContext } from "@rakazo/core";
+import {
+  botMessageHopExhausted,
+  chainedRunMode,
+  nextBotMessageHop,
+  renderGroupMembersContext,
+} from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import {
   appendEventInTransaction,
@@ -161,6 +166,14 @@ export async function handoffToGroupBot(
         status: "queued",
       },
     });
+    // A handoff is not a user action: the next stage keeps the source run's mode.
+    const mode = chainedRunMode(
+      "follow_up",
+      await tx.run.findUnique({
+        where: { id: run.id },
+        select: { unattended: true, externalTaint: true },
+      }),
+    );
     const nextRun = await tx.run.create({
       data: {
         spaceId: run.spaceId,
@@ -170,6 +183,8 @@ export async function handoffToGroupBot(
         userId: run.userId,
         status: "queued",
         trigger: "follow_up",
+        unattended: mode.unattended,
+        externalTaint: mode.externalTaint,
         sourceMessageId: message.id,
       },
     });

@@ -27,10 +27,8 @@ export async function fundraisingToolFromTool(
 ): Promise<Record<string, unknown>> {
   if (name !== "fundraising_read") return { error: `Unknown fundraising tool ${name}` };
   try {
-    const { round, pendingCents, signedCents, fundedCents, prospects, safes } = await getFundraisingOverview(
-      deps.prisma,
-      deps.scope,
-    );
+    const { round, pendingCents, signedCents, fundedCents, prospects, safes } =
+      await getFundraisingOverview(deps.prisma, deps.scope);
     const open = round && !round.closedAt ? round : null;
     return {
       round: round && {

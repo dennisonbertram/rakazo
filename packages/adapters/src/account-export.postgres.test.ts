@@ -113,7 +113,7 @@ describePostgres("account export (PostgreSQL)", () => {
       await prisma.agentSkill.create({
         data: { spaceId, userId, name: `skill-${tag}`, description: "d", content: "c" },
       });
-      await prisma.routine.create({
+      const routine = await prisma.routine.create({
         data: {
           spaceId,
           userId,
@@ -121,7 +121,15 @@ describePostgres("account export (PostgreSQL)", () => {
           name: `routine-${tag}`,
           prompt: "p",
           crons: ["0 9 * * *"],
+          quiet: true,
+          watch: { kind: "page", url: "https://example.com", intervalMinutes: 60 },
         },
+      });
+      await prisma.routineWatchState.create({
+        data: { routineId: routine.id, spaceId, snapshot: `page-${tag}`, recentChanges: [0, 1] },
+      });
+      await prisma.scratchpadItem.create({
+        data: { spaceId, userId, botId: bot.id, title: `item-${tag}`, waitingOn: "Acme legal" },
       });
       await prisma.contact.create({ data: { spaceId, userId, name: `contact-${tag}` } });
       await prisma.meeting.create({
@@ -260,6 +268,9 @@ describePostgres("account export (PostgreSQL)", () => {
       ["notes-A-shared", "Ada: transcript-A-shared"],
     ]);
     expect(zip.json("routines.json")[0].crons).toEqual(["0 9 * * *"]);
+    expect(zip.json("routines.json")[0]).toMatchObject({ quiet: true, watch: { kind: "page" } });
+    expect(names("routine-watch-state.json", "snapshot")).toEqual(["page-A-only", "page-A-shared"]);
+    expect(names("scratchpad-items.json", "title")).toEqual(["item-A-only", "item-A-shared"]);
     expect(zip.json("messages.json")).toHaveLength(2);
     expect(zip.json("legal-edges.json")).toHaveLength(2);
     expect(zip.json("legal-nodes.json")).toHaveLength(4);

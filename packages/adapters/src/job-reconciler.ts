@@ -8,6 +8,7 @@ import type { PoolClient } from "pg";
 import { returnBotMessageOutcome } from "./bot-messages.js";
 import { scheduleComputerControlExpiry } from "./computer-control.js";
 import { reconcileMailApprovals } from "./mail-approval-recovery.js";
+import { notifyPastDueItems } from "./past-due.js";
 import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
 import { isUserProgressClientNonce } from "./user-progress.js";
@@ -109,6 +110,11 @@ export function createJobReconciler(
     reconcileCloudAgents?: () => Promise<void>;
     reconcileDataRoom?: () => Promise<unknown>;
     reconcileMeetings?: () => Promise<unknown>;
+    reconcileCompanyImports?: () => Promise<void>;
+    /** Deletes typed passwords held for teaching that nobody saved or skipped in time. */
+    reconcileTeachHeldValues?: () => Promise<unknown>;
+    /** Watch probes; the in-process mode has no Graphile cron, so the tick runs here. */
+    runWatchProbes?: () => Promise<unknown>;
   },
   options: { intervalMs?: number; batchSize?: number } = {},
 ) {
@@ -133,6 +139,9 @@ export function createJobReconciler(
           deps.reconcileComputerUpdates,
           deps.reconcileDataRoom,
           deps.reconcileMeetings,
+          deps.reconcileCompanyImports,
+          deps.reconcileTeachHeldValues,
+          deps.runWatchProbes,
         ].map(async (reconcile) => reconcile?.()),
       );
       for (const result of auxiliary) {
@@ -153,6 +162,15 @@ export function createJobReconciler(
         });
       } catch (error) {
         getLogger().error("stuck work reconciliation", error);
+      }
+      try {
+        await notifyPastDueItems({
+          prisma: deps.prisma,
+          notificationEvents: deps.notificationEvents,
+          now,
+        });
+      } catch (error) {
+        getLogger().error("past-due reconciliation", error);
       }
       if (deps.events) {
         try {

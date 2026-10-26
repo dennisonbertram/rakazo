@@ -5,7 +5,9 @@ import type {
   ModelCatalogEntry,
   ModelCredential,
   Routine,
+  WatchSpec,
 } from "@rakazo/contracts";
+import { connectorToolLabel } from "@rakazo/contracts";
 import type { CronFreq, CronPreset } from "@rakazo/core";
 import {
   cronFromPreset,
@@ -33,6 +35,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Switch,
   Textarea,
   Tooltip,
   TooltipContent,
@@ -41,6 +44,7 @@ import {
 import {
   ChevronLeft,
   Clock,
+  Eye,
   GitBranch,
   Globe,
   MessageSquare,
@@ -57,6 +61,7 @@ import {
   parseModelOptionKey,
   thinkingLevelLabel,
 } from "../lib/model-catalog";
+import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { isHiddenBuiltinSkill, slashSkillLabel } from "../lib/slash-skills";
 import { RoutineRunHistory } from "./RoutineRunHistory";
@@ -102,6 +107,11 @@ export type RoutineDraftState = {
   thinkingLevel: string;
   /** Empty keeps the routine's zone, or the account zone for a new routine. */
   timezone: string;
+  /** Only message the user when something needs them. */
+  quiet: boolean;
+  watch: WatchSpec | null;
+  /** A saved taught skill this routine runs by reference, instead of pasted text. */
+  taughtSkill: { id: string; name: string } | null;
 };
 
 export function emptyRoutineDraft(): RoutineDraftState {
@@ -117,6 +127,9 @@ export function emptyRoutineDraft(): RoutineDraftState {
     modelKey: "",
     thinkingLevel: "",
     timezone: "",
+    quiet: false,
+    watch: null,
+    taughtSkill: null,
   };
 }
 
@@ -136,12 +149,35 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
         : "",
     thinkingLevel: routine.thinkingLevel ?? "",
     timezone: routine.timezone,
+    quiet: routine.quiet,
+    watch: routine.watch,
+    taughtSkill: routine.taughtSkill ?? null,
   };
 }
 
+function watchHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function checkInSummary(routine: Routine): string {
+  // The 4-hour check-in repeats on an hour step ("0 */4 * * *"); the daily one runs once a day.
+  const everyFourHours = routine.crons.some((cron) => cron.split(/\s+/)[1]?.includes("/4"));
+  return everyFourHours ? t`Check-in every 4 hours` : t`Daily check-in`;
+}
+
 export function routineTriggerSummary(routine: Routine): string {
+  if (routine.managedKind === "check_in") return checkInSummary(routine);
   if (!routine.active) return t`Paused`;
   const parts: string[] = [];
+  if (routine.watch) {
+    const host =
+      routine.watch.kind === "connector" ? routine.watch.appName : watchHost(routine.watch.url);
+    parts.push(t`Watches ${host}`);
+  }
   if (routine.webhookEnabled) parts.push(t`When a webhook fires`);
   if (routine.githubEnabled) parts.push(t`Git event`);
   if (routine.messageProvider === "slack") parts.push(t`Slack message`);
@@ -149,6 +185,65 @@ export function routineTriggerSummary(routine: Routine): string {
   else if (routine.messageProvider) parts.push(t`Message event`);
   for (const cron of routine.crons) parts.push(formatCron(cron));
   return parts.length > 0 ? parts.join(" · ") : t`No trigger`;
+}
+
+function formatRunTime(iso: string, zone: string, locale: string, now = new Date()): string {
+  const date = new Date(iso);
+  const time = { hour: "numeric", minute: "2-digit", timeZone: zone } as const;
+  const dayKey = (value: Date) => value.toLocaleDateString("en-CA", { timeZone: zone });
+  if (dayKey(date) === dayKey(now)) return date.toLocaleTimeString(locale, time);
+  const days = Math.abs(date.getTime() - now.getTime()) / 86_400_000;
+  return date.toLocaleString(
+    locale,
+    days < 6 ? { weekday: "short", ...time } : { month: "short", day: "numeric", ...time },
+  );
+}
+
+/** The muted second line of a routine row; null when there is nothing to say yet. */
+export function routineStatusLine(
+  routine: Routine,
+  locale = "en",
+  now = new Date(),
+): string | null {
+  const { status } = routine;
+  if (status.pausedReason) {
+    switch (status.pausedReason) {
+      case "errors":
+        return routine.watch?.kind === "connector"
+          ? t`Paused: the app could not be checked`
+          : t`Paused: the page could not be checked`;
+      case "noisy":
+        return routine.watch?.kind === "connector"
+          ? t`Paused: the app result changes too often`
+          : t`Paused: the page changes too often`;
+      case "access":
+        return t`Paused: no access`;
+      case "budget":
+        return t`Paused: too many checks today`;
+    }
+  }
+  const parts: string[] = [];
+  if (routine.watch) {
+    if (status.lastCheckedAt) {
+      const checked = formatRelativeTime(status.lastCheckedAt, now);
+      parts.push(t`Checked ${checked}`);
+    }
+    if (status.lastChangedAt) {
+      const changed = formatRelativeTime(status.lastChangedAt, now);
+      parts.push(t`Changed ${changed}`);
+    }
+  } else {
+    const lastRunAt = status.lastRunAt ?? routine.lastRunAt;
+    if (lastRunAt) {
+      const lastRan = formatRunTime(lastRunAt, routine.timezone, locale, now);
+      parts.push(t`Last ran ${lastRan}`);
+    }
+    if (status.nextRunAt && routine.active) {
+      const next = formatRunTime(status.nextRunAt, routine.timezone, locale, now);
+      parts.push(t`Next ${next}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 export function RoutineListHeader({ onCreate }: { onCreate: () => void }) {
@@ -175,17 +270,23 @@ export function RoutineListRow({
   running,
   onOpen,
   onStop,
+  onToggleActive,
 }: {
   routine: Routine;
   running: boolean;
   onOpen: () => void;
   onStop: () => void;
+  /** A managed routine (the check-in) shows only this switch; it cannot be opened. */
+  onToggleActive?: (active: boolean) => void;
 }) {
+  const { i18n } = useLingui();
+  const managed = routine.managedKind !== null;
+  const statusLine = routineStatusLine(routine, i18n.locale || "en");
+  const Body = managed ? "div" : "button";
   return (
     <div className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 hover:bg-accent">
-      <button
-        type="button"
-        onClick={onOpen}
+      <Body
+        {...(managed ? {} : { type: "button" as const, onClick: onOpen })}
         className="flex min-w-0 flex-1 items-center gap-3 text-start"
       >
         <span className="grid h-5 w-5 place-items-center">
@@ -203,8 +304,23 @@ export function RoutineListRow({
             {routineTriggerSummary(routine)}
             {routine.modelProvider && routine.modelId ? ` · ${routine.modelId}` : ""}
           </span>
+          {statusLine ? (
+            <span
+              data-testid="routine-status-line"
+              className="block text-[12.5px] text-muted-foreground/80"
+            >
+              {statusLine}
+            </span>
+          ) : null}
         </span>
-      </button>
+      </Body>
+      {managed ? (
+        <Switch
+          checked={routine.active}
+          aria-label={t`Active`}
+          onCheckedChange={(checked) => onToggleActive?.(checked)}
+        />
+      ) : null}
       {running ? (
         <Button
           size="xs"
@@ -217,6 +333,8 @@ export function RoutineListRow({
     </div>
   );
 }
+
+const TAUGHT_PREFIX = "taught:";
 
 function withoutSkillMention(prompt: string, skill: string) {
   const mention = new RegExp(
@@ -239,6 +357,7 @@ export function RoutineEditor({
   githubPath,
   messageProviders,
   skills = [],
+  taughtSkills = [],
   saving,
   running,
   error,
@@ -258,6 +377,8 @@ export function RoutineEditor({
   messageProviders: string[];
   /** The bot's skills; choosing one adds an @mention, which loads it when the routine runs. */
   skills?: AgentSkillCatalogEntry[];
+  /** Saved taught skills; choosing one makes the routine run it by reference. */
+  taughtSkills?: { id: string; name: string }[];
   saving: boolean;
   running: boolean;
   error: string | null;
@@ -318,6 +439,7 @@ export function RoutineEditor({
     draft.schedules.length > 0 ||
     draft.webhookEnabled ||
     draft.githubEnabled ||
+    Boolean(draft.watch) ||
     Boolean(draft.messageProvider);
   // A saved routine has nothing to save until a field changes. The baseline is the draft as
   // it stood when this routine was opened or last saved (the parent swaps `editing` on save).
@@ -360,6 +482,15 @@ export function RoutineEditor({
     if (!webhook.configured) {
       await onEnsureWebhook().catch(() => undefined);
     }
+  }
+
+  function addWatch() {
+    // A watch starts quiet on a new routine: most changes need no message.
+    onChange({
+      ...draft,
+      watch: { kind: "page", url: "", intervalMinutes: 60 },
+      ...(editing ? {} : { quiet: true }),
+    });
   }
 
   function addMessageProvider(provider: string) {
@@ -464,7 +595,7 @@ export function RoutineEditor({
           id={`${fieldId}-prompt`}
           value={instruction}
           placeholder={
-            skill
+            skill || draft.taughtSkill
               ? t`Optional: add details for this skill`
               : t`What should this routine do each time it runs?`
           }
@@ -474,16 +605,47 @@ export function RoutineEditor({
         />
       </label>
 
-      {pickableSkills.length > 0 ? (
+      {draft.taughtSkill ? (
+        <div className="mt-2 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-foreground">
+          <span className="min-w-0 flex-1 truncate" dir="auto" data-testid="routine-taught-skill">
+            <Trans>Runs taught skill: {draft.taughtSkill.name}</Trans>
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t`Remove taught skill`}
+            onClick={() => onChange({ ...draft, taughtSkill: null })}
+          >
+            <X size={14} strokeWidth={1.8} />
+          </Button>
+        </div>
+      ) : pickableSkills.length > 0 || taughtSkills.length > 0 ? (
         <NativeSelect
           aria-label={t`Add a skill`}
           className="mt-2 w-full"
           value={skill ?? ""}
-          onChange={(event) =>
-            onChange({ ...draft, prompt: withSkillMention(instruction, event.target.value) })
-          }
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value.startsWith(TAUGHT_PREFIX)) {
+              const id = value.slice(TAUGHT_PREFIX.length);
+              const picked = taughtSkills.find((entry) => entry.id === id);
+              if (picked) onChange({ ...draft, prompt: instruction, taughtSkill: picked });
+              return;
+            }
+            onChange({ ...draft, prompt: withSkillMention(instruction, value) });
+          }}
         >
           <NativeSelectOption value="">{t`Add a skill`}</NativeSelectOption>
+          {taughtSkills.length ? (
+            <NativeSelectOptGroup label={t`Taught`}>
+              {taughtSkills.map((entry) => (
+                <NativeSelectOption key={entry.id} value={`${TAUGHT_PREFIX}${entry.id}`}>
+                  {entry.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelectOptGroup>
+          ) : null}
           {[
             { label: t`Yours`, entries: pickableSkills.filter((entry) => entry.source === "user") },
             {
@@ -659,6 +821,14 @@ export function RoutineEditor({
             />
           ) : null}
 
+          {draft.watch ? (
+            <WatchTriggerCard
+              watch={draft.watch}
+              onChange={(watch) => onChange({ ...draft, watch })}
+              onRemove={() => onChange({ ...draft, watch: null })}
+            />
+          ) : null}
+
           {draft.messageProvider ? (
             <MessageTriggerCard
               provider={draft.messageProvider}
@@ -701,6 +871,11 @@ export function RoutineEditor({
               ))}
             </DropdownMenuGroup>
 
+            <DropdownMenuItem disabled={Boolean(draft.watch)} onClick={addWatch}>
+              <Eye />
+              <Trans>Watch a page</Trans>
+            </DropdownMenuItem>
+
             {slackAvailable ? (
               <DropdownMenuItem
                 disabled={draft.messageProvider === "slack"}
@@ -740,6 +915,18 @@ export function RoutineEditor({
           </p>
         ) : null}
       </div>
+
+      <label
+        htmlFor={`${fieldId}-quiet`}
+        className="mt-5 flex items-center justify-between gap-3 text-sm text-foreground/80 pointer-coarse:min-h-11"
+      >
+        <Trans>Only message me if something needs me</Trans>
+        <Switch
+          id={`${fieldId}-quiet`}
+          checked={draft.quiet}
+          onCheckedChange={(checked) => onChange({ ...draft, quiet: checked })}
+        />
+      </label>
 
       <div className="mt-5">
         <Button disabled={saving || running || !hasTriggers || unchanged} onClick={onSave}>
@@ -790,6 +977,105 @@ function MessageTriggerCard({ provider, onRemove }: { provider: string; onRemove
       <p className="mt-2.5 text-[13.5px] text-muted-foreground/70">
         <Trans>Runs when this bot receives a verified message from this provider.</Trans>
       </p>
+    </div>
+  );
+}
+
+const WATCH_INTERVALS = [15, 60, 1440] as const;
+
+function WatchTriggerCard({
+  watch,
+  onChange,
+  onRemove,
+}: {
+  watch: WatchSpec;
+  onChange: (next: WatchSpec) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useLingui();
+  const id = useId();
+  const labels: Record<(typeof WATCH_INTERVALS)[number], string> = {
+    15: t`Every 15 minutes`,
+    60: t`Every hour`,
+    1440: t`Every day`,
+  };
+  // The bot sets a connected-app watch up in chat; the card only shows it.
+  if (watch.kind === "connector") {
+    const tool = connectorToolLabel(watch.toolName);
+    return (
+      <div className="rounded-xl border border-border p-3" data-testid="watch-card">
+        <div className="flex items-center gap-2.5 px-0.5">
+          <Eye size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
+          <span className="flex-1 text-[14.5px] text-foreground">
+            <Trans>Watch a connected app</Trans>
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t`Remove app watch`}
+            onClick={onRemove}
+            className="text-muted-foreground"
+          >
+            <X />
+          </Button>
+        </div>
+        <p className="mt-2.5 px-0.5 text-[13.5px] text-muted-foreground">
+          {watch.appName} · {tool} · {labels[watch.intervalMinutes]}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-border p-3" data-testid="watch-card">
+      <div className="flex items-center gap-2.5 px-0.5">
+        <Eye size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
+        <span className="flex-1 text-[14.5px] text-foreground">
+          <Trans>Watch a page</Trans>
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t`Remove page watch`}
+          onClick={onRemove}
+          className="text-muted-foreground"
+        >
+          <X />
+        </Button>
+      </div>
+      <div className="mt-2.5 space-y-2.5 text-[13.5px]">
+        <label htmlFor={`${id}-url`} className="block text-muted-foreground/70">
+          <Trans>Page address</Trans>
+          <Input
+            id={`${id}-url`}
+            type="url"
+            inputMode="url"
+            value={watch.url}
+            placeholder="https://"
+            onChange={(event) => onChange({ ...watch, url: event.target.value.trim() })}
+            className="mt-1"
+          />
+        </label>
+        <label htmlFor={`${id}-every`} className="block text-muted-foreground/70">
+          <Trans>Check every</Trans>
+          <NativeSelect
+            id={`${id}-every`}
+            className="mt-1 w-full"
+            value={String(watch.intervalMinutes)}
+            onChange={(event) =>
+              onChange({
+                ...watch,
+                intervalMinutes: Number(event.target.value) as WatchSpec["intervalMinutes"],
+              })
+            }
+          >
+            {WATCH_INTERVALS.map((minutes) => (
+              <NativeSelectOption key={minutes} value={String(minutes)}>
+                {labels[minutes]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </label>
+      </div>
     </div>
   );
 }

@@ -718,8 +718,16 @@ describe("thread stream authorization", () => {
 
 describe("MCP server deletion", () => {
   it("does not fail when a concurrent credential rotation already removed the old secret", async () => {
-    const deleteServer = vi.fn().mockResolvedValue({ id: "server-1" });
+    const cleanupOrder: string[] = [];
+    const deleteServer = vi.fn(async () => {
+      cleanupOrder.push("delete");
+      return { id: "server-1" };
+    });
     const deleteSecrets = vi.fn().mockResolvedValue({ count: 0 });
+    const findImportSources = vi.fn(async () => {
+      cleanupOrder.push("disconnect");
+      return [];
+    });
     const prisma = {
       devinConnectionState: { findUnique: vi.fn().mockResolvedValue(null) },
       mcpServer: {
@@ -728,6 +736,15 @@ describe("MCP server deletion", () => {
       },
       secret: { deleteMany: deleteSecrets },
       message: { findMany: vi.fn().mockResolvedValue([]) },
+      spaceMember: { findUnique: vi.fn().mockResolvedValue({ userId: "user-1" }) },
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      companyEvidence: {
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      companyImportSource: { findMany: findImportSources },
+      companyCandidate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      companyRefreshSource: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
       $transaction: vi.fn(async (run: (tx: unknown) => Promise<unknown>) => run(prisma)),
     } as unknown as PrismaClient;
     const deps = {
@@ -761,6 +778,11 @@ describe("MCP server deletion", () => {
     expect(matched).toBe(true);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ json: { ok: true } });
+    expect(findImportSources).toHaveBeenCalledWith({
+      where: { spaceId: "workspace-1", ownerUserId: "user-1", mcpServerId: "server-1" },
+      select: { sourceKind: true, runId: true },
+    });
+    expect(cleanupOrder).toEqual(["disconnect", "delete"]);
     expect(deleteServer).toHaveBeenCalledWith({ where: { id: "server-1" } });
     expect(deleteSecrets).toHaveBeenCalledWith({
       where: {
@@ -1236,6 +1258,24 @@ describe("connections.complete", () => {
         mailSearch: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         inboxTodo: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         mailSyncState: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+        spaceMember: { findUnique: vi.fn(async () => ({ userId: "user-1" })) },
+        companyEvidence: {
+          findMany: vi.fn(async () => []),
+          deleteMany: vi.fn(async () => ({ count: 0 })),
+        },
+        dataRoomItem: { findMany: vi.fn(async () => []) },
+        companyImportRun: {
+          findMany: vi.fn(async () => []),
+          updateMany: vi.fn(async () => ({ count: 0 })),
+        },
+        companyImportUnit: { updateMany: vi.fn(async () => ({ count: 0 })) },
+        companySourceBlock: {
+          upsert: vi.fn(async () => ({})),
+          findMany: vi.fn(async () => []),
+        },
+        companyImportSource: { findMany: vi.fn(async () => []) },
+        companyCandidate: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+        companyRefreshSource: { updateMany: vi.fn(async () => ({ count: 0 })) },
         $executeRaw: vi.fn(),
         $queryRaw: vi.fn(async () => []),
       };
@@ -3668,6 +3708,9 @@ describe("routines.update", () => {
     thinkingLevel: null,
     lastRunAt: null,
     nextRunAt: null,
+    quiet: false,
+    watch: null,
+    managedKind: null,
     createdAt: new Date("2026-09-01T00:00:00.000Z"),
   };
 
@@ -4821,6 +4864,37 @@ describe("GTM scratchpad RPC", () => {
     } as unknown as RouterDeps;
     return createRouterClient(createRouter(deps), { context: { actor } });
   }
+
+  it("lists waiting-on-you items scoped to the caller's space and user", async () => {
+    const findMany = vi.fn(async () => [
+      {
+        id: "item-1",
+        botId: "bot-1",
+        title: "Sign the sample form",
+        status: "open",
+        waitingOn: "you",
+        dueAt: new Date("2026-01-05T00:00:00.000Z"),
+        bot: { name: "GTM" },
+      },
+    ]);
+    const client = scratchpadClient({ findMany });
+    const items = await client.scratchpad.waitingOnYou({});
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ spaceId: actor.spaceId, userId: actor.userId }),
+      }),
+    );
+    expect(items).toEqual([
+      {
+        id: "item-1",
+        botId: "bot-1",
+        botName: "GTM",
+        title: "Sign the sample form",
+        waitingOn: "you",
+        dueAt: "2026-01-05T00:00:00.000Z",
+      },
+    ]);
+  });
 
   it("creates gated items through the shared store in parked status", async () => {
     const createdAt = new Date("2026-08-25T12:00:00.000Z");
