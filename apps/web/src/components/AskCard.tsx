@@ -208,6 +208,11 @@ export function AskCard({
             : block.credential.origin}
         </div>
       ) : null}
+      {secretInput && block.credential?.auth.type === "command" ? (
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          <Trans>The bot can read this value.</Trans>
+        </p>
+      ) : null}
       {block.detail && block.consent ? (
         <details className="mt-2 text-[13px] text-muted-foreground">
           <summary className="w-fit cursor-pointer">

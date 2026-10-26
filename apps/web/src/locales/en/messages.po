@@ -11528,6 +11528,10 @@ msgstr "The AI your bots think with. They already have one, so change this only 
 msgid "The API did not come back. Refresh this page."
 msgstr "The API did not come back. Refresh this page."
 
+#: src/components/AskCard.tsx
+msgid "The bot can read this value."
+msgstr "The bot can read this value."
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "The bot can read this value. Shell commands get it as {commandVariable}."
 msgstr "The bot can read this value. Shell commands get it as {commandVariable}."

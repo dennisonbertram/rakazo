@@ -11528,6 +11528,10 @@ msgstr ""
 msgid "The API did not come back. Refresh this page."
 msgstr "L'API n'est pas revenue. Actualisez cette page."
 
+#: src/components/AskCard.tsx
+msgid "The bot can read this value."
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "The bot can read this value. Shell commands get it as {commandVariable}."
 msgstr "Le bot peut lire cette valeur. Les commandes shell la reçoivent sous le nom {commandVariable}."
