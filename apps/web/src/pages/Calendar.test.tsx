@@ -183,3 +183,15 @@ it("puts an item at 23:30 local on its own day, not the next", async () => {
   if (localDay(next).slice(0, 7) === localDay(now).slice(0, 7))
     expect(column(localDay(next)).textContent).not.toContain("Late call");
 });
+
+it("keeps titles and drops icons when items overlap", async () => {
+  const at9 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9);
+  agendaMock.mockImplementation(
+    answer(agenda({ items: [local("a", "First thing", at9), local("b", "Second thing", at9)] })),
+  );
+  await mount();
+  const col = column(localDay(at9));
+  expect(col.textContent).toContain("First thing");
+  expect(col.textContent).toContain("Second thing");
+  expect(col.querySelector('[role="img"]')).toBeNull();
+});

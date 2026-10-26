@@ -3,7 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import type { Bot, CalendarItem, CalendarItemKind } from "@rakazo/contracts";
 import { CalendarItemKindSchema } from "@rakazo/contracts";
 import { companyCalendarMonth } from "@rakazo/core";
-import { BotAvatar, Button } from "@rakazo/ui-web";
+import { BotAvatar, Button, parseBotAvatar } from "@rakazo/ui-web";
 import {
   Bell,
   CalendarDays,
@@ -285,7 +285,13 @@ export function CalendarPage({
     return () => clearInterval(timer);
   }, []);
 
-  const wrap = (item: CalendarItem, className: string, body: ReactNode, style?: CSSProperties) => {
+  const wrap = (
+    item: CalendarItem,
+    className: string,
+    body: ReactNode,
+    style?: CSSProperties,
+    label?: string,
+  ) => {
     if (item.href)
       return (
         <a
@@ -295,6 +301,7 @@ export function CalendarPage({
           rel="noopener noreferrer"
           className={className}
           style={style}
+          aria-label={label}
         >
           {body}
         </a>
@@ -306,6 +313,7 @@ export function CalendarPage({
           type="button"
           className={className}
           style={style}
+          aria-label={label}
           onClick={() => onOpenBot(item.botId!)}
         >
           {body}
@@ -313,7 +321,7 @@ export function CalendarPage({
       );
     // An inbox to-do belongs to no bot; its list is in the Inbox.
     return (
-      <Link key={item.id} to="/app/inbox" className={className} style={style}>
+      <Link key={item.id} to="/app/inbox" className={className} style={style} aria-label={label}>
         {body}
       </Link>
     );
@@ -374,22 +382,28 @@ export function CalendarPage({
       </>,
     );
 
-  /** A time-grid block (timed) or all-day bar. Google events are neutral; a bot's carry its avatar. */
-  const block = (item: CalendarItem, style?: CSSProperties) =>
-    wrap(
+  /** A time-grid block (timed) or all-day bar. Google events are neutral; a bot's carry a left border in its colour. Overlapping blocks drop the icon and avatar so the title stays readable. */
+  const block = (item: CalendarItem, style?: CSSProperties, crowded = false) => {
+    const bot = bots.find((candidate) => candidate.id === item.botId);
+    const parsed = bot ? parseBotAvatar(bot.color) : null;
+    const accent = parsed && !parsed.isImage && /^#[0-9a-f]{3,8}$/i.test(parsed.color);
+    const full = [timeText(item), item.title, item.botName].filter(Boolean).join(" · ");
+    return wrap(
       item,
       `${style ? "absolute" : ""} flex items-center gap-1 overflow-hidden rounded-md border px-1 py-0.5 text-start text-xs hover:bg-accent ${
         item.kind === "event" ? "bg-muted" : "bg-card"
-      }`,
+      } ${item.botId ? "border-s-2" : ""}`,
       <>
-        {kindIcon(item)}
-        <span className="min-w-0 flex-1 truncate" title={`${timeText(item)} ${item.title}`}>
+        {crowded ? null : kindIcon(item)}
+        <span className="min-w-0 flex-1 truncate" title={full}>
           {item.title}
         </span>
-        {avatar(item, 14)}
+        {crowded ? null : avatar(item, 14)}
       </>,
-      style,
+      { ...style, ...(accent ? { borderInlineStartColor: parsed.color } : {}) },
+      full,
     );
+  };
 
   const scroller = useRef<HTMLDivElement>(null);
   const isGrid = view === "day" || view === "week";
@@ -559,12 +573,19 @@ export function CalendarPage({
             return (
               <div key={day} data-day={day} className="relative border-s">
                 {layoutDay(itemsOn(day), day).map((entry) =>
-                  block(entry.item, {
-                    top: ((entry.start - dayStart) / HOUR_MS) * HOUR_PX,
-                    height: ((entry.end - entry.start) / HOUR_MS) * HOUR_PX,
-                    left: `${(entry.col / entry.cols) * 100}%`,
-                    width: `calc(${100 / entry.cols}% - 2px)`,
-                  }),
+                  block(
+                    entry.item,
+                    {
+                      top: ((entry.start - dayStart) / HOUR_MS) * HOUR_PX,
+                      height: ((entry.end - entry.start) / HOUR_MS) * HOUR_PX,
+                      // Cascade like Google: each overlapping item starts a share further right and
+                      // is drawn over the one before it, so every title keeps some width.
+                      left: `${(entry.col / entry.cols) * 100}%`,
+                      width: `calc(${100 - (entry.col / entry.cols) * 100}% - 2px)`,
+                      zIndex: entry.col + 1,
+                    },
+                    entry.cols > 1,
+                  ),
                 )}
                 {day === today ? (
                   <div

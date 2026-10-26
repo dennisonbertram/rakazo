@@ -140,6 +140,40 @@ export const GoogleError: Story = {
   ),
 };
 
+/** Three items at the same time cascade, each titled, instead of shrinking to slivers. */
+export const OverlappingWeek: Story = {
+  beforeEach: withAgenda(
+    agenda({
+      items: [
+        item({
+          id: "o1",
+          kind: "todo",
+          title: "Send the investor update",
+          start: at(1, 9),
+          botId: "bot_ada",
+          botName: "Ada",
+        }),
+        item({
+          id: "o2",
+          kind: "todo",
+          title: "Review the board deck",
+          start: at(1, 9),
+          botId: "bot_ben",
+          botName: "Ben",
+        }),
+        item({
+          id: "o3",
+          kind: "todo",
+          title: "Reply to Priya",
+          start: at(1, 9, 15),
+          botId: "bot_cy",
+          botName: "Cy",
+        }),
+      ],
+    }),
+  ),
+};
+
 export const EmptyWeek: Story = { beforeEach: withAgenda(agenda({ items: [] })) };
 
 export const FilteredToCheckBacks: Story = {
