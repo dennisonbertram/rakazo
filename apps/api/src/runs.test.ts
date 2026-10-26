@@ -93,8 +93,12 @@ it("tells a pending approval card from a pending question", () => {
 
 describe("listPendingApprovalNotifications", () => {
   const actor = { spaceId: "s", userId: "u" } as never;
-  const fake = (runs: unknown[], messages: unknown[]) => {
-    const notificationFind = vi.fn(async () => [{ id: "n1" }]);
+  const fake = (
+    runs: unknown[],
+    messages: unknown[],
+    notifications: unknown[] = [{ id: "n1", runId: "r1" }],
+  ) => {
+    const notificationFind = vi.fn(async () => notifications);
     const runFind = vi.fn(async () => runs);
     const prisma = {
       run: { findMany: runFind },
@@ -107,7 +111,12 @@ describe("listPendingApprovalNotifications", () => {
   it("looks only at held runs of existing agents, however old the notification", async () => {
     const { prisma, runFind, notificationFind } = fake(
       [{ id: "r1", threadId: "t1" }],
-      [{ runId: "r1", blocks: [{ kind: "ask", text: "Send?", status: "pending" }] }],
+      [
+        {
+          runId: "r1",
+          blocks: [{ kind: "ask", text: "Send?", status: "pending", approvalEffectId: "e1" }],
+        },
+      ],
     );
     await listPendingApprovalNotifications(prisma, actor);
     expect(runFind).toHaveBeenCalledWith(
@@ -132,7 +141,10 @@ describe("listPendingApprovalNotifications", () => {
       ],
       [
         { runId: "r1", blocks: [{ kind: "ask", text: "Send?", status: "answered" }] },
-        { runId: "r2", blocks: [{ kind: "ask", text: "Pay?", status: "pending" }] },
+        {
+          runId: "r2",
+          blocks: [{ kind: "ask", text: "Pay?", status: "pending", approvalEffectId: "e2" }],
+        },
       ],
     );
     await listPendingApprovalNotifications(prisma, actor);
@@ -148,5 +160,44 @@ describe("listPendingApprovalNotifications", () => {
     );
     expect(await listPendingApprovalNotifications(prisma, actor)).toEqual([]);
     expect(notificationFind).not.toHaveBeenCalled();
+  });
+
+  const approval = (runId: string, status?: "answered") => ({
+    runId,
+    blocks: [{ kind: "ask", text: "Send?", status, approvalEffectId: `e-${runId}` }],
+  });
+
+  it("counts one approval per held run, however many it asked before", async () => {
+    // The mock returns notifications newest first, as the query orders them.
+    const { prisma } = fake(
+      [
+        { id: "r1", threadId: "t1" },
+        { id: "r2", threadId: "t2" },
+      ],
+      [approval("r1"), approval("r2")],
+      [
+        { id: "n5", runId: "r1" },
+        { id: "n4", runId: "r2" },
+        { id: "n3", runId: "r1" },
+        { id: "n2", runId: "r1" },
+        { id: "n1", runId: "r2" },
+      ],
+    );
+    const result = await listPendingApprovalNotifications(prisma, actor);
+    expect(result.map((n) => n.id)).toEqual(["n4", "n5"]);
+  });
+
+  it("drops a run whose pending card is a question, not an approval", async () => {
+    const { prisma, notificationFind } = fake(
+      [{ id: "r1", threadId: "t1" }],
+      [{ runId: "r1", blocks: [{ kind: "ask", text: "Which one?", status: "pending" }] }],
+    );
+    expect(await listPendingApprovalNotifications(prisma, actor)).toEqual([]);
+    expect(notificationFind).not.toHaveBeenCalled();
+  });
+
+  it("drops an approval whose card was answered", async () => {
+    const { prisma } = fake([{ id: "r1", threadId: "t1" }], [approval("r1", "answered")]);
+    expect(await listPendingApprovalNotifications(prisma, actor)).toEqual([]);
   });
 });
