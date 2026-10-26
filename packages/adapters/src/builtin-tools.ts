@@ -1755,7 +1755,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "scratchpad_add",
     description:
-      "Add an open-work item to this bot's scratchpad. Use for todos or parked work that should outlive this turn. Not a reminder or schedule.",
+      "Add an open-work item to this bot's scratchpad. Use for todos or parked work that should outlive this turn. Not a reminder or schedule. Record who or what the item waits on (waitingOn) and when it is due (dueAt) whenever you know them, so the user is told when it goes past due.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1770,6 +1770,15 @@ export const builtinAgentTools: ConnectorTool[] = [
         channel: { type: "string", enum: ScratchpadChannelSchema.options },
         target: { type: "string", maxLength: 200 },
         scheduledFor: { type: "string", description: "Absolute ISO datetime with timezone." },
+        dueAt: {
+          type: "string",
+          description: "When the item is due: ISO date (2026-11-02) or datetime with timezone.",
+        },
+        waitingOn: {
+          type: "string",
+          maxLength: 120,
+          description: "Who or what the item waits on, for example 'Acme legal'.",
+        },
       },
       required: ["title"],
       additionalProperties: false,
@@ -1777,7 +1786,8 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "scratchpad_update",
-    description: "Update a scratchpad item's title, status, notes, target, schedule, or proof.",
+    description:
+      "Update a scratchpad item's title, status, notes, target, schedule, proof, due date (dueAt) or what it waits on (waitingOn). Keep waitingOn and dueAt current; send an empty string to clear waitingOn and null to clear dueAt.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1788,6 +1798,11 @@ export const builtinAgentTools: ConnectorTool[] = [
         target: { type: "string", maxLength: 200 },
         scheduledFor: { type: "string", description: "Absolute ISO datetime with timezone." },
         proof: { type: "string", maxLength: 2_000 },
+        dueAt: {
+          type: ["string", "null"],
+          description: "ISO date or datetime with timezone; null clears.",
+        },
+        waitingOn: { type: "string", maxLength: 120 },
       },
       required: ["itemId"],
       additionalProperties: false,
@@ -1795,11 +1810,13 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "scratchpad_complete",
-    description: "Mark a scratchpad item done.",
+    description:
+      "Mark a scratchpad item done. Give a short reason when it resolved by itself or for a different reason than you did it.",
     inputSchema: {
       type: "object",
       properties: {
         itemId: { type: "string" },
+        reason: { type: "string", maxLength: 200 },
         proof: { type: "string", maxLength: 2_000 },
       },
       required: ["itemId"],

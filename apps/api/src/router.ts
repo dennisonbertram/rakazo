@@ -4588,6 +4588,8 @@ export function createRouter(deps: RouterDeps) {
             channel: input.channel,
             target: input.target,
             scheduledFor: input.scheduledFor,
+            dueAt: input.dueAt,
+            waitingOn: input.waitingOn,
           },
         );
         if ("error" in result) {
@@ -4617,6 +4619,9 @@ export function createRouter(deps: RouterDeps) {
             notes: input.notes,
             target: input.target,
             scheduledFor: input.scheduledFor,
+            dueAt: input.dueAt,
+            waitingOn: input.waitingOn,
+            resolvedReason: input.resolvedReason,
             proof: input.proof,
             updatedAt: input.updatedAt,
             reapprove: input.reapprove,

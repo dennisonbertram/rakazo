@@ -59,6 +59,8 @@ export const RunActivityRowSchema = z.object({
   promptSnippet: z.string(),
   /** The held card is an approval (an action to allow), not a question. */
   needsApproval: z.boolean().optional(),
+  /** A completed routine run that posted nothing because nothing needed the user. Not counted as Finished. */
+  silent: z.boolean().optional(),
   updatedAt: z.string(),
 });
 export type RunActivityRow = z.infer<typeof RunActivityRowSchema>;
