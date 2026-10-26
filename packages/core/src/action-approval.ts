@@ -27,6 +27,8 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   "schedule_list",
   "schedule_cancel",
   "schedule_runs",
+  // A pure function in a sandbox with no I/O, and only the source the owner approved (hash-checked).
+  "tool_run",
 ]);
 // schedule_create and schedule_update are not listed: they ask only for repeating schedules, which
 // depends on the call's arguments, so the executor decides (see scheduleApproval in the adapters).
@@ -83,6 +85,8 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "calendar_query",
   "read_spreadsheet",
   "skill_read",
+  // A pure function in a sandbox with no I/O, and only the source the owner approved (hash-checked).
+  "tool_run",
   "web_fetch",
   "web_search",
   // Write only inside Rakazo (the owner's own notifications, pages, pins and files).
@@ -193,6 +197,8 @@ function scratchpadWriteIsGated(toolName: string, args?: Record<string, unknown>
 export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "ask_user",
   "skill_read",
+  // Pure function, no I/O, hash-checked: it cannot carry tainted input out of Praci.
+  "tool_run",
   "notify_user",
   "scratchpad_list",
   "scratchpad_add",

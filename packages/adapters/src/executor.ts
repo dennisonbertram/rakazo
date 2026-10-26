@@ -551,7 +551,9 @@ import {
   skillCreateFromTool,
   skillDeleteFromTool,
   skillReadFromTool,
+  skillToolArgs,
   skillUpdateFromTool,
+  toolRunFromTool,
 } from "./skill-tools.js";
 import {
   createSpreadsheetBytes,
@@ -614,6 +616,7 @@ const NO_FRAGMENT_TOOLS = new Set([
 ]);
 
 export const READ_ONLY_AGENT_TOOLS = new Set([
+  "tool_run",
   "imessage_list_conversations",
   "imessage_read",
   "computer_observe",
@@ -5985,6 +5988,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   description: args.description ? String(args.description) : undefined,
                   body: args.body ? String(args.body) : undefined,
                   content: args.content ? String(args.content) : undefined,
+                  ...skillToolArgs(args),
                 },
               ),
             );
@@ -6005,8 +6009,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     args.description !== undefined ? String(args.description) : undefined,
                   body: args.body !== undefined ? String(args.body) : undefined,
                   content: args.content ? String(args.content) : undefined,
+                  ...skillToolArgs(args),
                 },
               ),
+            );
+          }
+          if (name === "tool_run") {
+            // A draft script may be test-run only in a chat the owner is in, never in a background or
+            // tainted run.
+            return toolRunFromTool(
+              deps.prisma,
+              { spaceId: run.spaceId, userId: run.userId, botId: run.botId },
+              { name: args.name ? String(args.name) : undefined, input: args.input },
+              { allowDraft: run.unattended === false && !run.externalTaint },
             );
           }
           if (name === "skill_delete") {

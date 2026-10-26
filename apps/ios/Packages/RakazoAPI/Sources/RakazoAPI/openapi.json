@@ -886,6 +886,9 @@
                       "skillId": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "toolHash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -944,6 +947,9 @@
                           ]
                         },
                         "readOnly": {
+                          "type": "boolean"
+                        },
+                        "tool": {
                           "type": "boolean"
                         },
                         "createdAt": {
@@ -1150,6 +1156,9 @@
                           ]
                         },
                         "readOnly": {
+                          "type": "boolean"
+                        },
+                        "tool": {
                           "type": "boolean"
                         },
                         "createdAt": {
@@ -1483,6 +1492,30 @@
                           },
                           "revision": {
                             "type": "boolean"
+                          },
+                          "tool": {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string"
+                              },
+                              "hash": {
+                                "type": "string"
+                              },
+                              "reads": {
+                                "type": "string"
+                              },
+                              "writes": {
+                                "type": "string"
+                              },
+                              "sampleInput": {},
+                              "sampleOutput": {}
+                            },
+                            "required": [
+                              "source",
+                              "hash"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -1672,6 +1705,9 @@
                             ]
                           },
                           "readOnly": {
+                            "type": "boolean"
+                          },
+                          "tool": {
                             "type": "boolean"
                           },
                           "enabled": {
@@ -1868,6 +1904,9 @@
                           ]
                         },
                         "readOnly": {
+                          "type": "boolean"
+                        },
+                        "tool": {
                           "type": "boolean"
                         },
                         "createdAt": {
@@ -2070,6 +2109,9 @@
                         "readOnly": {
                           "type": "boolean"
                         },
+                        "tool": {
+                          "type": "boolean"
+                        },
                         "createdAt": {
                           "type": "string"
                         },
@@ -2253,6 +2295,9 @@
                             ]
                           },
                           "readOnly": {
+                            "type": "boolean"
+                          },
+                          "tool": {
                             "type": "boolean"
                           }
                         },
@@ -2785,6 +2830,9 @@
                           ]
                         },
                         "readOnly": {
+                          "type": "boolean"
+                        },
+                        "tool": {
                           "type": "boolean"
                         },
                         "createdAt": {
@@ -115332,7 +115380,7 @@
         "maxLength": 4000
       },
       "RpcBotsUpdateInputSchema17": {
-        "maxItems": 125,
+        "maxItems": 126,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema18"

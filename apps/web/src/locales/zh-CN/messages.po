@@ -2818,6 +2818,7 @@ msgid "Cloud"
 msgstr "云端"
 
 #: src/components/AskCard.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 msgid "Code"
 msgstr "代码"
 
@@ -8082,6 +8083,10 @@ msgstr ""
 msgid "Notetaker meetings, notes and tasks"
 msgstr ""
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "nothing"
+msgstr ""
+
 #: src/pages/Finance.tsx
 msgid "Nothing due in the next 30 days"
 msgstr ""
@@ -9201,6 +9206,10 @@ msgstr ""
 
 #: src/components/AiDataSharing.tsx
 msgid "Reads document text"
+msgstr ""
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Reads:"
 msgstr ""
 
 #: src/components/data-room/DataRoomStats.tsx
@@ -11900,6 +11909,10 @@ msgstr ""
 msgid "Too large to search inside"
 msgstr ""
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Tool"
+msgstr ""
+
 #: src/lib/run-phase.ts
 msgid "tools"
 msgstr ""
@@ -12879,6 +12892,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Write what this routine should do each time it runs."
+msgstr ""
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Writes:"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx

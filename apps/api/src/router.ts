@@ -4740,7 +4740,7 @@ export function createRouter(deps: RouterDeps) {
         agentSkills.drafts(context.actor),
       ),
       approveDraft: authed.agentSkills.approveDraft.handler(async ({ context, input }) =>
-        agentSkills.approveDraft(context.actor, input.skillId),
+        agentSkills.approveDraft(context.actor, input.skillId, input.toolHash),
       ),
       discardDraft: authed.agentSkills.discardDraft.handler(async ({ context, input }) =>
         agentSkills.discardDraft(context.actor, input.skillId),

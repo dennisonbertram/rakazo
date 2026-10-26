@@ -94,6 +94,7 @@ export * from "./thread-snapshot-reducer.js";
 export * from "./thread-subscription.js";
 export * from "./time-separators.js";
 export * from "./tool-activity.js";
+export * from "./tool-schema.js";
 export * from "./ui-locale.js";
 export * from "./user-error.js";
 export * from "./voice-agent.js";

@@ -88,6 +88,7 @@ const TOOL_ACTIONS: Record<string, ToolAction> = {
   message_bot: "ask-agent",
   message_user: "message-user",
   skill_read: "thinking",
+  tool_run: "thinking",
 };
 
 // Steps keep only the humanized label, so match on it; MCP and built-in names humanize the same way.

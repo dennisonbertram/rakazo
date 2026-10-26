@@ -900,6 +900,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "skill_create") return `Creating skill: ${detail(record.name ?? "skill")}`;
   if (toolName === "skill_update")
     return `Updating skill: ${detail(record.name ?? record.skillId)}`;
+  if (toolName === "tool_run") return `Running tool: ${detail(record.name)}`;
   if (toolName === "skill_delete")
     return `Deleting skill: ${detail(record.name ?? record.skillId)}`;
   const finance = describeFinanceActivity(toolName, record);

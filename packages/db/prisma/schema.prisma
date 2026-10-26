@@ -1041,6 +1041,19 @@ model AgentSkill {
   status         String   @default("active")
   /// An agent's proposed full SKILL.md for an active skill, applied when the owner approves.
   pendingContent String?
+  /// A bot-built tool: one self-contained JavaScript source defining `function run(input)`, run in the
+  /// QuickJS sandbox by tool_run. Null for an ordinary skill.
+  toolSource      String?
+  /// The tool's input schema (the subset validated by validateToolInputSchema).
+  toolInputSchema Json?
+  /// sha256 of the toolSource the owner approved. Null for a draft; tool_run refuses an active
+  /// tool whose source no longer matches.
+  toolSourceHash  String?
+  /// What the bot said about the tool, shown beside Approve: { reads, writes, sampleInput, sampleOutput }.
+  toolNotes       Json?
+  /// An agent's proposed replacement { source, inputSchema, notes } for an active tool, applied (and
+  /// hashed) only when the owner approves. The running source stays as it was until then.
+  pendingTool     Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   AdapterContext,
   AgentRunRequest,
@@ -160,6 +161,7 @@ function fixture({
   unattended = trigger === "webhook",
   externalTaint = false,
   scratchpadItem,
+  skillRows = [] as Record<string, unknown>[],
   secrets = [] as string[],
   prompt = "Read the item",
   bot = {
@@ -254,6 +256,8 @@ function fixture({
   externalTaint?: boolean;
   /** The stored scratchpad item the gate looks up for scratchpad_update/complete. */
   scratchpadItem?: { category: string | null } | null;
+  /** Stored skill rows the skill and tool lookups find. */
+  skillRows?: Record<string, unknown>[];
   secrets?: string[];
   prompt?: string;
   bot?: { name: string; title: string; description: string };
@@ -538,7 +542,7 @@ function fixture({
     taughtSkill: { findMany: vi.fn(async () => []) },
     agentSecret: { findMany: vi.fn(async () => []) },
     botSecret: { findMany: vi.fn(async () => []) },
-    agentSkill: { findMany: vi.fn(async () => []) },
+    agentSkill: { findMany: vi.fn(async () => skillRows) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
     scratchpadItem: {
       findMany: vi.fn(async () => []),
@@ -4175,6 +4179,79 @@ describe("unattended runs and block rules", () => {
     f.setCalls([{ args: { itemId: "i1", notes: "n" }, executionId: "c1" }]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  describe("tool_run", () => {
+    const source = "function run(i) { return { n: i.items.length }; }";
+    const toolRow = (over: Record<string, unknown> = {}) => ({
+      id: "skill-1",
+      name: "count_items",
+      description: "Counts",
+      content: "---\nname: count_items\ndescription: Counts\n---\n",
+      source: "user",
+      status: "active",
+      toolSource: source,
+      toolSourceHash: createHash("sha256").update(source).digest("hex"),
+      toolInputSchema: {
+        type: "object",
+        required: ["items"],
+        properties: { items: { type: "array" } },
+      },
+      ...over,
+    });
+    const run = async (f: ReturnType<typeof fixture>) => {
+      f.setCalls([{ args: { name: "count_items", input: { items: [1, 2] } }, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+    };
+
+    it.each([
+      ["a routine run", { trigger: "routine", unattended: true }],
+      ["a tainted run", { externalTaint: true, unattended: true }],
+    ])("runs an approved tool in %s without a card", async (_label, mode) => {
+      const f = fixture({ name: "tool_run", builtin: true, skillRows: [toolRow()], ...mode });
+      await run(f);
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ result: { n: 2 } });
+    });
+
+    it("refuses a tool whose source changed after approval", async () => {
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [toolRow({ toolSource: `${source} // edited` })],
+      });
+      await run(f);
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: "This tool changed since it was approved." });
+    });
+
+    it("refuses a draft in a background run but test-runs it in a chat", async () => {
+      const draft = toolRow({ status: "draft", toolSourceHash: null });
+      const background = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [draft],
+      });
+      await run(background);
+      expect(background.results[0]).toMatchObject({ error: expect.stringContaining("draft") });
+      const chat = fixture({ name: "tool_run", builtin: true, skillRows: [draft] });
+      await run(chat);
+      expect(chat.results[0]).toEqual({ result: { n: 2 } });
+    });
+
+    it("validates the input against the schema", async () => {
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        unattended: true,
+        skillRows: [toolRow()],
+      });
+      f.setCalls([{ args: { name: "count_items", input: { items: "x" } }, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+      expect(f.results[0]).toMatchObject({ error: expect.stringContaining("list") });
+    });
   });
 
   it("a tainted run asks for web_fetch but not notify_user", async () => {
