@@ -74,7 +74,9 @@ describePostgres("artifact shares (PostgreSQL)", () => {
     expect(row.tokenHash).toBe(createHash("sha256").update(token).digest("hex"));
     expect(row.tokenHash).not.toBe(token);
     expect(expiresAt.getTime() - now.getTime()).toBe(ARTIFACT_SHARE_TTL_MS);
-    expect((await openArtifactShare(prisma, token, now))?.name).toBe("hash");
+    expect(((await openArtifactShare(prisma, token, now)) as { name: string } | null)?.name).toBe(
+      "hash",
+    );
     expect(
       (await prisma.artifactShare.findUniqueOrThrow({ where: { id: row.id } })).lastOpenedAt,
     ).toEqual(now);
@@ -89,12 +91,36 @@ describePostgres("artifact shares (PostgreSQL)", () => {
     const first = await createArtifactShare(prisma, mine, v1.id, html, now);
     const second = await createArtifactShare(prisma, mine, v2.id, html, now);
     expect(await openArtifactShare(prisma, first.token, now)).toBeNull();
-    expect((await openArtifactShare(prisma, second.token, now))?.id).toBe(v2.id);
+    expect(
+      ((await openArtifactShare(prisma, second.token, now)) as { id: string } | null)?.id,
+    ).toBe(v2.id);
     // Read from any version of the family.
     expect((await getArtifactShare(prisma, mine, v1.id, now))?.artifactId).toBe(v2.id);
     await revokeArtifactShare(prisma, mine, v1.id, now);
     expect(await openArtifactShare(prisma, second.token, now)).toBeNull();
     expect(await getArtifactShare(prisma, mine, v2.id, now)).toBeNull();
+  });
+
+  it("two concurrent creates leave exactly one live link", async () => {
+    const a = await artifact(mine, "race");
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () => createArtifactShare(prisma, mine, a.id, html, now)),
+    );
+    expect(await prisma.artifactShare.count({ where: { artifactId: a.id, revokedAt: null } })).toBe(
+      1,
+    );
+    const live = await Promise.all(results.map((r) => openArtifactShare(prisma, r.token, now)));
+    expect(live.filter(Boolean)).toHaveLength(1);
+  });
+
+  it("limits public opens to 60 a minute and recovers after the window", async () => {
+    const a = await artifact(mine, "limit");
+    const { token } = await createArtifactShare(prisma, mine, a.id, html, now);
+    for (let i = 0; i < 60; i++)
+      expect(await openArtifactShare(prisma, token, now)).toMatchObject({ id: a.id });
+    expect(await openArtifactShare(prisma, token, now)).toBe("limited");
+    const later = new Date(now.getTime() + 61_000);
+    expect(await openArtifactShare(prisma, token, later)).toMatchObject({ id: a.id });
   });
 
   it("refuses another owner's artifact and unsupported types, and cascades on delete", async () => {

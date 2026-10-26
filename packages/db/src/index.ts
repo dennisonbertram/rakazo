@@ -1,4 +1,5 @@
 export * from "./approval-rules.js";
+export * from "./artifact-shares.js";
 export * from "./artifact-versions.js";
 export * from "./audit-requests.js";
 export * from "./billing.js";
@@ -22,7 +23,6 @@ export * from "./external-conversations.js";
 export * from "./fundraising.js";
 export * from "./groups.js";
 export * from "./history-retrieval.js";
-export * from "./artifact-shares.js";
 export * from "./investor-portal.js";
 export * from "./investor-updates.js";
 export * from "./legal.js";

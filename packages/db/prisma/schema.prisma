@@ -1428,6 +1428,9 @@ model ArtifactShare {
   expiresAt       DateTime
   revokedAt       DateTime?
   lastOpenedAt    DateTime?
+  /// Public opens in the current one-minute window, kept in Postgres so every API process agrees.
+  openWindowStart DateTime?
+  openCount       Int       @default(0)
 
   @@index([spaceId, artifactId])
   @@map("artifact_shares")

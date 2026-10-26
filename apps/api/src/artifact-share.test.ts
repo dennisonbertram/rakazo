@@ -72,6 +72,15 @@ describe("public share endpoint", () => {
     expect(new Set(bodies).size).toBe(1);
   });
 
+  it("answers 429 with the private headers when the store reports the link is over its limit", async () => {
+    const { app, open, get } = setup();
+    open.mockResolvedValueOnce("limited" as never);
+    const res = await post(app, TOKEN);
+    expect(res.status).toBe(429);
+    expectHeaders(res);
+    expect(get).not.toHaveBeenCalled();
+  });
+
   it("ignores the session cookie: the same artifact comes back with or without one", async () => {
     const { app, open } = setup();
     const withCookie = await post(app, TOKEN, { cookie: "better-auth.session_token=other-user" });

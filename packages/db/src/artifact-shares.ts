@@ -5,6 +5,9 @@ import { IsolationError } from "./scope.js";
 type Scope = { spaceId: string; userId: string };
 type Db = Pick<PrismaClient, "$transaction" | "artifact" | "artifactShare">;
 
+/** Public opens allowed per link in each one-minute window. */
+export const ARTIFACT_SHARE_OPENS_PER_MINUTE = 60;
+
 /** A link lasts 30 days from the day it was made. */
 export const ARTIFACT_SHARE_TTL_MS = 30 * 24 * 60 * 60_000;
 
@@ -59,6 +62,8 @@ export async function createArtifactShare(
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + ARTIFACT_SHARE_TTL_MS);
   await prisma.$transaction(async (tx) => {
+    // Serialise rotations of one artifact family so two concurrent creates cannot both survive.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${familyId}, 0))`;
     await tx.artifactShare.updateMany({
       where: {
         spaceId: scope.spaceId,
@@ -105,11 +110,12 @@ export class UnshareableArtifactError extends Error {
 }
 
 /**
- * The public lookup: only the row the token names. Null for an unknown, expired or revoked token.
+ * The public lookup: only the row the token names. Null for an unknown, expired or revoked token;
+ * "limited" when the link was opened more than 60 times in the last minute.
  * No caller-supplied id reaches the query; the space comes from the share row itself.
  */
 export async function openArtifactShare(
-  prisma: Pick<PrismaClient, "artifactShare">,
+  prisma: Pick<PrismaClient, "artifactShare" | "$queryRaw">,
   token: string,
   now = new Date(),
 ) {
@@ -131,6 +137,18 @@ export async function openArtifactShare(
   if (!share || share.revokedAt || share.expiresAt <= now) return null;
   // A share row and its artifact always agree on the space; refuse if they ever do not.
   if (share.artifact.spaceId !== share.spaceId) return null;
-  await prisma.artifactShare.update({ where: { id: share.id }, data: { lastOpenedAt: now } });
+  // One statement stamps the open and counts it in a one-minute window, so every API process
+  // shares the same limit.
+  const cutoff = new Date(now.getTime() - 60_000);
+  const [counted] = await prisma.$queryRaw<{ openCount: number }[]>`
+    UPDATE "artifact_shares" SET
+      "openCount" = CASE WHEN "openWindowStart" IS NULL OR "openWindowStart" <= ${cutoff}
+        THEN 1 ELSE "openCount" + 1 END,
+      "openWindowStart" = CASE WHEN "openWindowStart" IS NULL OR "openWindowStart" <= ${cutoff}
+        THEN ${now} ELSE "openWindowStart" END,
+      "lastOpenedAt" = ${now}
+    WHERE "id" = ${share.id}
+    RETURNING "openCount"`;
+  if (!counted || counted.openCount > ARTIFACT_SHARE_OPENS_PER_MINUTE) return "limited" as const;
   return share.artifact;
 }

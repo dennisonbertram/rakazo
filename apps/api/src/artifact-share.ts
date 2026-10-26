@@ -10,13 +10,17 @@ const PATH = "/api/share";
 
 /** What the public lookup needs: the artifact the token names, or null. */
 export interface ShareStore {
-  open(token: string): Promise<{
-    name: string;
-    mimeType: string;
-    spaceId: string;
-    userId: string;
-    storageKey: string;
-  } | null>;
+  open(token: string): Promise<
+    | {
+        name: string;
+        mimeType: string;
+        spaceId: string;
+        userId: string;
+        storageKey: string;
+      }
+    | "limited"
+    | null
+  >;
 }
 
 export const prismaShareStore = (prisma: PrismaClient): ShareStore => ({
@@ -52,6 +56,7 @@ export function mountArtifactShare(
     if (!body.success) return gone(c);
     try {
       const artifact = await deps.store.open(body.data.token);
+      if (artifact === "limited") return c.json({ error: "Not found" }, 429);
       if (!artifact) return gone(c);
       const operationId = `share.open:${randomUUID()}`;
       const bytes = await deps.artifacts.get(artifact.storageKey, {
