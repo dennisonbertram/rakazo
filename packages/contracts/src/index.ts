@@ -38,6 +38,7 @@ export * from "./integration-agent.js";
 export * from "./integration-settings.js";
 export * from "./investors.js";
 export * from "./legal.js";
+export * from "./legal-groups.js";
 export * from "./local-settings.js";
 export * from "./markdown-text.js";
 export * from "./mcp.js";

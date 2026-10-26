@@ -1,7 +1,7 @@
 import { plural, t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { LegalDeadline } from "@rakazo/contracts";
-import { LEGAL_CONSENT_REQUIRED_MESSAGE } from "@rakazo/contracts";
+import { groupLegalContracts, LEGAL_CONSENT_REQUIRED_MESSAGE } from "@rakazo/contracts";
 import { Button, Skeleton, Tabs, TabsList, TabsTrigger } from "@rakazo/ui-web";
 import { Scale, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -122,6 +122,9 @@ function Legal({
   const onlyOverdue = view === "deadlines" && params.get("due") === "overdue";
   const setView = (next: View) =>
     setParams(next === "contracts" ? {} : { view: next }, { replace: true });
+  // Grouping similar contracts is on unless the URL says group=off.
+  const grouped = params.get("group") !== "off";
+  const setGrouped = (on: boolean) => setParams(on ? {} : { group: "off" }, { replace: true });
   const [scanError, setScanError] = useState("");
   // The failed run whose notice the user closed; the next failed run shows its own.
   const [dismissedRun, setDismissedRun] = useState<string | null>(null);
@@ -521,8 +524,21 @@ function Legal({
           </Tabs>
           {resultLine}
           {uncheckedLine}
+          {view === "contracts" &&
+          groupLegalContracts(data.contracts).some((row) => row.kind === "group") ? (
+            <div className="mb-2 flex justify-end">
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-pressed={grouped}
+                onClick={() => setGrouped(!grouped)}
+              >
+                <Trans>Group similar</Trans>
+              </Button>
+            </div>
+          ) : null}
           {view === "contracts" ? (
-            <LegalContracts contracts={data.contracts} selfName={selfName} />
+            <LegalContracts contracts={data.contracts} selfName={selfName} grouped={grouped} />
           ) : null}
           {view === "deadlines" ? (
             <div className="mb-2 flex justify-end">

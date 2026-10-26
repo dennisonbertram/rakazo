@@ -747,6 +747,10 @@ msgstr "* Month to date"
 msgid "* So far"
 msgstr "* So far"
 
+#: src/pages/legal/LegalContracts.tsx
+msgid "+{count} more"
+msgstr "+{count} more"
+
 #: src/pages/shell/space-sidebar.tsx
 msgid "+{hiddenRows} more"
 msgstr "+{hiddenRows} more"
@@ -862,6 +866,7 @@ msgstr "Access token"
 
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/AccountSettingsOverlay.tsx
+#: src/pages/finance/FinanceBurn.tsx
 #: src/pages/Inbox.tsx
 msgid "Account"
 msgstr "Account"
@@ -1148,6 +1153,10 @@ msgstr "Add wallet"
 #: src/pages/Artifacts.tsx
 msgid "Added"
 msgstr "Added"
+
+#: src/pages/ContactDetail.tsx
+msgid "Added by"
+msgstr "Added by"
 
 #. placeholder {0}: contact.addedBy.name
 #: src/components/ContactDialog.tsx
@@ -2173,10 +2182,6 @@ msgid "Business plan"
 msgstr "Business plan"
 
 #: src/pages/finance/FinanceBurn.tsx
-msgid "By account"
-msgstr "By account"
-
-#: src/pages/finance/FinanceBurn.tsx
 msgid "By month"
 msgstr "By month"
 
@@ -2290,6 +2295,7 @@ msgstr "Cancel teaching?"
 
 #: src/components/fundraising/SafeList.tsx
 #: src/pages/BillingSettingsPanel.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/Fundraising.tsx
 msgid "Canceled"
 msgstr "Canceled"
@@ -2372,6 +2378,7 @@ msgstr "Categorize transactions"
 #: src/components/finance/ui.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceBurn.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Category"
 msgstr "Category"
@@ -2525,6 +2532,7 @@ msgid "Check queue"
 msgstr "Check queue"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Check size"
 msgstr "Check size"
 
@@ -3700,6 +3708,10 @@ msgstr "Could not load bots. Reload to try again."
 msgid "Could not load commands"
 msgstr "Could not load commands"
 
+#: src/pages/ContactDetail.tsx
+msgid "Could not load contact"
+msgstr "Could not load contact"
+
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
 msgid "Could not load contacts"
@@ -4089,6 +4101,7 @@ msgstr "Could not stop sharing."
 
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/pages/Shell.tsx
 msgid "Could not submit this answer"
 msgstr "Could not submit this answer"
 
@@ -4846,6 +4859,7 @@ msgstr "Document date"
 #: src/components/AiDataSharing.tsx
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/FolderDocuments.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
 msgid "Documents"
@@ -4928,6 +4942,7 @@ msgstr "Downloading…"
 
 #: src/components/fundraising/SafeList.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
 #: src/pages/legal/LegalContracts.tsx
@@ -5072,6 +5087,7 @@ msgstr "Earlier updates"
 #: src/components/MailApprovalCard.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyReview.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/Gtm.tsx
 #: src/pages/gtm/GtmPlan.tsx
@@ -5106,6 +5122,7 @@ msgstr "Edit wallet"
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/SelectionBar.tsx
 #: src/pages/Auth.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 msgid "Email"
 msgstr "Email"
@@ -5170,6 +5187,10 @@ msgstr "Email, calendar and your company pages"
 #: src/pages/shell/message-cards.tsx
 msgid "Email, Slack and docs"
 msgstr "Email, Slack and docs"
+
+#: src/pages/ContactDetail.tsx
+msgid "Emails"
+msgstr "Emails"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Embedding model"
@@ -5380,6 +5401,7 @@ msgstr "Expected"
 
 #: src/components/AskCard.tsx
 #: src/components/fundraising/SafeList.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/legal/LegalContracts.tsx
 msgid "Expired"
 msgstr "Expired"
@@ -5706,6 +5728,7 @@ msgstr "Fully diluted"
 
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/fundraising/SafeList.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Funded"
 msgstr "Funded"
 
@@ -5883,6 +5906,10 @@ msgstr "Group chats into folders"
 #: src/pages/GroupPanel.tsx
 msgid "Group settings"
 msgstr "Group settings"
+
+#: src/pages/Legal.tsx
+msgid "Group similar"
+msgstr "Group similar"
 
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Group updates"
@@ -6477,6 +6504,7 @@ msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
 msgid "Kind"
@@ -7096,6 +7124,10 @@ msgstr "Meeting notes"
 msgid "Meeting notes and transcripts"
 msgstr "Meeting notes and transcripts"
 
+#: src/pages/ContactDetail.tsx
+msgid "Meetings"
+msgstr "Meetings"
+
 #: src/pages/shell/GroupIntro.tsx
 msgid "Members"
 msgstr "Members"
@@ -7700,6 +7732,7 @@ msgid "Next run {nextRun}"
 msgstr "Next run {nextRun}"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Next step"
 msgstr "Next step"
 
@@ -8211,6 +8244,7 @@ msgid "Not waiting for approval"
 msgstr "Not waiting for approval"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Notes"
 msgstr "Notes"
 
@@ -8566,6 +8600,7 @@ msgid "Organisations"
 msgstr "Organisations"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 msgid "Organization"
 msgstr "Organization"
@@ -10199,6 +10234,7 @@ msgstr "SAFE"
 msgid "safe, round, raise"
 msgstr "safe, round, raise"
 
+#: src/pages/ContactDetail.tsx
 #: src/pages/Fundraising.tsx
 msgid "SAFEs"
 msgstr "SAFEs"
@@ -10545,6 +10581,10 @@ msgstr "Searching your mail"
 msgid "Searching…"
 msgstr "Searching…"
 
+#: src/pages/Investors.tsx
+msgid "Sections"
+msgstr "Sections"
+
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/pages/Inbox.tsx
@@ -10673,6 +10713,10 @@ msgstr "Send files and contracts"
 msgid "Send it"
 msgstr "Send it"
 
+#: src/components/MailApprovalCard.tsx
+msgid "Send now"
+msgstr "Send now"
+
 #: src/pages/Auth.tsx
 msgid "Send reset link"
 msgstr "Send reset link"
@@ -10728,6 +10772,7 @@ msgstr "Sends your meeting notes and transcripts to your AI model."
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailOutbox.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Sent"
@@ -11070,6 +11115,7 @@ msgstr "Sign-in was denied or failed."
 
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/fundraising/SafeList.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Signed"
 msgstr "Signed"
 
@@ -11355,6 +11401,7 @@ msgid "Stablecoins only"
 msgstr "Stablecoins only"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Stage"
 msgstr "Stage"
 
@@ -12203,6 +12250,10 @@ msgstr "Too large to search inside"
 msgid "Tool"
 msgstr "Tool"
 
+#: src/components/AskCard.tsx
+msgid "Tool name"
+msgstr "Tool name"
+
 #: src/lib/run-phase.ts
 msgid "tools"
 msgstr "tools"
@@ -12318,6 +12369,7 @@ msgstr "Try {name} again"
 #: src/components/ShellSkeleton.tsx
 #: src/lib/use-contact-notices.ts
 #: src/pages/ActivityList.tsx
+#: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Fundraising.tsx
 #: src/pages/Gtm.tsx
