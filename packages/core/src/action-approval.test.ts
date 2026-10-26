@@ -466,6 +466,30 @@ describe("actionTypeForTool", () => {
     ).toBe("connected_apps_write");
   });
 
+  it("does not let a readOnly hint hide a mutating connector tool", () => {
+    expect(
+      actionTypeForTool({ toolName: "gmail_send_email", viaConnector: true, readOnly: true }),
+    ).toBe("send_email");
+    expect(
+      actionTypeForTool({ toolName: "GMAIL_FETCH_EMAILS", viaConnector: true, readOnly: true }),
+    ).toBeNull();
+    expect(
+      resolveActionApprovalDetail({
+        toolName: "gmail_send_email",
+        viaConnector: true,
+        readOnly: true,
+        rules: [
+          {
+            matchKind: "category",
+            matchValue: "send_email",
+            effect: "block",
+            botId: null,
+          },
+        ],
+      } as never).decision,
+    ).toBe("block");
+  });
+
   it("lists the nine action types, five shown by default", () => {
     expect(ACTION_TYPES.map((type) => type.id)).toHaveLength(9);
     expect(ACTION_TYPES.filter((type) => type.primary)).toHaveLength(5);
