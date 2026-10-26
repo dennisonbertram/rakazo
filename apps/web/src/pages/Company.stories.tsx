@@ -16,6 +16,15 @@ export const Full: Story = {
   args: { onAskAgent: () => {} },
   beforeEach: () => mockRpc({ ...responses, "company.page": companyFixture }),
 };
+/** People with a search that matches no one: the toolbar, No matches and Clear filters. */
+export const NoMatches: Story = {
+  parameters: { initialEntries: ["/app/company?view=people&q=zzz"] },
+  beforeEach: () => mockRpc({ ...responses, "company.page": companyFixture }),
+};
+export const People: Story = {
+  parameters: { initialEntries: ["/app/company?view=people&sort=role"] },
+  beforeEach: () => mockRpc({ ...responses, "company.page": companyFixture }),
+};
 export const Review: Story = {
   parameters: { initialEntries: ["/app/company?view=review"] },
   beforeEach: () => {

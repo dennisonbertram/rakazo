@@ -8,6 +8,7 @@ import {
   deleteContact,
   listContacts,
   saveContact,
+  withContactPhotos,
 } from "./contacts.js";
 import { IsolationError } from "./scope.js";
 
@@ -377,5 +378,27 @@ describePostgres("contacts (PostgreSQL)", () => {
     for (const who of [sameSpace, otherSpace])
       await expect(contactDetail(prisma, who, contact.id)).rejects.toBeInstanceOf(IsolationError);
     await expect(contactDetail(prisma, mine, "missing")).rejects.toBeInstanceOf(IsolationError);
+  });
+
+  it("adds photoUrl only to this user's contacts that have a stored photo", async () => {
+    const withPhoto = await saveContact(prisma, mine, { name: "Pic", email: "Pic@Example.test" });
+    const without = await saveContact(prisma, mine, { name: "NoPic", email: "nopic@example.test" });
+    const photo = {
+      storageKey: "k",
+      source: "google",
+      contentType: "image/png",
+      contentHash: "h",
+      fetchedAt: new Date(),
+    };
+    await prisma.contactPhoto.createMany({
+      data: [
+        { ...mine, email: "pic@example.test", ...photo },
+        // Another user's photo for the same address must not show for this user.
+        { ...sameSpace, email: "nopic@example.test", ...photo },
+      ],
+    });
+    const [a, b] = await withContactPhotos(prisma, mine, [withPhoto, without]);
+    expect(a?.photoUrl).toBe("/api/contacts/photo?email=pic%40example.test");
+    expect(b?.photoUrl).toBeUndefined();
   });
 });
