@@ -596,6 +596,8 @@ export const ScratchpadItemSchema = z.object({
   dueAt: ScratchpadDateTimeSchema.nullish(),
   waitingOn: z.string().max(200).nullish(),
   resolvedReason: z.string().max(500).nullish(),
+  /** The provider message id of the mail thread this item tracks; mail_get takes it. */
+  mailMessageId: z.string().nullish(),
 });
 export type ScratchpadItem = z.infer<typeof ScratchpadItemSchema>;
 

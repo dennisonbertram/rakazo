@@ -432,7 +432,7 @@ function Overview({
   return (
     <div>
       {/* Sticks like the Inbox header from md up: -top cancels the scroller's padding, so rows never show above it. A phone keeps the screen for the figures. */}
-      <div className="pb-4 md:sticky md:-top-2 md:z-20 md:-mx-7 md:-mt-2 md:bg-background md:px-7 md:pt-2">
+      <div className="pb-4 md:sticky md:-top-2 md:z-20 md:-mx-7 md:-mt-2 md:bg-background md:px-7 md:pt-2 md:pb-3.5">
         <PageHeader
           className="mb-0"
           title={<Trans>Finance</Trans>}
@@ -548,7 +548,7 @@ function Overview({
       {showSkeleton ? (
         <DashboardSkeleton />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 md:pt-0.5">
           {data.excludedNonUsdCount > 0 ? (
             <p className="text-xs text-muted-foreground sm:hidden">
               {data.excludedNonUsdCount === 1
@@ -716,7 +716,7 @@ function Overview({
             ) : null}
           </Section>
 
-          <div className="grid items-start gap-3 @3xl:grid-cols-2">
+          <div className="grid gap-3 @3xl:grid-cols-2">
             <BackHere
               value={{
                 label: t`Breakdown`,

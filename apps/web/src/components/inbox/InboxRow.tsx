@@ -18,6 +18,7 @@ import {
   Archive,
   BellOff,
   Ellipsis,
+  Eye,
   ListChecks,
   Mail,
   MailOpen,
@@ -141,6 +142,7 @@ export function InboxGroup({
   onMark,
   onArchive,
   onRead,
+  onTrack,
   selectedId,
   hideAttention,
   unreadTotal,
@@ -157,6 +159,7 @@ export function InboxGroup({
   onMark: ((messageId: string, mark: InboxMark | null) => void) | undefined;
   onArchive?: (messageId: string) => void;
   onRead?: (messageId: string, read: boolean) => void;
+  onTrack?: (messageId: string, track: boolean) => void;
   selectedId?: string;
   /** Set when the group heading already says the rows need attention. */
   hideAttention?: boolean;
@@ -187,6 +190,7 @@ export function InboxGroup({
             onMark={onMark}
             onArchive={onArchive}
             onRead={onRead}
+            onTrack={onTrack}
             selected={row.id === selectedId}
             hideAttention={hideAttention}
             todo={todoDue?.has(row.id)}
@@ -205,6 +209,7 @@ export function InboxRow({
   onMark,
   onArchive,
   onRead,
+  onTrack,
   selected = false,
   hideAttention = false,
   todo = false,
@@ -222,6 +227,7 @@ export function InboxRow({
   onMark: ((messageId: string, mark: InboxMark | null) => void) | undefined;
   onArchive?: (messageId: string) => void;
   onRead?: (messageId: string, read: boolean) => void;
+  onTrack?: (messageId: string, track: boolean) => void;
   selected?: boolean;
   hideAttention?: boolean;
   todo?: boolean;
@@ -278,7 +284,13 @@ export function InboxRow({
         { mark: "noise", name: t`Mark noise`, Icon: BellOff },
       ] as const)
     : [];
-  const actions = [
+  const actions: {
+    name: string;
+    Icon: typeof Archive;
+    run: () => void;
+    menuOnly?: boolean;
+    pressed?: boolean;
+  }[] = [
     ...(onArchive && row.inInbox
       ? [{ name: t`Archive`, Icon: Archive, run: () => onArchive(row.id) }]
       : []),
@@ -288,6 +300,16 @@ export function InboxRow({
             name: row.unread ? t`Mark read` : t`Mark unread`,
             Icon: row.unread ? MailOpen : Mail,
             run: () => onRead(row.id, row.unread),
+          },
+        ]
+      : []),
+    ...(onTrack
+      ? [
+          {
+            name: row.tracked ? t`Stop tracking` : t`Track`,
+            Icon: Eye,
+            run: () => onTrack(row.id, !row.tracked),
+            pressed: row.tracked === true,
           },
         ]
       : []),
@@ -426,8 +448,8 @@ export function InboxRow({
               className={`absolute end-26 top-1/2 flex -translate-y-1/2 items-center gap-0.5 bg-linear-to-l from-muted from-75% to-transparent ps-6 pointer-coarse:hidden @max-md:hidden ${selected ? "" : "opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100"}`}
             >
               {actions
-                .filter((action) => !("menuOnly" in action))
-                .map(({ name, Icon, run }) => (
+                .filter((action) => !action.menuOnly)
+                .map(({ name, Icon, run, pressed }) => (
                   <Tooltip key={name}>
                     <TooltipTrigger
                       render={
@@ -435,9 +457,10 @@ export function InboxRow({
                           variant="ghost"
                           size="icon-xs"
                           aria-label={name}
+                          aria-pressed={pressed}
                           tabIndex={-1}
                           data-row-stop=""
-                          className="text-muted-foreground"
+                          className={pressed ? "text-foreground" : "text-muted-foreground"}
                           onClick={(event) => {
                             event.stopPropagation();
                             run();
@@ -445,7 +468,7 @@ export function InboxRow({
                         />
                       }
                     >
-                      <Icon aria-hidden="true" />
+                      <Icon aria-hidden="true" className={pressed ? "fill-current" : ""} />
                     </TooltipTrigger>
                     <TooltipContent>{name}</TooltipContent>
                   </Tooltip>

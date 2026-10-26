@@ -173,6 +173,7 @@ type Status =
   | { kind: "marked"; messageId: string; mark: InboxMark; sender: string }
   | { kind: "archived"; messageId: string; subject: string }
   | { kind: "archivedMany"; messageIds: string[] }
+  | { kind: "tracked"; messageId: string; subject: string }
   | {
       kind: "junked";
       op: MailMoveOp;
@@ -877,6 +878,14 @@ function InboxListPage({
     );
     change(rpc.inbox.markRead({ messageId, read }));
   };
+  const setTracked = (messageId: string, tracked: boolean) => {
+    const subject = rows.find((row) => row.id === messageId)?.subject ?? "";
+    patchRows((list) =>
+      list.map((row) => (row.id === messageId ? { ...row, tracked: tracked || undefined } : row)),
+    );
+    setStatus(tracked ? { kind: "tracked", messageId, subject } : null);
+    change(tracked ? rpc.inbox.track({ messageId }) : rpc.inbox.untrack({ messageId }));
+  };
   const archive = (messageId: string) => {
     // The selection and the open message move on to a neighbor before the row goes.
     const index = ids.indexOf(messageId);
@@ -1318,6 +1327,10 @@ function InboxListPage({
     >
       {status.kind === "archivedMany" ? (
         <Trans>Archived {count}</Trans>
+      ) : status.kind === "tracked" ? (
+        <span className="min-w-0 truncate" dir="auto">
+          <Trans>Tracking "{maskCurrencyWhenHidden(status.subject)}"</Trans>
+        </span>
       ) : status.kind === "archived" ? (
         <span className="min-w-0 truncate" dir="auto">
           {status.subject ? (
@@ -1352,13 +1365,15 @@ function InboxListPage({
           onClick={() =>
             status.kind === "archivedMany"
               ? unarchiveMany(status.messageIds)
-              : status.kind === "junked"
-                ? undoMove(status.batches)
-                : status.kind === "archived"
-                  ? unarchive(status.messageId)
-                  : status.kind === "moved"
-                    ? archive(status.messageId)
-                    : mark(status.messageId, null)
+              : status.kind === "tracked"
+                ? setTracked(status.messageId, false)
+                : status.kind === "junked"
+                  ? undoMove(status.batches)
+                  : status.kind === "archived"
+                    ? unarchive(status.messageId)
+                    : status.kind === "moved"
+                      ? archive(status.messageId)
+                      : mark(status.messageId, null)
           }
         >
           <Trans>Undo</Trans>
@@ -1917,6 +1932,7 @@ function InboxListPage({
                             onMark={triage ? mark : undefined}
                             onArchive={archive}
                             onRead={setRead}
+                            onTrack={setTracked}
                             onArchiveGroup={() => archiveMany(group.rows)}
                             onPickGroup={() => togglePicked(group.rows.map((row) => row.id))}
                             selectedId={selectedId}
@@ -1937,6 +1953,7 @@ function InboxListPage({
                   onMark={triage ? mark : undefined}
                   onArchive={archive}
                   onRead={setRead}
+                  onTrack={setTracked}
                   selectedId={selectedId}
                   pickedIds={pickedSet}
                   onPick={pick}
@@ -1955,6 +1972,7 @@ function InboxListPage({
                     onMark={triage ? mark : undefined}
                     onArchive={archive}
                     onRead={setRead}
+                    onTrack={setTracked}
                     selectedId={selectedId}
                     pickedIds={pickedSet}
                     onPick={pick}
@@ -1978,6 +1996,7 @@ function InboxListPage({
                       onMark={triage ? mark : undefined}
                       onArchive={archive}
                       onRead={setRead}
+                      onTrack={setTracked}
                       selectedId={selectedId}
                       pickedIds={pickedSet}
                       onPick={pick}
@@ -1999,6 +2018,7 @@ function InboxListPage({
                         onMark={triage ? mark : undefined}
                         onArchive={archive}
                         onRead={setRead}
+                        onTrack={setTracked}
                         selectedId={selectedId}
                         pickedIds={pickedSet}
                         onPick={pick}
@@ -2011,6 +2031,7 @@ function InboxListPage({
                         onMark={triage ? mark : undefined}
                         onArchive={archive}
                         onRead={setRead}
+                        onTrack={setTracked}
                         selectedId={selectedId}
                         pickedIds={pickedSet}
                         onPick={pick}
