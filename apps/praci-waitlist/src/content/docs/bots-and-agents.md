@@ -5,7 +5,7 @@ group: Agents and apps
 order: 20
 ---
 
-Praci is built around **bots**. A bot is a long-lived assistant with its own conversation, memory and history. It can also run scheduled **routines** and use its own **computer**: a browser, a terminal and files that belong to that bot. Your bots are listed in the sidebar.
+Praci is built around **bots**. A bot is a long-lived assistant with its own conversation, memory and history. It can also run [routines](/docs/routines) on a schedule or when a web page changes, keep a list of [open work](/docs/check-ins), and use its own **computer**: a browser, a terminal and files that belong to that bot. Your bots are listed in the sidebar.
 
 ![A conversation with Chief](/docs/chief.webp)
 
@@ -55,7 +55,11 @@ Choose **Approve** to let the bot use the tool, or **Discard**. A tool runs the 
 
 ## Routines
 
-A routine runs a prompt on a schedule, such as every Monday morning. Set one up from the **Computer and routines** button at the top of a bot's chat. A routine is a background run, so it is read-only: it asks before it sends, edits files or runs commands. See [Approvals](#approvals).
+A routine runs a prompt on a schedule, such as every Monday morning, or when a web page changes. Set one up from the **Computer and routines** button at the top of a bot's chat, or ask the bot in chat. A routine can stay silent when there is nothing to tell you. A routine is a background run, so it is read-only: it asks before it sends, edits files or runs commands. See [Routines](/docs/routines) and [Approvals](#approvals).
+
+## Check-ins and open work
+
+A bot can check in once a day and tell you only when something needs you, and it keeps a list of open work with what it is waiting on and when each item is due. See [Check-ins and open work](/docs/check-ins).
 
 ## Approvals
 
