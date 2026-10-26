@@ -90,6 +90,7 @@ import {
   removeAccountExportBlobs,
   removePiUserSessions,
   resolveEnsName,
+  reviewAttachment,
   runWatchProbeTick,
   ScriptedAgentRuntime,
   SmtpEmailProvider,
@@ -697,6 +698,8 @@ export async function createApp(
     email,
     describeTeachSteps: (input) =>
       describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
+    reviewAttachment: (input, signal) =>
+      reviewAttachment({ prisma, runtime, resolveModel: executor.resolveModel }, input, signal),
     unsubscriber: createMailUnsubscriber(),
     proposeSort: (model, input, context) =>
       new LlmDataRoomClassifier({

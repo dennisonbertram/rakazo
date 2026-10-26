@@ -264,6 +264,8 @@ import {
   ComposePrefillInputSchema,
   ComposePrefillOutputSchema,
   ComposeResultSchema,
+  InboxAttachmentReviewInputSchema,
+  InboxAttachmentReviewOutputSchema,
   InboxBulkInputSchema,
   InboxBulkResultSchema,
   InboxFeedbackInputSchema,
@@ -1555,6 +1557,10 @@ export const appContract = {
     agent: oc.output(BotSchema),
     /** Idempotent per mail conversation: opens the agent made for the message's thread, with the thread as context. */
     askAgent: oc.input(z.object({ messageId: Id })).output(BotSchema),
+    /** A disposable AI review of one attachment of the user's own message; nothing is stored. */
+    reviewAttachment: oc
+      .input(InboxAttachmentReviewInputSchema)
+      .output(InboxAttachmentReviewOutputSchema),
     list: oc.input(InboxListInputSchema).output(InboxListOutputSchema),
     refresh: oc.input(InboxRefreshInputSchema).output(InboxRefreshOutputSchema),
     get: oc.input(z.object({ messageId: Id })).output(InboxMessageSchema),

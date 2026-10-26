@@ -28,6 +28,7 @@ import type {
   MessagingSettings,
   PiOAuthLogins,
   RemoteConnectorDependencies,
+  reviewAttachment,
   SafeSyncDeps,
   TicketChangeNotifier,
   TriageReadinessDeps,
@@ -53,6 +54,11 @@ export interface RouterDeps {
   proposeSort?: Parameters<typeof createDataRoomService>[0]["proposeSort"];
   /** Rewrites a recording's coordinate steps as plain steps with the bot's model; absent keeps coordinates. */
   describeTeachSteps?: Parameters<typeof createTaughtSkillsService>[0]["describeSteps"];
+  /** One model turn of the attachment review chat; without it the review reports unavailable. */
+  reviewAttachment?: (
+    input: Parameters<typeof reviewAttachment>[1],
+    signal?: AbortSignal,
+  ) => ReturnType<typeof reviewAttachment>;
   cloudAgent?: CloudAgentConnection | null;
   prisma: PrismaClient;
   events: ThreadEvents;
