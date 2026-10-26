@@ -34,6 +34,7 @@ import {
   releaseComputerExecutionLease,
   releaseTeachingComputerControlForBot,
   scheduleComputerControlExpiry,
+  scrubTaughtSkillRow,
   screenLeaseIdForRun,
   teachingControlLeaseExpiresAt,
 } from "@rakazo/adapters";
@@ -343,9 +344,14 @@ async function settleTestOutcome(
 }
 
 async function present(deps: TaughtSkillsDeps, row: TaughtSkillRow): Promise<TaughtSkill> {
-  if (row.status === "recording") return mapTaughtSkill(row);
+  if (row.status === "recording") return mapTaughtSkill(await scrubTaughtSkillRow(deps, row));
   const settled = await settleTestOutcome(deps, row);
-  return mapTaughtSkill(settled, await listLoginPrompts(deps.prisma, settled.id));
+  const steps = parsePlaybook(settled.playbook).steps;
+  const prompts = (await listLoginPrompts(deps.prisma, settled.id)).map((prompt) => {
+    const username = findTypedUsername(steps, prompt.stepIndex)?.value;
+    return username ? { ...prompt, username } : prompt;
+  });
+  return mapTaughtSkill(settled, prompts);
 }
 
 /** Rewrites playbook steps and the draft card in the thread. */
@@ -376,20 +382,24 @@ async function skipHeldLogins(
   skill: TaughtSkillRow,
   stepIndex?: number,
 ): Promise<TaughtSkillRow> {
-  const pending = (await listLoginPrompts(deps.prisma, skill.id)).filter(
-    (prompt) => stepIndex === undefined || prompt.stepIndex === stepIndex,
-  );
+  const pending = (await listLoginPrompts(deps.prisma, skill.id))
+    .filter((prompt) => stepIndex === undefined || prompt.stepIndex === stepIndex)
+    .map((prompt) => prompt.stepIndex);
   await deleteHeldValues(deps.prisma, {
     skillId: skill.id,
     ...(stepIndex === undefined ? {} : { stepIndex }),
   });
-  if (pending.length === 0) return skill;
-  return rewriteSteps(
-    deps,
-    actor,
-    skill,
-    new Map(pending.map((prompt) => [prompt.stepIndex, ASK_SIGN_IN_STEP])),
-  );
+  // Skipping everything (Save) also covers a step whose value expired: no held row, but the
+  // placeholder must not reach a saved skill.
+  const orphaned =
+    stepIndex === undefined
+      ? parsePlaybook(skill.playbook).steps.flatMap((step, index) =>
+          step === PROTECTED_STEP ? [index] : [],
+        )
+      : [];
+  const edits = new Map([...pending, ...orphaned].map((index) => [index, ASK_SIGN_IN_STEP]));
+  if (edits.size === 0) return skill;
+  return rewriteSteps(deps, actor, skill, edits);
 }
 
 async function expireTeachingSessionIfNeeded(deps: TaughtSkillsDeps, skillId: string) {
@@ -721,7 +731,7 @@ export function createTaughtSkillsService(deps: TaughtSkillsDeps) {
         stepIndex: number;
         name: string;
         site: string;
-        username?: string;
+        username: string;
       },
     ): Promise<TaughtSkill> {
       const skill = await getOwnedSkill(deps, actor, input.skillId);
@@ -742,10 +752,10 @@ export function createTaughtSkillsService(deps: TaughtSkillsDeps) {
         },
       });
       if (!held) throw new ORPCError("NOT_FOUND", { message: HELD_VALUE_GONE });
-      // The username is the text typed just before the password (a Tab or click may sit between),
-      // unless the caller names it.
+      // The username is what the user confirmed. The typed step before the password is only
+      // offered as a suggestion, and is rewritten only when it is exactly that value.
       const typed = findTypedUsername(playbook.steps, input.stepIndex);
-      const username = input.username ?? typed?.value;
+      const username = input.username.trim();
       if (!username) {
         throw new ORPCError("BAD_REQUEST", { message: "Add the username for this login" });
       }
@@ -766,7 +776,7 @@ export function createTaughtSkillsService(deps: TaughtSkillsDeps) {
       });
       await deleteHeldValues(deps.prisma, { skillId: skill.id, stepIndex: input.stepIndex });
       const edits = new Map([[input.stepIndex, fillLoginStep(input.name, held.field)]]);
-      if (!input.username && typed) edits.set(typed.index, fillLoginStep(input.name, "Username"));
+      if (typed?.value === username) edits.set(typed.index, fillLoginStep(input.name, "Username"));
       return present(deps, await rewriteSteps(deps, actor, skill, edits));
     },
 

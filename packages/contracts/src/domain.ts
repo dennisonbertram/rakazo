@@ -667,6 +667,8 @@ export type TeachTestOutcome = z.infer<typeof TeachTestOutcomeSchema>;
 export const TeachLoginPromptSchema = z.object({
   stepIndex: z.number().int().min(0),
   field: z.string(),
+  /** The username typed just before the password, offered for the user to confirm. */
+  username: z.string().optional(),
 });
 export type TeachLoginPrompt = z.infer<typeof TeachLoginPromptSchema>;
 

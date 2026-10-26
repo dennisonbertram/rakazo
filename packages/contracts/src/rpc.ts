@@ -1001,8 +1001,8 @@ export const appContract = {
           stepIndex: z.number().int().min(0),
           name: BotSecretName,
           site: z.string().min(1).max(2048),
-          /** Only needed when the step before the password is not the typed username. */
-          username: z.string().min(1).max(512).optional(),
+          /** The username the user confirmed; the server never guesses it. */
+          username: z.string().min(1).max(512),
         }),
       )
       .output(TaughtSkillSchema),

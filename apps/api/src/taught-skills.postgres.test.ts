@@ -154,7 +154,7 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
       PROTECTED_STEP,
       "Press key: Enter.",
     ]);
-    expect(stopped.loginPrompts).toEqual([{ stepIndex: 2, field: "Password" }]);
+    expect(stopped.loginPrompts).toEqual([{ stepIndex: 2, field: "Password", username: "alice" }]);
     const row = await prisma.taughtSkill.findUniqueOrThrow({ where: { id: skill.id } });
     expect(JSON.stringify(row)).not.toContain("hunter2");
     const held = await prisma.teachHeldValue.findMany({ where: { skillId: skill.id } });
@@ -171,6 +171,7 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
       stepIndex: 2,
       name: "crm",
       site: "https://crm.example.test/login",
+      username: "alice",
     });
     expect(saved.playbook.steps).toEqual([
       "Fill saved login crm into Username.",
@@ -196,8 +197,32 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
         stepIndex: 2,
         name: "crm",
         site: "https://crm.example.test",
+        username: "alice",
       }),
     ).rejects.toThrow();
+  });
+
+  it("only rewrites the typed username step when the user confirmed that exact value", async () => {
+    const { skill } = await teachSignIn();
+    const saved = await service.saveLogin(owner, {
+      skillId: skill.id,
+      stepIndex: 2,
+      name: "crm2",
+      site: "https://crm.example.test",
+      username: "alice@example.test",
+    });
+    expect(saved.playbook.steps).toEqual([
+      'Type "alice".',
+      "Press key: Tab.",
+      "Fill saved login crm2 into Password.",
+      "Press key: Enter.",
+    ]);
+    const secret = await prisma.botSecret.findFirstOrThrow({
+      where: { botId, userId: ownerId, name: "crm2" },
+    });
+    expect(decodeLoginSecret(await secrets.load(secret.ciphertext, secret.id)).username).toBe(
+      "alice@example.test",
+    );
   });
 
   it("skipLogin deletes the held value and asks the user to sign in", async () => {
@@ -217,6 +242,34 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
     expect(await prisma.teachHeldValue.count({ where: { skillId: skill.id } })).toBe(0);
   });
 
+  it("saving rewrites a password step whose held value already expired", async () => {
+    const { skill } = await teachSignIn();
+    await prisma.teachHeldValue.updateMany({
+      where: { skillId: skill.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+    const saved = await service.save(owner, skill.id, "CRM sign in");
+    expect(saved.playbook.steps).not.toContain(PROTECTED_STEP);
+    expect(saved.playbook.steps[2]).toBe(ASK_SIGN_IN_STEP);
+  });
+
+  it("returns a recording scrubbed of a held password that a window title echoed", async () => {
+    const skill = await recording();
+    await type("hunter2", "Password");
+    await prisma.taughtSkill.update({
+      where: { id: skill.id },
+      data: {
+        recording: {
+          events: [{ at: "1", kind: "window", title: "Doc - hunter2", app: "hunter2" }],
+          snapshots: [{ at: "1", summary: "Doc - hunter2" }],
+        },
+      },
+    });
+    const fetched = await service.get(owner, skill.id);
+    expect(JSON.stringify(fetched.recording)).not.toContain("hunter2");
+    await service.cancel(owner, skill.id);
+  });
+
   it("refuses a held value that expired, and the sweep deletes it", async () => {
     const { skill } = await teachSignIn();
     await prisma.teachHeldValue.updateMany({
@@ -229,6 +282,7 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
         stepIndex: 2,
         name: "expired",
         site: "https://crm.example.test",
+        username: "alice",
       }),
     ).rejects.toThrow(/no longer held/);
     expect((await service.get(owner, skill.id)).loginPrompts).toEqual([]);
@@ -245,6 +299,7 @@ describePostgres("teach by demonstration (PostgreSQL)", () => {
         stepIndex: 2,
         name: "x",
         site: "https://crm.example.test",
+        username: "alice",
       }),
     ).rejects.toThrow();
     await expect(
