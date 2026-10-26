@@ -1802,7 +1802,7 @@ const MessageView = memo(function MessageView({
         }
         if (block.kind === "chart") {
           return (
-            <div key={i} className="flex justify-start">
+            <div key={i} className={`flex justify-start ${i > 0 ? "mt-5" : ""}`}>
               <ChartBlockView name={block.name} spec={block.spec} data={block.data} />
             </div>
           );
@@ -1881,11 +1881,15 @@ const MessageView = memo(function MessageView({
           );
         }
         if (block.kind === "card") {
-          return <ResultCard key={i} block={block} />;
+          return (
+            <div key={i} className={i > 0 ? "mt-5" : undefined}>
+              <ResultCard block={block} />
+            </div>
+          );
         }
         if (block.kind === "ui") {
           return (
-            <div key={i} className="flex justify-start">
+            <div key={i} className={`flex justify-start ${i > 0 ? "mt-5" : ""}`}>
               <ThreadUiBlock block={block.block} />
             </div>
           );
