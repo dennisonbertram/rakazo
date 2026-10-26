@@ -125,7 +125,7 @@ describePostgres("routine watches and check-ins (PostgreSQL)", () => {
       recordWatchCheck(prisma, { routineId: id, spaceId: ids.space, now: min(n), text });
     expect(await rec(0, "a\nb")).toEqual({ outcome: "baseline" });
     expect(await rec(60, "a\nb")).toEqual({ outcome: "unchanged" });
-    expect(await rec(120, "a\nc")).toEqual({ outcome: "wake", diff: "- b\n+ c" });
+    expect(await rec(120, "a\nc")).toEqual({ outcome: "wake", diff: "- b\n+ c", created: null });
     const state = await prisma.routineWatchState.findUniqueOrThrow({ where: { routineId: id } });
     expect(state).toMatchObject({
       snapshot: "a\nc",
@@ -149,7 +149,7 @@ describePostgres("routine watches and check-ins (PostgreSQL)", () => {
     const next = new Date("2026-03-02T00:30:00Z");
     expect(
       await recordWatchCheck(prisma, { routineId: id, spaceId: ids.space, now: next, text: "v7" }),
-    ).toEqual({ outcome: "wake", diff: "- v6\n+ v7" });
+    ).toEqual({ outcome: "wake", diff: "- v6\n+ v7", created: null });
     expect(
       (await prisma.routineWatchState.findUniqueOrThrow({ where: { routineId: id } })).wakesToday,
     ).toBe(1);
@@ -247,6 +247,75 @@ describePostgres("routine watches and check-ins (PostgreSQL)", () => {
     expect((await recordWatchCheck(prisma, { ...base, now: min(1), text: "b" })).outcome).toBe(
       "pending",
     );
+  });
+
+  it("rolls back the snapshot and budget when creating the wake fails", async () => {
+    const id = await newWatch();
+    const base = { routineId: id, spaceId: ids.space };
+    await recordWatchCheck(prisma, { ...base, now: min(0), text: "a" });
+    await expect(
+      recordWatchCheck(prisma, { ...base, now: min(1), text: "b" }, async () => {
+        throw new Error("crash");
+      }),
+    ).rejects.toThrow("crash");
+    const state = await prisma.routineWatchState.findUniqueOrThrow({ where: { routineId: id } });
+    expect(state).toMatchObject({ snapshot: "a", wakesToday: 0 });
+    // the next probe sees the change again and creates the wake
+    const retry = await recordWatchCheck(
+      prisma,
+      { ...base, now: min(2), text: "b" },
+      async () => 7,
+    );
+    expect(retry).toMatchObject({ outcome: "wake", created: 7 });
+  });
+
+  it("holds the space cap when two watches wake at once", async () => {
+    const space = otherSpace;
+    const a = await newWatch(otherBotId, space);
+    const b = await newWatch(otherBotId, space);
+    const c = await newWatch(otherBotId, space);
+    // the space is one wake short of the cap (c holds 49 of its own)
+    await prisma.routineWatchState.updateMany({
+      where: { spaceId: space },
+      data: { wakesToday: 0, wakesDay: null },
+    });
+    await prisma.routineWatchState.update({
+      where: { routineId: c },
+      data: { wakesToday: 49, wakesDay: "2026-03-01" },
+    });
+    for (const id of [a, b]) {
+      await recordWatchCheck(prisma, { routineId: id, spaceId: space, now: min(0), text: "x" });
+    }
+    const slow = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return null;
+    };
+    const results = await Promise.all(
+      [a, b].map((id) =>
+        recordWatchCheck(prisma, { routineId: id, spaceId: space, now: min(1), text: "y" }, slow),
+      ),
+    );
+    expect(results.map((r) => r.outcome).sort()).toEqual(["pending", "wake"]);
+  });
+
+  it("wakes with a note when the page changes only beyond the kept 16 KB", async () => {
+    const id = await newWatch();
+    const base = { routineId: id, spaceId: ids.space };
+    const head = Array.from({ length: 2000 }, (_, i) => `line ${i} xxxxxxxxxx`).join("\n");
+    await recordWatchCheck(prisma, { ...base, now: min(0), text: `${head}\ntail one` });
+    expect(
+      (await recordWatchCheck(prisma, { ...base, now: min(60), text: `${head}\ntail one` }))
+        .outcome,
+    ).toBe("unchanged");
+    const changed = await recordWatchCheck(prisma, {
+      ...base,
+      now: min(120),
+      text: `${head}\ntail two`,
+    });
+    expect(changed).toMatchObject({
+      outcome: "wake",
+      diff: "The page changed below the part I keep (first 16 KB).",
+    });
   });
 
   it("deleting the routine removes its watch state", async () => {

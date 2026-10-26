@@ -184,7 +184,7 @@ export type WatchCheckInput = {
   wakeInFlight?: boolean;
 };
 
-export type WatchCheckResult =
+export type WatchCheckResult<T = unknown> =
   | { outcome: "missing" }
   | { outcome: "baseline" }
   | { outcome: "unchanged" }
@@ -192,7 +192,7 @@ export type WatchCheckResult =
   /** Changed but not delivered (budget or a wake in flight); folds into a later wake. */
   | { outcome: "pending" }
   /** Start an unattended run whose prompt carries `diff` (fenced as untrusted data). */
-  | { outcome: "wake"; diff: string }
+  | { outcome: "wake"; diff: string; created: T | null }
   /** Paused as noisy. Notify once. */
   | { outcome: "noisy" };
 
@@ -201,10 +201,16 @@ export type WatchCheckResult =
  * worker should do next. The caller enqueues the run for "wake" and sends the one notification
  * when a result is paused (error/access/noisy).
  */
-export async function recordWatchCheck(
+export async function recordWatchCheck<T = unknown>(
   db: PrismaClient,
   input: WatchCheckInput,
-): Promise<WatchCheckResult> {
+  /**
+   * Runs inside the same transaction that advances the snapshot and spends the wake budget, so a
+   * crash leaves either nothing changed (the next probe re-detects) or a queued run (the job
+   * reconciler enqueues queued runs). Enqueueing the job can happen after commit.
+   */
+  createWake?: (tx: Prisma.TransactionClient, diff: string) => Promise<T | null>,
+): Promise<WatchCheckResult<T>> {
   return db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<Array<{ routineId: string }>>`
       SELECT "routineId" FROM "routine_watch_states"
@@ -235,8 +241,9 @@ export async function recordWatchCheck(
       return { outcome: "error", paused, pausedReason } as const;
     }
 
+    // The fingerprint covers the whole page; only the stored snapshot (the diff baseline) is cut.
     const text = truncateSnapshot(input.text);
-    const fingerprint = fingerprintText(text);
+    const fingerprint = fingerprintText(input.text);
     const common = {
       consecutiveErrors: 0,
       lastCheckedAt: input.now,
@@ -251,7 +258,10 @@ export async function recordWatchCheck(
 
     const changedSinceLastCheck = fingerprint !== state.fingerprint;
     const ring = recordCheckOutcome(state.recentChanges, changedSinceLastCheck);
-    const differsFromTold = text !== state.snapshot;
+    // ponytail: a change past 16 KB that is deferred (budget, wake in flight) is forgotten once the
+    // fingerprint settles, because the kept snapshot cannot show it. Store a told-fingerprint if it matters.
+    const beyondSnapshot = text === state.snapshot && changedSinceLastCheck;
+    const differsFromTold = text !== state.snapshot || beyondSnapshot;
     const lastChangedAt = changedSinceLastCheck ? input.now : undefined;
 
     if (isNoisy(ring)) {
@@ -271,6 +281,8 @@ export async function recordWatchCheck(
 
     const day = today(input.now, routine?.timezone ?? "UTC");
     const own = wakeBudget({ wakesToday: state.wakesToday, wakesDay: state.wakesDay, today: day });
+    // Serialize the space cap: concurrent probes in one space must not all read the same count.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.spaceId}, 0))`;
     const spaceUsed = await spaceWatchWakesToday(tx, { spaceId: input.spaceId, now: input.now });
     // The space total already includes this watch's own wakes today.
     const spaceFull = spaceUsed >= SPACE_WATCH_WAKES_PER_DAY;
@@ -287,7 +299,11 @@ export async function recordWatchCheck(
       wakesToday: own.nextWakesToday,
       wakesDay: own.nextWakesDay,
     });
-    return { outcome: "wake", diff: diffSnapshots(state.snapshot, text) } as const;
+    const diff = beyondSnapshot
+      ? "The page changed below the part I keep (first 16 KB)."
+      : diffSnapshots(state.snapshot, text);
+    const created = createWake ? await createWake(tx, diff) : null;
+    return { outcome: "wake", diff, created } as const;
   });
 }
 

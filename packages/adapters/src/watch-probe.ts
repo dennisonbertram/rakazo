@@ -83,19 +83,27 @@ export function watchWakePrompt(instruction: string, url: string, diff: string):
   )}`;
 }
 
-/** Queues one unattended, externally tainted run for a routine whose page changed. */
-export async function createWatchWakeRun(deps: WatchProbeDeps, wake: Wake) {
-  const routine = await deps.prisma.routine.findFirst({
+type WakeDb = Pick<
+  PrismaClient,
+  "routine" | "bot" | "thread" | "agentSkill" | "botSkillSetting" | "task" | "run"
+>;
+
+/**
+ * Creates the task and queued unattended, externally tainted run for a routine whose page
+ * changed. Called inside recordWatchCheck's transaction so the run exists iff the snapshot moved.
+ */
+export async function createWatchWakeRun(db: WakeDb, wake: Wake) {
+  const routine = await db.routine.findFirst({
     where: { id: wake.routine.id, spaceId: wake.routine.spaceId, active: true },
   });
   if (!routine) return null;
-  const bot = await deps.prisma.bot.findUnique({
+  const bot = await db.bot.findUnique({
     where: { id: routine.botId },
     include: { thread: true },
   });
   if (!bot || bot.archivedAt || !bot.thread) return null;
   const target = routine.threadId
-    ? await deps.prisma.thread.findFirst({
+    ? await db.thread.findFirst({
         where: {
           id: routine.threadId,
           spaceId: routine.spaceId,
@@ -108,7 +116,7 @@ export async function createWatchWakeRun(deps: WatchProbeDeps, wake: Wake) {
       })
     : null;
   const threadId = target?.id ?? bot.thread.id;
-  const skills = await listAgentSkillRecords(deps.prisma, {
+  const skills = await listAgentSkillRecords(db, {
     spaceId: routine.spaceId,
     userId: routine.userId,
     botId: routine.botId,
@@ -118,48 +126,56 @@ export async function createWatchWakeRun(deps: WatchProbeDeps, wake: Wake) {
     wake.url,
     wake.diff,
   );
-  const run = await deps.prisma.$transaction(async (tx) => {
-    const task = await tx.task.create({
-      data: {
-        spaceId: routine.spaceId,
-        botId: bot.id,
-        threadId,
-        userId: routine.userId,
-        prompt,
-        status: "queued",
-      },
-    });
-    return tx.run.create({
-      data: {
-        spaceId: routine.spaceId,
-        botId: bot.id,
-        threadId,
-        taskId: task.id,
-        userId: routine.userId,
-        status: "queued",
-        trigger: "routine",
-        unattended: newRunUnattended({ trigger: "routine" }),
-        externalTaint: newRunExternalTaint({ trigger: "routine", source: { externalTaint: true } }),
-        routineId: routine.id,
-        ...routineRunModelPin(routine),
-      },
-    });
+  const task = await db.task.create({
+    data: {
+      spaceId: routine.spaceId,
+      botId: bot.id,
+      threadId,
+      userId: routine.userId,
+      prompt,
+      status: "queued",
+    },
   });
+  const run = await db.run.create({
+    data: {
+      spaceId: routine.spaceId,
+      botId: bot.id,
+      threadId,
+      taskId: task.id,
+      userId: routine.userId,
+      status: "queued",
+      trigger: "routine",
+      unattended: newRunUnattended({ trigger: "routine" }),
+      externalTaint: newRunExternalTaint({ trigger: "routine", source: { externalTaint: true } }),
+      routineId: routine.id,
+      ...routineRunModelPin(routine),
+    },
+  });
+  return run;
+}
+
+/** After the wake commits: start the run. The job reconciler also enqueues any queued run, so a crash here is recovered. */
+async function startWatchWake(
+  deps: WatchProbeDeps,
+  run: { id: string; spaceId: string; threadId: string; botId: string; routineId: string | null },
+) {
   await deps.jobs.enqueue(runContinueJob(run.id));
-  await deps.prisma.routine.update({ where: { id: routine.id }, data: { lastRunAt: new Date() } });
+  await deps.prisma.routine.update({
+    where: { id: run.routineId as string },
+    data: { lastRunAt: new Date() },
+  });
   try {
     await deps.events?.append({
-      spaceId: routine.spaceId,
-      threadId,
-      botId: bot.id,
+      spaceId: run.spaceId,
+      threadId: run.threadId,
+      botId: run.botId,
       type: "routine.fired",
       runId: run.id,
-      payload: { routineId: routine.id, watch: true },
+      payload: { routineId: run.routineId, watch: true },
     });
   } catch {
     // Best effort: the run is already queued.
   }
-  return run;
 }
 
 const PAUSE_REASON: Record<string, string> = {
@@ -227,26 +243,32 @@ export async function runWatchProbeTick(deps: WatchProbeDeps) {
               status: { in: ACTIVE_RUN_STATUSES as never },
             },
           })) > 0;
-        const result = await recordWatchCheck(deps.prisma, {
-          routineId: claim.routineId,
-          spaceId: claim.spaceId,
-          now,
-          wakeInFlight,
-          ...(probe.ok ? { text: probe.text } : { error: { kind: probe.kind } }),
-        });
+        const wakeBase = {
+          routine: {
+            id: claim.routineId,
+            spaceId: claim.spaceId,
+            botId: claim.botId,
+            userId: claim.userId,
+          },
+          url: claim.watch.url,
+        };
+        const result = await recordWatchCheck(
+          deps.prisma,
+          {
+            routineId: claim.routineId,
+            spaceId: claim.spaceId,
+            now,
+            wakeInFlight,
+            ...(probe.ok ? { text: probe.text } : { error: { kind: probe.kind } }),
+          },
+          (tx, diff) => createWatchWakeRun(tx, { ...wakeBase, diff }),
+        );
         summary.checked++;
         if (result.outcome === "wake") {
-          const run = await createWatchWakeRun(deps, {
-            routine: {
-              id: claim.routineId,
-              spaceId: claim.spaceId,
-              botId: claim.botId,
-              userId: claim.userId,
-            },
-            url: claim.watch.url,
-            diff: result.diff,
-          });
-          if (run) summary.woke++;
+          if (result.created) {
+            await startWatchWake(deps, result.created);
+            summary.woke++;
+          }
         } else if (result.outcome === "noisy" || (result.outcome === "error" && result.paused)) {
           summary.paused++;
           await notifyPaused(
