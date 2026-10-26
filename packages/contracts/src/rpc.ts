@@ -27,6 +27,7 @@ import {
   BotSecretPutInput,
   StoredBotSecretName,
 } from "./bot-secrets.js";
+import { CalendarAgendaInputSchema, CalendarAgendaSchema } from "./calendar.js";
 import {
   CapTableChangeSourceInputSchema,
   CapTableSaveInputSchema,
@@ -1844,6 +1845,10 @@ export const appContract = {
   },
   carta: {
     agent: oc.output(BotSchema),
+  },
+  calendar: {
+    /** One time-sorted list for the range: Google events from every connected account, bot to-dos, check-backs and the next run of repeating routines. */
+    agenda: oc.input(CalendarAgendaInputSchema).output(CalendarAgendaSchema),
   },
   contacts: {
     list: oc.input(ContactListInputSchema).output(z.array(ContactSchema)),

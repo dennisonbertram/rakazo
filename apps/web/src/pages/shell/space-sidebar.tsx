@@ -24,6 +24,7 @@ import {
 import {
   BookUser,
   Building2,
+  CalendarDays,
   ChartColumn,
   ChevronDown,
   ChevronLeft,
@@ -378,6 +379,7 @@ export type SpaceSidebarProps = {
   investorsMode: boolean;
   fundraisingMode: boolean;
   contactsMode: boolean;
+  calendarMode: boolean;
   companyMode: boolean;
   dataRoomMode: boolean;
   artifactsMode: boolean;
@@ -491,6 +493,7 @@ export function SpaceSidebar({
   investorsMode,
   fundraisingMode,
   contactsMode,
+  calendarMode,
   companyMode,
   dataRoomMode,
   artifactsMode,
@@ -819,6 +822,7 @@ export function SpaceSidebar({
                 { key: "investors", label: t`Investors` },
                 { key: "fundraising", label: t`Fundraising` },
                 { key: "company", label: t`Company` },
+                { key: "calendar", label: t`Calendar` },
                 { key: "contacts", label: t`Contacts` },
                 { key: "data-room", label: t`Data room` },
                 { key: "artifacts", label: t`Artifacts` },
@@ -976,6 +980,20 @@ export function SpaceSidebar({
                   onOpen={() => {
                     setMobileSidebarOpen(false);
                     navigate("/app/company");
+                  }}
+                />
+              )}
+              {hiddenPages.includes("calendar") ? null : (
+                <SidebarPageLink
+                  testId="sidebar-calendar"
+                  href="/app/calendar"
+                  current={calendarMode}
+                  icon={<CalendarDays size={15} strokeWidth={1.8} aria-hidden="true" />}
+                  label={t`Calendar`}
+                  rail={rail}
+                  onOpen={() => {
+                    setMobileSidebarOpen(false);
+                    navigate("/app/calendar");
                   }}
                 />
               )}

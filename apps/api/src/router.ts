@@ -17,6 +17,7 @@ import {
   SecretStoreUnavailableError,
 } from "@rakazo/adapter-kit";
 import type {
+  CalendarAccount,
   CodexLiveCatalog,
   ComputerExecutionLease,
   getBotSecretMetadata,
@@ -36,6 +37,7 @@ import {
   CHATGPT_OAUTH_PROVIDER,
   CodexCatalogCache,
   ComputerBusyError,
+  calendarAgenda,
   cancelComputerRunWork,
   checkpointAndRecordComputerWorkspace,
   clearInactiveUserComputerControl,
@@ -76,6 +78,7 @@ import {
   latestAuditMessageId,
   listAvailablePiCatalog,
   listBotSecretMetadata,
+  listCalendarAccounts,
   listPiCatalog,
   listScratchpadItems,
   McpOAuthBroker,
@@ -8262,6 +8265,29 @@ export function createRouter(deps: RouterDeps) {
       remove: authed.sidebarPages.remove.handler(({ context, input }) =>
         removeSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey),
       ),
+    },
+    calendar: {
+      agenda: authed.calendar.agenda.handler(async ({ context, input }) => {
+        const scope = actorScope(context.actor);
+        const accounts = await listCalendarAccounts(deps.prisma, scope).catch(
+          () => [] as CalendarAccount[],
+        );
+        return calendarAgenda(
+          { prisma: deps.prisma, connectors: deps.connectors },
+          scope,
+          { from: new Date(input.from), to: new Date(input.to) },
+          accounts.length > 0
+            ? {
+                accounts,
+                context: connectionContext(
+                  scope,
+                  `calendar-agenda:${randomUUID()}`,
+                  context.signal,
+                ),
+              }
+            : null,
+        );
+      }),
     },
     contacts: {
       list: authed.contacts.list.handler(async ({ context, input }) => {

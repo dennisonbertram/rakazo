@@ -75,6 +75,7 @@ import {
   BookUser,
   Building2,
   CalendarClock,
+  CalendarDays,
   ChartColumn,
   CodeXml,
   Files,
@@ -281,6 +282,7 @@ import { useSidebarGlance } from "../lib/use-sidebar-glance";
 import { errorText } from "../lib/user-error";
 import { workingActivity } from "../lib/working-activity";
 import type { ContextMenuPosition } from "./BotContextMenu";
+import { CalendarPage } from "./Calendar";
 import { CompanyPage } from "./Company";
 import { CompanyImportPage } from "./CompanyImport";
 import { ContactDetailPage } from "./ContactDetail";
@@ -1153,6 +1155,7 @@ export function ShellPage() {
   const investorsMode = useMatch("/app/investors/*") != null;
   const investorUpdateMatch = useMatch("/app/investors/updates/:id");
   const fundraisingMode = useMatch("/app/fundraising") != null;
+  const calendarMode = useMatch("/app/calendar") != null;
   const contactMatch = useMatch("/app/contacts/:contactId");
   const contactsMode = useMatch("/app/contacts") != null || contactMatch != null;
   // Inbox, Finance, Legal, Data room, Investors and Integrations are pages of their own: no bot
@@ -1170,6 +1173,7 @@ export function ShellPage() {
     dataRoomMode ||
     artifactsMode ||
     contactsMode ||
+    calendarMode ||
     boardMode;
   useEffect(() => {
     if (!financeMode) setFinanceAgentOpen(false);
@@ -1202,7 +1206,7 @@ export function ShellPage() {
     namedOnly: (bot) => pageAgentKind(bot.spawnKey) !== null,
   });
   const active =
-    inGroup || integrationsMode || artifactsMode || contactsMode || boardMode
+    inGroup || integrationsMode || artifactsMode || contactsMode || calendarMode || boardMode
       ? undefined
       : companyMode
         ? findCompanyAgent(bots, userId, companyImportMode)
@@ -2345,6 +2349,7 @@ export function ShellPage() {
         icon: <HandCoins {...icon} />,
       },
       { id: "company", label: t`Company`, icon: <Building2 {...icon} /> },
+      { id: "calendar", label: t`Calendar`, icon: <CalendarDays {...icon} /> },
       { id: "contacts", label: t`Contacts`, icon: <BookUser {...icon} /> },
       { id: "data-room", label: t`Data room`, icon: <FolderOpen {...icon} /> },
       { id: "artifacts", label: t`Artifacts`, icon: <Files {...icon} /> },
@@ -4707,6 +4712,7 @@ export function ShellPage() {
         investorsMode={investorsMode}
         fundraisingMode={fundraisingMode}
         contactsMode={contactsMode}
+        calendarMode={calendarMode}
         companyMode={companyMode}
         dataRoomMode={dataRoomMode}
         artifactsMode={artifactsMode}
@@ -5021,6 +5027,8 @@ export function ShellPage() {
             />
           ) : contactMatch?.params.contactId ? (
             <ContactDetailPage id={contactMatch.params.contactId} spaceName={pageSpaceName} />
+          ) : calendarMode ? (
+            <CalendarPage spaceName={pageSpaceName} bots={bots} onOpenBot={openBotSettings} />
           ) : contactsMode ? (
             <ContactsPage spaceName={pageSpaceName} onAskAgent={askChief} />
           ) : artifactsMode ? (

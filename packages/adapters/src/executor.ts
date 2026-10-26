@@ -50,6 +50,7 @@ import {
   BotSecretName,
   BUILTIN_TOOL_NAMES,
   botSecretSubmissionSchema,
+  CALENDAR_AGENDA_MAX_DAYS,
   CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE,
   COMPANY_AGENT_BUILTIN_TOOLS,
   COMPANY_IMPORTER_BUILTIN_TOOLS,
@@ -286,6 +287,7 @@ import {
   gtmPostTool,
   sharedMemorySaveError,
 } from "./builtin-tools.js";
+import { calendarAgenda } from "./calendar-agenda.js";
 import type { CalendarAccount } from "./calendar-tools.js";
 import {
   CALENDAR_TOOL_NAMES,
@@ -679,6 +681,7 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "meetings_get",
   "schedule_list",
   "schedule_runs",
+  "calendar_agenda",
   "scratchpad_list",
   "board_tickets",
   "ticket_get",
@@ -6275,6 +6278,32 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ...(thread.groupId ? { threadId: thread.id } : {}),
             });
           }
+          if (name === "calendar_agenda") {
+            // The owner's items across all their bots: only in the owner's own chat.
+            if (thread.groupId || run.userId !== bot.userId)
+              return { error: "calendar_agenda is only available in the owner's own chat." };
+            const from = args.from ? new Date(String(args.from)) : new Date();
+            const to = args.to
+              ? new Date(String(args.to))
+              : new Date(from.getTime() + 7 * 86_400_000);
+            if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from)
+              return { error: "from and to must be ISO 8601 times, with to after from." };
+            if (to.getTime() - from.getTime() > CALENDAR_AGENDA_MAX_DAYS * 86_400_000)
+              return { error: `The range is at most ${CALENDAR_AGENDA_MAX_DAYS} days.` };
+            const google =
+              deps.connectors && calendarEnabled
+                ? {
+                    accounts: await accountsAllowedNow(calendarAccounts(), "calendar_list_events"),
+                    context,
+                  }
+                : null;
+            return calendarAgenda(
+              { prisma: deps.prisma, connectors: deps.connectors! },
+              { spaceId: run.spaceId, userId: bot.userId },
+              { from, to },
+              google,
+            );
+          }
           if (name === "schedule_update") {
             return finish(
               await updateScheduleFromTool(deps, {
@@ -9218,11 +9247,14 @@ function scratchpadClause(disabled?: ReadonlySet<string>): string | undefined {
   const schedules = ["schedule_create", "schedule_list", "schedule_cancel"].some((name) =>
     builtinOffered(disabled, name),
   );
+  const agenda = builtinOffered(disabled, "calendar_agenda")
+    ? " Call calendar_agenda to see what is due or scheduled."
+    : "";
   if (pads.length === 3 && schedules) {
-    return "Use scratchpad_add / scratchpad_update / scratchpad_complete for open work that should outlive this turn (not reminders — those are schedule_*).";
+    return `Use scratchpad_add / scratchpad_update / scratchpad_complete for open work that should outlive this turn (not reminders — those are schedule_*).${agenda}`;
   }
   const reminder = schedules ? " (not reminders — those are schedule_*)" : "";
-  return `Use ${pads.join(" / ")} for open work that should outlive this turn${reminder}.`;
+  return `Use ${pads.join(" / ")} for open work that should outlive this turn${reminder}.${agenda}`;
 }
 
 function spawnBotClause(disabled?: ReadonlySet<string>): string | undefined {
