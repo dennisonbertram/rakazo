@@ -29,6 +29,7 @@ import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint
 import { DataExportSection } from "../components/DataExport";
 import { DesktopUpdateSection } from "../components/DesktopUpdates";
 import { NotificationSettingsSection } from "../components/NotificationSettings";
+import { PasskeySettings } from "../components/PasskeySettings";
 import { DefaultRunsOnSection } from "../components/RunsOnPicker";
 import { SoftwareUpdateSection } from "../components/SoftwareUpdateSection";
 import { authClient } from "../lib/auth";
@@ -347,6 +348,7 @@ export function GeneralSettingsPanels({
             {accountSecurity?.hasPassword && accountSecurity.passwordChangeEnabled !== false ? (
               <ChangePasswordSection email={email} />
             ) : null}
+            <PasskeySettings />
             <div data-testid="account-access" className="pb-3">
               <AccountAccess onSecurity={setAccountSecurity} />
             </div>

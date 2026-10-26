@@ -40,6 +40,7 @@ model User {
   notifications               Notification[]
   notificationEndpoints       NotificationEndpoint[]
   accountExports              AccountExport[]
+  passkeys                    Passkey[]
   id                          String                       @id
   name                        String
   email                       String
@@ -121,6 +122,26 @@ model Account {
 
   @@index([userId])
   @@map("account")
+}
+
+/// Better Auth passkey plugin credentials; one row per registered authenticator.
+model Passkey {
+  id           String    @id
+  name         String?
+  publicKey    String
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime? @default(now())
+  aaguid       String?
+
+  @@index([userId])
+  @@index([credentialID])
+  @@map("passkey")
 }
 
 model Verification {

@@ -1098,6 +1098,10 @@ msgstr ""
 msgid "Add page"
 msgstr ""
 
+#: src/components/PasskeySettings.tsx
+msgid "Add passkey"
+msgstr ""
+
 #: src/components/ContactDialog.tsx
 #: src/pages/Fundraising.tsx
 msgid "Add prospect"
@@ -3537,6 +3541,7 @@ msgid "Could not connect to the computer screen"
 msgstr "Не удалось подключиться к экрану компьютера"
 
 #: src/components/AccountAccess.tsx
+#: src/components/PasskeySettings.tsx
 #: src/lib/account-security.ts
 #: src/lib/sso-flow.ts
 #: src/lib/user-error.ts
@@ -8838,6 +8843,14 @@ msgstr ""
 msgid "Passed"
 msgstr ""
 
+#: src/components/PasskeySettings.tsx
+msgid "Passkey"
+msgstr ""
+
+#: src/components/PasskeySettings.tsx
+msgid "Passkeys"
+msgstr ""
+
 #: src/components/AskCard.tsx
 #: src/pages/Auth.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -9768,6 +9781,7 @@ msgstr ""
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/ScratchpadSection.tsx
@@ -9853,6 +9867,10 @@ msgstr "Удалить триггер сообщения"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Remove page watch"
+msgstr ""
+
+#: src/components/PasskeySettings.tsx
+msgid "Remove passkey {label}"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
@@ -11208,6 +11226,10 @@ msgstr ""
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Sign in with OpenRouter"
+msgstr ""
+
+#: src/pages/Auth.tsx
+msgid "Sign in with passkey"
 msgstr ""
 
 #: src/lib/model-connection-preflight.ts

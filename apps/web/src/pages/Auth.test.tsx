@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authClient } from "../lib/auth";
 import type { AuthCapabilities } from "../lib/auth-capabilities";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
@@ -40,6 +40,7 @@ vi.mock("../lib/auth", () => ({
     signIn: {
       social: vi.fn(async () => ({})),
       email: vi.fn(async () => ({ error: { code: "INVALID_EMAIL_OR_PASSWORD", message: "no" } })),
+      passkey: vi.fn(async () => ({ error: { code: "AUTH_CANCELLED", message: "cancelled" } })),
     },
     requestPasswordReset: vi.fn(async () => ({})),
     resetPassword: vi.fn(async () => ({})),
@@ -344,4 +345,47 @@ it("keeps native required and minLength validation on the password-reset form", 
     ),
   );
   expect(host.querySelector("form")?.noValidate).toBe(false);
+});
+
+describe("passkey sign-in", () => {
+  const withPasskey = { ...capabilities, sso: null, passwordAuth: true, passkey: true };
+  const button = () =>
+    [...host.querySelectorAll("button")].find((b) => b.textContent === "Sign in with passkey");
+  beforeEach(() => {
+    Object.assign(window, { PublicKeyCredential: class {} });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(window, "PublicKeyCredential");
+  });
+  it("offers the button and passkey autofill on the email field", async () => {
+    vi.mocked(fetchAuthCapabilities).mockResolvedValue(withPasskey);
+    await render();
+    expect(button()).toBeTruthy();
+    expect(host.querySelector('input[name="email"]')?.getAttribute("autocomplete")).toBe(
+      "username webauthn",
+    );
+  });
+  it("is hidden when the server or the browser lacks passkeys", async () => {
+    vi.mocked(fetchAuthCapabilities).mockResolvedValue({ ...withPasskey, passkey: undefined });
+    await render();
+    expect(button()).toBeUndefined();
+    Reflect.deleteProperty(window, "PublicKeyCredential");
+    vi.mocked(fetchAuthCapabilities).mockResolvedValue(withPasskey);
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await render();
+    expect(button()).toBeUndefined();
+  });
+  it("shows nothing when the prompt is cancelled and the error style otherwise", async () => {
+    vi.mocked(fetchAuthCapabilities).mockResolvedValue(withPasskey);
+    await render();
+    await act(async () => button()!.click());
+    expect(authClient.signIn.passkey).toHaveBeenCalledWith({ autoFill: false });
+    expect(host.querySelector('p[role="alert"]:not(:empty)')).toBeNull();
+    vi.mocked(authClient.signIn.passkey).mockResolvedValueOnce({
+      error: { code: "PASSKEY_NOT_FOUND", message: "Passkey not found" },
+    } as never);
+    await act(async () => button()!.click());
+    expect(host.querySelector('p[role="alert"]:not(:empty)')).toBeTruthy();
+  });
 });
