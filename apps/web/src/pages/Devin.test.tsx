@@ -223,3 +223,24 @@ it("does not call a partly read, empty listing an empty organization", async () 
   expect(container.textContent).toContain("Some sessions could not be read.");
   expect(container.textContent).not.toContain("No Devin sessions yet.");
 });
+
+it("sorts by a header, searches, and shows No matches with Clear filters", async () => {
+  await show(overview);
+  const titles = () =>
+    [...table().querySelectorAll("tbody tr:not(:has(th)) a")].map((a) => a.textContent ?? "");
+  // Newest first by default; the Session header sorts by title.
+  const byUpdate = titles();
+  const head = [...table().querySelectorAll("th button")].find((b) => b.textContent === "Session")!;
+  await act(async () => (head as HTMLElement).click());
+  expect(table().querySelector("th[aria-sort=ascending]")?.textContent).toBe("Session");
+  expect(titles()).not.toEqual(byUpdate);
+  const search = container.querySelector("input[type=search]") as HTMLInputElement;
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  await act(async () => {
+    set.call(search, "no such session");
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(container.textContent).toContain("No matches");
+  await act(async () => button("Clear filters")!.click());
+  expect(container.textContent).not.toContain("No matches");
+});
