@@ -790,3 +790,99 @@ describe("saved website logins", () => {
     );
   });
 });
+
+describe("credential use bookkeeping", () => {
+  async function trackedFixture(status: number) {
+    const { input, findFirst } = await fixture();
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    // createNotification runs a transaction; a rejected credential only needs it to be called.
+    const tx = {
+      $executeRaw: vi.fn(),
+      notification: {
+        findFirst: vi.fn(async () => null),
+        count: vi.fn(async () => 0),
+        create: vi.fn(async () => ({ id: "n1", importance: "attention" })),
+      },
+      notificationDelivery: { createMany: vi.fn(), findMany: vi.fn(async () => []) },
+    };
+    const prisma = {
+      botSecret: { findFirst, updateMany },
+      $transaction: vi.fn(async (fn: (client: unknown) => unknown) => fn(tx)),
+      notification: tx.notification,
+      notificationDelivery: tx.notificationDelivery,
+    } as unknown as PrismaClient;
+    input.remote.fetch.mockResolvedValue(new Response("{}", { status }));
+    return { input: { ...input, prisma }, updateMany, transaction: prisma.$transaction };
+  }
+
+  it("stamps lastUsedAt and clears needsAttentionAt on success, scoped to the row", async () => {
+    const { input, updateMany } = await trackedFixture(200);
+    await requestWithBotSecret(input);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "secret-1", ...scope },
+      data: { lastUsedAt: expect.any(Date), needsAttentionAt: null },
+    });
+  });
+
+  it("does not stamp lastUsedAt when the request fails", async () => {
+    const { input, updateMany } = await trackedFixture(200);
+    input.remote.fetch.mockRejectedValue(new Error("network"));
+    await requestWithBotSecret(input);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("marks needs attention on 401 and 403 without stamping lastUsedAt", async () => {
+    for (const status of [401, 403]) {
+      const { input, updateMany, transaction } = await trackedFixture(status);
+      await requestWithBotSecret(input);
+      expect(updateMany).toHaveBeenCalledTimes(1);
+      expect(updateMany).toHaveBeenCalledWith({
+        where: { id: "secret-1", ...scope },
+        data: { needsAttentionAt: expect.any(Date) },
+      });
+      expect(transaction).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("ignores other error statuses", async () => {
+    const { input, updateMany } = await trackedFixture(500);
+    await requestWithBotSecret(input);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("still returns the response when the stamp fails", async () => {
+    const { input, updateMany } = await trackedFixture(200);
+    updateMany.mockRejectedValue(new Error("db down"));
+    expect(await requestWithBotSecret(input)).toMatchObject({ status: 200 });
+  });
+
+  it("stamps a login fill", async () => {
+    const { prisma } = await loginFixtureForUse();
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    (prisma as unknown as { botSecret: { updateMany: unknown } }).botSecret.updateMany = updateMany;
+    await resolveLoginFill({ prisma, secretStore, scope, name: "site_login", field: "password" });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "login-1", ...scope },
+      data: { lastUsedAt: expect.any(Date), needsAttentionAt: null },
+    });
+  });
+});
+
+async function loginFixtureForUse() {
+  const plaintext = encodeLoginSecret({ username: "fake-user@example.test", password: "pw-1" });
+  const encrypted = await secretStore.put(
+    plaintext,
+    { ...scope, operationId: "test", traceId: "test", signal: new AbortController().signal },
+    { recordId: "login-1" },
+  );
+  const row = {
+    ...scope,
+    name: "site_login",
+    origin: "https://login.example.test",
+    auth: { type: "login" },
+    ...encrypted,
+    id: "login-1",
+  };
+  const findFirst = vi.fn(async () => row);
+  return { prisma: { botSecret: { findFirst } } as unknown as PrismaClient };
+}

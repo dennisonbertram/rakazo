@@ -645,6 +645,7 @@ export function BotSettings({
             refreshKey={skillsRefreshKey}
             onSkillsChange={onSkillsChange}
           />
+          <BotCredentialsSection botId={bot.id} />
           <details
             data-testid="bot-settings-advanced"
             className="group mt-5 open:pb-3"
@@ -857,7 +858,6 @@ export function BotSettings({
                   />
                 </label>
               ))}
-              {advancedOpened ? <BotCredentialsSection botId={bot.id} /> : null}
             </div>
           </details>
           {error ? <p className="mt-2 text-[13px] text-destructive">{error}</p> : null}

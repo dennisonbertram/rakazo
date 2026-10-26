@@ -13,7 +13,7 @@ import {
 } from "@rakazo/contracts";
 import { isRecord } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
-import { withTransactionRetry } from "@rakazo/db";
+import { createNotification, withTransactionRetry } from "@rakazo/db";
 import { combineSignals, redactConnectorPayload } from "./connector-safety.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { createPrivateNetworkFetch, createSafeRemoteFetch } from "./remote-mcp.js";
@@ -196,6 +196,45 @@ export async function findCommandVariableConflict(
   return rows.find(
     (row) => isCommandCredential(row.auth) && commandVariableName(row.name) === variable,
   )?.name;
+}
+
+type SecretRow = { id: string; name: string };
+
+/**
+ * Record a successful use. A failed write must never fail the request, so errors are dropped.
+ * A 401/403 from the saved site marks the credential as needing attention instead and, at most
+ * once a day, tells the owner (createNotification dedupes on the key for 24 hours).
+ */
+async function recordSecretUse(
+  prisma: PrismaClient,
+  scope: BotSecretScope,
+  row: SecretRow,
+  outcome: "ok" | "rejected",
+) {
+  try {
+    const where = { id: row.id, ...scopeFields(scope) };
+    if (outcome === "ok") {
+      await prisma.botSecret.updateMany({
+        where,
+        data: { lastUsedAt: new Date(), needsAttentionAt: null },
+      });
+      return;
+    }
+    await prisma.botSecret.updateMany({ where, data: { needsAttentionAt: new Date() } });
+    await createNotification(prisma, {
+      spaceId: scope.spaceId,
+      userId: scope.userId,
+      botId: scope.botId,
+      surface: "thread",
+      title: `${row.name} needs attention`,
+      body: "The site rejected this credential. Replace it in the bot's settings.",
+      importance: "attention",
+      kind: "urgent",
+      dedupeKey: `credential-rejected:${row.id}`,
+    });
+  } catch {
+    /* Bookkeeping only. */
+  }
 }
 
 export type RequestSecretDestinationResult = {
@@ -423,7 +462,10 @@ export async function prepareBotSecret(input: {
       if (current?.id !== existing?.id)
         throw Object.assign(new Error("Credential changed while saving; retry"), { code: "P2034" });
       if (current)
-        await tx.botSecret.update({ where: { id }, data: { ciphertext: stored.ciphertext } });
+        await tx.botSecret.update({
+          where: { id },
+          data: { ciphertext: stored.ciphertext, needsAttentionAt: null },
+        });
       else
         await tx.botSecret.create({
           data: { id, ...scopeFields(scope), ...destination, ciphertext: stored.ciphertext },
@@ -455,7 +497,13 @@ export async function listBotSecrets(prisma: PrismaClient, scope: BotSecretScope
 }
 
 // Owner-facing view: destination and timestamps only, never the row id or ciphertext.
-const ownerMetadata = { ...metadata, createdAt: true, updatedAt: true } as const;
+const ownerMetadata = {
+  ...metadata,
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+  needsAttentionAt: true,
+} as const;
 
 export function listBotSecretMetadata(prisma: PrismaClient, scope: BotSecretScope) {
   return prisma.botSecret.findMany({
@@ -566,6 +614,11 @@ export async function requestWithBotSecret(input: {
     }
     // Redact before truncating, so an output boundary cannot expose part of a value.
     const safe = JSON.stringify(redactConnectorPayload(body, redactions));
+    // Only a 2xx counts as a use; other errors (404, 429, 5xx) say nothing about the credential.
+    if (response.ok) await recordSecretUse(input.prisma, input.scope, row, "ok");
+    else if (response.status === 401 || response.status === 403) {
+      await recordSecretUse(input.prisma, input.scope, row, "rejected");
+    }
     return {
       status: response.status,
       body: safe.length > 20_000 ? safe.slice(0, 20_000) : JSON.parse(safe),
@@ -620,6 +673,7 @@ export async function resolveLoginFill(input: {
     return { error: "Website logins can only be filled on an HTTPS origin." };
   }
   const login = decodeLoginSecret(await input.secretStore.load(row.ciphertext, row.id));
+  await recordSecretUse(input.prisma, input.scope, row, "ok");
   return {
     text: login[input.field],
     origin: destination.origin,
