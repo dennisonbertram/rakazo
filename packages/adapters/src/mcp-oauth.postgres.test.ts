@@ -4,6 +4,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import type { OAuthMaterial } from "./mcp-oauth.js";
 import { McpOAuthBroker } from "./mcp-oauth.js";
 import { PostgresRealtimeFanout } from "./realtime.js";
+import { secretRefDigest } from "./secret-changes.js";
 import { withSecretPersistence } from "./secret-persistence.js";
 import { ComposedSecretStore } from "./secret-store-factory.js";
 import { EncryptedSecretStore } from "./secrets.js";
@@ -106,7 +107,9 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
     const publisher = {
       query: async (sql: string, values: unknown[]) => {
         const result = await db.pool.query(sql, values);
-        notified.push(JSON.parse(JSON.parse(String(values[1])).payload).ref);
+        // The store announces an encrypted record by its digest, not by the ciphertext.
+        const event = JSON.parse(JSON.parse(String(values[1])).payload);
+        notified.push(event.digest ?? event.ref);
         return result;
       },
     };
@@ -146,7 +149,7 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
       expect(
         JSON.parse(await secrets.load(row.ciphertext, row.id)).oauth.tokens.refresh_token,
       ).toBe("refresh-1");
-      expect(notified).toContain(row.ciphertext);
+      expect(notified).toContain(secretRefDigest(row.ciphertext));
     }
   }, 30_000);
 });
