@@ -4531,6 +4531,521 @@
         ]
       }
     },
+    "/rpc/artifactShares/create": {
+      "post": {
+        "operationId": "rpc_artifactShares_create",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "artifactId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "artifactId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "share": {
+                          "type": "object",
+                          "properties": {
+                            "artifactId": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "expiresAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "artifactId",
+                            "version",
+                            "expiresAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "share"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/artifactShares/get": {
+      "post": {
+        "operationId": "rpc_artifactShares_get",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "artifactId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "artifactId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "artifactId": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "expiresAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "artifactId",
+                            "version",
+                            "expiresAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/artifactShares/revoke": {
+      "post": {
+        "operationId": "rpc_artifactShares_revoke",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "artifactId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "artifactId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/artifacts/create": {
       "post": {
         "operationId": "rpc_artifacts_create",
@@ -10059,6 +10574,18 @@
                           },
                           "updatedAt": {
                             "type": "string"
+                          },
+                          "lastUsedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "needsAttentionAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -10066,7 +10593,9 @@
                           "origin",
                           "auth",
                           "createdAt",
-                          "updatedAt"
+                          "updatedAt",
+                          "lastUsedAt",
+                          "needsAttentionAt"
                         ],
                         "additionalProperties": false
                       },
@@ -10350,6 +10879,18 @@
                         },
                         "updatedAt": {
                           "type": "string"
+                        },
+                        "lastUsedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "needsAttentionAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -10357,7 +10898,9 @@
                         "origin",
                         "auth",
                         "createdAt",
-                        "updatedAt"
+                        "updatedAt",
+                        "lastUsedAt",
+                        "needsAttentionAt"
                       ],
                       "additionalProperties": false,
                       "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
@@ -97951,6 +98494,193 @@
         ]
       }
     },
+    "/rpc/scratchpad/waitingOnYou": {
+      "post": {
+        "operationId": "rpc_scratchpad_waitingOnYou",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "$ref": "#/components/schemas/RpcScratchpadWaitingOnYouOutputSchema0"
+                          },
+                          "botId": {
+                            "$ref": "#/components/schemas/RpcScratchpadWaitingOnYouOutputSchema0"
+                          },
+                          "botName": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "waitingOn": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "dueAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "botId",
+                          "botName",
+                          "title",
+                          "waitingOn",
+                          "dueAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                      "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/search/query": {
       "post": {
         "operationId": "rpc_search_query",
@@ -118435,7 +119165,7 @@
         "maxLength": 4000
       },
       "RpcBotsUpdateInputSchema17": {
-        "maxItems": 126,
+        "maxItems": 127,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema18"
@@ -125724,6 +126454,10 @@
         "type": "string",
         "format": "date-time",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+      },
+      "RpcScratchpadWaitingOnYouOutputSchema0": {
+        "type": "string",
+        "minLength": 1
       },
       "RpcSearchQueryOutputSchema0": {
         "type": "object",

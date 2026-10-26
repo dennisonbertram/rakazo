@@ -422,6 +422,7 @@ export type SpaceSidebarProps = {
   onAttachmentPick: (files: ArrayLike<File> | null, targetThreadKey?: string) => boolean;
   setFocusComposerBotId: Dispatch<SetStateAction<string | null>>;
   openBot: (id: string) => void | Promise<void>;
+  openBotSettings: (id: string) => void;
   moveSidebarItem: (
     item: { kind: "bot" | "group"; id: string },
     folderId: string | null,
@@ -534,6 +535,7 @@ export function SpaceSidebar({
   onAttachmentPick,
   setFocusComposerBotId,
   openBot,
+  openBotSettings,
   moveSidebarItem,
   botMenuAnchor,
   setBotMenu,
@@ -1058,6 +1060,7 @@ export function SpaceSidebar({
           {activityMode && !rail ? (
             <ActivityList
               onListedBots={setActivityBotIds}
+              onOpenWaitingItem={(item) => openBotSettings(item.botId)}
               onOpenRun={(run) => {
                 setMobileSidebarOpen(false);
                 if (run.groupId) navigate(`/app/g/${run.groupId}`);

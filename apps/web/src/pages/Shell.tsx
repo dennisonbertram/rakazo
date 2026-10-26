@@ -3798,6 +3798,20 @@ export function ShellPage() {
   }
 
   /** `modelProvider` opens Models on that provider with its own-key form open. */
+  /** Opens a bot's settings panel (where Open work is), even on a narrow screen or for the bot already open. */
+  function openBotSettings(botId: string) {
+    const destKey =
+      userId && bootstrapMe?.spaceId
+        ? rightPanelStorageKey(userId, bootstrapMe.spaceId, "bot", botId)
+        : null;
+    explicitPanelTarget.current = destKey;
+    pendingPanelRestore.current = null;
+    navigate(`/app/${botId}`);
+    setPanelState("settings");
+    setRestoredPanelKey(destKey);
+    closeMobileSidebar();
+  }
+
   function openSettings(section: SettingsSection = "general", modelProvider?: string) {
     setSettingsSection(section);
     setSettingsModelProvider(modelProvider);
@@ -4707,6 +4721,7 @@ export function ShellPage() {
         onAttachmentPick={onAttachmentPick}
         setFocusComposerBotId={setFocusComposerBotId}
         openBot={openBot}
+        openBotSettings={openBotSettings}
         moveSidebarItem={moveSidebarItem}
         botMenuAnchor={botMenuAnchor}
         setBotMenu={setBotMenu}

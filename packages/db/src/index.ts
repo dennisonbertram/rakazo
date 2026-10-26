@@ -44,6 +44,7 @@ export * from "./routine-watch.js";
 export { delegatePendingAgents, delegatePendingIds } from "./run-pauses.js";
 export * from "./safes.js";
 export * from "./scope.js";
+export * from "./scratchpad-waiting.js";
 export * from "./sessions.js";
 export * from "./sidebar-folders.js";
 export * from "./sidebar-pages.js";

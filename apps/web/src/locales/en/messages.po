@@ -706,6 +706,10 @@ msgid "{tbd} TBD left. Send anyway?"
 msgstr "{tbd} TBD left. Send anyway?"
 
 #: src/pages/ActivityList.tsx
+msgid "{title}, {botName}"
+msgstr "{title}, {botName}"
+
+#: src/pages/ActivityList.tsx
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
 
@@ -12925,6 +12929,10 @@ msgstr "Waiting on {delegate}"
 #: src/pages/ScratchpadSection.tsx
 msgid "Waiting on {waitingOn}"
 msgstr "Waiting on {waitingOn}"
+
+#: src/pages/ActivityList.tsx
+msgid "Waiting on you"
+msgstr "Waiting on you"
 
 #: src/pages/shell/message-cards.tsx
 msgid "Waiting…"

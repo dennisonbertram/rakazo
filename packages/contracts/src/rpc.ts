@@ -192,6 +192,7 @@ import {
   VoiceCredentialSchema,
   VoiceInfoSchema,
   VoiceStatusSchema,
+  WaitingOnYouItemSchema,
 } from "./domain.js";
 import { ComputerCommandSchema, MailEditsSchema, ProductEventSchema } from "./events.js";
 import {
@@ -923,6 +924,8 @@ export const appContract = {
         }),
       )
       .output(z.array(ScratchpadItemSchema)),
+    /** Open items across the caller's bots that wait on them or are past due. */
+    waitingOnYou: oc.input(z.object({})).output(z.array(WaitingOnYouItemSchema)),
     create: oc.input(CreateScratchpadItemInput).output(ScratchpadItemSchema),
     update: oc
       .input(

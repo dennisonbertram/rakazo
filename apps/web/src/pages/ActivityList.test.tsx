@@ -4,9 +4,12 @@ import type { RunActivityRow } from "@rakazo/contracts";
 import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-const api = vi.hoisted(() => ({ runs: { list: vi.fn() } }));
+const api = vi.hoisted(() => ({
+  runs: { list: vi.fn() },
+  scratchpad: { waitingOnYou: vi.fn() },
+}));
 vi.mock("../lib/rpc", () => ({ rpc: api }));
 vi.mock("../lib/roster-time", () => ({ formatRosterTime: () => "9:00 AM" }));
 const join = vi.hoisted(
@@ -20,7 +23,7 @@ vi.mock("@lingui/core/macro", () => ({
     (count === 1 ? forms.one : forms.other).replace("#", String(count)),
 }));
 vi.mock("@lingui/react/macro", () => ({
-  useLingui: () => ({ t: join }),
+  useLingui: () => ({ t: join, i18n: { locale: "en" } }),
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("@rakazo/ui-web", async (importOriginal) => ({
@@ -53,10 +56,55 @@ const run = (runId: string, status: RunActivityRow["status"]): RunActivityRow =>
     updatedAt: new Date().toISOString(),
   }) as RunActivityRow;
 
+beforeEach(() => api.scratchpad.waitingOnYou.mockResolvedValue([]));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   api.runs.list.mockReset();
+  api.scratchpad.waitingOnYou.mockReset();
   document.body.innerHTML = "";
+});
+
+it("lists items waiting on the person after Needs you, opens the bot, and hides when none", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  api.runs.list.mockResolvedValue({ runs: [] });
+  const item = {
+    id: "item-1",
+    botId: "bot-9",
+    botName: "Ada (mock)",
+    title: "Sign the sample form",
+    waitingOn: "you",
+    dueAt: null,
+  };
+  api.scratchpad.waitingOnYou.mockResolvedValue([item]);
+  const onOpen = vi.fn();
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () =>
+    root.render(<ActivityList onOpenRun={() => {}} onOpenWaitingItem={onOpen} />),
+  );
+
+  expect(container.querySelector("#activity-waiting-heading")?.textContent).toBe("Waiting on you");
+  const row = container.querySelector<HTMLButtonElement>(
+    '[aria-labelledby="activity-waiting-heading"] [data-activity-row]',
+  );
+  expect(row?.textContent).toContain("Sign the sample form");
+  expect(row?.textContent).toContain("Ada (mock)");
+  expect(row?.textContent).toContain("Waiting on you");
+  expect(container.textContent).not.toContain("Nothing needs you right now.");
+  await act(async () => row?.click());
+  expect(onOpen).toHaveBeenCalledWith(item);
+});
+
+it("hides the Waiting on you group when nothing waits", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  api.scratchpad.waitingOnYou.mockResolvedValue([]);
+  api.runs.list.mockResolvedValue({ runs: [run("a", "waiting_input")] });
+  const empty = document.createElement("div");
+  document.body.append(empty);
+  await act(async () => createRoot(empty).render(view()));
+  expect(empty.querySelector("#activity-waiting-heading")).toBeNull();
 });
 
 it("reports only the bots whose runs the filters leave listed", async () => {

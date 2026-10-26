@@ -4865,6 +4865,37 @@ describe("GTM scratchpad RPC", () => {
     return createRouterClient(createRouter(deps), { context: { actor } });
   }
 
+  it("lists waiting-on-you items scoped to the caller's space and user", async () => {
+    const findMany = vi.fn(async () => [
+      {
+        id: "item-1",
+        botId: "bot-1",
+        title: "Sign the sample form",
+        status: "open",
+        waitingOn: "you",
+        dueAt: new Date("2026-01-05T00:00:00.000Z"),
+        bot: { name: "GTM" },
+      },
+    ]);
+    const client = scratchpadClient({ findMany });
+    const items = await client.scratchpad.waitingOnYou({});
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ spaceId: actor.spaceId, userId: actor.userId }),
+      }),
+    );
+    expect(items).toEqual([
+      {
+        id: "item-1",
+        botId: "bot-1",
+        botName: "GTM",
+        title: "Sign the sample form",
+        waitingOn: "you",
+        dueAt: "2026-01-05T00:00:00.000Z",
+      },
+    ]);
+  });
+
   it("creates gated items through the shared store in parked status", async () => {
     const createdAt = new Date("2026-08-25T12:00:00.000Z");
     const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
