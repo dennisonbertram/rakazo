@@ -1298,6 +1298,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           },
         });
         if (updated.count !== 1) return null;
+        // A skipped wake moves the schedule on but did not run, so Last ran stays as it was.
+        const skipped = async <Reason extends "active-run" | "no-work">(reason: Reason) => {
+          await tx.routine.update({
+            where: { id: routine.id },
+            data: { lastRunAt: previousLastRunAt },
+          });
+          return reason;
+        };
         if (gtmAgent) {
           const active = await tx.run.findFirst({
             where: {
@@ -1309,12 +1317,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
             select: { id: true },
           });
-          if (active) return "active-run" as const;
+          if (active) return skipped("active-run");
           const item = await findWorkableOpenItem(
             { prisma: tx as PrismaClient },
             { spaceId: routine.spaceId, userId: routine.userId, botId: bot.id },
           );
-          if (!item) return "no-work" as const;
+          if (!item) return skipped("no-work");
           gtmItemId = item.id;
         }
         // At most one check-in message per bot per day, and one check-in run at a time; the
@@ -1327,8 +1335,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
             select: { id: true },
           });
-          if (active) return "active-run" as const;
-          if (await checkInPostedToday(tx, routine, new Date())) return "no-work" as const;
+          if (active) return skipped("active-run");
+          if (await checkInPostedToday(tx, routine, new Date())) return skipped("no-work");
         }
         if (isLegalAgentSpawnKey(bot.spawnKey)) {
           // Scan now and the daily wakeup share one lock and one rule: a scan already in flight is
@@ -1342,7 +1350,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
             select: { id: true },
           });
-          if (active) return "active-run" as const;
+          if (active) return skipped("active-run");
         }
         // The claim locks the row, so this is the model that was committed when it fired.
         const currentModel = await tx.routine.findUnique({
