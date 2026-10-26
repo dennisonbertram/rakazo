@@ -4,6 +4,7 @@ import type { Contact, ContactKind } from "@rakazo/contracts";
 import { ContactKindSchema } from "@rakazo/contracts";
 import {
   Button,
+  ContactAvatar,
   Table,
   TableBody,
   TableCell,
@@ -223,20 +224,25 @@ export function ContactsPage({
                         }
                       >
                         <TableCell>
-                          <button
-                            type="button"
-                            title={contact.name}
-                            data-row-open
-                            className="block max-w-full truncate rounded-sm text-start font-medium outline-none hover:underline"
-                          >
-                            {contact.name}
-                          </button>
-                          {/* Without room for the Email column, the organization (else the email) shows here. */}
-                          <div
-                            className="truncate text-xs text-muted-foreground @md:hidden"
-                            title={contact.organization ?? contact.email ?? undefined}
-                          >
-                            {contact.organization ?? contact.email}
+                          <div className="flex items-center gap-2">
+                            <ContactAvatar name={contact.name} src={contact.photoUrl} size="sm" />
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                title={contact.name}
+                                data-row-open
+                                className="block max-w-full truncate rounded-sm text-start font-medium outline-none hover:underline"
+                              >
+                                {contact.name}
+                              </button>
+                              {/* Without room for the Email column, the organization (else the email) shows here. */}
+                              <div
+                                className="truncate text-xs text-muted-foreground @md:hidden"
+                                title={contact.organization ?? contact.email ?? undefined}
+                              >
+                                {contact.organization ?? contact.email}
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell
