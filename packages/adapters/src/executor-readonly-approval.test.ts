@@ -163,6 +163,7 @@ function fixture({
   trigger = "user",
   unattended = trigger === "webhook",
   externalTaint = false,
+  routineManagedKind,
   scratchpadItem,
   skillRows = [] as Record<string, unknown>[],
   secrets = [] as string[],
@@ -259,6 +260,8 @@ function fixture({
   /** Stored run mode; defaults to unattended for webhook runs only. */
   unattended?: boolean;
   externalTaint?: boolean;
+  /** Makes the run a routine run; the routine's managedKind. */
+  routineManagedKind?: string | null;
   /** The stored scratchpad item the gate looks up for scratchpad_update/complete. */
   scratchpadItem?: { category: string | null } | null;
   /** Stored skill rows the skill and tool lookups find. */
@@ -316,6 +319,7 @@ function fixture({
     // Webhook runs are created unattended; the other fixtures model an attended run.
     unattended,
     externalTaint,
+    routineId: routineManagedKind === undefined ? null : "routine-1",
     leaseFence: 0,
     ...(peer ? { sourceMessageId: "msg-1" } : {}),
   };
@@ -362,12 +366,14 @@ function fixture({
   };
   const prisma = {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
+    routine: { findUnique: vi.fn(async () => ({ managedKind: routineManagedKind ?? null })) },
     run: {
       findFirst: vi.fn(async () => ({
         bot: { notifyOnFinish: true },
         thread: { groupId: null },
       })),
       findUnique: vi.fn(async () => run),
+      findMany: vi.fn(async () => []),
       findUniqueOrThrow: vi.fn(async () => run),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
@@ -1097,6 +1103,34 @@ describe("connector read-only metadata and approval enforcement", () => {
       expect(f.execute).not.toHaveBeenCalled();
       expect(f.results.at(-1)).toEqual({ error: DENIED_ACTION_MESSAGE });
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("resolves the other parallel calls of a denied tool to the denial, with no new card", async () => {
+      const f = fixture({
+        catalog,
+        rules: [{ effect: "require_approval", matchKind: "tool", matchValue: "demo_get_item" }],
+      });
+      const calls = [
+        { args: { id: "item-1" }, executionId: "call-1" },
+        { args: { id: "item-2" }, executionId: "call-2" },
+        { args: { id: "item-3" }, executionId: "call-3" },
+      ];
+      f.setCalls(calls);
+      await f.run();
+      const cardsBefore = f.pauseRunForInput.mock.calls.length;
+      // The model made all three calls in one turn; each recorded its own pending effect.
+      for (const [index, call] of calls.slice(1).entries()) {
+        f.effects.push({
+          ...f.effects[0]!,
+          id: `effect-${index + 2}`,
+          idempotencyKey: approvalEffectKey("run-1", f.effects[0]!.kind, call.args),
+        });
+      }
+      f.effects[0]!.status = "denied";
+      await f.run();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.pauseRunForInput.mock.calls.length).toBe(cardsBefore);
+      expect(f.results.slice(-3)).toEqual(Array(3).fill({ error: DENIED_ACTION_MESSAGE }));
     });
 
     it("allows a new card when the user asks again in a new run", async () => {
@@ -4223,6 +4257,54 @@ describe("unattended runs and block rules", () => {
       source: "unattended",
       unattended: true,
     });
+  });
+
+  it("a check-in run fails a call that would ask, with no card and a check_in decision", async () => {
+    const f = fixture({
+      name: "write_file",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: "check_in",
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.effects).toEqual([]);
+    expect(f.results[0]).toEqual({
+      error: "Check-ins only read and report. Mention this in your message instead.",
+    });
+    expect(decisions(f)).toEqual([
+      expect.objectContaining({ tool: "write_file", decision: "block", source: "check_in" }),
+    ]);
+  });
+
+  it("a check-in run lists the ticket board without a card", async () => {
+    const f = fixture({
+      name: "board_tickets",
+      builtin: true,
+      ticketBoard: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: "check_in",
+    });
+    f.setCalls([{ args: {}, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(decisions(f)).toEqual([]);
+  });
+
+  it("an ordinary routine run still asks for write_file", async () => {
+    const f = fixture({
+      name: "write_file",
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: null,
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 
   it.each(["write_file", "shell"])(

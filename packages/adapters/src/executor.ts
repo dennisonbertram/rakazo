@@ -621,6 +621,10 @@ const NO_FRAGMENT_TOOLS = new Set([
   "render_plot",
 ]);
 
+/** Returned to a check-in run whose call would need approval. */
+const CHECK_IN_READ_ONLY_MESSAGE =
+  "Check-ins only read and report. Mention this in your message instead.";
+
 /** Final note of an unattended run that stopped because it needs the owner. */
 const UNATTENDED_NEEDS_OWNER_NOTE = "Stopped. I sent you a note about what I need.";
 
@@ -4161,6 +4165,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   checkerConfigured,
                   unattended: run.unattended,
                 });
+          // A check-in only reads and reports: a call that would ask fails at once, with no card and no pause.
+          if (
+            (plan === "ask" || plan === "judge") &&
+            run.routineId &&
+            (
+              await deps.prisma.routine.findUnique({
+                where: { id: run.routineId },
+                select: { managedKind: true },
+              })
+            )?.managedKind === CHECK_IN_MANAGED_KIND
+          ) {
+            await recordDecision("block", "check_in");
+            return { error: CHECK_IN_READ_ONLY_MESSAGE };
+          }
           let reviewReason: string | undefined;
           let gateDecision: "ask" | "allow" = plan === "ask" ? "ask" : "allow";
           const needsApprovalEarly = plan === "ask" || plan === "judge";
@@ -4682,6 +4700,46 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return result;
             }
           }
+          // Every parallel call of a denied tool resolves to the denial, not a new card.
+          const askUnlessDenied = async () => {
+            // A denial ends this request for the run: a reworded retry gets no new card.
+            const denied = await deps.prisma.externalEffect.findMany({
+              where: {
+                spaceId: run.spaceId,
+                runId,
+                kind: replayEffectToolName,
+                status: "denied",
+              },
+              select: { id: true, status: true, request: true, result: true },
+            });
+            // Connector wrappers cover many tools, so they compare arguments; any other tool
+            // is refused outright once the owner has denied it in this run.
+            const wrapperKind =
+              replayEffectToolName === CATALOG_APPROVAL_TOOL ||
+              replayEffectToolName === "connectors_execute_tool";
+            const repeated =
+              denied.find(
+                (prior) =>
+                  prior.id !== applied!.effect.id &&
+                  (!wrapperKind ||
+                    repeatsDeniedRequest(replayEffectToolName, prior.request, effectRequest)),
+              ) ??
+              (await priorDenialAwaitingOwner(
+                deps.prisma,
+                run,
+                replayEffectToolName,
+                effectRequest,
+                applied!.effect.id,
+              ));
+            if (repeated) {
+              const gate = resolveDuplicateEffectGate(repeated, name);
+              const result =
+                gate.action === "return" ? gate.result : { error: DENIED_ACTION_MESSAGE };
+              await completeEffect(deps, applied!.effect.id, "intended", result);
+              return result;
+            }
+            return requestApproval();
+          };
           if (applied?.duplicate) {
             const gate = resolveDuplicateEffectGate(applied.effect, name);
             if (gate.action === "return") {
@@ -4736,7 +4794,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 if (current?.status === "waiting_input") {
                   return pauseForApproval();
                 }
-                return requestApproval();
+                return askUnlessDenied();
               }
             } else if (gate.action === "uncertain") {
               return settleUncertainEffect(deps.prisma, applied.effect.id, gate.toolName);
@@ -4745,43 +4803,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               if (early !== undefined) return early;
             }
           } else if (needsApproval && applied) {
-            // A denial ends this request for the run: a reworded retry gets no new card.
-            const denied = await deps.prisma.externalEffect.findMany({
-              where: {
-                spaceId: run.spaceId,
-                runId,
-                kind: replayEffectToolName,
-                status: "denied",
-              },
-              select: { id: true, status: true, request: true, result: true },
-            });
-            // Connector wrappers cover many tools, so they compare arguments; any other tool
-            // is refused outright once the owner has denied it in this run.
-            const wrapperKind =
-              replayEffectToolName === CATALOG_APPROVAL_TOOL ||
-              replayEffectToolName === "connectors_execute_tool";
-            const repeated =
-              denied.find(
-                (prior) =>
-                  prior.id !== applied.effect.id &&
-                  (!wrapperKind ||
-                    repeatsDeniedRequest(replayEffectToolName, prior.request, effectRequest)),
-              ) ??
-              (await priorDenialAwaitingOwner(
-                deps.prisma,
-                run,
-                replayEffectToolName,
-                effectRequest,
-                applied.effect.id,
-              ));
-            if (repeated) {
-              const gate = resolveDuplicateEffectGate(repeated, name);
-              const result =
-                gate.action === "return" ? gate.result : { error: DENIED_ACTION_MESSAGE };
-              await completeEffect(deps, applied.effect.id, "intended", result);
-              return result;
-            }
-            return requestApproval();
+            return askUnlessDenied();
           } else if (bypassApproval && applied) {
             const early = await claimOrReturn("intended");
             if (early !== undefined) return early;
