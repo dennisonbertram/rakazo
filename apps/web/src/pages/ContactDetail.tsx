@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { ContactDetail } from "@rakazo/contracts";
+import type { Contact, ContactDetail } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import { Pencil } from "lucide-react";
 import type { ReactNode } from "react";
@@ -14,7 +14,7 @@ import { RowsSkeleton } from "../components/RowsSkeleton";
 import { usdFigure } from "../lib/finance-format";
 import { formatMailTime } from "../lib/mail-time";
 import { rpc } from "../lib/rpc";
-import { useContactNotices } from "../lib/use-contact-notices";
+import { CONTACT_RESTORED_EVENT, useContactNotices } from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
 
 const date = (iso: string) =>
@@ -69,8 +69,19 @@ export function ContactDetailPage({ id, spaceName }: { id: string; spaceName?: s
     setDetail(null);
     load();
   }, [load]);
-  // The list reloads when it opens, so the notices have nothing to refresh.
-  const { deleted } = useContactNotices(() => {}, container, null);
+  // The list reloads when it opens; an Undo clicked after returning to it tells it to reload.
+  const { deleted } = useContactNotices(
+    (restoredId) =>
+      restoredId &&
+      window.dispatchEvent(new CustomEvent(CONTACT_RESTORED_EVENT, { detail: restoredId })),
+    container,
+    null,
+  );
+  // The user's other contacts, so the dialog can offer the one that already has an email.
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  useEffect(() => {
+    rpc.contacts.list({}).then(setContacts, () => {});
+  }, []);
 
   const kinds = contactKindNames();
   const contact = detail?.contact;
@@ -204,6 +215,11 @@ export function ContactDetailPage({ id, spaceName }: { id: string; spaceName?: s
         {editing && contact ? (
           <ContactDialog
             contact={contact}
+            contacts={contacts}
+            onOpenContact={(other) => {
+              setEditing(false);
+              navigate(`/app/contacts/${other.id}${search}`);
+            }}
             onClose={() => setEditing(false)}
             onSaved={load}
             onDeleted={(gone, undoable) => {

@@ -549,7 +549,7 @@ function findContacts(query: string): Promise<SearchLink[]> {
         )
         .slice(0, 5)
         .map((c) => ({
-          id: c.name,
+          id: c.id,
           label: c.name,
           // The field that matched, so a hit on "halcyon" shows why; else the usual second line.
           detail:
@@ -2384,7 +2384,7 @@ export function ShellPage() {
           heading: t`Contacts`,
           icon: <BookUser size={16} strokeWidth={1.75} />,
           entries: contacts.map((c) => ({
-            id: `/app/contacts?q=${encodeURIComponent(c.id)}`,
+            id: `/app/contacts/${encodeURIComponent(c.id)}`,
             label: c.label,
             detail: c.detail,
           })),

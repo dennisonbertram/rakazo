@@ -23,7 +23,11 @@ import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
 import { rpc } from "../lib/rpc";
-import { SAVED_ROW_CLASS, useContactNotices } from "../lib/use-contact-notices";
+import {
+  CONTACT_RESTORED_EVENT,
+  SAVED_ROW_CLASS,
+  useContactNotices,
+} from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
 
 const matches = (contact: Contact, needle: string, kindName: string) =>
@@ -75,7 +79,20 @@ export function ContactsPage({
   }, []);
   useEffect(load, [load]);
   const container = useRef<HTMLDivElement>(null);
-  const { savedId, setSavedId, deleted } = useContactNotices(load, container, contacts);
+  const { savedId, setSavedId, setFocusId, deleted } = useContactNotices(load, container, contacts);
+  // An Undo clicked here for a contact deleted on its page restores it from that page's hook.
+  useEffect(() => {
+    const onRestored = (event: Event) => {
+      load();
+      const id = (event as CustomEvent<string | undefined>).detail;
+      if (id) {
+        setSavedId(id);
+        setFocusId(id);
+      }
+    };
+    window.addEventListener(CONTACT_RESTORED_EVENT, onRestored);
+    return () => window.removeEventListener(CONTACT_RESTORED_EVENT, onRestored);
+  }, [load, setSavedId, setFocusId]);
 
   const needle = query.trim().toLowerCase();
   const shown = (contacts ?? []).filter(
