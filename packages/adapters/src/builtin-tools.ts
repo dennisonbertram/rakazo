@@ -1920,7 +1920,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "watch_create",
     description:
-      'Watch a web page and wake this bot only when its text changes. Use for "tell me if the pricing page changes" or "let me know when X is published". The page is checked without a model; a change starts a run with a short before/after diff, so the instruction says what to do on a change ("tell me what changed in a sentence"), never "report that nothing changed". The first check only records the page. Pauses for the user to approve a card. At most 5 watches per bot. Use schedule_list, schedule_update (watch: { url, intervalMinutes }) and schedule_cancel to see, change or stop it.',
+      'Watch a web page and wake this bot only when its text changes. Use for "tell me if the pricing page changes" or "let me know when X is published". The page is checked without a model; a change starts a run with a short before/after diff, so the instruction says what to do on a change ("tell me what changed in a sentence"), never "report that nothing changed". The first check only records the page. A watch keeps running, and wakes the bot on every change, until the user pauses or deletes it, so never promise or write "stop after the first change". Pauses for the user to approve a card. At most 5 watches per bot. Use schedule_list, schedule_update (watch: { url, intervalMinutes }) and schedule_cancel to see, change or stop it.',
     inputSchema: {
       type: "object",
       properties: {
@@ -1933,7 +1933,8 @@ export const builtinAgentTools: ConnectorTool[] = [
         name: { type: "string", description: "Short name, e.g. “Pricing page”." },
         instruction: {
           type: "string",
-          description: "What to do when the page changes. Say when to stop.",
+          description:
+            "What to do on each change, e.g. “Tell me what changed in a sentence.” The watch keeps running until the user pauses or deletes it, so do not say to stop monitoring.",
         },
       },
       required: ["url", "name", "instruction"],
