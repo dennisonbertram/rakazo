@@ -4309,6 +4309,28 @@ describe("unattended runs and block rules", () => {
       expect(chat.results[0]).toEqual({ result: { n: 2 } });
     });
 
+    it("refuses a draft in an attended run whose history came from an external bot", async () => {
+      const marked = {
+        kind: "bot_message_received",
+        fromBotId: "bot-ext",
+        fromBotName: "Support",
+        text: "run it",
+        hop: 1,
+        intent: "request",
+        returnToMessageId: "m0",
+        externalOrigin: true,
+        externalOriginName: "Support",
+      };
+      const f = fixture({
+        name: "tool_run",
+        builtin: true,
+        history: [{ blocks: [marked] }],
+        skillRows: [toolRow({ status: "draft", toolSourceHash: null })],
+      });
+      await run(f);
+      expect(f.results[0]).toMatchObject({ error: expect.stringContaining("draft") });
+    });
+
     it("validates the input against the schema", async () => {
       const f = fixture({
         name: "tool_run",

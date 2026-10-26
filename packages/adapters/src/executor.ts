@@ -6057,7 +6057,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               deps.prisma,
               { spaceId: run.spaceId, userId: run.userId, botId: run.botId },
               { name: args.name ? String(args.name) : undefined, input: args.input },
-              { allowDraft: run.unattended === false && !run.externalTaint },
+              { allowDraft: run.unattended === false && !run.externalTaint && !externalTaint() },
             );
           }
           if (name === "skill_delete") {
