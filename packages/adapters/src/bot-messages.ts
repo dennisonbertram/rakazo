@@ -199,7 +199,7 @@ export async function messageBot(
         createdAt: { gte: new Date(Date.now() - PENDING_REQUEST_WINDOW_MS) },
       },
       orderBy: { seq: "desc" },
-      select: { blocks: true },
+      select: { role: true, blocks: true },
     });
     for (const message of recent) {
       const blocks = Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : [];
@@ -223,6 +223,8 @@ export async function messageBot(
           error: `${target.name} is still working on your earlier request; its answer will wake you. Do not send it again or post a waiting message.`,
         };
       }
+      // The owner wrote something after the pending request: a new question may need the delegate.
+      if (message.role === "user" && !blocks.some((b) => b.kind === "bot_message_received")) break;
     }
   }
   if (target.id === sender.id) return { ok: false as const, error: "a bot cannot message itself" };

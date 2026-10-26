@@ -1289,6 +1289,19 @@ describe("a delegate that has not answered yet", () => {
     expect(harness.enqueue).not.toHaveBeenCalled();
   });
 
+  it("can be asked a new question after the owner wrote again", async () => {
+    const harness = deps();
+    (harness.deps.prisma.message.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { role: "user", blocks: [{ kind: "text", text: "Do they have receipts?" }] },
+      pendingRequest,
+    ]);
+    const sent = await messageBot(harness.deps, run, sender, {
+      bot_id: "bot-target",
+      message: "do the drafts have receipts?",
+    });
+    expect(sent).toMatchObject({ ok: true });
+  });
+
   it("can be asked again once it has answered", async () => {
     const harness = deps();
     const result = {
