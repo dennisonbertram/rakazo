@@ -263,6 +263,12 @@ describe("password fields without Protected input", () => {
       "Sign in - [redacted] - Chrome",
     );
   });
+
+  it("redacts the whole text when a one or two character value appears in it", () => {
+    expect(scrubValues("Report 7 - Calc", ["7"])).toBe("[redacted]");
+    expect(scrubValues("Inbox ab", ["ab"])).toBe("[redacted]");
+    expect(scrubValues("Inbox", ["ab", ""])).toBe("Inbox");
+  });
 });
 
 describe("whole desktop events", () => {

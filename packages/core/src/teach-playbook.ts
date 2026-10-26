@@ -72,7 +72,12 @@ export function redactSecretText(text: string): string {
 export function scrubValues(text: string, values: readonly string[]): string {
   let out = text;
   for (const value of values) {
-    if (value.length < 3) continue;
+    if (!value) continue;
+    // Replacing a one or two character value inside text would mangle it, so drop the text.
+    if (value.length < 3) {
+      if (out.includes(value)) return "[redacted]";
+      continue;
+    }
     for (const form of new Set([value, encodeURIComponent(value)])) {
       out = out.split(form).join("[redacted]");
     }
