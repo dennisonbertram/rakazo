@@ -12,7 +12,7 @@ type ScratchpadStatus = (typeof SCRATCHPAD_STATUSES)[number];
 type Scope = { spaceId: string; userId: string; botId: string };
 type ScratchpadClient = PrismaClient | Prisma.TransactionClient;
 
-const OPEN_SCRATCHPAD_STATUSES: ScratchpadStatus[] = ["open", "parked"];
+export const OPEN_SCRATCHPAD_STATUSES: ScratchpadStatus[] = ["open", "parked"];
 export const APPROVALS_BEFORE_AUTO = 3;
 export const AUTO_DAILY_CAP = 5;
 const GATED_CATEGORIES = new Set<ScratchpadCategory>([

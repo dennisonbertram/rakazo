@@ -20,6 +20,7 @@ const PAGE_SEGMENTS = new Set([
   "fundraising",
   "cap-table",
   "contacts",
+  "calendar",
   "company",
 ]);
 

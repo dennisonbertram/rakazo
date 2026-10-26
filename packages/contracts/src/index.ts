@@ -7,6 +7,7 @@ export * from "./bot-avatar.js";
 export * from "./bot-secrets.js";
 export * from "./box.js";
 export * from "./builtin-tools.js";
+export * from "./calendar.js";
 export * from "./carta.js";
 export * from "./cloudflare-ai-gateway.js";
 export * from "./company.js";

@@ -25,6 +25,7 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   "run_subagent",
   "spawn_bot",
   "schedule_list",
+  "calendar_agenda",
   "schedule_cancel",
   "schedule_runs",
   // A pure function in a sandbox with no I/O, and only the source the owner approved (hash-checked).
@@ -116,6 +117,7 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "inbox_overview",
   "drive_search",
   "drive_read",
+  "calendar_agenda",
   "calendar_list_events",
   "calendar_get_event",
   "contacts_list",

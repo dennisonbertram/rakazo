@@ -1199,6 +1199,7 @@ msgstr "Advanced..."
 msgid "Advisor"
 msgstr "Advisor"
 
+#: src/pages/Calendar.tsx
 #: src/pages/CompanyCalendar.tsx
 msgid "Agenda"
 msgstr "Agenda"
@@ -1221,6 +1222,7 @@ msgid "AI data sharing off"
 msgstr "AI data sharing off"
 
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/Inbox.tsx
 msgid "All"
@@ -1250,6 +1252,10 @@ msgstr "All crypto counts as cash in this runway."
 #: src/components/FinanceCards.tsx
 msgid "all dates"
 msgstr "all dates"
+
+#: src/pages/Calendar.tsx
+msgid "All day"
+msgstr "All day"
 
 #: src/components/data-room/ProcessingStrip.tsx
 msgid "All files processed"
@@ -2059,6 +2065,7 @@ msgstr "bot"
 
 #: src/pages/ActivityList.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
 #: src/pages/shell/transcript.tsx
@@ -2197,9 +2204,12 @@ msgid "Cadence"
 msgstr "Cadence"
 
 #: src/components/gtm/GtmCalendar.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/Gtm.tsx
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
 msgid "Calendar"
 msgstr "Calendar"
 
@@ -2552,6 +2562,10 @@ msgstr "Check the server URL and network, then test again."
 msgid "Check your email"
 msgstr "Check your email"
 
+#: src/pages/Calendar.tsx
+msgid "Check-backs"
+msgstr "Check-backs"
+
 #: src/pages/RoutineEditor.tsx
 msgid "Check-in every 4 hours"
 msgstr "Check-in every 4 hours"
@@ -2701,6 +2715,7 @@ msgstr "Clear filter"
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/finance/ui.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/DataRoom.tsx
@@ -3199,6 +3214,10 @@ msgstr "Connect Gmail to send"
 #: src/pages/DataRoom.tsx
 msgid "Connect Gmail to send files"
 msgstr "Connect Gmail to send files"
+
+#: src/pages/Calendar.tsx
+msgid "Connect Google Calendar"
+msgstr "Connect Google Calendar"
 
 #: src/pages/Investors.tsx
 msgid "Connect Google Drive"
@@ -3778,6 +3797,10 @@ msgstr "Could not load skill"
 msgid "Could not load the app list. Reload to try again."
 msgstr "Could not load the app list. Reload to try again."
 
+#: src/pages/Calendar.tsx
+msgid "Could not load the calendar"
+msgstr "Could not load the calendar"
+
 #: src/pages/Investors.tsx
 msgid "Could not load the cap table, so holdings are missing."
 msgstr "Could not load the cap table, so holdings are missing."
@@ -4200,6 +4223,10 @@ msgstr "Couldn't classify"
 #: src/components/inbox/MailAttachments.tsx
 msgid "Couldn't download {0}"
 msgstr "Couldn't download {0}"
+
+#: src/pages/Calendar.tsx
+msgid "Couldn't load {account}"
+msgstr "Couldn't load {account}"
 
 #: src/components/data-room/ImportFromEmail.tsx
 msgid "Couldn't load mail"
@@ -5336,6 +5363,10 @@ msgstr "Erase company map?"
 #: src/pages/shell/space-sidebar.tsx
 msgid "Error"
 msgstr "Error"
+
+#: src/pages/Calendar.tsx
+msgid "Events"
+msgstr "Events"
 
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Every"
@@ -6532,6 +6563,7 @@ msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
@@ -7357,6 +7389,7 @@ msgid "month"
 msgstr "month"
 
 #: src/components/finance/ui.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/CompanyHistory.tsx
 #: src/pages/finance/FinanceAccounts.tsx
@@ -7823,6 +7856,10 @@ msgstr "No bot activity yet."
 msgid "No bot uses {0} yet. Choose bots on its page."
 msgstr "No bot uses {0} yet. Choose bots on its page."
 
+#: src/pages/Calendar.tsx
+msgid "No bots"
+msgstr "No bots"
+
 #: src/pages/Shell.tsx
 msgid "No bots yet"
 msgstr "No bots yet"
@@ -7947,6 +7984,7 @@ msgstr "No mail matches this filter"
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/components/finance/ui.tsx
 #: src/pages/AccountSettingsOverlay.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/devin/DevinSessions.tsx
@@ -8303,6 +8341,10 @@ msgstr "Nothing needs you right now."
 #: src/pages/KnowledgeSection.tsx
 msgid "Nothing remembered yet"
 msgstr "Nothing remembered yet"
+
+#: src/pages/Calendar.tsx
+msgid "Nothing scheduled"
+msgstr "Nothing scheduled"
 
 #: src/pages/portal/PortalHome.tsx
 msgid "Nothing shared yet."
@@ -10195,6 +10237,7 @@ msgstr "Routine"
 
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/BotContextMenu.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
 msgid "Routines"
@@ -10524,6 +10567,7 @@ msgstr "Scroll sideways to see the whole graph."
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
@@ -12276,10 +12320,15 @@ msgstr "To do"
 msgid "To pick up, press space. Use the arrow keys to move, space to drop, escape to cancel."
 msgstr "To pick up, press space. Use the arrow keys to move, space to drop, escape to cancel."
 
+#: src/pages/Calendar.tsx
+msgid "To-dos"
+msgstr "To-dos"
+
 #: src/components/EmailCards.tsx
 #: src/components/gtm/GtmCalendar.tsx
 #: src/components/inbox/TodoCard.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/shell/chat-context.tsx
 msgid "Today"
@@ -12450,6 +12499,7 @@ msgstr "Try {name} again"
 #: src/components/ShellSkeleton.tsx
 #: src/lib/use-contact-notices.ts
 #: src/pages/ActivityList.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Fundraising.tsx
