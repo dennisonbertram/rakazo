@@ -22,12 +22,14 @@ export {
 } from "./components/pixel/pixel-icon.js";
 export { PIXEL_ICONS, type PixelSprite } from "./components/pixel/sprites.js";
 export * from "./components/ui/alert-dialog.js";
+export * from "./components/ui/avatar.js";
 export * from "./components/ui/badge.js";
 export * from "./components/ui/breadcrumb.js";
 export * from "./components/ui/button.js";
 export * from "./components/ui/card.js";
 export * from "./components/ui/checkbox.js";
 export * from "./components/ui/command.js";
+export * from "./components/ui/contact-avatar.js";
 export * from "./components/ui/context-menu.js";
 export * from "./components/ui/dialog.js";
 export * from "./components/ui/dropdown-menu.js";

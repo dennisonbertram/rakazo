@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const text = vi.hoisted(
   () =>
@@ -1271,4 +1271,42 @@ it("labels the amount on a narrow contract card", async () => {
   expect(container.querySelector('ul[aria-label="Contracts"]')?.textContent).toContain(
     "Value$50,000",
   );
+});
+
+describe("grouped contracts", () => {
+  const warrants = Array.from({ length: 4 }, (_, n) => ({
+    ...contracts[0]!,
+    id: `w${n}`,
+    title: `Seed Warrant (Holder ${n})`,
+    contractType: "Warrant",
+    counterparties: ["Example Corp", `Holder ${n}`],
+  }));
+  const rows = () => container.querySelectorAll("tbody tr").length;
+
+  it("collapses similar contracts to one row, opens them, and restores the flat list when off", async () => {
+    await render(<LegalContracts contracts={warrants} grouped />);
+    expect(rows()).toBe(1);
+    expect(container.querySelector("tbody")?.textContent).toContain("Seed Warrant");
+    const more = container.querySelector<HTMLButtonElement>("tbody button[aria-expanded]");
+    expect(more?.textContent).toContain("+4 more");
+    await act(async () => more?.click());
+    expect(rows()).toBe(5);
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await render(<LegalContracts contracts={warrants} />);
+    expect(rows()).toBe(4);
+  });
+
+  it("keeps the toggle in the URL and off by default only when asked", async () => {
+    rpcMock.overview.mockResolvedValue({ ...overview, contracts: warrants });
+    await render(<LegalPage />);
+    const toggle = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("Group similar"),
+    );
+    expect(toggle?.getAttribute("aria-pressed")).toBe("true");
+    expect(rows()).toBe(1);
+    await act(async () => toggle?.click());
+    expect(toggle?.getAttribute("aria-pressed")).toBe("false");
+    expect(rows()).toBe(4);
+  });
 });
