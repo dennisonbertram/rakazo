@@ -36,6 +36,8 @@ Create more bots for jobs of your own, give each instructions, and choose which 
 
 A skill is a set of instructions a bot loads when a task calls for it. Praci ships built-in skills, for example for cost cutting, runway scenarios, monthly money reviews, drafting investor updates and answering auditor requests. You can add your own on a bot's **Skills** section: write one, upload a `SKILL.md` file, or add one from a URL. When a bot proposes a skill itself, it appears under **Drafts** and does nothing until you **Approve** or discard it.
 
+A bot can also learn a skill from you. Do the job once on its computer and Praci records it as steps. See [Teach a task](/docs/teach-a-task).
+
 ## Tools
 
 A tool is a small program a bot wrote to do the same calculation the same way every time, such as weekly burn from a list of transactions. The bot reads the data with its normal tools, then passes it to the tool and gets a result back.

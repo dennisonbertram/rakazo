@@ -94,6 +94,8 @@ When a routine posts a message in the bot's chat, a small line above it says **F
 
 ## Routines only read
 
-A routine runs in the background, so it is read-only. It can read and search, save notes inside Praci and run [tools](/docs/bots-and-agents#tools) you approved. Sending mail, editing files, running commands and other changes show an approval card that waits for you. The card says **Asked because this ran in the background.** Details are in [Privacy and safety](/docs/privacy-and-safety).
+A routine runs in the background, so it is read-only. It can read and search, save notes inside Praci and run [tools](/docs/bots-and-agents#tools) you approved. Sending mail, editing files, running commands and other changes show an approval card that waits for you. The card says **Asked because this ran in the background.** A run that a watch or a webhook starts is stricter: it also asks before it reads the web or your documents, because the page or message that started it came from outside. Details are in [Privacy and safety](/docs/privacy-and-safety#bots-ask-before-they-send-change-or-run-anything). A routine can also run a skill you [taught by demonstration](/docs/teach-a-task#run-it-on-a-schedule).
+
+On a phone, a routine shows the same status line and the **Active** switch. Watches are set up in the web or desktop app, or by asking a bot in chat.
 
 For a bot that checks in on its own every day, see [Check-ins and open work](/docs/check-ins).

@@ -22,6 +22,8 @@ Open a bot's settings and find **Credentials**. Choose **Add credential**, then 
 
 *Demo data.*
 
+You can also save a login while you [teach a task](/docs/teach-a-task#save-as-login). The password you typed is not kept, and the steps use the saved login instead.
+
 ## How a bot uses it
 
 For a key or token, the bot asks Praci to make the request. Praci adds the value to the request and returns only the response. For a website login, the bot fills the sign-in form in its browser, and Praci types the username and password only while the page is still on the saved site.
