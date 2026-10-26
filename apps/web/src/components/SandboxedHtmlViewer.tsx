@@ -145,8 +145,9 @@ function maskAmounts(doc: Document): void {
 
 // Email is designed for white paper, so it is shown on white in both themes and never recoloured. The base style
 // only sets defaults the message can override; media and tables are capped at the frame width, long words wrap,
+// the inner padding sits on <html> with !important so a message's own `body{padding:0}` cannot remove it,
 // and a fixed-width table scrolls sideways (never clips). The frame is as tall as its content, so the page scrolls.
-const EMAIL_FIT = `<meta name="viewport" content="width=device-width,initial-scale=1"><style>html{overflow-x:auto}html,body{margin:0;background:#fff;color:#1f1f1f}body{padding:20px 24px;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-wrap:anywhere}@media(max-width:480px){body{padding:12px}}img,video,table{max-width:100%!important;height:auto}img{color:#777;font-size:13px}details>summary{cursor:pointer;display:inline-block;padding:0 6px;border-radius:4px;background:#eee;color:#555;line-height:1.2}</style>`;
+const EMAIL_FIT = `<meta name="viewport" content="width=device-width,initial-scale=1"><style>html{overflow-x:auto;padding:24px 32px!important}html,body{margin:0;background:#fff;color:#1f1f1f}body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-wrap:anywhere}@media(max-width:480px){html{padding:12px!important}}img,video,table{max-width:100%!important;height:auto}img{color:#777;font-size:13px}details>summary{cursor:pointer;display:inline-block;padding:0 6px;border-radius:4px;background:#eee;color:#555;line-height:1.2}</style>`;
 
 function withPreviewDocument(html: string, scripts: boolean, email: boolean): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${previewCsp(scripts, email)}">`;

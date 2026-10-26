@@ -312,7 +312,7 @@ it("email mode shows white paper with base styles, not dimmed in dark mode", asy
   const email = await render("<p>hi</p>", false, true);
   const css = embeddedMessage(email.srcDoc).head.innerHTML;
   expect(css).toContain("html,body{margin:0;background:#fff;color:#1f1f1f}");
-  expect(css).toContain("padding:20px 24px");
+  expect(css).toContain("html{overflow-x:auto;padding:24px 32px!important}");
   expect(css).toContain("system-ui");
   expect(css).toContain("max-width:100%!important;height:auto");
   expect(css).toContain("overflow-wrap:anywhere");

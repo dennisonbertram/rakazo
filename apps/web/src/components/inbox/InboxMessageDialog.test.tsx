@@ -195,6 +195,12 @@ it("ignores keys typed in inputs", async () => {
   expect(onNavigate).not.toHaveBeenCalled();
 });
 
+it("is wide on large screens", async () => {
+  await open();
+  const popup = document.querySelector('[data-slot="dialog-content"]')?.className ?? "";
+  expect(popup).toContain("md:w-[min(1200px,94vw)]");
+});
+
 it("r opens a reply", async () => {
   await open();
   await press("r");
@@ -366,7 +372,7 @@ it("Ask agent opens the email's agent in a panel, which closes again and can sta
   // From 1280px the dialog grows right (left edge fixed) and the panel sits beside the email; below
   // that the panel overlays and the email column reserves its width.
   const popup = document.querySelector('[data-slot="dialog-content"]')?.className ?? "";
-  expect(popup).toContain("min-[1280px]:w-[min(1152px,calc(50vw+376px))]!");
+  expect(popup).toContain("min-[1280px]:w-[min(1440px,calc(50vw+376px))]!");
   // Stays centred (equal side gutters): no left override.
   expect(popup).not.toContain("min-[1280px]:left-");
   expect(document.querySelector("[data-slot=dialog-content] > div")?.className).toContain(
