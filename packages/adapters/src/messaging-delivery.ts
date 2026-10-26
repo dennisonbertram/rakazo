@@ -405,6 +405,7 @@ async function drain(deps: MessagingDeliveryDeps, context: AdapterContext): Prom
       data: { status: "sent", nextAttemptAt: null },
     });
     if (claim.count === 0) continue;
+    let accepted = false;
     try {
       if (row.kind === "group" || row.kind === "intro") {
         if (!row.threadId) {
@@ -418,6 +419,7 @@ async function drain(deps: MessagingDeliveryDeps, context: AdapterContext): Prom
           { threadId: row.threadId, body: row.body },
           context,
         );
+        accepted = true;
         await deps.prisma.messagingOutbound.update({
           where: { id: row.id },
           data: { providerHandle: sent.handle },
@@ -460,6 +462,7 @@ async function drain(deps: MessagingDeliveryDeps, context: AdapterContext): Prom
           context,
         );
         if (result === "delivered") {
+          accepted = true;
           await blankSentBody(deps.prisma, row.id, identity.provider);
           await deps.prisma.messagingIdentity.update({
             where: { id: identity.id },
@@ -472,6 +475,7 @@ async function drain(deps: MessagingDeliveryDeps, context: AdapterContext): Prom
         { threadId, body: row.body, idempotencyKey: row.id },
         context,
       );
+      accepted = true;
       await deps.prisma.messagingOutbound.updateMany({
         where: { id: row.id },
         data: { providerHandle: sent.handle, ...blankedBody(identity.provider) },
@@ -480,7 +484,12 @@ async function drain(deps: MessagingDeliveryDeps, context: AdapterContext): Prom
         where: { id: identity.id },
         data: { outboundSinceInbound: { increment: 1 } },
       });
-    } catch {
+    } catch (error) {
+      if (accepted) {
+        // Keep the sent claim even if saving the handle or counter fails.
+        getLogger().error("messaging outbound bookkeeping error", error);
+        continue;
+      }
       // Transient provider errors go back to pending with a backed-off
       // retry; only an exhausted budget is terminal.
       const attempts = (row.attempts ?? 0) + 1;
