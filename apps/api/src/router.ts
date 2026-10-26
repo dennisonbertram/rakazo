@@ -231,6 +231,7 @@ import {
   closeRound,
   companyForActor,
   companyWriter,
+  contactDetail,
   createArtifactShare,
   createExternalConversationRepos,
   createGroupRepos,
@@ -8225,6 +8226,9 @@ export function createRouter(deps: RouterDeps) {
     contacts: {
       list: authed.contacts.list.handler(({ context, input }) =>
         listContacts(deps.prisma, actorScope(context.actor), input),
+      ),
+      detail: authed.contacts.detail.handler(({ context, input }) =>
+        contactDetail(deps.prisma, actorScope(context.actor), input.id).catch(contactNotFound),
       ),
       save: authed.contacts.save.handler(({ context, input }) =>
         saveContact(deps.prisma, actorScope(context.actor), input).catch(contactNotFound),

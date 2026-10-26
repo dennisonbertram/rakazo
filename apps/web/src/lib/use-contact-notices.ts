@@ -5,6 +5,9 @@ import type { RefObject } from "react";
 import { useEffect, useState } from "react";
 import { rpc } from "./rpc";
 
+/** Fired on window when an Undo restores a contact; the list page, if open, reloads and focuses it. */
+export const CONTACT_RESTORED_EVENT = "contact-restored";
+
 /** How long the just-saved row stands out. */
 export const HIGHLIGHT_MS = 2000;
 
@@ -26,7 +29,8 @@ const toast = (title: string, action?: { label: string; onClick: () => void }) =
  * share. `container` holds the rows (each with `data-contact-id`); `contacts` is the loaded list.
  */
 export function useContactNotices(
-  reload: () => void,
+  /** `restoredId` is set when an Undo brought a contact back. */
+  reload: (restoredId?: string) => void,
   container: RefObject<HTMLElement | null>,
   contacts: Contact[] | null,
 ) {
@@ -83,7 +87,7 @@ export function useContactNotices(
         })
         .then((saved) => {
           toast(t`Restored ${name}`);
-          reload();
+          reload(saved.id);
           setSavedId(saved.id);
           setFocusId(saved.id);
         })
@@ -97,5 +101,5 @@ export function useContactNotices(
     toast(t`Deleted ${name}`, { label: t`Undo`, onClick: restore });
   };
 
-  return { notify: toast, savedId, setSavedId, deleted };
+  return { notify: toast, savedId, setSavedId, setFocusId, deleted };
 }

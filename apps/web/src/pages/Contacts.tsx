@@ -15,7 +15,7 @@ import {
 } from "@rakazo/ui-web";
 import { Plus, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { ContactDialog, contactKindNames } from "../components/ContactDialog";
 import { PickFilter, SearchField } from "../components/ListControls";
@@ -23,7 +23,11 @@ import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
 import { rpc } from "../lib/rpc";
-import { SAVED_ROW_CLASS, useContactNotices } from "../lib/use-contact-notices";
+import {
+  CONTACT_RESTORED_EVENT,
+  SAVED_ROW_CLASS,
+  useContactNotices,
+} from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
 
 const matches = (contact: Contact, needle: string, kindName: string) =>
@@ -42,6 +46,7 @@ export function ContactsPage({
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [error, setError] = useState("");
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const setParam = (key: string, value: string | undefined) =>
     setParams(
       (current) => {
@@ -74,7 +79,20 @@ export function ContactsPage({
   }, []);
   useEffect(load, [load]);
   const container = useRef<HTMLDivElement>(null);
-  const { savedId, setSavedId, deleted } = useContactNotices(load, container, contacts);
+  const { savedId, setSavedId, setFocusId, deleted } = useContactNotices(load, container, contacts);
+  // An Undo clicked here for a contact deleted on its page restores it from that page's hook.
+  useEffect(() => {
+    const onRestored = (event: Event) => {
+      load();
+      const id = (event as CustomEvent<string | undefined>).detail;
+      if (id) {
+        setSavedId(id);
+        setFocusId(id);
+      }
+    };
+    window.addEventListener(CONTACT_RESTORED_EVENT, onRestored);
+    return () => window.removeEventListener(CONTACT_RESTORED_EVENT, onRestored);
+  }, [load, setSavedId, setFocusId]);
 
   const needle = query.trim().toLowerCase();
   const shown = (contacts ?? []).filter(
@@ -201,7 +219,10 @@ export function ContactsPage({
                         key={contact.id}
                         data-contact-id={contact.id}
                         className={contact.id === savedId ? SAVED_ROW_CLASS : ""}
-                        onOpen={() => setEditing(contact)}
+                        onOpen={() =>
+                          // The search and filter ride along, so Back restores them.
+                          navigate(`/app/contacts/${contact.id}${params.size ? `?${params}` : ""}`)
+                        }
                       >
                         <TableCell>
                           <button

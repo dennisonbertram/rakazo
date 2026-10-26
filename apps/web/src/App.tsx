@@ -257,6 +257,7 @@ function SessionApp() {
             {/* Settings is a dialog over the shell; the shell opens it from this query. */}
             <Route path="/app/settings" element={<Navigate to="/app?settings=general" replace />} />
             <Route path="/app/contacts" element={<ShellPage />} />
+            <Route path="/app/contacts/:contactId" element={<ShellPage />} />
             <Route path="/app/:botId" element={<ShellPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
