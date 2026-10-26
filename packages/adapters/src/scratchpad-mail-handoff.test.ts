@@ -69,6 +69,19 @@ describe("scratchpad_add from an email chat", () => {
     expect(result).toMatchObject({ addedTo: "Carta agent" });
   });
 
+  it("marks a handed-off item as waiting on the person unless the model named someone", async () => {
+    const handed = fake();
+    await add(handed, { callerSpawnKey: mailKey, forAgent: "carta" });
+    expect(handed.scratchpadItem.create.mock.calls[0]?.[0].data).toMatchObject({
+      waitingOn: "you",
+    });
+    const named = fake();
+    await add(named, { callerSpawnKey: mailKey, forAgent: "carta", waitingOn: "Acme legal" });
+    expect(named.scratchpadItem.create.mock.calls[0]?.[0].data).toMatchObject({
+      waitingOn: "Acme legal",
+    });
+  });
+
   it("keeps the item on the email chat bot when no owning agent exists", async () => {
     const prisma = fake({ owner: false });
     const result = await add(prisma, { callerSpawnKey: mailKey, forAgent: "carta" });

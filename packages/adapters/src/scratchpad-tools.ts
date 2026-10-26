@@ -406,6 +406,8 @@ export async function addScratchpadItemFromTool(
     ...(target !== undefined ? { target } : {}),
     ...(scheduledFor ? { scheduledFor } : {}),
     ...open.data,
+    // A to-do handed to another agent is for the person to act on, so it shows in "Waiting on you".
+    ...(addedTo && !open.data.waitingOn ? { waitingOn: "you" } : {}),
     ...(mail && message
       ? {
           mailConnectionId: mail.connectionId,
