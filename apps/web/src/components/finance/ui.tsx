@@ -41,14 +41,25 @@ import { listAmount, money, shortDay, txnDay } from "../../lib/finance-format";
 import type { VendorGroup } from "../../lib/finance-group";
 import { groupByVendor, readGroupedPref, writeGroupedPref } from "../../lib/finance-group";
 import { financePath } from "../../lib/finance-route";
+import type { TransactionSort } from "../../lib/finance-transaction-list";
+import {
+  DEFAULT_TRANSACTION_SORT,
+  filterTransactions,
+  sortTransactionGroups,
+  sortTransactions,
+  TRANSACTION_SORTS,
+} from "../../lib/finance-transaction-list";
 import {
   getHideAmounts,
   maskCurrencyWhenHidden,
   useHideAmounts,
 } from "../../lib/hide-amounts-preference";
+import type { Sort } from "../../lib/list-params";
+import { useListParams } from "../../lib/list-params";
 import { errorText } from "../../lib/user-error";
 import { AskBotButton } from "../AskBotButton";
 import { ShowAmountsButton } from "../HideAmountsToggle";
+import { PickFilter, SearchField, SortControl } from "../ListControls";
 import { PageNavButton } from "../PageHeader";
 import { StillLoading } from "../ShellSkeleton";
 
@@ -806,12 +817,22 @@ export function TransactionTable({
   rows,
   grouped = false,
   empty,
+  sort,
 }: {
   rows: FinanceTransaction[];
   grouped?: boolean;
+  /** The current sort and the header click handler; without it the headers do not sort and the rows keep their order. */
+  sort?: { value: Sort<TransactionSort>; onToggle: (field: TransactionSort) => void };
   /** What an empty list says; a page without a period picks its own words. */
   empty?: ReactNode;
 }) {
+  const sortHead = (field: TransactionSort) =>
+    sort
+      ? {
+          sortDirection: sort.value.field === field ? sort.value.dir : null,
+          onSort: () => sort.onToggle(field),
+        }
+      : {};
   return (
     // A fixed layout: every column but Counterparty has a set width, so opening a vendor, hiding
     // amounts or a longer name moves no column.
@@ -819,16 +840,16 @@ export function TransactionTable({
       <TableHeader>
         <TableHeadRow>
           {/* Named in both views: an opened vendor's rows show their dates and status here. */}
-          <TableHead className="hidden w-[4.5rem] @md:table-cell">
+          <TableHead className="hidden w-[4.5rem] @md:table-cell" {...sortHead("date")}>
             <Trans>Date</Trans>
           </TableHead>
-          <TableHead>
+          <TableHead {...sortHead("counterparty")}>
             <Trans>Counterparty</Trans>
           </TableHead>
-          <TableHead className="hidden w-48 @2xl:table-cell">
+          <TableHead className="hidden w-48 @2xl:table-cell" {...sortHead("category")}>
             <Trans>Category</Trans>
           </TableHead>
-          <TableHead className="text-end w-24 ps-3">
+          <TableHead className="text-end w-24 ps-3" {...sortHead("amount")}>
             <Trans>Amount</Trans>
           </TableHead>
           <TableHead className="hidden w-24 ps-4 @2xl:table-cell">
@@ -846,22 +867,34 @@ export function TransactionTable({
           </TableRow>
         ) : null}
         {grouped
-          ? groupByVendor(rows).map((group) => <VendorGroupRows key={group.key} group={group} />)
+          ? (sort
+              ? sortTransactionGroups(groupByVendor(rows), sort.value, categoryLabel)
+              : groupByVendor(rows)
+            ).map((group) => <VendorGroupRows key={group.key} group={group} />)
           : rows.map((row) => <TransactionRow key={row.id} row={row} />)}
       </TableBody>
     </Table>
   );
 }
 
-/** A Transactions card whose header switches between the flat list and one row per vendor. The choice is remembered for this page during the visit. */
+const FILTER_PARAMS = ["q", "category", "status"] as const;
+
+/**
+ * A Transactions card whose header switches between the flat list and one row per vendor (the
+ * choice is remembered for this page during the visit), with search, Category and Status filters
+ * and sortable columns. They live in the URL as ?q=, category, status, sort and dir. `fixedCategory`
+ * leaves out the Category filter on a page whose category the page itself already picks.
+ */
 export function TransactionsSection({
   title,
   rows,
   empty,
+  fixedCategory = false,
 }: {
   title?: ReactNode;
   rows: FinanceTransaction[];
   empty?: ReactNode;
+  fixedCategory?: boolean;
 }) {
   // Remembered per page, so choosing By vendor on one page does not hide dates on the next.
   const page = useLocation().pathname;
@@ -870,9 +903,72 @@ export function TransactionsSection({
     setGrouped(next);
     writeGroupedPref(page, next);
   };
-  // Grouping one vendor's charges by vendor changes nothing, so the switch is left out.
+  const list = useListParams(TRANSACTION_SORTS, DEFAULT_TRANSACTION_SORT);
+  const filters = {
+    q: list.param("q"),
+    category: fixedCategory ? undefined : list.param("category"),
+    status: list.param("status"),
+  };
+  const filtered = Object.values(filters).some(Boolean);
+  const shown = sortTransactions(
+    filterTransactions(rows, filters, categoryLabel),
+    list.sort,
+    categoryLabel,
+  );
+  // Grouping one vendor's charges by vendor changes nothing, so the switch is left out. It follows
+  // all the rows, not the filtered ones, so filtering never makes the switch vanish.
   const manyVendors = groupByVendor(rows).length > 1;
   const grouped = preferGrouped && manyVendors;
+  const unique = (values: string[]): [string, string][] =>
+    [...new Set(values)].sort((a, b) => a.localeCompare(b)).map((v) => [v, v]);
+  const statuses = [...new Set(rows.map((row) => row.status))];
+  const sortNames: Record<TransactionSort, string> = {
+    date: t`Date`,
+    counterparty: t`Counterparty`,
+    category: t`Category`,
+    amount: t`Amount`,
+  };
+  const categories = unique(rows.map(categoryLabel));
+  const toolbar =
+    rows.length > 1 ? (
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <SearchField
+          name="transactions-search"
+          value={filters.q ?? ""}
+          onChange={(value) => list.setParam("q", value)}
+          placeholder={t`Search transactions`}
+          label={t`Search transactions`}
+          className="w-56"
+        />
+        {!fixedCategory && categories.length > 1 ? (
+          <PickFilter
+            label={t`Category`}
+            value={filters.category}
+            options={categories}
+            onChange={(value) => list.setParam("category", value)}
+          />
+        ) : null}
+        {statuses.length > 1 ? (
+          <PickFilter
+            label={t`Status`}
+            value={filters.status}
+            options={statuses.map((status) => [status, statusLabel(status)])}
+            onChange={(value) => list.setParam("status", value)}
+          />
+        ) : null}
+        {/* Wide, the column headers sort; narrow, they are not all shown. */}
+        <span className="ms-auto flex items-center gap-1 @2xl:hidden">
+          <SortControl
+            fields={TRANSACTION_SORTS.map((field) => [field, sortNames[field]])}
+            field={list.sort.field}
+            fieldLabel={sortNames[list.sort.field]}
+            direction={list.sort.dir}
+            onField={(field) => list.setSort({ field, dir: "asc" })}
+            onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+          />
+        </span>
+      </div>
+    ) : null;
   return (
     <Section
       title={title}
@@ -895,7 +991,24 @@ export function TransactionsSection({
         ) : null
       }
     >
-      <TransactionTable rows={rows} grouped={grouped} empty={empty} />
+      {toolbar}
+      <TransactionTable
+        rows={shown}
+        grouped={grouped}
+        sort={{ value: list.sort, onToggle: list.toggleSort }}
+        empty={
+          filtered ? (
+            <span className="flex items-center gap-3">
+              <Trans>No matches</Trans>
+              <Button variant="outline" size="sm" onClick={() => list.clear(...FILTER_PARAMS)}>
+                <Trans>Clear filters</Trans>
+              </Button>
+            </span>
+          ) : (
+            empty
+          )
+        }
+      />
     </Section>
   );
 }
