@@ -275,7 +275,7 @@ export function SkillDraftCard({
       className="w-160 max-w-full rounded-2xl border border-border bg-card px-5 py-4"
     >
       <div className="text-[15px] font-medium text-foreground">
-        <Trans>Draft skill</Trans>
+        {saved ? <Trans>Skill</Trans> : <Trans>Draft skill</Trans>}
       </div>
       <div className="mt-1 text-[13.5px] text-muted-foreground">{block.goal}</div>
       {fieldLabel("skill-draft-name", <Trans>Name</Trans>)}

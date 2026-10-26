@@ -11022,6 +11022,10 @@ msgstr ""
 msgid "Size"
 msgstr ""
 
+#: src/components/teach/SkillDraftCard.tsx
+msgid "Skill"
+msgstr ""
+
 #. placeholder {0}: label.title
 #: src/pages/shell/composer.tsx
 msgid "Skill {0}"
