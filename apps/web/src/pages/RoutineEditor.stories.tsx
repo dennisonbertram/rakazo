@@ -112,6 +112,32 @@ export const ListHeader: Story = {
   render: () => <RoutineListHeader onCreate={() => undefined} />,
 };
 
+/** The status line wraps under the title instead of cutting off next to the Running pill. */
+export const RunningNarrow: Story = {
+  decorators: [
+    (Story) => (
+      <div className="w-[340px]">
+        <Story />
+      </div>
+    ),
+  ],
+  render: () => (
+    <RoutineListRow
+      routine={{
+        ...routine,
+        status: {
+          ...routine.status,
+          lastRunAt: "2026-01-05T22:04:00.000Z",
+          nextRunAt: "2026-01-06T22:04:00.000Z",
+        },
+      }}
+      running
+      onOpen={() => undefined}
+      onStop={() => undefined}
+    />
+  ),
+};
+
 export const ListRows: Story = {
   render: () => (
     <div>

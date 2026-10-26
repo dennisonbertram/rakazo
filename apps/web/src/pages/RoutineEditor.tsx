@@ -297,7 +297,7 @@ export function RoutineListRow({
           {statusLine ? (
             <span
               data-testid="routine-status-line"
-              className="block truncate text-[12.5px] text-muted-foreground/80"
+              className="block text-[12.5px] text-muted-foreground/80"
             >
               {statusLine}
             </span>

@@ -4491,7 +4491,7 @@ export function createRouter(deps: RouterDeps) {
               select: { modelProvider: true, modelId: true, thinkingLevel: true },
             });
             if (!currentModel) throw new IsolationError();
-            return tx.run.create({
+            const created = await tx.run.create({
               data: {
                 spaceId: context.actor.spaceId,
                 botId: bot.id,
@@ -4507,6 +4507,11 @@ export function createRouter(deps: RouterDeps) {
               },
               select: { id: true },
             });
+            // "Last ran" counts a test. A one-shot keeps lastRunAt for "already ran", so it is left alone.
+            if (!isOneShotRoutineCrons(routine.crons)) {
+              await tx.routine.update({ where: { id: routine.id }, data: { lastRunAt: new Date() } });
+            }
+            return created;
           });
         } catch (error) {
           if (nonce) {
