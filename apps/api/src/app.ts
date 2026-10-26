@@ -542,6 +542,9 @@ export async function createApp(
       );
     },
   });
+  const oauthTokenUpgrade = auth
+    .encryptStoredOAuthTokens()
+    .catch((error) => getLogger().error("oauth token encryption upgrade failed", error));
   // One provider instance so emulator launches and polls share the same Map.
   const cloudAgent = createCloudAgentConnection({
     CLOUD_AGENT_PROVIDER: env.cloudAgentProvider,
@@ -878,7 +881,8 @@ export async function createApp(
   });
   mountLocalSettings(app, { token: env.desktopStackToken, prisma, rpc });
   const requestSession = async (request: Request) => {
-    const session = await auth.api.getSession({ headers: sessionHeaders(request) });
+    // The bearer plugin turns a signed `Authorization: Bearer` into the session cookie.
+    const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) return null;
     const actor = await actorFromMembership(
       requireMembership(prisma, session.user.id, request.headers.get("x-rakazo-space-id")),
@@ -1266,6 +1270,7 @@ export async function createApp(
       await teamChatBridge?.stop();
       await email?.drain?.();
       await reconciler?.stop();
+      await oauthTokenUpgrade;
       await jobs.close();
       await secrets.close();
       await realtime.close();
@@ -1344,15 +1349,6 @@ function emptyAuthBodyAsJson(request: Request) {
   headers.set("content-type", "application/json");
   headers.delete("content-length");
   return new Request(request, { headers, body: "{}" });
-}
-
-function sessionHeaders(request: Request) {
-  const headers = new Headers(request.headers);
-  const authz = headers.get("authorization");
-  if (authz?.toLowerCase().startsWith("bearer ") && !headers.get("cookie")) {
-    headers.set("cookie", `better-auth.session_token=${authz.slice(7).trim()}`);
-  }
-  return headers;
 }
 
 /**
