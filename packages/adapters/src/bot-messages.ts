@@ -79,6 +79,9 @@ export async function loadBotMessageContext(
 export const EXTERNAL_MESSAGE_REFUSED =
   "You can only message the bots your owner has chosen for you.";
 
+/** A request with no result after this long is treated as lost, so the delegate can be asked again. */
+const PENDING_REQUEST_WINDOW_MS = 10 * 60 * 1000;
+
 export type MessageBotOptions = {
   allowTerminalSource?: boolean;
   forceUnread?: boolean;
@@ -187,6 +190,40 @@ export async function messageBot(
       ok: false as const,
       error: externalSender ? EXTERNAL_MESSAGE_REFUSED : "no bot found with that id or name",
     };
+  }
+  // A request to this bot is still unanswered: sending it again only starts a second run.
+  if (intent === "request" && !options?.allowTerminalSource) {
+    const recent = await deps.prisma.message.findMany({
+      where: {
+        threadId: run.threadId,
+        createdAt: { gte: new Date(Date.now() - PENDING_REQUEST_WINDOW_MS) },
+      },
+      orderBy: { seq: "desc" },
+      select: { blocks: true },
+    });
+    for (const message of recent) {
+      const blocks = Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : [];
+      if (
+        blocks.some(
+          (b) =>
+            b.kind === "bot_message_received" && b.fromBotId === target.id && b.intent === "result",
+        )
+      )
+        break;
+      if (
+        blocks.some(
+          (b) =>
+            b.kind === "bot_message_sent" &&
+            b.toBotId === target.id &&
+            (b.intent === undefined || b.intent === "request"),
+        )
+      ) {
+        return {
+          ok: false as const,
+          error: `${target.name} is still working on your earlier request; its answer will wake you. Do not send it again or post a waiting message.`,
+        };
+      }
+    }
   }
   if (target.id === sender.id) return { ok: false as const, error: "a bot cannot message itself" };
   if (!target.thread)

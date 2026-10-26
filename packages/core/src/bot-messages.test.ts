@@ -377,8 +377,8 @@ describe("inbound wake prompt", () => {
       text: "The answer is 42.",
       intent: "result",
     });
-    expect(resultPrompt).toContain("Relay it to the user now");
-    expect(resultPrompt).toContain("include the actual substance");
+    expect(resultPrompt).toContain("relay the actual substance");
+    expect(resultPrompt).toContain("only what the conversation does not already show");
     expect(resultPrompt).not.toContain("staying silent is fine");
     expect(resultPrompt).toContain("do not invent a pending approval");
     expect(resultPrompt).not.toContain("already answered");
