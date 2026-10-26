@@ -656,6 +656,8 @@ export const AgentSkillSchema = z.object({
   /** Who wrote it. Agent-written skills carry a badge in settings. */
   origin: AgentSkillOriginSchema.optional(),
   readOnly: z.boolean(),
+  /** True when the skill carries a sandboxed tool script (see tool_run). */
+  tool: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -668,12 +670,26 @@ export const AgentSkillCatalogEntrySchema = AgentSkillSchema.pick({
   source: true,
   origin: true,
   readOnly: true,
+  tool: true,
 });
 export type AgentSkillCatalogEntry = z.infer<typeof AgentSkillCatalogEntrySchema>;
 
 /** A catalog entry with this bot's switch. A skill with no stored setting is on. */
 export const BotAgentSkillSchema = AgentSkillCatalogEntrySchema.extend({ enabled: z.boolean() });
 export type BotAgentSkill = z.infer<typeof BotAgentSkillSchema>;
+
+/** The tool a bot proposes with a skill. The owner approves exactly this source, pinned by its hash. */
+export const AgentSkillToolDraftSchema = z.object({
+  source: z.string(),
+  /** sha256 of `source`; approving with this value fails if the source changed since it was shown. */
+  hash: z.string(),
+  /** What the bot says the tool reads and writes. The bot's words, not checked. */
+  reads: z.string().optional(),
+  writes: z.string().optional(),
+  sampleInput: z.unknown().optional(),
+  sampleOutput: z.unknown().optional(),
+});
+export type AgentSkillToolDraft = z.infer<typeof AgentSkillToolDraftSchema>;
 
 /** An agent-written skill (new, or a revision of an active one) waiting for the owner. */
 export const AgentSkillDraftSchema = z.object({
@@ -684,6 +700,7 @@ export const AgentSkillDraftSchema = z.object({
   content: z.string(),
   /** True when it changes an active skill; false when the skill is new. */
   revision: z.boolean(),
+  tool: AgentSkillToolDraftSchema.optional(),
 });
 export type AgentSkillDraft = z.infer<typeof AgentSkillDraftSchema>;
 
@@ -997,6 +1014,22 @@ export const ArtifactVersionSchema = z.object({
 });
 
 export type ArtifactVersion = z.infer<typeof ArtifactVersionSchema>;
+
+/** The live link of an artifact: which version it shows and when it stops working. Never the token. */
+export const ArtifactShareSchema = z.object({
+  artifactId: z.string(),
+  version: z.number().int(),
+  expiresAt: z.string(),
+});
+export type ArtifactShare = z.infer<typeof ArtifactShareSchema>;
+
+/** What the public share endpoint returns: one artifact version, nothing about its owner. */
+export const SharedArtifactSchema = z.object({
+  name: z.string(),
+  mimeType: z.string(),
+  contentBase64: z.string(),
+});
+export type SharedArtifact = z.infer<typeof SharedArtifactSchema>;
 
 export const ArtifactWithContentSchema = ArtifactSchema.extend({
   contentBase64: z.string(),

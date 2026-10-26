@@ -206,6 +206,7 @@ messages.json          Every message in your conversations.
 memories.json          Your agents' memory documents.
 skills.json            Your skills.
 routines.json          Your routines, with their cron schedules.
+artifact-shares.json   Your artifact share links: which version, when made, when they end. Not the links.
 contacts.json          Your contacts.
 meetings.json          Your synced meetings, with notes and transcripts.
 cap-table.json         The latest cap table snapshot.
@@ -253,6 +254,18 @@ function collectors(prisma: PrismaClient, userId: string, spaceIds: string[]) {
     ["memories.json", (a) => prisma.memoryDocument.findMany(page({ where: own, ...after(a) }))],
     ["skills.json", (a) => prisma.agentSkill.findMany(page({ where: own, ...after(a) }))],
     ["routines.json", (a) => prisma.routine.findMany(page({ where: own, ...after(a) }))],
+    [
+      // Metadata only: the token is never stored, and the hash is left out too.
+      "artifact-shares.json",
+      (a) =>
+        prisma.artifactShare.findMany(
+          page({
+            where: { spaceId: { in: spaceIds }, createdByUserId: userId },
+            omit: { tokenHash: true },
+            ...after(a),
+          }),
+        ),
+    ],
     ["contacts.json", (a) => prisma.contact.findMany(page({ where: own, ...after(a) }))],
     ["meetings.json", (a) => prisma.meeting.findMany(page({ where: own, ...after(a) }))],
     ["cap-table.json", (a) => prisma.capTableSnapshot.findMany(page({ where: own, ...after(a) }))],

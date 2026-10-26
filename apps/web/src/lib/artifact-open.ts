@@ -19,6 +19,14 @@ export async function fetchArtifactBytes(
   return decodeArtifactBase64(artifact.contentBase64);
 }
 
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
 export function downloadArtifactBytes(name: string, mimeType: string, bytes: Uint8Array): void {
   const blob = new Blob([new Uint8Array(bytes)], { type: mimeType });
   const url = URL.createObjectURL(blob);

@@ -34,16 +34,26 @@ describe("task catalog", () => {
           { id: "taught-1", name: "Export report", goal: "Export the report", status: "saved" },
         ]),
       },
+      botSkillSetting: { findMany: vi.fn(async () => []) },
       agentSkill: {
-        findMany: vi.fn(async () => [
-          {
+        findMany: vi.fn(async (args: { where: { toolSource?: unknown } }) => {
+          const daily = {
             id: "skill-1",
             name: "Daily report",
             description: "Build the daily report",
             content: "steps",
             source: "user",
-          },
-        ]),
+          };
+          const tool = {
+            id: "skill-2",
+            name: "weekly_burn",
+            description: "Total spend",
+            content: "steps",
+            source: "user",
+            toolInputSchema: { type: "object" },
+          };
+          return args.where.toolSource ? [tool] : [daily, tool];
+        }),
       },
     };
 
@@ -61,6 +71,9 @@ describe("task catalog", () => {
       },
     );
 
+    expect(result.savedTools).toEqual([
+      { name: "weekly_burn", description: "Total spend", inputSchema: { type: "object" } },
+    ]);
     expect(result.tasks).toEqual([
       expect.objectContaining({ id: "item-1", title: "Check the inbox", source: "scratchpad" }),
     ]);

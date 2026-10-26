@@ -57,6 +57,35 @@ export async function taskCatalogFromTool(deps: TaskCatalogToolDeps, input: Task
     }),
   ]);
 
+  // Approved tools the bot can call with tool_run, with the input each one takes.
+  const toolRows = await deps.prisma.agentSkill.findMany({
+    where: {
+      spaceId: input.spaceId,
+      userId: input.userId,
+      status: "active",
+      toolSource: { not: null },
+      toolSourceHash: { not: null },
+    },
+    select: { id: true, name: true, description: true, toolInputSchema: true },
+    orderBy: { name: "asc" },
+  });
+  const enabledIds = new Set(
+    (
+      await listAgentSkillRecords(deps.prisma, {
+        spaceId: input.spaceId,
+        userId: input.userId,
+        botId: input.botId,
+      })
+    ).map((skill) => skill.id),
+  );
+  const savedTools = toolRows
+    .filter((row) => enabledIds.has(row.id))
+    .map((row) => ({
+      name: row.name,
+      description: row.description,
+      inputSchema: row.toolInputSchema,
+    }));
+
   const seenTools = new Set<string>();
   const exposedTools = input.tools.flatMap((tool) => {
     if (seenTools.has(tool.name)) return [];
@@ -80,6 +109,7 @@ export async function taskCatalogFromTool(deps: TaskCatalogToolDeps, input: Task
       source: "scratchpad",
     })),
     routines: schedules.routines,
+    savedTools,
     taughtSkills: taughtSkills.map((skill) => ({
       id: skill.id,
       name: skill.name,

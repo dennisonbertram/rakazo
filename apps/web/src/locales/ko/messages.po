@@ -1453,6 +1453,10 @@ msgstr ""
 msgid "Anyone who can reach this address can talk to your Mac's server. Use a private network or a tunnel."
 msgstr ""
 
+#: src/components/ArtifactShareDialog.tsx
+msgid "Anyone with this link can view this version until you stop sharing or for 30 days."
+msgstr ""
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Anything else"
 msgstr ""
@@ -2207,6 +2211,7 @@ msgid "Can't reach the server."
 msgstr "서버에 연결할 수 없습니다."
 
 #: src/components/AccountAccess.tsx
+#: src/components/ArtifactShareDialog.tsx
 #: src/components/AskCard.tsx
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/components/ComputerUpdateProgress.tsx
@@ -2802,6 +2807,7 @@ msgid "Cloud"
 msgstr "클라우드"
 
 #: src/components/AskCard.tsx
+#: src/pages/shell/BotSkillsSection.tsx
 msgid "Code"
 msgstr "코드"
 
@@ -3516,6 +3522,10 @@ msgstr ""
 msgid "Could not create the Legal agent"
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "Could not create the link."
+msgstr ""
+
 #: src/pages/Onboarding.tsx
 msgid "Could not create your bot"
 msgstr "Bot을 만들지 못했습니다."
@@ -4031,6 +4041,10 @@ msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Could not start the draft"
+msgstr ""
+
+#: src/pages/Artifacts.tsx
+msgid "Could not stop sharing."
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -6704,6 +6718,7 @@ msgstr ""
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/PeerMessagesOverlay.tsx
 #: src/pages/RoutineRunHistory.tsx
+#: src/pages/SharedArtifact.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Loading…"
 msgstr "불러오는 중…"
@@ -8102,6 +8117,10 @@ msgstr ""
 msgid "Notetaker meetings, notes and tasks"
 msgstr ""
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "nothing"
+msgstr ""
+
 #: src/pages/Finance.tsx
 msgid "Nothing due in the next 30 days"
 msgstr ""
@@ -9223,6 +9242,10 @@ msgstr ""
 msgid "Reads document text"
 msgstr ""
 
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Reads:"
+msgstr ""
+
 #: src/components/data-room/DataRoomStats.tsx
 #: src/pages/gtm/GtmChannels.tsx
 msgid "Ready"
@@ -9794,6 +9817,10 @@ msgstr "마지막으로 저장한 작업 공간을 복원합니다."
 #: src/components/ComputerMaintenanceActions.tsx
 msgid "Restore the last saved workspace. Unsaved work on the computer is lost."
 msgstr "마지막으로 저장된 작업 공간을 복원합니다. 컴퓨터에서 저장하지 않은 작업은 사라집니다."
+
+#: src/pages/Artifacts.tsx
+msgid "Restore this version"
+msgstr ""
 
 #: src/lib/use-contact-notices.ts
 msgid "Restored {name}"
@@ -10618,12 +10645,17 @@ msgstr "모양"
 #: src/components/AskCard.tsx
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/data-room/ItemMenu.tsx
+#: src/pages/Artifacts.tsx
 msgid "Share"
 msgstr ""
 
 #. placeholder {0}: item.name
 #: src/components/data-room/ItemDialogs.tsx
 msgid "Share {0}"
+msgstr ""
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Share link"
 msgstr ""
 
 #: src/pages/CompanyFactDetail.tsx
@@ -10652,6 +10684,10 @@ msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Shared chat with 2-6 bots. They all reply in the same thread."
+msgstr ""
+
+#: src/pages/SharedArtifact.tsx
+msgid "Shared from Praci"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
@@ -11256,6 +11292,14 @@ msgstr "중지"
 msgid "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 msgstr ""
 
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing"
+msgstr ""
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Stop sharing this link?"
+msgstr ""
+
 #: src/pages/shell/transcript.tsx
 msgid "Stop speaking"
 msgstr "읽기 중지"
@@ -11688,6 +11732,10 @@ msgstr ""
 msgid "This also removes the Legal contract {contractTitle}, its {deadlineCount} (including ones added by hand) and its links in the Legal graph. This can't be undone."
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "This also stops its link."
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
 msgstr "이 Bot은 별도 Linux 화면이 아니라 현재 컴퓨터에서 실행됩니다. 터미널과 파일 작업은 홈 폴더를 사용합니다."
@@ -11740,6 +11788,10 @@ msgstr ""
 
 #: src/components/data-room/DropZone.tsx
 msgid "This folder no longer exists"
+msgstr ""
+
+#: src/pages/SharedArtifact.tsx
+msgid "This link is not available."
 msgstr ""
 
 #: src/pages/NotFound.tsx
@@ -11938,6 +11990,10 @@ msgstr ""
 
 #: src/components/data-room/Preview.tsx
 msgid "Too large to search inside"
+msgstr ""
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Tool"
 msgstr ""
 
 #: src/lib/run-phase.ts
@@ -12297,6 +12353,10 @@ msgstr "업데이트 실패"
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Update finished with errors"
 msgstr "오류와 함께 업데이트가 완료되었습니다"
+
+#: src/pages/Artifacts.tsx
+msgid "Update link"
+msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Update options"
@@ -12932,6 +12992,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Write what this routine should do each time it runs."
+msgstr ""
+
+#: src/pages/shell/BotSkillsSection.tsx
+msgid "Writes:"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx

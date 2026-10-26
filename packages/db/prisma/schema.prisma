@@ -234,6 +234,7 @@ model Member {
 }
 
 model Space {
+  artifactShares              ArtifactShare[]
   scratchpadApprovals         ScratchpadApproval[]
   notifications               Notification[]
   notificationEndpoints       NotificationEndpoint[]
@@ -1041,6 +1042,19 @@ model AgentSkill {
   status         String   @default("active")
   /// An agent's proposed full SKILL.md for an active skill, applied when the owner approves.
   pendingContent String?
+  /// A bot-built tool: one self-contained JavaScript source defining `function run(input)`, run in the
+  /// QuickJS sandbox by tool_run. Null for an ordinary skill.
+  toolSource      String?
+  /// The tool's input schema (the subset validated by validateToolInputSchema).
+  toolInputSchema Json?
+  /// sha256 of the toolSource the owner approved. Null for a draft; tool_run refuses an active
+  /// tool whose source no longer matches.
+  toolSourceHash  String?
+  /// What the bot said about the tool, shown beside Approve: { reads, writes, sampleInput, sampleOutput }.
+  toolNotes       Json?
+  /// An agent's proposed replacement { source, inputSchema, notes } for an active tool, applied (and
+  /// hashed) only when the owner approves. The running source stays as it was until then.
+  pendingTool     Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -1388,6 +1402,7 @@ model Artifact {
   rootArtifactId String?
   rootArtifact   Artifact?  @relation("ArtifactVersions", fields: [rootArtifactId], references: [id], onDelete: Cascade)
   versions       Artifact[] @relation("ArtifactVersions")
+  shares         ArtifactShare[]
   version        Int        @default(1)
   // Client-chosen per upload so a retried upload that already landed returns this row.
   clientNonce    String?
@@ -1398,6 +1413,27 @@ model Artifact {
   @@index([rootArtifactId])
   // artifacts_family_version_key is raw SQL: Prisma cannot express COALESCE indexes.
   @@map("artifacts")
+}
+
+/// A view-only public link to one exact artifact version. Only the sha256 of the token is stored.
+model ArtifactShare {
+  id              String    @id @default(cuid())
+  spaceId         String
+  space           Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  artifactId      String
+  artifact        Artifact  @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  tokenHash       String    @unique
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  lastOpenedAt    DateTime?
+  /// Public opens in the current one-minute window, kept in Postgres so every API process agrees.
+  openWindowStart DateTime?
+  openCount       Int       @default(0)
+
+  @@index([spaceId, artifactId])
+  @@map("artifact_shares")
 }
 
 model UsageRecord {
