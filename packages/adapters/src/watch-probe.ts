@@ -86,7 +86,7 @@ export function watchWakePrompt(instruction: string, url: string, diff: string):
 
 type WakeDb = Pick<
   PrismaClient,
-  "routine" | "bot" | "thread" | "agentSkill" | "botSkillSetting" | "task" | "run"
+  "routine" | "bot" | "thread" | "agentSkill" | "botSkillSetting" | "task" | "run" | "taughtSkill"
 >;
 
 /**
@@ -124,7 +124,7 @@ export async function createWatchWakeRun(db: WakeDb, wake: Wake) {
   });
   const prompt = watchWakePrompt(
     expandSkillReferencesInPrompt(
-      (await taughtSkillPromptForRoutine(deps.prisma, routine)) ?? routine.prompt,
+      (await taughtSkillPromptForRoutine(db, routine)) ?? routine.prompt,
       skills,
     ),
     wake.url,
