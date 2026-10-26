@@ -446,13 +446,13 @@ export function CalendarPage({
                   <td
                     key={weekday}
                     data-day={date}
-                    className="h-20 overflow-hidden border p-1 align-top sm:h-28 sm:p-2"
+                    className={`h-20 overflow-hidden border p-1 align-top sm:h-28 sm:p-2 ${date === today ? "bg-muted/50" : ""}`}
                   >
                     {day > 0 && day <= bounds.days && (
                       <>
                         <time
                           dateTime={date}
-                          className={`text-xs ${date === today ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                          className={`inline-block text-xs ${date === today ? "rounded-full bg-primary px-1.5 font-semibold text-primary-foreground" : "text-muted-foreground"}`}
                         >
                           {day}
                         </time>
@@ -527,10 +527,10 @@ export function CalendarPage({
         <div className="sticky top-0 z-20 grid border-b bg-background" style={columns}>
           <div />
           {days.map((day) => (
-            <div key={day} className="min-w-0 border-s p-1">
+            <div key={day} className={`min-w-0 border-s p-1 ${day === today ? "bg-muted/50" : ""}`}>
               <time
                 dateTime={day}
-                className={`block text-xs ${day === today ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                className={`inline-block text-xs ${day === today ? "rounded-full bg-primary px-1.5 font-semibold text-primary-foreground" : "text-muted-foreground"}`}
               >
                 {new Intl.DateTimeFormat(undefined, {
                   weekday: "short",
@@ -571,7 +571,11 @@ export function CalendarPage({
           {days.map((day) => {
             const dayStart = startOf(day).getTime();
             return (
-              <div key={day} data-day={day} className="relative border-s">
+              <div
+                key={day}
+                data-day={day}
+                className={`relative border-s ${day === today ? "bg-muted/50" : ""}`}
+              >
                 {layoutDay(itemsOn(day), day).map((entry) =>
                   block(
                     entry.item,
