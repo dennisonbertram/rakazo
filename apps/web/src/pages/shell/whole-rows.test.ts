@@ -5,7 +5,10 @@ import { MORE_BAR_HEIGHT } from "./rows-below";
 import { endOnWholeRow } from "./whole-rows";
 
 // jsdom has no layout, so the geometry is supplied: a 200px-tall list of 30px rows.
-function list(rows: number, opts: { height?: number; heads?: number[]; expanded?: boolean } = {}) {
+function list(
+  rows: number,
+  opts: { height?: number; heads?: number[]; expanded?: boolean; offset?: number } = {},
+) {
   const height = opts.height ?? 200;
   const el = document.createElement("div");
   el.style.overflowY = "auto";
@@ -20,7 +23,9 @@ function list(rows: number, opts: { height?: number; heads?: number[]; expanded?
       row.dataset.rosterHead = "";
       row.setAttribute("aria-expanded", String(opts.expanded ?? true));
     }
-    row.getBoundingClientRect = () => ({ bottom: (i + 1) * 30 }) as DOMRect;
+    const offset = opts.offset ?? 0;
+    row.getBoundingClientRect = () =>
+      ({ top: offset + i * 30, bottom: offset + (i + 1) * 30 }) as DOMRect;
     el.append(row);
   }
   return el;
@@ -64,4 +69,13 @@ it("clears the margin on a list that no longer scrolls", () => {
   endOnWholeRow([outer, inner]);
   expect(inner.style.marginBottom).toBe("");
   expect(outer.style.marginBottom).toBe("50px");
+});
+
+it("measures from where a snapping list rests, not from its first row", () => {
+  // The first row starts 24px down and snaps 12px below the top, so the list rests scrolled 12px.
+  const el = list(10, { offset: 24 });
+  el.style.setProperty("scroll-padding-top", "12px");
+  endOnWholeRow([el]);
+  // Visible row bottoms are 42, 72, ... 162 (five rows fit under 172), so the margin is 200 - 162.
+  expect(el.style.marginBottom).toBe("38px");
 });
