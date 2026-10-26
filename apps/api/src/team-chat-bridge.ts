@@ -91,10 +91,14 @@ export function teamChatResponseText(
   allowSilence = false,
 ): string {
   const text = blocks
-    .flatMap((block) =>
-      block.kind === "text" ? [block.text] : block.kind === "ui" ? [uiBlockText(block.block)] : [],
+    .map((block) =>
+      block.kind === "text"
+        ? block.text
+        : block.kind === "ui"
+          ? `\n\n${uiBlockText(block.block)}\n\n`
+          : "",
     )
-    .join("\n\n")
+    .join("")
     .trim();
   return text || (allowSilence ? "" : `${botName} completed the request without a written reply.`);
 }
