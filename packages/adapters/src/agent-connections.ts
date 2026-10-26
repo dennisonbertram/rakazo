@@ -15,6 +15,7 @@ import {
   createThreadMessageInTransaction,
   crossSpaceCommunicationAllowed,
   isUniqueViolation,
+  runAsSystem,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import {
@@ -49,7 +50,14 @@ type Result =
  * messages ride the existing internal bot-message machinery and never
  * transit iMessage.
  */
-export async function connectAgent(
+export function connectAgent(...args: Parameters<typeof requestConnection>): Promise<Result> {
+  // The target is found by address on the whole deployment and invited in its own Space.
+  return runAsSystem("request an agent connection in another Space", () =>
+    requestConnection(...args),
+  );
+}
+
+async function requestConnection(
   deps: AgentConnectionDeps,
   _run: ConnectionRun,
   sender: { id: string; name: string },
@@ -195,7 +203,17 @@ export async function connectAgent(
 }
 
 /** Capture the exact request and requester shown on the owner's approval card. */
-export async function prepareAgentConnectionResponse(
+export function prepareAgentConnectionResponse(
+  prisma: PrismaClient,
+  targetBotId: string,
+  accept: boolean,
+) {
+  return runAsSystem("prepare an agent connection response for its target bot", () =>
+    prepareResponse(prisma, targetBotId, accept),
+  );
+}
+
+async function prepareResponse(
   prisma: PrismaClient,
   targetBotId: string,
   accept: boolean,
@@ -225,7 +243,15 @@ export async function prepareAgentConnectionResponse(
 }
 
 /** The target bot answers a pending request on its owner's instruction. */
-export async function respondAgentConnection(
+export function respondAgentConnection(
+  ...args: Parameters<typeof respondToConnection>
+): Promise<Result> {
+  return runAsSystem("respond to an agent connection in another Space", () =>
+    respondToConnection(...args),
+  );
+}
+
+async function respondToConnection(
   deps: AgentConnectionDeps,
   _run: ConnectionRun,
   sender: { id: string; name: string },
@@ -263,7 +289,16 @@ export async function respondAgentConnection(
  * Mirror of messageBot across Spaces: the target is resolved through an
  * approved connection instead of the sender's Space roster.
  */
-export async function messageConnectedAgent(
+export function messageConnectedAgent(
+  ...args: Parameters<typeof deliverToConnectedAgent>
+): Promise<Result> {
+  // Delivery writes the message, task and run into the connected agent's Space.
+  return runAsSystem("deliver a message to a connected agent in another Space", () =>
+    deliverToConnectedAgent(...args),
+  );
+}
+
+async function deliverToConnectedAgent(
   deps: AgentConnectionDeps,
   run: ConnectionRun,
   sender: { id: string; name: string },

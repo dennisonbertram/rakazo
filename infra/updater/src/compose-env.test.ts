@@ -55,7 +55,7 @@ const NOT_PASSED: Record<string, string> = {
  * Shared-package reads the worker must not receive. Only the API signs sessions and talks to
  * the identity provider, so the worker resolves no auth secret.
  */
-const WORKER_DENIED = new Set(["BETTER_AUTH_SECRET"]);
+const WORKER_DENIED = new Set(["BETTER_AUTH_SECRET", "DATABASE_MIGRATION_URL"]);
 
 /** Reads a source scan cannot see: names held in constants or read by third-party SDKs. */
 const INDIRECT = {
@@ -226,6 +226,9 @@ describe("api and worker environment allowlists", () => {
         "RAKAZO_UPDATER_TOKEN",
         "STRIPE_SECRET_KEY",
         "POSTGRES_PASSWORD",
+        "POSTGRES_APP_PASSWORD",
+        // The owner login that runs migrations; only the API container migrates.
+        "DATABASE_MIGRATION_URL",
       ]) {
         expect(worker).not.toHaveProperty(key);
       }

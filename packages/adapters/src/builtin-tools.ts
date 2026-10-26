@@ -16,6 +16,7 @@ import {
 } from "@rakazo/contracts";
 import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
+import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
 import { voiceAgentTools } from "./voice-agent-tools.js";
@@ -1540,6 +1541,14 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "render_ui",
+    description:
+      "Show structured content in the chat reply as typed blocks (1 to 5 per call). Block types: table (title?, columns [{label, align?}], rows of text or numbers, up to 50 rows and 8 columns), sections ([{heading, body}], body is Markdown), summary (title?, items [{label, value}]), stats ([{label, value, hint?}], up to 6), cards ([{title, subtitle?, body?, badge?, href?}], href is https or an app path), callout (tone info, warning, success or danger, title?, body). Invalid input returns the problems to fix.",
+    inputSchema: (({ $schema: _schema, ...rest }) => rest)(
+      z.toJSONSchema(uiBlocksInputSchema, { io: "input" }),
+    ),
+  },
+  {
     name: "create_ui_artifact",
     description:
       "Create a read-only dashboard, summary or table as a UI artifact and attach it to the chat. Give a title and blocks: heading, text, metric (label, value, delta), table (columns, rows), list, badge, divider, chart (line or bar from series), and card, stack or grid to group blocks (nested at most 3 deep). Text is plain; there are no links, images, buttons or scripts. Use it for dashboards, summaries and tables; use an HTML page only for free-form pages. Calling it again with the same title makes a new version. Invalid input returns errors to fix.",
@@ -1955,6 +1964,19 @@ export const builtinAgentTools: ConnectorTool[] = [
       required: ["name", "instruction"],
       additionalProperties: false,
     },
+  },
+  {
+    name: "calendar_agenda",
+    description:
+      "Read-only. One time-ordered list of what is coming up for the owner: Google Calendar events from every connected account, open to-dos with a due time (scratchpad_add with dueAt) from every bot, and routines and check-backs (schedule_create with runAt) with their next run. Defaults to now through the next 7 days; pass from and to (ISO 8601, at most 93 days apart) for another window. Use it to see what is due or scheduled; use schedule_create with runAt to set a check-back and scratchpad_add with dueAt for a to-do.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "ISO 8601 start. Default now." },
+        to: { type: "string", description: "ISO 8601 end. Default 7 days after from." },
+      },
+    },
+    readOnly: true,
   },
   {
     name: "schedule_list",

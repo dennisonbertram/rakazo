@@ -428,6 +428,8 @@ const PLAIN_TOOL_WORDS: Record<string, string> = {
   scratchpad_complete: "complete note",
   scratchpad_remove: "remove note",
   task_catalog: "get open tasks",
+  calendar_agenda: "get upcoming schedule",
+  render_ui: "format the answer",
   legal_unreviewed_documents: "get unreviewed documents",
   legal_upsert_node: "update legal records",
   legal_upsert_contract: "update contracts",

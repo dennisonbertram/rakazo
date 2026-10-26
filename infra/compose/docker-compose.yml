@@ -118,7 +118,7 @@ services:
     build:
       context: ../..
       dockerfile: infra/compose/Dockerfile
-    command: ["bash", "-lc", "pnpm --filter @rakazo/db exec prisma migrate deploy && pnpm --filter @rakazo/api start"]
+    command: ["bash", "-lc", "pnpm db:migrate && exec env -u DATABASE_MIGRATION_URL pnpm --filter @rakazo/api start"]
     environment:
       SECRET_STORE: ${SECRET_STORE:-encrypted}
       INFISICAL_URL: ${INFISICAL_URL:-}
@@ -128,7 +128,10 @@ services:
       INFISICAL_PROJECT_ID: ${INFISICAL_PROJECT_ID:-}
       INFISICAL_ENVIRONMENT: ${INFISICAL_ENVIRONMENT:-}
       INFISICAL_FOLDER: ${INFISICAL_FOLDER:-}
-      DATABASE_URL: postgres://${POSTGRES_USER:-rakazo}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
+      # The app's own login, subject to row-level security (docs/self-host.md#database-roles).
+      DATABASE_URL: postgres://rakazo_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
+      # Owner login for `pnpm db:migrate`; the start command drops it before serving.
+      DATABASE_MIGRATION_URL: postgres://${POSTGRES_USER:-rakazo}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
       API_HOST: "0.0.0.0"
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
@@ -282,6 +285,13 @@ services:
       RAKAZO_OPENAI_COMPATIBLE_VISION_MODELS:
       RAKAZO_OPENAI_COMPAT_ALLOW_PUBLIC:
       RAKAZO_OPENAI_COMPAT_PRIVATE_HOSTS:
+      RAKAZO_S3_ACCESS_KEY_ID:
+      RAKAZO_S3_BUCKET:
+      RAKAZO_S3_ENDPOINT:
+      RAKAZO_S3_FORCE_PATH_STYLE:
+      RAKAZO_S3_PREFIX:
+      RAKAZO_S3_REGION:
+      RAKAZO_S3_SECRET_ACCESS_KEY:
       RAKAZO_SECRETS_ALLOW_PRIVATE_HTTP:
       RAKAZO_UPDATER_TOKEN:
       RAKAZO_UPDATER_URL:
@@ -329,13 +339,15 @@ services:
       XIAOMI_TOKEN_PLAN_SGP_API_KEY:
       ZAI_API_KEY:
       ZAI_CODING_CN_API_KEY:
-      RAKAZO_S3_ACCESS_KEY_ID:
-      RAKAZO_S3_BUCKET:
-      RAKAZO_S3_ENDPOINT:
-      RAKAZO_S3_FORCE_PATH_STYLE:
-      RAKAZO_S3_PREFIX:
-      RAKAZO_S3_REGION:
-      RAKAZO_S3_SECRET_ACCESS_KEY:
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 20
     ports:
       - "127.0.0.1:3100:3100"
     volumes:
@@ -363,7 +375,8 @@ services:
       INFISICAL_PROJECT_ID: ${INFISICAL_PROJECT_ID:-}
       INFISICAL_ENVIRONMENT: ${INFISICAL_ENVIRONMENT:-}
       INFISICAL_FOLDER: ${INFISICAL_FOLDER:-}
-      DATABASE_URL: postgres://${POSTGRES_USER:-rakazo}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
+      # The app's own login, subject to row-level security (docs/self-host.md#database-roles).
+      DATABASE_URL: postgres://rakazo_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
       DATA_DIR: /data
       SANDBOX_SUPERVISOR_URL: http://supervisor:7091
       WAKEUP_DRIVER: graphile
@@ -501,6 +514,13 @@ services:
       RAKAZO_OPENAI_COMPATIBLE_VISION_MODELS:
       RAKAZO_OPENAI_COMPAT_ALLOW_PUBLIC:
       RAKAZO_OPENAI_COMPAT_PRIVATE_HOSTS:
+      RAKAZO_S3_ACCESS_KEY_ID:
+      RAKAZO_S3_BUCKET:
+      RAKAZO_S3_ENDPOINT:
+      RAKAZO_S3_FORCE_PATH_STYLE:
+      RAKAZO_S3_PREFIX:
+      RAKAZO_S3_REGION:
+      RAKAZO_S3_SECRET_ACCESS_KEY:
       RAKAZO_SECRETS_ALLOW_PRIVATE_HTTP:
       RAKAZO_UPDATE_RESTART_SUPERVISOR:
       REALTIME_DATABASE_URL:
@@ -534,13 +554,6 @@ services:
       XIAOMI_TOKEN_PLAN_SGP_API_KEY:
       ZAI_API_KEY:
       ZAI_CODING_CN_API_KEY:
-      RAKAZO_S3_ACCESS_KEY_ID:
-      RAKAZO_S3_BUCKET:
-      RAKAZO_S3_ENDPOINT:
-      RAKAZO_S3_FORCE_PATH_STYLE:
-      RAKAZO_S3_PREFIX:
-      RAKAZO_S3_REGION:
-      RAKAZO_S3_SECRET_ACCESS_KEY:
     volumes:
       - ../../data:/data
     depends_on:
@@ -551,6 +564,9 @@ services:
         condition: service_healthy
       data-init:
         condition: service_completed_successfully
+      # The API's start command migrates and creates the login the worker uses.
+      api:
+        condition: service_healthy
 
   web:
     build:

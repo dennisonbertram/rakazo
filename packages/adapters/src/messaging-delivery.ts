@@ -6,13 +6,14 @@ import type {
 } from "@rakazo/adapter-kit";
 import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
-import { botMessageHopExhausted, nextBotMessageHop } from "@rakazo/core";
+import { botMessageHopExhausted, nextBotMessageHop, uiBlockText } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import {
   appendEventInTransaction,
   CrossSpaceCommunicationBlockedError,
   createThreadMessageInTransaction,
   crossSpaceCommunicationAllowed,
+  runAsSystem,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 
@@ -111,7 +112,7 @@ async function mirrorRun(deps: MessagingDeliveryDeps, runId: string): Promise<vo
   if (!identity) return;
 
   // bot_message runs can carry the bot's user-facing reply after a delegate wake.
-  // extractText only keeps kind:"text", so inter-bot chatter blocks never leak out.
+  // extractText only keeps text and ui blocks, so inter-bot chatter blocks never leak out.
 
   const messages = await deps.prisma.message.findMany({
     where: { runId: run.id, role: "bot" },
@@ -197,6 +198,32 @@ async function mirrorChannelRun(
       NOT: { identityId: identity.id },
     },
   });
+  // Peer bots belong to other members, usually in other Spaces.
+  await runAsSystem("fan a group post out to peer bots in other Spaces", () =>
+    fanOutToPeers(deps, { identity, channel, channelBlock, fromLabel, hop, peers, messages }),
+  );
+}
+
+async function fanOutToPeers(
+  deps: MessagingDeliveryDeps,
+  {
+    identity,
+    channel,
+    channelBlock,
+    fromLabel,
+    hop,
+    peers,
+    messages,
+  }: {
+    identity: { provider: string; address: string; botId: string };
+    channel: { id: string; name: string | null };
+    channelBlock: Extract<MessageBlock, { kind: "channel_message" }>;
+    fromLabel: string;
+    hop: number;
+    peers: Array<{ identityId: string | null }>;
+    messages: Array<{ message: { id: string }; text: string }>;
+  },
+): Promise<void> {
   for (const { message, text } of messages) {
     for (const peer of peers) {
       const peerIdentity = await deps.prisma.messagingIdentity.findUnique({
@@ -567,15 +594,13 @@ export async function applyMessagingOutboundStatus(
 
 function extractText(blocks: unknown): string {
   if (!Array.isArray(blocks)) return "";
-  return blocks
-    .filter(
-      (block): block is { kind: string; text: string } =>
-        typeof block === "object" &&
-        block !== null &&
-        (block as { kind?: string }).kind === "text" &&
-        typeof (block as { text?: string }).text === "string",
-    )
-    .map((block) => block.text)
+  return (blocks as MessageBlock[])
+    .flatMap((block) => {
+      if (typeof block !== "object" || block === null) return [];
+      if (block.kind === "text" && typeof block.text === "string") return [block.text];
+      if (block.kind === "ui" && block.block) return [uiBlockText(block.block)];
+      return [];
+    })
     .join("\n")
     .trim();
 }

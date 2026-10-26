@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@rakazo/db";
-import { createDb, createThreadEvents } from "@rakazo/db";
+import { createDb, createThreadEvents, runAsTenant } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Actor } from "./rpc-context.js";
 import { stopThreadRuns } from "./thread-target.js";
@@ -11,17 +11,23 @@ const describePostgres =
 describePostgres("stopping a run with an open approval card (PostgreSQL)", () => {
   const suffix = `${process.pid}-${Date.now()}`;
   const ids = { user: `sap-user-${suffix}`, org: `sap-org-${suffix}`, space: `sap-sp-${suffix}` };
+  // Fixtures use the owner login; the stop runs as the runtime login in the caller's space, as a
+  // request does. Without DATABASE_MIGRATION_URL both are DATABASE_URL.
   let prisma: PrismaClient;
+  let app: ReturnType<typeof createDb>;
   let close: () => Promise<void>;
   let botId: string;
   let threadId: string;
 
   beforeAll(async () => {
-    const db = createDb(databaseUrl!);
+    const db = createDb(process.env.DATABASE_MIGRATION_URL || databaseUrl!);
+    app = createDb(databaseUrl!);
     prisma = db.prisma;
     close = async () => {
       await prisma.$disconnect();
       await db.pool.end();
+      await app.prisma.$disconnect();
+      await app.pool.end();
     };
     await prisma.user.create({
       data: { id: ids.user, name: "Tester", email: `${ids.user}@example.test` },
@@ -119,14 +125,16 @@ describePostgres("stopping a run with an open approval card (PostgreSQL)", () =>
       },
     });
 
-    await stopThreadRuns(
-      {
-        prisma,
-        sandbox: {} as never,
-        events: { notify: async () => undefined } as never,
-      },
-      { spaceId: ids.space, userId: ids.user } as Actor,
-      { kind: "bot", botId, threadId } as never,
+    await runAsTenant({ spaceId: ids.space, userId: ids.user }, () =>
+      stopThreadRuns(
+        {
+          prisma: app.prisma,
+          sandbox: {} as never,
+          events: { notify: async () => undefined } as never,
+        },
+        { spaceId: ids.space, userId: ids.user } as Actor,
+        { kind: "bot", botId, threadId } as never,
+      ),
     );
 
     expect((await prisma.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe(

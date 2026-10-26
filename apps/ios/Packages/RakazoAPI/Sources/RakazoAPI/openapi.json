@@ -9305,6 +9305,168 @@
                                               "properties": {
                                                 "kind": {
                                                   "type": "string",
+                                                  "const": "ui"
+                                                },
+                                                "block": {
+                                                  "oneOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "type": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
+                                                        },
+                                                        "title": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema46"
+                                                        },
+                                                        "columns": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                                        },
+                                                        "rows": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "type",
+                                                        "columns",
+                                                        "rows"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "type": {
+                                                          "type": "string",
+                                                          "const": "sections"
+                                                        },
+                                                        "sections": {
+                                                          "minItems": 1,
+                                                          "maxItems": 20,
+                                                          "type": "array",
+                                                          "items": {
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema52"
+                                                          }
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "type",
+                                                        "sections"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "type": {
+                                                          "type": "string",
+                                                          "const": "summary"
+                                                        },
+                                                        "title": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                                        },
+                                                        "items": {
+                                                          "minItems": 1,
+                                                          "maxItems": 20,
+                                                          "type": "array",
+                                                          "items": {
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
+                                                          }
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "type",
+                                                        "items"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "type": {
+                                                          "type": "string",
+                                                          "const": "stats"
+                                                        },
+                                                        "stats": {
+                                                          "minItems": 1,
+                                                          "maxItems": 6,
+                                                          "type": "array",
+                                                          "items": {
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema56"
+                                                          }
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "type",
+                                                        "stats"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "type": {
+                                                          "type": "string",
+                                                          "const": "cards"
+                                                        },
+                                                        "cards": {
+                                                          "minItems": 1,
+                                                          "maxItems": 20,
+                                                          "type": "array",
+                                                          "items": {
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema57"
+                                                          }
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "type",
+                                                        "cards"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "type": {
+                                                          "type": "string",
+                                                          "const": "callout"
+                                                        },
+                                                        "tone": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "info",
+                                                            "warning",
+                                                            "success",
+                                                            "danger"
+                                                          ]
+                                                        },
+                                                        "title": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                                        },
+                                                        "body": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "type",
+                                                        "tone",
+                                                        "body"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "block"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
                                                   "const": "image"
                                                 },
                                                 "artifactId": {
@@ -9452,7 +9614,7 @@
                                                   "type": "string"
                                                 },
                                                 "intent": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema58"
                                                 }
                                               },
                                               "required": [
@@ -9480,7 +9642,7 @@
                                                   "type": "string"
                                                 },
                                                 "intent": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema58"
                                                 },
                                                 "returnToMessageId": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -9637,7 +9799,7 @@
                                 "run": {
                                   "anyOf": [
                                     {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema46"
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
                                     },
                                     {
                                       "type": "null"
@@ -9647,7 +9809,7 @@
                                 "activeRuns": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema46"
+                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
                                   }
                                 },
                                 "delegatePending": {
@@ -9900,7 +10062,7 @@
                                             "maxLength": 2048
                                           },
                                           "intervalMinutes": {
-                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
                                           }
                                         },
                                         "required": [
@@ -9939,10 +10101,10 @@
                                           "arguments": {
                                             "type": "object",
                                             "propertyNames": {
-                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
                                             },
                                             "additionalProperties": {
-                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
                                             }
                                           },
                                           "appName": {
@@ -9950,7 +10112,7 @@
                                             "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
                                           },
                                           "intervalMinutes": {
-                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
                                           }
                                         },
                                         "required": [
@@ -10287,10 +10449,10 @@
                                     "automatedSenderPolicies": {
                                       "type": "object",
                                       "propertyNames": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
                                       },
                                       "additionalProperties": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema64"
                                       }
                                     },
                                     "automatedSenders": {
@@ -16231,6 +16393,274 @@
                         "externalComputerTools",
                         "webhookConfigured",
                         "spawnKey"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/calendar/agenda": {
+      "post": {
+        "operationId": "rpc_calendar_agenda",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "$ref": "#/components/schemas/RpcCalendarAgendaInputSchema0"
+                      },
+                      "to": {
+                        "$ref": "#/components/schemas/RpcCalendarAgendaInputSchema0"
+                      },
+                      "sources": {
+                        "$ref": "#/components/schemas/RpcCalendarAgendaInputSchema1"
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ],
+                    "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                    "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "event",
+                                  "todo",
+                                  "check_back",
+                                  "routine"
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "start": {
+                                "$ref": "#/components/schemas/RpcCalendarAgendaOutputSchema0"
+                              },
+                              "end": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcCalendarAgendaOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "allDay": {
+                                "type": "boolean"
+                              },
+                              "botId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "botName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "account": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "href": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "title",
+                              "start",
+                              "end",
+                              "allDay",
+                              "botId",
+                              "botName",
+                              "account",
+                              "href"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "account": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "account",
+                              "message"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "googleConnected": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "errors",
+                        "googleConnected"
                       ],
                       "additionalProperties": false
                     }
@@ -43686,6 +44116,168 @@
                                       "properties": {
                                         "kind": {
                                           "type": "string",
+                                          "const": "ui"
+                                        },
+                                        "block": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "$ref": "#/components/schemas/RpcExportBotOutputSchema15"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcExportBotOutputSchema16"
+                                                },
+                                                "columns": {
+                                                  "$ref": "#/components/schemas/RpcExportBotOutputSchema18"
+                                                },
+                                                "rows": {
+                                                  "$ref": "#/components/schemas/RpcExportBotOutputSchema20"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "columns",
+                                                "rows"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "sections"
+                                                },
+                                                "sections": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcExportBotOutputSchema22"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "sections"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "summary"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcExportBotOutputSchema17"
+                                                },
+                                                "items": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcExportBotOutputSchema24"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "items"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "stats"
+                                                },
+                                                "stats": {
+                                                  "minItems": 1,
+                                                  "maxItems": 6,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcExportBotOutputSchema26"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "stats"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "cards"
+                                                },
+                                                "cards": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcExportBotOutputSchema27"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "cards"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "callout"
+                                                },
+                                                "tone": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "info",
+                                                    "warning",
+                                                    "success",
+                                                    "danger"
+                                                  ]
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcExportBotOutputSchema17"
+                                                },
+                                                "body": {
+                                                  "$ref": "#/components/schemas/RpcExportBotOutputSchema23"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "tone",
+                                                "body"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "block"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
                                           "const": "image"
                                         },
                                         "artifactId": {
@@ -43833,7 +44425,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcExportBotOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcExportBotOutputSchema28"
                                         }
                                       },
                                       "required": [
@@ -43861,7 +44453,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcExportBotOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcExportBotOutputSchema28"
                                         },
                                         "returnToMessageId": {
                                           "$ref": "#/components/schemas/RpcExportBotOutputSchema0"
@@ -60109,6 +60701,168 @@
                                       "properties": {
                                         "kind": {
                                           "type": "string",
+                                          "const": "ui"
+                                        },
+                                        "block": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "$ref": "#/components/schemas/RpcGroupsGetOutputSchema15"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcGroupsGetOutputSchema16"
+                                                },
+                                                "columns": {
+                                                  "$ref": "#/components/schemas/RpcGroupsGetOutputSchema18"
+                                                },
+                                                "rows": {
+                                                  "$ref": "#/components/schemas/RpcGroupsGetOutputSchema20"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "columns",
+                                                "rows"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "sections"
+                                                },
+                                                "sections": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcGroupsGetOutputSchema22"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "sections"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "summary"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcGroupsGetOutputSchema17"
+                                                },
+                                                "items": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcGroupsGetOutputSchema24"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "items"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "stats"
+                                                },
+                                                "stats": {
+                                                  "minItems": 1,
+                                                  "maxItems": 6,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcGroupsGetOutputSchema26"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "stats"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "cards"
+                                                },
+                                                "cards": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcGroupsGetOutputSchema27"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "cards"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "callout"
+                                                },
+                                                "tone": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "info",
+                                                    "warning",
+                                                    "success",
+                                                    "danger"
+                                                  ]
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcGroupsGetOutputSchema17"
+                                                },
+                                                "body": {
+                                                  "$ref": "#/components/schemas/RpcGroupsGetOutputSchema23"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "tone",
+                                                "body"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "block"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
                                           "const": "image"
                                         },
                                         "artifactId": {
@@ -60256,7 +61010,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema28"
                                         }
                                       },
                                       "required": [
@@ -60284,7 +61038,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema28"
                                         },
                                         "returnToMessageId": {
                                           "$ref": "#/components/schemas/RpcGroupsGetOutputSchema0"
@@ -109977,6 +110731,168 @@
                                       "properties": {
                                         "kind": {
                                           "type": "string",
+                                          "const": "ui"
+                                        },
+                                        "block": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "$ref": "#/components/schemas/RpcThreadsGetOutputSchema15"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcThreadsGetOutputSchema16"
+                                                },
+                                                "columns": {
+                                                  "$ref": "#/components/schemas/RpcThreadsGetOutputSchema18"
+                                                },
+                                                "rows": {
+                                                  "$ref": "#/components/schemas/RpcThreadsGetOutputSchema20"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "columns",
+                                                "rows"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "sections"
+                                                },
+                                                "sections": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsGetOutputSchema22"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "sections"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "summary"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcThreadsGetOutputSchema17"
+                                                },
+                                                "items": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsGetOutputSchema24"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "items"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "stats"
+                                                },
+                                                "stats": {
+                                                  "minItems": 1,
+                                                  "maxItems": 6,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsGetOutputSchema26"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "stats"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "cards"
+                                                },
+                                                "cards": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsGetOutputSchema27"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "cards"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "callout"
+                                                },
+                                                "tone": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "info",
+                                                    "warning",
+                                                    "success",
+                                                    "danger"
+                                                  ]
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcThreadsGetOutputSchema17"
+                                                },
+                                                "body": {
+                                                  "$ref": "#/components/schemas/RpcThreadsGetOutputSchema23"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "tone",
+                                                "body"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "block"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
                                           "const": "image"
                                         },
                                         "artifactId": {
@@ -110124,7 +111040,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema28"
                                         }
                                       },
                                       "required": [
@@ -110152,7 +111068,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema28"
                                         },
                                         "returnToMessageId": {
                                           "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
@@ -110329,7 +111245,7 @@
                         "run": {
                           "anyOf": [
                             {
-                              "$ref": "#/components/schemas/RpcThreadsGetOutputSchema16"
+                              "$ref": "#/components/schemas/RpcThreadsGetOutputSchema29"
                             },
                             {
                               "type": "null"
@@ -110339,7 +111255,7 @@
                         "activeRuns": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema16"
+                            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema29"
                           }
                         },
                         "delegatePending": {
@@ -112181,6 +113097,168 @@
                                       "properties": {
                                         "kind": {
                                           "type": "string",
+                                          "const": "ui"
+                                        },
+                                        "block": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema15"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema16"
+                                                },
+                                                "columns": {
+                                                  "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema18"
+                                                },
+                                                "rows": {
+                                                  "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema20"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "columns",
+                                                "rows"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "sections"
+                                                },
+                                                "sections": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema22"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "sections"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "summary"
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema17"
+                                                },
+                                                "items": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema24"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "items"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "stats"
+                                                },
+                                                "stats": {
+                                                  "minItems": 1,
+                                                  "maxItems": 6,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema26"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "stats"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "cards"
+                                                },
+                                                "cards": {
+                                                  "minItems": 1,
+                                                  "maxItems": 20,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema27"
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "cards"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "callout"
+                                                },
+                                                "tone": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "info",
+                                                    "warning",
+                                                    "success",
+                                                    "danger"
+                                                  ]
+                                                },
+                                                "title": {
+                                                  "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema17"
+                                                },
+                                                "body": {
+                                                  "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema23"
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "tone",
+                                                "body"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "block"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
                                           "const": "image"
                                         },
                                         "artifactId": {
@@ -112328,7 +113406,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema28"
                                         }
                                       },
                                       "required": [
@@ -112356,7 +113434,7 @@
                                           "type": "string"
                                         },
                                         "intent": {
-                                          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema15"
+                                          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema28"
                                         },
                                         "returnToMessageId": {
                                           "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema0"
@@ -120311,6 +121389,159 @@
       },
       "RpcBootstrapOutputSchema45": {
         "type": "string",
+        "const": "table"
+      },
+      "RpcBootstrapOutputSchema46": {
+        "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+      },
+      "RpcBootstrapOutputSchema47": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "RpcBootstrapOutputSchema48": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+        }
+      },
+      "RpcBootstrapOutputSchema49": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ]
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBootstrapOutputSchema50": {
+        "maxItems": 50,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
+        }
+      },
+      "RpcBootstrapOutputSchema51": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "RpcBootstrapOutputSchema52": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+          }
+        },
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBootstrapOutputSchema53": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000
+      },
+      "RpcBootstrapOutputSchema54": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBootstrapOutputSchema55": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "RpcBootstrapOutputSchema56": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "hint": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBootstrapOutputSchema57": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+          },
+          "badge": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "href": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBootstrapOutputSchema58": {
+        "type": "string",
         "enum": [
           "request",
           "result",
@@ -120319,7 +121550,7 @@
           "fyi"
         ]
       },
-      "RpcBootstrapOutputSchema46": {
+      "RpcBootstrapOutputSchema59": {
         "type": "object",
         "properties": {
           "id": {
@@ -120440,7 +121671,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema47": {
+      "RpcBootstrapOutputSchema60": {
         "anyOf": [
           {
             "type": "number",
@@ -120456,10 +121687,10 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema48": {
+      "RpcBootstrapOutputSchema61": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema49": {
+      "RpcBootstrapOutputSchema62": {
         "anyOf": [
           {
             "type": "string"
@@ -120476,7 +121707,7 @@
           {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
             }
           },
           {
@@ -120485,27 +121716,27 @@
               "type": "string"
             },
             "additionalProperties": {
-              "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
             }
           }
         ]
       },
-      "RpcBootstrapOutputSchema50": {
+      "RpcBootstrapOutputSchema63": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcBootstrapOutputSchema51": {
+      "RpcBootstrapOutputSchema64": {
         "type": "object",
         "properties": {
           "name": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema52"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema65"
           },
           "mode": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema66"
           },
           "rollupHours": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema67"
           }
         },
         "required": [
@@ -120514,12 +121745,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema52": {
+      "RpcBootstrapOutputSchema65": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcBootstrapOutputSchema53": {
+      "RpcBootstrapOutputSchema66": {
         "type": "string",
         "enum": [
           "ignore",
@@ -120528,7 +121759,7 @@
           "user"
         ]
       },
-      "RpcBootstrapOutputSchema54": {
+      "RpcBootstrapOutputSchema67": {
         "type": "integer",
         "minimum": 1,
         "maximum": 720
@@ -120778,7 +122009,7 @@
         "type": "boolean"
       },
       "RpcBotsUpdateInputSchema18": {
-        "maxItems": 127,
+        "maxItems": 129,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
@@ -120818,6 +122049,24 @@
           {
             "type": "null"
           }
+        ]
+      },
+      "RpcCalendarAgendaOutputSchema0": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+      },
+      "RpcCalendarAgendaInputSchema0": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+      },
+      "RpcCalendarAgendaInputSchema1": {
+        "type": "string",
+        "enum": [
+          "all",
+          "local",
+          "google"
         ]
       },
       "RpcCartaAgentOutputSchema0": {
@@ -124488,6 +125737,159 @@
       },
       "RpcExportBotOutputSchema15": {
         "type": "string",
+        "const": "table"
+      },
+      "RpcExportBotOutputSchema16": {
+        "$ref": "#/components/schemas/RpcExportBotOutputSchema17"
+      },
+      "RpcExportBotOutputSchema17": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "RpcExportBotOutputSchema18": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcExportBotOutputSchema19"
+        }
+      },
+      "RpcExportBotOutputSchema19": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ]
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "RpcExportBotOutputSchema20": {
+        "maxItems": 50,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcExportBotOutputSchema21"
+        }
+      },
+      "RpcExportBotOutputSchema21": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "RpcExportBotOutputSchema22": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "$ref": "#/components/schemas/RpcExportBotOutputSchema17"
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcExportBotOutputSchema23"
+          }
+        },
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "RpcExportBotOutputSchema23": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000
+      },
+      "RpcExportBotOutputSchema24": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcExportBotOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcExportBotOutputSchema25": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "RpcExportBotOutputSchema26": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcExportBotOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "hint": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcExportBotOutputSchema27": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/RpcExportBotOutputSchema17"
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcExportBotOutputSchema23"
+          },
+          "badge": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "href": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "RpcExportBotOutputSchema28": {
+        "type": "string",
         "enum": [
           "request",
           "result",
@@ -125437,6 +126839,159 @@
         "additionalProperties": false
       },
       "RpcGroupsGetOutputSchema15": {
+        "type": "string",
+        "const": "table"
+      },
+      "RpcGroupsGetOutputSchema16": {
+        "$ref": "#/components/schemas/RpcGroupsGetOutputSchema17"
+      },
+      "RpcGroupsGetOutputSchema17": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "RpcGroupsGetOutputSchema18": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema19"
+        }
+      },
+      "RpcGroupsGetOutputSchema19": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ]
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "RpcGroupsGetOutputSchema20": {
+        "maxItems": 50,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema21"
+        }
+      },
+      "RpcGroupsGetOutputSchema21": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "RpcGroupsGetOutputSchema22": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "$ref": "#/components/schemas/RpcGroupsGetOutputSchema17"
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcGroupsGetOutputSchema23"
+          }
+        },
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "RpcGroupsGetOutputSchema23": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000
+      },
+      "RpcGroupsGetOutputSchema24": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcGroupsGetOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcGroupsGetOutputSchema25": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "RpcGroupsGetOutputSchema26": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcGroupsGetOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "hint": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcGroupsGetOutputSchema27": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/RpcGroupsGetOutputSchema17"
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcGroupsGetOutputSchema23"
+          },
+          "badge": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "href": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "RpcGroupsGetOutputSchema28": {
         "type": "string",
         "enum": [
           "request",
@@ -129224,6 +130779,159 @@
       },
       "RpcThreadsGetOutputSchema15": {
         "type": "string",
+        "const": "table"
+      },
+      "RpcThreadsGetOutputSchema16": {
+        "$ref": "#/components/schemas/RpcThreadsGetOutputSchema17"
+      },
+      "RpcThreadsGetOutputSchema17": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "RpcThreadsGetOutputSchema18": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema19"
+        }
+      },
+      "RpcThreadsGetOutputSchema19": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ]
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsGetOutputSchema20": {
+        "maxItems": 50,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema21"
+        }
+      },
+      "RpcThreadsGetOutputSchema21": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "RpcThreadsGetOutputSchema22": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema17"
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema23"
+          }
+        },
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsGetOutputSchema23": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000
+      },
+      "RpcThreadsGetOutputSchema24": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsGetOutputSchema25": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "RpcThreadsGetOutputSchema26": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "hint": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsGetOutputSchema27": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema17"
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcThreadsGetOutputSchema23"
+          },
+          "badge": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "href": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsGetOutputSchema28": {
+        "type": "string",
         "enum": [
           "request",
           "result",
@@ -129232,7 +130940,7 @@
           "fyi"
         ]
       },
-      "RpcThreadsGetOutputSchema16": {
+      "RpcThreadsGetOutputSchema29": {
         "type": "object",
         "properties": {
           "id": {
@@ -129669,6 +131377,159 @@
         "additionalProperties": false
       },
       "RpcThreadsMessagesOutputSchema15": {
+        "type": "string",
+        "const": "table"
+      },
+      "RpcThreadsMessagesOutputSchema16": {
+        "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema17"
+      },
+      "RpcThreadsMessagesOutputSchema17": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "RpcThreadsMessagesOutputSchema18": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema19"
+        }
+      },
+      "RpcThreadsMessagesOutputSchema19": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ]
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsMessagesOutputSchema20": {
+        "maxItems": 50,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema21"
+        }
+      },
+      "RpcThreadsMessagesOutputSchema21": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "RpcThreadsMessagesOutputSchema22": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema17"
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema23"
+          }
+        },
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsMessagesOutputSchema23": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000
+      },
+      "RpcThreadsMessagesOutputSchema24": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsMessagesOutputSchema25": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "RpcThreadsMessagesOutputSchema26": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema25"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "hint": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsMessagesOutputSchema27": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema17"
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "body": {
+            "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema23"
+          },
+          "badge": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "href": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "RpcThreadsMessagesOutputSchema28": {
         "type": "string",
         "enum": [
           "request",

@@ -37,6 +37,7 @@ import {
   selectableMessageText,
   signupRequiresEmailVerification,
   toolPhrase,
+  uiBlockText,
 } from "@rakazo/core";
 import * as SecureStore from "expo-secure-store";
 import { promptAiConsent } from "./ai-consent";
@@ -1112,6 +1113,7 @@ export function blockText(message: MobileMessage) {
         return `${block.status === "archived" ? "Archived" : block.status === "deleted" ? "Deleted" : "Bot"} ${block.name ?? ""}`;
       }
       if (block.kind === "emails") return emailCardsText(block.emails);
+      if (block.kind === "ui") return uiBlockText(block.block);
       if (block.kind === "mail_thread") {
         return `Email thread · ${block.messages.length} ${block.messages.length === 1 ? "message" : "messages"}`;
       }

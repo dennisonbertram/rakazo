@@ -745,6 +745,11 @@ msgstr ""
 msgid "* So far"
 msgstr ""
 
+#. placeholder {0}: items.length - MONTH_CHIPS
+#: src/pages/Calendar.tsx
+msgid "+{0} more"
+msgstr ""
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "+{count} more"
 msgstr ""
@@ -1221,6 +1226,7 @@ msgid "AI data sharing off"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/Inbox.tsx
 msgid "All"
@@ -1249,6 +1255,10 @@ msgstr ""
 
 #: src/components/FinanceCards.tsx
 msgid "all dates"
+msgstr ""
+
+#: src/pages/Calendar.tsx
+msgid "All day"
 msgstr ""
 
 #: src/components/data-room/ProcessingStrip.tsx
@@ -2063,6 +2073,7 @@ msgstr "бот"
 
 #: src/pages/ActivityList.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
 #: src/pages/shell/transcript.tsx
@@ -2201,9 +2212,12 @@ msgid "Cadence"
 msgstr ""
 
 #: src/components/gtm/GtmCalendar.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/Gtm.tsx
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
 msgid "Calendar"
 msgstr ""
 
@@ -2556,6 +2570,10 @@ msgstr "Проверьте URL сервера и сеть, затем повто
 msgid "Check your email"
 msgstr "Проверьте свою электронную почту"
 
+#: src/pages/Calendar.tsx
+msgid "Check-backs"
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "Check-in every 4 hours"
 msgstr ""
@@ -2705,6 +2723,7 @@ msgstr ""
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/finance/ui.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/DataRoom.tsx
@@ -3202,6 +3221,10 @@ msgstr ""
 
 #: src/pages/DataRoom.tsx
 msgid "Connect Gmail to send files"
+msgstr ""
+
+#: src/pages/Calendar.tsx
+msgid "Connect Google Calendar"
 msgstr ""
 
 #: src/pages/Investors.tsx
@@ -3782,6 +3805,10 @@ msgstr "Не удалось загрузить навык"
 msgid "Could not load the app list. Reload to try again."
 msgstr ""
 
+#: src/pages/Calendar.tsx
+msgid "Could not load the calendar"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Could not load the cap table, so holdings are missing."
 msgstr ""
@@ -4205,6 +4232,10 @@ msgstr ""
 msgid "Couldn't download {0}"
 msgstr ""
 
+#: src/pages/Calendar.tsx
+msgid "Couldn't load {account}"
+msgstr ""
+
 #: src/components/data-room/ImportFromEmail.tsx
 msgid "Couldn't load mail"
 msgstr ""
@@ -4484,6 +4515,10 @@ msgstr ""
 #: src/pages/RoutineSchedule.tsx
 msgid "day"
 msgstr "день"
+
+#: src/pages/Calendar.tsx
+msgid "Day"
+msgstr ""
 
 #: src/pages/RoutineSchedule.tsx
 msgid "Day of week"
@@ -5341,6 +5376,10 @@ msgstr ""
 msgid "Error"
 msgstr ""
 
+#: src/pages/Calendar.tsx
+msgid "Events"
+msgstr ""
+
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Every"
 msgstr "Каждые"
@@ -5893,6 +5932,10 @@ msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Google apps"
+msgstr ""
+
+#: src/pages/Calendar.tsx
+msgid "Google Calendar"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -6536,6 +6579,7 @@ msgid "Keyboard shortcuts"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
@@ -6796,6 +6840,7 @@ msgstr "Автоматически загружать изображения и�
 
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Finance.tsx
 #: src/pages/Shell.tsx
 msgid "Loading"
@@ -7361,6 +7406,7 @@ msgid "month"
 msgstr ""
 
 #: src/components/finance/ui.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/CompanyHistory.tsx
 #: src/pages/finance/FinanceAccounts.tsx
@@ -7724,6 +7770,7 @@ msgid "Newsletters"
 msgstr ""
 
 #: src/components/tour/TourPopover.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Next"
 msgstr ""
@@ -7825,6 +7872,10 @@ msgstr "Активности бота пока нет."
 #. placeholder {0}: item.name
 #: src/components/integrations/ConnectAppDialog.tsx
 msgid "No bot uses {0} yet. Choose bots on its page."
+msgstr ""
+
+#: src/pages/Calendar.tsx
+msgid "No bots"
 msgstr ""
 
 #: src/pages/Shell.tsx
@@ -7951,6 +8002,7 @@ msgstr ""
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/components/finance/ui.tsx
 #: src/pages/AccountSettingsOverlay.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/devin/DevinSessions.tsx
@@ -8307,6 +8359,10 @@ msgstr ""
 #: src/pages/KnowledgeSection.tsx
 msgid "Nothing remembered yet"
 msgstr "Пока ничего не запомнено"
+
+#: src/pages/Calendar.tsx
+msgid "Nothing scheduled"
+msgstr ""
 
 #: src/pages/portal/PortalHome.tsx
 msgid "Nothing shared yet."
@@ -9150,6 +9206,10 @@ msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "Preview sample"
+msgstr ""
+
+#: src/pages/Calendar.tsx
+msgid "Previous"
 msgstr ""
 
 #: src/components/inbox/MailAttachments.tsx
@@ -10199,6 +10259,7 @@ msgstr "Задача"
 
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/BotContextMenu.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
 msgid "Routines"
@@ -10502,6 +10563,10 @@ msgstr ""
 msgid "Scanning…"
 msgstr ""
 
+#: src/pages/Calendar.tsx
+msgid "Schedule"
+msgstr ""
+
 #: src/pages/shell/transcript.tsx
 msgid "Scheduled run failed: {failedNote}"
 msgstr ""
@@ -10528,6 +10593,7 @@ msgstr ""
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
@@ -12281,10 +12347,15 @@ msgstr ""
 msgid "To pick up, press space. Use the arrow keys to move, space to drop, escape to cancel."
 msgstr ""
 
+#: src/pages/Calendar.tsx
+msgid "To-dos"
+msgstr ""
+
 #: src/components/EmailCards.tsx
 #: src/components/gtm/GtmCalendar.tsx
 #: src/components/inbox/TodoCard.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/shell/chat-context.tsx
 msgid "Today"
@@ -12455,6 +12526,7 @@ msgstr ""
 #: src/components/ShellSkeleton.tsx
 #: src/lib/use-contact-notices.ts
 #: src/pages/ActivityList.tsx
+#: src/pages/Calendar.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Fundraising.tsx
@@ -13161,6 +13233,7 @@ msgid "week"
 msgstr ""
 
 #: src/components/finance/ui.tsx
+#: src/pages/Calendar.tsx
 msgid "Week"
 msgstr ""
 
