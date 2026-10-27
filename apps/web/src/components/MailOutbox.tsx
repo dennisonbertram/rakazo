@@ -25,6 +25,8 @@ export function MailOutbox() {
             >
               {/* The same high-contrast toast as the Inbox's Archived notice, so it stands apart from the rows under it. */}
               <div
+                // A pending approval toast rises above this notice instead of covering Undo.
+                data-toast-avoid=""
                 className={cn(
                   "pointer-events-auto flex min-h-9 items-center gap-2 rounded-lg bg-primary py-1 ps-3 text-sm text-primary-foreground shadow-lg",
                   undoable ? "pe-1" : "pe-3",
