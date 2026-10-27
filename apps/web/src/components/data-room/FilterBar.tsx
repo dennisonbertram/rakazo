@@ -18,7 +18,7 @@ import {
 import { ChevronDown, Folder, FolderPlus, ListFilter, WandSparkles, X } from "lucide-react";
 import type { FormEvent, ReactElement, ReactNode } from "react";
 import { useState } from "react";
-import { PickFilter, SearchField, SortControl, Tip } from "../ListControls";
+import { PickFilter, SearchField, SortControl, Tip, usePhone } from "../ListControls";
 import { PAGE_GUTTER_X } from "../PageHeader";
 import type { FolderNode } from "./folders";
 import { typeLabel } from "./format";
@@ -284,6 +284,8 @@ export function FilterBar({
   const openFolder = folders.find(({ folder }) => folder.id === folderId);
   // On a phone the pills sit behind one "Filters" button on the search row, with the count set.
   const [pillsOpen, setPillsOpen] = useState(false);
+  const phone = usePhone();
+  const label = t`Status`;
   const activeFilters = [
     filters.docType,
     filters.party,
@@ -294,6 +296,7 @@ export function FilterBar({
   ].filter(Boolean).length;
   const sortControl = (
     <SortControl
+      inline
       fields={fields.map((name) => [name, labels[name]])}
       field={field}
       fieldLabel={labels[field]}
@@ -314,7 +317,7 @@ export function FilterBar({
           className="order-1 min-w-0 flex-1 basis-48 pointer-coarse:h-11 @min-[800px]/bd:me-1.5 @min-[800px]/bd:w-80 @min-[800px]/bd:flex-none"
           value={query}
           onChange={onQuery}
-          placeholder={t`Search names and text`}
+          placeholder={phone ? t`Search` : t`Search names and text`}
           label={t`Search documents`}
           name="data-room-search"
         />
@@ -331,13 +334,26 @@ export function FilterBar({
         <Trans>Filters</Trans>
         {activeFilters > 0 ? <span className="tabular-nums">{activeFilters}</span> : null}
       </Button>
+      {/* The failed filter stays named in the main row, so one tap clears it; wider, its pill shows below. */}
+      {filters.status ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="order-1 h-8 rounded-full @min-[640px]/bd:hidden"
+          aria-label={t`Remove filter ${label}`}
+          onClick={() => onFilters({ ...filters, status: undefined })}
+        >
+          {label}: <Trans>Failed</Trans>
+          <X aria-hidden="true" />
+        </Button>
+      ) : null}
       {leading ? (
-        <div className="order-1 flex h-8 shrink-0 items-center empty:hidden @min-[960px]/bd:order-3">
+        <div className="order-1 flex min-h-8 shrink-0 items-center empty:hidden @min-[960px]/bd:order-3">
           {leading}
         </div>
       ) : null}
       {/* Where the folder tree is hidden, this picks the folder; it sits with Sort, not the pills. */}
-      <div className="order-2 flex h-8 min-w-0 items-center gap-1 @min-[800px]/bd:hidden">
+      <div className="order-2 flex min-h-8 min-w-0 items-center gap-1 @min-[800px]/bd:hidden">
         <DropdownMenu>
           <DropdownMenuTrigger
             data-testid="data-room-folder-picker"
@@ -390,9 +406,10 @@ export function FilterBar({
       <div
         id="data-room-filters"
         data-testid="data-room-filters"
-        className={`order-4 flex basis-full flex-wrap ${pillsOpen ? "" : "@max-[639px]/bd:hidden"} items-center gap-1.5 *:h-8 *:shrink-0 empty:hidden @min-[960px]/bd:order-3 @min-[960px]/bd:min-w-0 @min-[960px]/bd:basis-0 @min-[960px]/bd:flex-1`}
+        className={`order-4 flex basis-full flex-wrap ${pillsOpen ? "" : "@max-[639px]/bd:hidden"} items-center gap-1.5 *:min-h-8 *:shrink-0 empty:hidden @min-[960px]/bd:order-3 @min-[960px]/bd:min-w-0 @min-[960px]/bd:basis-0 @min-[960px]/bd:flex-1`}
       >
         <PickFilter
+          inline
           label={t`Type`}
           value={filters.docType}
           options={withValue(types, filters.docType).map((type) => [type, typeLabel(type)])}
@@ -400,6 +417,7 @@ export function FilterBar({
           onChange={(docType) => onFilters({ ...filters, docType })}
         />
         <PickFilter
+          inline
           label={t`Party`}
           value={filters.party}
           options={withValue(parties, filters.party).map((party) => [party, party])}
@@ -419,6 +437,7 @@ export function FilterBar({
         />
         {filters.status ? (
           <PickFilter
+            inline
             label={t`Status`}
             value={filters.status}
             options={[["failed", t`Failed`]]}
@@ -427,6 +446,7 @@ export function FilterBar({
         ) : null}
         {filters.legalUnchecked ? (
           <PickFilter
+            inline
             label={t`Legal`}
             value="unchecked"
             options={[["unchecked", t`Not checked`]]}
@@ -435,6 +455,7 @@ export function FilterBar({
         ) : null}
         {sources.length > 1 || filters.source ? (
           <PickFilter
+            inline
             label={t`Source`}
             value={filters.source}
             options={withValue(sources, filters.source).map((source) => [
@@ -453,12 +474,12 @@ export function FilterBar({
       </div>
       {/* On a phone the view toggles stay on the folder row in every view, not behind Filters. */}
       {trailing ? (
-        <div className="order-3 ms-auto flex h-8 items-center @min-[640px]/bd:hidden">
+        <div className="order-3 ms-auto flex min-h-8 items-center @min-[640px]/bd:hidden">
           {trailing}
         </div>
       ) : null}
       {statsView ? null : (
-        <div className="order-3 ms-auto flex h-8 shrink-0 items-center gap-0.5 @max-[639px]/bd:hidden @min-[960px]/bd:order-4">
+        <div className="order-3 ms-auto flex min-h-8 shrink-0 items-center gap-0.5 @max-[639px]/bd:hidden @min-[960px]/bd:order-4">
           {sortControl}
         </div>
       )}
