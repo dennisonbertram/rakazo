@@ -24,7 +24,10 @@ export function SafeRows({ safes }: { safes: readonly Safe[] }) {
       className="mt-3 border-t border-border pt-2"
     >
       <div className="flex items-center gap-2 py-1 text-sm font-medium">
-        <Link to="/app/fundraising" className="min-w-0 flex-1 underline-offset-4 hover:underline">
+        <Link
+          to="/app/fundraising"
+          className="flex min-w-0 flex-1 items-center underline-offset-4 hover:underline pointer-coarse:min-h-11"
+        >
           {t`SAFEs, if converted at cap`}
         </Link>
         <span className="tabular-nums" data-testid="safe-sum">

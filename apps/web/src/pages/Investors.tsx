@@ -467,6 +467,7 @@ function ContactRow({
   contact,
   saved,
   portal,
+  onOpen,
   onEdit,
   onDelete,
   onResend,
@@ -478,6 +479,8 @@ function ContactRow({
   saved: boolean;
   /** The Investors tab only: board and auditor contacts have no portal access. */
   portal: boolean;
+  /** A row tap opens the contact's page; Edit stays in the row menu. */
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onResend: () => void;
@@ -495,14 +498,25 @@ function ContactRow({
       <button
         type="button"
         data-row-open
-        className="min-w-0 flex-1 rounded-sm py-1.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={onEdit}
+        className="min-w-0 flex-1 rounded-sm px-2 py-1.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        onClick={onOpen}
       >
         <span className="block truncate text-sm font-medium" title={contact.name}>
           {contact.name}
         </span>
-        <span className="block truncate text-xs text-muted-foreground">
-          {[contact.organization, contact.email].filter(Boolean).join(" · ")}
+        {/* The email is the identifier, so the organization gives way first. */}
+        <span className="flex gap-1 text-xs text-muted-foreground">
+          {contact.organization ? (
+            <span className="max-w-[40%] min-w-12 truncate" title={contact.organization}>
+              {contact.organization}
+            </span>
+          ) : null}
+          {contact.organization && contact.email ? <span aria-hidden="true">·</span> : null}
+          {contact.email ? (
+            <span className="min-w-0 truncate" title={contact.email}>
+              {contact.email}
+            </span>
+          ) : null}
         </span>
       </button>
       {portal && portalLabel(contact) ? (
@@ -516,7 +530,12 @@ function ContactRow({
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="ghost" size="icon-sm" aria-label={t`Actions for ${contact.name}`} />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="pointer-coarse:size-11"
+              aria-label={t`Actions for ${contact.name}`}
+            />
           }
         >
           <MoreHorizontal aria-hidden="true" />
@@ -1579,6 +1598,7 @@ export function InvestorsPage({
                           contact={contact}
                           saved={contact.id === savedId}
                           portal={tab === "investor"}
+                          onOpen={() => navigate(`/app/contacts/${contact.id}`)}
                           onEdit={() => setEditing(contact)}
                           onDelete={() => void deleteContact(contact)}
                           onResend={() => void sendLink(contact, false)}
