@@ -33,6 +33,8 @@ function deps(
     uniqueConflictOnCommit?: boolean;
     transactionConflictOnce?: boolean;
     sender?: { audience: string; externalMessageTargets: string[] };
+    /** The target thread's stored messages, newest first. */
+    threadMessages?: { role: string; blocks: unknown[] }[];
   } = {},
 ) {
   const enqueue = vi.fn().mockResolvedValue(undefined);
@@ -64,6 +66,7 @@ function deps(
     message: {
       findUnique: messageFindUnique,
       create: vi.fn().mockResolvedValue({ id: "message-1", seq: 1 }),
+      findMany: vi.fn().mockResolvedValue(options.threadMessages ?? []),
       update: vi.fn().mockResolvedValue({}),
     },
     event: { create: vi.fn().mockResolvedValue({ seq: 7 }) },
@@ -1335,5 +1338,101 @@ describe("a delegate that has not answered yet", () => {
       intent: "status",
     });
     expect(prompt).toContain('do not post a "waiting" message');
+  });
+});
+
+describe("a result while the receiver delegated to several bots", () => {
+  const chief = {
+    id: "bot-chief",
+    name: "Chief",
+    title: "",
+    spawnKey: null,
+    thread: { id: "thread-chief" },
+  };
+  const asked = (id: string, name: string) => ({
+    role: "bot",
+    blocks: [
+      { kind: "bot_message_sent", toBotId: id, toBotName: name, text: "q", intent: "request" },
+    ],
+  });
+  const answered = (id: string, name: string) => ({
+    role: "user",
+    blocks: [
+      {
+        kind: "bot_message_received",
+        fromBotId: id,
+        fromBotName: name,
+        text: `${name} done`,
+        intent: "result",
+      },
+    ],
+  });
+  const typed = { role: "user", blocks: [{ kind: "text", text: "overview?" }] };
+  // Newest first, as the query returns them.
+  const deliver = async (threadMessages: { role: string; blocks: unknown[] }[]) => {
+    const d = deps({ bots: [chief], threadMessages });
+    await messageBot(
+      d.deps,
+      run,
+      { id: "bot-legal", name: "Legal" },
+      { bot_id: "bot-chief", message: "Legal done", intent: "result" },
+      { allowTerminalSource: true },
+    );
+    const blocks = d.tx.message.create.mock.calls.flatMap(
+      ([c]) => (c as { data: { blocks: unknown[] } }).data.blocks,
+    );
+    const received = blocks.find((b) => (b as { kind: string }).kind === "bot_message_received");
+    const taskArgs = d.tx.task.create.mock.calls[0]?.[0] as { data: { prompt: string } };
+    const prompt = taskArgs.data.prompt;
+    return { received, prompt };
+  };
+
+  it("waits and allows silence while two of three delegates have not answered", async () => {
+    const { received, prompt } = await deliver([
+      asked("bot-inbox", "Inbox"),
+      asked("bot-finance", "Finance"),
+      asked("bot-legal", "Legal"),
+      typed,
+    ]);
+    expect(received).toMatchObject({ stillWaitingFor: ["Finance", "Inbox"] });
+    expect(prompt).toContain("still waiting for: Finance, Inbox");
+    const waiting = (received as { stillWaitingFor: string[] }).stillWaitingFor.length > 0;
+    expect(botMessageAllowsSilence("result", true, waiting)).toBe(true);
+  });
+
+  it("asks for one combined answer when the last result arrives", async () => {
+    const { received, prompt } = await deliver([
+      answered("bot-finance", "Finance"),
+      answered("bot-inbox", "Inbox"),
+      asked("bot-legal", "Legal"),
+      asked("bot-finance", "Finance"),
+      asked("bot-inbox", "Inbox"),
+      typed,
+    ]);
+    expect(received).not.toHaveProperty("stillWaitingFor");
+    expect(prompt).toContain("one combined answer");
+    expect(prompt).toContain("present-clearly");
+  });
+
+  it("counts a failure reply and ignores delegations before the user's last message", async () => {
+    const { prompt } = await deliver([
+      answered("bot-inbox", "Inbox"),
+      asked("bot-legal", "Legal"),
+      asked("bot-inbox", "Inbox"),
+      typed,
+      asked("bot-finance", "Finance"),
+    ]);
+    expect(prompt).toContain("one combined answer");
+  });
+
+  it("leaves a single delegation as it is today", async () => {
+    const single = await deliver([asked("bot-legal", "Legal"), typed]);
+    const none = await deliver([]);
+    for (const { received, prompt } of [single, none]) {
+      expect(received).not.toHaveProperty("stillWaitingFor");
+      expect(prompt).not.toContain("combined");
+      expect(prompt).not.toContain("still waiting for:");
+    }
+    expect(botMessageAllowsSilence("result", true, false)).toBe(false);
   });
 });

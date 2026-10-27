@@ -17,6 +17,7 @@ import {
   checkOutbound,
   clampBotMessage,
   nextBotMessageHop,
+  openBotDelegations,
   resolveBotAddress,
 } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
@@ -73,6 +74,29 @@ export async function loadBotMessageContext(
         (block.intent === undefined || block.intent === "request" || block.intent === "question"),
     );
   return { ...context, repliesToRequest };
+}
+
+/**
+ * The thread's messages since the last one a person typed, oldest first. A delivered bot message
+ * is stored as a user-role message, so it does not end the window. Bounded to the newest 200.
+ */
+async function recentSinceUserMessage(
+  db: Pick<PrismaClient, "message">,
+  threadId: string,
+): Promise<{ blocks: MessageBlock[] }[]> {
+  const rows = await db.message.findMany({
+    where: { threadId },
+    orderBy: { seq: "desc" },
+    take: 200,
+    select: { role: true, blocks: true },
+  });
+  const window: { blocks: MessageBlock[] }[] = [];
+  for (const row of rows) {
+    const blocks = Array.isArray(row.blocks) ? (row.blocks as MessageBlock[]) : [];
+    if (row.role === "user" && !blocks.some((b) => b.kind === "bot_message_received")) break;
+    window.unshift({ blocks });
+  }
+  return window;
 }
 
 /** The fixed refusal an external bot gets for any target its owner has not chosen. */
@@ -328,13 +352,6 @@ export async function messageBot(
       ? sender.name
       : (sourceContext?.externalOriginName ?? options?.externalChain?.name)
     : undefined;
-  const wakePrompt = buildBotMessageWakePrompt({
-    from: sender,
-    text: message,
-    intent,
-    externalOrigin,
-    externalName: externalOriginName,
-  });
   const outboundBlock: MessageBlock = {
     kind: "bot_message_sent",
     toBotId: target.id,
@@ -418,6 +435,21 @@ export async function messageBot(
           markUnread: options?.forceUnread === true,
           allowCancelledRun: options?.allowTerminalSource === true || options?.anyRunState === true,
         });
+        const delegation =
+          intent === "result"
+            ? openBotDelegations(await recentSinceUserMessage(tx, targetThreadId), {
+                id: sender.id,
+                name: sender.name,
+              })
+            : undefined;
+        const wakePrompt = buildBotMessageWakePrompt({
+          from: sender,
+          text: message,
+          intent,
+          externalOrigin,
+          externalName: externalOriginName,
+          delegation,
+        });
         const inboundBlock: MessageBlock = {
           kind: "bot_message_received",
           fromBotId: sender.id,
@@ -426,6 +458,9 @@ export async function messageBot(
           hop,
           intent,
           returnToMessageId: outbound.id,
+          ...(delegation && delegation.waitingFor.length > 0
+            ? { stillWaitingFor: delegation.waitingFor }
+            : {}),
           ...(ownerAgentsOnly ? { backgroundOrigin: true } : {}),
           ...(externalOrigin
             ? {

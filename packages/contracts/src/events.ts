@@ -464,6 +464,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     externalOrigin: z.boolean().optional(),
     /** Name of the bot that started an external chain, from stored data, for the notice. */
     externalOriginName: z.string().max(200).optional(),
+    /** A result that arrived while the receiver still waits on these delegates. Server-written. */
+    stillWaitingFor: z.array(z.string()).optional(),
   }),
 ]);
 export type MessageBlock = z.infer<typeof MessageBlock>;

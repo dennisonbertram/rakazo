@@ -1,6 +1,7 @@
 import { devinSessionUrl } from "@rakazo/contracts";
 import { expect, it } from "vitest";
-import { BUILTIN_AGENT_SKILLS } from "./builtin-skills.js";
+import { BUILTIN_AGENT_SKILLS, PRESENT_CLEARLY_SKILL_NAME } from "./builtin-skills.js";
+import { PRESENTATION_GUIDANCE } from "./executor.js";
 
 const skill = BUILTIN_AGENT_SKILLS.find((s) => s.name === "devin-sessions");
 
@@ -53,4 +54,11 @@ it("the audit-response skill drafts in the thread, saves the row, notifies once 
   for (const banned of ["mail_send", "Carta", "drive_search"]) expect(text).not.toContain(banned);
   expect(text).toContain("Do not call add_to_data_room");
   expect(text).toContain("never close a request");
+});
+
+it("every agent is told to read present-clearly, and that skill exists", () => {
+  expect(PRESENTATION_GUIDANCE).toContain(PRESENT_CLEARLY_SKILL_NAME);
+  const present = BUILTIN_AGENT_SKILLS.find((s) => s.name === PRESENT_CLEARLY_SKILL_NAME);
+  expect(present?.description.length).toBeLessThanOrEqual(72);
+  expect(present?.content).toContain("Lead with the point");
 });
