@@ -163,6 +163,8 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
       scroller.style.maxHeight = "";
       // Expanded finished runs are what the person asked for: show them all, and let the sidebar scroll.
       if (showFinished) return;
+      // In the phone drawer the sidebar is the one scroller, so Working and Finished stay reachable.
+      if (window.matchMedia && !window.matchMedia("(min-width: 1024px)").matches) return;
       const top = scroller.getBoundingClientRect().top;
       const endOf = (row: Element) => row.getBoundingClientRect().bottom - top + scroller.scrollTop;
       // Everything waiting on the person always shows; the other runs share what is left of 30% of the window.
@@ -224,7 +226,7 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 rounded-full px-2 text-[12px] text-muted-foreground"
+                className="h-7 rounded-full px-2 text-[12px] text-muted-foreground pointer-coarse:h-11 pointer-coarse:px-3"
                 data-testid="activity-show-filters"
               />
             }
@@ -286,7 +288,7 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 w-full justify-start rounded-xl px-2.5 text-[12.5px] font-medium text-muted-foreground/80"
+            className="h-7 w-full justify-start rounded-xl px-2.5 text-[12.5px] font-medium text-muted-foreground/80 pointer-coarse:h-11"
             data-testid="activity-show-finished"
             aria-expanded={false}
             onClick={() => setShowFinished(true)}
@@ -477,7 +479,7 @@ function WaitingRow({ item, onOpen }: { item: WaitingOnYouItem; onOpen: () => vo
       aria-label={t`${title}, ${botName}`}
       onClick={onOpen}
       data-activity-row=""
-      className="flex w-full gap-3 rounded-xl px-2.5 py-[9px] text-left hover:bg-accent"
+      className="flex w-full gap-3 rounded-xl px-2.5 py-[9px] text-left hover:bg-accent pointer-coarse:min-h-11"
     >
       <span
         className="mt-1.5 size-2 shrink-0 rounded-full bg-current text-warning"
@@ -488,7 +490,7 @@ function WaitingRow({ item, onOpen }: { item: WaitingOnYouItem; onOpen: () => vo
           <span className="truncate text-sm font-medium text-foreground" dir="auto">
             {title}
           </span>
-          <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground/80">
+          <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground/80 pointer-coarse:max-w-[60%]">
             {botName}
           </span>
         </div>
@@ -520,7 +522,7 @@ function ActivityRow({
       aria-label={activityLabel}
       onClick={onOpen}
       data-activity-row=""
-      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent ${compact ? "py-1.5" : "py-[9px]"} ${quiet ? "opacity-60" : ""}`}
+      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent pointer-coarse:min-h-11 ${compact ? "py-1.5" : "py-[9px]"} ${quiet ? "opacity-60" : ""}`}
     >
       <span
         className={`mt-1.5 size-2 shrink-0 rounded-full bg-current ${tone}`}

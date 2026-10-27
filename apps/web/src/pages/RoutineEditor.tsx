@@ -253,7 +253,7 @@ export function RoutineListHeader({ onCreate }: { onCreate: () => void }) {
         <div className="text-sm text-muted-foreground">
           <Trans>Routines</Trans>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground/70">
+        <p className="mt-0.5 text-xs text-muted-foreground/70 max-sm:hidden">
           <Trans>Work this bot repeats for you, like a cash check every Monday.</Trans>
         </p>
       </div>
@@ -524,24 +524,8 @@ export function RoutineEditor({
       </div>
 
       <div className="mb-5 flex items-center justify-between gap-3">
-        <label className="flex items-center gap-2.5 text-sm text-foreground/75">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={draft.active}
-            onClick={() => onChange({ ...draft, active: !draft.active })}
-            className={`relative h-[22px] w-[40px] rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
-              draft.active ? "bg-primary" : "bg-input"
-            }`}
-          >
-            <span
-              className={`absolute top-[2px] left-0 h-[18px] w-[18px] rounded-full bg-background transition-transform ${
-                draft.active
-                  ? "translate-x-[20px] dark:bg-primary-foreground"
-                  : "translate-x-[2px] dark:bg-foreground"
-              }`}
-            />
-          </button>
+        <label className="flex items-center gap-2.5 text-sm text-foreground/75 pointer-coarse:min-h-11">
+          <Switch checked={draft.active} onCheckedChange={(active) => onChange({ ...draft, active })} />
           <Trans>Active</Trans>
         </label>
         <div className="flex items-center gap-2">
@@ -929,7 +913,11 @@ export function RoutineEditor({
       </label>
 
       <div className="mt-5">
-        <Button disabled={saving || running || !hasTriggers || unchanged} onClick={onSave}>
+        <Button
+          className="max-sm:w-full"
+          disabled={saving || running || !hasTriggers || unchanged}
+          onClick={onSave}
+        >
           {saving ? t`Saving…` : unchanged ? t`Saved` : t`Save`}
         </Button>
       </div>

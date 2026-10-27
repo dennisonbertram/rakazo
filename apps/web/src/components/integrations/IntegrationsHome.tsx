@@ -84,7 +84,7 @@ function hostOf(value: string | null) {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <IntegrationTile className="relative transition-colors hover:bg-muted/40">
+    <IntegrationTile className="relative transition-colors hover:bg-muted/40 max-sm:flex-row max-sm:flex-wrap max-sm:items-center">
       {children}
     </IntegrationTile>
   );
@@ -104,7 +104,7 @@ function OpenPageLink({ to, children }: { to: string; children: ReactNode }) {
 function UsedBy({ bots }: { bots: ReturnType<typeof agentsFor> }) {
   if (bots.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+    <div className="flex items-center gap-2 text-[11px] text-muted-foreground max-sm:hidden">
       <Trans>Used by</Trans>
       <AgentStack bots={bots} />
     </div>
@@ -207,7 +207,7 @@ function McpCard({
         ) : null}
       </div>
       {reconnect.error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-destructive max-sm:basis-full">
           {reconnect.error}
         </p>
       ) : null}
@@ -297,11 +297,11 @@ function AppCard({
         ) : null}
       </div>
       {app.status === "failed" ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground max-sm:basis-full">
           {app.error ?? <Trans>Sign-in did not finish.</Trans>}
         </p>
       ) : app.status === "connecting" ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground max-sm:basis-full">
           <Trans>Waiting for you to finish signing in.</Trans>
         </p>
       ) : null}
