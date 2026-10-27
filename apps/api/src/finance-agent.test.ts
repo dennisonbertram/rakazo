@@ -8,7 +8,7 @@ import {
   financeAgentSpawnKey,
 } from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
-import { ensureFinanceAgent } from "./finance-agent.js";
+import { ensureFinanceAgent, PREVIOUS_FINANCE_AGENT_INSTRUCTIONS } from "./finance-agent.js";
 
 const actor: Actor = {
   userId: "user-1",
@@ -23,10 +23,40 @@ function fakes(servers: Array<{ id: string; endpoint: string | null }>) {
   const findMany = vi.fn(async () => servers);
   const upsert = vi.fn(async () => ({}));
   const prisma = { mcpServer: { findMany }, botMcpServer: { upsert } } as never;
-  return { bot, createBot, findMany, upsert, deps: { prisma, repos: { createBot } } };
+  const replaceBotInstructions = vi.fn(async () => undefined);
+  return {
+    bot,
+    createBot,
+    findMany,
+    upsert,
+    replaceBotInstructions,
+    deps: { prisma, repos: { createBot, replaceBotInstructions } },
+  };
 }
 
 describe("ensureFinanceAgent", () => {
+  it("upgrades an earlier default, leaves edited text and the current text alone", async () => {
+    const { createBot, replaceBotInstructions, deps } = fakes([]);
+    await ensureFinanceAgent(deps, actor);
+    const current = (createBot.mock.calls[0] as unknown as [Actor, { instructions: string }])[1]
+      .instructions;
+    const earlier = PREVIOUS_FINANCE_AGENT_INSTRUCTIONS[0]!;
+    expect(earlier).not.toBe(current);
+    const run = async (instructions: string) => {
+      createBot.mockResolvedValueOnce({ id: "bot-1", instructions } as Bot);
+      return ensureFinanceAgent(deps, actor);
+    };
+    expect((await run(earlier)).instructions).toBe(current);
+    expect(replaceBotInstructions).toHaveBeenCalledWith(actor, "bot-1", {
+      from: earlier,
+      to: current,
+    });
+    replaceBotInstructions.mockClear();
+    await run(`${earlier} Mine.`);
+    await run(current);
+    expect(replaceBotInstructions).not.toHaveBeenCalled();
+  });
+
   it("creates the bot only through createBot, keyed by the helper and the session actor", async () => {
     const { bot, createBot, deps } = fakes([]);
 

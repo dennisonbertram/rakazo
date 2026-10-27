@@ -102,6 +102,8 @@ export const EmailCardSchema = z.object({
   receivedAt: z.string(),
   /** Absent when the count could not be read. */
   attachments: z.number().int().nonnegative().optional(),
+  /** The agent's own one-line reason this matters or what to do. Plain text. */
+  note: z.string().max(80).optional(),
 });
 export type EmailCard = z.infer<typeof EmailCardSchema>;
 
