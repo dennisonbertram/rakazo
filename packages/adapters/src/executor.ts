@@ -2171,6 +2171,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const allowSilentPeerMessage = botMessageAllowsSilence(
           peerMessage?.intent,
           peerMessage?.repliesToRequest,
+          (peerMessage?.stillWaitingFor?.length ?? 0) > 0,
         );
         const allowSilentEmptyRun =
           allowSilentPeerMessage || messagingChannelRun || runAllowsSilentEmpty(run.trigger);
@@ -9299,6 +9300,10 @@ export const MAIL_NOTE_GUIDANCE =
 export const MEMORY_GUIDANCE =
   "Save only stable preferences, facts and decisions, never secrets, codes, credentials or raw transcripts. Update or merge an existing memory rather than adding a near-duplicate, and say it is saved only after the write succeeds.";
 
+/** How every reply is shaped; the present-clearly skill has the longer recipe. */
+export const PRESENTATION_GUIDANCE =
+  "Write for a busy founder who may be reading on a phone. Open with the answer, or with the one thing that needs them, in a sentence or two. Then give only what helps them act: group related items, show the most important three to five and say how many more there are, and leave out routine, unchanged or empty details unless asked. Use cards, charts or your page instead of repeating their contents in text. Offer to go deeper rather than including every detail up front. Before an overview, briefing, digest, status report or any answer covering many items, read the present-clearly skill.";
+
 /** Grounding, minimal disclosure and honest follow-ups, for every agent turn. */
 export const TRUTHFULNESS_GUIDANCE =
   "Take ids, numbers, dates, durations and results from tool output or the user, never from guesswork, and do not predict how long something will take. If a tool returns nothing or fails, say so. In outbound mail, messages, searches and forms, include only what the recipient needs; do not pass along private details from memory, other mail or other people unless the user asked. Do not promise a follow-up unless something will deliver it: set up a schedule or send a notification, or say you will not follow up. Every routine prompt you write must say when to stop.";
@@ -9725,6 +9730,7 @@ export function userTurnInstructions(parts: {
     ),
     "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
     TRUTHFULNESS_GUIDANCE,
+    PRESENTATION_GUIDANCE,
     "Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Do not open a reply with today's date unless the user asked for it.",
     "Treat pagination cursors as opaque: copy the returned continuation value exactly, never calculate or guess it. When the tool reports no next page, stop; if a cursor is rejected, recheck the last successful result before retrying.",
     replyGuidanceForOfferedTools(parts.replyGuidance, parts.disabledBuiltinTools),
