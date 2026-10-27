@@ -1,8 +1,9 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { InboxPersonContext } from "@rakazo/contracts";
-import { cn, Skeleton } from "@rakazo/ui-web";
-import { ChevronDown } from "lucide-react";
+import { cn, ContactAvatar, Skeleton } from "@rakazo/ui-web";
+import type { LucideIcon } from "lucide-react";
+import { CalendarDays, ChevronDown, Circle, FileText, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { formatMailTime } from "../../lib/mail-time";
@@ -26,35 +27,60 @@ const hasFacts = (facts: InboxPersonContext) =>
       facts.nextMeeting,
   );
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+const rowClass =
+  "-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none";
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-3 text-sm">
-      <dt className="w-20 shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
-    </div>
+    <section className="flex flex-col">
+      <h3 className="mb-1 text-xs font-medium text-muted-foreground">{label}</h3>
+      {children}
+    </section>
   );
 }
 
-const linkClass = "block truncate underline-offset-2 hover:underline focus-visible:underline";
-
-function Meeting({ meeting }: { meeting: NonNullable<InboxPersonContext["lastMeeting"]> }) {
-  const label = `${meeting.title} · ${formatMailTime(meeting.start)}`;
-  return meeting.href ? (
-    <a
-      href={meeting.href}
-      target="_blank"
-      rel="noopener noreferrer"
-      dir="auto"
-      className={linkClass}
-    >
-      {label}
-    </a>
-  ) : (
-    <span dir="auto" className="block truncate">
-      {label}
-    </span>
+function Item({
+  icon: Icon,
+  title,
+  date,
+  to,
+  href,
+}: {
+  icon: LucideIcon;
+  title: string;
+  date?: string | null;
+  to?: string;
+  href?: string | null;
+}) {
+  const body = (
+    <>
+      <Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+      <span dir="auto" className="min-w-0 flex-1 truncate">
+        {title}
+      </span>
+      {date ? (
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+          {formatMailTime(date)}
+        </span>
+      ) : null}
+    </>
   );
+  if (to)
+    return (
+      <Link to={to} className={rowClass}>
+        {body}
+      </Link>
+    );
+  if (href)
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={rowClass}>
+        {body}
+      </a>
+    );
+  return <div className={cn(rowClass, "hover:bg-transparent")}>{body}</div>;
 }
+
+const linkClass = "underline-offset-2 hover:underline focus-visible:underline";
 
 /**
  * What the user already has about one address. The facts come first and carry no model; the
@@ -104,82 +130,81 @@ function PersonFacts({ email }: { email: string }) {
   ]
     .filter(Boolean)
     .join(" · ");
+  const meeting = (m: NonNullable<InboxPersonContext["lastMeeting"]>) => (
+    <Item icon={CalendarDays} title={m.title} date={m.start} href={m.href} />
+  );
   return (
-    <div className="flex flex-col gap-3">
-      {summary === undefined ? (
-        <p className="text-sm" role="status">
-          <Shimmer>
-            <Trans>Summarizing</Trans>
-          </Shimmer>
-        </p>
-      ) : summary ? (
-        <p dir="auto" className="text-sm">
-          {summary}
-        </p>
-      ) : null}
-      <dl className="flex flex-col gap-1.5">
-        {identity ? (
-          <Row label={t`Contact`}>
-            {facts.contactId ? (
+    <div className="flex flex-col gap-4">
+      {identity || facts.lastEmailedAt ? (
+        <p className="text-xs text-muted-foreground">
+          {identity ? (
+            facts.contactId ? (
               <Link to={`/app/contacts/${facts.contactId}`} dir="auto" className={linkClass}>
                 {identity}
               </Link>
             ) : (
               <span dir="auto">{identity}</span>
-            )}
-          </Row>
-        ) : null}
-        {facts.lastEmailedAt ? (
-          <Row label={t`Last emailed`}>{formatMailTime(facts.lastEmailedAt)}</Row>
-        ) : null}
-        {facts.threads.length ? (
-          <Row label={t`Threads`}>
-            {facts.threads.map((thread) => (
-              <Link
-                key={thread.id}
-                to={`/app/inbox?mail=${encodeURIComponent(thread.id)}`}
-                dir="auto"
-                className={linkClass}
-              >
-                {thread.subject}
-              </Link>
-            ))}
-          </Row>
-        ) : null}
-        {facts.lastMeeting ? (
-          <Row label={t`Last meeting`}>
-            <Meeting meeting={facts.lastMeeting} />
-          </Row>
-        ) : null}
-        {facts.nextMeeting ? (
-          <Row label={t`Next meeting`}>
-            <Meeting meeting={facts.nextMeeting} />
-          </Row>
-        ) : null}
-        {facts.documents.length ? (
-          <Row label={t`Documents`}>
-            {facts.documents.map((doc) => (
-              <Link
-                key={doc.id}
-                to={`/app/data-room?item=${encodeURIComponent(doc.id)}`}
-                dir="auto"
-                className={linkClass}
-              >
-                {doc.name}
-              </Link>
-            ))}
-          </Row>
-        ) : null}
-        {facts.todos.length ? (
-          <Row label={t`To-dos`}>
-            {facts.todos.map((todo) => (
-              <span key={todo.id} dir="auto" className="block truncate">
-                {todo.text}
-              </span>
-            ))}
-          </Row>
-        ) : null}
-      </dl>
+            )
+          ) : null}
+          {identity && facts.lastEmailedAt ? " · " : null}
+          {facts.lastEmailedAt ? (
+            <span>
+              <Trans>Last emailed</Trans> {formatMailTime(facts.lastEmailedAt)}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+      {summary === undefined || summary ? (
+        <div className="rounded-lg bg-muted/50 p-3 text-sm leading-relaxed">
+          {summary === undefined ? (
+            <p role="status">
+              <Shimmer>
+                <Trans>Summarizing</Trans>
+              </Shimmer>
+            </p>
+          ) : (
+            <p dir="auto">{summary}</p>
+          )}
+        </div>
+      ) : null}
+      {facts.threads.length ? (
+        <Section label={t`Threads`}>
+          {facts.threads.map((thread) => (
+            <Item
+              key={thread.id}
+              icon={Mail}
+              title={thread.subject}
+              date={thread.receivedAt}
+              to={`/app/inbox?mail=${encodeURIComponent(thread.id)}`}
+            />
+          ))}
+        </Section>
+      ) : null}
+      {facts.lastMeeting ? (
+        <Section label={t`Last meeting`}>{meeting(facts.lastMeeting)}</Section>
+      ) : null}
+      {facts.nextMeeting ? (
+        <Section label={t`Next meeting`}>{meeting(facts.nextMeeting)}</Section>
+      ) : null}
+      {facts.documents.length ? (
+        <Section label={t`Documents`}>
+          {facts.documents.map((doc) => (
+            <Item
+              key={doc.id}
+              icon={FileText}
+              title={doc.name}
+              to={`/app/data-room?item=${encodeURIComponent(doc.id)}`}
+            />
+          ))}
+        </Section>
+      ) : null}
+      {facts.todos.length ? (
+        <Section label={t`To-dos`}>
+          {facts.todos.map((todo) => (
+            <Item key={todo.id} icon={Circle} title={todo.text} date={todo.dueOn} />
+          ))}
+        </Section>
+      ) : null}
     </div>
   );
 }
@@ -203,10 +228,18 @@ export function ContextPanel({ people }: { people: ContextPerson[] }) {
               type="button"
               aria-expanded={expanded}
               onClick={() => setOpen({ ...open, [person.email]: !expanded })}
-              className="flex w-full items-center gap-2 rounded-md text-start text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+              className="flex w-full items-center gap-3 rounded-md text-start focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
             >
-              <span dir="auto" className="min-w-0 flex-1 truncate">
-                {person.name || person.email}
+              <ContactAvatar name={person.name || person.email} />
+              <span className="min-w-0 flex-1">
+                <span dir="auto" className="block truncate text-sm font-medium">
+                  {person.name || person.email}
+                </span>
+                {person.name ? (
+                  <span dir="auto" className="block truncate text-xs text-muted-foreground">
+                    {person.email}
+                  </span>
+                ) : null}
               </span>
               <ChevronDown
                 aria-hidden="true"
@@ -214,7 +247,7 @@ export function ContextPanel({ people }: { people: ContextPerson[] }) {
               />
             </button>
             {expanded ? (
-              <div className="mt-2">
+              <div className="mt-3">
                 <PersonFacts email={person.email} />
               </div>
             ) : null}

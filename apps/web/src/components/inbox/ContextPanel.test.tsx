@@ -126,7 +126,7 @@ it("gives each person a section, with only the first loaded until another is ope
   expect(personContext).toHaveBeenCalledTimes(1);
   expect(personContext).toHaveBeenCalledWith({ email: "a@example.test" });
   const headers = [...document.querySelectorAll<HTMLElement>("section > button")];
-  expect(headers.map((h) => h.textContent)).toEqual(["Ann", "b@example.test"]);
+  expect(headers.map((h) => h.textContent)).toEqual(["AAnna@example.test", "Bb@example.test"]);
   expect(headers.map((h) => h.getAttribute("aria-expanded"))).toEqual(["true", "false"]);
   await act(async () => headers[1]?.click());
   expect(personContext).toHaveBeenCalledWith({ email: "b@example.test" });
