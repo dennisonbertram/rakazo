@@ -3,18 +3,34 @@ import { Trans } from "@lingui/react/macro";
 import type { Bot, CalendarItem, CalendarItemKind } from "@rakazo/contracts";
 import { CalendarItemKindSchema } from "@rakazo/contracts";
 import { companyCalendarMonth } from "@rakazo/core";
-import { BotAvatar, Button, parseBotAvatar } from "@rakazo/ui-web";
+import {
+  BotAvatar,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+  parseBotAvatar,
+} from "@rakazo/ui-web";
 import {
   Bell,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
   Loader2,
   Repeat,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 import { BotTodos } from "../components/BotTodos";
 import { PickFilter, SearchField } from "../components/ListControls";
@@ -34,7 +50,23 @@ const CONNECT_GOOGLE = "/app/integrations?connect=googlecalendar&returnTo=/app/c
 
 const VIEWS = ["day", "week", "month", "schedule"] as const;
 type View = (typeof VIEWS)[number];
-const DEFAULT_VIEW: View = "week";
+/** Phones open on Schedule; the desktop opens on Week. */
+const defaultView = (phone: boolean): View => (phone ? "schedule" : "week");
+/** The week view shows this many days; a phone has room for three columns. */
+const weekDays = (phone: boolean) => (phone ? 3 : 7);
+/** A phone in portrait, or one on its side (wide, but short with a touch screen). */
+const PHONE_QUERY = "(max-width: 639px), (pointer: coarse) and (max-height: 500px)";
+const subscribePhone = (notify: () => void) => {
+  const media = window.matchMedia?.(PHONE_QUERY);
+  media?.addEventListener("change", notify);
+  return () => media?.removeEventListener("change", notify);
+};
+const usePhone = () =>
+  useSyncExternalStore(
+    subscribePhone,
+    () => window.matchMedia?.(PHONE_QUERY).matches ?? false,
+    () => false,
+  );
 
 const KIND_ICON = {
   event: CalendarDays,
@@ -50,9 +82,9 @@ const kindNames = (): Record<CalendarItemKind, string> => ({
   routine: t`Routines`,
 });
 
-const viewNames = (): Record<View, string> => ({
+const viewNames = (phone: boolean): Record<View, string> => ({
   day: t`Day`,
-  week: t`Week`,
+  week: phone ? t`3 days` : t`Week`,
   month: t`Month`,
   schedule: t`Schedule`,
 });
@@ -93,11 +125,11 @@ function daysOf(item: CalendarItem): string[] {
 }
 
 /** The days a view covers: `start` first, `end` the day after the last. */
-function visibleRange(view: View, focus: string, today: string) {
+function visibleRange(view: View, focus: string, today: string, phone: boolean) {
   if (view === "day") return { start: focus, end: addDays(focus, 1) };
   if (view === "week") {
-    const start = addDays(focus, -startOf(focus).getDay());
-    return { start, end: addDays(start, 7) };
+    const start = phone ? focus : addDays(focus, -startOf(focus).getDay());
+    return { start, end: addDays(start, weekDays(phone)) };
   }
   if (view === "month") {
     const start = `${focus.slice(0, 7)}-01`;
@@ -106,9 +138,21 @@ function visibleRange(view: View, focus: string, today: string) {
   return { start: today, end: addDays(today, SCHEDULE_DAYS) };
 }
 
-function rangeTitle(view: View, start: string, end: string) {
+function rangeTitle(view: View, start: string, end: string, phone: boolean) {
   const first = startOf(start);
   const last = startOf(addDays(end, -1));
+  // A phone has little room: no year, and a day is named in short.
+  if (phone && view === "day")
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(first);
+  if (phone && view !== "month")
+    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).formatRange(
+      first,
+      last,
+    );
   if (view === "month")
     return new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(first);
   if (view === "day")
@@ -183,8 +227,9 @@ export function CalendarPage({
   onOpenBot?: (botId: string) => void;
 }) {
   const list = useListParams(["time"] as const, { field: "time", dir: "asc" });
+  const phone = usePhone();
   const viewParam = list.param("view");
-  const view: View = VIEWS.find((name) => name === viewParam) ?? DEFAULT_VIEW;
+  const view: View = VIEWS.find((name) => name === viewParam) ?? defaultView(phone);
   const today = localDay(new Date());
   const dateParam = list.param("date");
   const focus = dateParam && DAY_PATTERN.test(dateParam) ? dateParam : today;
@@ -193,7 +238,7 @@ export function CalendarPage({
   const botId = list.param("bot");
   const query = list.param("q") ?? "";
   const names = kindNames();
-  const { start, end } = visibleRange(view, focus, today);
+  const { start, end } = visibleRange(view, focus, today, phone);
 
   // Bot items and Google events load apart, so a slow Google never holds back the bots' items.
   // They keep the last answer while a new range loads, and the grid never waits for either.
@@ -270,13 +315,14 @@ export function CalendarPage({
   ];
   const filtered = Boolean(kind || botId || needle);
 
-  const setView = (next: View) => list.setParam("view", next === DEFAULT_VIEW ? undefined : next);
+  const setView = (next: View) =>
+    list.setParam("view", next === defaultView(phone) ? undefined : next);
   const goTo = (day: string) => list.setParam("date", day === today ? undefined : day);
   const step = (direction: 1 | -1) =>
     goTo(
       view === "month"
         ? addMonths(focus, direction)
-        : addDays(focus, direction * (view === "week" ? 7 : 1)),
+        : addDays(focus, direction * (view === "week" ? weekDays(phone) : 1)),
     );
 
   // One tick a minute moves the "now" line.
@@ -307,6 +353,20 @@ export function CalendarPage({
           {body}
         </a>
       );
+    // A routine opens in its bot's chat with the routine editor, not in the bot's panel.
+    const routineId = item.id.startsWith("routine:") ? item.id.slice("routine:".length) : null;
+    if (item.botId && routineId)
+      return (
+        <Link
+          key={item.id}
+          to={`/app/${item.botId}?routine=${encodeURIComponent(routineId)}`}
+          className={className}
+          style={style}
+          aria-label={label}
+        >
+          {body}
+        </Link>
+      );
     if (item.botId && onOpenBot)
       return (
         <button
@@ -320,9 +380,15 @@ export function CalendarPage({
           {body}
         </button>
       );
-    // An inbox to-do belongs to no bot; its list is in the Inbox.
+    // An inbox to-do belongs to no bot; it opens the mail it came from, or else the Inbox.
     return (
-      <Link key={item.id} to="/app/inbox" className={className} style={style} aria-label={label}>
+      <Link
+        key={item.id}
+        to={item.mailId ? `/app/inbox?mail=${encodeURIComponent(item.mailId)}` : "/app/inbox"}
+        className={className}
+        style={style}
+        aria-label={label}
+      >
         {body}
       </Link>
     );
@@ -365,13 +431,16 @@ export function CalendarPage({
   const row = (item: CalendarItem) =>
     wrap(
       item,
-      "flex w-full items-center gap-3 rounded-md px-2 py-2 text-start text-sm hover:bg-accent",
+      "flex w-full items-center gap-3 rounded-md px-2 py-2 text-start text-sm hover:bg-accent pointer-coarse:min-h-11",
       <>
         {kindIcon(item)}
         <span className="w-16 shrink-0 text-xs text-muted-foreground tabular-nums">
           {timeText(item)}
         </span>
-        <span className="min-w-0 flex-1 truncate" title={item.title}>
+        <span
+          className={`min-w-0 flex-1 ${phone ? "line-clamp-2" : "truncate"}`}
+          title={item.title}
+        >
           {item.title}
         </span>
         {item.botName ? (
@@ -391,7 +460,7 @@ export function CalendarPage({
     const full = [timeText(item), item.title, item.botName].filter(Boolean).join(" · ");
     return wrap(
       item,
-      `${style ? "absolute" : ""} flex items-center gap-1 overflow-hidden rounded-md border px-1 py-0.5 text-start text-xs hover:bg-accent ${
+      `${style ? "absolute" : "pointer-coarse:min-h-11"} flex items-center gap-1 overflow-hidden rounded-md border px-1 py-0.5 text-start text-xs hover:bg-accent ${
         item.kind === "event" ? "bg-muted" : "bg-card"
       } ${item.botId ? "border-s-2" : ""}`,
       <>
@@ -406,6 +475,8 @@ export function CalendarPage({
     );
   };
 
+  // The day a phone's month grid lists below it; today while the month holds today.
+  const [pickedDay, setPickedDay] = useState<string>();
   const scroller = useRef<HTMLDivElement>(null);
   const isGrid = view === "day" || view === "week";
   useEffect(() => {
@@ -415,72 +486,162 @@ export function CalendarPage({
     el.scrollTop = hour * HOUR_PX;
   }, [isGrid, start, end, today]);
 
+  const todos = <BotTodos hideDueBetween={{ from: startOf(start), to: startOf(end) }} />;
+  const filters = (
+    <>
+      <SearchField
+        className="w-full @md:w-72"
+        value={query}
+        onChange={(next) => list.setParam("q", next)}
+        placeholder={t`Search`}
+        label={t`Search`}
+        name="calendar-search"
+      />
+      <PickFilter
+        label={t`Kind`}
+        value={kind}
+        anyLabel={t`All`}
+        options={(Object.keys(names) as CalendarItemKind[]).map((value) => [value, names[value]])}
+        onChange={(next) => list.setParam("kind", next)}
+      />
+      <PickFilter
+        label={t`Bot`}
+        value={botId}
+        anyLabel={t`All`}
+        options={botOptions}
+        empty={t`No bots`}
+        onChange={(next) => list.setParam("bot", next)}
+      />
+    </>
+  );
+
   let content: ReactNode;
   if (view === "month") {
     const bounds = companyCalendarMonth(start.slice(0, 7));
     const month = start.slice(0, 7);
+    const shownDay =
+      (pickedDay?.startsWith(month) ? pickedDay : undefined) ??
+      (today.startsWith(month) ? today : undefined);
     content = (
-      <table className="w-full table-fixed border-collapse" aria-label={month}>
-        <thead>
-          <tr>
-            {Array.from({ length: 7 }, (_, day) => (
-              <th
-                key={day}
-                scope="col"
-                className="p-1 text-start text-xs font-normal text-muted-foreground sm:p-2"
-              >
-                {new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" }).format(
-                  new Date(Date.UTC(2024, 0, 7 + day)),
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: Math.ceil((bounds.offset + bounds.days) / 7) }, (_, week) => (
-            <tr key={week}>
-              {Array.from({ length: 7 }, (_, weekday) => {
-                const day = week * 7 + weekday - bounds.offset + 1;
-                const date = `${month}-${pad(day)}`;
-                const items = day > 0 && day <= bounds.days ? itemsOn(date) : [];
-                return (
-                  <td
-                    key={weekday}
-                    data-day={date}
-                    className={`h-20 overflow-hidden border p-1 align-top sm:h-28 sm:p-2 ${date === today ? "bg-muted/50" : ""}`}
-                  >
-                    {day > 0 && day <= bounds.days && (
-                      <>
-                        <time
-                          dateTime={date}
-                          className={`inline-block text-xs ${date === today ? "rounded-full bg-primary px-1.5 font-semibold text-primary-foreground" : "text-muted-foreground"}`}
-                        >
-                          {day}
-                        </time>
-                        {items.slice(0, MONTH_CHIPS).map(chip)}
-                        {items.length > MONTH_CHIPS ? (
-                          <button
-                            type="button"
-                            className="text-xs text-muted-foreground hover:underline"
-                            onClick={() => {
-                              list.setParams({
-                                view: "day",
-                                date: date === today ? undefined : date,
-                              });
-                            }}
-                          >
-                            <Trans>+{items.length - MONTH_CHIPS} more</Trans>
-                          </button>
-                        ) : null}
-                      </>
-                    )}
-                  </td>
-                );
-              })}
+      <>
+        <table className="w-full table-fixed border-collapse" aria-label={month}>
+          <thead>
+            <tr>
+              {Array.from({ length: 7 }, (_, day) => (
+                <th
+                  key={day}
+                  scope="col"
+                  className="p-1 text-start text-xs font-normal text-muted-foreground sm:p-2"
+                >
+                  {new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" }).format(
+                    new Date(Date.UTC(2024, 0, 7 + day)),
+                  )}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {Array.from({ length: Math.ceil((bounds.offset + bounds.days) / 7) }, (_, week) => (
+              <tr key={week}>
+                {Array.from({ length: 7 }, (_, weekday) => {
+                  const day = week * 7 + weekday - bounds.offset + 1;
+                  const date = `${month}-${pad(day)}`;
+                  const items = day > 0 && day <= bounds.days ? itemsOn(date) : [];
+                  return (
+                    <td
+                      key={weekday}
+                      data-day={date}
+                      className={`h-20 overflow-hidden border p-1 align-top sm:h-28 sm:p-2 ${phone ? "h-14" : ""} ${date === today ? "bg-muted/50" : ""}`}
+                    >
+                      {phone && day > 0 && day <= bounds.days ? (
+                        <button
+                          type="button"
+                          aria-pressed={date === shownDay}
+                          aria-label={new Intl.DateTimeFormat(undefined, {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                          }).format(startOf(date))}
+                          onClick={() => setPickedDay(date)}
+                          className={`flex size-full min-h-11 flex-col items-center gap-1 rounded-md py-1 text-xs ${date === shownDay ? "bg-accent" : ""}`}
+                        >
+                          <time
+                            dateTime={date}
+                            className={
+                              date === today
+                                ? "rounded-full bg-primary px-1.5 font-semibold text-primary-foreground"
+                                : "text-muted-foreground"
+                            }
+                          >
+                            {day}
+                          </time>
+                          {items.length ? (
+                            <span className="flex items-center gap-0.5" data-dots={items.length}>
+                              {items.slice(0, MONTH_CHIPS).map((item) => (
+                                <span key={item.id} className="size-1.5 rounded-full bg-primary" />
+                              ))}
+                              {items.length > MONTH_CHIPS ? (
+                                <span className="text-[10px] text-muted-foreground">
+                                  +{items.length - MONTH_CHIPS}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                        </button>
+                      ) : null}
+                      {!phone && day > 0 && day <= bounds.days && (
+                        <>
+                          <time
+                            dateTime={date}
+                            className={`inline-block text-xs ${date === today ? "rounded-full bg-primary px-1.5 font-semibold text-primary-foreground" : "text-muted-foreground"}`}
+                          >
+                            {day}
+                          </time>
+                          {items.slice(0, MONTH_CHIPS).map(chip)}
+                          {items.length > MONTH_CHIPS ? (
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:underline"
+                              onClick={() => {
+                                list.setParams({
+                                  view: "day",
+                                  date: date === today ? undefined : date,
+                                });
+                              }}
+                            >
+                              <Trans>+{items.length - MONTH_CHIPS} more</Trans>
+                            </button>
+                          ) : null}
+                        </>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {phone && shownDay ? (
+          <section aria-label={shownDay} className="mt-3">
+            <h2 className="px-2 pb-1 text-xs font-medium text-muted-foreground">
+              <time dateTime={shownDay}>
+                {new Intl.DateTimeFormat(undefined, {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                }).format(startOf(shownDay))}
+              </time>
+            </h2>
+            {itemsOn(shownDay).length ? (
+              itemsOn(shownDay).map(row)
+            ) : (
+              <p className="px-2 py-2 text-sm text-muted-foreground">
+                <Trans>Nothing scheduled</Trans>
+              </p>
+            )}
+          </section>
+        ) : null}
+      </>
     );
   } else if (view === "schedule") {
     const days = [...new Set(shown.flatMap(daysOf))].filter((day) => day >= today && day < end);
@@ -521,10 +682,12 @@ export function CalendarPage({
         </div>
       );
   } else {
-    const days = Array.from({ length: view === "day" ? 1 : 7 }, (_, i) => addDays(start, i));
+    const days = Array.from({ length: view === "day" ? 1 : weekDays(phone) }, (_, i) =>
+      addDays(start, i),
+    );
     const columns = { gridTemplateColumns: `3rem repeat(${days.length}, minmax(0, 1fr))` };
     content = (
-      <div className={view === "week" ? "min-w-[40rem]" : undefined}>
+      <div className={view === "week" && !phone ? "min-w-[40rem]" : undefined}>
         <div className="sticky top-0 z-20 grid border-b bg-background" style={columns}>
           <div />
           {days.map((day) => (
@@ -616,78 +779,104 @@ export function CalendarPage({
           title={<Trans>Calendar</Trans>}
           spaceName={spaceName}
           actions={
-            loading ? (
-              <Loader2
-                size={16}
-                role="status"
-                aria-label={t`Loading`}
-                className="animate-spin text-muted-foreground"
-              />
-            ) : null
+            <>
+              {loading ? (
+                <Loader2
+                  size={16}
+                  role="status"
+                  aria-label={t`Loading`}
+                  className="animate-spin text-muted-foreground"
+                />
+              ) : null}
+              {phone ? (
+                <Dialog>
+                  <DialogTrigger
+                    render={
+                      <Button
+                        variant={filtered ? "secondary" : "outline"}
+                        size="icon-sm"
+                        aria-label={t`Filters`}
+                      />
+                    }
+                  >
+                    <SlidersHorizontal aria-hidden="true" />
+                  </DialogTrigger>
+                  {/* A bottom sheet: the dialog primitive pinned to the screen's bottom edge. */}
+                  <DialogContent className="top-auto bottom-0 max-w-full translate-y-0 rounded-b-none sm:max-w-full">
+                    <DialogHeader>
+                      <DialogTitle>
+                        <Trans>Filters</Trans>
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-wrap items-center gap-1.5">{filters}</div>
+                  </DialogContent>
+                </Dialog>
+              ) : null}
+            </>
           }
         />
       </div>
-      <div className={`${PAGE_GUTTER_X} mb-2 flex flex-wrap items-center gap-1.5`}>
+      <div className={`${PAGE_GUTTER_X} mb-2 flex items-center gap-1.5 sm:flex-wrap`}>
         <Button variant="outline" size="sm" onClick={() => list.clear("date")}>
           <Trans>Today</Trans>
         </Button>
-        {view === "schedule" ? null : (
-          <>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t`Previous`}
-              onClick={() => step(-1)}
-            >
-              <ChevronLeft size={16} aria-hidden="true" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" aria-label={t`Next`} onClick={() => step(1)}>
-              <ChevronRight size={16} aria-hidden="true" />
-            </Button>
-          </>
-        )}
-        <h2 className="min-w-0 flex-1 truncate ps-1 text-sm font-medium">
-          {rangeTitle(view, start, end)}
+        {/* On a phone Schedule keeps the arrows' room, so the title and the view switch stay put. */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t`Previous`}
+          className={view === "schedule" ? (phone ? "invisible" : "hidden") : undefined}
+          onClick={() => step(-1)}
+        >
+          <ChevronLeft size={16} aria-hidden="true" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t`Next`}
+          className={view === "schedule" ? (phone ? "invisible" : "hidden") : undefined}
+          onClick={() => step(1)}
+        >
+          <ChevronRight size={16} aria-hidden="true" />
+        </Button>
+        <h2 className="min-w-0 flex-1 text-sm leading-tight font-medium sm:truncate sm:ps-1">
+          {rangeTitle(view, start, end, phone)}
         </h2>
-        <div className="flex gap-0.5">
-          {VIEWS.map((name) => (
-            <Button
-              key={name}
-              size="sm"
-              variant={view === name ? "secondary" : "ghost"}
-              aria-pressed={view === name}
-              onClick={() => setView(name)}
-            >
-              {viewNames()[name]}
-            </Button>
-          ))}
-        </div>
+        {phone ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+              {viewNames(phone)[view]}
+              <ChevronDown aria-hidden="true" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup value={view} onValueChange={(next) => setView(next as View)}>
+                {VIEWS.map((name) => (
+                  <DropdownMenuRadioItem key={name} value={name}>
+                    {viewNames(phone)[name]}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="flex gap-0.5">
+            {VIEWS.map((name) => (
+              <Button
+                key={name}
+                size="sm"
+                variant={view === name ? "secondary" : "ghost"}
+                aria-pressed={view === name}
+                onClick={() => setView(name)}
+              >
+                {viewNames(phone)[name]}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
-      <div className={`${PAGE_GUTTER_X} mb-2 flex flex-wrap items-center gap-1.5`}>
-        <SearchField
-          className="w-full @md:w-72"
-          value={query}
-          onChange={(next) => list.setParam("q", next)}
-          placeholder={t`Search`}
-          label={t`Search`}
-          name="calendar-search"
-        />
-        <PickFilter
-          label={t`Kind`}
-          value={kind}
-          anyLabel={t`All`}
-          options={(Object.keys(names) as CalendarItemKind[]).map((value) => [value, names[value]])}
-          onChange={(next) => list.setParam("kind", next)}
-        />
-        <PickFilter
-          label={t`Bot`}
-          value={botId}
-          anyLabel={t`All`}
-          options={botOptions}
-          empty={t`No bots`}
-          onChange={(next) => list.setParam("bot", next)}
-        />
-      </div>
+      {phone ? null : (
+        <div className={`${PAGE_GUTTER_X} mb-2 flex flex-wrap items-center gap-1.5`}>{filters}</div>
+      )}
       {error ? (
         <div role="alert" className={`${PAGE_GUTTER_X} mb-2 flex items-center gap-3 text-sm`}>
           <span className="text-destructive">{error}</span>
@@ -705,19 +894,23 @@ export function CalendarPage({
           <Trans>Couldn't load {account}</Trans>
         </p>
       ))}
-      <div className={PAGE_GUTTER_X}>
-        <BotTodos hideDueBetween={{ from: startOf(start), to: startOf(end) }} />
-      </div>
+      {phone ? null : <div className={PAGE_GUTTER_X}>{todos}</div>}
+      {phone && view === "day" && !loading && itemsOn(start).length === 0 ? (
+        <p className={`${PAGE_GUTTER_X} mb-2 text-sm text-muted-foreground`}>
+          <Trans>Nothing scheduled</Trans>
+        </p>
+      ) : null}
       <div
         ref={scroller}
         className={`rk-scroll min-h-0 flex-1 overflow-auto ${PAGE_GUTTER_X} pb-6`}
       >
+        {phone ? todos : null}
         {content}
         {googleConnected === false ? (
           <p className="mt-4 text-sm">
             <Link
               to={CONNECT_GOOGLE}
-              className="text-muted-foreground underline underline-offset-4"
+              className="inline-flex items-center text-muted-foreground underline underline-offset-4 pointer-coarse:min-h-11"
             >
               <Trans>Connect Google Calendar</Trans>
             </Link>
