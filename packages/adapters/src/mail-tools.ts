@@ -772,12 +772,15 @@ async function showEmails(
   args: Record<string, unknown>,
 ) {
   if (!deps.publish) return { error: "Cards are unavailable" };
-  const requested = new Map<string, EmailUrgency | undefined>();
+  const requested = new Map<string, { urgency?: EmailUrgency; note?: string }>();
   for (const entry of Array.isArray(args.emails) ? args.emails : []) {
     if (requested.size >= MAX_EMAIL_CARDS) break;
-    const { id, urgency } = (entry ?? {}) as Record<string, unknown>;
+    const { id, urgency, note } = (entry ?? {}) as Record<string, unknown>;
     if (typeof id === "string" && id.trim() && !requested.has(id.trim())) {
-      requested.set(id.trim(), EmailUrgency.safeParse(urgency).data);
+      requested.set(id.trim(), {
+        urgency: EmailUrgency.safeParse(urgency).data,
+        note: typeof note === "string" ? note.trim().slice(0, 80) || undefined : undefined,
+      });
     }
   }
   if (requested.size === 0) return { error: "emails is required" };
@@ -796,7 +799,7 @@ async function showEmails(
   // ponytail: up to 20 getMessage calls in parallel for attachment counts; the provider retries
   // rate limits. Cache the count at sync time if this is slow.
   const emails = await Promise.all(
-    [...requested].flatMap(([providerId, urgency]) => {
+    [...requested].flatMap(([providerId, { urgency, note }]) => {
       const row = found.get(providerId);
       if (!row) return [];
       return [
@@ -814,6 +817,7 @@ async function showEmails(
             snippet: row.snippet,
             receivedAt: row.receivedAt.toISOString(),
             ...(attachments === undefined ? {} : { attachments }),
+            ...(note ? { note } : {}),
           };
         })(),
       ];
@@ -826,7 +830,7 @@ async function showEmails(
     shown: emails.length,
     ...(notFound.length ? { notFound } : {}),
     // Models tended to list every card again as text below them.
-    note: "The user now sees these emails as cards with sender, subject and date. Do not list them again; answer in a sentence or two.",
+    note: "The user now sees these emails as a table with sender, subject, date and your notes. Do not list them again; answer in a sentence or two.",
   };
 }
 

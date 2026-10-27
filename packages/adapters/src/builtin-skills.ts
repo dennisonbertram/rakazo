@@ -76,7 +76,7 @@ Use the steps below for history questions: mail older than two weeks, a person, 
 
 4. Open a message with mail_get only for the few ids where you need the body, an exact quote, or reply details. Pass the row's id, and its acct: address as account when more than one account is connected. Do not open every match.
 
-5. When your answer cites specific messages, call show_emails once with up to 20 of their ids (from inbox_overview or mail_grep rows), so the user sees them as cards. Give each an urgency: today (needs action today), within_3_days, this_week, or later (everything else, shown as a compact list). Keep the reply text short instead of repeating the cards' contents.
+5. When your answer cites specific messages, call show_emails once with up to 8 of their ids (from inbox_overview or mail_grep rows), most urgent first, so the user sees them in a table. Give each an urgency: today (needs action today), within_3_days, this_week, or later (everything else), and a short note saying why it matters or what to do. Keep the reply text to the headline instead of repeating the table's contents.
 
 6. Answer.
    - Say which accounts and what window you searched.
