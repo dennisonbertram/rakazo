@@ -25,6 +25,18 @@ export const People: Story = {
   parameters: { initialEntries: ["/app/company?view=people&sort=role"] },
   beforeEach: () => mockRpc({ ...responses, "company.page": companyFixture }),
 };
+/** No people recorded yet: one line, no bare column headers. */
+export const PeopleEmpty: Story = {
+  parameters: { initialEntries: ["/app/company?view=people"] },
+  beforeEach: () =>
+    mockRpc({
+      ...responses,
+      "company.page": {
+        ...companyFixture,
+        entities: companyFixture.entities.filter((e) => e.kind !== "person"),
+      },
+    }),
+};
 export const Review: Story = {
   parameters: { initialEntries: ["/app/company?view=review"] },
   beforeEach: () => {
