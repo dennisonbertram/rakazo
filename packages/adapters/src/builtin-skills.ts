@@ -7,12 +7,33 @@ import { buildSkillMd } from "@rakazo/core";
  * Descriptions show in the / picker (truncated at 72) and inject every turn in the skills catalog.
  */
 export const INBOX_SEARCH_SKILL_NAME = "inbox-search";
+export const PRESENT_CLEARLY_SKILL_NAME = "present-clearly";
 
 const SKILLS: Array<{ name: string; description: string; body: string }> = [
   {
     name: COMPANY_MAP_SKILL.name,
     description: COMPANY_MAP_SKILL.description,
     body: COMPANY_MAP_SKILL.content,
+  },
+  {
+    name: PRESENT_CLEARLY_SKILL_NAME,
+    description: "Turn many results into a short answer: lead, group, cap, cut.",
+    body: `Use this before any answer that covers many items or sources: what's new, a briefing, a digest, a status report, search results, a summary of a person, company or document, or a report to another agent. The user should know what matters and what to do within ten seconds of reading.
+
+1. Sort before you write. Put every item in one of three piles: needs the user (a reply, a decision, a payment, a deadline), changed since they last looked, and background. Most answers only need the first two piles.
+2. Lead with the point. Open with one or two sentences that answer the question or name what needs the user, with the date or amount that makes it matter. If nothing needs them, say that in one line.
+3. Group by what the user will do, or by person, company or project, never by the tool or source the data came from. Give each item one line: what it is, why it matters, what happens next.
+4. Cap every group. Show at most five items, most important first, then one line for the rest, such as "and 12 more, mostly newsletters". Count conversations, deals or vendors, not individual records, and give each count its scope ("4 threads with Northwind this month").
+5. Cut what does not change a decision: ids, exact timestamps, unchanged statuses, routine confirmations and empty fields. Round numbers the way a person says them ($48.2k, about three weeks) unless the exact figure is the point. When something the user asked for is missing, say so once.
+6. Pick the shape that fits.
+   - One answer: plain sentences, no headings or bullets.
+   - Several items: a short list.
+   - Several items compared on the same few attributes: a small table.
+   - Emails, files, charts and records: show them with the card or chart tool and write only what the cards do not already say.
+   - Something the user will come back to: put it on your page and reply with the headline.
+   Bold only the few words a reader would scan for. Use headings only in long reports.
+7. End with at most one next step: a single offer or question, such as "Want me to draft the reply to Priya?". Do not end with a menu of options.
+8. A report to another agent is the exception: include every fact it needs to act, still ordered most important first.`,
   },
   {
     name: "Interrogate",
