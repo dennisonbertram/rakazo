@@ -805,7 +805,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "show_emails",
     description:
-      "Show messages in the chat as cards grouped by urgency. Call it once when you cite specific messages in an answer, with the ids from mail_grep rows. Give each message an urgency: today, within_3_days, this_week or later (later is shown as a compact list).",
+      "Show messages in the chat as one compact table, most urgent first. Call it once when you cite specific messages in an answer, with the ids from mail_grep rows. Show at most 8 messages. Give each an urgency (today, within_3_days, this_week or later) and a short note, under 80 characters, saying why it matters or what to do. Keep your reply to the headline; do not repeat the table.",
     inputSchema: {
       type: "object",
       properties: {
@@ -817,6 +817,11 @@ export const builtinAgentTools: ConnectorTool[] = [
             properties: {
               id: { type: "string", description: "The id: field of a mail_grep row." },
               urgency: { type: "string", enum: [...EmailUrgency.options] },
+              note: {
+                type: "string",
+                maxLength: 80,
+                description: "Why this matters or what to do, in your own words.",
+              },
             },
             required: ["id"],
           },
