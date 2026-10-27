@@ -805,20 +805,6 @@ export function DataRoomPage({
             {/* Also in Stats, so switching views never moves the folder tree. */}
             <DataRoomConsentPrompt onAllowed={reload} onStatus={setConsent} />
           </div>
-          {filters.status ? null : (
-            <div className={`${PAGE_GUTTER_X} pb-2.5 empty:hidden`}>
-              <FailedChip
-                count={processing.processing?.failed ?? 0}
-                onClick={() =>
-                  setParams((prev) => {
-                    const next = new URLSearchParams(prev);
-                    next.set("status", "failed");
-                    return next;
-                  })
-                }
-              />
-            </div>
-          )}
           <FilterBar
             query={queryInput}
             onQuery={changeQuery}
@@ -838,6 +824,20 @@ export function DataRoomPage({
             onAutoSort={() => setAutoSorting(true)}
             statsView={showStats}
             trailing={viewToggles("@min-[640px]/bd:hidden")}
+            leading={
+              filters.status ? null : (
+                <FailedChip
+                  count={processing.processing?.failed ?? 0}
+                  onClick={() =>
+                    setParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.set("status", "failed");
+                      return next;
+                    })
+                  }
+                />
+              )
+            }
           />
           <div ref={setBodyEl} className="relative flex min-h-0 flex-1 border-t border-border">
             {/* With a preview beside the list the tree needs a wider page, or file names get ~100px. */}
