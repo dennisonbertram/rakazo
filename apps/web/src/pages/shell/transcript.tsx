@@ -148,6 +148,7 @@ export function UnreadDivider() {
 
 export const Transcript = memo(function Transcript({
   scrollRef,
+  delegateStates,
   sentHere,
   scrollRequest,
   onScrollRequestHandled,
@@ -195,6 +196,8 @@ export const Transcript = memo(function Transcript({
   onScrollRequestHandled: () => void;
   artifactTarget: ArtifactTarget;
   messages: ThreadMessage[];
+  /** Each sent request's state by message id and block index, from the whole thread. */
+  delegateStates?: ReadonlyMap<string, ReadonlyMap<number, "pending" | "answered">>;
   /** The agent this chat is waiting on, worked out from the full thread (the display list drops handoff replies). */
   delegate?: string | null;
   showToolActivity: boolean;
@@ -254,7 +257,9 @@ export const Transcript = memo(function Transcript({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
-  const sentStates = useMemo(() => pendingSentBlocks(messages, Date.now()), [messages]);
+  // Computed from the unfiltered thread when given: a delegate's reply is collapsed out of `messages`.
+  const ownSentStates = useMemo(() => pendingSentBlocks(messages, Date.now()), [messages]);
+  const sentStates = delegateStates ?? ownSentStates;
   const reactionView = useMemo(() => projectMessageReactions(messages), [messages]);
   // One Tab stop for all the messages' More buttons (roving): the newest, or the one last focused.
   // Up and Down move between them, so Tab reaches the composer in a few presses on a long chat.
