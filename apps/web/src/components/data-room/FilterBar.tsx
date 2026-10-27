@@ -229,6 +229,7 @@ export function FilterBar({
   hasDates,
   statsView = false,
   trailing,
+  leading,
   folders,
   folderId,
   onFolder,
@@ -264,6 +265,8 @@ export function FilterBar({
   statsView?: boolean;
   /** The view toggles: on a phone they sit in the folder row. */
   trailing?: ReactNode;
+  /** A status chip (the failed count) that sits after Search, never behind the phone's Filters button. */
+  leading?: ReactNode;
 }) {
   const labels = sortLabels();
   const field = sort?.field ?? "relevance";
@@ -328,6 +331,11 @@ export function FilterBar({
         <Trans>Filters</Trans>
         {activeFilters > 0 ? <span className="tabular-nums">{activeFilters}</span> : null}
       </Button>
+      {leading ? (
+        <div className="order-1 flex h-8 shrink-0 items-center empty:hidden @min-[960px]/bd:order-3">
+          {leading}
+        </div>
+      ) : null}
       {/* Where the folder tree is hidden, this picks the folder; it sits with Sort, not the pills. */}
       <div className="order-2 flex h-8 min-w-0 items-center gap-1 @min-[800px]/bd:hidden">
         <DropdownMenu>
