@@ -24,13 +24,20 @@ const LEGAL_INSTRUCTIONS_EXTRA =
 const LEGAL_INSTRUCTIONS_OFFER =
   ' After you draft a notice, call ask_user with the question "Send this draft to the Inbox agent?" and the options "Send to Inbox" and "Not now"; never ask the user to type a phrase. When they choose "Send to Inbox", send the draft to the Inbox agent with message_bot.';
 
-export const LEGAL_AGENT_INSTRUCTIONS =
+/** How to answer: the answer first, a short list, and any uncertainty once at the end. */
+const LEGAL_INSTRUCTIONS_REPLY =
+  ' Lead your first sentence with the answer, such as "Two things need you: the office lease notice by Dec 1 and the insurance renewal on Jan 15." Then list at most five items, soonest first, one line each: what it is, the date, what to do; say how many more there are. State what the records show as fact. Put any gap or doubt in one closing line (for example that some documents are not analyzed yet or a date is missing), never in the opening and never on every item. Do not open with "I can\'t confirm" or a list of what you could not check; if nothing is due, say "Nothing is due then." Leave out quotes, ids and graph details unless asked, and offer them. After analyzing documents, report in a line or two how many contracts and deadlines you recorded, then only what needs the founder: confirmations, missing documents and files to add.';
+
+const LEGAL_INSTRUCTIONS_BEFORE_REPLY =
   LEGAL_INSTRUCTIONS_BASE + LEGAL_INSTRUCTIONS_EXTRA + LEGAL_INSTRUCTIONS_OFFER;
+
+export const LEGAL_AGENT_INSTRUCTIONS = LEGAL_INSTRUCTIONS_BEFORE_REPLY + LEGAL_INSTRUCTIONS_REPLY;
 
 /** The previous default, before the instruction about not sending mail; an agent still holding it is updated. */
 const NEVER_DISMISS =
   " You never dismiss a deadline and never lower a stored value unless a document date or figure contradicts it. If a deadline seems not to apply any more, the tools mark it for the founder to confirm; list each one in your reply.";
 const OLDER_AGENT_INSTRUCTIONS = [
+  LEGAL_INSTRUCTIONS_BEFORE_REPLY,
   LEGAL_INSTRUCTIONS_BASE + LEGAL_INSTRUCTIONS_EXTRA,
   LEGAL_INSTRUCTIONS_BASE,
   LEGAL_INSTRUCTIONS_BASE.replace(NEVER_DISMISS, ""),
@@ -46,10 +53,11 @@ const OLDER_AGENT_INSTRUCTIONS = [
 
 /** The prompt of the daily routine and of "scan now". */
 export const LEGAL_SCAN_PROMPT =
-  'Run the legal scan. 1) Call legal_unreviewed_documents and analyze every document it lists (repeat until remaining is 0), recording contracts, deadlines, and graph nodes and edges as your instructions say. 2) Search the mail and Drive for contracts or other legal documents that are not in the Data Room yet, and list them in your reply. 3) Call legal_query with view deadlines, status done and dueInLastDays 90: for each closed deadline that recurs (annual, quarterly, monthly) and has no later open occurrence, record the next one with legal_upsert_deadline and say so in the notes. 4) Call legal_query for deadlines due in the next 60 days and for overdue ones, and state them first in your reply, soonest first. Write every date like "Oct 17, 2026", never as 2026-10-17. Keep the reply short.';
+  'Run the legal scan. 1) Call legal_unreviewed_documents and analyze every document it lists (repeat until remaining is 0), recording contracts, deadlines, and graph nodes and edges as your instructions say. 2) Search the mail and Drive for contracts or other legal documents that are not in the Data Room yet, and list them in your reply. 3) Call legal_query with view deadlines, status done and dueInLastDays 90: for each closed deadline that recurs (annual, quarterly, monthly) and has no later open occurrence, record the next one with legal_upsert_deadline and say so in the notes. 4) Call legal_query for deadlines due in the next 60 days and for overdue ones, and state them first in your reply, soonest first. Write every date like "Oct 17, 2026", never as 2026-10-17. Keep the reply to the headline and at most five items, with any gap or doubt in one closing line.';
 
 /** Earlier defaults; a routine still holding one is moved to the current prompt. */
 const OLDER_SCAN_PROMPTS = [
+  'Run the legal scan. 1) Call legal_unreviewed_documents and analyze every document it lists (repeat until remaining is 0), recording contracts, deadlines, and graph nodes and edges as your instructions say. 2) Search the mail and Drive for contracts or other legal documents that are not in the Data Room yet, and list them in your reply. 3) Call legal_query with view deadlines, status done and dueInLastDays 90: for each closed deadline that recurs (annual, quarterly, monthly) and has no later open occurrence, record the next one with legal_upsert_deadline and say so in the notes. 4) Call legal_query for deadlines due in the next 60 days and for overdue ones, and state them first in your reply, soonest first. Write every date like "Oct 17, 2026", never as 2026-10-17. Keep the reply short.',
   "Run the legal scan. 1) Call legal_unreviewed_documents and analyze every document it lists (repeat until remaining is 0), recording contracts, deadlines, and graph nodes and edges as your instructions say. 2) Search the mail and Drive for contracts or other legal documents that are not in the Data Room yet, and list them in your reply. 3) Call legal_query with view deadlines, status done and dueInLastDays 90: for each closed deadline that recurs (annual, quarterly, monthly) and has no later open occurrence, record the next one with legal_upsert_deadline and say so in the notes. 4) Call legal_query for deadlines due in the next 60 days and for overdue ones, and state them first in your reply, soonest first. Keep the reply short.",
 ];
 

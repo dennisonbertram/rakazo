@@ -264,10 +264,11 @@ async function triagePass(
       const items = await triageBatch(deps, ready, scope, await toInput(prisma, scope, batch));
       const byId = new Map(items.map((item) => [item.id, item]));
       // An id the model skipped is stamped too, with null fields, so it is not paid for again.
-      await prisma.$transaction(
-        batch.map((row) => {
+      // Interactive, not a batch array: row-level security cannot carry its context into a batch.
+      await prisma.$transaction(async (tx) => {
+        for (const row of batch) {
           const item = byId.get(row.id);
-          return prisma.cachedMailMessage.updateMany({
+          await tx.cachedMailMessage.updateMany({
             where: { id: row.id, userId, spaceId },
             data: {
               triagedAt: new Date(),
@@ -284,8 +285,8 @@ async function triagePass(
               dueOn: item?.due ? new Date(`${item.due}T00:00:00Z`) : null,
             },
           });
-        }),
-      );
+        }
+      });
       classified += batch.length;
     }),
   );

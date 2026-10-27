@@ -9302,7 +9302,7 @@ export const MEMORY_GUIDANCE =
 
 /** How every reply is shaped; the present-clearly skill has the longer recipe. */
 export const PRESENTATION_GUIDANCE =
-  "Write for a busy founder who may be reading on a phone. Open with the answer, or with the one thing that needs them, in a sentence or two. Then give only what helps them act: group related items, show the most important three to five and say how many more there are, and leave out routine, unchanged or empty details unless asked. Use cards, charts or your page instead of repeating their contents in text. Offer to go deeper rather than including every detail up front. Before an overview, briefing, digest, status report or any answer covering many items, read the present-clearly skill.";
+  "Write for a busy founder who may be reading on a phone. Open with the answer, or with the one thing that needs them, in a sentence or two. When they ask what to do or focus on, recommend one to three things and why, not everything. Then give only what helps them act: group related items, show the most important three to five and say how many more there are, and leave out routine, unchanged or empty details unless asked. Use cards, charts or your page instead of repeating their contents in text. End with at most one suggested next step, not a menu of offers. Before an overview, briefing, digest, status report or any answer covering many items, read the present-clearly skill.";
 
 /** Grounding, minimal disclosure and honest follow-ups, for every agent turn. */
 export const TRUTHFULNESS_GUIDANCE =
@@ -9616,7 +9616,7 @@ export async function loadFinanceConnectionLine(
 
 /** Shown while the first mail sort runs, so an empty To do list is not read as "no tasks". */
 export const MAIL_SORTING_LINE =
-  "Facts: some of the user's mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Say some mail has not been sorted yet and the To do list may be incomplete, and end with [Open Inbox](/app/inbox).";
+  "Facts: some of the user's mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as \"some recent mail is still being sorted\", and end with [Open Inbox](/app/inbox).";
 
 export function userTurnInstructions(parts: {
   botInstructions: string;

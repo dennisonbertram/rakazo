@@ -108,8 +108,8 @@ describe("directory", () => {
     expect(directory).toContain("Investigates source-backed questions");
     expect(directory).toContain("Analyst (id: b_2)");
     expect(directory).toContain("async");
-    expect(directory).toContain("does not end your turn");
-    expect(directory).toContain("Later updates only if they add something new");
+    expect(directory).toContain("who you are checking with and end your turn");
+    expect(directory).toContain("Do not poll");
   });
 
   it("adds the integration note once, only when an integration agent is listed", () => {

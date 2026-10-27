@@ -5025,6 +5025,7 @@ describe("mail sorting line", () => {
     expect(MAIL_SORTING_LINE).toContain("do not say there are no tasks");
     expect(MAIL_SORTING_LINE).toContain("may be incomplete");
     expect(MAIL_SORTING_LINE).not.toMatch(/in a minute|will appear in/);
+    expect(MAIL_SORTING_LINE).toContain("answer first from what you can see");
     expect(PLAIN_CAPABILITY_GUIDANCE).toContain('Speak to the user as "you"');
   });
 });

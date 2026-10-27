@@ -88,7 +88,7 @@ import { notFound } from "./inbox.js";
 export interface FinanceDeps {
   prisma: PrismaClient;
   jobs: JobPublisher;
-  repos: Pick<ReturnType<typeof createRepos>, "createBot">;
+  repos: Pick<ReturnType<typeof createRepos>, "createBot" | "replaceBotInstructions">;
   /** Tells whether a server holds a working login. */
   mcpOAuth: Pick<McpOAuthBroker, "statusFor">;
   /** The `mcp.oauth.begin` logic (redirect check included), shared with that procedure. */

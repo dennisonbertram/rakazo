@@ -387,7 +387,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "ask_user",
     description:
-      "Ask the user one short multiple-choice question with tappable options, then wait for their selection. Use this instead of asking them to type when two to four concise choices are enough.",
+      "Ask the user one short multiple-choice question with tappable options, then wait for their selection. Use it only when you cannot go on without their choice and two to four concise choices cover it; otherwise pick a sensible default and say what you chose. Never use it for a menu of next steps.",
     inputSchema: {
       type: "object",
       properties: {
@@ -805,7 +805,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "show_emails",
     description:
-      "Show messages in the chat as cards grouped by urgency. Call it once when you cite specific messages in an answer, with the ids from mail_grep rows. Give each message an urgency: today, within_3_days, this_week or later (later is shown as a compact list).",
+      "Show messages in the chat as one compact table, most urgent first. Call it once when you cite specific messages in an answer, with the ids from mail_grep rows. Show at most 8 messages. Give each an urgency (today, within_3_days, this_week or later) and a short note, under 80 characters, saying why it matters or what to do. Keep your reply to the headline; do not repeat the table.",
     inputSchema: {
       type: "object",
       properties: {
@@ -817,6 +817,11 @@ export const builtinAgentTools: ConnectorTool[] = [
             properties: {
               id: { type: "string", description: "The id: field of a mail_grep row." },
               urgency: { type: "string", enum: [...EmailUrgency.options] },
+              note: {
+                type: "string",
+                maxLength: 80,
+                description: "Why this matters or what to do, in your own words.",
+              },
             },
             required: ["id"],
           },
@@ -2186,7 +2191,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "run_subagent",
     description:
-      "Run a short-lived helper inside this turn only. It is not a bot: no list entry, no thread, no computer of its own, and it disappears when this turn ends. Never call this because the user asked to create a bot — that is spawn_bot, and spawn_bot alone.",
+      "Run a short-lived helper inside this turn only. It is not a bot: no list entry, no thread, no computer of its own, and it disappears when this turn ends. Report what it found in your own words, not its raw output. Never call this because the user asked to create a bot — that is spawn_bot, and spawn_bot alone.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2313,7 +2318,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "message_bot",
     description:
-      'Send a useful update, question, or result to another of the user\'s bots. You must call this tool to actually deliver it — writing the message in your own reply text (e.g. "[to Comms] ...") does not send anything and the recipient never sees it. Delivery is async and does not end your turn. Continue independent work; do not poll or send ack-only messages. Later updates only if they add something new. When you ask bots for something the user is waiting on, tell the user in one short sentence who you are checking with, with no figures or guesses, then end your turn; their answers wake you, and you answer the user yourself.',
+      'Send a useful update, question, or result to another of the user\'s bots. You must call this tool to actually deliver it — writing the message in your own reply text (e.g. "[to Comms] ...") does not send anything and the recipient never sees it. Delivery is async. Do not poll or send ack-only messages. When the user is waiting on the answer, tell them in one short sentence who you are checking with (no figures or guesses), then end your turn; replies wake you, and you answer the user yourself in your own words. Otherwise continue independent work.',
     inputSchema: {
       type: "object",
       properties: {
