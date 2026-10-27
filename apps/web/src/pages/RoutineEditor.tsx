@@ -524,8 +524,15 @@ export function RoutineEditor({
       </div>
 
       <div className="mb-5 flex items-center justify-between gap-3">
-        <label className="flex items-center gap-2.5 text-sm text-foreground/75 pointer-coarse:min-h-11">
-          <Switch checked={draft.active} onCheckedChange={(active) => onChange({ ...draft, active })} />
+        <label
+          htmlFor={`${fieldId}-active`}
+          className="flex items-center gap-2.5 text-sm text-foreground/75 pointer-coarse:min-h-11"
+        >
+          <Switch
+            id={`${fieldId}-active`}
+            checked={draft.active}
+            onCheckedChange={(active) => onChange({ ...draft, active })}
+          />
           <Trans>Active</Trans>
         </label>
         <div className="flex items-center gap-2">
