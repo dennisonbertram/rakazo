@@ -199,7 +199,7 @@ import {
 import { publishComputerCommand } from "../lib/computer-workspace";
 import { fetchDataRoomBlob } from "../lib/data-room";
 import { dataRoomAgentSuggestions, findDataRoomAgent } from "../lib/data-room-agent";
-import { delegateWaitTarget, pendingDelegateAgents } from "../lib/delegate-wait";
+import { delegateWaitTarget, pendingDelegateAgents, pendingSentBlocks } from "../lib/delegate-wait";
 import { desktopBridge } from "../lib/desktop";
 import { setDockedAgentBotId } from "../lib/docked-agent";
 import { financeAgentSuggestions, findFinanceAgent } from "../lib/finance-agent";
@@ -2684,6 +2684,10 @@ export function ShellPage() {
       }),
     [activeSnapshot?.messages],
   );
+  const transcriptDelegateStates = useMemo(
+    () => pendingSentBlocks(activeSnapshot?.messages ?? [], Date.now()),
+    [activeSnapshot?.messages],
+  );
   const transcriptArtifactTarget = useMemo<ArtifactTarget>(
     () => (inGroup ? { groupId: groupId ?? "" } : { botId: active?.id ?? "" }),
     [active?.id, groupId, inGroup],
@@ -4369,6 +4373,7 @@ export function ShellPage() {
               <Transcript
                 key={activeSnapshot?.threadId}
                 scrollRef={messageScroll}
+                delegateStates={transcriptDelegateStates}
                 sentHere={sentHere}
                 scrollRequest={scrollRequest}
                 onScrollRequestHandled={clearScrollRequest}
