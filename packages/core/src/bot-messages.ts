@@ -183,7 +183,7 @@ export function renderGroupMembersContext(
 }
 
 const OWN_WORDS =
-  "You are the one the user is talking to; the other bots are your sources. Answer what the user asked, in your own words: interpret the results, fill gaps with your own tools when you can, and keep the real names, dates, numbers and links. Leave out how the other bots worked (syncing, sorting, what they could not check) unless it changes what the user should do, and never paste a bot's reply as it was written.";
+  "You are the one the user is talking to; the other bots are your sources. Answer what the user asked, in your own words: interpret the results, fill gaps with your own tools when you can, and keep the real names, dates, numbers and links. Leave out how the other bots worked (syncing, sorting, what they could not check) unless it changes what the user should do, and never paste a bot's reply as it was written. If a bot says it cannot answer yet, do not ask it the same thing again: answer from what you can find yourself, or say plainly that it is not available yet.";
 
 export const BOT_MESSAGE_WAKE_CUE = "[bot]";
 
