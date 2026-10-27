@@ -377,8 +377,9 @@ describe("inbound wake prompt", () => {
       text: "The answer is 42.",
       intent: "result",
     });
-    expect(resultPrompt).toContain("relay the actual substance");
+    expect(resultPrompt).toContain("answer the user yourself");
     expect(resultPrompt).toContain("only what the conversation does not already show");
+    expect(resultPrompt).toContain("never paste a bot's reply as it was written");
     expect(resultPrompt).not.toContain("staying silent is fine");
     expect(resultPrompt).toContain("do not invent a pending approval");
     expect(resultPrompt).not.toContain("already answered");
