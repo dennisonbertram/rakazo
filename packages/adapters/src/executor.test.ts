@@ -2526,7 +2526,8 @@ describe("directoryDescription", () => {
     });
     expect(line).toContain("Answers questions about your bank accounts.");
     expect(line).toContain("Message it with message_bot");
-    expect(line).toContain("Do not write a reply to the user until its answer arrives");
+    expect(line).toContain("Do not answer the user until its answer arrives");
+    expect(line).toContain("tell the user in one short sentence that you are checking with it");
     expect(line).toContain("quote the figures in your reply yourself");
     expect(line).toContain("[Open Finance](/app/finance)");
     expect(line).toContain("no accounts are connected yet");
