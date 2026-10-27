@@ -153,7 +153,7 @@ export async function ensureConnectedAppAgent(
       PrismaClient,
       "connection" | "botConnectionAccess" | "bot" | "mcpServer" | "$transaction"
     >;
-    repos: Pick<ReturnType<typeof createRepos>, "createBot">;
+    repos: Pick<ReturnType<typeof createRepos>, "createBot" | "replaceBotInstructions">;
     archiveBot: (botId: string) => Promise<void>;
   },
   actor: Actor,

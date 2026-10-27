@@ -1,7 +1,7 @@
 import type { Actor, Bot } from "@rakazo/contracts";
 import { inboxAgentSpawnKey, pageAgentColor } from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
-import { ensureInboxAgent } from "./inbox-agent.js";
+import { ensureInboxAgent, PREVIOUS_INBOX_AGENT_INSTRUCTIONS } from "./inbox-agent.js";
 
 const actor: Actor = {
   userId: "user-1",
@@ -11,11 +11,37 @@ const actor: Actor = {
 };
 
 describe("ensureInboxAgent", () => {
+  it("upgrades an earlier default, leaves edited text and the current text alone", async () => {
+    const replaceBotInstructions = vi.fn(async () => undefined);
+    const createBot = vi.fn(async () => ({ id: "bot-1" }) as Bot);
+    const repos = { createBot, replaceBotInstructions };
+    await ensureInboxAgent(repos, actor);
+    const current = (createBot.mock.calls[0] as unknown as [Actor, { instructions: string }])[1]
+      .instructions;
+    const earlier = PREVIOUS_INBOX_AGENT_INSTRUCTIONS[0]!;
+    expect(earlier).not.toBe(current);
+    const run = async (instructions: string) => {
+      createBot.mockResolvedValueOnce({ id: "bot-1", instructions } as Bot);
+      return ensureInboxAgent(repos, actor);
+    };
+    expect((await run(earlier)).instructions).toBe(current);
+    expect(replaceBotInstructions).toHaveBeenCalledWith(actor, "bot-1", {
+      from: earlier,
+      to: current,
+    });
+    replaceBotInstructions.mockClear();
+    await run(`${earlier} Mine.`);
+    await run(current);
+    expect(replaceBotInstructions).not.toHaveBeenCalled();
+  });
+
   it("creates the bot only through createBot, keyed by the helper and the session actor", async () => {
     const bot = { id: "bot-1" } as Bot;
     const createBot = vi.fn(async () => bot);
 
-    await expect(ensureInboxAgent({ createBot }, actor)).resolves.toBe(bot);
+    await expect(
+      ensureInboxAgent({ createBot, replaceBotInstructions: vi.fn() }, actor),
+    ).resolves.toBe(bot);
 
     expect(createBot).toHaveBeenCalledTimes(1);
     expect(createBot).toHaveBeenCalledWith(
