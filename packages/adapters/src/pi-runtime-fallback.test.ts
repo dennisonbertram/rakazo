@@ -64,7 +64,7 @@ import {
   MODEL_STREAM_IDLE_TIMEOUT_MESSAGE,
   PiAgentRuntime,
 } from "./pi-runtime.js";
-import { MODEL_STREAM_IDLE_TIMEOUT_MS } from "./pi-runtime-limits.js";
+import { MODEL_STREAM_IDLE_TIMEOUT_MS, MODEL_STREAM_TIMEOUT_MS } from "./pi-runtime-limits.js";
 import { PiJsonlSessionRecorder } from "./pi-session.js";
 
 const primary = model("provider-a", "primary", 32_768);
@@ -281,6 +281,8 @@ describe("Pi runtime transient model retries", () => {
     "terminated",
     "Stream ended without finish_reason",
     "Codex error: Our servers are currently overloaded. Please try again later.",
+    "Connection error.",
+    "Request timed out.",
   ])(
     "recovers from two pre-output failures with %s and commits one assistant message",
     async (error) => {
@@ -399,13 +401,87 @@ describe("Pi runtime transient model retries", () => {
     expect(providerState.stream).toHaveBeenCalledOnce();
   });
 
-  it("does not back off after a provider timeout, which already spent its request budget", async () => {
+  it.each(["Request timed out.", "Connection error.", "HTTP 503 unavailable"])(
+    "does not retry %s after the request budget is spent",
+    async (error) => {
+      vi.useFakeTimers();
+      const pending = new AssistantMessageEventStream();
+      providerState.stream.mockReturnValue(pending);
+      const outcome = run(request()).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(MODEL_STREAM_TIMEOUT_MS);
+      const failure = message(primary, [], "error", error);
+      pending.push({ type: "error", reason: "error", error: failure });
+      pending.end(failure);
+      expect(await outcome).toEqual(
+        expect.objectContaining({
+          message: error === "Connection error." ? "Couldn't reach primary. Try again." : error,
+        }),
+      );
+      expect(providerState.stream).toHaveBeenCalledTimes(1);
+      expect(providerState.delay).not.toHaveBeenCalled();
+    },
+  );
+
+  it("bounds repeated early timeouts by elapsed request budget", async () => {
+    vi.useFakeTimers();
+    const { abortableDelay } = await vi.importActual<typeof Core>("@rakazo/core");
+    providerState.delay.mockImplementation(abortableDelay);
+    providerState.stream.mockImplementation((_target, _context, options) => {
+      const pending = new AssistantMessageEventStream();
+      setTimeout(
+        () => {
+          const failure = message(primary, [], "error", "Request timed out.");
+          pending.push({ type: "error", reason: "error", error: failure });
+          pending.end(failure);
+        },
+        Math.min(MODEL_STREAM_TIMEOUT_MS / 2, options.timeoutMs),
+      );
+      return pending;
+    });
+    const outcome = run(request()).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(MODEL_STREAM_TIMEOUT_MS);
+    expect(providerState.stream.mock.calls.map(([, , options]) => options.timeoutMs)).toEqual([
+      MODEL_STREAM_TIMEOUT_MS,
+      MODEL_STREAM_TIMEOUT_MS / 2 - 2_000,
+    ]);
+    expect(await outcome).toEqual(expect.objectContaining({ message: "Request timed out." }));
+    expect(providerState.stream).toHaveBeenCalledTimes(2);
+    expect(providerState.delay.mock.calls.map(([delay]) => delay)).toEqual([2_000]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not back off when the delay would consume the remaining budget", async () => {
+    vi.useFakeTimers();
+    const { abortableDelay } = await vi.importActual<typeof Core>("@rakazo/core");
+    providerState.delay.mockImplementation(abortableDelay);
+    providerState.stream.mockImplementation(() => {
+      const pending = new AssistantMessageEventStream();
+      setTimeout(() => {
+        const failure = message(primary, [], "error", "Request timed out.");
+        pending.push({ type: "error", reason: "error", error: failure });
+        pending.end(failure);
+      }, 30_000);
+      return pending;
+    });
+    const outcome = run(request()).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(100_000);
+    expect(providerState.stream).toHaveBeenCalledTimes(3);
+    expect(providerState.delay.mock.calls.map(([delay]) => delay)).toEqual([2_000, 8_000]);
+    expect(await outcome).toEqual(expect.objectContaining({ message: "Request timed out." }));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("rechecks the budget when backoff wakes after the deadline", async () => {
+    vi.useFakeTimers();
+    providerState.delay.mockImplementation(async () => {
+      vi.setSystemTime(Date.now() + MODEL_STREAM_TIMEOUT_MS);
+    });
     providerState.stream.mockImplementation(() =>
-      stream(primary, message(primary, [], "error", "Request timed out.")),
+      stream(primary, message(primary, [], "error", "Connection error.")),
     );
-    await expect(run(request())).rejects.toThrow("Request timed out.");
-    expect(providerState.stream).toHaveBeenCalledTimes(1);
-    expect(providerState.delay).not.toHaveBeenCalled();
+    await expect(run(request())).rejects.toThrow("Couldn't reach primary. Try again.");
+    expect(providerState.stream).toHaveBeenCalledOnce();
+    expect(providerState.delay).toHaveBeenCalledOnce();
   });
 
   it("surfaces a non-retryable error encountered after a transient failure", async () => {

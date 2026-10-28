@@ -2378,10 +2378,6 @@ function retryAfterMs(error: unknown): number | undefined {
   return match[1] || match[3] ? value : value * 1000;
 }
 
-function isProviderTimeout(error: unknown): boolean {
-  return /timed? out|timeout/.test(errorFacts(error).text);
-}
-
 /** Only provider availability failures may advance the user's explicit chain. */
 export function isRetryableProviderUnavailable(error: unknown): boolean {
   const { text, statuses } = errorFacts(error);
@@ -2593,8 +2589,19 @@ function fallbackAwareModelStream(
     let buffered: AssistantMessageEvent[] = [];
     let retries = 0;
     let recoveredIdle = false;
+    // Same-model retries and their backoff share one request budget. A post-header
+    // idle stream renews it once, since the idle bound can outlast the budget.
+    let startedAt = Date.now();
+    const timeoutMs = options?.timeoutMs ?? MODEL_STREAM_TIMEOUT_MS;
     let firstRetryableError: Extract<AssistantMessageEvent, { type: "error" }> | undefined;
     while (!signalAborted()) {
+      const remainingMs = timeoutMs - (Date.now() - startedAt);
+      if (retries > 0 && firstRetryableError && remainingMs <= 0) {
+        output.push(firstRetryableError);
+        output.end(firstRetryableError.error);
+        return;
+      }
+      const attemptOptions = retries > 0 ? { ...options, timeoutMs: remainingMs } : options;
       const target = state.getActive();
       lastPartial = undefined;
       let sawPartialOutput = false;
@@ -2614,7 +2621,9 @@ function fallbackAwareModelStream(
         stream = state.stream(
           target,
           context,
-          state.request.fallbackModels?.length ? { ...options, apiKey, reasoning } : options,
+          state.request.fallbackModels?.length
+            ? { ...attemptOptions, apiKey, reasoning }
+            : attemptOptions,
         );
       } catch (error) {
         finishWithThrownError(target, error);
@@ -2643,23 +2652,24 @@ function fallbackAwareModelStream(
                 break;
               }
               firstRetryableError ??= event;
-              // A silent stream is retried once on the same model; other timeouts are not.
+              // A silent stream is retried once on the same model.
               const idle = event.error.errorMessage === MODEL_STREAM_IDLE_TIMEOUT_MESSAGE;
               const backoff = idle
                 ? recoveredIdle
                   ? undefined
                   : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
-                : isProviderTimeout(event.error)
-                  ? undefined
-                  : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
-              if (idle) recoveredIdle = true;
+                : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
+              if (idle && backoff !== undefined) {
+                recoveredIdle = true;
+                startedAt = Date.now();
+              }
               const requested = retryAfterMs(event.error);
               // A server asking for a longer wait than we allow is not worth retrying.
               const delay =
                 backoff === undefined || (requested ?? 0) > MAX_RETRY_AFTER_MS
                   ? undefined
                   : (requested ?? backoff + Math.floor(Math.random() * (backoff / 4)));
-              if (delay !== undefined) {
+              if (delay !== undefined && Date.now() - startedAt + delay < timeoutMs) {
                 retries += 1;
                 state.request.onModelRetry?.(
                   isConnectionFailure(event.error)
@@ -2668,9 +2678,11 @@ function fallbackAwareModelStream(
                 );
                 await abortableDelay(delay, signal);
                 if (failIfAborted(target)) return;
-                buffered = [];
-                restart = true;
-                break;
+                if (Date.now() - startedAt < timeoutMs) {
+                  buffered = [];
+                  restart = true;
+                  break;
+                }
               }
               terminalEvent = firstRetryableError;
               if (isConnectionFailure(terminalEvent.error)) {
