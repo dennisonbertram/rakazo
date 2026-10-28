@@ -1289,7 +1289,11 @@ describe("team chat bridge", () => {
           })),
         },
         message: { findUnique: messageFindUnique },
-        run: { updateMany: runUpdateMany },
+        run: {
+          updateMany: runUpdateMany,
+          findMany: vi.fn(async () => [{ id: "run-1", userId: "user-1", spaceId: "space-1" }]),
+        },
+        secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         task: { updateMany: taskUpdateMany },
       } as unknown as PrismaClient,
       events: { sendUserMessage },

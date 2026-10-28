@@ -67,6 +67,14 @@ export interface AuthEnv {
   afterReplaceSession?: (previous: AuthSession, session: AuthSession) => Promise<void>;
 }
 
+/**
+ * A session lasts 90 days from its last renewal, and renews once a day of use
+ * (any session read). Web, desktop and mobile share it: cookies and bearer
+ * tokens both name the same session row. `freshAge` stays at Better Auth's one day.
+ */
+export const SESSION_LIFETIME_SECONDS = 60 * 60 * 24 * 90;
+export const SESSION_RENEW_AFTER_SECONDS = 60 * 60 * 24;
+
 type AuthSession = { id: string; userId: string };
 
 export async function resolveSignupPolicy(
@@ -288,6 +296,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
       },
     },
     rateLimit: authRateLimitOptions(),
+    session: { expiresIn: SESSION_LIFETIME_SECONDS, updateAge: SESSION_RENEW_AFTER_SECONDS },
     database: prismaAdapter(prisma, { provider: "postgresql" }),
     emailAndPassword: {
       enabled: env.passwordAuth !== false,
