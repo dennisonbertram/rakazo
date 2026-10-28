@@ -479,13 +479,17 @@ export function CalendarPage({
   const [pickedDay, setPickedDay] = useState<string>();
   const scroller = useRef<HTMLDivElement>(null);
   const isGrid = view === "day" || view === "week";
+  // Scroll once per range and view, after the first load, so a later reload does not move the grid.
+  const scrolledFor = useRef("");
   useEffect(() => {
     const el = scroller.current;
-    if (!el || !isGrid || loading) return;
+    const key = `${view}:${start}:${end}`;
+    if (!el || !isGrid || loading || scrolledFor.current === key) return;
+    scrolledFor.current = key;
     const hour = start <= today && today < end ? Math.max(new Date().getHours() - 1, 0) : 7;
     // The hour line sits right under the sticky day header, which grows once all-day items load; back up a little so its label is not half hidden.
     el.scrollTop = Math.max(hour * HOUR_PX - 8, 0);
-  }, [isGrid, start, end, today, loading]);
+  }, [isGrid, view, start, end, today, loading]);
 
   const todos = <BotTodos hideDueBetween={{ from: startOf(start), to: startOf(end) }} />;
   const filters = (

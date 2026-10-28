@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 306 of 306
-- Web and shared components: 793
+- Web and shared components: 794
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -98,7 +98,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | FinanceCards, FinanceCardGroup, Header, Preview | [apps/web/src/components/FinanceCards.tsx](../../apps/web/src/components/FinanceCards.tsx) | [FinanceCards.stories.tsx](../../apps/web/src/components/FinanceCards.stories.tsx) | web |
 | HideAmountsMenuItem, ShowAmountsButton | [apps/web/src/components/HideAmountsToggle.tsx](../../apps/web/src/components/HideAmountsToggle.tsx) | [HideAmountsToggle.stories.tsx](../../apps/web/src/components/HideAmountsToggle.stories.tsx) | web |
 | I18nBootstrap | [apps/web/src/components/I18nBootstrap.tsx](../../apps/web/src/components/I18nBootstrap.tsx) | [I18nBootstrap.stories.tsx](../../apps/web/src/components/I18nBootstrap.stories.tsx) | web |
-| PhoneSlot, FilterSheet, Tip, SearchField, PickFilter, SortControl | [apps/web/src/components/ListControls.tsx](../../apps/web/src/components/ListControls.tsx) | [ListControls.stories.tsx](../../apps/web/src/components/ListControls.stories.tsx) | web |
+| PhoneSlot, FilterSheet, Tip, SearchField, PickFilter, PhoneDateRange, SortControl | [apps/web/src/components/ListControls.tsx](../../apps/web/src/components/ListControls.tsx) | [ListControls.stories.tsx](../../apps/web/src/components/ListControls.stories.tsx) | web |
 | Row, MailApprovalCard | [apps/web/src/components/MailApprovalCard.tsx](../../apps/web/src/components/MailApprovalCard.tsx) | [MailApprovalCard.stories.tsx](../../apps/web/src/components/MailApprovalCard.stories.tsx) | web |
 | MailOutbox | [apps/web/src/components/MailOutbox.tsx](../../apps/web/src/components/MailOutbox.tsx) | [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
 | MailThreadCard | [apps/web/src/components/MailThreadCard.tsx](../../apps/web/src/components/MailThreadCard.tsx) | [MailThreadCard.stories.tsx](../../apps/web/src/components/MailThreadCard.stories.tsx) | web |
@@ -211,7 +211,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | StatementImport | [apps/web/src/components/finance/StatementImport.tsx](../../apps/web/src/components/finance/StatementImport.tsx) | [StatementImport.stories.tsx](../../apps/web/src/components/finance/StatementImport.stories.tsx) | web |
 | StatementReminderBanner | [apps/web/src/components/finance/StatementReminderBanner.tsx](../../apps/web/src/components/finance/StatementReminderBanner.tsx) | [StatementReminderBanner.stories.tsx](../../apps/web/src/components/finance/StatementReminderBanner.stories.tsx) | web |
 | CheckLine, Row, StatementGroup | [apps/web/src/components/finance/StatementReviewCard.tsx](../../apps/web/src/components/finance/StatementReviewCard.tsx) | [StatementReviewCard.stories.tsx](../../apps/web/src/components/finance/StatementReviewCard.stories.tsx) | web |
-| SpaceName, AskAgentButton, WithEndings, HereLink, DetailHead, CompanyMenu, NotFoundNotice, ErrorNotice, DetailPage, Section, Kpi, BreakdownRows, Chevron, TransactionRow, VendorGroupRows, TransactionTable, TransactionsSection, Chip, PeriodTabs, Legend, BurnLegend, Kv, KvRow, ValueLink | [apps/web/src/components/finance/ui.tsx](../../apps/web/src/components/finance/ui.tsx) | [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx), [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx), [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx), [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx) | web |
+| SpaceName, AskAgentButton, WithEndings, HereLink, DetailHead, CompanyMenu, NotFoundNotice, ErrorNotice, DetailPage, Section, Kpi, BreakdownRows, Chevron, TransactionRow, VendorGroupRows, TransactionTable, TransactionsSection, Chip, PeriodTabs, Legend, BurnLegend, Kv, KvRow, ValueLink | [apps/web/src/components/finance/ui.tsx](../../apps/web/src/components/finance/ui.tsx) | [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx), [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx), [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx), [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx), [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |
 | WalletDialog | [apps/web/src/components/finance/WalletDialog.tsx](../../apps/web/src/components/finance/WalletDialog.tsx) | [WalletDialog.stories.tsx](../../apps/web/src/components/finance/WalletDialog.stories.tsx) | web |
 
 ## Web components/fundraising
