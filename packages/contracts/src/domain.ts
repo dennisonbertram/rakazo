@@ -28,6 +28,24 @@ export const MemoryScopeSchema = z.enum(["isolated", "shared"]);
 export type MemoryScopeValue = z.infer<typeof MemoryScopeSchema>;
 
 export const AvatarStyleSchema = z.enum(["robot", "organic"]);
+
+/** True for an IANA timezone this runtime can format in, such as "Pacific/Auckland". */
+export function isValidTimeZone(value: string): boolean {
+  // Intl also accepts fixed offsets, which are not IANA timezone names.
+  if (/^[+-]/.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const TimeZoneSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine(isValidTimeZone, { message: "Unknown timezone" });
 export type AvatarStyle = z.infer<typeof AvatarStyleSchema>;
 export const DEFAULT_AVATAR_STYLE: AvatarStyle = "organic";
 
@@ -84,6 +102,12 @@ export const BotAudienceSchema = z.enum(["internal", "external"]);
 export type BotAudience = z.infer<typeof BotAudienceSchema>;
 
 /** Only a bot the owner made can be external; page and integration agents hold private data by design. */
+/** A page the person asked for by hand: the server picks this key, so a client cannot claim it. */
+export const customPageSpawnKey = (id: string) => `custom-page:${id}`;
+
+export const isCustomPageSpawnKey = (spawnKey: string | null | undefined) =>
+  Boolean(spawnKey?.startsWith(customPageSpawnKey("")));
+
 export const botAudienceEditable = (spawnKey: string | null | undefined) => !spawnKey;
 
 export const BotSchema = z.object({
@@ -100,6 +124,8 @@ export const BotSchema = z.object({
   /** Order within its folder; bots and groups share one scale. Null: not ordered by hand yet. */
   position: z.number().int().nullable().optional(),
   archivedAt: z.string().nullable(),
+  /** Left out of the sidebar chat list by the person; the bot keeps working. */
+  hiddenAt: z.string().nullable().optional(),
   unread: z.boolean(),
   parentBotId: Id.nullable(),
   memoryScope: MemoryScopeSchema.nullable(),
@@ -229,6 +255,7 @@ export const SpaceBotSchema = BotSchema.pick({
   color: true,
   notifyOnFinish: true,
   pinned: true,
+  hiddenAt: true,
   sectionId: true,
   position: true,
   unread: true,
@@ -369,6 +396,8 @@ export const CreateBotInput = z.object({
   computerMode: ComputerModeSchema.default("team"),
   /** Idempotency key within a space (unique with spaceId). */
   spawnKey: z.string().trim().min(1).max(120).optional(),
+  /** Makes a page agent: the server gives it a reserved custom-page key. */
+  page: z.boolean().optional(),
 });
 export type CreateBotInput = z.infer<typeof CreateBotInput>;
 
@@ -394,6 +423,8 @@ export const UpdateBotInput = z
     notifyOnFinish: z.boolean().optional(),
     color: BotAvatarValueSchema.optional(),
     pinned: z.boolean().optional(),
+    /** Leaves the bot out of the sidebar chat list (or puts it back). */
+    hidden: z.boolean().optional(),
     memoryScope: MemoryScopeSchema.nullable().optional(),
     sectionId: Id.nullable().optional(),
     voiceId: z.string().max(120).nullable().optional(),
@@ -511,7 +542,7 @@ export const CreateRoutineInput = z
     taughtSkillId: Id.nullable().default(null),
     crons: z.array(z.string().min(1)).default([]),
     /** Defaults to the user's stored time zone, then UTC. */
-    timezone: z.string().optional(),
+    timezone: TimeZoneSchema.optional(),
     notify: z.boolean().default(true),
     active: z.boolean().default(false),
     webhookEnabled: z.boolean().default(false),
@@ -1302,6 +1333,10 @@ export type Run = z.infer<typeof RunSchema>;
 // Stored as a failed-run error, not an assistant message: asking the user to continue would
 // store that sentence as the reply, and the next "continue" misses a final answer again.
 export const MISSING_TOOL_FINAL_RESPONSE_ERROR = "This agent could not finish. Try again.";
+
+/** Resumed without its saved turn, the model did not call the action the user approved. */
+export const APPROVED_ACTION_NOT_RUN_ERROR =
+  "The model did not run the approved action. Try again.";
 
 export const ThreadMessagePageSchema = z.object({
   threadId: Id,

@@ -4203,6 +4203,7 @@ describe("groups.archive", () => {
     const groupUpdate = vi.fn();
     // As in production: the run's computer is known only through its execution lease.
     const tx = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "group-1" }]),
       chatGroup: {
         findFirst: vi.fn().mockResolvedValue({
@@ -4999,6 +5000,48 @@ describe("Investors agent", () => {
         spawnKey: "investors-agent:someone",
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // The custom-page key is server-made; a client cannot send it.
+    await expect(
+      client.bots.create({
+        name: "Squatter",
+        title: "",
+        description: "",
+        instructions: "",
+        notifyOnFinish: true,
+        computerMode: "team" as const,
+        spawnKey: "custom-page:someone",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("Hiding a bot", () => {
+  it("looks the bot up within the actor's space and user, so another user's bot is not found", async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const deps = {
+      prisma: { bot: { findFirst } } as unknown as PrismaClient,
+      env: { defaultProvider: "fake", defaultModel: "fake-model" },
+      dataDir: "/tmp/rakazo-router-test",
+    } as unknown as RouterDeps;
+    const actor = {
+      spaceId: "workspace-1",
+      userId: "user-1",
+      email: "user@rakazo.test",
+      isDeploymentOwner: false,
+    } satisfies Actor;
+    const client = createRouterClient(createRouter(deps), { context: { actor } });
+    await expect(
+      client.bots.update({ botId: "someone-elses-bot", hidden: true }),
+    ).rejects.toThrow();
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "someone-elses-bot",
+          spaceId: "workspace-1",
+          userId: "user-1",
+        }),
+      }),
+    );
   });
 });
 

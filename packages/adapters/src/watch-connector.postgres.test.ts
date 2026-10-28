@@ -9,6 +9,7 @@ import type { PrismaClient } from "@rakazo/db";
 import { createDb } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createWatchFromTool, scheduleApproval } from "./schedule-tools.js";
+import { WATCH_CONNECTOR_TIMEOUT_MS } from "./watch-connector.js";
 import { runWatchProbeTick } from "./watch-probe.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -364,6 +365,22 @@ describePostgres("connected-app watches (PostgreSQL)", () => {
     expect(
       (await prisma.notification.findMany({ where: { routineId: routine.id } }))[0]?.title,
     ).toBe("Flip paused: the tool is no longer a read-only tool");
+  });
+
+  it("starts a fresh timeout for the tool call once discovery returns", async () => {
+    fake.tools = [read("list_accounts")];
+    fake.value = { balance: 1 };
+    await create("Budget", "list_accounts", { account: "x" });
+    const spy = vi.spyOn(globalThis, "setTimeout");
+    try {
+      await tick();
+      const budgets = spy.mock.calls.filter(([, ms]) => ms === WATCH_CONNECTOR_TIMEOUT_MS);
+      // One budget for discovery, a second for the call: a slow unrelated provider cannot
+      // use up the watched tool's time.
+      expect(budgets.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("ignores Composio's per-execution log id when comparing results", async () => {

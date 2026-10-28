@@ -1,7 +1,7 @@
 import type { AdapterContext, MessagingSurface, ToolProgress } from "@rakazo/adapter-kit";
 import { clampInt, messagingProviderBlocksBot } from "@rakazo/core";
 import { normalizeIMessageHandle } from "./bluebubbles-adapter.js";
-import { providerOfThreadId } from "./chat-sdk-surface.js";
+import { MessagingSendError, providerOfThreadId } from "./chat-sdk-surface.js";
 import { mailToolsAllowed } from "./mail-tools.js";
 import { MESSAGING_AI_DISCLOSURE } from "./messaging-delivery.js";
 
@@ -90,9 +90,11 @@ export async function imessageToolFromTool(
 }
 
 function sanitizedMessage(error: unknown): string | undefined {
-  const name = error instanceof Error ? error.name : "";
+  // The surface wraps send failures; the adapter's own error is the cause.
+  const root = error instanceof MessagingSendError ? error.cause : error;
+  const name = root instanceof Error ? root.name : "";
   return name === "BlueBubblesError" || name === "PhotonError"
-    ? (error as Error).message
+    ? (root as Error).message
     : undefined;
 }
 

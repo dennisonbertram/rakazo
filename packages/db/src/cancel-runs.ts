@@ -3,7 +3,7 @@ import { clearEndedRunState } from "./run-secrets.js";
 
 /** The caller selects authorized runs and owns the surrounding transaction and cleanup. */
 export async function cancelRunsInTransaction(
-  tx: Pick<Prisma.TransactionClient, "run" | "attempt" | "task" | "secret">,
+  tx: Pick<Prisma.TransactionClient, "run" | "attempt" | "task" | "secret" | "externalEffect">,
   runs: ReadonlyArray<{ id: string; taskId: string }>,
   cancelledAt: Date,
 ): Promise<void> {
