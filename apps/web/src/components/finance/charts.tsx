@@ -1,14 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { CashPoint } from "@rakazo/contracts";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import {
   axisMoney,
   dayAxisLabels,
@@ -33,10 +26,7 @@ export function niceScale(max: number): { step: number; top: number } {
 }
 
 /** Like `niceScale`, but also reaching down to `min` when it is below zero (`floor` is then negative). */
-export function niceRange(
-  min: number,
-  max: number,
-): { step: number; top: number; floor: number } {
+export function niceRange(min: number, max: number): { step: number; top: number; floor: number } {
   if (min >= 0) return { ...niceScale(max), floor: 0 };
   const { step } = niceScale(Math.max(max, 0) - min);
   return {
@@ -55,18 +45,13 @@ function lineRange(min: number, max: number) {
   if (min === max && min > 0) {
     // A round step (1, 2 or 5 times a power of ten) keeps the three gridline labels evenly spaced; the middle one is the balance.
     const unit = 10 ** Math.floor(Math.log10(Math.max(min / 10, 100)));
-    const step =
-      [1, 2, 5, 10].map((m) => m * unit).find((s) => s >= min / 10) ??
-      10 * unit;
+    const step = [1, 2, 5, 10].map((m) => m * unit).find((s) => s >= min / 10) ?? 10 * unit;
     // Round ticks around the balance, not the balance plus or minus a step, so labels read "$200k", "$250k".
     const floor = Math.floor((min - step / 2) / step) * step;
     return {
       step,
       floor,
-      top: Math.max(
-        floor + 2 * step,
-        Math.ceil((min + step / 2) / step) * step,
-      ),
+      top: Math.max(floor + 2 * step, Math.ceil((min + step / 2) / step) * step),
     };
   }
   if (min > 0 && max - min < max / 2) {
@@ -139,9 +124,7 @@ export function Chart({
           viewBox={`0 0 ${svgWidth} ${height}`}
           className="block max-w-none"
         >
-          <ScrollX.Provider value={scrollX}>
-            {children(svgWidth)}
-          </ScrollX.Provider>
+          <ScrollX.Provider value={scrollX}>{children(svgWidth)}</ScrollX.Provider>
         </svg>
       ) : null}
     </div>
@@ -203,27 +186,15 @@ function Grid({
   const lines: number[] = [];
   // With nothing to plot every step rounds to "$0"; one $0 line is drawn instead of a stack of them.
   for (let v = floor; v <= scale.top; v += scale.step)
-    if (
-      lines.length === 0 ||
-      axisMoney(v) !== axisMoney(lines.at(-1) as number)
-    )
-      lines.push(v);
+    if (lines.length === 0 || axisMoney(v) !== axisMoney(lines.at(-1) as number)) lines.push(v);
   return (
     <>
       {/* Scrolled, the plot slides under the pinned labels: an opaque gutter keeps them clear of it. */}
       {layer === "labels" && scrollX > 0 && !hidden ? (
-        <rect
-          x={scrollX}
-          y={0}
-          width={left}
-          height={height - bottom}
-          className="fill-card"
-        />
+        <rect x={scrollX} y={0} width={left} height={height - bottom} className="fill-card" />
       ) : null}
       {lines.map((v) => {
-        const y =
-          top +
-          (height - top - bottom) * (1 - (v - floor) / (scale.top - floor));
+        const y = top + (height - top - bottom) * (1 - (v - floor) / (scale.top - floor));
         return (
           <g key={v}>
             {layer === "labels" ? null : (
@@ -261,10 +232,7 @@ function Grid({
  * the last point (today, or the month a projection runs out) is always named. A kept label takes the
  * year (`'27`) of a skipped label since the one kept before it, so a year change is never lost.
  */
-export function axisTicks(
-  labels: readonly string[],
-  every: number,
-): (string | null)[] {
+export function axisTicks(labels: readonly string[], every: number): (string | null)[] {
   const last = labels.length - 1;
   let since = 0;
   return labels.map((text, i) => {
@@ -274,9 +242,7 @@ export function axisTicks(
       .map((l) => l.match(/'\d\d$/)?.[0])
       .findLast(Boolean);
     since = i + 1;
-    return year && !text.endsWith(year) && !text.includes("•")
-      ? `${text} ${year}`
-      : text;
+    return year && !text.endsWith(year) && !text.includes("•") ? `${text} ${year}` : text;
   });
 }
 
@@ -288,17 +254,12 @@ export function dropCrowdedTick(
 ): (string | null)[] {
   const last = ticks.length - 1;
   const before = ticks.findLastIndex((text, i) => i < last && text !== null);
-  if (before < 0 || x(last) <= width - 24 || x(last) - x(before) >= 80)
-    return ticks;
+  if (before < 0 || x(last) <= width - 24 || x(last) - x(before) >= 80) return ticks;
   // The dropped tick may carry a year change ('27); the last tick takes it over.
   const year = ticks[before]?.match(/'\d\d$/)?.[0];
   return ticks.map((text, i) => {
     if (i === before) return null;
-    return i === last &&
-      text &&
-      year &&
-      !text.endsWith(year) &&
-      !text.includes("•")
+    return i === last && text && year && !text.endsWith(year) && !text.includes("•")
       ? `${text} ${year}`
       : text;
   });
@@ -342,29 +303,16 @@ export function LineChart({
         const left = axes
           ? Math.max(
               46,
-              Math.max(
-                axisMoney(scale.top).length,
-                axisMoney(scale.floor).length,
-              ) *
-                7 +
-                10,
+              Math.max(axisMoney(scale.top).length, axisMoney(scale.floor).length) * 7 + 10,
             )
           : 4;
         const hi = axes ? scale.top : maxValue;
         const lo = axes ? scale.floor : Math.min(...values);
         const x = (i: number) =>
-          values.length < 2
-            ? left
-            : left + (i * (width - left - right)) / (values.length - 1);
-        const y = (v: number) =>
-          top + (height - top - bottom) * (1 - (v - lo) / (hi - lo || 1));
-        const points = values.map(
-          (v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`,
-        );
-        const solid = Math.min(
-          solidUntil ?? values.length - 1,
-          values.length - 1,
-        );
+          values.length < 2 ? left : left + (i * (width - left - right)) / (values.length - 1);
+        const y = (v: number) => top + (height - top - bottom) * (1 - (v - lo) / (hi - lo || 1));
+        const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+        const solid = Math.min(solidUntil ?? values.length - 1, values.length - 1);
         const every = Math.max(
           1,
           Math.ceil(62 / ((width - left - right) / (values.length - 1 || 1))),
@@ -382,24 +330,19 @@ export function LineChart({
                   bottom={bottom}
                   scale={scale}
                 />
-                {dropCrowdedTick(axisTicks(labels, every), x, width).map(
-                  (text, i) =>
-                    text !== null ? (
-                      <text
-                        key={i}
-                        x={x(i)}
-                        y={height - 6}
-                        textAnchor={
-                          i === values.length - 1 && x(i) > width - 24
-                            ? "end"
-                            : "middle"
-                        }
-                        className="fill-muted-foreground"
-                        fontSize={12}
-                      >
-                        {text}
-                      </text>
-                    ) : null,
+                {dropCrowdedTick(axisTicks(labels, every), x, width).map((text, i) =>
+                  text !== null ? (
+                    <text
+                      key={i}
+                      x={x(i)}
+                      y={height - 6}
+                      textAnchor={i === values.length - 1 && x(i) > width - 24 ? "end" : "middle"}
+                      className="fill-muted-foreground"
+                      fontSize={12}
+                    >
+                      {text}
+                    </text>
+                  ) : null,
                 )}
               </>
             ) : null}
@@ -426,9 +369,7 @@ export function LineChart({
                 x={(x(solid) + x(values.length - 1)) / 2 + 8}
                 y={y(((values[solid] ?? 0) + (values.at(-1) ?? 0)) / 2) - 8}
                 textAnchor={
-                  (x(solid) + x(values.length - 1)) / 2 + 8 > width - 70
-                    ? "end"
-                    : "start"
+                  (x(solid) + x(values.length - 1)) / 2 + 8 > width - 70 ? "end" : "start"
                 }
                 className="fill-muted-foreground"
                 fontSize={12}
@@ -436,12 +377,7 @@ export function LineChart({
                 {projectedLabel}
               </text>
             ) : null}
-            <circle
-              cx={x(solid)}
-              cy={y(values[solid] ?? 0)}
-              r={3}
-              className="fill-foreground"
-            />
+            <circle cx={x(solid)} cy={y(values[solid] ?? 0)} r={3} className="fill-foreground" />
             {endMarker ? (
               <circle
                 cx={x(values.length - 1)}
@@ -473,15 +409,11 @@ const MIN_SLOTS = 6;
 /** Axis labels: weekdays for a week of days, day numbers for more days, `Oct 6` for weeks, `Oct` for months (years on the first tick and January), `Q3 '26` for quarters, `2026` for years. */
 function barLabels(series: CashPoint[], granularity: BarGranularity): string[] {
   if (granularity === "year") return series.map((p) => p.start.slice(0, 4));
-  if (granularity === "quarter")
-    return series.map((p) => quarterLabel(p.start));
-  if (granularity === "month")
-    return monthAxisLabels(series.map((p) => p.start.slice(0, 7)));
+  if (granularity === "quarter") return series.map((p) => quarterLabel(p.start));
+  if (granularity === "month") return monthAxisLabels(series.map((p) => p.start.slice(0, 7)));
   if (granularity === "week") return dayAxisLabels(series.map((p) => p.start));
   return series.map((p) =>
-    series.length <= 7
-      ? weekdayShort(p.start)
-      : String(Number(p.start.slice(8, 10))),
+    series.length <= 7 ? weekdayShort(p.start) : String(Number(p.start.slice(8, 10))),
   );
 }
 
@@ -489,9 +421,7 @@ function barLabels(series: CashPoint[], granularity: BarGranularity): string[] {
 function monotoneSegments(pts: [number, number][]): string[] {
   const n = pts.length;
   const dx = pts.slice(1).map((p, i) => p[0] - (pts[i] as [number, number])[0]);
-  const m = pts
-    .slice(1)
-    .map((p, i) => (p[1] - (pts[i] as [number, number])[1]) / (dx[i] || 1));
+  const m = pts.slice(1).map((p, i) => (p[1] - (pts[i] as [number, number])[1]) / (dx[i] || 1));
   const t = pts.map((_, i) => {
     if (i === 0) return m[0] ?? 0;
     if (i === n - 1) return m[n - 2] ?? 0;
@@ -506,10 +436,7 @@ function monotoneSegments(pts: [number, number][]): string[] {
       t[i + 1] = 0;
       continue;
     }
-    const k = Math.hypot(
-      (t[i] as number) / slope,
-      (t[i + 1] as number) / slope,
-    );
+    const k = Math.hypot((t[i] as number) / slope, (t[i + 1] as number) / slope);
     if (k > 3) {
       t[i] = (3 * slope * (t[i] as number)) / (k * slope);
       t[i + 1] = (3 * slope * (t[i + 1] as number)) / (k * slope);
@@ -543,31 +470,21 @@ export function BurnLines({
   const gradient = useId();
   const [active, setActive] = useState<number | null>(null);
   // Periods before the first one with money in or out are flat zeros that only take width.
-  const firstUsed = allSeries.findIndex(
-    (m) => m.outCents || m.revenueCents || m.financingCents,
-  );
+  const firstUsed = allSeries.findIndex((m) => m.outCents || m.revenueCents || m.financingCents);
   const trim =
-    (granularity === "month" ||
-      granularity === "quarter" ||
-      granularity === "year") &&
+    (granularity === "month" || granularity === "quarter" || granularity === "year") &&
     firstUsed > 0;
   const trimmed = trim ? allSeries.slice(firstUsed) : allSeries;
   // A few quarters or years fill the plot; days, weeks and months keep a minimum so they start at the left edge.
-  const minSlots =
-    granularity === "quarter" || granularity === "year" ? 1 : MIN_SLOTS;
+  const minSlots = granularity === "quarter" || granularity === "year" ? 1 : MIN_SLOTS;
   // A finger cannot hit 20 px columns, so on touch the whole plot is one target: a tap picks the
   // nearest period (its figures show), a second tap in the same column opens it.
   const touch = window.matchMedia?.("(pointer: coarse)").matches ?? false;
   // The scale follows spend and revenue; a raise many times larger would flatten every other
   // point, so a financing point above the scale is cut at the top and labelled instead.
   const series = trimmed;
-  const max = Math.max(
-    ...series.flatMap((m) => [m.outCents, m.revenueCents]),
-    0,
-  );
-  const scale = niceScale(
-    max > 0 ? max : Math.max(...series.map((m) => m.financingCents), 0),
-  );
+  const max = Math.max(...series.flatMap((m) => [m.outCents, m.revenueCents]), 0);
+  const scale = niceScale(max > 0 ? max : Math.max(...series.map((m) => m.financingCents), 0));
   // Room for the widest axis label (about 7 px a character at 12 px) so none is cut off.
   const left = Math.max(40, axisMoney(scale.top).length * 7 + 10);
   const right = 8;
@@ -575,23 +492,18 @@ export function BurnLines({
   const clipped = series.some((m) => m.financingCents > scale.top);
   // A quarter or year names its financing point in a label above the plot, so the label never sits on a bar.
   const named = series.some(
-    (m) =>
-      m.financingCents > 0 &&
-      (granularity === "quarter" || granularity === "year"),
+    (m) => m.financingCents > 0 && (granularity === "quarter" || granularity === "year"),
   );
   // Neighbouring labels that collide go on a second row, so two or more labels get the extra room.
   const labelled = series.filter(
     (m) =>
       m.financingCents > scale.top ||
-      (m.financingCents > 0 &&
-        (granularity === "quarter" || granularity === "year")),
+      (m.financingCents > 0 && (granularity === "quarter" || granularity === "year")),
   ).length;
   const top = labelled > 1 ? 42 : clipped || named ? 28 : 10;
   // Each month is a control and must be 44 px wide on touch: a narrow phone scrolls the chart.
   const minWidth =
-    touch && granularity === "month"
-      ? left + right + Math.max(series.length, minSlots) * 44
-      : 0;
+    touch && granularity === "month" ? left + right + Math.max(series.length, minSlots) * 44 : 0;
   return (
     <Chart height={height} label={label} minWidth={minWidth}>
       {(width) => {
@@ -606,28 +518,20 @@ export function BurnLines({
         const y = (v: number) => top + (base - top) * (1 - v / scale.top);
         const cx = (i: number) => left + slot * (i + 0.5);
         const line = (pick: (m: CashPoint) => number) =>
-          series.map((m, i): [number, number] => [
-            cx(i),
-            y(Math.min(pick(m), scale.top)),
-          ]);
+          series.map((m, i): [number, number] => [cx(i), y(Math.min(pick(m), scale.top))]);
         const out = line((m) => m.outCents);
         const last = series.length - 1;
         const partial = series[last]?.partial === true;
         // A bucket still running is a hollow dot only: a line to it would read as spend falling.
         const drawn = partial ? out.slice(0, -1) : out;
         // One period cannot make a line: it is a bar (hollow while it is still running).
-        const single =
-          series.length === 1 &&
-          (granularity === "year" || granularity === "quarter");
+        const single = series.length === 1 && (granularity === "year" || granularity === "quarter");
         const rev = line((m) => m.revenueCents);
         // The partial period is one mark: a second dot closer than 12 px (two 3 px rings plus a gap) would read as an "8".
         const apart = (a?: [number, number], b?: [number, number]) =>
           !a || !b || Math.hypot(a[0] - b[0], a[1] - b[1]) >= 12;
         const revDrawn = partial ? rev.slice(0, -1) : rev;
-        const revEnd =
-          partial &&
-          series[last]?.revenueCents &&
-          apart(rev.at(-1), out.at(-1));
+        const revEnd = partial && series[last]?.revenueCents && apart(rev.at(-1), out.at(-1));
         const outSegs = monotoneSegments(drawn);
         const start = (p: [number, number] | undefined) =>
           `M${p?.[0].toFixed(1)},${p?.[1].toFixed(1)}`;
@@ -768,10 +672,7 @@ export function BurnLines({
                   .filter((b) => b.cents > 0)
                   .map((b, j, all) => {
                     const w = Math.min(28, slot * 0.25);
-                    const x =
-                      cx(0) -
-                      (all.length * w + (all.length - 1) * 2) / 2 +
-                      j * (w + 2);
+                    const x = cx(0) - (all.length * w + (all.length - 1) * 2) / 2 + j * (w + 2);
                     return (
                       <rect
                         key={b.key}
@@ -853,13 +754,7 @@ export function BurnLines({
                   strokeWidth={1.5}
                 />
               ) : drawn.length === 1 || i === active ? (
-                <circle
-                  key={series[i]?.start}
-                  cx={px}
-                  cy={py}
-                  r={3}
-                  className="fill-foreground"
-                />
+                <circle key={series[i]?.start} cx={px} cy={py} r={3} className="fill-foreground" />
               ) : null,
             )}
             {active !== null ? (
@@ -906,11 +801,7 @@ export function BurnLines({
                     className="fill-transparent"
                   />
                   {showLabel ? (
-                    <AxisLabel
-                      x={cx(i)}
-                      y={height - 8}
-                      bold={m.partial === true}
-                    >
+                    <AxisLabel x={cx(i)} y={height - 8} bold={m.partial === true}>
                       {name}
                       {m.partial ? "*" : ""}
                     </AxisLabel>
@@ -931,8 +822,7 @@ export function BurnLines({
                 onClick={(event) => {
                   const box = event.currentTarget.getBoundingClientRect();
                   const i = Math.floor(
-                    ((event.clientX - box.left) / box.width) *
-                      Math.max(series.length, minSlots),
+                    ((event.clientX - box.left) / box.width) * Math.max(series.length, minSlots),
                   );
                   const point = series[i];
                   if (!point) return;
@@ -949,25 +839,14 @@ export function BurnLines({
                 m.financingCents > 0 &&
                 (granularity === "quarter" || granularity === "year");
               if (!off && !inPlace) return null;
-              const when =
-                granularity === "day" ? dayMonth(m.start) : (names[i] ?? "");
+              const when = granularity === "day" ? dayMonth(m.start) : (names[i] ?? "");
               const text = `${t`Financing, ${when}`} ${off ? "↑ " : ""}${money(m.financingCents)}`;
               // About 6.5 px a character at 12 px; a centred label that would pass either edge hugs it.
               const half = (text.length * 6.5) / 2;
               const anchor =
-                cx(i) + half > width - 8
-                  ? "end"
-                  : cx(i) - half < 8
-                    ? "start"
-                    : "middle";
-              const x =
-                anchor === "end" ? width - 8 : anchor === "start" ? 8 : cx(i);
-              const from =
-                anchor === "end"
-                  ? x - 2 * half
-                  : anchor === "start"
-                    ? x
-                    : x - half;
+                cx(i) + half > width - 8 ? "end" : cx(i) - half < 8 ? "start" : "middle";
+              const x = anchor === "end" ? width - 8 : anchor === "start" ? 8 : cx(i);
+              const from = anchor === "end" ? x - 2 * half : anchor === "start" ? x : x - half;
               // Drop to the second row when an earlier label on the first row reaches this one.
               const row = from < (rowEnd[0] ?? 0) ? 1 : 0;
               rowEnd[row] = from + 2 * half;
@@ -1002,9 +881,7 @@ export function BurnLines({
                   className="fill-foreground"
                   fontWeight={600}
                 >
-                  {granularity === "day"
-                    ? dayMonth(shown.start)
-                    : (names[active] ?? "")}
+                  {granularity === "day" ? dayMonth(shown.start) : (names[active] ?? "")}
                 </text>
                 {rows.map((r, j) => (
                   <g key={r.key}>
@@ -1070,8 +947,7 @@ export function MonthBars({
             />
             {items.map((item, i) => {
               const cx = left + slot * (i + 0.5);
-              const y =
-                top + (height - top - bottom) * (1 - item.cents / scale.top);
+              const y = top + (height - top - bottom) * (1 - item.cents / scale.top);
               return (
                 <g key={i}>
                   <rect
@@ -1080,9 +956,7 @@ export function MonthBars({
                     width={bw}
                     height={Math.max(height - bottom - y, 0)}
                     rx={2}
-                    className={
-                      item.partial ? "fill-foreground/40" : "fill-foreground"
-                    }
+                    className={item.partial ? "fill-foreground/40" : "fill-foreground"}
                   />
                   {hidden ? null : (
                     <text

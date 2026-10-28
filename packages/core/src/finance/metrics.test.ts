@@ -44,10 +44,8 @@ function txn(
   maybeOver: Partial<FinanceTransaction> = {},
 ): FinanceTransaction {
   seq += 1;
-  const counterparty =
-    typeof counterpartyOrOver === "string" ? counterpartyOrOver : "Acme";
-  const over =
-    typeof counterpartyOrOver === "string" ? maybeOver : counterpartyOrOver;
+  const counterparty = typeof counterpartyOrOver === "string" ? counterpartyOrOver : "Acme";
+  const over = typeof counterpartyOrOver === "string" ? maybeOver : counterpartyOrOver;
   return {
     id: `t${seq}`,
     provider: "mercury",
@@ -58,9 +56,7 @@ function txn(
     amountCents: Math.round(dollars * 100),
     currency: "USD",
     counterparty,
-    vendorKey: vendorKey(
-      (over as Partial<FinanceTransaction>).counterparty ?? counterparty,
-    ),
+    vendorKey: vendorKey((over as Partial<FinanceTransaction>).counterparty ?? counterparty),
     category: null,
     status: "posted",
     kind: "other",
@@ -90,10 +86,7 @@ function account(over: Partial<FinanceAccount>): FinanceAccount {
 }
 
 describe("classify", () => {
-  const ctx: ClassifyContext = {
-    brexConnected: true,
-    ownAccountNames: ["Mercury Savings"],
-  };
+  const ctx: ClassifyContext = { brexConnected: true, ownAccountNames: ["Mercury Savings"] };
   const raw = (over: Partial<FinanceRawTxn>): FinanceRawTxn => ({
     provider: "mercury",
     amountCents: -1000,
@@ -104,40 +97,28 @@ describe("classify", () => {
   });
 
   it("treats Treasury transfers as internal in both directions", () => {
-    expect(
-      classify(raw({ kind: "treasuryTransfer", amountCents: -500000 }), ctx),
-    ).toBe("internal_transfer");
-    expect(
-      classify(raw({ kind: "treasuryTransfer", amountCents: 500000 }), ctx),
-    ).toBe("internal_transfer");
-  });
-  it("treats a move to the user's own account as internal", () => {
-    expect(classify(raw({ counterparty: "Mercury Savings" }), ctx)).toBe(
+    expect(classify(raw({ kind: "treasuryTransfer", amountCents: -500000 }), ctx)).toBe(
       "internal_transfer",
     );
+    expect(classify(raw({ kind: "treasuryTransfer", amountCents: 500000 }), ctx)).toBe(
+      "internal_transfer",
+    );
+  });
+  it("treats a move to the user's own account as internal", () => {
+    expect(classify(raw({ counterparty: "Mercury Savings" }), ctx)).toBe("internal_transfer");
     expect(classify(raw({ counterparty: "Mercury Savings xx1234" }), ctx)).toBe(
       "internal_transfer",
     );
     expect(
-      classify(raw({ counterparty: "Mercury Savings Bank" }), {
-        ...ctx,
-        ownAccountNames: [],
-      }),
+      classify(raw({ counterparty: "Mercury Savings Bank" }), { ...ctx, ownAccountNames: [] }),
     ).toBe("spend");
   });
   it("marks Brex payments as card payments only when Brex is connected", () => {
-    const pay = raw({
-      counterparty: "Brex Inc.",
-      category: "Credit & Loan Payments",
-    });
+    const pay = raw({ counterparty: "Brex Inc.", category: "Credit & Loan Payments" });
     expect(classify(pay, ctx)).toBe("card_payment");
-    expect(classify(raw({ counterparty: "BREX", category: null }), ctx)).toBe(
-      "card_payment",
-    );
+    expect(classify(raw({ counterparty: "BREX", category: null }), ctx)).toBe("card_payment");
     expect(classify(pay, { ...ctx, brexConnected: false })).toBe("spend");
-    expect(
-      classify(raw({ counterparty: "Brex", category: "Software" }), ctx),
-    ).toBe("spend");
+    expect(classify(raw({ counterparty: "Brex", category: "Software" }), ctx)).toBe("spend");
   });
   it("classifies financing, revenue and refunds", () => {
     expect(
@@ -150,31 +131,15 @@ describe("classify", () => {
         ctx,
       ),
     ).toBe("financing");
-    expect(
-      classify(
-        raw({ amountCents: 5000, counterparty: "STRIPE", category: null }),
-        ctx,
-      ),
-    ).toBe("revenue");
-    expect(classify(raw({ amountCents: 5000, category: "Revenue" }), ctx)).toBe(
+    expect(classify(raw({ amountCents: 5000, counterparty: "STRIPE", category: null }), ctx)).toBe(
       "revenue",
     );
+    expect(classify(raw({ amountCents: 5000, category: "Revenue" }), ctx)).toBe("revenue");
+    expect(classify(raw({ amountCents: 5000, kind: "incomingDomesticWire" }), ctx)).toBe("revenue");
     expect(
-      classify(raw({ amountCents: 5000, kind: "incomingDomesticWire" }), ctx),
-    ).toBe("revenue");
-    expect(
-      classify(
-        raw({
-          amountCents: 1500,
-          category: "Software",
-          counterparty: "Vercel",
-        }),
-        ctx,
-      ),
+      classify(raw({ amountCents: 1500, category: "Software", counterparty: "Vercel" }), ctx),
     ).toBe("spend");
-    expect(
-      classify(raw({ amountCents: 1500, kind: "debitCardTransaction" }), ctx),
-    ).toBe("spend");
+    expect(classify(raw({ amountCents: 1500, kind: "debitCardTransaction" }), ctx)).toBe("spend");
   });
   it("keeps a transfer in from the owner's own account out of revenue", () => {
     expect(
@@ -192,72 +157,42 @@ describe("classify", () => {
   it("treats an uncategorized credit that is not a wire as a refund", () => {
     expect(
       classify(
-        raw({
-          amountCents: 120000,
-          counterparty: "Benefits Trust",
-          kind: "other",
-          category: null,
-        }),
+        raw({ amountCents: 120000, counterparty: "Benefits Trust", kind: "other", category: null }),
         ctx,
       ),
     ).toBe("spend");
   });
   it("counts a deposit on an uploaded statement as revenue, never as a refund against spend", () => {
-    const line = raw({
-      provider: "statement",
-      kind: "statement",
-      counterparty: "Customer Beta",
-    });
+    const line = raw({ provider: "statement", kind: "statement", counterparty: "Customer Beta" });
     expect(classify({ ...line, amountCents: 120000 }, ctx)).toBe("revenue");
     expect(classify({ ...line, amountCents: -25000 }, ctx)).toBe("spend");
-    expect(
-      classify(
-        { ...line, amountCents: 5000, counterparty: "Mercury Savings" },
-        ctx,
-      ),
-    ).toBe("internal_transfer");
+    expect(classify({ ...line, amountCents: 5000, counterparty: "Mercury Savings" }, ctx)).toBe(
+      "internal_transfer",
+    );
   });
   it("nets a statement refund off spend and keeps a deposit as revenue", () => {
     const line = raw({ provider: "statement", kind: "statement" });
-    const buy = classify(
-      { ...line, amountCents: -10000, counterparty: "Acme Store" },
-      ctx,
-    );
+    const buy = classify({ ...line, amountCents: -10000, counterparty: "Acme Store" }, ctx);
     const refund = classify(
       { ...line, amountCents: 10000, counterparty: "Acme Store REFUND" },
       ctx,
     );
-    const deposit = classify(
-      { ...line, amountCents: 10000, counterparty: "Customer Beta" },
-      ctx,
-    );
+    const deposit = classify({ ...line, amountCents: 10000, counterparty: "Customer Beta" }, ctx);
     expect([buy, refund, deposit]).toEqual(["spend", "spend", "revenue"]);
   });
   it("counts other outgoing money and every Brex expense as spend", () => {
     expect(classify(raw({ category: "Payroll" }), ctx)).toBe("spend");
-    expect(
-      classify(
-        raw({ provider: "brex", amountCents: -2000, kind: "CARD" }),
-        ctx,
-      ),
-    ).toBe("spend");
-    expect(
-      classify(raw({ provider: "brex", amountCents: 2000, kind: "CARD" }), ctx),
-    ).toBe("spend");
+    expect(classify(raw({ provider: "brex", amountCents: -2000, kind: "CARD" }), ctx)).toBe(
+      "spend",
+    );
+    expect(classify(raw({ provider: "brex", amountCents: 2000, kind: "CARD" }), ctx)).toBe("spend");
   });
 });
 
 describe("cashSummary with stablecoins", () => {
   it("adds stablecoins to cash and keeps the bank figure apart", () => {
-    const s = cashSummary(
-      [account({ kind: "checking", balanceCents: 1000 })],
-      250,
-    );
-    expect(s).toMatchObject({
-      cashCents: 1250,
-      bankCashCents: 1000,
-      stablecoinCents: 250,
-    });
+    const s = cashSummary([account({ kind: "checking", balanceCents: 1000 })], 250);
+    expect(s).toMatchObject({ cashCents: 1250, bankCashCents: 1000, stablecoinCents: 250 });
   });
   it("runway on cash with stablecoins is longer than on bank cash alone", () => {
     const now = new Date("2026-10-14T00:00:00Z");
@@ -287,13 +222,8 @@ describe("cashSummary", () => {
     });
   });
   it("reports no card balance when there is no card account", () => {
-    expect(
-      cashSummary([account({ balanceCents: 5 })]).cardOwedCents,
-    ).toBeNull();
-    expect(cashSummary([])).toMatchObject({
-      cashCents: 0,
-      cardOwedCents: null,
-    });
+    expect(cashSummary([account({ balanceCents: 5 })]).cardOwedCents).toBeNull();
+    expect(cashSummary([])).toMatchObject({ cashCents: 0, cardOwedCents: null });
   });
 });
 
@@ -343,12 +273,12 @@ describe("spendTotals", () => {
       txn("2025-10-15", -512),
     ];
     const month = spendTotals(all, "month", NOW);
-    expect([
-      month.currentCents,
-      month.previousCents,
-      month.start,
-      month.previousStart,
-    ]).toEqual([100, 200, "2026-10-01", "2026-09-01"]);
+    expect([month.currentCents, month.previousCents, month.start, month.previousStart]).toEqual([
+      100,
+      200,
+      "2026-10-01",
+      "2026-09-01",
+    ]);
     const quarter = spendTotals(all, "quarter", NOW);
     expect([
       quarter.currentCents,
@@ -364,41 +294,26 @@ describe("spendTotals", () => {
     ]);
   });
   it("clamps the comparison to the previous period's length", () => {
-    const feb = [
-      txn("2026-02-28", -5),
-      txn("2026-02-01", -7),
-      txn("2026-03-31", -1),
-    ];
+    const feb = [txn("2026-02-28", -5), txn("2026-02-01", -7), txn("2026-03-31", -1)];
     const t = spendTotals(feb, "month", new Date("2026-03-31T12:00:00Z"));
     expect([t.previousStart, t.previousEnd, t.previousCents]).toEqual([
       "2026-02-01",
       "2026-03-01",
       1200,
     ]);
-    expect(
-      spendTotals([], "month", new Date("2024-03-31T12:00:00Z")).previousEnd,
-    ).toBe("2024-03-01");
+    expect(spendTotals([], "month", new Date("2024-03-31T12:00:00Z")).previousEnd).toBe(
+      "2024-03-01",
+    );
   });
   it("uses the purchase date, in UTC, and gives a null change when nothing was spent before", () => {
     // Posted after midnight UTC on Tuesday the 6th but bought on Monday the 5th.
-    const t = txn("2026-10-06", -10, {
-      purchasedAt: "2026-10-05T23:30:00.000Z",
-    });
-    expect(spendTotals([t], "week", NOW)).toMatchObject({
-      currentCents: 0,
-      previousCents: 1000,
-    });
-    expect(
-      spendTotals([txn("2026-10-13", -10)], "week", NOW).changePct,
-    ).toBeNull();
+    const t = txn("2026-10-06", -10, { purchasedAt: "2026-10-05T23:30:00.000Z" });
+    expect(spendTotals([t], "week", NOW)).toMatchObject({ currentCents: 0, previousCents: 1000 });
+    expect(spendTotals([txn("2026-10-13", -10)], "week", NOW).changePct).toBeNull();
   });
   it("keeps Monday as the week start when now is Sunday or Monday", () => {
-    expect(
-      spendTotals([], "week", new Date("2026-10-18T23:59:00Z")).start,
-    ).toBe("2026-10-12");
-    expect(
-      spendTotals([], "week", new Date("2026-10-19T00:00:00Z")).start,
-    ).toBe("2026-10-19");
+    expect(spendTotals([], "week", new Date("2026-10-18T23:59:00Z")).start).toBe("2026-10-12");
+    expect(spendTotals([], "week", new Date("2026-10-19T00:00:00Z")).start).toBe("2026-10-19");
   });
 });
 
@@ -433,10 +348,7 @@ describe("monthlySeries and monthlyBurn", () => {
       revenueCents: 40000,
       partial: false,
     });
-    expect(series[8]).toMatchObject({
-      month: "2026-07",
-      financingCents: 900000,
-    });
+    expect(series[8]).toMatchObject({ month: "2026-07", financingCents: 900000 });
     expect(series.filter((p) => p.partial)).toHaveLength(1);
   });
   it("averages out minus revenue over the 3 full months before this one", () => {
@@ -446,15 +358,10 @@ describe("monthlySeries and monthlyBurn", () => {
     expect(burn.monthlyCents).toBe(150000);
   });
   it("is negative when revenue exceeds spend", () => {
-    expect(
-      monthlyBurn([txn("2026-09-10", 500, as("revenue"))], NOW).monthlyCents,
-    ).toBeLessThan(0);
+    expect(monthlyBurn([txn("2026-09-10", 500, as("revenue"))], NOW).monthlyCents).toBeLessThan(0);
   });
   it("crosses a year boundary", () => {
-    const burn = monthlyBurn(
-      [txn("2025-12-15", -300)],
-      new Date("2026-02-10T00:00:00Z"),
-    );
+    const burn = monthlyBurn([txn("2025-12-15", -300)], new Date("2026-02-10T00:00:00Z"));
     expect(burn.months).toEqual(["2025-11", "2025-12", "2026-01"]);
     expect(burn.monthlyCents).toBe(10000);
   });
@@ -462,20 +369,14 @@ describe("monthlySeries and monthlyBurn", () => {
 
 describe("runway and projectCash", () => {
   it("divides cash by burn and dates the run-out", () => {
-    expect(runway(1_200_000, 100_000, NOW)).toEqual({
-      months: 12,
-      runOutDate: "2027-10-14",
-    });
+    expect(runway(1_200_000, 100_000, NOW)).toEqual({ months: 12, runOutDate: "2027-10-14" });
   });
   it("has no runway when not burning", () => {
     expect(runway(1_000, 0, NOW)).toEqual({ months: null, runOutDate: null });
     expect(runway(1_000, -5, NOW)).toEqual({ months: null, runOutDate: null });
   });
   it("is zero months with no cash", () => {
-    expect(runway(0, 100, NOW)).toEqual({
-      months: 0,
-      runOutDate: "2026-10-14",
-    });
+    expect(runway(0, 100, NOW)).toEqual({ months: 0, runOutDate: "2026-10-14" });
   });
   it("projects cash down to zero", () => {
     expect(projectCash(250, 100, NOW)).toEqual([
@@ -499,10 +400,7 @@ describe("runway and projectCash", () => {
 describe("breakdown", () => {
   const range = { start: "2026-09-01", end: "2026-10-01" };
   const txns = [
-    txn("2026-09-02", -100, {
-      category: "Software",
-      counterparty: "Vercel Inc",
-    }),
+    txn("2026-09-02", -100, { category: "Software", counterparty: "Vercel Inc" }),
     txn("2026-09-03", -50, { category: "software", counterparty: "VERCEL" }),
     txn("2026-09-04", -300, {
       category: "Payroll",
@@ -552,14 +450,10 @@ describe("monthlySpend", () => {
       { month: "2026-09", cents: 0 },
       { month: "2026-10", cents: 1000 },
     ]);
-    expect(
-      monthlySpend(txns, { categorySlug: "software" }, NOW, 3).map(
-        (m) => m.cents,
-      ),
-    ).toEqual([2000, 0, 1000]);
-    expect(
-      monthlySpend(txns, { vendorKey: "nobody" }, NOW, 2).map((m) => m.cents),
-    ).toEqual([0, 0]);
+    expect(monthlySpend(txns, { categorySlug: "software" }, NOW, 3).map((m) => m.cents)).toEqual([
+      2000, 0, 1000,
+    ]);
+    expect(monthlySpend(txns, { vendorKey: "nobody" }, NOW, 2).map((m) => m.cents)).toEqual([0, 0]);
   });
 });
 
@@ -571,27 +465,25 @@ describe("accountBalanceHistory", () => {
       [txn("2026-09-18", -450), txn("2026-09-03", 1200)],
       NOW,
     );
-    expect(history.map((p) => p.month)).toEqual([
-      "2026-08",
-      "2026-09",
-      "2026-10",
-    ]);
+    expect(history.map((p) => p.month)).toEqual(["2026-08", "2026-09", "2026-10"]);
     expect(history[0]?.balanceCents).toBe(10_500 + 45_000 - 120_000);
   });
-  it("shows a large Treasury withdrawal today as a drop into the current balance", () => {
-    const acct = account({ kind: "treasury", balanceCents: 125_000_000 });
+  it("ends a Treasury history at the available balance, below the previous month, when a withdrawal is pending today", () => {
+    // Available 1,150,000 after a pending 100,000 withdrawal; the posted rows (a dividend) are older.
+    const acct = account({ kind: "treasury", balanceCents: 115_000_000 });
     const history = accountBalanceHistory(
       acct,
-      [txn("2026-10-27", -100_000, as("internal_transfer"))],
+      [
+        txn("2026-10-27", -1_000_000, { status: "pending", ...as("internal_transfer") }),
+        txn("2026-10-01", 5_678, as("internal_transfer")),
+      ],
       NOW,
     );
-    expect(history.at(-1)?.balanceCents).toBe(125_000_000);
-    expect(history.at(-2)?.balanceCents).toBe(135_000_000);
+    expect(history.at(-1)?.balanceCents).toBe(115_000_000);
+    expect(history.at(-2)?.balanceCents).toBe(115_000_000 + 100_000_000 - 567_800);
   });
   it("keeps all 12 months for an account with no transactions", () => {
-    expect(
-      accountBalanceHistory(account({ balanceCents: 1 }), [], NOW),
-    ).toHaveLength(12);
+    expect(accountBalanceHistory(account({ balanceCents: 1 }), [], NOW)).toHaveLength(12);
   });
 });
 
@@ -625,12 +517,7 @@ describe("balanceHistory", () => {
     });
     const history = balanceHistory(
       card,
-      [
-        txn("2026-10-02", -8, {
-          provider: "brex",
-          accountExternalId: "card-acct",
-        }),
-      ],
+      [txn("2026-10-02", -8, { provider: "brex", accountExternalId: "card-acct" })],
       NOW,
     );
     expect(history).toHaveLength(12);
@@ -649,9 +536,7 @@ describe("comparison coverage", () => {
       previousCents: null,
       changePct: null,
     });
-    expect(spendTotals(txns, "month", NOW, since)).toMatchObject({
-      previousCents: 0,
-    });
+    expect(spendTotals(txns, "month", NOW, since)).toMatchObject({ previousCents: 0 });
     expect(spendTotals(txns, "year", NOW).previousCents).toBe(5000);
   });
 });
@@ -680,16 +565,10 @@ describe("cashHistory", () => {
     });
     const history = cashHistory(
       [checking, treasury],
-      [
-        txn("2026-09-20", -100, "Mercury Treasury", {
-          classification: "internal_transfer",
-        }),
-      ],
+      [txn("2026-09-20", -100, "Mercury Treasury", { classification: "internal_transfer" })],
       NOW,
     );
-    expect(history.find((p) => p.month === "2026-08")?.balanceCents).toBe(
-      100_000,
-    );
+    expect(history.find((p) => p.month === "2026-08")?.balanceCents).toBe(100_000);
     expect(history.at(-1)?.balanceCents).toBe(100_000);
   });
 });
@@ -703,9 +582,7 @@ describe("balanceGrid", () => {
     expect(month).toHaveLength(30);
     expect([month[0], month[29]]).toEqual(["2026-09-15", "2026-10-14"]);
     // The 30 days cross a month boundary and a leap-free February.
-    expect(balanceGrid("month", new Date("2026-03-05T01:00:00Z"))[0]).toBe(
-      "2026-02-04",
-    );
+    expect(balanceGrid("month", new Date("2026-03-05T01:00:00Z"))[0]).toBe("2026-02-04");
   });
   it("plots 13 weekly points back from today", () => {
     const quarter = balanceGrid("quarter", NOW);
@@ -719,16 +596,8 @@ describe("balanceGrid", () => {
   it("plots 11 month-ends plus today, across the year change", () => {
     const year = balanceGrid("year", NOW);
     expect(year).toHaveLength(12);
-    expect([year[0], year[10], year[11]]).toEqual([
-      "2025-11-30",
-      "2026-09-30",
-      "2026-10-14",
-    ]);
-    expect(year.slice(0, 3)).toEqual([
-      "2025-11-30",
-      "2025-12-31",
-      "2026-01-31",
-    ]);
+    expect([year[0], year[10], year[11]]).toEqual(["2025-11-30", "2026-09-30", "2026-10-14"]);
+    expect(year.slice(0, 3)).toEqual(["2025-11-30", "2025-12-31", "2026-01-31"]);
     const early = balanceGrid("year", new Date("2026-01-10T00:00:00Z"));
     expect(early[0]).toBe("2025-02-28");
     expect(early.slice(-3)).toEqual(["2025-11-30", "2025-12-31", "2026-01-10"]);
@@ -760,12 +629,7 @@ describe("cashAtDays", () => {
     ).toEqual([100_000, 100_000, 102_000, 97_000]);
   });
   it("leaves out cards and is zero without cash accounts", () => {
-    const card = account({
-      id: "a3",
-      externalId: "card",
-      kind: "card",
-      balanceCents: 5_000,
-    });
+    const card = account({ id: "a3", externalId: "card", kind: "card", balanceCents: 5_000 });
     expect(cashAtDays([card], txns, ["2026-10-14"], NOW)).toEqual([0]);
     expect(cashAtDays([], txns, ["2026-10-14"], NOW)).toEqual([0]);
   });
@@ -811,24 +675,17 @@ describe("detectRecurring", () => {
     expect(detectRecurring(monthly("Notion", "05", 1000, 2), NOW)).toEqual([]);
   });
   it("finds weekly, biweekly and annual cadences and normalizes to a month", () => {
-    const weekly = ["2026-09-16", "2026-09-23", "2026-09-30", "2026-10-07"].map(
-      (d) => txn(d, -12, "Gym"),
+    const weekly = ["2026-09-16", "2026-09-23", "2026-09-30", "2026-10-07"].map((d) =>
+      txn(d, -12, "Gym"),
     );
-    const biweekly = [
-      "2026-08-19",
-      "2026-09-02",
-      "2026-09-16",
-      "2026-09-30",
-      "2026-10-14",
-    ].map((d) => txn(d, -2400, "Gusto Payroll", { category: "Payroll" }));
+    const biweekly = ["2026-08-19", "2026-09-02", "2026-09-16", "2026-09-30", "2026-10-14"].map(
+      (d) => txn(d, -2400, "Gusto Payroll", { category: "Payroll" }),
+    );
     const annual = ["2024-10-10", "2025-10-09", "2026-10-11"].map((d) =>
       txn(d, -1200, "Domain Registrar"),
     );
     const byKey = Object.fromEntries(
-      detectRecurring([...weekly, ...biweekly, ...annual], NOW).map((r) => [
-        r.key,
-        r,
-      ]),
+      detectRecurring([...weekly, ...biweekly, ...annual], NOW).map((r) => [r.key, r]),
     );
     expect(byKey.gym).toMatchObject({
       cadence: "weekly",
@@ -848,31 +705,22 @@ describe("detectRecurring", () => {
     });
   });
   it("tolerates a charge that lands 3 days off and clamps month ends", () => {
-    const shifted = ["2026-07-31", "2026-08-31", "2026-09-28"].map((d) =>
-      txn(d, -10, "Cloud Box"),
-    );
+    const shifted = ["2026-07-31", "2026-08-31", "2026-09-28"].map((d) => txn(d, -10, "Cloud Box"));
     const [r] = detectRecurring(shifted, NOW);
     expect(r?.cadence).toBe("monthly");
     expect(r?.nextExpectedAt).toBe("2026-10-28T00:00:00.000Z");
     const [feb] = detectRecurring(
-      ["2026-11-30", "2026-12-31", "2027-01-31"].map((d) =>
-        txn(d, -10, "Edge Co"),
-      ),
+      ["2026-11-30", "2026-12-31", "2027-01-31"].map((d) => txn(d, -10, "Edge Co")),
       new Date("2027-02-05T00:00:00Z"),
     );
     expect(feb?.nextExpectedAt).toBe("2027-02-28T00:00:00.000Z");
   });
   it("ignores irregular gaps and a vendor that stopped", () => {
-    const irregular = [
-      "2026-07-01",
-      "2026-07-09",
-      "2026-08-30",
-      "2026-09-02",
-    ].map((d) => txn(d, -10, "Corner Shop"));
-    expect(detectRecurring(irregular, NOW)).toEqual([]);
-    const old = ["2026-03-05", "2026-04-05", "2026-05-05"].map((d) =>
-      txn(d, -10, "Old Tool"),
+    const irregular = ["2026-07-01", "2026-07-09", "2026-08-30", "2026-09-02"].map((d) =>
+      txn(d, -10, "Corner Shop"),
     );
+    expect(detectRecurring(irregular, NOW)).toEqual([]);
+    const old = ["2026-03-05", "2026-04-05", "2026-05-05"].map((d) => txn(d, -10, "Old Tool"));
     expect(detectRecurring(old, NOW)).toEqual([]);
   });
   it("drops non-usage vendors whose amounts vary too much", () => {
@@ -886,11 +734,7 @@ describe("detectRecurring", () => {
       txn(d, -[100, 500, 2000][i]!, "OpenRouter"),
     );
     const [r] = detectRecurring(usage, NOW);
-    expect(r).toMatchObject({
-      key: "openrouter",
-      variable: true,
-      amountCents: 86667,
-    });
+    expect(r).toMatchObject({ key: "openrouter", variable: true, amountCents: 86667 });
   });
   it("averages a usage-based vendor the way the vendor page does: full months since first seen", () => {
     const usage = [
@@ -925,9 +769,7 @@ describe("detectRecurring", () => {
   });
   it("ignores extra charges from the same vendor that are off the rhythm", () => {
     const base = monthly("Cursor Pro", "05", 2000, 4);
-    const extras = ["2026-09-07", "2026-09-20", "2026-08-12"].map((d) =>
-      txn(d, -5, "Cursor Pro"),
-    );
+    const extras = ["2026-09-07", "2026-09-20", "2026-08-12"].map((d) => txn(d, -5, "Cursor Pro"));
     const [r] = detectRecurring([...base, ...extras], NOW);
     expect(r).toMatchObject({
       key: "cursor-pro",
@@ -968,18 +810,12 @@ describe("detectRecurring", () => {
       "2026-10-02",
     ].map((d, i) => txn(d, -(100 + i * 40), "Claude"));
     const [r] = detectRecurring(topUps, NOW);
-    expect(r).toMatchObject({
-      key: "claude",
-      cadence: "monthly",
-      variable: true,
-    });
+    expect(r).toMatchObject({ key: "claude", cadence: "monthly", variable: true });
     expect(r?.trendCents).toEqual([0, 24000, 66000, 102000]);
     expect(r?.amountCents).toBe(Math.round((24000 + 66000 + 102000) / 3));
   });
   it("drops a usage-based vendor that skipped one of the last 3 months", () => {
-    const gap = ["2026-06-05", "2026-07-05", "2026-09-05"].map((d) =>
-      txn(d, -50, "OpenAI"),
-    );
+    const gap = ["2026-06-05", "2026-07-05", "2026-09-05"].map((d) => txn(d, -50, "OpenAI"));
     expect(detectRecurring(gap, NOW)).toEqual([]);
   });
   it("merges same-day charges into one occurrence", () => {
@@ -987,18 +823,11 @@ describe("detectRecurring", () => {
       t,
       txn(t.postedAt.slice(0, 10), -10, "Seats Inc"),
     ]);
-    expect(detectRecurring(twice, NOW)[0]).toMatchObject({
-      amountCents: 2000,
-      chargeCount: 3,
-    });
+    expect(detectRecurring(twice, NOW)[0]).toMatchObject({ amountCents: 2000, chargeCount: 3 });
   });
   it("lists the accounts and cards that paid, most used first", () => {
     const accounts = [
-      account({
-        externalId: "acct-checking",
-        name: "Mercury Checking",
-        lastFour: "1111",
-      }),
+      account({ externalId: "acct-checking", name: "Mercury Checking", lastFour: "1111" }),
     ];
     const charges = [
       ...monthly("Vercel", "05", 2000, 2, {
@@ -1017,19 +846,11 @@ describe("detectRecurring", () => {
     expect(r?.paidWith).toEqual([
       { provider: "brex", kind: "card", name: "Brex card", lastFour: "0003" },
       { provider: "brex", kind: "card", name: "Brex card", lastFour: "9999" },
-      {
-        provider: "mercury",
-        kind: "account",
-        name: "Mercury Checking",
-        lastFour: "1111",
-      },
+      { provider: "mercury", kind: "account", name: "Mercury Checking", lastFour: "1111" },
     ]);
   });
   it("detects the Brex card payment as its own recurring card_payment", () => {
-    const [r] = detectRecurring(
-      monthly("Brex Inc.", "03", 500000, 4, as("card_payment")),
-      NOW,
-    );
+    const [r] = detectRecurring(monthly("Brex Inc.", "03", 500000, 4, as("card_payment")), NOW);
     expect(r).toMatchObject({ key: "brex", classification: "card_payment" });
   });
 });
@@ -1039,9 +860,7 @@ describe("upcoming", () => {
     [
       ...monthly("Notion", "20", 1000, 4),
       ...monthly("Brex", "03", 500000, 4, as("card_payment")),
-      ...["2026-08-17", "2026-09-17", "2026-10-02"].map((d) =>
-        txn(d, -45, "Weekly Thing"),
-      ),
+      ...["2026-08-17", "2026-09-17", "2026-10-02"].map((d) => txn(d, -45, "Weekly Thing")),
     ],
     NOW,
   );
@@ -1057,9 +876,7 @@ describe("upcoming", () => {
   });
   it("predicts recurring charges and bills, and leaves out card payments and pending charges", () => {
     // A pending charge already counts as spend, so Upcoming leaves it out rather than count it twice.
-    const pending = [
-      txn("2026-10-13", -15, "Coffee Cart", { status: "pending" }),
-    ];
+    const pending = [txn("2026-10-13", -15, "Coffee Cart", { status: "pending" })];
     const result = upcoming(recurring, pending, [bill({})], NOW);
     expect(result.items.map((i) => [i.kind, i.key, i.dates])).toEqual([
       ["recurring", "notion", ["2026-10-20"]],
@@ -1070,15 +887,11 @@ describe("upcoming", () => {
   it("drops a prediction that a pending charge (already spent) covers", () => {
     const pending = [txn("2026-10-19", -10, "Notion", { status: "pending" })];
     const result = upcoming(recurring, pending, [], NOW);
-    expect(
-      result.items.filter((i) => i.name.startsWith("Notion")),
-    ).toHaveLength(0);
+    expect(result.items.filter((i) => i.name.startsWith("Notion"))).toHaveLength(0);
   });
   it("lists every occurrence inside the window and respects its end", () => {
     const weekly = detectRecurring(
-      ["2026-09-23", "2026-09-30", "2026-10-07"].map((d) =>
-        txn(d, -10, "Weekly Gym"),
-      ),
+      ["2026-09-23", "2026-09-30", "2026-10-07"].map((d) => txn(d, -10, "Weekly Gym")),
       NOW,
     );
     const item = upcoming(weekly, [], [], NOW, 30).items[0];
@@ -1103,9 +916,7 @@ describe("upcoming", () => {
       ],
       NOW,
     );
-    expect(result.items.map((i) => [i.key, i.dates])).toEqual([
-      ["bill-1", ["2026-10-14"]],
-    ]);
+    expect(result.items.map((i) => [i.key, i.dates])).toEqual([["bill-1", ["2026-10-14"]]]);
   });
   it("is empty with nothing expected", () => {
     expect(upcoming([], [], [], NOW)).toEqual({ items: [], totalCents: 0 });
@@ -1120,9 +931,7 @@ describe("subscriptions", () => {
       ...monthly("Notion", "20", 1000, 4),
       ...monthly("Perplexity", "09", 5000, 4),
       ...monthly("Brex", "03", 500000, 4, as("card_payment")),
-      ...["2026-08-01", "2026-09-01", "2026-10-01"].map((d) =>
-        txn(d, -8, "Cursor Pro"),
-      ),
+      ...["2026-08-01", "2026-09-01", "2026-10-01"].map((d) => txn(d, -8, "Cursor Pro")),
     ],
     NOW,
   );
@@ -1135,9 +944,7 @@ describe("subscriptions", () => {
       "notion",
       "cursor-pro",
     ]);
-    expect(
-      Object.fromEntries(subs.items.map((s) => [s.key, s.overlapGroup])),
-    ).toEqual({
+    expect(Object.fromEntries(subs.items.map((s) => [s.key, s.overlapGroup]))).toEqual({
       anthropic: "ai-models",
       openai: "ai-models",
       "cursor-pro": "ai-models",
@@ -1149,16 +956,12 @@ describe("subscriptions", () => {
   it("leaves payroll and rent out: they recur but are fixed costs, not subscriptions", () => {
     const fixed = detectRecurring(
       [
-        ...monthly("Paylodex Payroll", "15", 5_840_000, 4, {
-          category: "Payroll",
-        }),
+        ...monthly("Paylodex Payroll", "15", 5_840_000, 4, { category: "Payroll" }),
         ...monthly("Landlord Placeholder LLC", "01", 750_000, 4),
         ...monthly("Office Space Co", "02", 300_000, 4, { category: "Rent" }),
         ...monthly("Notion", "20", 1000, 4, { category: "Software" }),
         // A Brex bill paid from Mercury while Brex is not connected: still spend, not a subscription.
-        ...monthly("Brex", "05", 1_120_000, 4, {
-          category: "Credit & Loan Payments",
-        }),
+        ...monthly("Brex", "05", 1_120_000, 4, { category: "Credit & Loan Payments" }),
       ],
       NOW,
     );
@@ -1175,9 +978,7 @@ describe("subscriptions", () => {
     expect(next.find((i) => i.key === "notion")?.cardBill).toBeUndefined();
   });
   it("tags no overlap when only one vendor of a group is subscribed", () => {
-    const only = subscriptions(
-      detectRecurring(monthly("Anthropic", "06", 70000, 4), NOW),
-    );
+    const only = subscriptions(detectRecurring(monthly("Anthropic", "06", 70000, 4), NOW));
     expect(only.items[0]?.overlapGroup).toBeNull();
   });
   it("maps the AI, model and coding tools vendors into one group", () => {
@@ -1225,11 +1026,7 @@ describe("cashSeries", () => {
     txn("2026-09-30", -700),
   ];
   it("buckets days, oldest first, zero-filled, with today partial", () => {
-    const days = cashSeries(txns, {
-      granularity: "day",
-      buckets: 7,
-      now: today,
-    });
+    const days = cashSeries(txns, { granularity: "day", buckets: 7, now: today });
     expect(days.map((d) => d.start)).toEqual([
       "2026-10-08",
       "2026-10-09",
@@ -1239,22 +1036,13 @@ describe("cashSeries", () => {
       "2026-10-13",
       "2026-10-14",
     ]);
-    expect(days.map((d) => d.outCents)).toEqual([
-      50000, 0, 0, 40000, 30000, 20000, 10000,
-    ]);
-    expect(days[5]).toMatchObject({
-      financingCents: 500000,
-      end: "2026-10-13",
-    });
+    expect(days.map((d) => d.outCents)).toEqual([50000, 0, 0, 40000, 30000, 20000, 10000]);
+    expect(days[5]).toMatchObject({ financingCents: 500000, end: "2026-10-13" });
     expect(days[6]).toMatchObject({ revenueCents: 7000, partial: true });
     expect(days.filter((d) => d.partial)).toHaveLength(1);
   });
   it("starts weeks on Monday and keeps Sunday in the earlier week", () => {
-    const weeks = cashSeries(txns, {
-      granularity: "week",
-      buckets: 3,
-      now: today,
-    });
+    const weeks = cashSeries(txns, { granularity: "week", buckets: 3, now: today });
     expect(weeks.map((w) => [w.start, w.end])).toEqual([
       ["2026-09-28", "2026-10-04"],
       ["2026-10-05", "2026-10-11"],
@@ -1265,11 +1053,7 @@ describe("cashSeries", () => {
   });
   it("covers exactly the period to date when given its first day", () => {
     // Quarter to date from Wed Oct 1: the first week bucket starts on Oct 1, not Monday Sep 29.
-    const quarter = cashSeries(txns, {
-      granularity: "week",
-      from: "2026-10-01",
-      now: today,
-    });
+    const quarter = cashSeries(txns, { granularity: "week", from: "2026-10-01", now: today });
     expect(quarter.map((w) => [w.start, w.end])).toEqual([
       ["2026-10-01", "2026-10-04"],
       ["2026-10-05", "2026-10-11"],
@@ -1277,23 +1061,12 @@ describe("cashSeries", () => {
     ]);
     // Sep 30 is before the quarter, so it is not in the first bucket.
     expect(quarter[0]?.outCents).toBe(0);
-    const month = cashSeries(txns, {
-      granularity: "day",
-      from: "2026-10-01",
-      now: today,
-    });
+    const month = cashSeries(txns, { granularity: "day", from: "2026-10-01", now: today });
     expect(month).toHaveLength(14);
     expect(month[0]?.start).toBe("2026-10-01");
-    const year = cashSeries(txns, {
-      granularity: "month",
-      from: "2026-01-01",
-      now: today,
-    });
+    const year = cashSeries(txns, { granularity: "month", from: "2026-01-01", now: today });
     expect(year.map((m) => m.start.slice(0, 7))).toEqual(
-      Array.from(
-        { length: 10 },
-        (_, i) => `2026-${String(i + 1).padStart(2, "0")}`,
-      ),
+      Array.from({ length: 10 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`),
     );
   });
   it("is on the same Monday for a Sunday and the next Monday", () => {
@@ -1311,54 +1084,30 @@ describe("cashSeries", () => {
     expect(monday[0]?.start).toBe("2026-10-19");
   });
   it("buckets calendar months and matches monthlySeries", () => {
-    const months = cashSeries(txns, {
-      granularity: "month",
-      buckets: 2,
-      now: today,
-    });
+    const months = cashSeries(txns, { granularity: "month", buckets: 2, now: today });
     expect(months.map((m) => [m.start, m.end])).toEqual([
       ["2026-09-01", "2026-09-30"],
       ["2026-10-01", "2026-10-31"],
     ]);
     expect(months.map((m) => m.outCents)).toEqual([70000, 210000]);
     const series = monthlySeries(txns, today);
-    expect(series[11]).toMatchObject({
-      month: "2026-10",
-      outCents: 210000,
-      partial: true,
-    });
+    expect(series[11]).toMatchObject({ month: "2026-10", outCents: 210000, partial: true });
   });
   it("buckets quarters and years, the current one partial, and covers a period from its first day", () => {
-    const quarters = cashSeries(txns, {
-      granularity: "quarter",
-      buckets: 2,
-      now: today,
-    });
+    const quarters = cashSeries(txns, { granularity: "quarter", buckets: 2, now: today });
     expect(quarters.map((q) => [q.start, q.end])).toEqual([
       ["2026-07-01", "2026-09-30"],
       ["2026-10-01", "2026-12-31"],
     ]);
     expect(quarters.map((q) => q.outCents)).toEqual([70000, 210000]);
     expect(quarters[1]?.partial).toBe(true);
-    const years = cashSeries(txns, {
-      granularity: "year",
-      buckets: 2,
-      now: today,
-    });
+    const years = cashSeries(txns, { granularity: "year", buckets: 2, now: today });
     expect(years.map((y) => [y.start, y.end])).toEqual([
       ["2025-01-01", "2025-12-31"],
       ["2026-01-01", "2026-12-31"],
     ]);
     expect(years.map((y) => y.outCents)).toEqual([0, 280000]);
-    const sinceApril = cashSeries(txns, {
-      granularity: "quarter",
-      from: "2026-04-01",
-      now: today,
-    });
-    expect(sinceApril.map((q) => q.start)).toEqual([
-      "2026-04-01",
-      "2026-07-01",
-      "2026-10-01",
-    ]);
+    const sinceApril = cashSeries(txns, { granularity: "quarter", from: "2026-04-01", now: today });
+    expect(sinceApril.map((q) => q.start)).toEqual(["2026-04-01", "2026-07-01", "2026-10-01"]);
   });
 });

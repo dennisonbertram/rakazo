@@ -11,15 +11,10 @@ vi.mock("@lingui/react/macro", () => ({
 
 import { BurnLines, LineChart, MonthBars } from "./charts";
 
-(
-  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
-).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 async function mount(width: number, node: ReactNode) {
-  const saved = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    "clientWidth",
-  );
+  const saved = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
   Object.defineProperty(HTMLElement.prototype, "clientWidth", {
     configurable: true,
     get: () => width,
@@ -33,8 +28,7 @@ async function mount(width: number, node: ReactNode) {
     done: () => {
       act(() => root.unmount());
       el.remove();
-      if (saved)
-        Object.defineProperty(HTMLElement.prototype, "clientWidth", saved);
+      if (saved) Object.defineProperty(HTMLElement.prototype, "clientWidth", saved);
     },
   };
 }
@@ -49,42 +43,29 @@ const day = (d: number, financingCents = 0) => ({
 });
 
 // The label is about 6 px a character at 11 px, so "Financing, Oct 29 ↑ $250,000" is ~170 px.
-it.each([375, 600, 1000])(
-  "keeps the Financing label inside the chart at %i px",
-  async (width) => {
-    // A raise on any of the last four days must stay inside the plot, wherever it falls.
-    for (const raise of [26, 27, 28, 29]) {
-      const days = Array.from({ length: 29 }, (_, i) =>
-        day(i + 1, i + 1 === raise ? 25_000_000 : 0),
-      );
-      const { el, done } = await mount(
-        width,
-        <BurnLines
-          label="Burn"
-          height={200}
-          granularity="day"
-          series={days}
-          onOpen={() => {}}
-        />,
-      );
-      const text = el.querySelector(
-        "[data-testid=financing-clipped]",
-      ) as SVGTextElement;
-      const x = Number(text.getAttribute("x"));
-      const len = (text.textContent ?? "").length * 6;
-      const anchor = text.getAttribute("text-anchor");
-      const [from, to] =
-        anchor === "end"
-          ? [x - len, x]
-          : anchor === "start"
-            ? [x, x + len]
-            : [x - len / 2, x + len / 2];
-      expect(from).toBeGreaterThanOrEqual(0);
-      expect(to).toBeLessThanOrEqual(width);
-      done();
-    }
-  },
-);
+it.each([375, 600, 1000])("keeps the Financing label inside the chart at %i px", async (width) => {
+  // A raise on any of the last four days must stay inside the plot, wherever it falls.
+  for (const raise of [26, 27, 28, 29]) {
+    const days = Array.from({ length: 29 }, (_, i) => day(i + 1, i + 1 === raise ? 25_000_000 : 0));
+    const { el, done } = await mount(
+      width,
+      <BurnLines label="Burn" height={200} granularity="day" series={days} onOpen={() => {}} />,
+    );
+    const text = el.querySelector("[data-testid=financing-clipped]") as SVGTextElement;
+    const x = Number(text.getAttribute("x"));
+    const len = (text.textContent ?? "").length * 6;
+    const anchor = text.getAttribute("text-anchor");
+    const [from, to] =
+      anchor === "end"
+        ? [x - len, x]
+        : anchor === "start"
+          ? [x, x + len]
+          : [x - len / 2, x + len / 2];
+    expect(from).toBeGreaterThanOrEqual(0);
+    expect(to).toBeLessThanOrEqual(width);
+    done();
+  }
+});
 
 it("names the dashed part of the projection", async () => {
   const { el, done } = await mount(
@@ -114,9 +95,7 @@ it("keeps the projected label inside a chart with a short runway", async () => {
       projectedLabel="Projected"
     />,
   );
-  const text = [...el.querySelectorAll("text")].find(
-    (t) => t.textContent === "Projected",
-  );
+  const text = [...el.querySelectorAll("text")].find((t) => t.textContent === "Projected");
   expect(text?.getAttribute("text-anchor")).toBe("end");
   done();
 });
@@ -125,12 +104,7 @@ it("draws a flat balance line mid-chart, not on the x axis", async () => {
   const values = [115_000_000, 115_000_000, 115_000_000, 115_000_000];
   const { el, done } = await mount(
     600,
-    <LineChart
-      values={values}
-      labels={["a", "b", "c", "d"]}
-      height={200}
-      label="Balance"
-    />,
+    <LineChart values={values} labels={["a", "b", "c", "d"]} height={200} label="Balance" />,
   );
   const ys = el
     .querySelector("polyline")
@@ -146,38 +120,28 @@ it.each([
   [[125_387_500, 125_387_500, 125_387_500], 375],
   [[125_387_500, 130_000_000, 99_900_000_000], 320],
   [[2_538_750, 2_538_750], 600],
-])(
-  "keeps every y axis label inside the chart (%j, %i px)",
-  async (values, width) => {
-    const { el, done } = await mount(
-      width,
-      <LineChart
-        values={values}
-        labels={values.map((_, i) => String(i))}
-        height={200}
-        label="Balance"
-      />,
-    );
-    const first = Number(
-      el.querySelector("polyline")?.getAttribute("points")?.split(",")[0],
-    );
-    for (const t of el.querySelectorAll("text[text-anchor=end]")) {
-      if (!t.textContent?.startsWith("$")) continue;
-      const x = Number(t.getAttribute("x"));
-      // 12 px text is about 7 px a character; the label must start at or right of x=0.
-      expect(x - (t.textContent ?? "").length * 7).toBeGreaterThanOrEqual(0);
-      expect(x).toBeLessThanOrEqual(first);
-    }
-    done();
-  },
-);
+])("keeps every y axis label inside the chart (%j, %i px)", async (values, width) => {
+  const { el, done } = await mount(
+    width,
+    <LineChart
+      values={values}
+      labels={values.map((_, i) => String(i))}
+      height={200}
+      label="Balance"
+    />,
+  );
+  const first = Number(el.querySelector("polyline")?.getAttribute("points")?.split(",")[0]);
+  for (const t of el.querySelectorAll("text[text-anchor=end]")) {
+    if (!t.textContent?.startsWith("$")) continue;
+    const x = Number(t.getAttribute("x"));
+    // 12 px text is about 7 px a character; the label must start at or right of x=0.
+    expect(x - (t.textContent ?? "").length * 7).toBeGreaterThanOrEqual(0);
+    expect(x).toBeLessThanOrEqual(first);
+  }
+  done();
+});
 
-const month = (
-  m: number,
-  outCents: number,
-  revenueCents: number,
-  partial = false,
-) => ({
+const month = (m: number, outCents: number, revenueCents: number, partial = false) => ({
   start: `2026-${String(m).padStart(2, "0")}-01`,
   end: `2026-${String(m).padStart(2, "0")}-01`,
   outCents,
@@ -213,9 +177,7 @@ it("starts the monthly chart at the first month with money and ends both lines o
         .filter(Boolean)
         .at(-2),
     );
-  const outEnd = lastX(
-    el.querySelector("[data-testid=burn-out-line]")?.getAttribute("d"),
-  );
+  const outEnd = lastX(el.querySelector("[data-testid=burn-out-line]")?.getAttribute("d"));
   expect(outEnd).toBeLessThan(endX("burn-out-end"));
   done();
 });
@@ -273,9 +235,7 @@ it("shows revenue when trimming leaves one month, or one full month plus the cur
       onOpen={() => {}}
     />,
   );
-  expect(
-    two.el.querySelector("[data-testid=burn-revenue-point]"),
-  ).not.toBeNull();
+  expect(two.el.querySelector("[data-testid=burn-revenue-point]")).not.toBeNull();
   two.done();
 });
 
@@ -352,12 +312,7 @@ it("starts quarters at the first one with data and fills the plot width", async 
   done();
 });
 
-const mk = (
-  m: number,
-  outCents: number,
-  partial = false,
-  financingCents = 0,
-) => ({
+const mk = (m: number, outCents: number, partial = false, financingCents = 0) => ({
   start: `2026-${String(m).padStart(2, "0")}-01`,
   end: `2026-${String(m).padStart(2, "0")}-01`,
   outCents,
@@ -382,11 +337,7 @@ it("draws a single running period as a bar with no stray markers", async () => {
 });
 
 it("never puts two markers within 8 px of each other", async () => {
-  const series = [
-    mk(8, 300_000),
-    mk(9, 320_000),
-    mk(10, 310_000, true, 305_000),
-  ];
+  const series = [mk(8, 300_000), mk(9, 320_000), mk(10, 310_000, true, 305_000)];
   const { el, done } = await mount(
     375,
     <BurnLines label="Burn" series={series} onOpen={() => {}} />,
@@ -403,29 +354,20 @@ it("never puts two markers within 8 px of each other", async () => {
   done();
 });
 
-it.each([300, 375])(
-  "keeps all 12 months reachable and 44 px wide at %i px on touch",
-  async (w) => {
-    const saved = window.matchMedia;
-    window.matchMedia = ((q: string) => ({
-      matches: q.includes("coarse"),
-    })) as typeof matchMedia;
-    const series = Array.from({ length: 12 }, (_, i) => mk(i + 1, 300_000 + i));
-    const { el, done } = await mount(
-      w,
-      <BurnLines label="Burn" series={series} onOpen={() => {}} />,
-    );
-    const links = [...el.querySelectorAll("g[role=link] rect")];
-    expect(links).toHaveLength(12);
-    for (const r of links)
-      expect(Number(r.getAttribute("width"))).toBeGreaterThanOrEqual(44);
-    expect(
-      Number(el.querySelector("svg")?.getAttribute("width")),
-    ).toBeGreaterThan(w);
-    done();
-    window.matchMedia = saved;
-  },
-);
+it.each([300, 375])("keeps all 12 months reachable and 44 px wide at %i px on touch", async (w) => {
+  const saved = window.matchMedia;
+  window.matchMedia = ((q: string) => ({
+    matches: q.includes("coarse"),
+  })) as typeof matchMedia;
+  const series = Array.from({ length: 12 }, (_, i) => mk(i + 1, 300_000 + i));
+  const { el, done } = await mount(w, <BurnLines label="Burn" series={series} onOpen={() => {}} />);
+  const links = [...el.querySelectorAll("g[role=link] rect")];
+  expect(links).toHaveLength(12);
+  for (const r of links) expect(Number(r.getAttribute("width"))).toBeGreaterThanOrEqual(44);
+  expect(Number(el.querySelector("svg")?.getAttribute("width"))).toBeGreaterThan(w);
+  done();
+  window.matchMedia = saved;
+});
 
 it("names the Financing ring on a quarter view", async () => {
   const q = (start: string, outCents: number, financingCents = 0) => ({
@@ -446,9 +388,9 @@ it("names the Financing ring on a quarter view", async () => {
       onOpen={() => {}}
     />,
   );
-  expect(
-    el.querySelector("[data-testid=financing-clipped]")?.textContent,
-  ).toMatch(/^Financing, .*\$2,500$/);
+  expect(el.querySelector("[data-testid=financing-clipped]")?.textContent).toMatch(
+    /^Financing, .*\$2,500$/,
+  );
   done();
 });
 
@@ -476,8 +418,8 @@ it("puts neighbouring quarters' Financing labels on separate rows", async () => 
       onOpen={() => {}}
     />,
   );
-  const ys = [...el.querySelectorAll("[data-testid=financing-clipped]")].map(
-    (n) => n.getAttribute("y"),
+  const ys = [...el.querySelectorAll("[data-testid=financing-clipped]")].map((n) =>
+    n.getAttribute("y"),
   );
   expect(new Set(ys).size).toBeGreaterThan(1);
   expect(ys[0]).not.toBe(ys[1]);
@@ -496,9 +438,7 @@ it("keeps a Financing label inside the chart when financing equals the scale top
       onOpen={() => {}}
     />,
   );
-  const text = el.querySelector(
-    "[data-testid=financing-clipped]",
-  ) as SVGTextElement;
+  const text = el.querySelector("[data-testid=financing-clipped]") as SVGTextElement;
   expect(Number(text.getAttribute("y"))).toBeGreaterThanOrEqual(12);
   done();
 });
@@ -531,19 +471,14 @@ it("keeps one Financing label on the first row after the chart is measured again
   await act(async () => {
     for (const cb of cbs) cb();
   });
-  const text = el.querySelector(
-    "[data-testid=financing-clipped]",
-  ) as SVGTextElement;
+  const text = el.querySelector("[data-testid=financing-clipped]") as SVGTextElement;
   expect(Number(text.getAttribute("y"))).toBeGreaterThanOrEqual(14);
   done();
   globalThis.ResizeObserver = savedRO;
 });
 
 it("keeps the last axis label clear of the one before it", async () => {
-  const days = Array.from(
-    { length: 30 },
-    (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`,
-  );
+  const days = Array.from({ length: 30 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`);
   const labels = days.map((d) => `Oct ${Number(d.slice(8))}`);
   const { el, done } = await mount(
     600,
@@ -566,12 +501,7 @@ it("keeps the last axis label clear of the one before it", async () => {
 it("keeps the y axis labels at the left edge of a chart scrolled sideways", async () => {
   const { el, done } = await mount(
     300,
-    <LineChart
-      values={[0, 5_000_00, 10_000_00]}
-      labels={["a", "b", "c"]}
-      height={120}
-      label="x"
-    />,
+    <LineChart values={[0, 5_000_00, 10_000_00]} labels={["a", "b", "c"]} height={120} label="x" />,
   );
   const box = el.querySelector("div.overflow-x-auto") as HTMLElement;
   const axis = () => el.querySelector("svg text") as SVGTextElement;
@@ -602,18 +532,10 @@ it("paints the y axis labels of a burn chart after its lines", async () => {
   const days = Array.from({ length: 5 }, (_, i) => day(i + 1));
   const { el, done } = await mount(
     600,
-    <BurnLines
-      label="Burn"
-      height={200}
-      granularity="day"
-      series={days}
-      onOpen={() => {}}
-    />,
+    <BurnLines label="Burn" height={200} granularity="day" series={days} onOpen={() => {}} />,
   );
   const nodes = [...el.querySelectorAll("svg *")];
-  const line = nodes.indexOf(
-    el.querySelector("[data-testid=burn-out-line]") as Element,
-  );
+  const line = nodes.indexOf(el.querySelector("[data-testid=burn-out-line]") as Element);
   const tick = nodes.indexOf(el.querySelector("svg text") as Element);
   expect(line).toBeGreaterThan(-1);
   expect(tick).toBeGreaterThan(line);

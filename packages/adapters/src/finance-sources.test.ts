@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { getLogger } from "@rakazo/logging";
+import { describe, expect, it, vi } from "vitest";
 import { createBrexFinanceSource } from "./brex-finance-source.js";
 import {
   brexExpense,
@@ -8,6 +9,7 @@ import {
   MERCURY_SAVINGS,
   mercuryAccountsResponse,
   mercuryRow,
+  mercuryTreasuryResponse,
 } from "./finance-fake-tools.js";
 import { FinanceShapeError } from "./finance-source-util.js";
 import { createMercuryFinanceSource } from "./mercury-finance-source.js";
@@ -42,12 +44,8 @@ describe("Mercury source", () => {
         },
       ]),
     });
-    const accounts = await createMercuryFinanceSource(
-      fake.callTool,
-    ).fetchAccounts();
-    expect(
-      accounts.map((a) => [a.externalId, a.kind, a.balanceCents, a.lastFour]),
-    ).toEqual([
+    const accounts = await createMercuryFinanceSource(fake.callTool).fetchAccounts();
+    expect(accounts.map((a) => [a.externalId, a.kind, a.balanceCents, a.lastFour])).toEqual([
       [MERCURY_CHECKING, "checking", 100050, "1111"],
       [MERCURY_SAVINGS, "savings", 25000, "2222"],
       ["trs-3333", "treasury", 500025, null],
@@ -61,26 +59,19 @@ describe("Mercury source", () => {
         [MERCURY_SAVINGS]: [mercuryRow("s-1")],
       },
     });
-    const txns = await createMercuryFinanceSource(
-      fake.callTool,
-    ).fetchTransactions("2026-01-01T00:00:00.000Z");
-    expect(txns).toHaveLength(651);
-    expect(
-      txns.filter((t) => t.accountExternalId === MERCURY_CHECKING),
-    ).toHaveLength(650);
-    expect(txns.find((t) => t.externalId === "s-1")?.accountExternalId).toBe(
-      MERCURY_SAVINGS,
+    const txns = await createMercuryFinanceSource(fake.callTool).fetchTransactions(
+      "2026-01-01T00:00:00.000Z",
     );
+    expect(txns).toHaveLength(651);
+    expect(txns.filter((t) => t.accountExternalId === MERCURY_CHECKING)).toHaveLength(650);
+    expect(txns.find((t) => t.externalId === "s-1")?.accountExternalId).toBe(MERCURY_SAVINGS);
     // 650 rows at 300 a page is three pages (300, 300, 50) plus the pending query, for checking.
     const checking = fake.calls.filter(
       (c) =>
-        c.name === "listTransactions" &&
-        (c.args.accountId as string[])[0] === MERCURY_CHECKING,
+        c.name === "listTransactions" && (c.args.accountId as string[])[0] === MERCURY_CHECKING,
     );
     expect(checking.map((c) => c.args.order)).toEqual(Array(4).fill("desc"));
-    expect(
-      checking.filter((c) => c.args.postedStart === "2026-01-01"),
-    ).toHaveLength(3);
+    expect(checking.filter((c) => c.args.postedStart === "2026-01-01")).toHaveLength(3);
   });
 
   it("follows page.nextPage when the server sends it", async () => {
@@ -88,9 +79,9 @@ describe("Mercury source", () => {
       txns: { [MERCURY_CHECKING]: manyMercury(320) },
       withNextPage: true,
     });
-    const txns = await createMercuryFinanceSource(
-      fake.callTool,
-    ).fetchTransactions("2026-01-01T00:00:00.000Z");
+    const txns = await createMercuryFinanceSource(fake.callTool).fetchTransactions(
+      "2026-01-01T00:00:00.000Z",
+    );
     expect(txns).toHaveLength(320);
   });
 
@@ -119,9 +110,9 @@ describe("Mercury source", () => {
         ],
       },
     });
-    const txns = await createMercuryFinanceSource(
-      fake.callTool,
-    ).fetchTransactions("2026-08-01T00:00:00.000Z");
+    const txns = await createMercuryFinanceSource(fake.callTool).fetchTransactions(
+      "2026-08-01T00:00:00.000Z",
+    );
     const pending = txns.find((t) => t.externalId === "p-1");
     expect(pending).toMatchObject({
       status: "pending",
@@ -132,9 +123,7 @@ describe("Mercury source", () => {
       postedAt: "2025-01-01T00:00:00.000Z",
     });
     // An uncategorized payment to Brex is a card bill, not 'Uncategorized' spend.
-    expect(txns.find((t) => t.externalId === "b-1")?.category).toBe(
-      "Credit & Loan Payments",
-    );
+    expect(txns.find((t) => t.externalId === "b-1")?.category).toBe("Credit & Loan Payments");
     expect(txns.find((t) => t.externalId === "t-1")).toMatchObject({
       status: "posted",
       counterparty: "Unknown",
@@ -149,13 +138,11 @@ describe("Mercury source", () => {
       txns: { [MERCURY_CHECKING]: manyMercury(40) },
       truncateAbove: 100,
     });
-    const txns = await createMercuryFinanceSource(
-      fake.callTool,
-    ).fetchTransactions("2026-01-01T00:00:00.000Z");
+    const txns = await createMercuryFinanceSource(fake.callTool).fetchTransactions(
+      "2026-01-01T00:00:00.000Z",
+    );
     expect(txns).toHaveLength(40);
-    const limits = fake.calls
-      .filter((c) => c.name === "listTransactions")
-      .map((c) => c.args.limit);
+    const limits = fake.calls.filter((c) => c.name === "listTransactions").map((c) => c.args.limit);
     expect(limits.slice(0, 3)).toEqual([300, 150, 75]);
     expect(limits.slice(2).every((l) => l === 75)).toBe(true);
   });
@@ -173,8 +160,7 @@ describe("Mercury source", () => {
       ],
     }));
     await expect(source.fetchAccounts()).rejects.toThrow(
-      new FinanceShapeError("getAccounts", "accounts.0.availableBalance")
-        .message,
+      new FinanceShapeError("getAccounts", "accounts.0.availableBalance").message,
     );
   });
 
@@ -194,62 +180,74 @@ describe("Mercury source", () => {
     expect(fake.calls.filter((c) => c.name === "getTreasury")).toHaveLength(1);
   });
 
-  it("reads Treasury deposits and withdrawals as signed internal transfers on the Treasury account", async () => {
+  it("reads Treasury rows with signed amounts across pages, and turns a pending withdrawal into one pending row", async () => {
+    const row = (id: string, type: string, amount: number, canonicalDay: string) => ({
+      id,
+      type,
+      amount,
+      canonicalDay,
+      accountId: "trs-3333",
+      description: "Example",
+      balance: 5100.25,
+    });
     const fake = fakeMercury({
       txns: {},
+      treasury: {
+        accounts: [{ ...mercuryTreasuryResponse.accounts[0], currentBalance: 5100.25 }],
+      },
       treasuryTxns: {
         "trs-3333": [
-          {
-            id: "tt-2",
-            amount: 100000,
-            type: "withdrawal",
-            status: "completed",
-            postedAt: "2026-10-27T10:00:00Z",
-          },
-          {
-            id: "tt-1",
-            amount: 250000,
-            type: "deposit",
-            status: "completed",
-            createdAt: "2026-08-02T10:00:00Z",
-          },
+          row("tt-3", "mercuryFeePosted", -12.34, "2026-10-05"),
+          row("tt-2", "dividendPosted", 56.78, "2026-10-01"),
+          row("tt-1", "someFutureDepositType", 250, "2026-08-02"),
         ],
       },
     });
     const rows = (
-      await createMercuryFinanceSource(fake.callTool).fetchTransactions(
-        "2026-01-01T00:00:00Z",
-      )
+      await createMercuryFinanceSource(fake.callTool).fetchTransactions("2026-01-01T00:00:00Z")
     ).filter((t) => t.accountExternalId === "trs-3333");
     expect(
-      rows.map((t) => [t.externalId, t.amountCents, t.kind, t.status]),
+      rows.map((t) => [t.externalId, t.amountCents, t.kind, t.status, t.postedAt.slice(0, 10)]),
     ).toEqual([
-      ["tt-2", -10000000, "treasury", "posted"],
-      ["tt-1", 25000000, "treasury", "posted"],
+      ["tt-3", -1234, "treasury", "posted", "2026-10-05"],
+      ["tt-2", 5678, "treasury", "posted", "2026-10-01"],
+      ["tt-1", 25000, "treasury", "posted", "2026-08-02"],
+      // availableBalance 5000.25 is 100 below currentBalance 5100.25.
+      ["pending-trs-3333", -10000, "treasury", "pending", new Date().toISOString().slice(0, 10)],
     ]);
+  });
+
+  it("logs and skips Treasury rows it cannot read, keeping the other transactions", async () => {
+    const warn = vi.spyOn(getLogger(), "warn").mockImplementation(() => {});
+    const fake = fakeMercury({
+      txns: {},
+      treasuryTxns: {
+        "trs-3333": [{ id: "bad", amount: "x", canonicalDay: "2026-10-01" }],
+      },
+    });
+    const rows = await createMercuryFinanceSource(fake.callTool).fetchTransactions(
+      "2026-01-01T00:00:00Z",
+    );
+    expect(rows.filter((t) => t.kind === "treasury")).toEqual([]);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 
   it("finds a receipt link on demand, through getAttachment when the row has only an id", async () => {
     const withId = fakeMercury({ txns: {}, attachments: [{ id: "att-1" }] });
-    expect(
-      await createMercuryFinanceSource(withId.callTool).receiptUrl("m-1"),
-    ).toEqual({
+    expect(await createMercuryFinanceSource(withId.callTool).receiptUrl("m-1")).toEqual({
       url: "https://files.example.test/receipt.pdf?sig=1",
       mimeType: "application/pdf",
     });
     const none = fakeMercury({ txns: {}, attachments: [] });
-    expect(
-      await createMercuryFinanceSource(none.callTool).receiptUrl("m-1"),
-    ).toBeNull();
+    expect(await createMercuryFinanceSource(none.callTool).receiptUrl("m-1")).toBeNull();
   });
 });
 
 describe("Brex source", () => {
   it("maps cash accounts from decimal strings and skips card accounts", async () => {
     const fake = fakeBrex({ expenses: [] });
-    expect(
-      await createBrexFinanceSource(fake.callTool).fetchAccounts(),
-    ).toEqual([
+    expect(await createBrexFinanceSource(fake.callTool).fetchAccounts()).toEqual([
       {
         provider: "brex",
         externalId: "dpacc_1",
@@ -267,10 +265,7 @@ describe("Brex source", () => {
     const expenses = Array.from({ length: 250 }, (_, i) =>
       brexExpense(`e-${i}`, {
         receipt_count: i === 3 ? 1 : 0,
-        receipts:
-          i === 3
-            ? [{ id: "r1", download_uri: "https://files.example.test/r.pdf" }]
-            : [],
+        receipts: i === 3 ? [{ id: "r1", download_uri: "https://files.example.test/r.pdf" }] : [],
       }),
     );
     const fake = fakeBrex({ expenses });
@@ -281,14 +276,10 @@ describe("Brex source", () => {
     expect(fake.calls).toHaveLength(3);
     expect(
       fake.calls.every(
-        (c) =>
-          c.args.limit === 100 &&
-          (c.args.include as string[])[0] === "receipts",
+        (c) => c.args.limit === 100 && (c.args.include as string[])[0] === "receipts",
       ),
     ).toBe(true);
-    expect(txns.filter((t) => t.hasReceipt).map((t) => t.externalId)).toEqual([
-      "e-3",
-    ]);
+    expect(txns.filter((t) => t.hasReceipt).map((t) => t.externalId)).toEqual(["e-3"]);
     expect(txns[0]).toMatchObject({
       provider: "brex",
       accountExternalId: "brex-card",
@@ -314,9 +305,9 @@ describe("Brex source", () => {
         }),
       ],
     });
-    const [txn] = await createBrexFinanceSource(
-      fake.callTool,
-    ).fetchTransactions("2026-01-01T00:00:00.000Z");
+    const [txn] = await createBrexFinanceSource(fake.callTool).fetchTransactions(
+      "2026-01-01T00:00:00.000Z",
+    );
     expect(txn).toMatchObject({ amountCents: -10800, currency: "USD" });
   });
 
@@ -356,11 +347,7 @@ describe("Brex source", () => {
     const txns = await createBrexFinanceSource(fake.callTool).fetchTransactions(
       "2026-01-01T00:00:00.000Z",
     );
-    expect(txns.map((t) => t.externalId).sort()).toEqual([
-      "paid-bill",
-      "processing",
-      "reimb",
-    ]);
+    expect(txns.map((t) => t.externalId).sort()).toEqual(["paid-bill", "processing", "reimb"]);
     const processing = txns.find((t) => t.externalId === "processing");
     expect(processing).toMatchObject({
       status: "pending",
@@ -389,46 +376,38 @@ describe("Brex source", () => {
         { id: "b-2", status: "DRAFT" },
       ],
     });
-    expect(await createBrexFinanceSource(fake.callTool).fetchBills?.()).toEqual(
-      [
-        {
-          provider: "brex",
-          externalId: "b-1",
-          vendorName: "Initech LLC",
-          vendorKey: "initech",
-          dueAt: "2026-10-20T00:00:00.000Z",
-          amountCents: 120000,
-          status: "APPROVED",
-        },
-      ],
-    );
+    expect(await createBrexFinanceSource(fake.callTool).fetchBills?.()).toEqual([
+      {
+        provider: "brex",
+        externalId: "b-1",
+        vendorName: "Initech LLC",
+        vendorKey: "initech",
+        dueAt: "2026-10-20T00:00:00.000Z",
+        amountCents: 120000,
+        status: "APPROVED",
+      },
+    ]);
   });
 
   it("rejects a response in an unknown shape", async () => {
     const source = createBrexFinanceSource(async () => ({
       items: [{ id: "e", type: "CARD", amount: "5" }],
     }));
-    await expect(
-      source.fetchTransactions("2026-01-01T00:00:00.000Z"),
-    ).rejects.toThrow("Unexpected list_expenses response at items.0.amount");
+    await expect(source.fetchTransactions("2026-01-01T00:00:00.000Z")).rejects.toThrow(
+      "Unexpected list_expenses response at items.0.amount",
+    );
   });
 
   it("returns a fresh receipt link and null when there is none", async () => {
     const withReceipt = fakeBrex({
       expenses: [],
-      receipts: [
-        { download_uri: "https://files.example.test/r.pdf?Expires=1" },
-      ],
+      receipts: [{ download_uri: "https://files.example.test/r.pdf?Expires=1" }],
     });
-    expect(
-      await createBrexFinanceSource(withReceipt.callTool).receiptUrl("e-1"),
-    ).toEqual({
+    expect(await createBrexFinanceSource(withReceipt.callTool).receiptUrl("e-1")).toEqual({
       url: "https://files.example.test/r.pdf?Expires=1",
       mimeType: "application/pdf",
     });
     const none = fakeBrex({ expenses: [], receipts: null });
-    expect(
-      await createBrexFinanceSource(none.callTool).receiptUrl("e-1"),
-    ).toBeNull();
+    expect(await createBrexFinanceSource(none.callTool).receiptUrl("e-1")).toBeNull();
   });
 });
