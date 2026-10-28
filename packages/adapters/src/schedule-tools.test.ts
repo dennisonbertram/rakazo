@@ -16,6 +16,23 @@ import {
 } from "./schedule-tools.js";
 
 describe("resolveScheduleTiming", () => {
+  it.each(["2030-02-30T10:00Z", "2030-04-31T10:00+05:30", "2030-06-15T24:00:00Z"])(
+    "rejects an impossible runAt instead of rolling it over: %s",
+    (runAt) => {
+      expect(resolveScheduleTiming({ runAt })).toEqual({
+        ok: false,
+        error: "runAt must be a valid ISO datetime.",
+      });
+    },
+  );
+
+  it("still accepts a real offset datetime for runAt", () => {
+    expect(resolveScheduleTiming({ runAt: "2099-04-30T10:00+05:30" })).toMatchObject({
+      ok: true,
+      nextRunAt: new Date("2099-04-30T04:30:00Z"),
+    });
+  });
+
   it("rejects repeating intervals under one minute", () => {
     expect(resolveScheduleTiming({ every: 2, unit: "seconds" })).toEqual({
       ok: false,

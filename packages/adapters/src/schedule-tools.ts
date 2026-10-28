@@ -89,6 +89,38 @@ export function compactScheduleInput(input: Record<string, unknown>): Record<str
   );
 }
 
+const ISO_DATE_TIME =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/i;
+
+/**
+ * Date.parse rolls an impossible calendar date over (February 30 becomes March 2), so a
+ * mistyped run time would be scheduled for the wrong day. Check the written parts first.
+ */
+function parseIsoInstant(text: string): Date {
+  const value = text.trim();
+  const parts = ISO_DATE_TIME.exec(value);
+  if (parts) {
+    const [year, month, day, hour, minute, second] = parts
+      .slice(1, 7)
+      .map((part) => (part === undefined ? 0 : Number(part)));
+    const check = new Date(0);
+    check.setUTCFullYear(year ?? 0, (month ?? 1) - 1, day ?? 1);
+    check.setUTCHours(hour ?? 0, minute ?? 0, second ?? 0);
+    if (
+      check.getUTCFullYear() !== year ||
+      check.getUTCMonth() !== (month ?? 1) - 1 ||
+      check.getUTCDate() !== day ||
+      check.getUTCHours() !== hour ||
+      check.getUTCMinutes() !== minute ||
+      check.getUTCSeconds() !== second
+    ) {
+      return new Date(Number.NaN);
+    }
+  }
+  return new Date(value);
+}
+
+
 export function resolveScheduleTiming(
   input: {
     cron?: unknown;
@@ -155,7 +187,7 @@ export function resolveScheduleTiming(
       }
       nextRunAt = new Date(Date.now() + delayMinutes * 60_000);
     } else {
-      const parsed = new Date(String(input.runAt ?? ""));
+      const parsed = parseIsoInstant(String(input.runAt ?? ""));
       if (!Number.isFinite(parsed.getTime())) {
         return { ok: false, error: "runAt must be a valid ISO datetime." };
       }
