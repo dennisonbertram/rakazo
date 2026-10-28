@@ -60,8 +60,29 @@ export function retryAfterMs(error: unknown): number | undefined {
   return match[1] || match[3] ? value : value * 1000;
 }
 
+/** An explicit statement that the account is out of credits, balance, quota or a usage window. */
+const EXHAUSTION_SIGNAL =
+  /insufficient[ _](?:credits?|funds|balance|quota)|(?:out of|no (?:more|remaining)) (?:credits?|balance|quota)|credits? (?:have been |are |is )?(?:exhausted|depleted|used up)|(?:credit )?balance (?:is )?(?:too )?(?:low|empty|insufficient|exhausted|depleted)|(?:low|empty|insufficient|exhausted|depleted) (?:credit )?balance|(?:purchase|buy|add) more credits|(?:exceeded|exhausted|used up) your (?:current )?quota|quota (?:exceeded|exhausted)|(?:reached|hit) your (?:[a-z0-9()-]+ ){0,4}usage limit|usage limit (?:reached|exceeded)|out of budget/;
+
+/** Terminal wording that outranks an exhaustion phrase: invalid input, auth, cancellation or a short rate window. */
+const NOT_EXHAUSTION =
+  /not (?:yet )?(?:reached|hit)|unsupported parameter|invalid[ _](?:api[ _]key|parameter|param|input|argument|tool|schema|credential)|validation|must be|context[ _-](?:length|window)|too many tokens|model not found|bad request|unauthori[sz]ed|forbidden|access denied|permission (?:is )?(?:denied|refused|declined)|(?:expired|revoked|missing) (?:api )?(?:key|credential|token)|authentication (?:failed|failure|denied|expired|invalid)|abort|cancel|\bper[- ](?:second|minute)\b|\b(?:rpm|tpm)\b|concurrent/;
+
+/**
+ * Providers report an exhausted account as 400, 402 or 403. A 4xx counts only when the response
+ * says so explicitly and nothing marks it as an auth, permission or input failure. A 401 never
+ * counts, even when it wraps an exhaustion message.
+ */
+export function isAccountExhaustion(error: unknown): boolean {
+  const { text, statuses } = errorFacts(error);
+  if (statuses.has(401)) return false;
+  if (![400, 402, 403].some((status) => statuses.has(status))) return false;
+  return EXHAUSTION_SIGNAL.test(text) && !NOT_EXHAUSTION.test(text);
+}
+
 /** Only provider availability failures may advance the user's explicit chain. */
 export function isRetryableProviderUnavailable(error: unknown): boolean {
+  if (isAccountExhaustion(error)) return true;
   const { text, statuses } = errorFacts(error);
   if (statuses.has(400) || statuses.has(401)) return false;
   // Kimi For Coding reports an exhausted usage window as HTTP 403. errorFacts lowercases text.
@@ -104,7 +125,7 @@ export function isRetryableProviderUnavailable(error: unknown): boolean {
     return true;
   if ([...statuses].some((status) => status >= 400 && status < 600)) return false;
   if (CONNECTION_FAILURE.test(text)) return true;
-  return /rate.?limit|too many requests|quota|overload|capacity|temporarily unavailable|service unavailable|retry[- ](?:after|delay)|server error|upstream error|gateway timeout|timed? out|timeout|connection reset|connection refused|network error|max retries exceeded|stream ended without finish_reason|\bterminated\b|fetch failed|socket hang up|econnreset|econnrefused|etimedout|websocket closed/.test(
+  return /rate.?limit|too many requests|quota|overload|capacity|temporarily unavailable|service unavailable|retry[- ](?:after|delay)|server error|upstream error|an error occurred while processing your request|gateway timeout|timed? out|timeout|connection reset|connection refused|network error|max retries exceeded|stream ended without finish_reason|\bterminated\b|fetch failed|socket hang up|econnreset|econnrefused|etimedout|websocket closed/.test(
     text,
   );
 }
@@ -117,6 +138,8 @@ export function isRetryableProviderUnavailable(error: unknown): boolean {
 export function isTransientModelError(error: unknown): boolean {
   return (
     isRetryableProviderUnavailable(error) &&
+    // An exhausted account stays exhausted; retrying the same model cannot help.
+    !isAccountExhaustion(error) &&
     !/insufficient_quota|exceeded your current quota|quota exhausted|usage limit|billing|credit balance|insufficient (?:funds|balance|credits)|payment|out of budget/.test(
       errorFacts(error).text,
     )

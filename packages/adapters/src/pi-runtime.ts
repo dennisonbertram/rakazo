@@ -32,6 +32,7 @@ import type {
 } from "@rakazo/adapter-kit";
 import {
   DEFAULT_CONTEXT_STRATEGY,
+  isAccountExhaustion,
   isConnectionFailure,
   isRetryableProviderUnavailable,
   isTransientModelError,
@@ -2396,6 +2397,11 @@ export function providerFailureText(message: unknown): string | undefined {
   if (stopReason === "length" && !text) {
     return errorMessage || "The model hit its output limit before writing a response.";
   }
+  // A reply cut at the limit is not a finished answer. The run fails and keeps the text written.
+  // A cut tool call is left to the tool path.
+  if (stopReason === "length" && !messageHasToolCall(message)) {
+    return "The model hit its output limit before finishing its reply.";
+  }
   if (errorMessage && !text) return errorMessage;
   return undefined;
 }
@@ -2850,11 +2856,14 @@ function fallbackAwareModelStream(
               firstRetryableError ??= event;
               // A silent stream is retried once on the same model.
               const idle = event.error.errorMessage === MODEL_STREAM_IDLE_TIMEOUT_MESSAGE;
-              const backoff = idle
-                ? recoveredIdle
-                  ? undefined
-                  : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
-                : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
+              // An exhausted account stays exhausted; retrying the same model cannot help.
+              const backoff = isAccountExhaustion(event.error)
+                ? undefined
+                : idle
+                  ? recoveredIdle
+                    ? undefined
+                    : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
+                  : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
               if (idle && backoff !== undefined) {
                 recoveredIdle = true;
                 startedAt = Date.now();
