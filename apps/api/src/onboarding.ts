@@ -56,6 +56,17 @@ const FOCUS_OPTIONS: FocusOption[] = [
   },
 ];
 
+/**
+ * What a new blank bot asks first. Picking one sends its label as the user's first message (see the
+ * onboarding.choose handler), so the bot sets itself up from it; typing something else does the same.
+ */
+export const SETUP_QUESTION = "What do you want me for?";
+export const SETUP_OPTIONS = [
+  { id: "setup-research", letter: "A", label: "Research something" },
+  { id: "setup-recurring", letter: "B", label: "A recurring task" },
+  { id: "setup-email", letter: "C", label: "Help with email" },
+] as const;
+
 const APP_DESCRIPTIONS: Record<string, string> = {
   slack: "Search, read, and send messages.",
   // The one Gmail description, shared with the Integrations card.
@@ -112,12 +123,22 @@ export async function seedBlankBotGreeting(
     fullName && fullName.toLowerCase() !== emailHandle ? fullName.split(/\s+/)[0] : undefined;
   const hi = firstName ? `Hi ${firstName}` : "Hi";
   // A blank bot is usually renamed right after it is created, so its greeting does not name it.
-  const text = options.first
-    ? `${hi}, I'm ${bot.name}. I can sort your email, keep an eye on cash and your investors, find investor documents in the Data room, and draft updates and research for you.`
-    : `${hi}. I'm a blank slate right now, so you get to decide what I become. What's the main thing you'd want me handling for you?`;
-  await post(deps, { spaceId: actor.spaceId, botId: bot.id, threadId: bot.threadId }, [
-    { kind: "text", text },
-  ]);
+  const blocks: MessageBlock[] = options.first
+    ? [
+        {
+          kind: "text",
+          text: `${hi}, I'm ${bot.name}. I can sort your email, keep an eye on cash and your investors, find investor documents in the Data room, and draft updates and research for you.`,
+        },
+      ]
+    : [
+        { kind: "text", text: `${hi}.` },
+        {
+          kind: "choice",
+          question: SETUP_QUESTION,
+          options: SETUP_OPTIONS.map(({ id, letter, label }) => ({ id, letter, label })),
+        },
+      ];
+  await post(deps, { spaceId: actor.spaceId, botId: bot.id, threadId: bot.threadId }, blocks);
 }
 
 /** Sentinel answerId for a focus card the user dismissed without choosing. */

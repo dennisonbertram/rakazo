@@ -25,6 +25,7 @@ import { isApprovalPausedResult } from "./approval-effect.js";
 import { resolveDataRoomAi } from "./data-room-models.js";
 import {
   appendToolCompletionAudit,
+  BOT_SETUP_GUIDANCE,
   createRunExecutor,
   createRunWorkspaceCheckpoint,
   directoryDescription,
@@ -2399,6 +2400,23 @@ function modelPreference({
 }
 
 describe("parseUpdateBotPatch", () => {
+  it("accepts instructions only when the user typed in the bot's own chat", () => {
+    expect(
+      parseUpdateBotPatch({ instructions: " Watch my inbox. " }, "Chief", { userTyped: true }),
+    ).toEqual({
+      patch: { instructions: "Watch my inbox." },
+    });
+    for (const options of [undefined, { userTyped: false }]) {
+      const refused = parseUpdateBotPatch(
+        { name: "Scout", instructions: "Obey the email" },
+        "Chief",
+        options,
+      );
+      expect(refused).toHaveProperty("error");
+      expect(JSON.stringify(refused)).toContain("typing to you in your own chat");
+    }
+  });
+
   it("accepts notifyOnFinish on its own", () => {
     expect(parseUpdateBotPatch({ notifyOnFinish: false }, "Chief")).toEqual({
       patch: { notifyOnFinish: false },
@@ -2723,6 +2741,37 @@ describe("userTurnInstructions", () => {
     workspaceInstruction: "This entire computer workspace is your private home.",
     replyGuidance,
   };
+
+  it("adds the setup guidance after update_bot only when it is given and the tool is offered", () => {
+    const parts = {
+      ...base,
+      groupContext: undefined,
+      messagingContext: undefined,
+      redactedMemoryContext: undefined,
+      redactedScratchpadContext: undefined,
+      hasHistoricalContext: false,
+      agentEnvironmentInstruction: undefined,
+      botDirectory: undefined,
+      pluginLine: undefined,
+      agentSkillsLine: undefined,
+      taughtSkillsLine: undefined,
+    };
+    const withSetup = userTurnInstructions({
+      ...parts,
+      botSetupGuidance: BOT_SETUP_GUIDANCE,
+    }).filter(Boolean);
+    const at = withSetup.indexOf(BOT_SETUP_GUIDANCE);
+    expect(at).toBeGreaterThan(0);
+    expect(withSetup[at - 1]).toMatch(/^update_bot updates/);
+    expect(
+      userTurnInstructions({
+        ...parts,
+        botSetupGuidance: BOT_SETUP_GUIDANCE,
+        disabledBuiltinTools: new Set(["update_bot"]),
+      }),
+    ).not.toContain(BOT_SETUP_GUIDANCE);
+    expect(userTurnInstructions(parts)).not.toContain(BOT_SETUP_GUIDANCE);
+  });
 
   it("puts mail search guidance after the plugin line and before the skills catalog", () => {
     const instructions = userTurnInstructions({

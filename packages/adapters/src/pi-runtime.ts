@@ -1157,6 +1157,7 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
           ...(raw.name !== undefined ? { name: String(raw.name) } : {}),
           ...(raw.title !== undefined ? { title: String(raw.title) } : {}),
           ...(raw.description !== undefined ? { description: String(raw.description) } : {}),
+          ...(raw.instructions !== undefined ? { instructions: String(raw.instructions) } : {}),
           ...(raw.color !== undefined ? { color: String(raw.color) } : {}),
           ...(raw.artifact_id !== undefined ? { artifact_id: String(raw.artifact_id) } : {}),
           ...(raw.use_attached_image !== undefined
@@ -1767,6 +1768,7 @@ function builtinParameters(tool: ConnectorTool) {
       name: Type.Optional(Type.String()),
       title: Type.Optional(Type.String()),
       description: Type.Optional(Type.String()),
+      instructions: Type.Optional(Type.String()),
       color: Type.Optional(Type.String()),
       artifact_id: Type.Optional(Type.String()),
       use_attached_image: Type.Optional(Type.Boolean()),

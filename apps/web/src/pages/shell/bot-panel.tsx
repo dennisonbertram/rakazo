@@ -173,6 +173,8 @@ export function BotSettings({
   onExport,
   onClear,
   focusName = false,
+  foldable = focusName,
+  onFoldedChange,
   hostComputer,
   messageTargets = [],
   notificationsOff = false,
@@ -188,6 +190,10 @@ export function BotSettings({
   hostComputer?: { defaultHost: ComputerHost };
   /** A bot just created as "New bot": focus and select its name so it gets named first. */
   focusName?: boolean;
+  /** Show the More settings toggle even when the name-only view is off (the user opened it). */
+  foldable?: boolean;
+  /** The user pressed More settings. The parent keeps this, so a rebuilt panel stays as they left it. */
+  onFoldedChange?: (folded: boolean) => void;
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
   /** The check-in setting changed, so its managed routine appeared, changed or went away. */
   onCheckInChange?: () => void;
@@ -525,8 +531,8 @@ export function BotSettings({
   }
 
   // A bot just created as "New bot" shows only its name until it has replied once.
-  const [unfolded, setUnfolded] = useState(false);
-  const folded = focusName && !unfolded;
+  const [folded, setFolded] = useState(focusName);
+  useEffect(() => setFolded(focusName), [focusName]);
 
   return (
     <div data-testid="bot-settings">
@@ -561,17 +567,25 @@ export function BotSettings({
           className="mt-1.5"
         />
       </label>
-      {folded ? (
+      {foldable ? (
         <Button
           variant="ghost"
           size="sm"
+          aria-expanded={!folded}
           className="mt-4 -ms-2.5 text-muted-foreground"
-          onClick={() => setUnfolded(true)}
+          onClick={() => {
+            setFolded(!folded);
+            onFoldedChange?.(!folded);
+          }}
         >
           <Trans>More settings</Trans>
-          <ChevronDown aria-hidden="true" className="size-4" />
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-4 transition-transform ${folded ? "" : "rotate-180"}`}
+          />
         </Button>
-      ) : (
+      ) : null}
+      {folded ? null : (
         <>
           <label htmlFor={`${ids}-description`} className={advancedLabelClass}>
             <Trans>Description</Trans>
