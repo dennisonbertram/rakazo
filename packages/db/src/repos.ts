@@ -63,6 +63,7 @@ function mapBot(
     sectionId: string | null;
     position?: number;
     archivedAt: Date | null;
+    hiddenAt: Date | null;
     parentBotId: string | null;
     memoryScope: string | null;
     createdAt: Date;
@@ -106,6 +107,7 @@ function mapBot(
     sectionId: bot.sectionId,
     position: bot.position,
     archivedAt: bot.archivedAt?.toISOString() ?? null,
+    hiddenAt: bot.hiddenAt?.toISOString() ?? null,
     unread: bot.thread.unread,
     parentBotId: bot.parentBotId,
     memoryScope: bot.memoryScope as "isolated" | "shared" | null,
@@ -164,6 +166,7 @@ export function createRepos(prisma: PrismaClient) {
         color: true,
         notifyOnFinish: true,
         pinned: true,
+        hiddenAt: true,
         sectionId: true,
         position: true,
         updatedAt: true,
@@ -194,6 +197,7 @@ export function createRepos(prisma: PrismaClient) {
         color: bot.color,
         notifyOnFinish: bot.notifyOnFinish,
         pinned: bot.pinned,
+        hiddenAt: bot.hiddenAt?.toISOString() ?? null,
         sectionId: bot.sectionId,
         position: bot.position,
         unread: bot.thread.unread,

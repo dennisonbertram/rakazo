@@ -52,6 +52,7 @@ export {
   settleApprovalsOfEndedRuns,
 } from "./run-pauses.js";
 export * from "./run-secrets.js";
+export * from "./run-turn-checkpoint.js";
 export * from "./safes.js";
 export * from "./scope.js";
 export * from "./scratchpad-waiting.js";

@@ -52,6 +52,7 @@ describe("threadHead", () => {
 describe("queued run supersession", () => {
   it("only cancels queued runs started by user messages or reactions", async () => {
     const tx = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       run: {
         findMany: vi
           .fn()
@@ -235,7 +236,14 @@ describe("threadSnapshot", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           type: {
-            in: ["thread.progress", "thread.subagent", "agent.tool.called", "agent.tool.completed"],
+            in: [
+              "thread.progress",
+              "thread.subagent",
+              "run.waiting_input",
+              "computer.takeover.requested",
+              "agent.tool.called",
+              "agent.tool.completed",
+            ],
           },
         }),
       }),
@@ -1160,6 +1168,7 @@ describe("sendThreadMessage", () => {
       blocks: [{ kind: "ask", text: "Which city should I use?", status: "pending" }],
     };
     const tx = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
       thread: {
         update: vi.fn(async ({ data }: { data: { nextMessageSeq?: unknown } }) =>
@@ -1332,6 +1341,7 @@ describe("sendThreadMessage", () => {
       blocks: [{ kind: "ask", text: "Which city should I use?", status: "pending" }],
     };
     const tx = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "group-1" }]),
       thread: {
         update: vi.fn(async ({ data }: { data: { nextMessageSeq?: unknown } }) =>
@@ -3347,6 +3357,7 @@ describe("stopThreadRuns", () => {
     });
     let nextEventSeq = 0;
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
@@ -3489,6 +3500,7 @@ describe("stopThreadRuns", () => {
       yield { type: "exit", code: 0 };
     });
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: {
         update: vi.fn().mockResolvedValue({ nextEventSeq: 5 }),
@@ -3635,7 +3647,7 @@ describe("stopThreadRuns", () => {
         ]),
         update: messageUpdate,
       },
-      externalEffect: { updateMany: effectUpdate },
+      externalEffect: { updateMany: effectUpdate, deleteMany: vi.fn(async () => ({ count: 0 })) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: { findMany: vi.fn().mockResolvedValue([]) },
       computerExecutionLease: { findMany: vi.fn().mockResolvedValue([]) },
@@ -3689,6 +3701,7 @@ describe("stopThreadRuns", () => {
     const writes: string[] = [];
     const created: Array<Record<string, unknown>> = [];
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
@@ -3783,6 +3796,7 @@ describe("stopThreadRuns", () => {
 
   it("emits no event and skips the wake when nothing was running", async () => {
     const transaction = {
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
       thread: { update: vi.fn() },
       run: {
@@ -3830,5 +3844,84 @@ describe("stopThreadRuns", () => {
     expect(transaction.event.deleteMany).not.toHaveBeenCalled();
     expect(transaction.thread.update).not.toHaveBeenCalled();
     expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("helper snapshot settlement", () => {
+  it.each(["bot", "group"])("settles stale helpers on reload in a %s thread", async (kind) => {
+    const runs = [
+      { id: "paused", status: "waiting_input" },
+      { id: "working", status: "running" },
+    ].map((run) => ({
+      ...run,
+      botId: "bot-1",
+      threadId: "thread-1",
+      taskId: "task",
+      trigger: "user",
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      startedAt: null,
+      completedAt: null,
+    }));
+    const liveEvents = runs.map((run, seq) => ({
+      id: `event-${seq}`,
+      threadId: "thread-1",
+      runId: run.id,
+      seq,
+      type: "thread.subagent",
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      payload: { agentId: run.id, name: "Helper", task: "Check", status: "running" },
+    }));
+    const previous = liveEvents[1]!;
+    const history = [
+      liveEvents[0]!,
+      { ...previous, payload: { ...previous.payload, agentId: "before-resume" } },
+      { ...previous, seq: 2, type: "run.waiting_input", payload: {} },
+      { ...previous, seq: 3 },
+    ];
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      message: { findMany: vi.fn().mockResolvedValue([]) },
+      event: {
+        findFirst: vi.fn().mockResolvedValue({ seq: 2 }),
+        findMany: vi.fn(
+          async (input: {
+            where: { type: { in: string[] }; runId?: string | { in: string[] } };
+          }) => {
+            const { runId } = input.where;
+            const runIds = typeof runId === "string" ? [runId] : runId?.in;
+            return history.filter(
+              (event) =>
+                input.where.type.in.includes(event.type) &&
+                (!runIds || runIds.includes(event.runId)),
+            );
+          },
+        ),
+      },
+      run: { findFirst: botRunFindFirst(runs), findMany: groupRunFindMany({ active: runs }) },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (work: (client: typeof tx) => unknown) => work(tx)),
+      run: { findMany: vi.fn().mockResolvedValue([]) },
+    } as unknown as PrismaClient;
+    const result = await threadSnapshot({ prisma }, {
+      kind,
+      botId: "bot-1",
+      threadId: "thread-1",
+      bot: { computer: null },
+      members: [],
+    } as ThreadTarget);
+    expect(result.messages.find((m) => m.id === "subagent:paused")?.blocks[0]).toMatchObject({
+      status: "failed",
+      result: "stopped",
+    });
+    // A bot thread loads live events for its one current run only; a group loads every active run.
+    if (kind === "group") {
+      expect(
+        result.messages.find((m) => m.id === "subagent:before-resume")?.blocks[0],
+      ).toMatchObject({ status: "failed", result: "stopped" });
+      expect(result.messages.find((m) => m.id === "subagent:working")?.blocks[0]).toMatchObject({
+        status: "running",
+      });
+    }
   });
 });

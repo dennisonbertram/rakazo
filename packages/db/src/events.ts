@@ -26,6 +26,7 @@ import {
   assertRunCanWriteHistory,
   assertRunIsCancelled,
   createThreadMessageInTransaction,
+  RunHistoryWriteError,
 } from "./messages.js";
 import { finalizeRun } from "./run-finalize.js";
 import {
@@ -38,7 +39,7 @@ import { claimSteering } from "./steering.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
 export { completedRunBlocks, finalizeRun } from "./run-finalize.js";
-export { createPendingSteeringRun } from "./steering.js";
+export { createPendingSteeringRun, discardAnsweredSteering } from "./steering.js";
 export {
   answerRunInput,
   answerWaitingRunWithTextInTransaction,
@@ -842,11 +843,18 @@ export async function appendEventInTransaction(
   tx: Prisma.TransactionClient,
   input: AppendEventInput,
 ) {
-  const thread = await tx.thread.update({
-    where: { id: input.threadId },
-    data: { nextEventSeq: { increment: 1 } },
-    select: { nextEventSeq: true },
-  });
+  const thread = await tx.thread
+    .update({
+      where: { id: input.threadId },
+      data: { nextEventSeq: { increment: 1 } },
+      select: { nextEventSeq: true },
+    })
+    .catch((error: unknown) => {
+      // Deleting the bot or space cascades the thread and its runs away under
+      // in-flight work; that run has no history left to write to.
+      if (input.runId && isRecordNotFound(error)) throw new RunHistoryWriteError();
+      throw error;
+    });
   // run.cancelled is appended after the run row already reads cancelled, so it
   // asserts the terminal status where every other event needs a writable run.
   if (input.type === "run.cancelled") {
@@ -867,6 +875,10 @@ export async function appendEventInTransaction(
       runId: input.runId,
     },
   });
+}
+
+function isRecordNotFound(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2025");
 }
 
 export async function notifyRealtime(

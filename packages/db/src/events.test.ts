@@ -99,8 +99,9 @@ describe("finalizeRun", () => {
         updateMany: vi.fn(async () => ({ count: 1 })),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: { updateMany: vi.fn(async () => ({ count: 1 })) },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
       event: { create: createEvent, deleteMany: vi.fn(async () => ({ count: 0 })) },
@@ -151,8 +152,9 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "run-reply" })),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "task-reply" })),
@@ -219,8 +221,9 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "run-reply" })),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "task-reply" })),
@@ -299,8 +302,9 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "run-reply" })),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
-      message: { findMany: vi.fn(async () => []) },
+      message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "task-reply" })),
@@ -605,6 +609,7 @@ describe("pauseRunForInput", () => {
         }),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -678,6 +683,7 @@ describe("pauseRunForInput", () => {
         }),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 9 }) },
       message: {
@@ -755,6 +761,7 @@ describe("pauseRunForInput", () => {
         }),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -838,6 +845,7 @@ describe("pauseRunForTakeover", () => {
         findUnique: vi.fn().mockResolvedValue({ status: "waiting_takeover" }),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -928,6 +936,7 @@ describe("pauseRunForTakeover", () => {
         findUnique: vi.fn().mockResolvedValue({ status: "waiting_takeover" }),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -987,6 +996,7 @@ describe("pauseRunForTakeover", () => {
         findUnique: vi.fn().mockResolvedValue({ status: "waiting_takeover" }),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -2843,7 +2853,15 @@ describe("claimSteering", () => {
   it("claims pending messages for the fenced run in message order", async () => {
     const tx = {
       $queryRaw: vi.fn(),
-      run: { findFirst: vi.fn().mockResolvedValue({ id: "run-1" }) },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({ id: "run-1", spaceId: "space-1" }),
+        findUnique: vi.fn().mockResolvedValue({ status: "running", startedAt: null }),
+      },
+      thread: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ nextMessageSeq: 7 }),
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 1 }),
+      },
+      event: { create: vi.fn() },
       steeringMessage: {
         findMany: vi.fn().mockResolvedValue([
           {
@@ -2911,6 +2929,12 @@ describe("claimSteering", () => {
         where: expect.objectContaining({ leaseOwner: "worker-1", leaseFence: 2 }),
       }),
     );
+    expect(tx.event.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: "run.steering.claimed",
+        payload: { steeringIds: ["steer-1", "steer-2"], nextMessageSeq: 7 },
+      }),
+    });
     expect(tx.steeringMessage.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["steer-1", "steer-2"] }, claimedAt: null },
       data: { runId: "run-1", claimedAt: expect.any(Date) },
@@ -3082,6 +3106,7 @@ describe("clearThread", () => {
         updateMany: vi.fn(),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
@@ -3147,6 +3172,7 @@ describe("clearThread", () => {
         updateMany: vi.fn(),
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
@@ -3266,6 +3292,36 @@ describe("appendEvent", () => {
     expect(tx.thread.update).toHaveBeenCalledTimes(2);
     expect(tx.event.create).toHaveBeenCalledTimes(2);
     expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a run event for a deleted thread as closed run history", async () => {
+    const missing = Object.assign(new Error("No record was found for an update."), {
+      code: "P2025",
+    });
+    const tx = {
+      thread: { update: vi.fn().mockRejectedValue(missing) },
+      run: { findUnique: vi.fn() },
+      event: { create: vi.fn() },
+    };
+    const transaction = vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx));
+    const input = {
+      spaceId: "workspace-1",
+      threadId: "thread-1",
+      botId: "bot-1",
+      type: "computer.command" as const,
+      payload: { text: "late output" },
+    };
+
+    await expect(
+      appendEvent({ $transaction: transaction } as unknown as PrismaClient, {
+        ...input,
+        runId: "run-1",
+      }),
+    ).rejects.toThrow(RunHistoryWriteError);
+    await expect(
+      appendEvent({ $transaction: transaction } as unknown as PrismaClient, input),
+    ).rejects.toBe(missing);
+    expect(tx.event.create).not.toHaveBeenCalled();
   });
 
   it("does not retry a run that can no longer write history", async () => {

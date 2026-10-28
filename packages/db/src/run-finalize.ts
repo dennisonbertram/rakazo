@@ -2,7 +2,7 @@ import type { RealtimeFanout } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import type { Prisma, PrismaClient } from "./client.js";
 import type { FinalizeRunInput, FinalizeRunResult } from "./events.js";
-import { appendEventInTransaction, notifyRealtime } from "./events.js";
+import { appendEventInTransaction, discardAnsweredSteering, notifyRealtime } from "./events.js";
 import {
   assertRunCanWriteHistory,
   createThreadMessageInTransaction,
@@ -46,6 +46,10 @@ export function completedRunBlocks(
       : block,
   );
 }
+
+// The thread lock is shared with snapshot reads that may hold it for up to 15s. Prisma's 5s
+// default counts that wait, and expiring would fail a run whose work already finished.
+const FINALIZE_TRANSACTION_OPTIONS = { maxWait: 5_000, timeout: 20_000 };
 
 async function finalizeRunOnce(
   prisma: PrismaClient,
@@ -208,6 +212,7 @@ async function finalizeRunOnce(
         data: { runId: null },
       });
     } else {
+      await discardAnsweredSteering(tx, input);
       const { sourceMessage } = await tx.run.findUniqueOrThrow({
         where: { id: input.runId },
         select: { sourceMessage: { select: { seq: true } } },
@@ -225,5 +230,5 @@ async function finalizeRunOnce(
     const continuationRunId = await createPendingSteeringRun(tx, input);
     await tx.bot.update({ where: { id: input.botId }, data: { updatedAt: now } });
     return { threadId: lastEvent.threadId, seq: lastEvent.seq, continuationRunId };
-  });
+  }, FINALIZE_TRANSACTION_OPTIONS);
 }

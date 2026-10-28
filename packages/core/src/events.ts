@@ -13,6 +13,7 @@ export function projectMessages(
     threadId: string;
     botId?: string | null;
   }>,
+  runs?: readonly { id: string; status: string }[],
 ): ThreadMessage[] {
   const messages: ThreadMessage[] = [];
   type LiveProjection = {
@@ -52,6 +53,13 @@ export function projectMessages(
     else liveById.clear();
   };
   for (const event of events) {
+    if (stopsRunHelpers(event)) {
+      const settled = settleRunSubagents([...liveSubagents.values()], event.runId);
+      for (const message of settled) {
+        const block = message.blocks[0];
+        if (block?.kind === "subagent") liveSubagents.set(block.agentId, message);
+      }
+    }
     const payload = asRecord(event.payload) ?? {};
     const createdAt =
       typeof event.createdAt === "string" ? event.createdAt : event.createdAt.toISOString();
@@ -142,7 +150,14 @@ export function projectMessages(
       clearLive(event);
     }
   }
-  for (const live of liveSubagents.values()) messages.push(live);
+  let helpers = [...liveSubagents.values()];
+  if (runs) {
+    const running = new Set(runs.filter((run) => run.status === "running").map((run) => run.id));
+    for (const runId of new Set(helpers.map((message) => message.runId))) {
+      if (runId && !running.has(runId)) helpers = settleRunSubagents(helpers, runId);
+    }
+  }
+  for (const live of helpers) messages.push(live);
   for (const live of liveById.values()) {
     if (live.blocks.length > 0) {
       messages.push({
@@ -158,6 +173,37 @@ export function projectMessages(
     }
   }
   return messages;
+}
+
+/** A pause ends the current helper execution, even when the run later resumes. */
+export function stopsRunHelpers(event: { type: string }): boolean {
+  return (
+    isRunTerminalEvent(event) ||
+    event.type === "run.waiting_input" ||
+    event.type === "computer.takeover.requested"
+  );
+}
+
+export function settleRunSubagents<T extends { runId?: string; blocks: readonly unknown[] }>(
+  messages: T[],
+  runId: string | null | undefined,
+): T[] {
+  if (!runId) return messages;
+  let changed = false;
+  const next = messages.map((message) => {
+    if (message.runId !== runId) return message;
+    let settled = false;
+    const blocks = message.blocks.map((value) => {
+      const block = asRecord(value) ?? {};
+      if (block.kind !== "subagent" || block.status !== "running") return value;
+      settled = true;
+      return { ...block, status: "failed", result: "stopped" };
+    });
+    if (!settled) return message;
+    changed = true;
+    return { ...message, blocks };
+  });
+  return changed ? next : messages;
 }
 
 export function progressMessageId(event: { runId?: string | null; id?: string }): string {
@@ -540,6 +586,28 @@ export function subagentBlockFromPayload(
   };
 }
 
+/** Shorter lines, or lines with spaces such as a key's BEGIN header, also appear in ordinary text. */
+const MIN_SECRET_LINE_LENGTH = 16;
+
+/**
+ * The values to hide for `secrets`: each value, and each long unspaced line of a multi-line value
+ * such as a private key's body, since output that prints only some lines or joins them with
+ * spaces (an unquoted `echo $KEY`) never contains the whole value.
+ */
+function protectedValues(secrets: Iterable<string>): string[] {
+  const values = new Set<string>();
+  for (const secret of secrets) {
+    if (!secret) continue;
+    values.add(secret);
+    if (!/[\r\n]/.test(secret)) continue;
+    for (const line of secret.split(/\r\n?|\n/)) {
+      const trimmed = line.trim();
+      if (trimmed.length >= MIN_SECRET_LINE_LENGTH && !/\s/.test(trimmed)) values.add(trimmed);
+    }
+  }
+  return [...values];
+}
+
 /**
  * The stretches protected values cover in `value`, in order, as [start, end). Matches that
  * overlap make one stretch, so a shorter value inside or across a longer one can't cut it and
@@ -550,8 +618,7 @@ function redactedRanges(value: string, secrets: Iterable<string>): Array<[number
   // that repeats or overlaps itself across a long text costs no more than two counters per offset.
   let starts: Int32Array | undefined;
   let ends: Int32Array | undefined;
-  for (const secret of new Set(secrets)) {
-    if (!secret) continue;
+  for (const secret of protectedValues(secrets)) {
     for (let at = value.indexOf(secret); at !== -1; at = value.indexOf(secret, at + 1)) {
       starts ??= new Int32Array(value.length + 1);
       ends ??= new Int32Array(value.length + 1);
@@ -586,7 +653,7 @@ export function redactSecrets(value: string, secrets: string[]): string {
 }
 
 export function containsSecret(value: unknown, secrets: string[]): boolean {
-  const active = secrets.filter((secret) => secret.length > 0);
+  const active = protectedValues(secrets);
   if (active.length === 0) return false;
   const serialized = JSON.stringify(value);
   if (serialized === undefined) return false;
@@ -665,7 +732,7 @@ export function sanitizeJsonValue<T>(value: T): T {
 }
 
 export function createStreamingRedactor(secrets: string[]) {
-  const values = [...new Set(secrets.filter(Boolean))];
+  const values = protectedValues(secrets);
   const maxLength = Math.max(0, ...values.map((value) => value.length));
   let buffer = "";
   let covered = 0;

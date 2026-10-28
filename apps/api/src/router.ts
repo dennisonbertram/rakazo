@@ -162,6 +162,7 @@ import {
   BotSecretAuth,
   botAudienceEditable,
   ComputerCommandSchema,
+  customPageSpawnKey,
   encodeLoginSecret,
   FIRST_BOT_SPAWN_KEY,
   foldComputerCommands,
@@ -174,6 +175,7 @@ import {
   isCartaEndpoint,
   isCompanyAgentSpawnKey,
   isCompanyImporterSpawnKey,
+  isCustomPageSpawnKey,
   isDataRoomAgentSpawnKey,
   isFinanceAgentSpawnKey,
   isGranolaEndpoint,
@@ -2475,13 +2477,18 @@ export function createRouter(deps: RouterDeps) {
           isCartaAgentSpawnKey(input.spawnKey) ||
           isGtmAgentSpawnKey(input.spawnKey) ||
           isIntegrationAgentSpawnKey(input.spawnKey) ||
-          isVoiceAgentSpawnKey(input.spawnKey)
+          isVoiceAgentSpawnKey(input.spawnKey) ||
+          isCustomPageSpawnKey(input.spawnKey)
         ) {
           throw new ORPCError("BAD_REQUEST", { message: "Reserved spawn key" });
         }
         let bot: Bot;
         try {
-          bot = await repos.createBot(context.actor, input);
+          const { page, ...fields } = input;
+          bot = await repos.createBot(
+            context.actor,
+            page ? { ...fields, spawnKey: customPageSpawnKey(randomUUID()) } : fields,
+          );
         } catch (error) {
           throw mapSpaceLifecycleError(error);
         }
@@ -2721,6 +2728,9 @@ export function createRouter(deps: RouterDeps) {
             notifyOnFinish: input.notifyOnFinish,
             color: input.color,
             pinned: input.pinned,
+            ...(input.hidden !== undefined
+              ? { hiddenAt: input.hidden ? new Date() : null }
+              : {}),
             memoryScope: input.memoryScope,
             sectionId: input.sectionId,
             voiceId: input.voiceId,
@@ -9448,6 +9458,7 @@ async function memberSpaceNavigation(
           color: bot.color,
           notifyOnFinish: bot.notifyOnFinish,
           pinned: bot.pinned,
+          hiddenAt: bot.hiddenAt ?? null,
           sectionId: bot.sectionId,
           unread: bot.unread,
           preview: bot.preview,

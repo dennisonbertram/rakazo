@@ -142,6 +142,19 @@ describe("sidebarGroupsForSpaces", () => {
     ).toEqual(["a"]);
   });
 
+  it("leaves a hidden bot out of every group", () => {
+    const hidden = { ...chat("h", "Hidden one"), hiddenAt: "2026-01-01T00:00:00.000Z" };
+    const pinnedHidden = { ...chat("p", "Pinned hidden"), pinned: true, hiddenAt: "2026-01-01" };
+    const groups = sidebarGroupsForSpaces(
+      [space("a", "Acme", { bots: [chat("c", "Chief"), hidden, pinnedHidden] })],
+      "",
+      "a",
+      "Personal",
+    );
+    const names = groups.flatMap((g) => g.bots.map((item) => item.chat.name));
+    expect(names).toEqual(["Chief"]);
+  });
+
   it("names the only space above its chats, beside its actions", () => {
     const [group] = sidebarGroupsForSpaces([space("space-1", "Personal", { canRename: true })], "");
 
@@ -713,7 +726,8 @@ it("hides an unused idle page agent and reveals it when active", async () => {
   try {
     await act(async () => root.render(renderFixture(false)));
 
-    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).toBeNull();
+    // The header stays (its menu holds New page), but the untouched agent is not listed.
+    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Inbox agent");
 
     await act(async () => root.render(renderFixture(true)));
@@ -808,7 +822,7 @@ it("folds email chats separately and reveals the active email chat", async () =>
     const emailChats = container.querySelector<HTMLButtonElement>(
       '[data-testid="sidebar-email-chats"]',
     );
-    expect(pageAgents).toBeNull();
+    expect(pageAgents).not.toBeNull();
     expect(emailChats?.textContent).toContain("Email chats");
     expect(emailChats?.getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).not.toContain("Client email");
@@ -816,7 +830,7 @@ it("folds email chats separately and reveals the active email chat", async () =>
     await act(async () => emailChats?.click());
     expect(emailChats?.getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("Client email");
-    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).toBeNull();
+    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
 
     await act(async () => emailChats?.click());
     expect(emailChats?.getAttribute("aria-expanded")).toBe("false");
@@ -930,6 +944,71 @@ it("opens the command palette from expanded and rail Search", async () => {
     container.remove();
     vi.unstubAllGlobals();
   }
+});
+
+async function renderSidebar(
+  props: Record<string, unknown>,
+  check: (c: HTMLElement) => void | Promise<void>,
+) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  stubSidebarObservers();
+  Element.prototype.scrollIntoView ??= () => undefined;
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        createElement(
+          MemoryRouter,
+          null,
+          createElement(SidebarFixture, { mode: "expanded", ...props }),
+        ),
+      ),
+    );
+    await check(container);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  }
+}
+
+it("lists Email chats directly below Page agents, before the other chats", async () => {
+  await renderSidebar({ pageAgents: true, crowded: true, emailChats: true }, (container) => {
+    const pageAgents = container.querySelector('[data-testid="sidebar-page-agents"]');
+    const emailChats = container.querySelector('[data-testid="sidebar-email-chats"]');
+    const chat = [...container.querySelectorAll("[data-roster-row]")].find((row) =>
+      row.textContent?.includes("Plain chat"),
+    );
+    if (!pageAgents || !emailChats || !chat) throw new Error("Expected both folds and a chat");
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(pageAgents.compareDocumentPosition(emailChats) & following).toBeTruthy();
+    expect(emailChats.compareDocumentPosition(chat) & following).toBeTruthy();
+  });
+});
+
+it("treats a page made with New page as a page agent, listed only when unused ones are shown", async () => {
+  const open = async (c: HTMLElement) => {
+    const fold = c.querySelector<HTMLButtonElement>('[data-testid="sidebar-page-agents"]');
+    expect(fold).not.toBeNull();
+    await act(async () => fold?.click());
+  };
+  await renderSidebar({ customPage: true }, async (c) => {
+    await open(c);
+    expect(c.textContent).not.toContain("New page");
+  });
+  localStorage.setItem("rakazo.showUnusedPageAgents", "1");
+  await renderSidebar({ customPage: true }, async (c) => {
+    await open(c);
+    expect(c.textContent).toContain("New page");
+  });
 });
 
 describe("foldRows", () => {

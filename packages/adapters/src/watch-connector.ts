@@ -271,7 +271,7 @@ export async function probeConnectorWatch(
   const abort = new AbortController();
   const stop = () => abort.abort();
   deps.signal?.addEventListener("abort", stop);
-  const timer = setTimeout(stop, WATCH_CONNECTOR_TIMEOUT_MS);
+  let timer = setTimeout(stop, WATCH_CONNECTOR_TIMEOUT_MS);
   try {
     const resolved = await resolveWatchTool(
       deps.prisma,
@@ -282,6 +282,9 @@ export async function probeConnectorWatch(
       `watch:${scope.routineId}`,
     );
     if (!resolved.ok) return resolved;
+    // Discovery waits on every provider; the tool call gets its own full budget.
+    clearTimeout(timer);
+    timer = setTimeout(stop, WATCH_CONNECTOR_TIMEOUT_MS);
     const declaredReadOnly = resolved.tool.readOnly;
     let refusal: string | null = null;
     const check = async () => {

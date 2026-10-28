@@ -173,8 +173,9 @@ Rakazo uses two Postgres logins:
   superuser, cannot bypass row-level security, cannot create objects, and can only read and write
   the app tables.
 
-`pnpm db:migrate`, which the API's start command runs, applies the migrations and the job queue
-schema as the owner. It then creates the app login named in `DATABASE_URL`, or updates its
+`pnpm db:migrate` (in Compose, the one-shot `migrate` service runs it before the API starts) applies
+the migrations and the job queue schema as the owner. Only that service gets the owner login, so code
+running in the API or worker cannot find one that bypasses row-level security. It then creates the app login named in `DATABASE_URL`, or updates its
 password, and grants it the `rakazo_app` role. When migrations run as a role without
 `CREATEROLE`, as on some managed Postgres, create the login yourself and
 `GRANT rakazo_app TO <login>`.
@@ -850,7 +851,7 @@ GIT_SHA=$(git rev-parse HEAD) docker compose --env-file .env -f infra/compose/do
 ```
 
 `up --wait` does not report success until the new API is healthy and the worker and web containers
-are running. The API's start command runs `pnpm db:migrate` before it serves, so migration
+are running. The API starts only after the `migrate` service finishes, so a migration
 failure keeps health red. A failed CLI recreate does not auto-roll back; recover with the previous
 `RAKAZO_IMAGE_TAG` (or rebuild `local`) and `up -d --wait --pull never`.
 
@@ -1100,6 +1101,8 @@ The optional marketing site in `apps/www` can be hosted separately.
 ## Connect mobile clients
 
 The iOS and Android app can also point at a self-hosted origin at runtime. On the sign-in screen, tap **Use a custom server** and enter the same HTTPS origin as `WEB_ORIGIN` (for example `https://app.example.com`). Store builds still default to `EXPO_PUBLIC_API_URL`; the in-app setting is an override for people running their own API. Changing the server signs the device out of any previous session.
+
+Plain `http://` is accepted only for a private IP, `localhost`, or a `.local` name. A hostname reached over a VPN such as WireGuard or Tailscale needs HTTPS with a certificate the phone trusts, for example a real domain with a Let's Encrypt certificate issued through a DNS challenge.
 
 ## Connect outside AI clients (MCP)
 

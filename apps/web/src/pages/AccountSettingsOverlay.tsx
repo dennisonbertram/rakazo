@@ -1,5 +1,5 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import type { AccountSecurity, AvatarStyle } from "@rakazo/contracts";
+import type { AccountSecurity, AvatarStyle, Bot } from "@rakazo/contracts";
 import {
   BotAvatar,
   Button,
@@ -28,6 +28,7 @@ import { SuccessPop } from "../components/ai/primitives";
 import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint";
 import { DataExportSection } from "../components/DataExport";
 import { DesktopUpdateSection } from "../components/DesktopUpdates";
+import { HiddenBotsList } from "../components/HiddenBotsList";
 import { NotificationSettingsSection } from "../components/NotificationSettings";
 import { PasskeySettings } from "../components/PasskeySettings";
 import { DefaultRunsOnSection } from "../components/RunsOnPicker";
@@ -63,6 +64,8 @@ export type SettingsGeneralProps = {
   name: string;
   avatarStyle: AvatarStyle;
   onAvatarStyleChange: (style: AvatarStyle) => Promise<void>;
+  hiddenBots?: readonly Pick<Bot, "id" | "name" | "color">[];
+  onShowBot?: (botId: string) => void;
   /** The zone agents and new schedules use; the section is hidden without it. */
   timezone?: string;
   onTimezoneChange?: (timezone: string) => Promise<void>;
@@ -78,6 +81,8 @@ export function GeneralSettingsPanels({
   name,
   avatarStyle,
   onAvatarStyleChange,
+  hiddenBots,
+  onShowBot,
   timezone,
   onTimezoneChange,
   messagingEnabled = false,
@@ -306,6 +311,7 @@ export function GeneralSettingsPanels({
               </div>
             </div>
           </details>
+          {hiddenBots && onShowBot ? <HiddenBotsList bots={hiddenBots} onShow={onShowBot} /> : null}
           {isDeploymentOwner ? <DefaultRunsOnSection /> : null}
 
           <section className="rounded-xl border border-border px-4 py-4">

@@ -880,6 +880,23 @@ describe("redactSecrets", () => {
       "[redacted][redacted][redacted][redacted]",
     );
   });
+
+  it("hides each body line of a multi-line value when output splits or rejoins its lines", () => {
+    const key =
+      "-----BEGIN FAKE KEY-----\r\nAAAAfakeKeyLineOne01\nBBBBfakeKeyLineTwo02\nshort\n-----END FAKE KEY-----\n";
+    expect(redactSecrets(`key: ${key}`, [key])).toBe("key: [redacted]");
+    // An unquoted `echo $KEY` joins the lines with spaces.
+    expect(
+      redactSecrets(
+        "-----BEGIN FAKE KEY----- AAAAfakeKeyLineOne01 BBBBfakeKeyLineTwo02 short -----END",
+        [key],
+      ),
+    ).toBe("-----BEGIN FAKE KEY----- [redacted] [redacted] short -----END");
+    expect(redactSecrets("tail: BBBBfakeKeyLineTwo02", [key])).toBe("tail: [redacted]");
+    expect(containsSecret({ out: "AAAAfakeKeyLineOne01" }, [key])).toBe(true);
+    // Short lines and spaced lines like the header also appear in ordinary text.
+    expect(containsSecret({ out: "short -----BEGIN FAKE KEY-----" }, [key])).toBe(false);
+  });
 });
 
 describe("createStreamingRedactor", () => {
@@ -915,6 +932,16 @@ describe("createStreamingRedactor", () => {
     expect(outputs[0]).toBe("[redacted]");
     expect(outputs.slice(1).every((output) => output === "")).toBe(true);
     expect(redactor.push(" done") + redactor.finish()).toBe(" done");
+  });
+
+  it("hides a line of a multi-line value split across chunks", () => {
+    const redactor = createStreamingRedactor(["header\nAAAAfakeKeyLineOne01\n"]);
+    const output = [
+      redactor.push("x AAAAfake"),
+      redactor.push("KeyLineOne01 y"),
+      redactor.finish(),
+    ];
+    expect(output.join("")).toBe("x [redacted] y");
   });
 
   it("does not delay chunks when there are no known secrets", () => {
@@ -975,6 +1002,38 @@ describe("sanitizeUtf16ForJson", () => {
         "meta\uFFFD": "ok",
         "meta\uFFFD#2": "also",
       },
+    });
+  });
+});
+
+describe("stale helper projection", () => {
+  it.each([
+    "run.waiting_input",
+    "computer.takeover.requested",
+    "run.completed",
+    "run.failed",
+    "run.cancelled",
+  ])("settles helpers on %s without reviving them on resume", (type) => {
+    const base = {
+      id: "fixture",
+      threadId: "thread-1",
+      runId: "run-1",
+      seq: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const helper = { agentId: "helper", name: "Helper", task: "Check", status: "running" };
+    const next = projectMessages([
+      { ...base, type: "thread.subagent", payload: helper },
+      { ...base, seq: 2, type, payload: {} },
+      { ...base, seq: 3, type: "run.started", payload: {} },
+      { ...base, seq: 4, type: "thread.subagent", payload: { ...helper, agentId: "resumed" } },
+    ]);
+    expect(next.find((m) => m.id === "subagent:helper")?.blocks[0]).toMatchObject({
+      status: "failed",
+      result: "stopped",
+    });
+    expect(next.find((m) => m.id === "subagent:resumed")?.blocks[0]).toMatchObject({
+      status: "running",
     });
   });
 });
