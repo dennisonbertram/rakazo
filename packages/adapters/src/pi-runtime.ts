@@ -30,7 +30,14 @@ import type {
   ConnectorTool,
   ModelCallObserver,
 } from "@rakazo/adapter-kit";
-import { DEFAULT_CONTEXT_STRATEGY } from "@rakazo/adapter-kit";
+import {
+  DEFAULT_CONTEXT_STRATEGY,
+  isConnectionFailure,
+  isRetryableProviderUnavailable,
+  isTransientModelError,
+  retryAfterMs,
+  TransientModelError,
+} from "@rakazo/adapter-kit";
 import { MISSING_TOOL_FINAL_RESPONSE_ERROR, usableModelId } from "@rakazo/contracts";
 import { abortableDelay, humanizeToolName, toolPhrase } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
@@ -118,7 +125,7 @@ const SILENT_TOOL_CONTINUATION_PROMPT =
 const SILENT_ALLOWED_TOOL_CONTINUATION_PROMPT =
   "Continue the original task from the latest tool result. If you were instructed to stay silent when there is nothing to report, follow that instruction for the entire final assistant reply. Otherwise use any remaining tools needed, then give the user the final answer.";
 
-export { MISSING_TOOL_FINAL_RESPONSE_ERROR };
+export { isRetryableProviderUnavailable, MISSING_TOOL_FINAL_RESPONSE_ERROR };
 
 const DEFAULT_COMPUTER_SCREENSHOTS_TO_KEEP = 2;
 // Reasoning-capable models must not start at "off": for OpenRouter, pi-ai maps
@@ -816,7 +823,10 @@ export class PiAgentRuntime implements AgentRuntime {
           !budgetExceeded && terminalMessage ? providerFailureText(terminalMessage) : undefined;
         const error = agent.state.errorMessage || providerFailure;
         if (error && !budgetExceeded && (!host.pausePending || signal.aborted)) {
-          throw new Error(sanitizeProviderError(activeStreamTarget.model.provider, error));
+          const message = sanitizeProviderError(activeStreamTarget.model.provider, error);
+          throw isTransientModelError(error)
+            ? new TransientModelError(message)
+            : new Error(message);
         }
         if (!budgetExceeded && terminalMessage && !messageHasToolCall(terminalMessage)) {
           const terminalText = assistantText(terminalMessage);
@@ -867,7 +877,11 @@ export class PiAgentRuntime implements AgentRuntime {
         queue.push(streamed.trim() ? { type: "done", text: streamed } : { type: "done" });
       } catch (error) {
         const message = sanitizeError(error instanceof Error ? error.message : String(error));
-        queue.fail(new Error(message));
+        queue.fail(
+          error instanceof TransientModelError
+            ? new TransientModelError(message)
+            : new Error(message),
+        );
       } finally {
         queue.close();
         if (trackedBudget) {
@@ -2570,100 +2584,7 @@ interface FallbackStreamState {
   ): AssistantMessageEventStream;
 }
 
-function errorFacts(value: unknown) {
-  const text: string[] = [];
-  const statuses = new Set<number>();
-  const seen = new Set<object>();
-  const visit = (item: unknown, depth: number) => {
-    if (depth > 4 || item == null) return;
-    if (typeof item === "string") {
-      text.push(item);
-      return;
-    }
-    if (typeof item !== "object" || seen.has(item)) return;
-    seen.add(item);
-    const record = item as Record<string, unknown>;
-    for (const key of ["message", "errorMessage", "name", "code", "type"]) {
-      if (typeof record[key] === "string") text.push(record[key] as string);
-    }
-    for (const key of ["status", "statusCode", "httpStatus"]) {
-      if (typeof record[key] === "number") statuses.add(record[key] as number);
-    }
-    for (const key of ["response", "cause", "details", "diagnostics", "data", "error"]) {
-      visit(record[key], depth + 1);
-    }
-    if (Array.isArray(item)) for (const child of item) visit(child, depth + 1);
-  };
-  visit(value, 0);
-  for (const detail of text) {
-    for (const match of detail.matchAll(
-      /(?:\b(?:http(?:\s+status(?:\s+code)?)?|status(?:\s+code)?|error\s+code)\s*[:=]?\s*|^\s*)([45]\d{2})\b/gi,
-    )) {
-      statuses.add(Number(match[1]));
-    }
-  }
-  return { text: text.join(" ").toLowerCase(), statuses };
-}
-
-const CONNECTION_FAILURE =
-  /connection error|apiconnection|fetch failed|econnreset|econnrefused|etimedout|enotfound|eai_again|socket hang up|network error|connection (?:reset|refused|closed)/;
-
-/** A dropped or refused model connection: no HTTP response came back at all. */
-function isConnectionFailure(error: unknown): boolean {
-  const { text, statuses } = errorFacts(error);
-  return statuses.size === 0 && CONNECTION_FAILURE.test(text);
-}
-
 const MAX_RETRY_AFTER_MS = 60_000;
-
-/** Server-requested wait in ms, from "Retry-After: 3" / "retry after 1500ms" in the error. */
-function retryAfterMs(error: unknown): number | undefined {
-  const match = /retry[- ]after(-ms)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(ms)?/.exec(
-    errorFacts(error).text,
-  );
-  if (!match) return undefined;
-  const value = Number(match[2]);
-  return match[1] || match[3] ? value : value * 1000;
-}
-
-/** Only provider availability failures may advance the user's explicit chain. */
-export function isRetryableProviderUnavailable(error: unknown): boolean {
-  const { text, statuses } = errorFacts(error);
-  if (
-    [400, 401, 403].some((status) => statuses.has(status)) ||
-    /\b(?:http(?:\s+status(?:\s+code)?)?|status(?:\s+code)?|error\s+code)\s*[:=]?\s*(?:400|401|403)\b/.test(
-      text,
-    )
-  ) {
-    return false;
-  }
-  if (
-    /\b(abort(?:ed)?|cancel(?:lation|led|ed)?|unauthori[sz]ed|forbidden|permission(?: is)? (?:denied|refused|declined)|access denied|consent(?: is)? (?:required|denied|refused|declined|not granted)|user (?:refused|declined)|invalid api key|invalid credential|(?:expired|revoked|missing) (?:api )?(?:key|credential|token)|(?:api )?key (?:expired|revoked|missing)|authentication (?:failed|failure|denied|expired|invalid)|authorization (?:failed|failure|denied|expired|invalid)|bad request|invalid request|invalid input|invalid argument|context length|model not found|unsupported parameter)\b/.test(
-      text,
-    )
-  ) {
-    return false;
-  }
-  if (
-    /context[ _-](?:length|window)|too many tokens|maximum context|token limit|request too large|invalid_api_key|authentication_error|permission_error|bad_request|invalid_request/.test(
-      text,
-    )
-  )
-    return false;
-  if (statuses.has(402)) {
-    return /quota|billing|credit|payment limit|insufficient funds/.test(text);
-  }
-  if (
-    [408, 429].some((status) => statuses.has(status)) ||
-    [...statuses].some((status) => status >= 500 && status < 600)
-  )
-    return true;
-  if ([...statuses].some((status) => status >= 400 && status < 600)) return false;
-  if (CONNECTION_FAILURE.test(text)) return true;
-  return /rate.?limit|too many requests|quota|overload|capacity|temporarily unavailable|service unavailable|retry[- ](?:after|delay)|server error|upstream error|gateway timeout|timed? out|timeout|connection reset|connection refused|network error|max retries exceeded|stream ended without finish_reason|\bterminated\b/.test(
-    text,
-  );
-}
 
 function assistantHasPartialOutput(message: AssistantMessage): boolean {
   return message.content.some((part) => {

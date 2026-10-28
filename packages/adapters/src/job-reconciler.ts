@@ -120,6 +120,8 @@ export function createJobReconciler(
     reconcileTeachHeldValues?: () => Promise<unknown>;
     /** Watch probes; the in-process mode has no Graphile cron, so the tick runs here. */
     runWatchProbes?: () => Promise<unknown>;
+    /** Tells the owner about routine retries whose job queue attempts ran out. */
+    reconcileRoutineRetryNotices?: () => Promise<void>;
   },
   options: { intervalMs?: number; batchSize?: number } = {},
 ) {
@@ -147,6 +149,7 @@ export function createJobReconciler(
           deps.reconcileCompanyImports,
           deps.reconcileTeachHeldValues,
           deps.runWatchProbes,
+          deps.reconcileRoutineRetryNotices,
         ].map(async (reconcile) => reconcile?.()),
       );
       for (const result of auxiliary) {
