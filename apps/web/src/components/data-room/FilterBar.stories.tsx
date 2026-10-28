@@ -73,3 +73,11 @@ export const Body343: Story = { render: () => inBody(375) };
 export const Stats343: Story = { render: () => inBody(375, true) };
 export const Stats1440: Story = { render: () => inBody(1100, true) };
 export const List1440: Story = { render: () => inBody(1100) };
+/** The failed filter is applied: on a phone it is named in the main row and one tap clears it. */
+export const FailedFilter375: Story = {
+  render: () => (
+    <div className="@container/bd" style={{ width: 375 }}>
+      <Bar initial={{ status: "failed" }} />
+    </div>
+  ),
+};

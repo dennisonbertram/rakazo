@@ -131,7 +131,10 @@ export function FinanceSpendPage({
               ) : null}
             </div>
           </Section>
-          <div className="flex flex-wrap gap-1">
+          {/* On a phone the Filters sheet picks the category; the chips only show once one is set, in one scrolling row. */}
+          <div
+            className={`${category ? "flex" : "hidden sm:flex"} gap-1 overflow-x-auto sm:flex-wrap`}
+          >
             <Chip to={financePath.spend(period, null, range, source)} on={!category}>
               <Trans>All</Trans>
             </Chip>

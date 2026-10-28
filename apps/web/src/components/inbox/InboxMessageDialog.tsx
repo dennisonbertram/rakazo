@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   Ellipsis,
+  Eye,
   Forward,
   Inbox,
   Mail,
@@ -85,6 +86,8 @@ export function InboxMessageDialog({
   onMoveToInbox,
   onRead,
   onReplyDone,
+  tracked,
+  onTrack,
   replyDoneText,
   onAskAgent,
   onAskAgentPanel,
@@ -113,6 +116,9 @@ export function InboxMessageDialog({
   onRead?: (read: boolean) => void;
   /** Adds Mark reply done, for a reply to-do the list page hides because this mail is under Needs reply. */
   onReplyDone?: () => void;
+  /** With `onTrack`, adds Track or Stop tracking to More and shows a Tracked mark while it is on. */
+  tracked?: boolean;
+  onTrack?: (track: boolean) => void;
   /** The to-do `onReplyDone` completes; the menu item names it. */
   replyDoneText?: string;
   /** Adds Ask agent: opens the chat made for this conversation. A rejection shows in the dialog. */
@@ -136,7 +142,7 @@ export function InboxMessageDialog({
   const [agentBot, setAgentBot] = useState<AgentBot | null>(null);
   useEffect(() => setAgentBot(null), [messageId]);
   // The side panel beside the email: Context by default, open or closed as the user left it.
-  const [panelOpen, setPanelOpen] = useContextPanelOpen();
+  const [panelOpen, setPanelOpen] = useContextPanelOpen(messageId);
   const [tab, setTab] = useState<EmailPanelTab>("context");
   useEffect(() => setTab("context"), [messageId]);
   return (
@@ -175,6 +181,8 @@ export function InboxMessageDialog({
             onMoveToInbox={onMoveToInbox}
             onRead={onRead}
             onReplyDone={onReplyDone}
+            tracked={tracked}
+            onTrack={onTrack}
             replyDoneText={replyDoneText}
             onAskAgent={onAskAgent}
             onAskAgentPanel={onAskAgentPanel}
@@ -210,6 +218,8 @@ function InboxMessage({
   onMoveToInbox,
   onRead,
   onReplyDone,
+  tracked,
+  onTrack,
   replyDoneText,
   onAskAgent,
   onAskAgentPanel,
@@ -236,6 +246,8 @@ function InboxMessage({
   onMoveToInbox?: () => void;
   onRead?: (read: boolean) => void;
   onReplyDone?: () => void;
+  tracked?: boolean;
+  onTrack?: (track: boolean) => void;
   replyDoneText?: string;
   onAskAgent?: () => Promise<unknown>;
   onAskAgentPanel?: () => Promise<AgentBot>;
@@ -457,6 +469,12 @@ function InboxMessage({
               </span>
               <span className="flex shrink-0 items-baseline gap-2">
                 {message.fromSelf ? <SentMark /> : null}
+                {tracked ? (
+                  <span className="inline-flex items-center gap-1 text-xs">
+                    <Eye aria-hidden="true" className="size-3" />
+                    <Trans>Tracked</Trans>
+                  </span>
+                ) : null}
                 <time
                   dateTime={sent && !Number.isNaN(sent.getTime()) ? sent.toISOString() : undefined}
                   className="text-xs tabular-nums"
@@ -505,7 +523,7 @@ function InboxMessage({
         )}
         {/* The actions need only the id, so they show while the body loads. */}
         {message || !gone ? (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 max-md:flex-nowrap">
             <Button size="sm" onClick={() => setComposing("reply")}>
               <Reply aria-hidden="true" />
               <Trans>Reply</Trans>
@@ -526,6 +544,7 @@ function InboxMessage({
               <Button
                 variant="outline"
                 size="sm"
+                className="max-md:hidden"
                 disabled={asking}
                 aria-pressed={onAskAgentPanel ? Boolean(agentBot) && panelOpen : undefined}
                 onClick={askAgent}
@@ -536,7 +555,8 @@ function InboxMessage({
             ) : null}
             <Button
               variant="outline"
-              size="icon-sm"
+              size="sm"
+              className="md:w-7 md:px-0 pointer-coarse:md:w-11"
               aria-label={t`Context`}
               aria-pressed={panelOpen && tab === "context"}
               onClick={() => {
@@ -546,6 +566,9 @@ function InboxMessage({
               }}
             >
               <UserRound aria-hidden="true" />
+              <span className="md:hidden">
+                <Trans>Context</Trans>
+              </span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -554,6 +577,18 @@ function InboxMessage({
                 <Ellipsis aria-hidden="true" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
+                {onAskAgent || onAskAgentPanel ? (
+                  <DropdownMenuItem className="md:hidden" disabled={asking} onClick={askAgent}>
+                    <Bot aria-hidden="true" />
+                    <Trans>Ask agent</Trans>
+                  </DropdownMenuItem>
+                ) : null}
+                {onTrack ? (
+                  <DropdownMenuItem className="whitespace-nowrap" onClick={() => onTrack(!tracked)}>
+                    <Eye aria-hidden="true" />
+                    {tracked ? <Trans>Stop tracking</Trans> : <Trans>Track</Trans>}
+                  </DropdownMenuItem>
+                ) : null}
                 {canReplyAll ? (
                   <DropdownMenuItem onClick={() => setComposing("replyAll")}>
                     <ReplyAll aria-hidden="true" />
@@ -695,7 +730,7 @@ function InboxMessage({
         </div>
       </div>
       {panelOpen ? (
-        <div className="absolute inset-y-0 end-0 z-10 w-full max-w-[384px] shadow-xl min-[1280px]:relative min-[1280px]:-my-4 min-[1280px]:-me-4 min-[1280px]:w-96 min-[1280px]:max-w-none min-[1280px]:shrink-0 min-[1280px]:shadow-none">
+        <div className="absolute inset-y-0 end-0 z-10 w-full max-w-[384px] shadow-xl max-md:inset-x-0 max-md:inset-y-auto max-md:bottom-0 max-md:h-3/5 max-md:max-w-none max-md:overflow-hidden max-md:rounded-t-xl max-md:border-t min-[1280px]:relative min-[1280px]:-my-4 min-[1280px]:-me-4 min-[1280px]:w-96 min-[1280px]:max-w-none min-[1280px]:shrink-0 min-[1280px]:shadow-none">
           <EmailSidePanel
             people={people}
             tab={tab}

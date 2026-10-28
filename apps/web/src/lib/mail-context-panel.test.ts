@@ -31,3 +31,13 @@ it("still answers when storage is blocked", () => {
   expect(readContextPanelOpen("u1")).toBe(true);
   expect(() => writeContextPanelOpen("u1", false)).not.toThrow();
 });
+
+it("never restores or saves an open panel on a phone", () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  writeContextPanelOpen("u1", true);
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  expect(readContextPanelOpen("u1")).toBe(false);
+  writeContextPanelOpen("u1", false);
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  expect(readContextPanelOpen("u1")).toBe(true);
+});

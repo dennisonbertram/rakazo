@@ -10,7 +10,7 @@ export function FailedChip({ count, onClick }: { count: number; onClick: () => v
       variant="outline"
       size="sm"
       data-testid="failed-chip"
-      className="h-7 rounded-full text-destructive"
+      className="h-8 rounded-full text-destructive"
       onClick={onClick}
     >
       {plural(count, { one: "# failed", other: "# failed" })}

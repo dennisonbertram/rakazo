@@ -376,8 +376,8 @@ it("Ask agent opens the email's agent in a panel, which closes again and can sta
       [...document.querySelectorAll("button")].find((b) => b.textContent === name)?.click(),
     );
   expect(document.querySelector('[data-testid="agent-panel"]')).toBeNull();
-  // Beside Reply in the toolbar, not behind More.
-  expect(await menuItem("Ask agent")).toBeUndefined();
+  // Beside Reply in the toolbar; behind More only on a phone, where the toolbar has no room.
+  expect((await menuItem("Ask agent"))?.className).toContain("md:hidden");
   await clickAsk();
   expect(onAskAgentPanel).toHaveBeenCalledTimes(1);
   expect(document.querySelector('[data-testid="agent-panel"]')?.textContent).toContain(
@@ -908,4 +908,29 @@ it("shows Reply and Archive while the body loads, and a retry line after 5 secon
     [...document.querySelectorAll("button")].find((b) => b.textContent === "Try again")?.click();
   });
   expect(get).toHaveBeenCalledTimes(2);
+});
+
+it("offers Track in More and shows a Tracked mark while it is on", async () => {
+  get.mockImplementation(async ({ messageId }) => message(messageId));
+  const onTrack = vi.fn();
+  const render = (tracked: boolean) =>
+    act(() =>
+      root.render(
+        <InboxMessageDialog
+          messageId="m2"
+          tracked={tracked}
+          onTrack={onTrack}
+          onClose={() => {}}
+        />,
+      ),
+    );
+  await render(false);
+  await flush();
+  expect(document.body.textContent).not.toContain("Tracked");
+  await act(async () => (await menuItem("Track"))?.click());
+  expect(onTrack).toHaveBeenLastCalledWith(true);
+  await render(true);
+  expect(document.body.textContent).toContain("Tracked");
+  await act(async () => (await menuItem("Stop tracking"))?.click());
+  expect(onTrack).toHaveBeenLastCalledWith(false);
 });

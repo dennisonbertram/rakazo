@@ -31,7 +31,7 @@ const meta = {
   component: ApprovalActionsTable,
   decorators: [
     (Story) => (
-      <div className="w-[480px]">
+      <div className="w-[480px] max-w-full px-5 sm:px-0">
         <Story />
       </div>
     ),

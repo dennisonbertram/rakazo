@@ -71,7 +71,15 @@ const items: CalendarItem[] = [
     href: "https://calendar.example.test/e2",
   }),
   item({
-    id: "r1",
+    id: "inbox-todo:i1",
+    kind: "todo",
+    title: "Sign the lease form",
+    start: allDayAt(0),
+    allDay: true,
+    mailId: "mail_1",
+  }),
+  item({
+    id: "routine:r1",
     kind: "routine",
     title: "Weekly metrics digest",
     start: at(3, 14),
@@ -111,7 +119,8 @@ const split = (data: CalendarAgenda) => (input: { sources?: "local" | "google" }
     items: data.items.filter((entry) => (input.sources === "local") === (entry.kind !== "event")),
     errors: input.sources === "local" ? [] : data.errors,
   });
-const withAgenda = (data: CalendarAgenda) => () => mockRpc({ "calendar.agenda": split(data) });
+const withAgenda = (data: CalendarAgenda) => () =>
+  mockRpc({ "calendar.agenda": split(data), "scratchpad.waitingOnYou": [] });
 const view = (name: string) => ({ initialEntries: [`/app/calendar?view=${name}`] });
 
 export const Week: Story = { beforeEach: withAgenda(agenda()) };
@@ -202,4 +211,31 @@ export const LoadError: Story = {
         throw new Error("Could not load the calendar");
       },
     }),
+};
+
+const phone = {
+  globals: { viewport: { value: "mobile1" } },
+};
+
+/** Under 640px wide the page opens on Schedule, with one toolbar row and the filters in a sheet. */
+export const PhoneSchedule: Story = { ...phone, beforeEach: withAgenda(agenda()) };
+
+/** Week becomes three days, so no day is off screen and the hour column stays in view. */
+export const PhoneThreeDays: Story = {
+  ...phone,
+  parameters: view("week"),
+  beforeEach: withAgenda(agenda()),
+};
+
+/** Days show dots; tapping one lists its items below the month. */
+export const PhoneMonth: Story = {
+  ...phone,
+  parameters: view("month"),
+  beforeEach: withAgenda(agenda()),
+};
+
+export const PhoneEmptyDay: Story = {
+  ...phone,
+  parameters: view("day"),
+  beforeEach: withAgenda(agenda({ items: [] })),
 };

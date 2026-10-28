@@ -138,6 +138,21 @@ export const WithAskAgent: Story = {
   beforeEach: () => mockRpc({ "inbox.get": message }),
 };
 
+/** Phone toolbar: one line (Ask agent moves into More), a labelled Context button, and Track in More with a Tracked mark. */
+export const TrackedWithPhoneToolbar: Story = {
+  args: {
+    messageId: "msg_tracked",
+    unread: false,
+    tracked: true,
+    onTrack: () => undefined,
+    onNavigate: () => undefined,
+    onArchive: () => undefined,
+    onRead: () => undefined,
+    onAskAgent: async () => undefined,
+  },
+  beforeEach: () => mockRpc({ "inbox.get": message }),
+};
+
 /** The agent opens beside the email (from 1280px) or over its right side, and the email text starts where it did. */
 export const AskAgentPanelOpen: Story = {
   args: {

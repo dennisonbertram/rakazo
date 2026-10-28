@@ -73,13 +73,13 @@ export function ApprovalActionsTable({ botId }: { botId?: string }) {
 
   const renderRow = (row: ApprovalTableRow) => (
     <TableRow key={row.actionType}>
-      <TableCell className="py-1.5 pl-0 text-[14px] text-foreground/75">
+      <TableCell className="whitespace-normal py-1.5 pl-0 text-[14px] text-foreground/75">
         {labels[row.actionType]}
       </TableCell>
       <TableCell className="py-1.5 pr-0 text-right">
         <NativeSelect
           size="sm"
-          className="ml-auto"
+          className="ml-auto pointer-coarse:min-w-44"
           aria-label={labels[row.actionType]}
           data-testid={`approval-row-${row.actionType}`}
           disabled={saving !== null}

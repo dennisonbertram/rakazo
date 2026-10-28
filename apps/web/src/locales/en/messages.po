@@ -559,6 +559,10 @@ msgstr "{imported, plural, one {Imported # file} other {Imported # files}}"
 msgid "{inboxUnread, plural, one {# unread} other {# unread}}"
 msgstr "{inboxUnread, plural, one {# unread} other {# unread}}"
 
+#: src/components/cap-table/HoldingsTable.tsx
+msgid "{invested} invested"
+msgstr "{invested} invested"
+
 #: src/components/sidebar-folders/SidebarDnd.tsx
 msgid "{item} dropped on {target}."
 msgstr "{item} dropped on {target}."
@@ -622,6 +626,10 @@ msgstr "{overdue} overdue"
 #: src/pages/finance/FinanceAccounts.tsx
 msgid "{pct} yield"
 msgstr "{pct} yield"
+
+#: src/pages/shell/transcript.tsx
+msgid "{peer} replied"
+msgstr "{peer} replied"
 
 #: src/pages/Inbox.tsx
 msgid "{pickedCount} selected"
@@ -795,6 +803,11 @@ msgstr "1 SAFE could not be read"
 #: src/pages/Fundraising.tsx
 msgid "1 SAFE found in Legal"
 msgstr "1 SAFE found in Legal"
+
+#: src/components/EmailCards.tsx
+#: src/pages/Calendar.tsx
+msgid "3 days"
+msgstr "3 days"
 
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceBurn.tsx
@@ -1161,6 +1174,11 @@ msgstr "Add wallet"
 msgid "Added"
 msgstr "Added"
 
+#. placeholder {0}: saved.name
+#: src/pages/Contacts.tsx
+msgid "Added {0}"
+msgstr "Added {0}"
+
 #: src/pages/ContactDetail.tsx
 msgid "Added by"
 msgstr "Added by"
@@ -1212,6 +1230,7 @@ msgstr "Advisor"
 msgid "Agenda"
 msgstr "Agenda"
 
+#: src/components/inbox/EmailSidePanel.tsx
 #: src/components/integrations/IntegrationAgentSection.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Agent"
@@ -1744,6 +1763,10 @@ msgstr "Ask the server owner to set up the app catalog."
 #: src/pages/shell/working-label.ts
 msgid "Asking {agentName}"
 msgstr "Asking {agentName}"
+
+#: src/pages/shell/transcript.tsx
+msgid "Asking {peer}…"
+msgstr "Asking {peer}…"
 
 #: src/pages/shell/working-label.ts
 msgid "Asking another agent"
@@ -2706,6 +2729,7 @@ msgstr "Clear {rangeLabel}"
 msgid "Clear {sourceName} filter"
 msgstr "Clear {sourceName} filter"
 
+#: src/components/ListControls.tsx
 #: src/pages/DataRoom.tsx
 msgid "Clear all"
 msgstr "Clear all"
@@ -2771,6 +2795,7 @@ msgstr "Client secret (optional)"
 #: src/components/ComposeEmail.tsx
 #: src/components/ErrorBoundary.tsx
 #: src/components/fundraising/SafeDialog.tsx
+#: src/components/inbox/EmailSidePanel.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/integrations/SignInStep.tsx
@@ -3362,6 +3387,12 @@ msgstr "Contacts"
 #: src/components/ContactDialog.tsx
 msgid "Contacts are your address book. They do not change Carta."
 msgstr "Contacts are your address book. They do not change Carta."
+
+#: src/components/ComposeEmail.tsx
+#: src/components/inbox/EmailSidePanel.tsx
+#: src/components/inbox/InboxMessageDialog.tsx
+msgid "Context"
+msgstr "Context"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Context limit"
@@ -4169,6 +4200,7 @@ msgstr "Could not undo Send SAFE"
 msgid "Could not unshare"
 msgstr "Could not unshare"
 
+#: src/components/BotTodos.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Could not update"
 msgstr "Could not update"
@@ -4512,6 +4544,10 @@ msgstr "Date"
 msgid "Date window"
 msgstr "Date window"
 
+#: src/pages/ActivityList.tsx
+msgid "Dates"
+msgstr "Dates"
+
 #: src/lib/billing.ts
 #: src/pages/RoutineSchedule.tsx
 msgid "day"
@@ -4542,6 +4578,7 @@ msgid "Decline"
 msgstr "Decline"
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/pages/Contacts.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Default"
@@ -4915,6 +4952,7 @@ msgstr "Document date"
 #: src/components/AiDataSharing.tsx
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/FolderDocuments.tsx
+#: src/components/inbox/ContextPanel.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
@@ -4940,6 +4978,7 @@ msgstr "Don't share"
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/sidebar-glance.tsx
 #: src/components/tour/TourPopover.tsx
@@ -5593,6 +5632,8 @@ msgid "Filter memory"
 msgstr "Filter memory"
 
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
+#: src/pages/Calendar.tsx
 msgid "Filters"
 msgstr "Filters"
 
@@ -5742,6 +5783,7 @@ msgstr "Free"
 #: src/components/ComposeEmail.tsx
 #: src/components/data-room/FilterBar.tsx
 #: src/components/gtm/EmailItemCard.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/CompanyImportScope.tsx
@@ -6067,6 +6109,10 @@ msgstr "Hidden folders"
 #: src/components/inbox/MailAttachments.tsx
 msgid "Hidden while amounts are hidden"
 msgstr "Hidden while amounts are hidden"
+
+#: src/components/investors/ActionItems.tsx
+msgid "Hide action items"
+msgstr "Hide action items"
 
 #: src/components/HideAmountsToggle.tsx
 msgid "Hide amounts"
@@ -6629,6 +6675,14 @@ msgstr "Last charge"
 msgid "Last completed"
 msgstr "Last completed"
 
+#: src/components/inbox/ContextPanel.tsx
+msgid "Last emailed"
+msgstr "Last emailed"
+
+#: src/components/inbox/ContextPanel.tsx
+msgid "Last meeting"
+msgstr "Last meeting"
+
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Last month vs 3 mo ago"
 msgstr "Last month vs 3 mo ago"
@@ -6839,6 +6893,7 @@ msgstr "Load older runs"
 msgid "Load web images automatically"
 msgstr "Load web images automatically"
 
+#: src/components/inbox/ContextPanel.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/pages/Calendar.tsx
@@ -7796,6 +7851,10 @@ msgstr "Next dates"
 msgid "Next deadline"
 msgstr "Next deadline"
 
+#: src/components/inbox/ContextPanel.tsx
+msgid "Next meeting"
+msgstr "Next meeting"
+
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 msgid "Next message"
@@ -7903,6 +7962,10 @@ msgstr "No company facts yet"
 #: src/pages/Investors.tsx
 msgid "No contacts yet"
 msgstr "No contacts yet"
+
+#: src/components/inbox/ContextPanel.tsx
+msgid "No context yet"
+msgstr "No context yet"
 
 #. placeholder {0}: fullDay(data.agent.lastScanAt)
 #: src/pages/Legal.tsx
@@ -8065,6 +8128,14 @@ msgstr "No newsletters in the last 7 days"
 msgid "No open deadlines."
 msgstr "No open deadlines."
 
+#: src/pages/Company.tsx
+msgid "No organisations yet"
+msgstr "No organisations yet"
+
+#: src/pages/Company.tsx
+msgid "No people yet"
+msgstr "No people yet"
+
 #: src/components/fundraising/Pipeline.tsx
 msgid "No prospects yet"
 msgstr "No prospects yet"
@@ -8119,10 +8190,6 @@ msgstr "No runs match these filters."
 #: src/pages/RoutineRunHistory.tsx
 msgid "No runs yet"
 msgstr "No runs yet"
-
-#: src/components/EmailCards.tsx
-msgid "No rush"
-msgstr "No rush"
 
 #: src/pages/Fundraising.tsx
 msgid "No SAFEs yet"
@@ -8540,6 +8607,7 @@ msgid "Open document"
 msgstr "Open document"
 
 #: src/components/inbox/EmailAgentPanel.tsx
+#: src/components/inbox/EmailSidePanel.tsx
 msgid "Open email agent full screen"
 msgstr "Open email agent full screen"
 
@@ -9018,10 +9086,6 @@ msgstr "Pick a model from the list or enter a model id served by this endpoint."
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Pick a provider below and connect it."
 msgstr "Pick a provider below and connect it."
-
-#: src/pages/RoutineEditor.tsx
-msgid "Pick when this runs, for example every Monday morning."
-msgstr "Pick when this runs, for example every Monday morning."
 
 #: src/components/sidebar-folders/SidebarDnd.tsx
 msgid "Picked up {item}."
@@ -10601,6 +10665,7 @@ msgstr "Scheduling"
 msgid "Scroll sideways to see the whole graph."
 msgstr "Scroll sideways to see the whole graph."
 
+#: src/components/data-room/FilterBar.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
@@ -11095,6 +11160,10 @@ msgstr "Sheets"
 #: src/components/computer/TerminalApp.tsx
 msgid "Shell"
 msgstr "Shell"
+
+#: src/components/investors/ActionItems.tsx
+msgid "Show {count} action items"
+msgstr "Show {count} action items"
 
 #: src/pages/Inbox.tsx
 msgid "Show {hiddenReplies} more"
@@ -11709,6 +11778,7 @@ msgstr "Stop speaking"
 msgid "Stop teaching"
 msgstr "Stop teaching"
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Stop tracking"
 msgstr "Stop tracking"
@@ -11783,6 +11853,10 @@ msgstr "Suggests categories for uncategorized transactions."
 #: src/components/PageAgentIntro.tsx
 msgid "Summarize what's new this week"
 msgstr "Summarize what's new this week"
+
+#: src/components/inbox/ContextPanel.tsx
+msgid "Summarizing"
+msgstr "Summarizing"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Supports images"
@@ -12316,6 +12390,10 @@ msgstr "This zip is password-protected"
 msgid "This zip is too large to unpack"
 msgstr "This zip is too large to unpack"
 
+#: src/components/inbox/ContextPanel.tsx
+msgid "Threads"
+msgstr "Threads"
+
 #: src/components/integrations/IMessageSection.tsx
 msgid "Through BlueBubbles on your Mac"
 msgstr "Through BlueBubbles on your Mac"
@@ -12348,6 +12426,7 @@ msgstr "to"
 
 #: src/components/ComposeEmail.tsx
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/investors/UpdateEditor.tsx
@@ -12364,6 +12443,7 @@ msgstr "To do"
 msgid "To pick up, press space. Use the arrow keys to move, space to drop, escape to cancel."
 msgstr "To pick up, press space. Use the arrow keys to move, space to drop, escape to cancel."
 
+#: src/components/inbox/ContextPanel.tsx
 #: src/pages/Calendar.tsx
 msgid "To-dos"
 msgstr "To-dos"
@@ -12424,10 +12504,6 @@ msgstr "Too large to search inside"
 msgid "Tool"
 msgstr "Tool"
 
-#: src/components/AskCard.tsx
-msgid "Tool name"
-msgstr "Tool name"
-
 #: src/lib/run-phase.ts
 msgid "tools"
 msgstr "tools"
@@ -12472,9 +12548,15 @@ msgstr "Total incl. crypto"
 msgid "Tour"
 msgstr "Tour"
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Track"
 msgstr "Track"
+
+#: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/inbox/InboxRow.tsx
+msgid "Tracked"
+msgstr "Tracked"
 
 #. placeholder {0}: maskCurrencyWhenHidden(status.subject)
 #: src/pages/Inbox.tsx
@@ -12702,6 +12784,7 @@ msgstr "Unmute"
 msgid "Unpin"
 msgstr "Unpin"
 
+#: src/components/EmailCards.tsx
 #: src/pages/Inbox.tsx
 msgid "Unread"
 msgstr "Unread"
@@ -13184,6 +13267,7 @@ msgstr "Waiting on {delegate}"
 msgid "Waiting on {waitingOn}"
 msgstr "Waiting on {waitingOn}"
 
+#: src/components/BotTodos.tsx
 #: src/pages/ActivityList.tsx
 msgid "Waiting on you"
 msgstr "Waiting on you"
@@ -13409,10 +13493,6 @@ msgstr "With {shareCount} investors"
 #: src/components/data-room/Preview.tsx
 msgid "With 1 investor"
 msgstr "With 1 investor"
-
-#: src/components/EmailCards.tsx
-msgid "Within 3 days"
-msgstr "Within 3 days"
 
 #: src/components/AskCard.tsx
 msgid "Won't ask again for this kind of action."

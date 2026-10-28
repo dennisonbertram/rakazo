@@ -134,6 +134,12 @@ export const ContactsTab: Story = {
     mockRpc({ "contacts.list": contacts, "mcp.servers.list": [cartaServer], ...noUpdates }),
 };
 
+/** On a phone a row tap opens the contact page, and the email stays visible. */
+export const ContactsTabPhone: Story = {
+  ...ContactsTab,
+  globals: { viewport: { value: "mobile1" } },
+};
+
 /** Investors with pipeline stages: the Stage filter and Sort control appear, sorted by stage. */
 export const ContactsSortedByStage: Story = {
   parameters: { initialEntries: ["/app/investors?tab=contacts&sort=stage&dir=desc"] },

@@ -18,7 +18,14 @@ import {
 import { ChevronDown, Folder, FolderPlus, ListFilter, WandSparkles, X } from "lucide-react";
 import type { FormEvent, ReactElement, ReactNode } from "react";
 import { useState } from "react";
-import { PickFilter, SearchField, SortControl, Tip } from "../ListControls";
+import {
+  PhoneDateRange,
+  PickFilter,
+  SearchField,
+  SortControl,
+  Tip,
+  usePhone,
+} from "../ListControls";
 import { PAGE_GUTTER_X } from "../PageHeader";
 import type { FolderNode } from "./folders";
 import { typeLabel } from "./format";
@@ -284,6 +291,8 @@ export function FilterBar({
   const openFolder = folders.find(({ folder }) => folder.id === folderId);
   // On a phone the pills sit behind one "Filters" button on the search row, with the count set.
   const [pillsOpen, setPillsOpen] = useState(false);
+  const phone = usePhone();
+  const label = t`Status`;
   const activeFilters = [
     filters.docType,
     filters.party,
@@ -294,6 +303,7 @@ export function FilterBar({
   ].filter(Boolean).length;
   const sortControl = (
     <SortControl
+      inline={!phone}
       fields={fields.map((name) => [name, labels[name]])}
       field={field}
       fieldLabel={labels[field]}
@@ -311,33 +321,49 @@ export function FilterBar({
       {/* Stats count by the filters only, so there is no search box; the Filters button and pills then start at the left edge. */}
       {statsView ? null : (
         <SearchField
-          className="order-1 min-w-0 flex-1 basis-48 pointer-coarse:h-11 @min-[800px]/bd:me-1.5 @min-[800px]/bd:w-80 @min-[800px]/bd:flex-none"
+          className="order-1 max-sm:order-none min-w-0 flex-1 basis-48 max-sm:flex-[1_1_11rem] pointer-coarse:h-11 @min-[800px]/bd:me-1.5 @min-[800px]/bd:w-80 @min-[800px]/bd:flex-none"
           value={query}
           onChange={onQuery}
-          placeholder={t`Search names and text`}
+          placeholder={phone ? t`Search` : t`Search names and text`}
           label={t`Search documents`}
           name="data-room-search"
         />
       )}
-      <Button
-        variant="outline"
-        size="sm"
-        className="order-1 h-8 rounded-full @min-[640px]/bd:hidden"
-        aria-expanded={pillsOpen}
-        aria-controls="data-room-filters"
-        onClick={() => setPillsOpen(!pillsOpen)}
-      >
-        <ListFilter aria-hidden="true" />
-        <Trans>Filters</Trans>
-        {activeFilters > 0 ? <span className="tabular-nums">{activeFilters}</span> : null}
-      </Button>
+      {/* A phone has the shared Filters sheet instead (below); a narrow page wider than that unfolds the pills. */}
+      {phone ? null : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="order-1 h-8 rounded-full @min-[640px]/bd:hidden"
+          aria-expanded={pillsOpen}
+          aria-controls="data-room-filters"
+          onClick={() => setPillsOpen(!pillsOpen)}
+        >
+          <ListFilter aria-hidden="true" />
+          <Trans>Filters</Trans>
+          {activeFilters > 0 ? <span className="tabular-nums">{activeFilters}</span> : null}
+        </Button>
+      )}
+      {/* The failed filter stays named in the main row, so one tap clears it; wider, its pill shows below. */}
+      {filters.status && !phone ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="order-1 h-8 rounded-full @min-[640px]/bd:hidden"
+          aria-label={t`Remove filter ${label}`}
+          onClick={() => onFilters({ ...filters, status: undefined })}
+        >
+          {label}: <Trans>Failed</Trans>
+          <X aria-hidden="true" />
+        </Button>
+      ) : null}
       {leading ? (
-        <div className="order-1 flex h-8 shrink-0 items-center empty:hidden @min-[960px]/bd:order-3">
+        <div className="order-1 flex min-h-8 shrink-0 items-center empty:hidden @min-[960px]/bd:order-3">
           {leading}
         </div>
       ) : null}
       {/* Where the folder tree is hidden, this picks the folder; it sits with Sort, not the pills. */}
-      <div className="order-2 flex h-8 min-w-0 items-center gap-1 @min-[800px]/bd:hidden">
+      <div className="order-2 flex min-h-8 min-w-0 items-center gap-1 @min-[800px]/bd:hidden">
         <DropdownMenu>
           <DropdownMenuTrigger
             data-testid="data-room-folder-picker"
@@ -390,7 +416,7 @@ export function FilterBar({
       <div
         id="data-room-filters"
         data-testid="data-room-filters"
-        className={`order-4 flex basis-full flex-wrap ${pillsOpen ? "" : "@max-[639px]/bd:hidden"} items-center gap-1.5 *:h-8 *:shrink-0 empty:hidden @min-[960px]/bd:order-3 @min-[960px]/bd:min-w-0 @min-[960px]/bd:basis-0 @min-[960px]/bd:flex-1`}
+        className={`${phone ? "contents" : `order-4 flex basis-full flex-wrap ${pillsOpen ? "" : "@max-[639px]/bd:hidden"}`} items-center gap-1.5 *:min-h-8 *:shrink-0 empty:hidden @min-[960px]/bd:order-3 @min-[960px]/bd:min-w-0 @min-[960px]/bd:basis-0 @min-[960px]/bd:flex-1`}
       >
         <PickFilter
           label={t`Type`}
@@ -406,17 +432,32 @@ export function FilterBar({
           empty={t`No documents here name a party`}
           onChange={(party) => onFilters({ ...filters, party })}
         />
-        <DateFilter
-          filters={filters}
-          hasDates={hasDates}
-          onChange={(from, to) =>
-            onFilters({
-              ...filters,
-              docDateFrom: from && `${from}T00:00:00.000Z`,
-              docDateTo: to && `${to}T23:59:59.999Z`,
-            })
-          }
-        />
+        {phone ? (
+          <PhoneDateRange
+            label={t`Document date`}
+            from={filters.docDateFrom?.slice(0, 10)}
+            to={filters.docDateTo?.slice(0, 10)}
+            onChange={(from, to) =>
+              onFilters({
+                ...filters,
+                docDateFrom: from && `${from}T00:00:00.000Z`,
+                docDateTo: to && `${to}T23:59:59.999Z`,
+              })
+            }
+          />
+        ) : (
+          <DateFilter
+            filters={filters}
+            hasDates={hasDates}
+            onChange={(from, to) =>
+              onFilters({
+                ...filters,
+                docDateFrom: from && `${from}T00:00:00.000Z`,
+                docDateTo: to && `${to}T23:59:59.999Z`,
+              })
+            }
+          />
+        )}
         {filters.status ? (
           <PickFilter
             label={t`Status`}
@@ -445,7 +486,8 @@ export function FilterBar({
           />
         ) : null}
         {/* On a phone Sort ends the filter row; alone it took a row of its own above the chips. */}
-        {pillsOpen && !statsView ? (
+        {phone && !statsView ? sortControl : null}
+        {pillsOpen && !phone && !statsView ? (
           <div className="ms-auto flex items-center gap-0.5 @min-[640px]/bd:hidden">
             {sortControl}
           </div>
@@ -453,12 +495,12 @@ export function FilterBar({
       </div>
       {/* On a phone the view toggles stay on the folder row in every view, not behind Filters. */}
       {trailing ? (
-        <div className="order-3 ms-auto flex h-8 items-center @min-[640px]/bd:hidden">
+        <div className="order-3 ms-auto flex min-h-8 items-center @min-[640px]/bd:hidden">
           {trailing}
         </div>
       ) : null}
-      {statsView ? null : (
-        <div className="order-3 ms-auto flex h-8 shrink-0 items-center gap-0.5 @max-[639px]/bd:hidden @min-[960px]/bd:order-4">
+      {statsView || phone ? null : (
+        <div className="order-3 ms-auto flex min-h-8 shrink-0 items-center gap-0.5 @max-[639px]/bd:hidden @min-[960px]/bd:order-4">
           {sortControl}
         </div>
       )}

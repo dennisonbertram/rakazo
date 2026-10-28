@@ -229,3 +229,15 @@ export const FourApprovals: Story = {
     ),
   ],
 };
+
+/** In the phone drawer the whole column scrolls, so Working and the finished-runs button stay reachable. */
+export const PhoneDrawer: Story = {
+  beforeEach: () => mockRpc({ "runs.list": byFilter }),
+  decorators: [
+    (Story) => (
+      <div className="flex w-full flex-col">
+        <Story />
+      </div>
+    ),
+  ],
+};

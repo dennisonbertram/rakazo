@@ -57,3 +57,10 @@ it("renders an older block without a tool id as before", () => {
   expect(container.querySelector("button[aria-expanded]")).toBeNull();
   expect(container.textContent).toContain("tool: shell");
 });
+
+it("names the disclosure with the readable tool name, not a generic label", () => {
+  const container = mount(block);
+  const toggle = container.querySelector("button[aria-expanded]") as HTMLElement;
+  expect(toggle.getAttribute("aria-label")).toBeNull();
+  expect(toggle.textContent).toBe("discover");
+});

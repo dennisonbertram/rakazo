@@ -173,7 +173,7 @@ export function CardHead({
   to?: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 pe-6">
+    <div className="flex min-w-0 items-center gap-3 pe-6 max-sm:min-w-36 max-sm:flex-1">
       <AppLogo name={name} logo={logo} />
       <div className="min-w-0">
         {to ? (

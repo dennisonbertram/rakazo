@@ -19,11 +19,13 @@ import {
   TabsTrigger,
 } from "@rakazo/ui-web";
 import { Ellipsis } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { useFinanceQuery } from "../components/finance/ui";
 import { PickFilter, SearchField } from "../components/ListControls";
+import { PageHeader } from "../components/PageHeader";
 import { downloadArtifactBytes } from "../lib/artifact-open";
 import { companyDate, companyDateEnd } from "../lib/company-format";
 import { money } from "../lib/finance-format";
@@ -158,8 +160,12 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
         </Button>
       </div>
     );
+  const empty = (entities: CompanyEntityRecord[], message: ReactNode) =>
+    !filtered && entities.length === 0 ? (
+      <p className="py-8 text-center text-sm text-muted-foreground">{message}</p>
+    ) : null;
   const rows = (entities: CompanyEntityRecord[]) =>
-    filtered && visible(entities).length === 0 ? null : (
+    visible(entities).length === 0 ? null : (
       <Table>
         <TableHeader>
           <TableRow>
@@ -212,40 +218,40 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
     );
   return (
     <div className="rk-scroll flex-1 overflow-y-auto px-4 py-5 md:px-7">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">
-            <Trans>Company</Trans>
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            <Trans>Reconstructed</Trans>
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {onAskAgent && <AskBotButton botName={t`Company agent`} onClick={onAskAgent} />}
-          <Link to="/app/company/import" className="text-sm underline underline-offset-4">
-            <Trans>Import</Trans>
-          </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="ghost" size="icon" aria-label={t`Company actions`} />}
+      <PageHeader
+        className="mb-6"
+        title={<Trans>Company</Trans>}
+        meta={<Trans>Reconstructed</Trans>}
+        actions={
+          <>
+            {onAskAgent && <AskBotButton botName={t`Company agent`} onClick={onAskAgent} />}
+            <Link
+              to="/app/company/import"
+              className="inline-flex items-center text-sm underline underline-offset-4 pointer-coarse:min-h-11 pointer-coarse:px-2"
             >
-              <Ellipsis className="size-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={exporting} onClick={() => void exportMap()}>
-                <Trans>Export JSON</Trans>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPrivacy(true)}>
-                <Trans>Privacy</Trans>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setRefreshOpen((open) => !open)}>
-                <Trans>Refresh sources</Trans>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
+              <Trans>Import</Trans>
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button variant="ghost" size="icon" aria-label={t`Company actions`} />}
+              >
+                <Ellipsis className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={exporting} onClick={() => void exportMap()}>
+                  <Trans>Export JSON</Trans>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPrivacy(true)}>
+                  <Trans>Privacy</Trans>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRefreshOpen((open) => !open)}>
+                  <Trans>Refresh sources</Trans>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
       {exportError && (
         <p role="alert" className="mb-4 text-sm text-destructive">
           {exportError}
@@ -444,6 +450,7 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
             <>
               {toolbar}
               {noMatches(people)}
+              {empty(people, <Trans>No people yet</Trans>)}
               {rows(people.filter((row) => !past(row)))}
               {visible(people.filter(past)).length > 0 && (
                 <details>
@@ -457,6 +464,7 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           )}
           {view === "organisations" && toolbar}
           {view === "organisations" && noMatches(organisations)}
+          {view === "organisations" && empty(organisations, <Trans>No organisations yet</Trans>)}
           {view === "organisations" &&
             [...new Set(visible(organisations).map((row) => String(row.attrs.type ?? "other")))]
               .sort()

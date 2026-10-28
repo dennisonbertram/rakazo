@@ -611,7 +611,7 @@ export function ListView({
 
 /** The picture area at the top of a file tile: one fixed shape, so tiles line up. */
 const PREVIEW_AREA =
-  "relative grid aspect-4/3 w-full place-items-center @min-[640px]/list:aspect-4/5 overflow-hidden rounded-md bg-muted [&>svg]:size-6";
+  "relative grid aspect-4/3 max-sm:aspect-video w-full place-items-center @min-[640px]/list:aspect-4/5 overflow-hidden rounded-md bg-muted [&>svg]:size-6";
 
 /**
  * The drawn thumbnail, fetched with the session once the tile nears the screen. The file icon

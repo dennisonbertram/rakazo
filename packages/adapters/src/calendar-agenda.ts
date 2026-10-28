@@ -80,7 +80,7 @@ export async function calendarAgenda(
       ? none<never>()
       : deps.prisma.inboxTodo.findMany({
           where: { ...scope, doneAt: null, dueOn: { gte: range.from, lt: range.to } },
-          select: { id: true, text: true, dueOn: true },
+          select: { id: true, text: true, dueOn: true, messageId: true },
           orderBy: { dueOn: "asc" },
           take: MAX_PER_QUERY,
         }),
@@ -108,7 +108,7 @@ export async function calendarAgenda(
         }),
   ]);
   const local = (
-    item: Pick<CalendarItem, "id" | "kind" | "title" | "allDay" | "botId" | "botName">,
+    item: Pick<CalendarItem, "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId">,
     start: Date,
   ): CalendarItem => ({
     ...item,
@@ -147,6 +147,7 @@ export async function calendarAgenda(
                 allDay: true,
                 botId: null,
                 botName: null,
+                mailId: row.messageId,
               },
               row.dueOn,
             ),

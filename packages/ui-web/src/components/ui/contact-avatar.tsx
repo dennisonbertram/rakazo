@@ -10,9 +10,14 @@ export interface ContactAvatarPerson {
 
 const SUFFIX = /[\s,]+(inc|llc|ltd|corp|corporation|co|company|gmbh)\.?$/i;
 
-/** Up to two initials; a trailing company suffix such as "Inc." does not count. */
+/** Up to two initials; a trailing company suffix such as "Inc." and anything in parentheses do not count. */
 export function initials(name: string): string {
-  const words = name.replace(SUFFIX, "").split(/\s+/).filter(Boolean);
+  const words = name
+    .replace(/\([^)]*\)/g, " ")
+    .trim()
+    .replace(SUFFIX, "")
+    .split(/\s+/)
+    .filter(Boolean);
   const picks = words.length > 1 ? [words[0], words[words.length - 1]] : words;
   return picks
     .map((word) => Array.from(word as string)[0] ?? "")

@@ -115,7 +115,7 @@ export function InboxSenderGroup({
           </span>
           <time
             dateTime={newest.receivedAt}
-            className={`col-start-3 row-start-1 whitespace-nowrap text-end text-[13px] tabular-nums text-muted-foreground @md:col-start-4 ${hasActions ? "@max-md:group-focus-within/row:opacity-0 @max-md:group-hover/row:opacity-0 pointer-coarse:opacity-100" : ""}`}
+            className={`col-start-3 row-start-1 whitespace-nowrap text-end text-[13px] tabular-nums text-muted-foreground @md:col-start-4 ${hasActions ? "[@media(hover:hover)]:@max-md:group-focus-within/row:opacity-0 [@media(hover:hover)]:@max-md:group-hover/row:opacity-0" : ""}`}
           >
             {formatMailTime(newest.receivedAt)}
           </time>
@@ -138,7 +138,7 @@ export function InboxSenderGroup({
                   size="icon-xs"
                   aria-label={t`Archive`}
                   tabIndex={selected ? 0 : -1}
-                  className={`absolute end-3 top-1/2 -translate-y-1/2 bg-muted text-muted-foreground @md:end-24 pointer-coarse:size-10 ${selected ? "" : "opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 pointer-coarse:opacity-100"}`}
+                  className={`absolute end-3 top-1/2 -translate-y-1/2 bg-muted text-muted-foreground @md:end-24 pointer-coarse:size-10 pointer-coarse:@md:end-3 ${selected ? "" : "opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 pointer-coarse:opacity-100"}`}
                   onClick={onArchiveGroup}
                 />
               }

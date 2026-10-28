@@ -3,7 +3,7 @@ import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { ThreadMessage } from "@rakazo/contracts";
-import { commandVariableName } from "@rakazo/contracts";
+import { commandVariableName, connectorToolLabel } from "@rakazo/contracts";
 import {
   formatMessageTime,
   isApprovalAskBlock,
@@ -202,15 +202,15 @@ export function AskCard({
         <ChatMarkdown>{block.text}</ChatMarkdown>
       </div>
       {block.toolId ? (
-        <div className="mt-1">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2">
           <button
             type="button"
             aria-expanded={toolIdOpen}
             aria-controls={toolIdPanel}
-            aria-label={t`Tool name`}
-            className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 rounded text-[13px] text-muted-foreground hover:text-foreground pointer-coarse:min-h-11"
             onClick={() => setToolIdOpen((open) => !open)}
           >
+            {connectorToolLabel(block.toolId)}
             <ChevronDown
               aria-hidden
               className={`size-4 transition-transform ${toolIdOpen ? "rotate-180" : ""}`}
@@ -219,7 +219,7 @@ export function AskCard({
           {toolIdOpen ? (
             <code
               id={toolIdPanel}
-              className="ms-1 break-all font-mono text-[12.5px] text-muted-foreground"
+              className="break-all font-mono text-[12.5px] text-muted-foreground"
             >
               {block.toolId}
             </code>

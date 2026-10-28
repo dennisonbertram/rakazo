@@ -27,11 +27,14 @@ function setup(google: (url: string, ref: string) => unknown) {
       ]),
     },
     inboxTodo: {
-      findMany: vi
-        .fn()
-        .mockResolvedValue([
-          { id: "i1", text: "Sign form", dueOn: new Date("2026-11-02T00:00:00Z") },
-        ]),
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: "i1",
+          text: "Sign form",
+          dueOn: new Date("2026-11-02T00:00:00Z"),
+          messageId: "m1",
+        },
+      ]),
     },
     routine: {
       findMany: vi.fn().mockResolvedValue([
@@ -123,6 +126,7 @@ describe("calendarAgenda", () => {
       account: "Work",
       botId: null,
     });
+    expect(result.items.find((i) => i.title === "Sign form")?.mailId).toBe("m1");
     expect(result.items.find((i) => i.title === "Send deck")).toMatchObject({
       botId: "bot-1",
       botName: "Chief",

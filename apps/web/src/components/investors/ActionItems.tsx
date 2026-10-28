@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
   Spinner,
 } from "@rakazo/ui-web";
-import { MoreHorizontal } from "lucide-react";
+import { ChevronDown, MoreHorizontal } from "lucide-react";
+import { useState } from "react";
 import { shortDay } from "../../lib/finance-format";
 import { SectionCard } from "../SectionCard";
 
@@ -128,10 +129,30 @@ export function ActionItems({
   onDraftAudit?: (audit: AuditRequest) => void;
   onCloseAudit?: (audit: AuditRequest, status: "done" | "dismissed") => void;
 }) {
-  if (drafts.length === 0 && audits.length === 0) return null;
+  // On a phone the card is one line until opened; from sm up the list always shows.
+  const [open, setOpen] = useState(false);
+  const count = drafts.length + audits.length;
+  if (count === 0) return null;
   return (
-    <SectionCard title={t`Action items`} attention>
-      <ul>
+    <SectionCard
+      title={t`Action items`}
+      attention
+      className={open ? "" : "max-sm:py-2 max-sm:[&>div:first-child]:mb-0"}
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          className="pointer-coarse:h-11 sm:hidden"
+          aria-expanded={open}
+          aria-label={open ? t`Hide action items` : t`Show ${count} action items`}
+          onClick={() => setOpen(!open)}
+        >
+          {count}
+          <ChevronDown className={open ? "rotate-180" : ""} aria-hidden="true" />
+        </Button>
+      }
+    >
+      <ul className={open ? "" : "max-sm:hidden"}>
         {audits.map((audit) => (
           <AuditRow
             key={audit.id}

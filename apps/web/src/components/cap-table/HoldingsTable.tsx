@@ -140,7 +140,7 @@ export function HoldingsTable({
         </div>
       ) : (
         <Table compact className="table-fixed">
-          <TableHeader>
+          <TableHeader className="max-sm:hidden">
             <TableHeadRow>
               <TableHead className="ps-2" {...head("holder")}>
                 <Trans>Holder</Trans>
@@ -192,8 +192,13 @@ export function HoldingsTable({
                         {row.name}
                       </span>
                     )}
-                    <div className="truncate text-xs text-muted-foreground @lg:hidden">
-                      {[row.security, shares, row.amountUsd != null ? invested : null]
+                    {/* Wraps rather than truncates, so the invested amount is never cut off. */}
+                    <div className="text-xs text-muted-foreground @lg:hidden">
+                      {[
+                        row.security,
+                        shares,
+                        row.amountUsd != null ? t`${invested} invested` : null,
+                      ]
                         .filter((part) => part !== DASH && part != null)
                         .join(" · ")}
                     </div>

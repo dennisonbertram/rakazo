@@ -2126,6 +2126,8 @@ function InboxListPage({
               ? `${openReplyTodo.text} · ${dueLabel(openReplyTodo.dueOn, new Date())}`
               : openReplyTodo?.text
           }
+          tracked={openRow?.tracked === true}
+          onTrack={openRow ? (track) => setTracked(openRow.id, track) : undefined}
           onReplyDone={
             openReplyTodo
               ? () =>

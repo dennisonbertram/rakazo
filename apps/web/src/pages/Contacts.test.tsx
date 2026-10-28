@@ -253,17 +253,28 @@ it.each(["not an email", "name@example..com"])(
   },
 );
 
-it("shows the organization, else the email, under the name", async () => {
+it("shows the organization and the email under the name", async () => {
   rpcMock.list.mockResolvedValue([
     contact("c1", "Ada", "customer"),
     { ...contact("c3", "Cy", "vendor"), organization: null },
     { ...contact("c4", "Di", "other"), email: null },
   ]);
   await show();
-  const under = [...container.querySelectorAll("tbody td:first-child div.truncate")].map(
+  const under = [...container.querySelectorAll("tbody td:first-child div.flex.gap-1")].map(
     (div) => div.textContent,
   );
-  expect(under).toEqual(["Acme Corp", "cy@example.test", "Acme Corp"]);
+  expect(under).toEqual(["Acme Corp·ada@example.test", "cy@example.test", "Acme Corp"]);
+});
+
+it("clears the search and confirms when a new contact is saved", async () => {
+  rpcMock.list.mockResolvedValue([contact("c1", "Ada", "vendor")]);
+  rpcMock.save.mockResolvedValue(contact("c2", "Cy", "vendor"));
+  await show("/app/contacts?q=ada");
+  await click(button("Add contact"));
+  await typeInto(document.getElementById("contact-name") as HTMLInputElement, "Cy");
+  await click(button("Save"));
+  expect(search).toBe("");
+  expect(document.body.textContent).toContain("Added Cy");
 });
 
 it("lets the table fill the page and titles a long email", async () => {

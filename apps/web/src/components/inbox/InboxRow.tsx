@@ -418,8 +418,15 @@ export function InboxRow({
           )}
           <time
             dateTime={row.receivedAt}
-            className={`col-start-3 row-start-1 text-end text-[13px] text-muted-foreground @md:col-start-5 whitespace-nowrap tabular-nums ${marks.length + actions.length ? "@max-md:group-focus-within/row:opacity-0 @max-md:group-hover/row:opacity-0 pointer-coarse:opacity-100" : ""}`}
+            className={`col-start-3 row-start-1 text-end text-[13px] text-muted-foreground @md:col-start-5 whitespace-nowrap tabular-nums ${marks.length + actions.length ? "[@media(hover:hover)]:@max-md:group-focus-within/row:opacity-0 [@media(hover:hover)]:@max-md:group-hover/row:opacity-0" : ""}`}
           >
+            {row.tracked ? (
+              <Eye
+                role="img"
+                aria-label={t`Tracked`}
+                className="me-1 inline size-3 align-text-bottom"
+              />
+            ) : null}
             {row.hasAttachment ? (
               <Paperclip
                 role="img"

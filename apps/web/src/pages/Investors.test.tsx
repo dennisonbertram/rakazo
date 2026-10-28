@@ -5,7 +5,7 @@ import { NotificationToaster, notificationToastManager } from "@rakazo/ui-web";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const text = vi.hoisted(
@@ -317,6 +317,26 @@ it("adds a contact of the open tab's kind and shows a server error", async () =>
   expect(document.getElementById("contact-name")).toBeNull();
 });
 
+it("opens the contact page when a contact row is tapped", async () => {
+  let path = "";
+  const Where = () => {
+    path = useLocation().pathname;
+    return null;
+  };
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={["/app/investors?tab=contacts"]}>
+        <InvestorsPage />
+        <Where />
+      </MemoryRouter>,
+    ),
+  );
+  await flush();
+  await click(openRow("c1"));
+  expect(path).toBe("/app/contacts/c1");
+  expect(document.getElementById("contact-name")).toBeNull();
+});
+
 it("edits and deletes a contact from its row menu", async () => {
   rpcMock.remove.mockResolvedValue({ ok: true });
   await show("/app/investors?tab=contacts");
@@ -507,11 +527,17 @@ it("offers to open the contact that already has the email when adding a duplicat
   expect((document.getElementById("contact-name") as HTMLInputElement).value).toBe("Ada");
 });
 
+/** A row tap opens the contact page; the edit dialog opens from the row menu. */
+const editRow = async (name: string) => {
+  await click(rowActions(name));
+  await click(menuItem("Edit"));
+};
+
 it("deletes a contact with an Undo that restores it", async () => {
   rpcMock.remove.mockResolvedValue({ ok: true });
   rpcMock.save.mockResolvedValue({});
   await show("/app/investors?kind=board&tab=contacts");
-  await click(openRow("c2"));
+  await editRow("Bo");
   await click(button("Delete"));
   expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c2" });
   expect(document.body.textContent).toContain("Deleted Bo");
@@ -531,7 +557,7 @@ it("drops a deleted row and focuses the restored name after Undo, like Contacts"
   rpcMock.remove.mockResolvedValue({ ok: true });
   rpcMock.save.mockResolvedValue({ ...bo, id: "c9" });
   await show("/app/investors?kind=board&tab=contacts");
-  await click(openRow("c2"));
+  await editRow("Bo");
   rpcMock.list.mockResolvedValue([contact("c1", "Ada", "investor")]);
   await click(button("Delete"));
   expect(container.querySelector('[data-contact-id="c2"]')).toBeNull();
@@ -546,7 +572,7 @@ it("keeps the contact restorable when Undo fails, and restores it on Try again",
   rpcMock.remove.mockResolvedValue({ ok: true });
   rpcMock.save.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({});
   await show("/app/investors?kind=board&tab=contacts");
-  await click(openRow("c2"));
+  await editRow("Bo");
   await click(button("Delete"));
   await click(button("Undo"));
   expect(document.body.textContent).toContain("Could not restore Bo");

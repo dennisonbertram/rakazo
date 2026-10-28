@@ -722,7 +722,7 @@ function ArtifactTable({
                       <Link
                         to={artifactPath(artifact.id)}
                         onClick={(event) => event.stopPropagation()}
-                        className="truncate font-medium"
+                        className="truncate font-medium pointer-coarse:-my-3 pointer-coarse:py-3"
                         title={artifact.name}
                       >
                         {displayName(artifact.name)}

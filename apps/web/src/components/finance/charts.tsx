@@ -121,6 +121,35 @@ export function Chart({
   );
 }
 
+/** An x-axis label; scrolled sideways it is dropped once the container edge would cut it. */
+function AxisLabel({
+  x,
+  y,
+  bold,
+  children,
+}: {
+  x: number;
+  y: number;
+  bold: boolean;
+  children: React.ReactNode;
+}) {
+  const scrollX = useContext(ScrollX);
+  // About 40 px is the widest label ("Mar '26"), centred on x.
+  if (scrollX > 0 && x - 20 < scrollX) return null;
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      className="fill-muted-foreground"
+      fontSize={12}
+      fontWeight={bold ? 700 : 400}
+    >
+      {children}
+    </text>
+  );
+}
+
 function Grid({
   width,
   height,
@@ -150,6 +179,10 @@ function Grid({
     if (lines.length === 0 || axisMoney(v) !== axisMoney(lines.at(-1) as number)) lines.push(v);
   return (
     <>
+      {/* Scrolled, the plot slides under the pinned labels: an opaque gutter keeps them clear of it. */}
+      {layer === "labels" && scrollX > 0 && !hidden ? (
+        <rect x={scrollX} y={0} width={left} height={height - bottom} className="fill-card" />
+      ) : null}
       {lines.map((v) => {
         const y = top + (height - top - bottom) * (1 - (v - floor) / (scale.top - floor));
         return (
@@ -732,17 +765,10 @@ export function BurnLines({
                     className="fill-transparent"
                   />
                   {showLabel ? (
-                    <text
-                      x={cx(i)}
-                      y={height - 8}
-                      textAnchor="middle"
-                      className="fill-muted-foreground"
-                      fontSize={12}
-                      fontWeight={m.partial ? 700 : 400}
-                    >
+                    <AxisLabel x={cx(i)} y={height - 8} bold={m.partial === true}>
                       {name}
                       {m.partial ? "*" : ""}
-                    </text>
+                    </AxisLabel>
                   ) : null}
                 </g>
               );

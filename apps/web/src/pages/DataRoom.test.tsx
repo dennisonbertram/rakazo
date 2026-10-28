@@ -1286,7 +1286,15 @@ it("downloads the ticked files and opens the mail composer with them attached", 
 
 it("sends every ticked file to the chosen agent in one go", async () => {
   const onSendToAgent = vi.fn();
-  vi.stubGlobal("matchMedia", () => ({ matches: true }) as MediaQueryList);
+  vi.stubGlobal(
+    "matchMedia",
+    () =>
+      ({
+        matches: true,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }) as unknown as MediaQueryList,
+  );
   await act(async () => {
     root.render(
       <MemoryRouter initialEntries={["/"]}>

@@ -22,6 +22,8 @@ export const CalendarItemSchema = z.object({
   account: z.string().nullable(),
   /** Where the event opens in Google Calendar. */
   href: z.string().nullable(),
+  /** The cached mail message an inbox to-do came from, when it still exists. The Inbox opens it with `?mail=`. */
+  mailId: z.string().nullable().optional(),
 });
 export type CalendarItem = z.infer<typeof CalendarItemSchema>;
 
