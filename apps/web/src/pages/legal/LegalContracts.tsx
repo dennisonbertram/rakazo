@@ -74,7 +74,7 @@ function NextDeadline({ contract }: { contract: LegalContract }) {
   );
 }
 
-function Title({ contract }: { contract: LegalContract }) {
+function Title({ contract, wrap = false }: { contract: LegalContract; wrap?: boolean }) {
   return (
     <Link
       to={`${DATA_ROOM_PATH}?item=${contract.dataRoomItemId}`}
@@ -82,7 +82,9 @@ function Title({ contract }: { contract: LegalContract }) {
       className="rk-tap min-w-0 font-medium hover:underline"
     >
       {/* .rk-tap is inline-flex on phones and the link is inline elsewhere, so neither can clip: the text truncates as a block inside it. */}
-      <span className="block min-w-0 truncate">{contract.title}</span>
+      <span className={cn("block min-w-0", wrap ? "line-clamp-2" : "truncate")}>
+        {contract.title}
+      </span>
     </Link>
   );
 }
@@ -269,23 +271,15 @@ export function LegalContracts({
         className={cn("cursor-pointer border-t border-border py-2 text-sm", nested && "ps-4")}
       >
         <div className="flex items-center justify-between gap-3">
-          <Title contract={contract} />
-          <span className="flex shrink-0 items-center gap-2">
-            {showValue ? (
-              <span className="tabular-nums">
-                <span className="me-1 text-xs text-muted-foreground">
-                  <Trans>Value</Trans>
-                </span>
-                {value(contract)}
-              </span>
-            ) : null}
-            <Status status={contract.status} />
-          </span>
+          <Title contract={contract} wrap />
+          <Status status={contract.status} />
         </div>
         {/* Only what the agent found: no labels, since the values say what they are. */}
         {names ? <p className="truncate text-xs text-muted-foreground">{names}</p> : null}
         <p className="text-xs text-muted-foreground">
-          {[term(contract), renewal(contract)].filter((text) => text !== dash).join(" · ")}
+          {[term(contract), renewal(contract), showValue ? `${t`Value`} ${value(contract)}` : dash]
+            .filter((text) => text !== dash)
+            .join(" · ")}
           {contract.nextDeadline ? (
             <>
               {" · "}

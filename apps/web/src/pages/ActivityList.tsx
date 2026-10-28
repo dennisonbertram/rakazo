@@ -5,7 +5,7 @@ import { isAgedStuckWork } from "@rakazo/core";
 import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import type { ReactNode, Ref } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { PickFilter, SearchField, SortControl } from "../components/ListControls";
+import { PhoneDateRange, PickFilter, SearchField, SortControl } from "../components/ListControls";
 import { RowsSkeleton } from "../components/RowsSkeleton";
 import type { ActivityListFilters, ActivitySort } from "../lib/activity-list-filters";
 import {
@@ -163,6 +163,8 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
       scroller.style.maxHeight = "";
       // Expanded finished runs are what the person asked for: show them all, and let the sidebar scroll.
       if (showFinished) return;
+      // In the phone drawer the sidebar is the one scroller, so Working and Finished stay reachable.
+      if (window.matchMedia && !window.matchMedia("(min-width: 1024px)").matches) return;
       const top = scroller.getBoundingClientRect().top;
       const endOf = (row: Element) => row.getBoundingClientRect().bottom - top + scroller.scrollTop;
       // Everything waiting on the person always shows; the other runs share what is left of 30% of the window.
@@ -224,7 +226,7 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 rounded-full px-2 text-[12px] text-muted-foreground"
+                className="h-7 rounded-full px-2 text-[12px] text-muted-foreground pointer-coarse:h-11 pointer-coarse:px-3"
                 data-testid="activity-show-filters"
               />
             }
@@ -286,7 +288,7 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 w-full justify-start rounded-xl px-2.5 text-[12.5px] font-medium text-muted-foreground/80"
+            className="h-7 w-full justify-start rounded-xl px-2.5 text-[12.5px] font-medium text-muted-foreground/80 pointer-coarse:h-11"
             data-testid="activity-show-finished"
             aria-expanded={false}
             onClick={() => setShowFinished(true)}
@@ -402,7 +404,8 @@ function ActivityFilters({
   ];
 
   return (
-    <div className="flex flex-col gap-2">
+    // On a phone, search and the one Filters button share a row; From, To and Reset live in its sheet.
+    <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-stretch">
       <SearchField
         value={filters.query}
         onChange={(value) => list.setParam(param("q"), value)}
@@ -410,7 +413,7 @@ function ActivityFilters({
         label={t`Search activity`}
         name="activity-search"
       />
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="contents sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
         <PickFilter
           label={t`Status`}
           value={filters.status === "all" ? undefined : filters.status}
@@ -426,7 +429,20 @@ function ActivityFilters({
           onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
         />
       </div>
-      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80">
+      <PhoneDateRange
+        label={t`Dates`}
+        from={filters.dateRange.from || undefined}
+        to={filters.dateRange.to || undefined}
+        // One edge changes per edit; "Clear all" empties both in one go.
+        onChange={(from, to) =>
+          from === undefined && to === undefined
+            ? list.clear(param("from"), param("to"))
+            : from !== (filters.dateRange.from || undefined)
+              ? list.setParam(param("from"), from)
+              : list.setParam(param("to"), to)
+        }
+      />
+      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80 max-sm:hidden">
         <Trans>From</Trans>
         <Input
           type="date"
@@ -438,7 +454,7 @@ function ActivityFilters({
           className="w-40 rounded-xl bg-card text-[13px] dark:bg-input"
         />
       </div>
-      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80">
+      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80 max-sm:hidden">
         <Trans>To</Trans>
         <Input
           type="date"
@@ -455,7 +471,7 @@ function ActivityFilters({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 self-start rounded-full px-2 text-[12px]"
+          className="h-7 self-start rounded-full px-2 text-[12px] max-sm:hidden"
           data-testid="activity-reset-filters"
           onClick={() => list.clear(...["q", "status", "from", "to"].map(param))}
         >
@@ -477,7 +493,7 @@ function WaitingRow({ item, onOpen }: { item: WaitingOnYouItem; onOpen: () => vo
       aria-label={t`${title}, ${botName}`}
       onClick={onOpen}
       data-activity-row=""
-      className="flex w-full gap-3 rounded-xl px-2.5 py-[9px] text-left hover:bg-accent"
+      className="flex w-full gap-3 rounded-xl px-2.5 py-[9px] text-left hover:bg-accent pointer-coarse:min-h-11"
     >
       <span
         className="mt-1.5 size-2 shrink-0 rounded-full bg-current text-warning"
@@ -488,7 +504,7 @@ function WaitingRow({ item, onOpen }: { item: WaitingOnYouItem; onOpen: () => vo
           <span className="truncate text-sm font-medium text-foreground" dir="auto">
             {title}
           </span>
-          <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground/80">
+          <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground/80 pointer-coarse:max-w-[60%]">
             {botName}
           </span>
         </div>
@@ -520,7 +536,7 @@ function ActivityRow({
       aria-label={activityLabel}
       onClick={onOpen}
       data-activity-row=""
-      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent ${compact ? "py-1.5" : "py-[9px]"} ${quiet ? "opacity-60" : ""}`}
+      className={`flex w-full gap-3 rounded-xl px-2.5 text-left hover:bg-accent pointer-coarse:min-h-11 ${compact ? "py-1.5" : "py-[9px]"} ${quiet ? "opacity-60" : ""}`}
     >
       <span
         className={`mt-1.5 size-2 shrink-0 rounded-full bg-current ${tone}`}

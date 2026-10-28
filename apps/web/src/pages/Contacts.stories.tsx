@@ -26,6 +26,7 @@ const contacts = [
   contact("c2", "Bo Sample", "vendor", "Sample & Co"),
   contact("c3", "Cy Placeholder", "legal", "Placeholder LLP"),
   contact("c4", "Di Demo", "investor", null),
+  contact("c5", "Casey Advisor (Mock)", "advisor", "Placeholder Advisory Group"),
 ];
 
 const meta = {
@@ -39,6 +40,12 @@ type Story = StoryObj<typeof meta>;
 export const Populated: Story = { beforeEach: () => mockRpc({ "contacts.list": contacts }) };
 
 /** In a workspace among several, the header names it. */
+/** Phone: name, organization and email under it, Kind as a badge. */
+export const Phone: Story = {
+  beforeEach: () => mockRpc({ "contacts.list": contacts }),
+  globals: { viewport: { value: "mobile1" } },
+};
+
 export const NamedWorkspace: Story = {
   args: { spaceName: "Example Co" },
   beforeEach: () => mockRpc({ "contacts.list": contacts }),

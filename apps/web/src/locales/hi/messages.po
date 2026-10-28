@@ -559,6 +559,10 @@ msgstr ""
 msgid "{inboxUnread, plural, one {# unread} other {# unread}}"
 msgstr ""
 
+#: src/components/cap-table/HoldingsTable.tsx
+msgid "{invested} invested"
+msgstr ""
+
 #: src/components/sidebar-folders/SidebarDnd.tsx
 msgid "{item} dropped on {target}."
 msgstr ""
@@ -621,6 +625,10 @@ msgstr ""
 
 #: src/pages/finance/FinanceAccounts.tsx
 msgid "{pct} yield"
+msgstr ""
+
+#: src/pages/shell/transcript.tsx
+msgid "{peer} replied"
 msgstr ""
 
 #: src/pages/Inbox.tsx
@@ -794,6 +802,11 @@ msgstr ""
 
 #: src/pages/Fundraising.tsx
 msgid "1 SAFE found in Legal"
+msgstr ""
+
+#: src/components/EmailCards.tsx
+#: src/pages/Calendar.tsx
+msgid "3 days"
 msgstr ""
 
 #: src/pages/Finance.tsx
@@ -1161,6 +1174,11 @@ msgstr ""
 msgid "Added"
 msgstr ""
 
+#. placeholder {0}: saved.name
+#: src/pages/Contacts.tsx
+msgid "Added {0}"
+msgstr ""
+
 #: src/pages/ContactDetail.tsx
 msgid "Added by"
 msgstr ""
@@ -1212,6 +1230,7 @@ msgstr ""
 msgid "Agenda"
 msgstr ""
 
+#: src/components/inbox/EmailSidePanel.tsx
 #: src/components/integrations/IntegrationAgentSection.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Agent"
@@ -1743,6 +1762,10 @@ msgstr ""
 
 #: src/pages/shell/working-label.ts
 msgid "Asking {agentName}"
+msgstr ""
+
+#: src/pages/shell/transcript.tsx
+msgid "Asking {peer}…"
 msgstr ""
 
 #: src/pages/shell/working-label.ts
@@ -2706,6 +2729,7 @@ msgstr ""
 msgid "Clear {sourceName} filter"
 msgstr ""
 
+#: src/components/ListControls.tsx
 #: src/pages/DataRoom.tsx
 msgid "Clear all"
 msgstr ""
@@ -2771,6 +2795,7 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/ErrorBoundary.tsx
 #: src/components/fundraising/SafeDialog.tsx
+#: src/components/inbox/EmailSidePanel.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/integrations/SignInStep.tsx
@@ -3361,6 +3386,12 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 msgid "Contacts are your address book. They do not change Carta."
+msgstr ""
+
+#: src/components/ComposeEmail.tsx
+#: src/components/inbox/EmailSidePanel.tsx
+#: src/components/inbox/InboxMessageDialog.tsx
+msgid "Context"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4169,6 +4200,7 @@ msgstr ""
 msgid "Could not unshare"
 msgstr ""
 
+#: src/components/BotTodos.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Could not update"
 msgstr "अपडेट नहीं हो सका"
@@ -4512,6 +4544,10 @@ msgstr ""
 msgid "Date window"
 msgstr ""
 
+#: src/pages/ActivityList.tsx
+msgid "Dates"
+msgstr ""
+
 #: src/lib/billing.ts
 #: src/pages/RoutineSchedule.tsx
 msgid "day"
@@ -4542,6 +4578,7 @@ msgid "Decline"
 msgstr ""
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/pages/Contacts.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Default"
@@ -4915,6 +4952,7 @@ msgstr ""
 #: src/components/AiDataSharing.tsx
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/FolderDocuments.tsx
+#: src/components/inbox/ContextPanel.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
@@ -4940,6 +4978,7 @@ msgstr ""
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/sidebar-glance.tsx
 #: src/components/tour/TourPopover.tsx
@@ -5593,6 +5632,8 @@ msgid "Filter memory"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
+#: src/pages/Calendar.tsx
 msgid "Filters"
 msgstr ""
 
@@ -5742,6 +5783,7 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/data-room/FilterBar.tsx
 #: src/components/gtm/EmailItemCard.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/CompanyImportScope.tsx
@@ -6066,6 +6108,10 @@ msgstr ""
 
 #: src/components/inbox/MailAttachments.tsx
 msgid "Hidden while amounts are hidden"
+msgstr ""
+
+#: src/components/investors/ActionItems.tsx
+msgid "Hide action items"
 msgstr ""
 
 #: src/components/HideAmountsToggle.tsx
@@ -6629,6 +6675,14 @@ msgstr ""
 msgid "Last completed"
 msgstr ""
 
+#: src/components/inbox/ContextPanel.tsx
+msgid "Last emailed"
+msgstr ""
+
+#: src/components/inbox/ContextPanel.tsx
+msgid "Last meeting"
+msgstr ""
+
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Last month vs 3 mo ago"
 msgstr ""
@@ -6839,6 +6893,7 @@ msgstr "पुराने रन लोड करें"
 msgid "Load web images automatically"
 msgstr "वेब छवियाँ अपने-आप लोड करें"
 
+#: src/components/inbox/ContextPanel.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/pages/Calendar.tsx
@@ -7796,6 +7851,10 @@ msgstr ""
 msgid "Next deadline"
 msgstr ""
 
+#: src/components/inbox/ContextPanel.tsx
+msgid "Next meeting"
+msgstr ""
+
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 msgid "Next message"
@@ -7902,6 +7961,10 @@ msgstr ""
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
 msgid "No contacts yet"
+msgstr ""
+
+#: src/components/inbox/ContextPanel.tsx
+msgid "No context yet"
 msgstr ""
 
 #. placeholder {0}: fullDay(data.agent.lastScanAt)
@@ -8065,6 +8128,14 @@ msgstr ""
 msgid "No open deadlines."
 msgstr ""
 
+#: src/pages/Company.tsx
+msgid "No organisations yet"
+msgstr ""
+
+#: src/pages/Company.tsx
+msgid "No people yet"
+msgstr ""
+
 #: src/components/fundraising/Pipeline.tsx
 msgid "No prospects yet"
 msgstr ""
@@ -8118,10 +8189,6 @@ msgstr ""
 
 #: src/pages/RoutineRunHistory.tsx
 msgid "No runs yet"
-msgstr ""
-
-#: src/components/EmailCards.tsx
-msgid "No rush"
 msgstr ""
 
 #: src/pages/Fundraising.tsx
@@ -8540,6 +8607,7 @@ msgid "Open document"
 msgstr ""
 
 #: src/components/inbox/EmailAgentPanel.tsx
+#: src/components/inbox/EmailSidePanel.tsx
 msgid "Open email agent full screen"
 msgstr ""
 
@@ -9017,10 +9085,6 @@ msgstr "सूची से एक मॉडल चुनें या इस �
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Pick a provider below and connect it."
-msgstr ""
-
-#: src/pages/RoutineEditor.tsx
-msgid "Pick when this runs, for example every Monday morning."
 msgstr ""
 
 #: src/components/sidebar-folders/SidebarDnd.tsx
@@ -10601,6 +10665,7 @@ msgstr ""
 msgid "Scroll sideways to see the whole graph."
 msgstr ""
 
+#: src/components/data-room/FilterBar.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
@@ -11095,6 +11160,10 @@ msgstr ""
 #: src/components/computer/TerminalApp.tsx
 msgid "Shell"
 msgstr "शेल"
+
+#: src/components/investors/ActionItems.tsx
+msgid "Show {count} action items"
+msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Show {hiddenReplies} more"
@@ -11709,6 +11778,7 @@ msgstr "बोलना रोकें"
 msgid "Stop teaching"
 msgstr "सिखाना रोकें"
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Stop tracking"
 msgstr ""
@@ -11782,6 +11852,10 @@ msgstr ""
 
 #: src/components/PageAgentIntro.tsx
 msgid "Summarize what's new this week"
+msgstr ""
+
+#: src/components/inbox/ContextPanel.tsx
+msgid "Summarizing"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -12316,6 +12390,10 @@ msgstr ""
 msgid "This zip is too large to unpack"
 msgstr ""
 
+#: src/components/inbox/ContextPanel.tsx
+msgid "Threads"
+msgstr ""
+
 #: src/components/integrations/IMessageSection.tsx
 msgid "Through BlueBubbles on your Mac"
 msgstr ""
@@ -12348,6 +12426,7 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/investors/UpdateEditor.tsx
@@ -12364,6 +12443,7 @@ msgstr ""
 msgid "To pick up, press space. Use the arrow keys to move, space to drop, escape to cancel."
 msgstr ""
 
+#: src/components/inbox/ContextPanel.tsx
 #: src/pages/Calendar.tsx
 msgid "To-dos"
 msgstr ""
@@ -12424,10 +12504,6 @@ msgstr ""
 msgid "Tool"
 msgstr ""
 
-#: src/components/AskCard.tsx
-msgid "Tool name"
-msgstr ""
-
 #: src/lib/run-phase.ts
 msgid "tools"
 msgstr ""
@@ -12472,8 +12548,14 @@ msgstr ""
 msgid "Tour"
 msgstr ""
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Track"
+msgstr ""
+
+#: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/inbox/InboxRow.tsx
+msgid "Tracked"
 msgstr ""
 
 #. placeholder {0}: maskCurrencyWhenHidden(status.subject)
@@ -12702,6 +12784,7 @@ msgstr "अनम्यूट करें"
 msgid "Unpin"
 msgstr "पिन हटाएं"
 
+#: src/components/EmailCards.tsx
 #: src/pages/Inbox.tsx
 msgid "Unread"
 msgstr ""
@@ -13184,6 +13267,7 @@ msgstr ""
 msgid "Waiting on {waitingOn}"
 msgstr ""
 
+#: src/components/BotTodos.tsx
 #: src/pages/ActivityList.tsx
 msgid "Waiting on you"
 msgstr ""
@@ -13408,10 +13492,6 @@ msgstr ""
 
 #: src/components/data-room/Preview.tsx
 msgid "With 1 investor"
-msgstr ""
-
-#: src/components/EmailCards.tsx
-msgid "Within 3 days"
 msgstr ""
 
 #: src/components/AskCard.tsx

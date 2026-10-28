@@ -947,7 +947,7 @@ export function ComposeEmail({
           </div>
         </div>
         {panelOpen ? (
-          <div className="w-80 shrink-0 max-md:absolute max-md:inset-0 max-md:z-10 max-md:w-full">
+          <div className="w-80 shrink-0 max-md:absolute max-md:inset-x-0 max-md:top-[calc(3.75rem+env(safe-area-inset-top))] max-md:z-10 max-md:h-[45%] max-md:w-full max-md:overflow-hidden max-md:rounded-b-xl max-md:border-b max-md:shadow-xl">
             <EmailSidePanel people={people} tab="context" onClose={() => setPanelOpen(false)} />
           </div>
         ) : null}

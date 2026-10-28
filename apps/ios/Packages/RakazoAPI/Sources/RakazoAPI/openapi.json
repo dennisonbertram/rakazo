@@ -16599,6 +16599,12 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "mailId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               }
                             },
                             "required": [

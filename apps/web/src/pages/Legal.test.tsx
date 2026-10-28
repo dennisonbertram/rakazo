@@ -1271,7 +1271,7 @@ it("labels the amount on a narrow contract card", async () => {
   rpcMock.overview.mockResolvedValue(overview);
   await render(<LegalPage />);
   expect(container.querySelector('ul[aria-label="Contracts"]')?.textContent).toContain(
-    "Value$50,000",
+    "Value $50,000",
   );
 });
 

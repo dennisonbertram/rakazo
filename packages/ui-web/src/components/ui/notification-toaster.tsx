@@ -207,6 +207,14 @@ function ToastList({
       const pageReserve =
         lift === 0 ? window.innerHeight - viewport.getBoundingClientRect().top : 0;
       document.documentElement.style.setProperty("--toast-page-reserve", `${pageReserve}px`);
+      // A phone's side panel fills the screen over the composer, so the toast covers the panel's
+      // bottom; its scroll container pads by what the toast covers.
+      const panelOpen = Boolean(document.querySelector("[data-toast-panel]"));
+      const panelReserve =
+        lift > 0 && isPhone() && panelOpen
+          ? window.innerHeight - viewport.getBoundingClientRect().top + GAP_ABOVE_PX
+          : 0;
+      document.documentElement.style.setProperty("--toast-panel-reserve", `${panelReserve}px`);
       const beside = besidePanel();
       if (beside === null) {
         viewport.style.removeProperty("--toast-shift");
@@ -229,6 +237,7 @@ function ToastList({
       viewport.style.removeProperty("--toast-max-width");
       document.documentElement.style.removeProperty("--toast-reserve");
       document.documentElement.style.removeProperty("--toast-page-reserve");
+      document.documentElement.style.removeProperty("--toast-panel-reserve");
     };
   }, [shownCount, viewportRef]);
   const [, tick] = useState(0);

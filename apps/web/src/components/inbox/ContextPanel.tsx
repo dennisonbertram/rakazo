@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { InboxPersonContext } from "@rakazo/contracts";
-import { cn, ContactAvatar, Skeleton } from "@rakazo/ui-web";
+import { ContactAvatar, cn, Skeleton } from "@rakazo/ui-web";
 import type { LucideIcon } from "lucide-react";
 import { CalendarDays, ChevronDown, Circle, FileText, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -28,7 +28,7 @@ const hasFacts = (facts: InboxPersonContext) =>
   );
 
 const rowClass =
-  "-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none";
+  "-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm pointer-coarse:min-h-11 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none";
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -81,6 +81,8 @@ function Item({
 }
 
 const linkClass = "underline-offset-2 hover:underline focus-visible:underline";
+/** The contact line is 16px tall; a touch gets a 44px target without moving the line. */
+const tapLinkClass = `${linkClass} pointer-coarse:inline-block pointer-coarse:py-3.5 pointer-coarse:-my-3.5`;
 
 /**
  * What the user already has about one address. The facts come first and carry no model; the
@@ -139,7 +141,7 @@ function PersonFacts({ email }: { email: string }) {
         <p className="text-xs text-muted-foreground">
           {identity ? (
             facts.contactId ? (
-              <Link to={`/app/contacts/${facts.contactId}`} dir="auto" className={linkClass}>
+              <Link to={`/app/contacts/${facts.contactId}`} dir="auto" className={tapLinkClass}>
                 {identity}
               </Link>
             ) : (
