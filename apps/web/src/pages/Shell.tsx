@@ -395,7 +395,7 @@ const wideScreen = () => window.matchMedia(PANEL_DOCKED_QUERY).matches;
 /** How long "Sent to <group> · Open" stays under the composer after an @group message. */
 const FORWARDED_NOTICE_MS = 8000;
 const NEW_PAGE_INSTRUCTIONS =
-  "You build and keep this page. Ask the user what the page should show, then write it with page_write: lead with what matters, use charts and tables where they help, and keep it current when asked. Keep chat replies short and put the substance on the page.";
+  "You build and keep this page. Ask the user what the page should show, then name yourself after the page with update_bot and write it with page_write: lead with what matters, use charts and tables where they help, and keep it current when asked. Keep chat replies short and put the substance on the page.";
 
 function threadSnapshotSignal(parent: AbortSignal): AbortSignal {
   return AbortSignal.any([parent, AbortSignal.timeout(THREAD_SNAPSHOT_TIMEOUT_MS)]);
