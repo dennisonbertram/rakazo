@@ -153,6 +153,9 @@ services:
       OIDC_NAME: ${OIDC_NAME:-SSO}
       OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
       OIDC_ALLOW_SIGNUP_BYPASS: ${OIDC_ALLOW_SIGNUP_BYPASS:-false}
+      # Public MCP address and extra trusted browser origins: API only.
+      PUBLIC_MCP_URL:
+      RAKAZO_TRUSTED_ORIGINS:
       AUTH_PASSWORD_ENABLED: ${AUTH_PASSWORD_ENABLED:-true}
       DATA_DIR: /data
       SANDBOX_SUPERVISOR_URL: http://supervisor:7091
@@ -435,6 +438,7 @@ services:
       BLUEBUBBLES_URL:
       BLUEBUBBLES_WEBHOOK_TOKEN:
       BOX_API_KEY:
+      API_URL:
       BOX_API_URL:
       BOX_BASE_URL:
       BROWSER_PROVIDER:

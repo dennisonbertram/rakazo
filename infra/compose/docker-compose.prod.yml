@@ -156,6 +156,9 @@ services:
       OIDC_NAME: ${OIDC_NAME:-SSO}
       OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
       OIDC_ALLOW_SIGNUP_BYPASS: ${OIDC_ALLOW_SIGNUP_BYPASS:-false}
+      # Public MCP address and extra trusted browser origins: API only.
+      PUBLIC_MCP_URL:
+      RAKAZO_TRUSTED_ORIGINS:
       AUTH_PASSWORD_ENABLED: ${AUTH_PASSWORD_ENABLED:-true}
       # The app's own login, subject to row-level security (docs/self-host.md#database-roles).
       DATABASE_URL: postgres://rakazo_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
@@ -453,6 +456,7 @@ services:
       BLUEBUBBLES_URL:
       BLUEBUBBLES_WEBHOOK_TOKEN:
       BOX_API_KEY:
+      API_URL:
       BOX_API_URL:
       BOX_BASE_URL:
       BROWSER_PROVIDER:

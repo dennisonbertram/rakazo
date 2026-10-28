@@ -207,6 +207,9 @@ services:
       OIDC_NAME: ${OIDC_NAME:-SSO}
       OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
       OIDC_ALLOW_SIGNUP_BYPASS: ${OIDC_ALLOW_SIGNUP_BYPASS:-false}
+      # Public MCP address and extra trusted browser origins: API only.
+      PUBLIC_MCP_URL:
+      RAKAZO_TRUSTED_ORIGINS:
       AUTH_PASSWORD_ENABLED: ${AUTH_PASSWORD_ENABLED:-true}
       RAKAZO_DESKTOP_STACK_TOKEN: ${RAKAZO_DESKTOP_STACK_TOKEN:-}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://127.0.0.1:5173}
@@ -502,6 +505,7 @@ services:
       BLUEBUBBLES_URL:
       BLUEBUBBLES_WEBHOOK_TOKEN:
       BOX_API_KEY:
+      API_URL: ${API_URL:-http://127.0.0.1:5173}
       BOX_API_URL:
       BOX_BASE_URL:
       BROWSER_PROVIDER:
