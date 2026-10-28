@@ -114,11 +114,27 @@ services:
       seaweedfs:
         condition: service_healthy
 
+  # Applies migrations as the database owner, creates the runtime login, and exits. Only this
+  # container gets the owner login: the API and worker connect as rakazo_app, which row-level
+  # security binds, so code running in either cannot find a login that bypasses it.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/compose/Dockerfile
+    command: ["pnpm", "db:migrate"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://rakazo_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
+      DATABASE_MIGRATION_URL: postgres://${POSTGRES_USER:-rakazo}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: ../..
       dockerfile: infra/compose/Dockerfile
-    command: ["bash", "-lc", "pnpm db:migrate && exec env -u DATABASE_MIGRATION_URL pnpm --filter @rakazo/api start"]
+    command: ["pnpm", "--filter", "@rakazo/api", "start"]
     environment:
       SECRET_STORE: ${SECRET_STORE:-encrypted}
       INFISICAL_URL: ${INFISICAL_URL:-}
@@ -130,8 +146,6 @@ services:
       INFISICAL_FOLDER: ${INFISICAL_FOLDER:-}
       # The app's own login, subject to row-level security (docs/self-host.md#database-roles).
       DATABASE_URL: postgres://rakazo_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
-      # Owner login for `pnpm db:migrate`; the start command drops it before serving.
-      DATABASE_MIGRATION_URL: postgres://${POSTGRES_USER:-rakazo}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}
       API_HOST: "0.0.0.0"
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
@@ -353,6 +367,8 @@ services:
     volumes:
       - ../../data:/data
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       seaweedfs-init:
         condition: service_completed_successfully
         required: false
@@ -564,7 +580,7 @@ services:
         condition: service_healthy
       data-init:
         condition: service_completed_successfully
-      # The API's start command migrates and creates the login the worker uses.
+      # The migrate service (through the API) creates the login the worker uses.
       api:
         condition: service_healthy
 
