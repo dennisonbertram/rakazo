@@ -8117,6 +8117,14 @@ msgstr ""
 msgid "No open deadlines."
 msgstr ""
 
+#: src/pages/Company.tsx
+msgid "No organisations yet"
+msgstr ""
+
+#: src/pages/Company.tsx
+msgid "No people yet"
+msgstr ""
+
 #: src/components/fundraising/Pipeline.tsx
 msgid "No prospects yet"
 msgstr ""

@@ -8117,6 +8117,14 @@ msgstr "No newsletters in the last 7 days"
 msgid "No open deadlines."
 msgstr "No open deadlines."
 
+#: src/pages/Company.tsx
+msgid "No organisations yet"
+msgstr "No organisations yet"
+
+#: src/pages/Company.tsx
+msgid "No people yet"
+msgstr "No people yet"
+
 #: src/components/fundraising/Pipeline.tsx
 msgid "No prospects yet"
 msgstr "No prospects yet"
