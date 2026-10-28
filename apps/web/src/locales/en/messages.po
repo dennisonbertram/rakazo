@@ -447,6 +447,10 @@ msgstr "{count, plural, one {# message} other {# messages}}"
 msgid "{count, plural, one {# transaction} other {# transactions}}"
 msgstr "{count, plural, one {# transaction} other {# transactions}}"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "{count, plural, one {# unpriced token} other {# unpriced tokens}}"
+msgstr "{count, plural, one {# unpriced token} other {# unpriced tokens}}"
+
 #: src/components/ContactDeleteConfirm.tsx
 msgid "{count, plural, one {access to # shared document} other {access to # shared documents}}"
 msgstr "{count, plural, one {access to # shared document} other {access to # shared documents}}"

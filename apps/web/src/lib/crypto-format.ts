@@ -16,6 +16,12 @@ export function tokenAmount(rawBalance: string, decimals: number, locale?: strin
   const trimmed = fraction.replace(/0+$/, "");
   if (BigInt(rawBalance) !== 0n && whole === "0" && trimmed === "")
     return `<0.${"0".repeat(FRACTION_DIGITS - 1)}1`;
+  // A balance of a billion or more (almost always a scam airdrop) is shown as 1.05e+38, cut not rounded.
+  if (whole.length > 9) {
+    const digits = whole.replace(/^0+/, "");
+    const mantissa = `${digits.slice(0, 1)}.${digits.slice(1, 3)}`.replace(/\.?0+$/, "");
+    return `${mantissa}e+${digits.length - 1}`;
+  }
   const grouped = BigInt(whole).toLocaleString(locale);
   if (!trimmed) return grouped;
   const point = (0.1).toLocaleString(locale).charAt(1);

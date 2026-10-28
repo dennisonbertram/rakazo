@@ -4,10 +4,18 @@ import { chainName, shortAddress, tokenAmount, tokenPrice } from "./crypto-forma
 describe("tokenAmount", () => {
   it("places the decimal point without floats", () => {
     expect(tokenAmount("1500000000000000000", 18)).toBe("1.5");
-    expect(tokenAmount("123456789012345678901234567890", 18)).toBe("123,456,789,012.34567");
+    expect(tokenAmount("123456789012345678901234567", 18)).toBe("123,456,789.01234");
     expect(tokenAmount("2500000", 6)).toBe("2.5");
     expect(tokenAmount("7", 0)).toBe("7");
     expect(tokenAmount("0", 18)).toBe("0");
+  });
+  it("shows a balance of a billion or more in scientific form", () => {
+    expect(tokenAmount("999999999000000000000000000", 18)).toBe("999,999,999");
+    expect(tokenAmount("1000000000000000000000000000", 18)).toBe("1e+9");
+    expect(tokenAmount("105120665521407875322000000000000000000000000000000000000", 18)).toBe(
+      "1.05e+38",
+    );
+    expect(tokenAmount("1500000000", 0)).toBe("1.5e+9");
   });
   it("shows tiny balances instead of rounding them to zero", () => {
     expect(tokenAmount("1", 18)).toBe("<0.00001");

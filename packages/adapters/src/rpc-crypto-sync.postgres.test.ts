@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@rakazo/db";
-import { createDb } from "@rakazo/db";
+import { asSystem, createDb, runAsTenant } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CRYPTO_TOKEN_LIST } from "./crypto-token-list.js";
 import type { FakeWorld } from "./rpc-crypto-fake-fetch.js";
@@ -31,14 +31,18 @@ describePostgres("crypto sync (PostgreSQL)", () => {
   const spaceId = `cry-space-${suffix}`;
   const userId = `cry-user-${suffix}`;
   const otherUserId = `cry-other-${suffix}`;
+  // Fixtures and assertions run as the system; the sync under test runs as the tenant, as a request does.
   let prisma: PrismaClient;
+  let runtime: PrismaClient;
   let close: () => Promise<void>;
   let fake = fakeRpc();
   const sync = (opts: { force?: boolean; user?: string; walletIds?: string[] } = {}) =>
-    syncCryptoHoldings(
-      { prisma, fetch: fake.fetch, callGapMs: 0, retryDelayMs: 0 },
-      { spaceId, userId: opts.user ?? userId },
-      opts,
+    runAsTenant({ spaceId, userId: opts.user ?? userId }, () =>
+      syncCryptoHoldings(
+        { prisma: runtime, fetch: fake.fetch, callGapMs: 0, retryDelayMs: 0 },
+        { spaceId, userId: opts.user ?? userId },
+        opts,
+      ),
     );
   const addServer = (owner: string) =>
     prisma.mcpServer.create({
@@ -61,7 +65,8 @@ describePostgres("crypto sync (PostgreSQL)", () => {
 
   beforeAll(async () => {
     const db = createDb(databaseUrl as string);
-    prisma = db.prisma;
+    runtime = db.prisma;
+    prisma = asSystem(db.prisma);
     close = async () => {
       await db.prisma.$disconnect();
       await db.pool.end();
@@ -204,10 +209,12 @@ describePostgres("crypto sync (PostgreSQL)", () => {
       },
     });
     const run = () =>
-      syncCryptoHoldings(
-        { prisma, fetch: fake.fetch, callGapMs: 0, retryDelayMs: 0, now: () => now },
-        { spaceId, userId: owner },
-        { force: true },
+      runAsTenant({ spaceId, userId: owner }, () =>
+        syncCryptoHoldings(
+          { prisma: runtime, fetch: fake.fetch, callGapMs: 0, retryDelayMs: 0, now: () => now },
+          { spaceId, userId: owner },
+          { force: true },
+        ),
       );
     expect(await run()).toMatchObject({ ok: true, outcome: "synced" });
     const days = () =>

@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 307 of 307
-- Web and shared components: 795
+- Web and shared components: 796
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -353,7 +353,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | FinancePage, Dashboard, EmptyState, DashboardSkeleton, Overview, ShowAll, HoverRow, UpcomingRow, SubscriptionsTable | [apps/web/src/pages/Finance.tsx](../../apps/web/src/pages/Finance.tsx) | [Finance.stories.tsx](../../apps/web/src/pages/Finance.stories.tsx) | web |
 | AccountTable, CryptoGroup, FinanceAccountsPage, FinanceAccountPage | [apps/web/src/pages/finance/FinanceAccounts.tsx](../../apps/web/src/pages/finance/FinanceAccounts.tsx) | [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx) | web |
 | FinanceBurnPage, FinanceMonthPage, Counted, FinanceRunwayPage | [apps/web/src/pages/finance/FinanceBurn.tsx](../../apps/web/src/pages/finance/FinanceBurn.tsx) | [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx) | web |
-| RemoveDialog, WalletRows, FinanceCryptoPage | [apps/web/src/pages/finance/FinanceCrypto.tsx](../../apps/web/src/pages/finance/FinanceCrypto.tsx) | [FinanceCrypto.stories.tsx](../../apps/web/src/pages/finance/FinanceCrypto.stories.tsx) | web |
+| RemoveDialog, WalletRows, UnpricedRows, FinanceCryptoPage | [apps/web/src/pages/finance/FinanceCrypto.tsx](../../apps/web/src/pages/finance/FinanceCrypto.tsx) | [FinanceCrypto.stories.tsx](../../apps/web/src/pages/finance/FinanceCrypto.stories.tsx) | web |
 | FinanceNotFound | [apps/web/src/pages/finance/FinanceNotFound.tsx](../../apps/web/src/pages/finance/FinanceNotFound.tsx) | [FinanceNotFound.stories.tsx](../../apps/web/src/pages/finance/FinanceNotFound.stories.tsx) | web |
 | FinanceSpendPage, FinanceCategoryPage, FinanceRecurringPage, FinanceVendorPage | [apps/web/src/pages/finance/FinanceSpend.tsx](../../apps/web/src/pages/finance/FinanceSpend.tsx) | [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx) | web |
 | ReceiptIcon, ReceiptThumb, CheckReceipt, FinanceTransactionPage, FinanceReceiptPage | [apps/web/src/pages/finance/FinanceTransaction.tsx](../../apps/web/src/pages/finance/FinanceTransaction.tsx) | [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |

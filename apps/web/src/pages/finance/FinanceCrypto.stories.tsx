@@ -134,6 +134,29 @@ type Story = StoryObj;
 
 export const Default: Story = { beforeEach: () => load(base) };
 
+/** Unpriced tokens, including one that copies a priced symbol with an enormous balance, sit behind one line. */
+export const UnpricedTokens: Story = {
+  beforeEach: () =>
+    load({
+      ...base,
+      holdings: [
+        ...base.holdings,
+        {
+          walletId: "w1",
+          chainId: 8453,
+          tokenAddress: addr(11),
+          symbol: "USDX",
+          name: "Look-alike",
+          decimals: 18,
+          rawBalance: `7${"0".repeat(45)}`,
+          usdPrice: null,
+          usdValueCents: null,
+          syncedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    }),
+};
+
 export const WithExchange: Story = { beforeEach: () => load(base, [exchange]) };
 
 export const NotConnected: Story = {
