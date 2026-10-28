@@ -459,6 +459,8 @@ export async function threadSnapshot(
                       in: [
                         "thread.progress",
                         "thread.subagent",
+                        "run.waiting_input",
+                        "computer.takeover.requested",
                         "agent.tool.called",
                         "agent.tool.completed",
                       ],
@@ -476,7 +478,11 @@ export async function threadSnapshot(
       botId: target.botId,
       threadId: target.threadId,
       cursor: core.last?.seq ?? -1,
-      messages: messagesWithLiveEvents(core.messagePage.messages, core.liveEvents),
+      messages: messagesWithLiveEvents(
+        core.messagePage.messages,
+        core.liveEvents,
+        core.run ? [core.run] : [],
+      ),
       olderCursor: core.messagePage.olderCursor,
       run: core.run ? mapRun(core.run) : null,
       ...(await delegatePendingField(deps.prisma, target)),
@@ -529,6 +535,8 @@ export async function threadSnapshot(
                   in: [
                     "thread.progress",
                     "thread.subagent",
+                    "run.waiting_input",
+                    "computer.takeover.requested",
                     "agent.tool.called",
                     "agent.tool.completed",
                   ],
@@ -554,7 +562,7 @@ export async function threadSnapshot(
     members: target.members,
     threadId: target.threadId,
     cursor: core.last?.seq ?? -1,
-    messages: messagesWithLiveEvents(core.messagePage.messages, core.liveEvents),
+    messages: messagesWithLiveEvents(core.messagePage.messages, core.liveEvents, core.activeRuns),
     olderCursor: core.messagePage.olderCursor,
     // Match the live reducer: a failed latest terminal stays in run even while siblings are
     // still active or start late. A newer completed/cancelled terminal clears it.
@@ -602,8 +610,9 @@ function pickLatestTerminalRun<T extends { id: string; createdAt: Date; complete
 function messagesWithLiveEvents(
   persisted: ThreadSnapshot["messages"],
   liveEvents: Parameters<typeof projectMessages>[0],
+  runs: NonNullable<Parameters<typeof projectMessages>[1]>,
 ) {
-  const live = projectMessages(liveEvents).filter((message) => {
+  const live = projectMessages(liveEvents, runs).filter((message) => {
     if (message.blocks.some((block) => block.kind === "progress" || block.kind === "steps")) {
       return true;
     }

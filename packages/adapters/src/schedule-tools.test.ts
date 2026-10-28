@@ -9,6 +9,7 @@ import {
   isOneShotRoutineCron,
   keepForcedSkill,
   listSchedulesFromTool,
+  MAX_ACTIVE_ROUTINES_PER_BOT,
   resolveScheduleTiming,
   SCHEDULE_TOOL_NAMES,
   scheduleApproval,
@@ -16,6 +17,23 @@ import {
 } from "./schedule-tools.js";
 
 describe("resolveScheduleTiming", () => {
+  it.each(["2030-02-30T10:00Z", "2030-04-31T10:00+05:30", "2030-06-15T24:00:00Z"])(
+    "rejects an impossible runAt instead of rolling it over: %s",
+    (runAt) => {
+      expect(resolveScheduleTiming({ runAt })).toEqual({
+        ok: false,
+        error: "runAt must be a valid ISO datetime.",
+      });
+    },
+  );
+
+  it("still accepts a real offset datetime for runAt", () => {
+    expect(resolveScheduleTiming({ runAt: "2099-04-30T10:00+05:30" })).toMatchObject({
+      ok: true,
+      nextRunAt: new Date("2099-04-30T04:30:00Z"),
+    });
+  });
+
   it("rejects repeating intervals under one minute", () => {
     expect(resolveScheduleTiming({ every: 2, unit: "seconds" })).toEqual({
       ok: false,
@@ -203,7 +221,129 @@ describe("isOneShotRoutineCron", () => {
   });
 });
 
+const noRoutines = async () => [];
+
 describe("schedule tool persistence", () => {
+  it.each([
+    { cron: "0 9 * * *" },
+    { watch: { kind: "page", url: "https://example.com", intervalMinutes: 60 } },
+  ])("rejects an invalid timezone before persisting %j", async (schedule) => {
+    const create = vi.fn(async (args: { data: Record<string, unknown> }) => ({
+      id: "routine-1",
+      ...args.data,
+    }));
+    const enqueue = vi.fn(async () => undefined);
+    const deps = {
+      prisma: {
+        routine: { create, findMany: noRoutines },
+        bot: { findFirst: vi.fn(async () => ({ computer: null })) },
+      },
+      events: { append: vi.fn() },
+      jobs: { enqueue },
+    } as unknown as Parameters<typeof createScheduleFromTool>[0];
+    const result = await createScheduleFromTool(deps, {
+      spaceId: "ws-1",
+      botId: "bot-1",
+      userId: "user-1",
+      threadId: "thread-1",
+      name: "Daily",
+      prompt: "Check",
+      timezone: "Mars/Olympus_Mons",
+      schedule,
+    });
+    expect(result).toEqual({ error: "Unknown time zone: Mars/Olympus_Mons." });
+    expect(create).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+  it("refuses a name already active in the thread, not one in another thread", async () => {
+    const findMany = vi.fn(async () => [
+      { id: "routine-1", name: "Morning joke", threadId: "thread-1" },
+      { id: "routine-2", name: "Evening joke", threadId: "thread-2" },
+    ]);
+    const create = vi.fn(async (args: { data: Record<string, unknown> }) => ({
+      id: "routine-3",
+      ...args.data,
+    }));
+    const deps = {
+      prisma: {
+        user: { findUnique: vi.fn(async () => null) },
+        routine: {
+          create,
+          findMany,
+        },
+      },
+      events: { append: vi.fn() },
+      jobs: { enqueue: vi.fn() },
+    } as unknown as Parameters<typeof createScheduleFromTool>[0];
+
+    const result = await createScheduleFromTool(deps, {
+      spaceId: "ws-1",
+      botId: "bot-1",
+      userId: "user-1",
+      threadId: "thread-1",
+      name: " morning joke ",
+      prompt: "Tell a joke",
+      schedule: { every: 1, unit: "minutes" },
+    });
+
+    expect(result).toEqual({
+      error:
+        'An active routine named "Morning joke" already exists (routine-1). Update or cancel it instead.',
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { spaceId: "ws-1", botId: "bot-1", active: true },
+      select: { id: true, name: true, threadId: true },
+    });
+    expect(create).not.toHaveBeenCalled();
+
+    const other = await createScheduleFromTool(deps, {
+      spaceId: "ws-1",
+      botId: "bot-1",
+      userId: "user-1",
+      threadId: "thread-1",
+      name: "Evening joke",
+      prompt: "Tell a joke",
+      schedule: { every: 1, unit: "minutes" },
+    });
+    expect(other).toMatchObject({ ok: true, routineId: "routine-3" });
+  });
+
+  it("refuses a new routine once the bot has the maximum active", async () => {
+    const create = vi.fn();
+    const deps = {
+      prisma: {
+        user: { findUnique: vi.fn(async () => null) },
+        routine: {
+          create,
+          findMany: vi.fn(async () =>
+            Array.from({ length: MAX_ACTIVE_ROUTINES_PER_BOT }, (_, i) => ({
+              id: `routine-${i}`,
+              name: `Check ${i}`,
+              threadId: "thread-1",
+            })),
+          ),
+        },
+      },
+      events: { append: vi.fn() },
+      jobs: { enqueue: vi.fn() },
+    } as unknown as Parameters<typeof createScheduleFromTool>[0];
+
+    const result = await createScheduleFromTool(deps, {
+      spaceId: "ws-1",
+      botId: "bot-1",
+      userId: "user-1",
+      threadId: "thread-1",
+      name: "One more",
+      prompt: "Check",
+      schedule: { cron: "0 9 * * *" },
+    });
+
+    expect(result).toEqual({
+      error: `This bot already has ${MAX_ACTIVE_ROUTINES_PER_BOT} active routines. Cancel one before adding another.`,
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("creates routines with routine.created and enqueues wakeup", async () => {
     const append = vi.fn(async () => undefined);
     const enqueue = vi.fn(async () => undefined);
@@ -213,7 +353,10 @@ describe("schedule tool persistence", () => {
       nextRunAt: args.data.nextRunAt,
     }));
     const deps = {
-      prisma: { routine: { create }, user: { findUnique: vi.fn(async () => null) } },
+      prisma: {
+        routine: { create, findMany: noRoutines },
+        user: { findUnique: vi.fn(async () => null) },
+      },
       events: { append },
       jobs: { enqueue, cancel: vi.fn(async () => undefined) },
     } as unknown as Parameters<typeof createScheduleFromTool>[0];
@@ -253,6 +396,7 @@ describe("schedule tool persistence", () => {
       prisma: {
         user: { findUnique: vi.fn(async () => null) },
         routine: {
+          findMany: noRoutines,
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
@@ -291,6 +435,7 @@ describe("schedule tool persistence", () => {
       prisma: {
         user: { findUnique: vi.fn(async () => null) },
         routine: {
+          findMany: noRoutines,
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
@@ -329,6 +474,7 @@ describe("schedule tool persistence", () => {
       prisma: {
         user: { findUnique: vi.fn(async () => null) },
         routine: {
+          findMany: noRoutines,
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
@@ -372,6 +518,7 @@ describe("schedule tool persistence", () => {
       prisma: {
         user: { findUnique: vi.fn(async () => null) },
         routine: {
+          findMany: noRoutines,
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
@@ -545,6 +692,53 @@ describe("routine from a forced skill", () => {
     });
     expect(prisma.routine.update).not.toHaveBeenCalled();
     expect(prisma.routine.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { cron: "0 */7 * * *", keeps: true },
+    { cron: "0 9 * * *", keeps: false },
+  ])("on a timezone-only change, keeps the next run of $cron: $keeps", async ({ cron, keeps }) => {
+    const due = new Date(Date.now() + 3 * 3_600_000);
+    const update = vi.fn(async (args: { data: Record<string, unknown> }) => ({
+      id: "r1",
+      spaceId: "s",
+      botId: "b",
+      name: "Note",
+      prompt: "x",
+      crons: [cron],
+      active: true,
+      threadId: null,
+      watch: null,
+      ...args.data,
+    }));
+    const prisma = {
+      routine: {
+        findFirst: vi.fn(async () => ({
+          id: "r1",
+          prompt: "x",
+          timezone: "UTC",
+          crons: [cron],
+          active: true,
+          nextRunAt: due,
+          managedKind: null,
+        })),
+        update,
+      },
+    };
+    const deps = {
+      prisma,
+      events: { append: vi.fn() },
+      jobs: { enqueue: vi.fn(), cancel: vi.fn() },
+    } as never;
+    await updateScheduleFromTool(deps, {
+      spaceId: "s",
+      botId: "b",
+      userId: "u",
+      id: "r1",
+      timezone: "Pacific/Auckland",
+    });
+    const nextRunAt = update.mock.calls[0]![0].data.nextRunAt as Date;
+    expect(nextRunAt.getTime() === due.getTime()).toBe(keeps);
   });
 
   it("names the group an updated routine posts in", async () => {

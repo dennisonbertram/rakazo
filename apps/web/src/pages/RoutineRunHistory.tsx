@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { rpc } from "../lib/rpc";
 import { formatToolActivityDuration } from "../lib/tool-activity-view";
+import { runErrorText } from "../lib/user-error";
 import { statusLabel, statusTone } from "./ActivityList";
 
 export function RoutineRunHistory({
@@ -17,7 +18,7 @@ export function RoutineRunHistory({
   name?: string;
   running?: boolean;
 }) {
-  const { i18n } = useLingui();
+  const { i18n, t } = useLingui();
   const [history, setHistory] = useState<RoutineHistory | null>(null);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -268,6 +269,19 @@ export function RoutineRunHistory({
                   </p>
                 ) : run.preview && !run.waitingOn ? (
                   <p className={`truncate text-foreground ${name ? "" : "mt-1"}`}>{run.preview}</p>
+                ) : null}
+                {run.status === "failed" && run.error ? (
+                  <div className="mt-1 text-destructive">
+                    <p>{runErrorText(run.error)}</p>
+                    {runErrorText(run.error) !== run.error ? (
+                      <details key={run.error} className="mt-1">
+                        <summary className="w-fit cursor-pointer">{t`Details`}</summary>
+                        <pre className="mt-2 whitespace-pre-wrap break-words text-xs">
+                          {run.error}
+                        </pre>
+                      </details>
+                    ) : null}
+                  </div>
                 ) : null}
                 <div className="mt-1 flex items-center justify-between gap-2">
                   <span>{duration}</span>

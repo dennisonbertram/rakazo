@@ -3,9 +3,14 @@ import type { StuckWorkStatus } from "@rakazo/core";
 import { ACTIVE_RUN_STATUSES, stuckWorkExpiredNonce, stuckWorkStatusMessage } from "@rakazo/core";
 import type { Prisma } from "./client.js";
 import { expireComputerExecutionLeases } from "./computers.js";
-import { appendEventInTransaction, createPendingSteeringRun } from "./events.js";
+import {
+  appendEventInTransaction,
+  createPendingSteeringRun,
+  discardAnsweredSteering,
+} from "./events.js";
 import { createThreadMessageInTransaction } from "./messages.js";
 import { deleteRunSecretsInTransaction } from "./run-secrets.js";
+import { clearRunTurnCheckpoints } from "./run-turn-checkpoint.js";
 
 export interface ExpireStuckRunInput {
   runId: string;
@@ -108,6 +113,7 @@ export async function expireStuckRun(
     payload: {},
   });
   await tx.event.deleteMany({ where: { runId: input.runId, type: "thread.progress" } });
+  await clearRunTurnCheckpoints(tx, [input.runId]);
   await deleteRunSecretsInTransaction(tx, [
     { id: input.runId, userId: run.userId, spaceId: run.spaceId },
   ]);
@@ -129,6 +135,7 @@ export async function expireStuckRun(
       executionLeaseExpiresAt: null,
     },
   });
+  await discardAnsweredSteering(tx, { threadId: run.threadId, runId: input.runId });
   await tx.steeringMessage.updateMany({
     where: { runId: input.runId },
     data: { runId: null, claimedAt: null },

@@ -38,7 +38,7 @@ import { claimSteering } from "./steering.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
 export { completedRunBlocks, finalizeRun } from "./run-finalize.js";
-export { createPendingSteeringRun } from "./steering.js";
+export { createPendingSteeringRun, discardAnsweredSteering } from "./steering.js";
 export {
   answerRunInput,
   answerWaitingRunWithTextInTransaction,

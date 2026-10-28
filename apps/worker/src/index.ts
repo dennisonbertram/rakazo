@@ -30,6 +30,7 @@ import {
   createJobReconciler,
   createMessagingContextLoader,
   createPostgresReconciliationLeadership,
+  createRoutineRetryNoticeReconciler,
   createRunExecutor,
   createRunSandbox,
   createRunSecretWriter,
@@ -364,6 +365,11 @@ async function main() {
     reconcileMeetings: () => reconcileMeetingSyncs({ prisma, jobs }),
     reconcileCompanyImports: () => companyImport.recoveryJob(),
     reconcileTeachHeldValues: () => deleteExpiredTeachData(prisma),
+    reconcileRoutineRetryNotices: inMemoryJobs
+      ? undefined
+      : createRoutineRetryNoticeReconciler(pool, (runId) =>
+          executor.notifyRoutineRetryAttemptsExhausted(runId),
+        ),
   });
   reconciler.start();
 

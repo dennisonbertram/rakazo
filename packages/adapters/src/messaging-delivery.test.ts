@@ -1,6 +1,7 @@
 import type { AdapterContext, MessagingSurface } from "@rakazo/adapter-kit";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
+import { MessagingSendError } from "./chat-sdk-surface.js";
 import type { MessagingDeliveryDeps } from "./messaging-delivery.js";
 import {
   applyMessagingOutboundStatus,
@@ -157,6 +158,29 @@ function createDeps(overrides: {
           return nextMs <= now;
         });
       }),
+      // Earlier undelivered part of the same reply (see hasUndeliveredEarlierPart).
+      findFirst: vi.fn(
+        async ({
+          where,
+        }: {
+          where: {
+            sourceMessageId: string;
+            createdAt: { lt: Date };
+            OR: Array<{ status: string; updatedAt?: { gt: Date } }>;
+          };
+        }) =>
+          rows.find((row) => {
+            if (row.sourceMessageId !== where.sourceMessageId) return false;
+            if (!((row.createdAt as Date) < where.createdAt.lt)) return false;
+            return where.OR.some((condition) =>
+              condition.status === "pending"
+                ? row.status === "pending"
+                : row.status === "sent" &&
+                  row.providerHandle == null &&
+                  ((row.updatedAt as Date | undefined) ?? new Date()) > condition.updatedAt!.gt,
+            );
+          }) ?? null,
+      ),
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
         let count = 0;
         for (const item of data) {
@@ -801,6 +825,29 @@ function createChannelDeps(
           return nextMs <= now;
         });
       }),
+      // Earlier undelivered part of the same reply (see hasUndeliveredEarlierPart).
+      findFirst: vi.fn(
+        async ({
+          where,
+        }: {
+          where: {
+            sourceMessageId: string;
+            createdAt: { lt: Date };
+            OR: Array<{ status: string; updatedAt?: { gt: Date } }>;
+          };
+        }) =>
+          rows.find((row) => {
+            if (row.sourceMessageId !== where.sourceMessageId) return false;
+            if (!((row.createdAt as Date) < where.createdAt.lt)) return false;
+            return where.OR.some((condition) =>
+              condition.status === "pending"
+                ? row.status === "pending"
+                : row.status === "sent" &&
+                  row.providerHandle == null &&
+                  ((row.updatedAt as Date | undefined) ?? new Date()) > condition.updatedAt!.gt,
+            );
+          }) ?? null,
+      ),
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
         for (const item of data)
           rows.push({ id: `out-${rows.length + 1}`, status: "pending", ...item });
@@ -1101,4 +1148,238 @@ it("drops a queued connection invite after opt-out", async () => {
   });
   await deliverMessagingOutbound(deps, {}, context);
   expect(deps.sendToThread).not.toHaveBeenCalled();
+});
+
+describe("accepted outbound bookkeeping failures", () => {
+  const cases = [
+    ["group", "handle"],
+    ["intro", "handle"],
+    ["invite", "counter"],
+    ["text", "handle"],
+    ["text", "counter"],
+  ] as const;
+
+  function pending(kind: string) {
+    return createDeps({
+      identity: { provider: "telegram", dmThreadId: "telegram:123" },
+      outboundRows: [
+        {
+          id: "out-accepted",
+          idempotencyKey: kind === "invite" ? "connect:bot-1:bot-9" : "msg:m-1",
+          sourceMessageId: "m-1",
+          kind: kind === "group" || kind === "intro" ? kind : "dm",
+          identityId: kind === "group" || kind === "intro" ? null : "mi-1",
+          threadId: kind === "group" || kind === "intro" ? "telegram:group" : null,
+          body: "Hello",
+          status: "pending",
+          attempts: 0,
+          providerHandle: null,
+          nextAttemptAt: null,
+          createdAt: new Date(1_000),
+        },
+      ],
+    });
+  }
+
+  it.each(cases)("does not resend accepted %s after a %s save failure", async (kind, failure) => {
+    const deps = pending(kind);
+    const error = new Error("bookkeeping unavailable");
+    if (failure === "counter") {
+      deps.prisma.messagingIdentity.update.mockRejectedValueOnce(error);
+    } else if (kind === "group" || kind === "intro") {
+      deps.prisma.messagingOutbound.update.mockRejectedValueOnce(error);
+    } else {
+      const update = deps.prisma.messagingOutbound.updateMany.getMockImplementation()!;
+      deps.prisma.messagingOutbound.updateMany
+        .mockImplementationOnce(update)
+        .mockRejectedValueOnce(error);
+    }
+    await deliverMessagingOutbound(deps, {}, context);
+    // Past every send retry and abandoned-part deadline, the accepted row stays claimed.
+    deps.rows[0]!.nextAttemptAt = new Date(0);
+    deps.rows[0]!.updatedAt = new Date(0);
+    await deliverMessagingOutbound(deps, {}, context);
+    expect(deps.sendToThread).toHaveBeenCalledTimes(1);
+    expect(deps.rows[0]!.status).toBe("sent");
+    expect(deps.rows[0]!.attempts).toBe(0);
+    expect(deps.rows[0]!.providerHandle).toBe(failure === "counter" ? "handle-out-1" : null);
+    expect(deps.jobs.enqueue).not.toHaveBeenCalled();
+    expect(deps.rows).toHaveLength(1);
+  });
+
+  it.each(["group", "intro", "text"])(
+    "still retries %s when the provider fails before acceptance",
+    async (kind) => {
+      const deps = pending(kind);
+      deps.sendToThread.mockRejectedValueOnce(new Error("provider unavailable"));
+      await deliverMessagingOutbound(deps, {}, context);
+      expect(deps.rows[0]!.status).toBe("pending");
+      expect(deps.rows[0]!.attempts).toBe(1);
+      expect(deps.jobs.enqueue).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          name: "messaging.deliver",
+          availableAt: deps.rows[0]!.nextAttemptAt,
+        }),
+      );
+      deps.rows[0]!.nextAttemptAt = new Date(0);
+      await deliverMessagingOutbound(deps, {}, context);
+      expect(deps.sendToThread).toHaveBeenCalledTimes(2);
+      expect(deps.rows[0]!.status).toBe("sent");
+    },
+  );
+});
+
+describe("deliverMessagingOutbound send failure classification", () => {
+  it("fails a permanently rejected row at once instead of retrying it", async () => {
+    const deps = createDeps({
+      sendError: new MessagingSendError(new Error("channel_not_found"), {
+        permanent: true,
+        retryAfterMs: null,
+      }),
+    });
+    await deliverMessagingOutbound(deps, { runId: "run-1" }, context);
+
+    expect(deps.rows).toEqual([expect.objectContaining({ status: "failed", attempts: 1 })]);
+    expect(deps.jobs.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("waits at least the provider's retry-after before the next attempt", async () => {
+    const deps = createDeps({
+      sendError: new MessagingSendError(new Error("rate limited"), {
+        permanent: false,
+        retryAfterMs: 30_000,
+      }),
+    });
+    const before = Date.now();
+    await deliverMessagingOutbound(deps, { runId: "run-1" }, context);
+
+    const retryAt = deps.rows[0]!.nextAttemptAt as Date;
+    expect(deps.rows[0]).toEqual(expect.objectContaining({ status: "pending", attempts: 1 }));
+    expect(retryAt.getTime()).toBeGreaterThanOrEqual(before + 30_000);
+    expect(deps.jobs.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "messaging.deliver", availableAt: retryAt }),
+    );
+  });
+});
+
+describe("deliverMessagingOutbound conversation order", () => {
+  const whatsapp = { provider: "whatsapp", address: "15551234567", dmThreadId: "whatsapp:p:1" };
+  const part = (letter: string) => letter.repeat(3000);
+  const longReply = [part("a"), part("b"), part("c")].join("\n\n");
+
+  it("queues a long WhatsApp reply as one row per message-sized part", async () => {
+    const deps = createDeps({
+      identity: whatsapp,
+      messages: [{ id: "m-1", blocks: [{ kind: "text", text: longReply }] }],
+    });
+    await deliverMessagingOutbound(deps, { runId: "run-1" }, context);
+
+    expect(deps.rows.map((row) => [row.idempotencyKey, row.body, row.status])).toEqual([
+      ["msg:m-1", part("a"), "sent"],
+      ["msg:m-1:2", part("b"), "sent"],
+      ["msg:m-1:3", part("c"), "sent"],
+    ]);
+    expect(deps.rows.every((row) => row.sourceMessageId === "m-1")).toBe(true);
+  });
+
+  it("re-sends only the parts that failed, in order", async () => {
+    const deps = createDeps({
+      identity: whatsapp,
+      messages: [{ id: "m-1", blocks: [{ kind: "text", text: longReply }] }],
+    });
+    deps.sendToThread
+      .mockResolvedValueOnce({ handle: "wamid.1" })
+      .mockRejectedValueOnce(new Error("WhatsApp API error"));
+    await deliverMessagingOutbound(deps, { runId: "run-1" }, context);
+
+    // The third part waits behind the failed second one.
+    expect(deps.rows.map((row) => row.status)).toEqual(["sent", "pending", "pending"]);
+    expect(deps.rows[2]!.attempts ?? 0).toBe(0);
+
+    deps.rows[1]!.nextAttemptAt = new Date(Date.now() - 1);
+    await deliverMessagingOutbound(deps, { runId: "run-1" }, context);
+
+    expect(deps.sendToThread.mock.calls.map((call) => (call as unknown[])[0])).toEqual(
+      [
+        [part("a"), "out-1"],
+        [part("b"), "out-2"],
+        [part("b"), "out-2"],
+        [part("c"), "out-3"],
+      ].map(([body, idempotencyKey]) => ({
+        threadId: "whatsapp:p:1",
+        body,
+        idempotencyKey,
+      })),
+    );
+    expect(deps.rows.map((row) => row.status)).toEqual(["sent", "sent", "sent"]);
+  });
+
+  it.each([
+    ["in flight in another drain", "sent", new Date(), false],
+    ["abandoned mid-send long ago", "sent", new Date(Date.now() - 10 * 60_000), true],
+    ["permanently failed", "failed", new Date(), true],
+  ] as const)(
+    "a later part whose first part is %s is sent=%s",
+    async (_label, status, updatedAt, sent) => {
+      const part = (id: string, key: string, offset: number, extra: Record<string, unknown>) => ({
+        id,
+        idempotencyKey: key,
+        kind: "dm",
+        identityId: "mi-1",
+        body: id,
+        sourceMessageId: "m-1",
+        providerHandle: null,
+        attempts: 0,
+        nextAttemptAt: null,
+        createdAt: new Date(1_000 + offset),
+        ...extra,
+      });
+      const deps = createDeps({
+        run: null,
+        identity: whatsapp,
+        outboundRows: [
+          part("p-1", "msg:m-1", 0, { status, updatedAt }),
+          part("p-2", "msg:m-1:2", 1, { status: "pending" }),
+        ],
+      });
+      await deliverMessagingOutbound(deps, {}, context);
+
+      expect(deps.sendToThread).toHaveBeenCalledTimes(sent ? 1 : 0);
+      expect(deps.rows[1]!.status).toBe(sent ? "sent" : "pending");
+    },
+  );
+
+  it("holds later rows to a conversation while an earlier one waits out its backoff", async () => {
+    const pendingRow = (id: string, body: string, nextAttemptAt: Date | null) => ({
+      id,
+      idempotencyKey: `msg:${id}`,
+      kind: "dm",
+      identityId: "mi-1",
+      body,
+      status: "pending",
+      attempts: nextAttemptAt ? 1 : 0,
+      nextAttemptAt,
+      providerHandle: null,
+    });
+    const deps = createDeps({
+      run: null,
+      outboundRows: [
+        pendingRow("out-1", "first", new Date(Date.now() + 60_000)),
+        pendingRow("out-2", "second", null),
+        {
+          ...pendingRow("out-3", "elsewhere", null),
+          identityId: null,
+          kind: "group",
+          threadId: "sendblue:grp",
+        },
+      ],
+    });
+    await deliverMessagingOutbound(deps, {}, context);
+
+    expect(deps.sendToThread).toHaveBeenCalledExactlyOnceWith(
+      { threadId: "sendblue:grp", body: "elsewhere" },
+      context,
+    );
+    expect(deps.rows.map((row) => row.status)).toEqual(["pending", "pending", "sent"]);
+  });
 });

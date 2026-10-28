@@ -518,6 +518,7 @@ function noticePrisma(run: ReturnType<typeof candidate>, stamps: NoticeStamp[]) 
 
 function expireClient(run: ReturnType<typeof candidate>, options?: { cancelled?: number }) {
   const client = {
+    externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     run: {
       findMany: vi.fn(async () => [run]),
       updateMany: vi.fn(async () => ({ count: options?.cancelled ?? 1 })),
@@ -541,7 +542,10 @@ function expireClient(run: ReturnType<typeof candidate>, options?: { cancelled?:
       create: vi.fn(async () => ({ id: "task-next" })),
     },
     thread: { update: vi.fn(async () => ({ nextMessageSeq: 2, nextEventSeq: 9 })) },
-    message: { create: vi.fn(async () => ({ id: "message-expired", seq: 1 })) },
+    message: {
+      create: vi.fn(async () => ({ id: "message-expired", seq: 1 })),
+      findFirst: vi.fn(async () => null),
+    },
     event: {
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({ seq: 8 })),

@@ -149,13 +149,10 @@ async function cancelActiveRuns(
   _actor: Actor,
   botId: string,
 ): Promise<void> {
-  const activeRuns = await deps.prisma.run.findMany({
-    where: { botId, status: { in: [...ACTIVE_RUN_STATUSES] } },
-    select: { id: true },
-  });
-  await deps.prisma.run.updateMany({
+  const activeRuns = await deps.prisma.run.updateManyAndReturn({
     where: { botId, status: { in: [...ACTIVE_RUN_STATUSES] } },
     data: { status: "cancelled", completedAt: new Date() },
+    select: { id: true },
   });
   await clearEndedRunState(
     deps.prisma,

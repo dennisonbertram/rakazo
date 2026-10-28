@@ -223,6 +223,9 @@ export function createBackgroundJobHandlers(deps: {
     "routine.wakeup": asOwner(routine, async (payload) => {
       await deps.executor.wakeRoutine(payload.routineId, payload.scheduledFor);
     }),
+    "routine.retry": asOwner(run, async (payload) => {
+      await deps.executor.retryRoutineRun(payload.runId);
+    }),
     "computer.update": asOwner(updatedComputer, async ({ updateId }) => {
       await performComputerUpdate(deps, updateId);
     }),

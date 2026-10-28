@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "./client.js";
+import { clearRunTurnCheckpoints } from "./run-turn-checkpoint.js";
 
 /** A one-time answer longer than a saved value may be. Nothing is stored or echoed. */
 export class AnswerTooLongError extends Error {
@@ -38,10 +39,11 @@ export async function deleteRunSecretsInTransaction(
  * run's user and space here for the secrets index.
  */
 export async function clearEndedRunState(
-  prisma: Pick<PrismaClient, "run" | "secret">,
+  prisma: Pick<PrismaClient, "run" | "secret" | "externalEffect">,
   runIds: readonly string[],
 ): Promise<void> {
   if (runIds.length === 0) return;
+  await clearRunTurnCheckpoints(prisma, runIds);
   const runs = await prisma.run.findMany({
     where: { id: { in: [...runIds] } },
     select: { id: true, userId: true, spaceId: true },

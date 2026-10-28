@@ -38,6 +38,9 @@ export function defaultCatalogModelId(
   return usableModelId(entry?.id);
 }
 
+/** A run pinned to a provider the user has no connection for. */
+export const PINNED_PROVIDER_NOT_CONNECTED = "Connect that model provider first";
+
 export class UnavailableModelForAuthError extends Error {
   constructor(message = UNAVAILABLE_MODEL_FOR_AUTH_MESSAGE) {
     super(message);
@@ -326,7 +329,7 @@ export async function validateConnectedModelChoice(
   modelId: string,
 ) {
   const credential = await findModelCredential(prisma, actor, provider);
-  if (!credential) return "Connect that model provider first";
+  if (!credential) return PINNED_PROVIDER_NOT_CONNECTED;
   if (!usableModelId(modelId)) return "Unknown model for that provider";
   if (isCatalogModelChoice(provider, modelId)) return undefined;
   // Free-form saved IDs only resolve at runtime for openai-compatible connections.
@@ -414,7 +417,7 @@ export function pinnedModelCredentialError(
   credential: { defaultModel: string | null } | null,
 ): string | undefined {
   if (!choice.modelProvider || !usableModelId(choice.modelId)) return undefined;
-  if (!credential) return "Connect that model provider first";
+  if (!credential) return PINNED_PROVIDER_NOT_CONNECTED;
   const modelId = usableModelId(choice.modelId);
   if (
     modelId &&
