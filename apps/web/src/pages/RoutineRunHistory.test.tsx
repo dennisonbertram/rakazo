@@ -12,7 +12,10 @@ vi.mock("@lingui/core/macro", () => ({
   t: (parts: TemplateStringsArray) => parts.join(""),
 }));
 vi.mock("@lingui/react/macro", () => ({
-  useLingui: () => ({ i18n: { locale: "en" } }),
+  useLingui: () => ({
+    i18n: { locale: "en" },
+    t: (parts: TemplateStringsArray) => parts.join(""),
+  }),
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("@rakazo/ui-web", () => ({
@@ -30,6 +33,7 @@ const run: RoutineRun = {
   botId: "bot-1",
   groupId: null,
   status: "completed",
+  error: null,
   createdAt: "2026-01-02T12:00:00Z",
   startedAt: "2026-01-02T12:00:00Z",
   completedAt: "2026-01-02T12:01:22Z",
@@ -388,4 +392,56 @@ it("shows a finished run that only asked another agent as waiting on that agent"
   expect(row?.textContent).toContain("Waiting on Inbox agent");
   expect(row?.textContent).not.toContain("Done");
   await view.close();
+});
+
+it("shows why a silent run failed, with the raw error behind Details when it was reworded", async () => {
+  const error = "401: invalid key";
+  api.history.mockResolvedValue(page([{ ...run, status: "failed", messageId: null, error }]));
+  const view = await mounted();
+  try {
+    expect(view.container.textContent).toContain(
+      "The model provider did not accept your API key. Check it in Settings > Models.",
+    );
+    const details = view.container.querySelector("details");
+    expect(details?.open).toBe(false);
+    expect(details?.querySelector("summary")?.textContent).toBe("Details");
+    expect(details?.querySelector("pre")?.textContent).toBe(error);
+  } finally {
+    await view.close();
+  }
+});
+
+it("shows a plain failure reason once, without a Details toggle", async () => {
+  const error = "504: request timed out";
+  api.history.mockResolvedValue(page([{ ...run, status: "failed", messageId: null, error }]));
+  const view = await mounted();
+  try {
+    expect(view.container.textContent).toContain(error);
+    expect(view.container.querySelector("details")).toBeNull();
+  } finally {
+    await view.close();
+  }
+});
+
+it.each(["completed", "failed"] as const)(
+  "shows no failure reason for a %s run without an error",
+  async (status) => {
+    api.history.mockResolvedValue(page([{ ...run, status, messageId: null }]));
+    const view = await mounted();
+    try {
+      expect(view.container.querySelector("details")).toBeNull();
+    } finally {
+      await view.close();
+    }
+  },
+);
+
+it("omits the failure reason of a completed run carrying a stale error", async () => {
+  api.history.mockResolvedValue(page([{ ...run, error: "504: request timed out" }]));
+  const view = await mounted();
+  try {
+    expect(view.container.textContent).not.toContain("504: request timed out");
+  } finally {
+    await view.close();
+  }
 });
