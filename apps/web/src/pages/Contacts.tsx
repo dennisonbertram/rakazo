@@ -249,7 +249,7 @@ export function ContactsPage({
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <ContactAvatar name={contact.name} src={contact.photoUrl} size="sm" />
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <button
                                 type="button"
                                 title={contact.name}
