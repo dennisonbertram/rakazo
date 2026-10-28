@@ -53,9 +53,14 @@ describe("queued run supersession", () => {
   it("only cancels queued runs started by user messages or reactions", async () => {
     const tx = {
       run: {
-        findMany: vi.fn().mockResolvedValue([{ id: "run-old", taskId: "task-old" }]),
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "run-old", taskId: "task-old", userId: "user-1", spaceId: "space-1" },
+          ]),
         updateMany: vi.fn(),
       },
+      secret: { deleteMany: vi.fn() },
       task: { updateMany: vi.fn() },
     };
     await cancelSupersededQueuedRuns(tx as never, {
@@ -76,6 +81,10 @@ describe("queued run supersession", () => {
     expect(tx.task.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["task-old"] } },
       data: { status: "cancelled" },
+    });
+    // A superseded run never reads a waiting one-time answer.
+    expect(tx.secret.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ userId: "user-1", spaceId: "space-1", kind: "run-secret:run-old" }] },
     });
   });
 });
@@ -3343,12 +3352,15 @@ describe("stopThreadRuns", () => {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
       },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([
           { id: "run-a", botId: "bot-a" },
           { id: "run-b", botId: "bot-b" },
         ]),
         findUnique: vi.fn().mockResolvedValue({ status: "cancelled" }),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      message: { findMany: vi.fn().mockResolvedValue([]) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: {
         // Production team ownership is lease-only: Computer.executionRunId stays null.
@@ -3482,9 +3494,12 @@ describe("stopThreadRuns", () => {
         update: vi.fn().mockResolvedValue({ nextEventSeq: 5 }),
       },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([{ id: "run-a", botId: "bot-a" }]),
         findUnique: vi.fn().mockResolvedValue({ status: "cancelled" }),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      message: { findMany: vi.fn().mockResolvedValue([]) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: {
         // Selected via lease for cancelled run A, but legacy columns still name
@@ -3577,6 +3592,96 @@ describe("stopThreadRuns", () => {
     );
   });
 
+  it("closes an open approval card and the effects behind it when the user stops the run", async () => {
+    let nextEventSeq = 0;
+    const effectUpdate = vi.fn().mockResolvedValue({ count: 2 });
+    const messageUpdate = vi.fn().mockResolvedValue({});
+    const created: Array<Record<string, unknown>> = [];
+    const transaction = {
+      $queryRaw: vi.fn(),
+      thread: { update: vi.fn(async () => ({ nextEventSeq: nextEventSeq++ })) },
+      run: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "run-a", botId: "bot-a", userId: "user-1", spaceId: "workspace-1" },
+          ]),
+        updateManyAndReturn: vi.fn().mockResolvedValue([{ id: "run-a", botId: "bot-a" }]),
+        // Still waiting when the card is closed: a cancelled run cannot write to the thread.
+        findUnique: vi
+          .fn()
+          .mockResolvedValueOnce({ status: "waiting_input" })
+          .mockResolvedValue({ status: "cancelled" }),
+      },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      message: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "message-1",
+            runId: "run-a",
+            blocks: [
+              {
+                kind: "ask",
+                text: "Review before shell",
+                status: "pending",
+                approvalEffectId: "effect-1",
+                actions: [
+                  { id: "allow", label: "Allow once" },
+                  { id: "deny", label: "Deny" },
+                ],
+              },
+            ],
+          },
+        ]),
+        update: messageUpdate,
+      },
+      externalEffect: { updateMany: effectUpdate },
+      steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      computer: { findMany: vi.fn().mockResolvedValue([]) },
+      computerExecutionLease: { findMany: vi.fn().mockResolvedValue([]) },
+      event: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          created.push(data);
+          return data;
+        }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
+      computer: { findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn() },
+      computerExecutionLease: { updateMany: vi.fn() },
+    } as unknown as PrismaClient;
+    await stopThreadRuns(
+      {
+        prisma,
+        sandbox: {} as SandboxProvider,
+        events: { notify: vi.fn().mockResolvedValue(undefined) } as never,
+      },
+      { spaceId: "workspace-1", userId: "user-1" } as Actor,
+      {
+        kind: "bot",
+        botId: "bot-a",
+        threadId: "thread-1",
+      } as ThreadTarget,
+    );
+
+    // The card shows it was closed, and the effect behind it (and any other pending one) cannot run.
+    expect(messageUpdate).toHaveBeenCalledWith({
+      where: { id: "message-1" },
+      data: {
+        blocks: [expect.objectContaining({ status: "answered", answer: "stopped" })],
+      },
+    });
+    expect(effectUpdate).toHaveBeenCalledWith({
+      where: { runId: { in: ["run-a"] }, spaceId: "workspace-1", status: "intended" },
+      data: { status: "stopped" },
+    });
+    expect(created.map((event) => event.type)).toEqual(["thread.message.updated", "run.cancelled"]);
+  });
+
   it("writes a run.cancelled event per cancelled run ahead of the progress purge", async () => {
     // Two earlier progress events already hold seqs 0 and 1; a client may have
     // applied cursor 1 before Stop deletes those rows.
@@ -3589,6 +3694,7 @@ describe("stopThreadRuns", () => {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
       },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([
           { id: "run-a", botId: "bot-a" },
           { id: "run-b", botId: "bot-b" },
@@ -3596,6 +3702,8 @@ describe("stopThreadRuns", () => {
         // appendEventInTransaction re-reads the run after the flip.
         findUnique: vi.fn().mockResolvedValue({ status: "cancelled" }),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      message: { findMany: vi.fn().mockResolvedValue([]) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: { findMany: vi.fn().mockResolvedValue([]) },
       computerExecutionLease: { findMany: vi.fn().mockResolvedValue([]) },
@@ -3678,9 +3786,12 @@ describe("stopThreadRuns", () => {
       $queryRaw: vi.fn(),
       thread: { update: vi.fn() },
       run: {
+        findMany: vi.fn().mockResolvedValue([]),
         updateManyAndReturn: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn(),
       },
+      secret: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      message: { findMany: vi.fn().mockResolvedValue([]) },
       steeringMessage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       computer: { findMany: vi.fn() },
       computerExecutionLease: { findMany: vi.fn() },

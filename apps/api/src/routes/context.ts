@@ -155,6 +155,8 @@ export interface RouterDeps {
     imageTag?: string;
     integrationsCatalogUrl?: string;
     mcpAllowPrivateEndpoint?: boolean;
+    mcpStdioEnabled?: boolean;
+    mcpStdioAllowedCommands?: readonly string[];
     mailWritesDisabled?: boolean;
   };
 }

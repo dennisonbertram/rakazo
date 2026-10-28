@@ -698,17 +698,19 @@ export function CustomConnectionDialog({
                         {label}
                       </Button>
                     ))}
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      onClick={() => {
-                        setError(null);
-                        setName("");
-                        setView({ kind: "stdio" });
-                      }}
-                    >
-                      <Trans>Local command</Trans>
-                    </Button>
+                    {data.mcpStdioEnabled ? (
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          setError(null);
+                          setName("");
+                          setView({ kind: "stdio" });
+                        }}
+                      >
+                        <Trans>Local command</Trans>
+                      </Button>
+                    ) : null}
                     <Button
                       variant="outline"
                       size="xs"

@@ -458,6 +458,12 @@ describePostgres("row-level security (PostgreSQL)", () => {
           },
         }),
       );
+      keep(
+        "financeChartNote",
+        await o.financeChartNote.create({
+          data: { spaceId: t.spaceId, userId: t.userId, day: "2026-08-01", text: `n-${tag}` },
+        }),
+      );
       const search = keep(
         "mailSearch",
         await o.mailSearch.create({
@@ -489,6 +495,12 @@ describePostgres("row-level security (PostgreSQL)", () => {
         "notificationDelivery",
         await o.notificationDelivery.create({
           data: { notificationId: notification.id, channel: "push", nextAttemptAt: new Date() },
+        }),
+      );
+      keep(
+        "mcpConnection",
+        await o.mcpConnection.create({
+          data: { spaceId: t.spaceId, userId: t.userId, kind: "oauth", label: `c-${tag}` },
         }),
       );
       keep(
@@ -622,6 +634,35 @@ describePostgres("row-level security (PostgreSQL)", () => {
         db.message.create({ data: { threadId: a.threadId, seq: 51, role: "user", blocks: [] } }),
       ),
     ).rejects.toThrow(/row-level security/);
+  });
+
+  it("creates, lists and deletes Burn chart notes as the runtime login, per Space", async () => {
+    const note = await runAsTenant(a, () =>
+      db.financeChartNote.create({
+        data: { spaceId: a.spaceId, userId: a.userId, day: "2026-09-01", text: "created by a" },
+      }),
+    );
+    const texts = (t: typeof a) =>
+      runAsTenant(t, async () =>
+        (await db.financeChartNote.findMany({ where: { day: "2026-09-01" } })).map((n) => n.text),
+      );
+    expect(await texts(a)).toEqual(["created by a"]);
+    expect(await texts(b)).toEqual([]);
+    // Another Space can neither write into this one nor delete from it.
+    await expect(
+      runAsTenant(b, () =>
+        db.financeChartNote.create({
+          data: { spaceId: a.spaceId, userId: b.userId, day: "2026-09-01", text: "x" },
+        }),
+      ),
+    ).rejects.toThrow(/row-level security/);
+    expect(
+      await runAsTenant(b, () => db.financeChartNote.deleteMany({ where: { id: note.id } })),
+    ).toEqual({ count: 0 });
+    expect(
+      await runAsTenant(a, () => db.financeChartNote.deleteMany({ where: { id: note.id } })),
+    ).toEqual({ count: 1 });
+    expect(await texts(a)).toEqual([]);
   });
 
   it("applies the same rules to secrets, skills and voice credentials", async () => {

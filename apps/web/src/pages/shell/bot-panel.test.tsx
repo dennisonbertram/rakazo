@@ -2,7 +2,7 @@
 
 import type { Bot } from "@rakazo/contracts";
 import type { ComponentProps, ReactNode } from "react";
-import { act } from "react";
+import { act, useState } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -405,6 +405,42 @@ describe("BotSettings for a bot just created with New bot", () => {
     await act(async () => more?.click());
     expect(container.querySelector("textarea")).not.toBeNull();
     expect(container.querySelector('[data-testid="bot-settings-advanced"]')).not.toBeNull();
+  });
+});
+
+describe("BotSettings More settings toggles and keeps its state across a remount", () => {
+  it("opens, stays open when rebuilt, then closes when pressed again", async () => {
+    // Mirrors Shell: the parent keeps the choice and rebuilds the panel (new key) after a save.
+    function Parent({ generation }: { generation: number }) {
+      const [folded, setFolded] = useState(true);
+      return (
+        <BotSettings
+          key={generation}
+          bot={bot("")}
+          focusName={folded}
+          foldable
+          onFoldedChange={setFolded}
+          memoryProviderConfigured={false}
+          onSkillsChange={() => undefined}
+          onSave={onSave}
+          onExport={async () => undefined}
+          onClear={() => undefined}
+        />
+      );
+    }
+    const toggle = () =>
+      [...container.querySelectorAll("button")].find((b) =>
+        b.textContent?.includes("More settings"),
+      );
+    await act(async () => root.render(<Parent generation={0} />));
+    expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => toggle()?.click());
+    expect(container.querySelector("textarea")).not.toBeNull();
+    await act(async () => root.render(<Parent generation={1} />));
+    expect(container.querySelector("textarea")).not.toBeNull();
+    expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => toggle()?.click());
+    expect(container.querySelector("textarea")).toBeNull();
   });
 });
 

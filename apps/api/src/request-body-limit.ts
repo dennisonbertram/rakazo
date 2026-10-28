@@ -4,6 +4,8 @@ import { cancelBody } from "./http-body.js";
 
 export const MAX_AUTH_REQUEST_BYTES = 64 * 1024;
 export const MAX_RPC_REQUEST_BYTES = 16 * 1024 * 1024;
+/** An MCP request is one JSON-RPC message of tool arguments. */
+export const MAX_MCP_REQUEST_BYTES = 256 * 1024;
 /** The portal takes one link token or nothing. */
 export const MAX_PORTAL_REQUEST_BYTES = 4 * 1024;
 
@@ -62,6 +64,7 @@ export function mountApiRequestBodyLimits(app: Hono): void {
   app.use("/api/auth/*", requestBodyLimit(MAX_AUTH_REQUEST_BYTES));
   app.use(`${LOCAL_SETTINGS_RPC}/*`, requestBodyLimit(MAX_RPC_REQUEST_BYTES));
   app.use("/rpc/*", requestBodyLimit(MAX_RPC_REQUEST_BYTES));
+  app.use("/mcp", requestBodyLimit(MAX_MCP_REQUEST_BYTES));
   app.use("/api/portal/*", requestBodyLimit(MAX_PORTAL_REQUEST_BYTES));
   app.use("/api/share/*", requestBodyLimit(MAX_PORTAL_REQUEST_BYTES));
 }

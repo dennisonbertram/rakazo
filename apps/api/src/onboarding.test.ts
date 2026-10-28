@@ -83,7 +83,7 @@ it("marks only the authorized connector when provider slugs collide", async () =
 });
 
 describe("blank bot greeting", () => {
-  it("posts a fixed greeting that names the user but not the soon-renamed bot", async () => {
+  it("greets the user and asks what the bot is for with a choice card, without a model run", async () => {
     const { deps, actor } = fixture([]);
     (deps.prisma as unknown as { user: unknown }).user = {
       findUnique: vi.fn(async () => ({ name: "Ada Lovelace" })),
@@ -91,9 +91,15 @@ describe("blank bot greeting", () => {
     await seedBlankBotGreeting(deps, actor, { id: "bot", name: "New Bot", threadId: "thread" });
     expect(posted).toHaveLength(1);
     expect(posted[0]?.blocks).toEqual([
+      { kind: "text", text: "Hi Ada." },
       {
-        kind: "text",
-        text: expect.stringMatching(/^Hi Ada\. I'm a blank slate/),
+        kind: "choice",
+        question: "What do you want me for?",
+        options: [
+          { id: "setup-research", letter: "A", label: "Research something" },
+          { id: "setup-recurring", letter: "B", label: "A recurring task" },
+          { id: "setup-email", letter: "C", label: "Help with email" },
+        ],
       },
     ]);
   });

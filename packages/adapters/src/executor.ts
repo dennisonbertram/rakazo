@@ -45,6 +45,7 @@ import {
   AI_DISCLOSURE_VERSION,
   ATTACHMENT_MAX_BYTES,
   BOT_DESCRIPTION_MAX_LENGTH,
+  BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
   BOT_TITLE_MAX_LENGTH,
   BotSecretName,
@@ -146,6 +147,7 @@ import {
   PrivateFragments,
   parseSkillMd,
   plainRunError,
+  plainTextFromMarkdown,
   planActionGate,
   promptInvokesSkill,
   quietRoutineGuidance,
@@ -159,6 +161,7 @@ import {
   toolRequiresExplicitApproval,
   toolResultTaintsRun,
   truncatedPlainText,
+  truncatePlainText,
   unattendedToolRequiresApproval,
   userTurnMessageForRun,
   VOICE_AGENT_INSTRUCTIONS,
@@ -200,6 +203,7 @@ import { createUiArtifact } from "@rakazo/ui-artifact";
 import {
   connectAgent,
   messageConnectedAgent,
+  prepareAgentConnectionResponse,
   respondAgentConnection,
 } from "./agent-connections.js";
 import {
@@ -269,6 +273,7 @@ import {
   forgetBotSecret,
   listBotSecrets,
   loadBotCommandEnvironment,
+  loadLoginPasswordRedactions,
   normalizeSecretDestination,
   requestWithBotSecret,
   resolveLoginFill,
@@ -463,6 +468,8 @@ import {
   needsOAuthProbe,
   parseMcpServerToolArgs,
 } from "./mcp-server-tool.js";
+import type { McpStdioPolicy } from "./mcp-transport.js";
+import { mcpStdioRefusal } from "./mcp-transport.js";
 import {
   isMeetingSourceAgent,
   MEETING_AGENT_BUILTIN_TOOLS,
@@ -823,6 +830,8 @@ export interface ExecutorDeps {
   secretHttp?: RemoteTransportDependencies;
   /** Allow RFC1918 / Docker-network MCP URLs when the deployment owner enabled the escape. */
   mcpAllowPrivateEndpoint?: boolean;
+  /** Which stdio MCP servers this deployment runs; absent runs none. */
+  mcpStdio?: McpStdioPolicy;
   /** Remote cloud coding agents. Null/omit means tools stay uninjected. */
   cloudAgent?: CloudAgentConnection | null;
   /** Mail tools (mail_search, mail_grep, mail_get, show_emails, inbox_overview). Null/omit means they are never offered. */
@@ -1635,6 +1644,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           agentSkills,
           agentSecretRows,
           initialBotCommandEnvironment,
+          savedLoginPasswordRedactions,
         ] = await Promise.all([
           deps.prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } }),
           loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId),
@@ -1689,6 +1699,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           voiceAgent
             ? Promise.resolve({})
             : loadBotCommandEnvironment(deps.prisma, deps.secretStore, run),
+          loadLoginPasswordRedactions(deps.prisma, deps.secretStore, run),
         ]);
         const voiceWorkspaceReadAllowed =
           voiceAgent &&
@@ -1863,6 +1874,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         runSecrets.push(...Object.values(agentEnvironment));
         // Encoded forms too: read_file redacts with these values before any shell command runs.
         runSecrets.push(...commandCredentialRedactions(initialBotCommandEnvironment));
+        // A login filled in an earlier run may still be on its page, and anything this run reads
+        // or is given may contain it, so every run hides its saved passwords before the model runs.
+        runSecrets.push(...savedLoginPasswordRedactions);
         const agentEnvironmentInstruction = restrictedContext
           ? undefined
           : formatAgentEnvironmentInstruction({
@@ -2017,7 +2031,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: bot.id,
           type: "run.started",
           runId,
-          payload: { trigger: run.trigger, routineId: run.routineId },
+          payload: { trigger: run.trigger, routineId: run.routineId, userId: run.userId },
         });
 
         const discoveredPromise =
@@ -2680,6 +2694,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // An external bot is told nothing about tools it is not offered, and gets none of the
         // automatic private context (memory, tickets, recall, environment, connected apps).
         const externalBot = bot.audience === "external";
+        // Only the user typing in this bot's own chat may rewrite the bot's standing instructions.
+        const userTypedInOwnChat =
+          (run.trigger === "user" || run.trigger === "follow_up") &&
+          !thread.groupId &&
+          run.userId === bot.userId;
         const instructionDisabledTools = externalBot
           ? new Set([
               ...disabledBuiltinTools,
@@ -3130,6 +3149,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }),
           // Cross-owner agent connections only exist for chat-linked bots.
           ...(hasMessagingIdentity &&
+          bot.crossSpaceCommunication === true &&
           bot.audience !== "external" &&
           !voiceAgent &&
           !gtmAgent &&
@@ -3462,8 +3482,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
             visualActionKey,
           );
           unchangedVisualStreak = guard.streak;
+          // A browser window's title is the page title, which can echo a signed-in username.
+          const activeWindow = observation.activeWindow;
           const result = observationToolResult(
-            observation,
+            activeWindow?.title
+              ? {
+                  ...observation,
+                  activeWindow: {
+                    ...activeWindow,
+                    title: redactSecrets(activeWindow.title, runSecrets),
+                  },
+                }
+              : observation,
             note,
             lastComputerFrameId,
             visualActionKey ? { unchangedVisualCount: guard.streak.count } : undefined,
@@ -4113,6 +4143,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? { disclosure: MESSAGING_AI_DISCLOSURE }
                 : {}),
             };
+          }
+          if (name === "respond_agent_connection") {
+            if (nextApprovedTool !== name) {
+              const request = await prepareAgentConnectionResponse(
+                deps.prisma,
+                bot.id,
+                Boolean(args.accept),
+              );
+              if (!request) return { error: "no pending connection request" };
+              args = request;
+            } else if (
+              typeof args.requester_name !== "string" ||
+              typeof args.requester_address !== "string" ||
+              typeof args.requester_provider !== "string"
+            ) {
+              return { error: "connection request is no longer pending" };
+            }
+            effectRequest = args;
           }
           const viaConnector = !BUILTIN_AGENT_TOOL_NAMES.has(name) && !COMPANY_TOOL_NAMES.has(name);
           const builtinDenial = viaConnector ? null : await googleBuiltinDenial(name);
@@ -5172,7 +5220,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               path: requestedPath,
               entries: entries.map((entry) => ({
                 ...entry,
-                path: displayBotWorkspacePath(computerMode, bot.id, requestedPath, entry.path),
+                // A file name can carry a value an earlier command or page wrote.
+                path: redactSecrets(
+                  displayBotWorkspacePath(computerMode, bot.id, requestedPath, entry.path),
+                  runSecrets,
+                ),
               })),
             };
           }
@@ -5324,7 +5376,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               }
               return finish({ ok: true, path: outPath, attached });
             } catch (error) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message = redactSecrets(
+                error instanceof Error ? error.message : String(error),
+                runSecrets,
+              );
               getLogger().error(`render_plot failed for bot ${bot.id}: ${message}`);
               return finish({
                 error: message,
@@ -6233,6 +6288,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               await updateTicket(deps, {
                 spaceId: run.spaceId,
                 botId: bot.id,
+                userId: run.userId,
                 id: String(args.id ?? ""),
                 title: args.title !== undefined ? String(args.title) : undefined,
                 description: args.description !== undefined ? String(args.description) : undefined,
@@ -6440,6 +6496,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   "Invalid MCP server details. Required: name, transport (streamable_http|sse|stdio); endpoint for remote transports; command for stdio.",
               });
             }
+            const stdioRefusal =
+              parsed.transport === "stdio"
+                ? mcpStdioRefusal(parsed.command ?? "", deps.mcpStdio ?? {})
+                : undefined;
+            if (stdioRefusal) return finish({ error: stdioRefusal });
             if (parsed.endpoint) {
               try {
                 await assertSafeRemoteUrl(parsed.endpoint, deps.secretHttp?.resolveHostname, {
@@ -6631,6 +6692,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               await semanticMemory.forget(
                 {
                   id: String(args.id ?? ""),
+                  scope: memoryScope!,
+                  botId: bot.id,
                   ...(typeof args.entity === "string" && args.entity.trim()
                     ? { entity: args.entity.trim() }
                     : {}),
@@ -6967,8 +7030,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
             await notifyRun(deps, run, {
               kind: "help",
-              title: `${bot.name} needs a code`,
-              body: String(args.label ?? "Code"),
+              ...secretAskNotification(bot.name, String(args.label ?? "Code"), runSecrets),
               botId: bot.id,
               threadId: thread.id,
             });
@@ -7052,7 +7114,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return spawned;
           }
           if (name === "update_bot") {
-            const parsed = parseUpdateBotPatch(args, bot.name);
+            const parsed = parseUpdateBotPatch(args, bot.name, { userTyped: userTypedInOwnChat });
             if ("error" in parsed) return finish(parsed);
             const patch = parsed.patch;
             const wantsImage = args.artifact_id !== undefined || args.use_attached_image === true;
@@ -7259,7 +7321,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               deps,
               { ...run, sourceMessageId: run.sourceMessageId },
               { id: bot.id, name: bot.name },
-              { accept: Boolean(args.accept) },
+              {
+                accept: Boolean(args.accept),
+                connectionId: String(args.connection_id ?? ""),
+                connectionVersion: Number(args.connection_version ?? 0),
+              },
             );
             if (!result.ok) return finish({ error: result.error });
             return finish(result);
@@ -7735,6 +7801,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     agentSkillsLine: restrictedContext ? undefined : agentSkillsLine,
                     taughtSkillsLine: restrictedContext ? undefined : taughtSkillsLine,
                     replyGuidance: runReplyGuidance(run.trigger),
+                    botSetupGuidance:
+                      userTypedInOwnChat &&
+                      !bot.description.trim() &&
+                      !bot.instructions.trim() &&
+                      bot.audience !== "external"
+                        ? BOT_SETUP_GUIDANCE
+                        : undefined,
                     quietGuidance,
                     disabledBuiltinTools: instructionDisabledTools,
                   })
@@ -8689,6 +8762,7 @@ export type UpdateBotPatch = {
   name?: string;
   title?: string;
   description?: string;
+  instructions?: string;
   color?: string;
   notifyOnFinish?: boolean;
 };
@@ -8699,11 +8773,32 @@ function hasUpdateBotAvatarArgs(args: Record<string, unknown>): boolean {
   );
 }
 
+/**
+ * `userTyped` is true only when this run came from the user typing in this bot's own chat. A bot's
+ * standing instructions outlive the run, so a routine, another bot or text read from mail or the web
+ * must not be able to rewrite them.
+ */
 export function parseUpdateBotPatch(
   args: Record<string, unknown>,
   currentName: string,
+  options: { userTyped?: boolean } = {},
 ): { error: string } | { patch: UpdateBotPatch } {
   const patch: UpdateBotPatch = {};
+  if (args.instructions !== undefined) {
+    if (!options.userTyped) {
+      return {
+        error:
+          "instructions can only be changed while the user is typing to you in your own chat. Ask the user to change them in your settings.",
+      };
+    }
+    const next = String(args.instructions).trim();
+    if (next.length > BOT_INSTRUCTIONS_MAX_LENGTH) {
+      return {
+        error: `instructions must be at most ${BOT_INSTRUCTIONS_MAX_LENGTH} characters.`,
+      };
+    }
+    patch.instructions = next;
+  }
   if (args.name !== undefined) patch.name = String(args.name);
   if (args.title !== undefined) patch.title = String(args.title);
   if (args.description !== undefined) patch.description = String(args.description);
@@ -9302,7 +9397,7 @@ export const MEMORY_GUIDANCE =
 
 /** How every reply is shaped; the present-clearly skill has the longer recipe. */
 export const PRESENTATION_GUIDANCE =
-  "Write for a busy founder who may be reading on a phone. Open with the answer, or with the one thing that needs them, in a sentence or two. When they ask what to do or focus on, recommend one to three things and why, not everything. Then give only what helps them act: group related items, show the most important three to five and say how many more there are, and leave out routine, unchanged or empty details unless asked. Use cards, charts or your page instead of repeating their contents in text. End with at most one suggested next step, not a menu of offers. Before an overview, briefing, digest, status report or any answer covering many items, read the present-clearly skill.";
+  "Write for a busy founder who may be reading on a phone. Open with the answer, or with the one thing that needs them, in a sentence or two. When they ask what to do or focus on, recommend one to three things and why, not everything. Then give only what helps them act: group related items, show the most important three to five and say how many more there are, and leave out routine, unchanged or empty details unless asked. Use cards, charts or your page instead of repeating their contents in text. Write in plain words, not field names or codes, and leave out record ids, reference, tracking and invoice numbers and full account or routing numbers unless asked for that exact detail; link the record instead. When several items share the same details, say them once for the group. End with at most one suggested next step, not a menu of offers. When another agent asks, give it full detail instead, including ids and reference numbers, organized so the shared details appear once; it presents the answer to the user. Before an overview, briefing, digest, status report or any answer covering many items, read the present-clearly skill.";
 
 /** Grounding, minimal disclosure and honest follow-ups, for every agent turn. */
 export const TRUTHFULNESS_GUIDANCE =
@@ -9551,6 +9646,10 @@ export function directoryDescription(
 export const PLAIN_CAPABILITY_GUIDANCE =
   'When you tell the user what you can do, describe it in plain words (for example "check bank transactions"), never as raw tool names. Name an email by its subject and a record by its name, never by its id. Speak to the user as "you", never by their name or as "the user".';
 
+/** Only while a bot has no description and no instructions and the user is typing in its own chat. */
+export const BOT_SETUP_GUIDANCE =
+  "You have no description or instructions yet, so set yourself up from what the user says they want you for. Call update_bot once with a fitting name, title, a one-sentence description, an avatar color, and instructions written in the second person that cover your role, how you work and what you need from the user. Then reply in one or two lines saying what you will do, and ask only for what you need to start.";
+
 export const NOT_CONNECTED_GUIDANCE =
   'If the user asks about mail, calendar or files and you have no tool for it because the account is not connected, say so and end with [Open Integrations](/app/integrations). If the user asks to pay a bill or change something at their bank and no bank agent is among your teammates, do not say no payment connection exists. If no bank is connected, say "Add a bank account in Finance" and end with [Open Finance](/app/finance); do not mention Integrations in that reply. The same goes for a question about cash, balance, spending or runway with no bank connected. If a bank is connected but has no agent yet, say that turning on Allow changes for the bank under Integrations sets it up. End with the link given for that bank in the Facts, or [Open Integrations](/app/integrations) when it has none.';
 
@@ -9616,7 +9715,7 @@ export async function loadFinanceConnectionLine(
 
 /** Shown while the first mail sort runs, so an empty To do list is not read as "no tasks". */
 export const MAIL_SORTING_LINE =
-  "Facts: some of the user's mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as \"some recent mail is still being sorted\", and end with [Open Inbox](/app/inbox).";
+  'Facts: some of the user\'s mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as "some recent mail is still being sorted", and end with [Open Inbox](/app/inbox).';
 
 export function userTurnInstructions(parts: {
   botInstructions: string;
@@ -9647,6 +9746,8 @@ export function userTurnInstructions(parts: {
   agentSkillsLine: string | undefined;
   taughtSkillsLine: string | undefined;
   replyGuidance: string;
+  /** Set while the bot is unconfigured and the user is typing in its own chat; see BOT_SETUP_GUIDANCE. */
+  botSetupGuidance?: string | undefined;
   /** Added for quiet routines; follows replyGuidance. */
   quietGuidance?: string | undefined;
   disabledBuiltinTools?: ReadonlySet<string>;
@@ -9682,6 +9783,9 @@ export function userTurnInstructions(parts: {
       "update_bot",
       "update_bot updates this bot's own name (chat header / list label), title, description, avatar, and notifyOnFinish. When the user asks you to rename yourself, change your title or description, change your profile picture, or turn finish notifications on or off, call update_bot — do not claim you changed them without the tool. Pass color for a hex or encoded shape, artifact_id for an image in this space, or use_attached_image when they attached a picture on this message.",
     ),
+    parts.botSetupGuidance && builtinOffered(parts.disabledBuiltinTools, "update_bot")
+      ? parts.botSetupGuidance
+      : undefined,
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "run_subagent",
@@ -9938,6 +10042,17 @@ const COMPLETION_NOTIFICATION_MAX_CHARS = 180;
 /** Push body: Markdown stripped, then truncated so a cut cannot land inside a marker. */
 export function completionNotificationPreview(text: string): string {
   return truncatedPlainText(text, COMPLETION_NOTIFICATION_MAX_CHARS);
+}
+
+/** A secret card can ask for a code or a login, so the title stays generic and the label short. */
+export function secretAskNotification(botName: string, label: string, runSecrets: string[]) {
+  // Strip and redact before shortening so no protected value is left half-shown.
+  const text = plainTextFromMarkdown(redactSecrets(label, runSecrets), { maxSource: Infinity });
+  const body = truncatePlainText(
+    redactSecrets(text, runSecrets),
+    COMPLETION_NOTIFICATION_MAX_CHARS,
+  );
+  return { title: `${botName} needs an answer`, body };
 }
 
 export function completionMarksUnread(
@@ -10241,6 +10356,11 @@ async function failRun(
         keyRejected:
           "The model provider did not accept your API key. Check it in Settings > Models.",
         generic: "Something went wrong. Try again.",
+        spendLimit: (resetsOn) =>
+          `The AI key hit its spending limit.${resetsOn ? ` It resets ${resetsOn}.` : ""} Raise the limit with your provider or use another key in Settings > Models.`,
+        outOfCredits:
+          "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.",
+        rateLimited: "The model provider is rate limiting requests. Try again in a few minutes.",
       }).slice(0, 180),
       botId: bot.id,
       threadId: run.threadId,

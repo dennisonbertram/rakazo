@@ -61,8 +61,8 @@ describe("source-checkout compose postgres hardening", () => {
     expect(compose.services.api?.environment?.DATABASE_MIGRATION_URL).toBe(
       "postgres://${POSTGRES_USER:-rakazo}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rakazo}",
     );
-    // The worker loads .env too, so its owner URL is blanked rather than left out.
-    expect(compose.services.worker?.environment?.DATABASE_MIGRATION_URL).toBe("");
+    // The worker takes no .env wholesale, so it never receives the owner URL.
+    expect(compose.services.worker?.environment).not.toHaveProperty("DATABASE_MIGRATION_URL");
     expect(JSON.stringify(compose.services.api?.command)).toContain(
       "pnpm db:migrate && exec env -u DATABASE_MIGRATION_URL",
     );

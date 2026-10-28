@@ -173,6 +173,8 @@ export function BotSettings({
   onExport,
   onClear,
   focusName = false,
+  foldable = focusName,
+  onFoldedChange,
   hostComputer,
   messageTargets = [],
   notificationsOff = false,
@@ -188,6 +190,10 @@ export function BotSettings({
   hostComputer?: { defaultHost: ComputerHost };
   /** A bot just created as "New bot": focus and select its name so it gets named first. */
   focusName?: boolean;
+  /** Show the More settings toggle even when the name-only view is off (the user opened it). */
+  foldable?: boolean;
+  /** The user pressed More settings. The parent keeps this, so a rebuilt panel stays as they left it. */
+  onFoldedChange?: (folded: boolean) => void;
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
   /** The check-in setting changed, so its managed routine appeared, changed or went away. */
   onCheckInChange?: () => void;
@@ -206,6 +212,7 @@ export function BotSettings({
       runsOn?: ComputerHost;
       memoryScope?: "isolated" | "shared" | null;
       autoSpeak?: boolean;
+      crossSpaceCommunication?: boolean;
       voiceId?: string | null;
       modelProvider?: string | null;
       modelId?: string | null;
@@ -237,6 +244,9 @@ export function BotSettings({
   useEffect(() => setComputerMode(bot.computerMode), [bot.computerMode]);
   const [memoryScope, setMemoryScope] = useState(bot.memoryScope);
   const [autoSpeak, setAutoSpeak] = useState(bot.autoSpeak);
+  const [crossSpaceCommunication, setCrossSpaceCommunication] = useState(
+    bot.crossSpaceCommunication ?? false,
+  );
   const [voiceId, setVoiceId] = useState(bot.voiceId ?? "");
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [modelKey, setModelKey] = useState(
@@ -425,6 +435,7 @@ export function BotSettings({
           ? { externalComputerTools: patchOverrides.externalComputerTools }
           : {}),
         autoSpeak,
+        crossSpaceCommunication,
         voiceId: voiceId || null,
         modelProvider: selected?.provider ?? null,
         modelId: selected?.modelId ?? null,
@@ -520,8 +531,8 @@ export function BotSettings({
   }
 
   // A bot just created as "New bot" shows only its name until it has replied once.
-  const [unfolded, setUnfolded] = useState(false);
-  const folded = focusName && !unfolded;
+  const [folded, setFolded] = useState(focusName);
+  useEffect(() => setFolded(focusName), [focusName]);
 
   return (
     <div data-testid="bot-settings">
@@ -556,17 +567,25 @@ export function BotSettings({
           className="mt-1.5"
         />
       </label>
-      {folded ? (
+      {foldable ? (
         <Button
           variant="ghost"
           size="sm"
+          aria-expanded={!folded}
           className="mt-4 -ms-2.5 text-muted-foreground"
-          onClick={() => setUnfolded(true)}
+          onClick={() => {
+            setFolded(!folded);
+            onFoldedChange?.(!folded);
+          }}
         >
           <Trans>More settings</Trans>
-          <ChevronDown aria-hidden="true" className="size-4" />
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-4 transition-transform ${folded ? "" : "rotate-180"}`}
+          />
         </Button>
-      ) : (
+      ) : null}
+      {folded ? null : (
         <>
           <label htmlFor={`${ids}-description`} className={advancedLabelClass}>
             <Trans>Description</Trans>
@@ -870,6 +889,19 @@ export function BotSettings({
                   id={`${ids}-auto-speak`}
                   checked={autoSpeak}
                   onCheckedChange={(checked) => saveOnChange(() => setAutoSpeak(checked))}
+                />
+              </label>
+              <label
+                htmlFor={`${ids}-cross-space`}
+                className="mt-5 flex cursor-pointer items-center justify-between gap-3 text-[14px] text-foreground/75 pointer-coarse:min-h-11"
+              >
+                <Trans>Allow cross-space bot communication</Trans>
+                <Switch
+                  id={`${ids}-cross-space`}
+                  checked={crossSpaceCommunication}
+                  onCheckedChange={(checked) =>
+                    saveOnChange(() => setCrossSpaceCommunication(checked))
+                  }
                 />
               </label>
               {voices.length ? (

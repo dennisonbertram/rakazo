@@ -15,13 +15,15 @@
     "test": "vitest run --root ../.. packages/auth/src"
   },
   "dependencies": {
-    "@better-auth/expo": "1.7.7",
-    "@better-auth/passkey": "1.7.7",
+    "@better-auth/expo": "1.7.14",
+    "@better-auth/mcp": "1.7.14",
+    "@better-auth/oauth-provider": "1.7.14",
+    "@better-auth/passkey": "1.7.14",
     "@rakazo/adapter-kit": "workspace:*",
     "@rakazo/core": "workspace:*",
     "@rakazo/db": "workspace:*",
     "@simplewebauthn/server": "13.3.3",
-    "better-auth": "1.7.7"
+    "better-auth": "1.7.14"
   },
   "devDependencies": {
     "typescript": "7.0.2",

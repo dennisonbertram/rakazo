@@ -24,8 +24,15 @@ export interface AppEnv {
   authSecret: string;
   authUrl: string;
   webOrigin: string;
+  /** Extra browser origins trusted like `webOrigin` (RAKAZO_TRUSTED_ORIGINS). */
+  trustedOrigins: string[];
   privacyPolicyUrl?: string;
   apiUrl: string;
+  /**
+   * Public HTTPS address of the API when outside AI clients connect from the internet
+   * (for example a Tailscale Funnel host). Unset serves MCP at `apiUrl`, which is enough on localhost.
+   */
+  publicMcpUrl: string | undefined;
   apiHost: string;
   signupsEnabled: string | undefined;
   signupAllowlist: string | undefined;
@@ -174,8 +181,10 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     authSecret,
     authUrl: source.BETTER_AUTH_URL ?? source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
     webOrigin: source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
+    trustedOrigins: parseTrustedOrigins(source.RAKAZO_TRUSTED_ORIGINS),
     privacyPolicyUrl: optional(source.PRIVACY_POLICY_URL),
     apiUrl: source.API_URL ?? "http://127.0.0.1:3100",
+    publicMcpUrl: publicMcpUrl(source.PUBLIC_MCP_URL),
     apiHost: source.API_HOST ?? "127.0.0.1",
     signupsEnabled: source.SIGNUPS_ENABLED,
     signupAllowlist: source.SIGNUP_ALLOWLIST,
@@ -265,6 +274,34 @@ function required(source: NodeJS.ProcessEnv, key: string): string {
   const value = source[key];
   if (!value) throw new Error(`Missing ${key}`);
   return value;
+}
+
+/** Comma-separated http(s) origins. Anything else fails startup rather than widening trust silently. */
+function parseTrustedOrigins(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      try {
+        const url = new URL(entry);
+        // Exact origins only: no path, query, credentials or wildcard (Better Auth expands `*`).
+        const exact = entry.replace(/\/$/, "").toLowerCase() === url.origin;
+        if (
+          (url.protocol === "http:" || url.protocol === "https:") &&
+          exact &&
+          !entry.includes("*")
+        )
+          return url.origin;
+      } catch {}
+      throw new Error(`RAKAZO_TRUSTED_ORIGINS has an invalid origin: ${entry}`);
+    });
+}
+
+function publicMcpUrl(value: string | undefined): string | undefined {
+  const trimmed = optional(value)?.replace(/\/+$/, "");
+  if (trimmed && !URL.canParse(trimmed)) throw new Error("PUBLIC_MCP_URL must be an absolute URL");
+  return trimmed;
 }
 
 function optional(value: string | undefined): string | undefined {

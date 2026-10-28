@@ -160,6 +160,7 @@ import {
 } from "./investor-portal.js";
 import { mountLocalSettings } from "./local-settings.js";
 import { mountMailPushRoute } from "./mail-push.js";
+import { mountMcpDiscovery, mountMcpServer } from "./mcp-server.js";
 import {
   createMessagingInboundHandler,
   teamChatSenderCanWakeMessageRoutines,
@@ -488,17 +489,20 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const notifications = new ExpoPushProvider(prisma, (sessionId) =>
     pushSessionExpiresAt(prisma, sessionId),
   );
+  // Localhost needs no setting: MCP clients reach the API where it listens.
+  const mcpBaseUrl = (env.publicMcpUrl ?? env.apiUrl).replace(/\/+$/, "");
   const auth = createAuth(prisma, {
     passwordAuth: env.passwordAuth,
     oidc: env.oidc,
     secret: env.authSecret,
     baseURL: env.authUrl,
     webOrigin: env.webOrigin,
+    mcp: { issuer: mcpBaseUrl, resource: `${mcpBaseUrl}/mcp`, webOrigin: env.webOrigin },
     signupsEnabled: env.signupsEnabled,
     signupAllowlist: env.signupAllowlist,
     email,
     onEmailError: (error) => getLogger().error("transactional email delivery failed", error),
-    extraOrigins: MOBILE_AUTH_ORIGINS,
+    extraOrigins: [...MOBILE_AUTH_ORIGINS, ...env.trustedOrigins],
     beforeDeleteUser: async (userId) => {
       // First, so a provider failure aborts deletion before anything is destroyed.
       await billing?.cancelForDeletedUser(userId);
@@ -606,6 +610,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     secretStore: secrets,
     secretHttp: remoteConnectors,
     mcpAllowPrivateEndpoint: env.mcpAllowPrivateEndpoint,
+    mcpStdio: { stdioEnabled: env.mcpStdioEnabled, allowedCommands: env.mcpStdioAllowedCommands },
     deploymentModelKey: env.deploymentModelKey,
     deploymentModelConfigured: env.deploymentModelConfigured,
     dataDir: env.dataDir,
@@ -840,6 +845,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       imageTag: env.imageTag,
       integrationsCatalogUrl: env.integrationsCatalogUrl,
       mcpAllowPrivateEndpoint: env.mcpAllowPrivateEndpoint,
+      mcpStdioEnabled: env.mcpStdioEnabled,
+      mcpStdioAllowedCommands: env.mcpStdioAllowedCommands,
       mailWritesDisabled: env.mailWritesDisabled,
     },
   });
@@ -898,6 +905,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       return c.json({ error: "Not available in version 1" }, 404);
     }
     return auth.handler(emptyAuthBodyAsJson(c.req.raw));
+  });
+  mountMcpDiscovery(app, { auth, baseUrl: mcpBaseUrl, authUrl: env.authUrl });
+  mountMcpServer(app, {
+    prisma,
+    auth,
+    baseUrl: mcpBaseUrl,
+    jwksUrl: `${env.apiUrl.replace(/\/+$/, "")}${"/api/auth"}/jwks`,
   });
   mountLocalSettings(app, { token: env.desktopStackToken, prisma, rpc });
   const requestSession = async (request: Request) => {
@@ -1319,12 +1333,18 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
 
 export function isTrustedOrigin(
   origin: string,
-  env: Pick<AppEnv, "webOrigin" | "apiUrl" | "authUrl">,
+  env: Pick<AppEnv, "webOrigin" | "apiUrl" | "authUrl"> & { trustedOrigins?: string[] },
 ) {
   if (!origin) return true;
   if (origin.startsWith("rakazo://")) return true;
   const allowed = new Set(
-    [env.webOrigin, env.apiUrl, env.authUrl, ...MOBILE_AUTH_ORIGINS].flatMap(originVariants),
+    [
+      env.webOrigin,
+      env.apiUrl,
+      env.authUrl,
+      ...MOBILE_AUTH_ORIGINS,
+      ...(env.trustedOrigins ?? []),
+    ].flatMap(originVariants),
   );
   return allowed.has(origin);
 }
