@@ -1793,6 +1793,11 @@ describe("provider availability classification", () => {
     ["HTTP server status", new Error("HTTP 500"), true],
     ["context overflow", new Error("context_length_exceeded; retry after 60s"), false],
     ["transient server failure", { status: 503, message: "service unavailable" }, true],
+    [
+      "OpenAI server-side processing failure",
+      new Error("Codex error: An error occurred while processing your request. You can retry."),
+      true,
+    ],
   ])("classifies %s", (_label, error, expected) => {
     expect(isRetryableProviderUnavailable(error)).toBe(expected);
   });
