@@ -41,6 +41,7 @@ import {
   BookmarkCheck,
   BookmarkPlus,
   Copy,
+  MessageSquareDot,
   MoreHorizontal,
   Reply,
   Smile,
@@ -172,6 +173,7 @@ export const Transcript = memo(function Transcript({
   onOpenBot,
   onAnswer,
   onReply,
+  onMarkUnread,
   onQuote,
   onReact,
   remember,
@@ -226,6 +228,7 @@ export const Transcript = memo(function Transcript({
     mail?: MailEdits,
   ) => Promise<void>;
   onReply: (message: ThreadMessage) => void;
+  onMarkUnread?: (message: ThreadMessage) => void;
   onQuote: (message: ThreadMessage, quote: string) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
   remember?: RememberControls;
@@ -912,6 +915,7 @@ export const Transcript = memo(function Transcript({
                         below={fullWidth || mailCard}
                         hideOnTouch={cardOnly}
                         onReply={onReply}
+                        onMarkUnread={onMarkUnread}
                         onReact={onReact}
                         remember={remember}
                         tabbable={message.id === tabbableMoreId}
@@ -1202,6 +1206,7 @@ function MessageHoverActions({
   side,
   hasReactions = false,
   onReply,
+  onMarkUnread,
   onReact,
   remember,
   below,
@@ -1215,6 +1220,7 @@ function MessageHoverActions({
   hideOnTouch?: boolean;
   hasReactions?: boolean;
   onReply: (message: ThreadMessage) => void;
+  onMarkUnread?: (message: ThreadMessage) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
   remember?: RememberControls;
   tabbable?: boolean;
@@ -1346,7 +1352,7 @@ function MessageHoverActions({
           >
             <MoreHorizontal size={15} strokeWidth={1.7} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={side === "end" ? "start" : "end"}>
+          <DropdownMenuContent align={side === "end" ? "start" : "end"} className="w-auto">
             {canReactToThreadMessage(message) ? (
               // The row's buttons are not Tab stops (one stop per message), so this menu is the keyboard route to every action.
               <div className="grid w-33 grid-cols-3 pb-1">
@@ -1371,6 +1377,17 @@ function MessageHoverActions({
               <Reply size={14} strokeWidth={1.7} />
               <Trans>Reply</Trans>
             </DropdownMenuItem>
+            {onMarkUnread && isStoredMessage(message) ? (
+              <DropdownMenuItem
+                onClick={() => {
+                  setMoreOpen(false);
+                  onMarkUnread(message);
+                }}
+              >
+                <MessageSquareDot size={14} strokeWidth={1.7} />
+                <Trans>Mark as unread</Trans>
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem onClick={copyMessage}>
               <Copy size={14} strokeWidth={1.7} />
               <Trans>Copy</Trans>
