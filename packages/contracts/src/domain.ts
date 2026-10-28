@@ -84,6 +84,12 @@ export const BotAudienceSchema = z.enum(["internal", "external"]);
 export type BotAudience = z.infer<typeof BotAudienceSchema>;
 
 /** Only a bot the owner made can be external; page and integration agents hold private data by design. */
+/** A page the person asked for by hand: the server picks this key, so a client cannot claim it. */
+export const customPageSpawnKey = (id: string) => `custom-page:${id}`;
+
+export const isCustomPageSpawnKey = (spawnKey: string | null | undefined) =>
+  Boolean(spawnKey?.startsWith(customPageSpawnKey("")));
+
 export const botAudienceEditable = (spawnKey: string | null | undefined) => !spawnKey;
 
 export const BotSchema = z.object({
@@ -100,6 +106,8 @@ export const BotSchema = z.object({
   /** Order within its folder; bots and groups share one scale. Null: not ordered by hand yet. */
   position: z.number().int().nullable().optional(),
   archivedAt: z.string().nullable(),
+  /** Left out of the sidebar chat list by the person; the bot keeps working. */
+  hiddenAt: z.string().nullable().optional(),
   unread: z.boolean(),
   parentBotId: Id.nullable(),
   memoryScope: MemoryScopeSchema.nullable(),
@@ -229,6 +237,7 @@ export const SpaceBotSchema = BotSchema.pick({
   color: true,
   notifyOnFinish: true,
   pinned: true,
+  hiddenAt: true,
   sectionId: true,
   position: true,
   unread: true,
@@ -369,6 +378,8 @@ export const CreateBotInput = z.object({
   computerMode: ComputerModeSchema.default("team"),
   /** Idempotency key within a space (unique with spaceId). */
   spawnKey: z.string().trim().min(1).max(120).optional(),
+  /** Makes a page agent: the server gives it a reserved custom-page key. */
+  page: z.boolean().optional(),
 });
 export type CreateBotInput = z.infer<typeof CreateBotInput>;
 
@@ -394,6 +405,8 @@ export const UpdateBotInput = z
     notifyOnFinish: z.boolean().optional(),
     color: BotAvatarValueSchema.optional(),
     pinned: z.boolean().optional(),
+    /** Leaves the bot out of the sidebar chat list (or puts it back). */
+    hidden: z.boolean().optional(),
     memoryScope: MemoryScopeSchema.nullable().optional(),
     sectionId: Id.nullable().optional(),
     voiceId: z.string().max(120).nullable().optional(),

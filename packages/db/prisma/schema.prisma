@@ -778,6 +778,8 @@ model Bot {
   sectionId              String?
   section                BotSection?           @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   archivedAt             DateTime?
+  /// Left out of the sidebar chat list by the person; the bot keeps working.
+  hiddenAt               DateTime?
   parentBotId            String?
   spawnKey               String?
   memoryScope            String?

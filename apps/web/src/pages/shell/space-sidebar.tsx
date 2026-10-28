@@ -2,6 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot, Group, Me, ThreadSnapshot } from "@rakazo/contracts";
 import {
+  isCustomPageSpawnKey,
   isGtmAgentSpawnKey,
   isIntegrationAgentSpawnKey,
   isMailThreadAgentSpawnKey,
@@ -11,6 +12,8 @@ import { nestRosterByParent, sidebarSections } from "@rakazo/core";
 import {
   BotAvatar,
   Button,
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
   GroupAvatar,
   InputGroup,
   InputGroupAddon,
@@ -113,6 +116,8 @@ type SidebarChat = {
   title?: string | null;
   preview?: string | null;
   pinned: boolean;
+  /** Set when the person left the bot out of the sidebar. */
+  hiddenAt?: string | null;
   sectionId: string | null;
   position?: number | null;
   parentBotId?: string | null;
@@ -216,6 +221,7 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
     const headless = spaceLabel === null;
     const otherSpace = showSpaceNames && space.id !== currentSpaceId;
     const visibleBots = space.bots
+      .filter((bot) => !bot.hiddenAt)
       .filter((bot) => !(otherSpace && untouched?.(bot)))
       .filter((bot) =>
         `${bot.name} ${bot.title ?? ""} ${bot.preview ?? ""}`.toLowerCase().includes(needle),
@@ -350,6 +356,8 @@ type SidebarGroup = ReturnType<
   typeof sidebarGroupsForSpaces<SidebarBotChat, SidebarGroupChat>
 >[number];
 
+const SHOW_UNUSED_PAGE_AGENTS_KEY = "rakazo.showUnusedPageAgents";
+
 export type SpaceSidebarProps = {
   sidebarRef: RefObject<HTMLElement | null>;
   botsSidebarDensity: string;
@@ -367,6 +375,11 @@ export type SpaceSidebarProps = {
   bots: Bot[];
   initialBotsLoaded: boolean;
   createBot: () => Promise<void>;
+  /** A new agent that builds and keeps its own page. */
+  createPage: () => Promise<void>;
+  markBotsRead: (ids: string[]) => Promise<void>;
+  /** Asks to archive these chats; the shell confirms first. */
+  askArchiveBots: (botIds: string[]) => void;
   navigate: NavigateFunction;
   setPanel: (next: Panel | ((current: Panel) => Panel)) => void;
   setNewSpaceOpen: Dispatch<SetStateAction<boolean>>;
@@ -489,6 +502,9 @@ export function SpaceSidebar({
   bots,
   initialBotsLoaded,
   createBot,
+  createPage,
+  markBotsRead,
+  askArchiveBots,
   navigate,
   setPanel,
   setNewSpaceOpen,
@@ -622,6 +638,14 @@ export function SpaceSidebar({
     };
   }, [mobileSidebarOpen]);
   const [pageAgentsOpen, setPageAgentsOpen] = useState(false);
+  // Untouched page agents stay out of the list unless the person asks for them; kept per browser.
+  const [showUnusedPageAgents, setShowUnusedPageAgents] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_UNUSED_PAGE_AGENTS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [emailChatsOpen, setEmailChatsOpen] = useState(false);
   return (
     <aside
@@ -1131,6 +1155,7 @@ export function SpaceSidebar({
                   row.item.kind === "bot" &&
                   (pageAgentKind(rowKey(row)) !== null ||
                     isGtmAgentSpawnKey(rowKey(row)) ||
+                    isCustomPageSpawnKey(rowKey(row)) ||
                     isIntegrationAgentSpawnKey(rowKey(row)))
                 );
               };
@@ -1149,22 +1174,27 @@ export function SpaceSidebar({
                 activityBotIds.has(row.item.chat.id) &&
                 row.item.chat.id !== active?.id;
               const listedRows = (
-                foldable ? nestedRows.filter((row) => !unusedPageAgent(row)) : nestedRows
+                foldable && !showUnusedPageAgents
+                  ? nestedRows.filter((row) => !unusedPageAgent(row))
+                  : nestedRows
               ).filter((row) => !inActivity(row));
               const pageAgentRows = foldable ? listedRows.filter(isPageAgent) : [];
               const emailChatRows = foldable ? listedRows.filter(isEmailChat) : [];
+              // The header stays while any page agent exists, even all hidden as unused, so its menu stays reachable.
+              const hasPageAgents =
+                foldable && nestedRows.some((row) => isPageAgent(row) && !inActivity(row));
               const displayRows: (
                 | (typeof nestedRows)[number]
                 | { foldHeader: "page" | "email" }
               )[] =
-                pageAgentRows.length || emailChatRows.length
+                hasPageAgents || emailChatRows.length
                   ? [
-                      // Page agents sit first, right under the folders above, so the folded groups stay together.
-                      ...(pageAgentRows.length ? [{ foldHeader: "page" as const }] : []),
+                      // Page agents sit first, right under the folders above, with Email chats directly below them.
+                      ...(hasPageAgents ? [{ foldHeader: "page" as const }] : []),
                       ...foldRows(pageAgentRows, pageAgentsOpen, active?.id, !pageMode),
-                      ...listedRows.filter((row) => !isPageAgent(row) && !isEmailChat(row)),
                       ...(emailChatRows.length ? [{ foldHeader: "email" as const }] : []),
                       ...foldRows(emailChatRows, emailChatsOpen, active?.id),
+                      ...listedRows.filter((row) => !isPageAgent(row) && !isEmailChat(row)),
                     ]
                   : listedRows;
               const treeActive = nestedRows.some((row) => row.depth > 0 || row.hasChildren);
@@ -1328,9 +1358,63 @@ export function SpaceSidebar({
                             : held.includes("takeover")
                               ? "takeover"
                               : null;
+                          const unreadIds = rows.flatMap((row) =>
+                            row.item.kind === "bot" && row.item.chat.unread
+                              ? [row.item.chat.id]
+                              : [],
+                          );
+                          const markAllRead = (
+                            <DropdownMenuItem
+                              disabled={unreadIds.length === 0}
+                              onClick={() => void markBotsRead(unreadIds)}
+                            >
+                              {t`Mark all read`}
+                            </DropdownMenuItem>
+                          );
                           return (
                             <PageAgentsRow
                               key={displayRow.foldHeader}
+                              actions={
+                                email ? (
+                                  <>
+                                    {markAllRead}
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        askArchiveBots(
+                                          rows.flatMap((row) =>
+                                            row.item.kind === "bot" ? [row.item.chat.id] : [],
+                                          ),
+                                        )
+                                      }
+                                    >
+                                      {t`Archive all email chats`}
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <>
+                                    <DropdownMenuItem onClick={() => void createPage()}>
+                                      {t`New page`}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuCheckboxItem
+                                      checked={showUnusedPageAgents}
+                                      onCheckedChange={(checked) => {
+                                        setShowUnusedPageAgents(checked);
+                                        try {
+                                          localStorage.setItem(
+                                            SHOW_UNUSED_PAGE_AGENTS_KEY,
+                                            checked ? "1" : "0",
+                                          );
+                                        } catch {
+                                          // Storage is blocked: the choice lasts until reload.
+                                        }
+                                      }}
+                                    >
+                                      {t`Show unused page agents`}
+                                    </DropdownMenuCheckboxItem>
+                                    {markAllRead}
+                                  </>
+                                )
+                              }
                               label={email ? t`Email chats` : t`Page agents`}
                               testId={email ? "sidebar-email-chats" : undefined}
                               open={email ? emailChatsOpen : pageAgentsOpen}
