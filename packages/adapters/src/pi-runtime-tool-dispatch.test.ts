@@ -1336,6 +1336,26 @@ describe("Pi connector tool dispatch", () => {
     ).toBe("upstream unavailable");
   });
 
+  it("fails a reply cut off at the output limit but keeps a cut tool call on the tool path", () => {
+    expect(
+      providerFailureText({
+        role: "assistant",
+        content: [{ type: "text", text: "Half an answ" }],
+        stopReason: "length",
+      }),
+    ).toBe("The model hit its output limit before finishing its reply.");
+    expect(
+      providerFailureText({
+        role: "assistant",
+        content: [
+          { type: "text", text: "Checking." },
+          { type: "toolCall", id: "t1", name: "x", arguments: {} },
+        ],
+        stopReason: "length",
+      }),
+    ).toBeUndefined();
+  });
+
   it("fails when tools succeeded and the final assistant content is an empty provider error", async () => {
     fakeAgentState.mode = "tools-then-empty-failure";
     fakeAgentState.terminalMessage = {

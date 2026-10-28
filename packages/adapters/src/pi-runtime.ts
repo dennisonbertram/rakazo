@@ -2145,6 +2145,11 @@ export function providerFailureText(message: unknown): string | undefined {
   if (stopReason === "length" && !text) {
     return errorMessage || "The model hit its output limit before writing a response.";
   }
+  // A reply cut at the limit is not a finished answer. The run fails and keeps the text written.
+  // A cut tool call is left to the tool path.
+  if (stopReason === "length" && !messageHasToolCall(message)) {
+    return "The model hit its output limit before finishing its reply.";
+  }
   if (errorMessage && !text) return errorMessage;
   return undefined;
 }
