@@ -9667,7 +9667,7 @@ export async function loadFinanceConnectionLine(
 
 /** Shown while the first mail sort runs, so an empty To do list is not read as "no tasks". */
 export const MAIL_SORTING_LINE =
-  "Facts: some of the user's mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as \"some recent mail is still being sorted\", and end with [Open Inbox](/app/inbox).";
+  'Facts: some of the user\'s mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as "some recent mail is still being sorted", and end with [Open Inbox](/app/inbox).';
 
 export function userTurnInstructions(parts: {
   botInstructions: string;
@@ -10303,6 +10303,11 @@ async function failRun(
         keyRejected:
           "The model provider did not accept your API key. Check it in Settings > Models.",
         generic: "Something went wrong. Try again.",
+        spendLimit: (resetsOn) =>
+          `The AI key hit its spending limit.${resetsOn ? ` It resets ${resetsOn}.` : ""} Raise the limit with your provider or use another key in Settings > Models.`,
+        outOfCredits:
+          "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.",
+        rateLimited: "The model provider is rate limiting requests. Try again in a few minutes.",
       }).slice(0, 180),
       botId: bot.id,
       threadId: run.threadId,
