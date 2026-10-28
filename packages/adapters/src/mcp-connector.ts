@@ -65,7 +65,6 @@ type PendingSession = {
  */
 type ExpectedFailure = "reconnect" | "unreachable";
 const UNREACHABLE_CODES = new Set([
-  "ENOTFOUND",
   "EAI_AGAIN",
   "ECONNREFUSED",
   "ECONNRESET",
@@ -81,6 +80,8 @@ function expectedFailure(error: unknown, depth = 0): ExpectedFailure | undefined
   const { expected, code } = error as { expected?: ExpectedFailure; code?: unknown };
   if (expected) return expected;
   if (error instanceof UnauthorizedError || code === 401 || code === 403) return "reconnect";
+  // A name that no longer resolves (an expired tunnel) needs a new address, not a retry.
+  if (code === "ENOTFOUND") return "reconnect";
   if (typeof code === "string" && UNREACHABLE_CODES.has(code)) return "unreachable";
   const inner = error instanceof AggregateError ? error.errors : [error.cause];
   for (const cause of inner) {

@@ -821,6 +821,31 @@ describe("MCP connector session cache", () => {
       }
     });
 
+    it("warns when the host times out", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new TypeError("fetch failed", {
+            cause: Object.assign(new Error("connect ETIMEDOUT 192.0.2.1:443"), {
+              code: "ETIMEDOUT",
+            }),
+          });
+        }),
+      );
+      const connector = connectorWith();
+      const error = vi.spyOn(getLogger(), "error");
+      const warn = vi.spyOn(getLogger(), "warn");
+      try {
+        expect(await connector.discoverTools(context)).toEqual([]);
+        expect(error).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith("mcp discovery failed for server demo", {
+          reason: expect.any(String),
+        });
+      } finally {
+        await connector.close();
+      }
+    });
+
     it("still reports an unexpected server failure as an error", async () => {
       vi.stubGlobal("fetch", mcpFetch({ failNext: true, initializations: 0 }));
       const connector = connectorWith();
