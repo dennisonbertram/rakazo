@@ -8,7 +8,7 @@ export function DueSoonChip({ count }: { count: number }) {
   return (
     <Link
       to={LEGAL_DUE_SOON_PATH}
-      className="mb-3 inline-flex h-6 items-center rounded-full border border-warning/40 px-2.5 text-xs font-medium text-warning hover:bg-warning/10"
+      className="mb-3 inline-flex h-6 items-center pointer-coarse:h-11 rounded-full border border-warning/40 px-2.5 text-xs font-medium text-warning hover:bg-warning/10"
     >
       {plural(count, { one: "# due soon", other: "# due soon" })}
     </Link>

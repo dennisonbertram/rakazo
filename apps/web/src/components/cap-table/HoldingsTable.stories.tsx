@@ -61,6 +61,9 @@ type Story = StoryObj<typeof meta>;
 /** A holder with a contact offers Open contact; one without offers Add as contact; the pool has no menu. */
 export const Default: Story = {};
 
+/** Phone: shares and the labelled invested amount wrap under the name instead of truncating. */
+export const Phone: Story = { globals: { viewport: { value: "mobile1" } } };
+
 /** Filtered to one security with the holder sorted descending. */
 export const Sorted: Story = {
   parameters: { initialEntries: ["/?sort=holder&dir=desc&security=Seed%20Preferred"] },

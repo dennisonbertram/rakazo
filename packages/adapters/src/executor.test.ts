@@ -38,6 +38,7 @@ import {
   missingTurnImagesInstruction,
   NOT_CONNECTED_GUIDANCE,
   PLAIN_CAPABILITY_GUIDANCE,
+  PRESENTATION_GUIDANCE,
   parseUpdateBotPatch,
   persistentComputerInstruction,
   READ_ONLY_AGENT_TOOLS,
@@ -2525,7 +2526,8 @@ describe("directoryDescription", () => {
     });
     expect(line).toContain("Answers questions about your bank accounts.");
     expect(line).toContain("Message it with message_bot");
-    expect(line).toContain("Do not write a reply to the user until its answer arrives");
+    expect(line).toContain("Do not answer the user until its answer arrives");
+    expect(line).toContain("tell the user in one short sentence that you are checking with it");
     expect(line).toContain("quote the figures in your reply yourself");
     expect(line).toContain("[Open Finance](/app/finance)");
     expect(line).toContain("no accounts are connected yet");
@@ -2708,6 +2710,7 @@ describe("userTurnInstructions", () => {
     "When the user asks you to add or connect an MCP server (and gives you its details), use add_mcp_server. If it uses browser sign-in, an approval card appears in the chat — tell the user to click Authorize on it.",
     "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
     TRUTHFULNESS_GUIDANCE,
+    PRESENTATION_GUIDANCE,
     "Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Do not open a reply with today's date unless the user asked for it.",
     "Treat pagination cursors as opaque: copy the returned continuation value exactly, never calculate or guess it. When the tool reports no next page, stop; if a cursor is rejected, recheck the last successful result before retrying.",
     replyGuidance,
@@ -5022,6 +5025,7 @@ describe("mail sorting line", () => {
     expect(MAIL_SORTING_LINE).toContain("do not say there are no tasks");
     expect(MAIL_SORTING_LINE).toContain("may be incomplete");
     expect(MAIL_SORTING_LINE).not.toMatch(/in a minute|will appear in/);
+    expect(MAIL_SORTING_LINE).toContain("answer first from what you can see");
     expect(PLAIN_CAPABILITY_GUIDANCE).toContain('Speak to the user as "you"');
   });
 });

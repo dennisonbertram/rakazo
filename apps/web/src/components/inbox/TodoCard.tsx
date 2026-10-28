@@ -126,7 +126,7 @@ export function TodoCard({
                       variant="link"
                       aria-haspopup="dialog"
                       // A button does not inherit the strike-through, so it carries its own.
-                      className={`h-auto whitespace-normal rounded-sm p-0 text-start text-sm font-normal text-foreground hover:underline ${done ? "text-muted-foreground line-through" : ""}`}
+                      className={`h-auto whitespace-normal rounded-sm p-0 text-start pointer-coarse:h-auto pointer-coarse:min-h-11 pointer-coarse:-my-3 text-sm font-normal text-foreground hover:underline ${done ? "text-muted-foreground line-through" : ""}`}
                       onClick={() => todo.messageId && onOpen(todo.messageId)}
                     >
                       {todo.text}

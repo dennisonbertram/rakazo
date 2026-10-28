@@ -200,7 +200,7 @@ import {
 import { publishComputerCommand } from "../lib/computer-workspace";
 import { fetchDataRoomBlob } from "../lib/data-room";
 import { dataRoomAgentSuggestions, findDataRoomAgent } from "../lib/data-room-agent";
-import { delegateWaitTarget, pendingDelegateAgents } from "../lib/delegate-wait";
+import { delegateWaitTarget, pendingDelegateAgents, pendingSentBlocks } from "../lib/delegate-wait";
 import { desktopBridge } from "../lib/desktop";
 import { setDockedAgentBotId } from "../lib/docked-agent";
 import { financeAgentSuggestions, findFinanceAgent } from "../lib/finance-agent";
@@ -2689,6 +2689,10 @@ export function ShellPage() {
       }),
     [activeSnapshot?.messages],
   );
+  const transcriptDelegateStates = useMemo(
+    () => pendingSentBlocks(activeSnapshot?.messages ?? [], Date.now()),
+    [activeSnapshot?.messages],
+  );
   const transcriptArtifactTarget = useMemo<ArtifactTarget>(
     () => (inGroup ? { groupId: groupId ?? "" } : { botId: active?.id ?? "" }),
     [active?.id, groupId, inGroup],
@@ -4374,6 +4378,7 @@ export function ShellPage() {
               <Transcript
                 key={activeSnapshot?.threadId}
                 scrollRef={messageScroll}
+                delegateStates={transcriptDelegateStates}
                 sentHere={sentHere}
                 scrollRequest={scrollRequest}
                 onScrollRequestHandled={clearScrollRequest}
@@ -5257,19 +5262,19 @@ export function ShellPage() {
             </div>
           ) : null
         ) : panel && (active || activeGroup) ? (
-          <div className="rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]">
+          <div className="rk-scroll h-full w-full overflow-y-auto px-5 pt-[17px] pb-[calc(17px+var(--toast-panel-reserve,0px))]">
             {panel !== "routine" && panel !== "create-group" && panel !== "group-settings" ? (
               <div
                 className={`sticky top-[-17px] z-10 -mx-5 -mt-[17px] mb-4 flex items-center justify-between bg-background px-5 ${TOP_BAR_HEIGHT}`}
               >
-                {/* On a phone this panel covers the chat header, so it carries the way to the sidebar. */}
+                {/* Between phone and desktop this panel covers the chat header, so it carries the way to the sidebar. A phone panel is a full sheet that closes back to the chat. */}
                 <div className="flex min-w-0 items-center gap-2">
                   <Button
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t`Open navigation`}
                     onClick={() => setMobileSidebarOpen(true)}
-                    className="-ms-1.5 text-foreground/75 lg:hidden"
+                    className="-ms-1.5 text-foreground/75 max-sm:hidden lg:hidden"
                   >
                     <Menu size={19} strokeWidth={1.7} />
                   </Button>

@@ -23,12 +23,14 @@ import {
   ChevronDown,
   ChevronUp,
   Ellipsis,
+  Eye,
   Forward,
   Inbox,
   Mail,
   MailOpen,
   Reply,
   ReplyAll,
+  UserRound,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -45,10 +47,15 @@ import {
   peekInboxMessage,
   prefetchInboxMessage,
 } from "../../lib/inbox-message-cache";
+import { useContextPanelOpen } from "../../lib/mail-context-panel";
 import { MAIL_SENT_EVENT } from "../../lib/outbox";
+import { recipientPeople, splitEntries } from "../../lib/recipients";
 import { errorText } from "../../lib/user-error";
 import type { ComposerDraft } from "../BotToolControls";
+import type { ContextPerson } from "./ContextPanel";
 import { EmailAgentPanel } from "./EmailAgentPanel";
+import type { EmailPanelTab } from "./EmailSidePanel";
+import { EmailSidePanel } from "./EmailSidePanel";
 import { MailAttachments } from "./MailAttachments";
 
 /** Opens one cached message in a modal; full screen on phones. Shared by the Inbox and chat email cards. */
@@ -79,6 +86,8 @@ export function InboxMessageDialog({
   onMoveToInbox,
   onRead,
   onReplyDone,
+  tracked,
+  onTrack,
   replyDoneText,
   onAskAgent,
   onAskAgentPanel,
@@ -107,6 +116,9 @@ export function InboxMessageDialog({
   onRead?: (read: boolean) => void;
   /** Adds Mark reply done, for a reply to-do the list page hides because this mail is under Needs reply. */
   onReplyDone?: () => void;
+  /** With `onTrack`, adds Track or Stop tracking to More and shows a Tracked mark while it is on. */
+  tracked?: boolean;
+  onTrack?: (track: boolean) => void;
   /** The to-do `onReplyDone` completes; the menu item names it. */
   replyDoneText?: string;
   /** Adds Ask agent: opens the chat made for this conversation. A rejection shows in the dialog. */
@@ -129,6 +141,10 @@ export function InboxMessageDialog({
   // The email's own agent, docked on the right of the dialog until it is closed.
   const [agentBot, setAgentBot] = useState<AgentBot | null>(null);
   useEffect(() => setAgentBot(null), [messageId]);
+  // The side panel beside the email: Context by default, open or closed as the user left it.
+  const [panelOpen, setPanelOpen] = useContextPanelOpen(messageId);
+  const [tab, setTab] = useState<EmailPanelTab>("context");
+  useEffect(() => setTab("context"), [messageId]);
   return (
     <Dialog open={messageId !== null} onOpenChange={(next) => !next && onClose()}>
       {/* Anchored at the top on wide screens, so a loading body or a notice grows it downward instead
@@ -145,7 +161,7 @@ export function InboxMessageDialog({
           // the dialog's right side and the email column reserves that space, so no text runs under it.
           // The `!` is needed because Tailwind emits an arbitrary min-width variant before `md`, which
           // would otherwise win.
-          agentBot &&
+          panelOpen &&
             "md:h-[85vh] min-[1280px]:w-[min(1440px,calc(50vw+376px))]! min-[1280px]:flex-row min-[1280px]:gap-0",
           composing && "invisible",
         )}
@@ -165,11 +181,17 @@ export function InboxMessageDialog({
             onMoveToInbox={onMoveToInbox}
             onRead={onRead}
             onReplyDone={onReplyDone}
+            tracked={tracked}
+            onTrack={onTrack}
             replyDoneText={replyDoneText}
             onAskAgent={onAskAgent}
             onAskAgentPanel={onAskAgentPanel}
             agentBot={agentBot}
             setAgentBot={setAgentBot}
+            panelOpen={panelOpen}
+            setPanelOpen={setPanelOpen}
+            tab={tab}
+            setTab={setTab}
             notice={notice}
             composing={composing}
             setComposing={setComposing}
@@ -196,11 +218,17 @@ function InboxMessage({
   onMoveToInbox,
   onRead,
   onReplyDone,
+  tracked,
+  onTrack,
   replyDoneText,
   onAskAgent,
   onAskAgentPanel,
   agentBot,
   setAgentBot,
+  panelOpen,
+  setPanelOpen,
+  tab,
+  setTab,
   notice,
   composing,
   setComposing,
@@ -218,11 +246,17 @@ function InboxMessage({
   onMoveToInbox?: () => void;
   onRead?: (read: boolean) => void;
   onReplyDone?: () => void;
+  tracked?: boolean;
+  onTrack?: (track: boolean) => void;
   replyDoneText?: string;
   onAskAgent?: () => Promise<unknown>;
   onAskAgentPanel?: () => Promise<AgentBot>;
   agentBot: AgentBot | null;
   setAgentBot: (bot: AgentBot | null) => void;
+  panelOpen: boolean;
+  setPanelOpen: (open: boolean) => void;
+  tab: EmailPanelTab;
+  setTab: (tab: EmailPanelTab) => void;
   notice?: React.ReactNode;
   composing: ComposeMode | null;
   setComposing: (mode: ComposeMode | null) => void;
@@ -343,6 +377,29 @@ function InboxMessage({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onNavigate, composing, setComposing, nextId, previousId, message, canArchive, canReplyAll]);
 
+  // Ask agent and the Agent tab both open this email's agent beside it.
+  const askAgent = () => {
+    setAsking(true);
+    setAskError("");
+    (onAskAgentPanel
+      ? onAskAgentPanel().then((bot) => {
+          // This message is gone if the user moved on or closed the dialog meanwhile.
+          if (!mounted.current) return;
+          setAgentBot(bot);
+          setTab("agent");
+          setPanelOpen(true);
+        })
+      : (onAskAgent?.() ?? Promise.resolve())
+    ).then(
+      () => setAsking(false),
+      (cause) => {
+        setAsking(false);
+        setAskError(errorText(cause));
+      },
+    );
+  };
+  const people = useMemo(() => contextPeople(message), [message]);
+
   const title = gone
     ? t`Email not found`
     : maskCurrencyWhenHidden(message?.subject ?? subject ?? "");
@@ -357,7 +414,7 @@ function InboxMessage({
       <div
         className={cn(
           "flex min-h-0 min-w-0 flex-1 flex-col gap-2",
-          agentBot && "md:pe-96 min-[1280px]:pe-4!",
+          panelOpen && "md:pe-96 min-[1280px]:pe-4!",
         )}
       >
         <div className="flex items-start gap-2">
@@ -412,6 +469,12 @@ function InboxMessage({
               </span>
               <span className="flex shrink-0 items-baseline gap-2">
                 {message.fromSelf ? <SentMark /> : null}
+                {tracked ? (
+                  <span className="inline-flex items-center gap-1 text-xs">
+                    <Eye aria-hidden="true" className="size-3" />
+                    <Trans>Tracked</Trans>
+                  </span>
+                ) : null}
                 <time
                   dateTime={sent && !Number.isNaN(sent.getTime()) ? sent.toISOString() : undefined}
                   className="text-xs tabular-nums"
@@ -460,7 +523,7 @@ function InboxMessage({
         )}
         {/* The actions need only the id, so they show while the body loads. */}
         {message || !gone ? (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 max-md:flex-nowrap">
             <Button size="sm" onClick={() => setComposing("reply")}>
               <Reply aria-hidden="true" />
               <Trans>Reply</Trans>
@@ -481,30 +544,32 @@ function InboxMessage({
               <Button
                 variant="outline"
                 size="sm"
+                className="max-md:hidden"
                 disabled={asking}
-                aria-pressed={onAskAgentPanel ? Boolean(agentBot) : undefined}
-                onClick={() => {
-                  setAsking(true);
-                  setAskError("");
-                  (onAskAgentPanel
-                    ? onAskAgentPanel().then((bot) => {
-                        // This message is gone if the user moved on or closed the dialog meanwhile.
-                        if (mounted.current) setAgentBot(bot);
-                      })
-                    : (onAskAgent?.() ?? Promise.resolve())
-                  ).then(
-                    () => setAsking(false),
-                    (cause) => {
-                      setAsking(false);
-                      setAskError(errorText(cause));
-                    },
-                  );
-                }}
+                aria-pressed={onAskAgentPanel ? Boolean(agentBot) && panelOpen : undefined}
+                onClick={askAgent}
               >
                 {asking ? <Spinner aria-hidden="true" /> : <Bot aria-hidden="true" />}
                 <Trans>Ask agent</Trans>
               </Button>
             ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              className="md:w-7 md:px-0 pointer-coarse:md:w-11"
+              aria-label={t`Context`}
+              aria-pressed={panelOpen && tab === "context"}
+              onClick={() => {
+                const closing = panelOpen && tab === "context";
+                setTab("context");
+                setPanelOpen(!closing);
+              }}
+            >
+              <UserRound aria-hidden="true" />
+              <span className="md:hidden">
+                <Trans>Context</Trans>
+              </span>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={<Button variant="outline" size="icon-sm" aria-label={t`More`} />}
@@ -512,6 +577,18 @@ function InboxMessage({
                 <Ellipsis aria-hidden="true" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
+                {onAskAgent || onAskAgentPanel ? (
+                  <DropdownMenuItem className="md:hidden" disabled={asking} onClick={askAgent}>
+                    <Bot aria-hidden="true" />
+                    <Trans>Ask agent</Trans>
+                  </DropdownMenuItem>
+                ) : null}
+                {onTrack ? (
+                  <DropdownMenuItem className="whitespace-nowrap" onClick={() => onTrack(!tracked)}>
+                    <Eye aria-hidden="true" />
+                    {tracked ? <Trans>Stop tracking</Trans> : <Trans>Track</Trans>}
+                  </DropdownMenuItem>
+                ) : null}
                 {canReplyAll ? (
                   <DropdownMenuItem onClick={() => setComposing("replyAll")}>
                     <ReplyAll aria-hidden="true" />
@@ -652,21 +729,50 @@ function InboxMessage({
           ) : null}
         </div>
       </div>
-      {agentBot ? (
-        <div className="absolute inset-y-0 end-0 z-10 w-full max-w-[384px] shadow-xl min-[1280px]:relative min-[1280px]:-my-4 min-[1280px]:-me-4 min-[1280px]:w-96 min-[1280px]:max-w-none min-[1280px]:shrink-0 min-[1280px]:shadow-none">
-          <EmailAgentPanel
-            bot={agentBot}
-            onClose={() => setAgentBot(null)}
-            onReplyWithDraft={(text, failed) => {
-              setAgentDraft(text);
-              setFailedDraft(failed);
-              setComposing("reply");
-            }}
+      {panelOpen ? (
+        <div className="absolute inset-y-0 end-0 z-10 w-full max-w-[384px] shadow-xl max-md:inset-x-0 max-md:inset-y-auto max-md:bottom-0 max-md:h-3/5 max-md:max-w-none max-md:overflow-hidden max-md:rounded-t-xl max-md:border-t min-[1280px]:relative min-[1280px]:-my-4 min-[1280px]:-me-4 min-[1280px]:w-96 min-[1280px]:max-w-none min-[1280px]:shrink-0 min-[1280px]:shadow-none">
+          <EmailSidePanel
+            people={people}
+            tab={tab}
+            onTab={
+              onAskAgentPanel
+                ? (next) => (next === "agent" && !agentBot ? askAgent() : setTab(next))
+                : undefined
+            }
+            agentLoading={asking}
+            fullScreenTo={agentBot ? `/app/${agentBot.id}` : undefined}
+            onClose={() => setPanelOpen(false)}
+            agent={
+              agentBot ? (
+                <EmailAgentPanel
+                  embedded
+                  bot={agentBot}
+                  onClose={() => setPanelOpen(false)}
+                  onReplyWithDraft={(text, failed) => {
+                    setAgentDraft(text);
+                    setFailedDraft(failed);
+                    setComposing("reply");
+                  }}
+                />
+              ) : null
+            }
           />
         </div>
       ) : null}
     </>
   );
+}
+
+/**
+ * Who the side panel is about: the sender of a received message, or the recipients of one the user
+ * wrote. Thread rows carry only a display name, so earlier senders cannot be added.
+ */
+function contextPeople(message: InboxMessageOutput | null): ContextPerson[] {
+  if (!message) return [];
+  const entries = message.fromSelf
+    ? [...splitEntries(message.to), ...splitEntries(message.cc)]
+    : [message.from];
+  return recipientPeople(entries);
 }
 
 /** False for a mail whose HTML has no text and no picture, which would show as a blank frame. */

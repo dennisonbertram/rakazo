@@ -65,6 +65,7 @@ import {
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { InboxConsentPrompt } from "../components/AiDataSharing";
 import { AskBotButton } from "../components/AskBotButton";
+import { BotTodos } from "../components/BotTodos";
 import { ComposeEmail, NEW_MESSAGE } from "../components/ComposeEmail";
 import { InboxCleanup } from "../components/inbox/InboxCleanup";
 import { InboxDigest } from "../components/inbox/InboxDigest";
@@ -1808,6 +1809,7 @@ function InboxListPage({
           </>
         ) : shown ? (
           <>
+            {pile === "important" ? <BotTodos /> : null}
             {consentPrompt ? (
               consentPrompt
             ) : consentDismissed ? (
@@ -2124,6 +2126,8 @@ function InboxListPage({
               ? `${openReplyTodo.text} · ${dueLabel(openReplyTodo.dueOn, new Date())}`
               : openReplyTodo?.text
           }
+          tracked={openRow?.tracked === true}
+          onTrack={openRow ? (track) => setTracked(openRow.id, track) : undefined}
           onReplyDone={
             openReplyTodo
               ? () =>

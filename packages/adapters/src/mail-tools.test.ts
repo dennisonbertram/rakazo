@@ -417,6 +417,25 @@ describe("show_emails", () => {
     });
   });
 
+  it("passes the agent's note through, trimmed and cut to 80 characters", async () => {
+    const { deps, publish } = withRows([cached("m1"), cached("m2"), cached("m3")]);
+    await mailToolFromTool("show_emails", deps, context(), {
+      emails: [
+        { id: "m1", note: `  ${"x".repeat(100)}  ` },
+        { id: "m2", note: "   " },
+        { id: "m3" },
+      ],
+    });
+    const [[blocks]] = publish.mock.calls as unknown as [
+      [Array<{ emails: Array<{ note?: string }> }>],
+    ];
+    expect(blocks?.[0]?.emails.map((email) => email.note)).toEqual([
+      "x".repeat(80),
+      undefined,
+      undefined,
+    ]);
+  });
+
   it("falls back to the triage urgency, then Later, when the model gives none", async () => {
     const { deps, publish } = withRows([cached("m1", { priority: "critical" }), cached("m2")]);
     await mailToolFromTool("show_emails", deps, context(), {

@@ -102,6 +102,8 @@ export const EmailCardSchema = z.object({
   receivedAt: z.string(),
   /** Absent when the count could not be read. */
   attachments: z.number().int().nonnegative().optional(),
+  /** The agent's own one-line reason this matters or what to do. Plain text. */
+  note: z.string().max(80).optional(),
 });
 export type EmailCard = z.infer<typeof EmailCardSchema>;
 
@@ -464,6 +466,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     externalOrigin: z.boolean().optional(),
     /** Name of the bot that started an external chain, from stored data, for the notice. */
     externalOriginName: z.string().max(200).optional(),
+    /** A result that arrived while the receiver still waits on these delegates. Server-written. */
+    stillWaitingFor: z.array(z.string()).optional(),
   }),
 ]);
 export type MessageBlock = z.infer<typeof MessageBlock>;

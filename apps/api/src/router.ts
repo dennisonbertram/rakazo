@@ -89,6 +89,7 @@ import {
   PinsValidationError,
   parseModelSecret,
   persistPreparedSecret,
+  personCalendarMeetings,
   pickReusableConnection,
   planLiveConnectionSync,
   prepareApiInstall,
@@ -239,6 +240,7 @@ import {
   companyWriter,
   contactDetail,
   createArtifactShare,
+  createDataRoomRepos,
   createExternalConversationRepos,
   createGroupRepos,
   createRepos,
@@ -488,6 +490,8 @@ import {
   inboxUnarchive,
   inboxUnarchiveMany,
 } from "./inbox-modify.js";
+import type { PersonContextDeps } from "./inbox-person-context.js";
+import { inboxPersonContext, inboxPersonSummary } from "./inbox-person-context.js";
 import { inboxAskAgent } from "./inbox-thread-agent.js";
 import { inboxTrack, inboxUntrack } from "./inbox-track.js";
 import { inboxUnsubscribe } from "./inbox-unsubscribe.js";
@@ -1539,6 +1543,29 @@ export function createRouter(deps: RouterDeps) {
       resolveDataRoomAi({ prisma: deps.prisma, resolveModel: deps.resolveModel }, scope),
     proposeSort: deps.proposeSort,
   });
+
+  const dataRoomRepo = createDataRoomRepos(deps.prisma);
+  const personContextDeps: PersonContextDeps = {
+    prisma: deps.prisma,
+    searchDataRoom: async (actor, query) =>
+      (await dataRoomRepo.searchPage(actor, { query, limit: 5 })).results.map((hit) => ({
+        id: hit.item.id,
+        name: hit.item.name,
+      })),
+    calendarMeetings: async (actor, email, signal) => {
+      const scope = actorScope(actor);
+      const accounts = await listCalendarAccounts(deps.prisma, scope);
+      return accounts.length
+        ? personCalendarMeetings(
+            { connectors: deps.connectors },
+            accounts,
+            connectionContext(scope, `person-context:${randomUUID()}`, signal),
+            email,
+          )
+        : [];
+    },
+    summarize: deps.summarizePerson,
+  };
 
   const boardEnabled = os
     .use(async ({ next }) => {
@@ -8510,6 +8537,12 @@ export function createRouter(deps: RouterDeps) {
             throw mapSpaceLifecycleError(error);
           },
         ),
+      ),
+      personContext: authed.inbox.personContext.handler(({ context, input }) =>
+        inboxPersonContext(personContextDeps, context.actor, input, context.signal),
+      ),
+      personSummary: authed.inbox.personSummary.handler(({ context, input }) =>
+        inboxPersonSummary(personContextDeps, context.actor, input, context.signal),
       ),
       reviewAttachment: authed.inbox.reviewAttachment.handler(({ context, input }) =>
         inboxReviewAttachment(deps, context.actor, input, context.signal),

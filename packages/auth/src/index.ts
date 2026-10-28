@@ -1,4 +1,5 @@
 import { expo } from "@better-auth/expo";
+import { passkey } from "@better-auth/passkey";
 import type { TransactionalEmail, TransactionalEmailProvider } from "@rakazo/adapter-kit";
 import {
   allowlistedSignupAdmission,
@@ -433,6 +434,17 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
       expo(),
       accountSecurity(env.email, env.oidc?.name, env.oidc?.issuer, env.passwordAuth !== false),
       ...(discovery ? [discovery.plugin] : []),
+      // A passkey signs in without OIDC, so it follows password sign-in: off when SSO is mandatory.
+      // rpID is the web origin's host: the browser runs on the web origin, not the API's.
+      ...(env.passwordAuth !== false
+        ? [
+            passkey({
+              rpID: passkeyRpId(env.webOrigin),
+              rpName: "Praci",
+              origin: [env.webOrigin, ...loopbackTwinOrigins(env.webOrigin)],
+            }),
+          ]
+        : []),
       organization({
         allowUserToCreateOrganization: false,
         disableOrganizationDeletion: true,
@@ -776,6 +788,12 @@ export function buildTrustedOrigins(env: Pick<AuthEnv, "webOrigin" | "baseURL" |
   const configured = [env.webOrigin, env.baseURL, ...(env.extraOrigins ?? [])];
   const twins = [env.webOrigin, env.baseURL].flatMap(loopbackTwinOrigins);
   return [...new Set([...configured, ...twins])];
+}
+
+/** The web origin's host. WebAuthn rejects IP hosts, so a loopback origin uses its name, "localhost". */
+export function passkeyRpId(webOrigin: string): string {
+  const { hostname } = new URL(webOrigin);
+  return isLoopbackHost(hostname) ? "localhost" : hostname;
 }
 
 function isLoopbackHost(host: string): boolean {

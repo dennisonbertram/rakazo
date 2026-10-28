@@ -16,9 +16,10 @@ import {
 } from "@rakazo/contracts";
 import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
-import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
+import { SCRATCHPAD_HANDOFF_AGENTS } from "./scratchpad-tools.js";
+import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { voiceAgentTools } from "./voice-agent-tools.js";
 
 // The owner flag can land in process.env after static imports run (loadRootEnv
@@ -386,7 +387,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "ask_user",
     description:
-      "Ask the user one short multiple-choice question with tappable options, then wait for their selection. Use this instead of asking them to type when two to four concise choices are enough.",
+      "Ask the user one short multiple-choice question with tappable options, then wait for their selection. Use it only when you cannot go on without their choice and two to four concise choices cover it; otherwise pick a sensible default and say what you chose. Never use it for a menu of next steps.",
     inputSchema: {
       type: "object",
       properties: {
@@ -804,7 +805,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "show_emails",
     description:
-      "Show messages in the chat as cards grouped by urgency. Call it once when you cite specific messages in an answer, with the ids from mail_grep rows. Give each message an urgency: today, within_3_days, this_week or later (later is shown as a compact list).",
+      "Show messages in the chat as one compact table, most urgent first. Call it once when you cite specific messages in an answer, with the ids from mail_grep rows. Show at most 8 messages. Give each an urgency (today, within_3_days, this_week or later) and a short note, under 80 characters, saying why it matters or what to do. Keep your reply to the headline; do not repeat the table.",
     inputSchema: {
       type: "object",
       properties: {
@@ -816,6 +817,11 @@ export const builtinAgentTools: ConnectorTool[] = [
             properties: {
               id: { type: "string", description: "The id: field of a mail_grep row." },
               urgency: { type: "string", enum: [...EmailUrgency.options] },
+              note: {
+                type: "string",
+                maxLength: 80,
+                description: "Why this matters or what to do, in your own words.",
+              },
             },
             required: ["id"],
           },
@@ -1789,6 +1795,12 @@ export const builtinAgentTools: ConnectorTool[] = [
           description:
             "Who or what the item waits on. Write exactly 'you' when it waits on the owner, otherwise the other party's name, for example 'Acme legal'.",
         },
+        forAgent: {
+          type: "string",
+          enum: Object.keys(SCRATCHPAD_HANDOFF_AGENTS),
+          description:
+            "Email chats only: when the to-do belongs to another agent's area, name that agent and the item is recorded there (linked to this email) instead of on this chat's bot.",
+        },
       },
       required: ["title"],
       additionalProperties: false,
@@ -2179,7 +2191,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "run_subagent",
     description:
-      "Run a short-lived helper inside this turn only. It is not a bot: no list entry, no thread, no computer of its own, and it disappears when this turn ends. Never call this because the user asked to create a bot — that is spawn_bot, and spawn_bot alone.",
+      "Run a short-lived helper inside this turn only. It is not a bot: no list entry, no thread, no computer of its own, and it disappears when this turn ends. Report what it found in your own words, not its raw output. Never call this because the user asked to create a bot — that is spawn_bot, and spawn_bot alone.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2306,7 +2318,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "message_bot",
     description:
-      'Send a useful update, question, or result to another of the user\'s bots. You must call this tool to actually deliver it — writing the message in your own reply text (e.g. "[to Comms] ...") does not send anything and the recipient never sees it. Delivery is async and does not end your turn. Continue independent work; do not poll or send ack-only messages. Later updates only if they add something new.',
+      'Send a useful update, question, or result to another of the user\'s bots. You must call this tool to actually deliver it — writing the message in your own reply text (e.g. "[to Comms] ...") does not send anything and the recipient never sees it. Delivery is async. Do not poll or send ack-only messages. When the user is waiting on the answer, tell them in one short sentence who you are checking with (no figures or guesses), then end your turn; replies wake you, and you answer the user yourself in your own words. Otherwise continue independent work.',
     inputSchema: {
       type: "object",
       properties: {

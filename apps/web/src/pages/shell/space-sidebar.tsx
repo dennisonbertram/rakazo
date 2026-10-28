@@ -103,9 +103,8 @@ import type { ContextMenuPosition } from "../BotContextMenu";
 import type { SettingsSection } from "../SettingsOverlay";
 import { BotCreatePicker, pickerInitialFocus } from "./bot-picker";
 import { moveRosterFocus, rosterRowId, syncRosterTabStops } from "./roster-tab-stops";
-import { moreBarHeight, rowsBelow, scrollingList } from "./rows-below";
+import { moreBarHeight, rowsBelow } from "./rows-below";
 import { SidebarHeaderRow } from "./sidebar-header-row";
-import { endOnWholeRow } from "./whole-rows";
 
 type SidebarChat = {
   id: string;
@@ -143,6 +142,21 @@ export async function commitSpaceRename(input: {
   await input.rename();
   input.apply();
   await input.refresh().catch(() => undefined);
+}
+
+/**
+ * The rows listed under a fold header, nested one level. A closed fold still shows the open
+ * thread's row (when it belongs to the fold and `showActive` allows it), like the collapsed Pages
+ * group showing the current page.
+ */
+export function foldRows<
+  T extends { depth: number; item: { kind: string; chat?: { id: string } } },
+>(rows: T[], open: boolean, activeId: string | undefined, showActive = true): T[] {
+  return rows
+    .filter(
+      (row) => open || (showActive && row.item.kind === "bot" && row.item.chat?.id === activeId),
+    )
+    .map((row) => ({ ...row, depth: row.depth + 1 }));
 }
 
 /**
@@ -577,31 +591,8 @@ export function SpaceSidebar({
   }, [mobileSidebarOpen]);
   const rosterStopId = useRef<string | null>(null);
   useEffect(() => syncRosterTabStops(sidebarRef.current, rosterStopId.current));
-  useEffect(() => {
-    const scrollers = [sidebarPaneRef.current, sidebarScrollRef.current];
-    let frame = 0;
-    const trim = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => endOnWholeRow(scrollers));
-    };
-    trim();
-    const resize = new ResizeObserver(trim);
-    const mutate = new MutationObserver(trim);
-    for (const el of scrollers) {
-      if (!el) continue;
-      resize.observe(el);
-      mutate.observe(el, { childList: true, subtree: true });
-    }
-    return () => {
-      cancelAnimationFrame(frame);
-      resize.disconnect();
-      mutate.disconnect();
-    };
-  }, [mobileSidebarOpen]);
   // "+N more" over the foot of the list while rows remain below the fold.
   const [hiddenRows, setHiddenRows] = useState(0);
-  // The bar fills the margin left below the last whole row.
-  const [moreBarFill, setMoreBarFill] = useState(0);
   useEffect(() => {
     const scrollers = [sidebarPaneRef.current, sidebarScrollRef.current];
     let frame = 0;
@@ -609,7 +600,6 @@ export function SpaceSidebar({
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         setHiddenRows(rowsBelow(scrollers));
-        setMoreBarFill(Number.parseFloat(scrollingList(scrollers)?.style.marginBottom ?? "") || 0);
       });
     };
     measure();
@@ -800,7 +790,7 @@ export function SpaceSidebar({
       ) : null}
       <div
         ref={sidebarPaneRef}
-        className="flex min-h-0 flex-1 flex-col max-lg:overflow-y-auto lg:contents short:lg:flex short:lg:overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto"
       >
         {bootstrapMe === undefined ? null : (
           // Waiting for the account (undefined) keeps pages the user hid from flashing in.
@@ -1160,27 +1150,18 @@ export function SpaceSidebar({
               ).filter((row) => !inActivity(row));
               const pageAgentRows = foldable ? listedRows.filter(isPageAgent) : [];
               const emailChatRows = foldable ? listedRows.filter(isEmailChat) : [];
-              const holdsActive = (rows: typeof nestedRows) =>
-                rows.some((row) => row.item.kind === "bot" && row.item.chat.id === active?.id);
-              const showPageAgents = pageAgentsOpen || (!pageMode && holdsActive(pageAgentRows));
-              const showEmailChats = emailChatsOpen || holdsActive(emailChatRows);
               const displayRows: (
                 | (typeof nestedRows)[number]
                 | { foldHeader: "page" | "email" }
               )[] =
                 pageAgentRows.length || emailChatRows.length
                   ? [
-                      ...listedRows.filter((row) => !isPageAgent(row) && !isEmailChat(row)),
+                      // Page agents sit first, right under the folders above, so the folded groups stay together.
                       ...(pageAgentRows.length ? [{ foldHeader: "page" as const }] : []),
-                      ...(showPageAgents
-                        ? pageAgentsOpen
-                          ? pageAgentRows
-                          : pageAgentRows.filter(
-                              (row) => row.item.kind === "bot" && row.item.chat.id === active?.id,
-                            )
-                        : []),
+                      ...foldRows(pageAgentRows, pageAgentsOpen, active?.id, !pageMode),
+                      ...listedRows.filter((row) => !isPageAgent(row) && !isEmailChat(row)),
                       ...(emailChatRows.length ? [{ foldHeader: "email" as const }] : []),
-                      ...(showEmailChats ? emailChatRows : []),
+                      ...foldRows(emailChatRows, emailChatsOpen, active?.id),
                     ]
                   : listedRows;
               const treeActive = nestedRows.some((row) => row.depth > 0 || row.hasChildren);
@@ -1349,7 +1330,7 @@ export function SpaceSidebar({
                               key={displayRow.foldHeader}
                               label={email ? t`Email chats` : t`Page agents`}
                               testId={email ? "sidebar-email-chats" : undefined}
-                              open={email ? showEmailChats : showPageAgents}
+                              open={email ? emailChatsOpen : pageAgentsOpen}
                               // The open page’s own agent is listed but not counted.
                               count={rows.filter((row) => !untouchedPageAgent(row)).length}
                               needsYou={
@@ -1568,6 +1549,12 @@ export function SpaceSidebar({
                                       });
                                     }}
                                     className={`relative flex w-full items-center ${
+                                      // Folded page agents are leaves: on a phone the fold's indent only truncates their names.
+                                      foldable &&
+                                      (isPageAgent(displayRow) || isEmailChat(displayRow))
+                                        ? "max-sm:ps-2.5!"
+                                        : ""
+                                    } ${
                                       rail
                                         ? "justify-center rounded-xl px-0 py-1"
                                         : compact
@@ -1581,7 +1568,7 @@ export function SpaceSidebar({
                                         : "group-hover/row:bg-sidebar-accent"
                                     } data-file-drop:ring-2 data-file-drop:ring-inset data-file-drop:ring-ring`}
                                     style={
-                                      treeActive && !rail
+                                      (treeActive || depth > 0) && !rail
                                         ? { paddingInlineStart: `${24 + depth * 14}px` }
                                         : undefined
                                     }
@@ -1645,7 +1632,11 @@ export function SpaceSidebar({
                                               />
                                             ) : null}
                                             {!compact ? (
-                                              <span className="text-[12px] leading-[18px] text-muted-foreground tabular-nums">
+                                              <span
+                                                className={`text-[12px] leading-[18px] text-muted-foreground tabular-nums ${
+                                                  item.kind === "bot" ? "pointer-coarse:hidden" : ""
+                                                }`}
+                                              >
                                                 {formatRosterTime(item.chat.updatedAt)}
                                               </span>
                                             ) : null}
@@ -1839,11 +1830,17 @@ export function SpaceSidebar({
       </div>
       {hiddenRows > 0 && !rail ? (
         <div className="relative h-0 shrink-0">
+          {/* A short fade, so a partly hidden row reads as continuing below. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 z-10 h-4 bg-linear-to-t from-sidebar to-transparent"
+            style={{ bottom: moreBarHeight() }}
+          />
           <button
             type="button"
             data-testid="sidebar-more-rows"
             className="absolute inset-x-0 bottom-0 z-10 flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            style={{ height: Math.max(moreBarHeight(), moreBarFill) }}
+            style={{ height: moreBarHeight() }}
             onClick={() => {
               const pane = sidebarPaneRef.current;
               const list = sidebarScrollRef.current;

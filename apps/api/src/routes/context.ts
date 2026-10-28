@@ -30,6 +30,7 @@ import type {
   RemoteConnectorDependencies,
   reviewAttachment,
   SafeSyncDeps,
+  summarizePerson,
   TicketChangeNotifier,
   TriageReadinessDeps,
 } from "@rakazo/adapters";
@@ -60,6 +61,11 @@ export interface RouterDeps {
     input: Parameters<typeof reviewAttachment>[1],
     signal?: AbortSignal,
   ) => ReturnType<typeof reviewAttachment>;
+  /** One model turn that briefs the user on a person; without it the summary reports unavailable. */
+  summarizePerson?: (
+    input: Parameters<typeof summarizePerson>[1],
+    signal?: AbortSignal,
+  ) => ReturnType<typeof summarizePerson>;
   cloudAgent?: CloudAgentConnection | null;
   prisma: PrismaClient;
   events: ThreadEvents;

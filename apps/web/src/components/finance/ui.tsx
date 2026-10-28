@@ -155,7 +155,7 @@ export function AskAgentButton() {
   if (!onAskAgent) return null;
   return (
     <div className="ms-auto">
-      <AskBotButton botName={agentName ?? "Finance agent"} onClick={onAskAgent} />
+      <AskBotButton compact botName={agentName ?? "Finance agent"} onClick={onAskAgent} />
     </div>
   );
 }
@@ -733,18 +733,20 @@ function TransactionRow({ row }: { row: FinanceTransaction }) {
       <TableCell className="hidden w-[4.5rem] whitespace-nowrap pe-2 text-muted-foreground @md:table-cell">
         {shortDay(txnDay(row))}
       </TableCell>
-      <TableCell className="min-w-0 break-words">
+      <TableCell className="min-w-0 break-words py-3 @md:py-2">
         <Link
           state={{ ...back, preview: row }}
           to={financePath.transaction(row.id)}
-          className="rk-tap outline-none hover:underline focus-visible:underline"
+          className="outline-none hover:underline focus-visible:underline"
         >
           {row.counterparty}
         </Link>
-        {/* Narrow, the date sits under the name instead of taking a column from it. */}
-        <div className="text-xs text-muted-foreground @md:hidden">{shortDay(txnDay(row))}</div>
+        {/* Narrow, the date and category sit under the name instead of taking columns from it. The whole row opens the transaction, so the link needs no 44 px box of its own. */}
+        <div className="truncate text-xs text-muted-foreground @md:hidden">
+          {shortDay(txnDay(row))} · {categoryLabel(row)}
+        </div>
         {row.memo ? (
-          <div className="line-clamp-1 text-xs text-muted-foreground">
+          <div className="line-clamp-1 hidden text-xs text-muted-foreground @md:block">
             {maskCurrencyWhenHidden(row.memo)}
           </div>
         ) : null}
@@ -837,7 +839,7 @@ export function TransactionTable({
     // A fixed layout: every column but Counterparty has a set width, so opening a vendor, hiding
     // amounts or a longer name moves no column.
     <Table compact className="table-fixed">
-      <TableHeader>
+      <TableHeader className={sort ? "max-sm:hidden" : undefined}>
         <TableHeadRow>
           {/* Named in both views: an opened vendor's rows show their dates and status here. */}
           <TableHead className="hidden w-[4.5rem] @md:table-cell" {...sortHead("date")}>
@@ -1020,7 +1022,7 @@ export function Chip({ to, on, children }: { to: string; on?: boolean; children:
       to={to}
       aria-current={on ? "true" : undefined}
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs",
+        "inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-xs pointer-coarse:min-h-11",
         on
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",

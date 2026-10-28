@@ -99,6 +99,7 @@ import {
   StripeBillingProvider,
   sandboxProviderOptionsFromEnv,
   stripeBillingConfigFromEnv,
+  summarizePerson,
   syncCryptoHoldings,
   toTeamChatInbound,
   triageStatus,
@@ -718,6 +719,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
     reviewAttachment: (input, signal) =>
       reviewAttachment({ prisma, runtime, resolveModel: executor.resolveModel }, input, signal),
+    summarizePerson: (input, signal) =>
+      summarizePerson({ prisma, runtime, resolveModel: executor.resolveModel }, input, signal),
     unsubscriber: createMailUnsubscriber(),
     proposeSort: (model, input, context) =>
       new LlmDataRoomClassifier({
@@ -875,6 +878,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       resetUrl:
         env.passwordAuth !== false && email ? new URL("/reset-password", env.webOrigin).href : null,
       billing: Boolean(billing),
+      passkey: env.passwordAuth !== false,
     } satisfies AuthCapabilities);
   });
   if (localEmailEmulator && env.nodeEnv === "development") {

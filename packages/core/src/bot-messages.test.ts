@@ -108,8 +108,8 @@ describe("directory", () => {
     expect(directory).toContain("Investigates source-backed questions");
     expect(directory).toContain("Analyst (id: b_2)");
     expect(directory).toContain("async");
-    expect(directory).toContain("does not end your turn");
-    expect(directory).toContain("Later updates only if they add something new");
+    expect(directory).toContain("who you are checking with and end your turn");
+    expect(directory).toContain("Do not poll");
   });
 
   it("adds the integration note once, only when an integration agent is listed", () => {
@@ -377,8 +377,9 @@ describe("inbound wake prompt", () => {
       text: "The answer is 42.",
       intent: "result",
     });
-    expect(resultPrompt).toContain("relay the actual substance");
+    expect(resultPrompt).toContain("answer the user yourself");
     expect(resultPrompt).toContain("only what the conversation does not already show");
+    expect(resultPrompt).toContain("never paste a bot's reply as it was written");
     expect(resultPrompt).not.toContain("staying silent is fine");
     expect(resultPrompt).toContain("do not invent a pending approval");
     expect(resultPrompt).not.toContain("already answered");

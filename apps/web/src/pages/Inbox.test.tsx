@@ -35,6 +35,7 @@ const rpcMock = vi.hoisted(() => ({
   todos: vi.fn(),
   setDone: vi.fn(),
   connections: vi.fn(),
+  waiting: vi.fn(),
 }));
 vi.mock("../lib/rpc", () => ({
   rpc: {
@@ -51,6 +52,7 @@ vi.mock("../lib/rpc", () => ({
       todos: { list: rpcMock.todos, setDone: rpcMock.setDone },
     },
     connections: { list: rpcMock.connections },
+    scratchpad: { waitingOnYou: rpcMock.waiting, update: vi.fn() },
   },
 }));
 vi.mock("../lib/inbox-message-cache", () => ({
@@ -292,6 +294,7 @@ beforeEach(() => {
   vi.setSystemTime(clock);
   rpcMock.refresh.mockResolvedValue({});
   rpcMock.todos.mockResolvedValue({ todos: [] });
+  rpcMock.waiting.mockResolvedValue([]);
   rpcMock.feedback.mockResolvedValue({});
   rpcMock.archive.mockResolvedValue({ ok: true });
   rpcMock.unarchive.mockResolvedValue({ ok: true });
@@ -1974,4 +1977,20 @@ it("shows the rows from the start of a slow first sort, and the stall notice lat
   } finally {
     vi.useRealTimers();
   }
+});
+
+it("lists open to-dos that bots saved for the person", async () => {
+  rpcMock.waiting.mockResolvedValue([
+    {
+      id: "t1",
+      botId: "b1",
+      botName: "Ada",
+      title: "Sign the form",
+      waitingOn: "you",
+      dueAt: null,
+    },
+  ]);
+  const c = await render();
+  await dwell();
+  expect(c.textContent).toContain("Sign the form");
 });

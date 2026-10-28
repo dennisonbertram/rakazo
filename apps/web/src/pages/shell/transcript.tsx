@@ -84,6 +84,7 @@ import { SkillDraftCard } from "../../components/teach/SkillDraftCard";
 import { UiBlockView } from "../../components/UiBlockView";
 import { bubbleMeasure, UserTextBubble } from "../../components/UserTextBubble";
 import type { ArtifactTarget } from "../../lib/artifact-open";
+import { pendingSentBlocks } from "../../lib/delegate-wait";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../../lib/hide-amounts-preference";
 import { copyableMessageText } from "../../lib/message-text";
 import { messageProviderLabel } from "../../lib/messaging";
@@ -147,6 +148,7 @@ export function UnreadDivider() {
 
 export const Transcript = memo(function Transcript({
   scrollRef,
+  delegateStates,
   sentHere,
   scrollRequest,
   onScrollRequestHandled,
@@ -195,6 +197,8 @@ export const Transcript = memo(function Transcript({
   onScrollRequestHandled: () => void;
   artifactTarget: ArtifactTarget;
   messages: ThreadMessage[];
+  /** Each sent request's state by message id and block index, from the whole thread. */
+  delegateStates?: ReadonlyMap<string, ReadonlyMap<number, "pending" | "answered">>;
   /** The agent this chat is waiting on, worked out from the full thread (the display list drops handoff replies). */
   delegate?: string | null;
   showToolActivity: boolean;
@@ -256,6 +260,9 @@ export const Transcript = memo(function Transcript({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
+  // Computed from the unfiltered thread when given: a delegate's reply is collapsed out of `messages`.
+  const ownSentStates = useMemo(() => pendingSentBlocks(messages, Date.now()), [messages]);
+  const sentStates = delegateStates ?? ownSentStates;
   const reactionView = useMemo(() => projectMessageReactions(messages), [messages]);
   // One Tab stop for all the messages' More buttons (roving): the newest, or the one last focused.
   // Up and Down move between them, so Tab reaches the composer in a few presses on a long chat.
@@ -870,6 +877,7 @@ export const Transcript = memo(function Transcript({
                       ownerOnly={ownerOnlyAskMessageIds?.has(message.id) ?? false}
                       onOpenBot={onOpenBot}
                       onOpenPeerMessages={onOpenPeerMessages}
+                      sentStates={sentStates.get(message.id)}
                       onAnswer={onAnswer}
                       speakerName={
                         peerReceipt
@@ -1459,6 +1467,7 @@ const MessageView = memo(function MessageView({
   onAnswer,
   onOpenBot,
   onOpenPeerMessages,
+  sentStates,
   speakerName,
   memberName,
   peerBot,
@@ -1486,6 +1495,8 @@ const MessageView = memo(function MessageView({
   ) => Promise<void>;
   onOpenBot: (botId: string) => void;
   onOpenPeerMessages: (peer: { peerBotId: string; peerBotName: string }) => void;
+  /** State of this message's sent requests by block index: awaiting an answer, or answered. */
+  sentStates?: ReadonlyMap<number, "pending" | "answered">;
   speakerName?: string;
   memberName?: (botId: string | undefined) => string | undefined;
   peerBot: (botId: string) => { name?: string; color: string; status?: string } | undefined;
@@ -1664,7 +1675,15 @@ const MessageView = memo(function MessageView({
           const sent = block.kind === "bot_message_sent";
           const peer = sent ? block.toBotName : block.fromBotName;
           const peerBotId = sent ? block.toBotId : block.fromBotId;
-          const label = sent ? t`Messaged ${peer}` : t`Message from ${peer}`;
+          const state = sent ? sentStates?.get(i) : undefined;
+          const asking = state === "pending";
+          const label = asking
+            ? t`Asking ${peer}…`
+            : state === "answered"
+              ? t`${peer} replied`
+              : sent
+                ? t`Messaged ${peer}`
+                : t`Message from ${peer}`;
           return (
             <CollaborationMarker
               key={i}
@@ -1672,6 +1691,7 @@ const MessageView = memo(function MessageView({
               color={peerBot(peerBotId)?.color ?? DEFAULT_BOT_COLOR}
               identity={peerBotId}
               label={label}
+              pending={asking}
               onClick={() => onOpenPeerMessages({ peerBotId, peerBotName: peer })}
             />
           );
@@ -1808,7 +1828,7 @@ const MessageView = memo(function MessageView({
         }
         if (block.kind === "chart") {
           return (
-            <div key={i} className="flex justify-start">
+            <div key={i} className={`flex justify-start ${i > 0 ? "mt-5" : ""}`}>
               <ChartBlockView name={block.name} spec={block.spec} data={block.data} />
             </div>
           );
@@ -1887,11 +1907,15 @@ const MessageView = memo(function MessageView({
           );
         }
         if (block.kind === "card") {
-          return <ResultCard key={i} block={block} />;
+          return (
+            <div key={i} className={i > 0 ? "mt-5" : undefined}>
+              <ResultCard block={block} />
+            </div>
+          );
         }
         if (block.kind === "ui") {
           return (
-            <div key={i} className="flex justify-start">
+            <div key={i} className={`flex justify-start ${i > 0 ? "mt-5" : ""}`}>
               <ThreadUiBlock block={block.block} />
             </div>
           );

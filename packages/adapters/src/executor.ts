@@ -80,6 +80,7 @@ import {
   isInvestorsAgentSpawnKey,
   isLegalAgentSpawnKey,
   isMailAgentSpawnKey,
+  isMailThreadAgentSpawnKey,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
@@ -2179,6 +2180,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const allowSilentPeerMessage = botMessageAllowsSilence(
           peerMessage?.intent,
           peerMessage?.repliesToRequest,
+          (peerMessage?.stillWaitingFor?.length ?? 0) > 0,
         );
         const allowSilentEmptyRun =
           allowSilentPeerMessage || messagingChannelRun || runAllowsSilentEmpty(run.trigger);
@@ -5533,7 +5535,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "render_ui") {
             const parsed = parseUiBlocks(args);
-            if (!parsed.ok) return finish({ error: "Invalid UI blocks", problems: parsed.problems });
+            if (!parsed.ok)
+              return finish({ error: "Invalid UI blocks", problems: parsed.problems });
             await publishMessage(
               deps,
               run,
@@ -6187,6 +6190,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               scheduledFor: args.scheduledFor !== undefined ? String(args.scheduledFor) : undefined,
               dueAt: args.dueAt != null ? String(args.dueAt) : undefined,
               waitingOn: args.waitingOn != null ? String(args.waitingOn) : undefined,
+              forAgent: args.forAgent != null ? String(args.forAgent) : undefined,
+              callerSpawnKey: bot.spawnKey,
             });
             return finish(created);
           }
@@ -7776,6 +7781,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     mailSearchGuidance: mailSkill.guidance,
                     financeConnectionLine,
                     mailSortingLine,
+                    mailThreadAgent: isMailThreadAgentSpawnKey(bot.spawnKey),
                     dataRoomEnabled: dataRoomEnabled && !legalOnly && !externalBot,
                     agentSkillsLine: restrictedContext ? undefined : agentSkillsLine,
                     taughtSkillsLine: restrictedContext ? undefined : taughtSkillsLine,
@@ -9339,8 +9345,15 @@ function offeredBuiltinClause(
   return builtinOffered(disabled, name) ? text : undefined;
 }
 
+export const MAIL_NOTE_GUIDANCE =
+  "When the user asks you to make a note or to-do, call scratchpad_add; it is linked to this email automatically. If the work belongs to another agent's area (Carta, finance, legal, data room, investors, company, GTM), set forAgent to that area so the to-do goes to that agent instead of staying here, and tell the user plainly where it went, for example \"Added to the Carta agent's to-dos.\" If the result has no addedTo, say it was added to this chat's to-dos.";
+
 export const MEMORY_GUIDANCE =
   "Save only stable preferences, facts and decisions, never secrets, codes, credentials or raw transcripts. Update or merge an existing memory rather than adding a near-duplicate, and say it is saved only after the write succeeds.";
+
+/** How every reply is shaped; the present-clearly skill has the longer recipe. */
+export const PRESENTATION_GUIDANCE =
+  "Write for a busy founder who may be reading on a phone. Open with the answer, or with the one thing that needs them, in a sentence or two. When they ask what to do or focus on, recommend one to three things and why, not everything. Then give only what helps them act: group related items, show the most important three to five and say how many more there are, and leave out routine, unchanged or empty details unless asked. Use cards, charts or your page instead of repeating their contents in text. End with at most one suggested next step, not a menu of offers. Before an overview, briefing, digest, status report or any answer covering many items, read the present-clearly skill.";
 
 /** Grounding, minimal disclosure and honest follow-ups, for every agent turn. */
 export const TRUTHFULNESS_GUIDANCE =
@@ -9578,12 +9591,12 @@ export function directoryDescription(
   forBankAgent = false,
 ): string {
   if (isIntegrationAgentSpawnKey(peer.spawnKey) || isCartaAgentSpawnKey(peer.spawnKey)) {
-    return `${peer.description} Message it with message_bot whenever the user asks about this account, even if they did not name it; it answers you, and you pass its answer on. Do not write a reply to the user until its answer arrives: after messaging it, end your turn without text, and when its answer comes in, give the user the answer yourself, speaking to them as "you" (say "your mail", never the user's name). Do not tell the user to ask it themselves. If its answer says it could not do something, give the user that reason and end your reply with the link in its answer, copied exactly (do not swap it for a general page), or [Open Integrations](/app/integrations) when it has none, except when the user denied the request or the reason is a payee with no matching recipient: then give no link; never reply only that the request could not be completed.${peer.id ? ` If its answer says the user must approve a payment or other change, tell the user in one line to approve it in the ${peer.name ?? "agent"} chat and end with [Open ${peer.name ?? "the agent"}](/app/${peer.id}), never with an Integrations link.` : ""}${CONSENT_LINK_GUIDANCE}`;
+    return `${peer.description} Message it with message_bot whenever the user asks about this account, even if they did not name it; it answers you, and you pass its answer on. Do not answer the user until its answer arrives: after messaging it, tell the user in one short sentence that you are checking with it (for example "Checking with Finance."), with no figures or guesses, and end your turn. When its answer comes in, give the user the answer yourself, speaking to them as "you" (say "your mail", never the user's name). Do not tell the user to ask it themselves. If its answer says it could not do something, give the user that reason and end your reply with the link in its answer, copied exactly (do not swap it for a general page), or [Open Integrations](/app/integrations) when it has none, except when the user denied the request or the reason is a payee with no matching recipient: then give no link; never reply only that the request could not be completed.${peer.id ? ` If its answer says the user must approve a payment or other change, tell the user in one line to approve it in the ${peer.name ?? "agent"} chat and end with [Open ${peer.name ?? "the agent"}](/app/${peer.id}), never with an Integrations link.` : ""}${CONSENT_LINK_GUIDANCE}`;
   }
   if (!isFinanceAgentSpawnKey(peer.spawnKey)) {
     return peer.description;
   }
-  return `${peer.description} Message it with message_bot whenever the user asks about cash, runway, burn or spending, even if they did not name it. It answers with the figures from the Finance page. Do not write a reply to the user until its answer arrives: after messaging it, end your turn without text. When its answer comes in, quote the figures in your reply yourself and end with [Open Finance](/app/finance) for the detail. Never estimate a figure yourself; if it cannot answer, or no accounts are connected yet, say so and still end with [Open Finance](/app/finance). ${forBankAgent ? "" : `If the user asks to pay or change something, message the Mercury or Brex agent instead, and give the user its actual reason and end your reply with its link, or [Open Integrations](/app/integrations) when it has none. When the user denied the request, say it was not submitted and add no link; when a payee has no matching recipient, say to add it at the bank and add no link. Post exactly one message per payment request, only after its answer arrives, saying one of: waiting for the user's approval, not submitted (with the reason), or submitted. If its answer is about a different payment than the one you asked for, say so; never report it as this request's outcome. If you cannot message it, say so. `}Never link Finance in a reply about a payment or other change: Finance does not show the request.${CONSENT_LINK_GUIDANCE}`.trim();
+  return `${peer.description} Message it with message_bot whenever the user asks about cash, runway, burn or spending, even if they did not name it. It answers with the figures from the Finance page. Do not answer the user until its answer arrives: after messaging it, tell the user in one short sentence that you are checking with it (for example "Checking with Finance."), with no figures or guesses, and end your turn. When its answer comes in, quote the figures in your reply yourself and end with [Open Finance](/app/finance) for the detail. Never estimate a figure yourself; if it cannot answer, or no accounts are connected yet, say so and still end with [Open Finance](/app/finance). ${forBankAgent ? "" : `If the user asks to pay or change something, message the Mercury or Brex agent instead, and give the user its actual reason and end your reply with its link, or [Open Integrations](/app/integrations) when it has none. When the user denied the request, say it was not submitted and add no link; when a payee has no matching recipient, say to add it at the bank and add no link. Post exactly one message per payment request, only after its answer arrives, saying one of: waiting for the user's approval, not submitted (with the reason), or submitted. If its answer is about a different payment than the one you asked for, say so; never report it as this request's outcome. If you cannot message it, say so. `}Never link Finance in a reply about a payment or other change: Finance does not show the request.${CONSENT_LINK_GUIDANCE}`.trim();
 }
 
 export const PLAIN_CAPABILITY_GUIDANCE =
@@ -9654,7 +9667,7 @@ export async function loadFinanceConnectionLine(
 
 /** Shown while the first mail sort runs, so an empty To do list is not read as "no tasks". */
 export const MAIL_SORTING_LINE =
-  "Facts: some of the user's mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Say some mail has not been sorted yet and the To do list may be incomplete, and end with [Open Inbox](/app/inbox).";
+  "Facts: some of the user's mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as \"some recent mail is still being sorted\", and end with [Open Inbox](/app/inbox).";
 
 export function userTurnInstructions(parts: {
   botInstructions: string;
@@ -9678,6 +9691,8 @@ export function userTurnInstructions(parts: {
   financeConnectionLine?: string | undefined;
   /** Set while the mail sort has not finished; see MAIL_SORTING_LINE. */
   mailSortingLine?: string | undefined;
+  /** This run is an email chat's agent. */
+  mailThreadAgent?: boolean;
   /** add_to_data_room is offered in this run. */
   dataRoomEnabled?: boolean;
   agentSkillsLine: string | undefined;
@@ -9704,6 +9719,9 @@ export function userTurnInstructions(parts: {
     NOT_CONNECTED_GUIDANCE,
     parts.financeConnectionLine,
     parts.mailSortingLine,
+    parts.mailThreadAgent
+      ? offeredBuiltinClause(parts.disabledBuiltinTools, "scratchpad_add", MAIL_NOTE_GUIDANCE)
+      : undefined,
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "create_space",
@@ -9763,6 +9781,7 @@ export function userTurnInstructions(parts: {
     ),
     "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
     TRUTHFULNESS_GUIDANCE,
+    PRESENTATION_GUIDANCE,
     "Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Do not open a reply with today's date unless the user asked for it.",
     "Treat pagination cursors as opaque: copy the returned continuation value exactly, never calculate or guess it. When the tool reports no next page, stop; if a cursor is rejected, recheck the last successful result before retrying.",
     replyGuidanceForOfferedTools(parts.replyGuidance, parts.disabledBuiltinTools),

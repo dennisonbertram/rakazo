@@ -32,7 +32,7 @@ export const Narrow: StoryObj<typeof meta> = {
   ],
 };
 
-/** A title longer than the card ends in an ellipsis, also under a touch pointer. */
+/** A title longer than the card wraps to a second line, also under a touch pointer. */
 export const LongTitle: StoryObj<typeof meta> = {
   args: {
     contracts: [

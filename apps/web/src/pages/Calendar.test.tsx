@@ -19,7 +19,13 @@ vi.mock("@lingui/react/macro", () => ({
 }));
 
 const agendaMock = vi.hoisted(() => vi.fn());
-vi.mock("../lib/rpc", () => ({ rpc: { calendar: { agenda: agendaMock } } }));
+const waitingMock = vi.hoisted(() => vi.fn());
+vi.mock("../lib/rpc", () => ({
+  rpc: {
+    calendar: { agenda: agendaMock },
+    scratchpad: { waitingOnYou: waitingMock, update: vi.fn() },
+  },
+}));
 
 import { CalendarPage } from "./Calendar";
 
@@ -74,6 +80,8 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   agendaMock.mockReset();
+  waitingMock.mockReset();
+  waitingMock.mockResolvedValue([]);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -194,4 +202,94 @@ it("keeps titles and drops icons when items overlap", async () => {
   expect(col.textContent).toContain("First thing");
   expect(col.textContent).toContain("Second thing");
   expect(col.querySelector('[role="img"]')).toBeNull();
+});
+
+it("shows open to-dos waiting on the person above the grid, and still loads without them", async () => {
+  agendaMock.mockImplementation(answer(agenda()));
+  waitingMock.mockResolvedValue([
+    {
+      id: "t1",
+      botId: "b1",
+      botName: "Ada",
+      title: "Sign the form",
+      waitingOn: "you",
+      dueAt: null,
+    },
+  ]);
+  await mount("/app/calendar?view=week");
+  expect(container.textContent).toContain("Sign the form");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  waitingMock.mockRejectedValue(new Error("down"));
+  await mount("/app/calendar?view=week");
+  expect(container.textContent).not.toContain("Sign the form");
+  expect(container.textContent).toContain("Calendar");
+});
+
+/** Makes the page see a phone for the length of one test. */
+const asPhone = () => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: true,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+};
+afterEach(() => vi.unstubAllGlobals());
+const link = (title: string) =>
+  [...container.querySelectorAll("a")].find((a) => a.textContent?.includes(title));
+
+it("opens on Schedule on a phone and shows three days instead of the week", async () => {
+  asPhone();
+  agendaMock.mockImplementation(answer(agenda()));
+  await mount();
+  expect(container.textContent).toContain("Board call");
+  expect(container.querySelector("[data-day]")).toBeNull();
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await mount("/app/calendar?view=week");
+  expect(container.querySelectorAll("[data-day]")).toHaveLength(3);
+});
+
+it("opens a to-do's mail and a routine's own editor from the schedule", async () => {
+  asPhone();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12);
+  agendaMock.mockImplementation(
+    answer(
+      agenda({
+        items: [
+          local("inbox-todo:i1", "Sign form", tomorrow, { botId: null, mailId: "m1" }),
+          local("routine:r1", "Daily scan", tomorrow, { kind: "routine" }),
+        ],
+      }),
+    ),
+  );
+  await mount();
+  expect(link("Sign form")?.getAttribute("href")).toBe("/app/inbox?mail=m1");
+  expect(link("Daily scan")?.getAttribute("href")).toBe("/app/b1?routine=r1");
+});
+
+it("lists the tapped day under a phone's month and says when a day is empty", async () => {
+  asPhone();
+  const noonToday = noon();
+  agendaMock.mockImplementation(answer(agenda({ items: [local("t1", "Send deck", noonToday)] })));
+  await mount("/app/calendar?view=month");
+  const cell = column(localDay(now)).querySelector("button") as HTMLButtonElement;
+  expect(container.querySelector(`[data-day="${localDay(now)}"] [data-dots="1"]`)).not.toBeNull();
+  await act(async () => cell.click());
+  expect(container.querySelector(`section[aria-label="${localDay(now)}"]`)?.textContent).toContain(
+    "Send deck",
+  );
+  const empty = new Date(now.getFullYear(), now.getMonth(), 28 === now.getDate() ? 27 : 28);
+  const emptyCell = column(localDay(empty)).querySelector("button") as HTMLButtonElement;
+  await act(async () => emptyCell.click());
+  expect(
+    container.querySelector(`section[aria-label="${localDay(empty)}"]`)?.textContent,
+  ).toContain("Nothing scheduled");
+});
+
+it("says a phone's empty day is empty", async () => {
+  asPhone();
+  agendaMock.mockImplementation(answer(agenda({ items: [] })));
+  await mount("/app/calendar?view=day");
+  expect(container.textContent).toContain("Nothing scheduled");
 });
