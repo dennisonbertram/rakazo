@@ -462,13 +462,18 @@ export function CalendarPage({
     const full = [timeText(item), item.title, item.botName].filter(Boolean).join(" · ");
     return wrap(
       item,
-      `${style ? "absolute" : ""} pointer-coarse:min-h-11 flex ${tall ? "items-start" : "items-center"} gap-1 overflow-hidden rounded-md border px-1 py-0.5 text-start text-xs hover:bg-accent ${
+      `${
+        style
+          ? // A timed block keeps its time slot's height; on touch an invisible band above and below makes it 44 px to tap.
+            "absolute pointer-coarse:min-h-0! pointer-coarse:overflow-visible pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2.5"
+          : "pointer-coarse:min-h-11"
+      } flex ${tall ? "items-start" : "items-center"} gap-1 overflow-hidden rounded-md border px-1 py-0.5 text-start text-xs hover:bg-accent ${
         item.kind === "event" ? "bg-muted" : "bg-card"
       } ${item.botId ? "border-s-2" : ""}`,
       <>
         {crowded ? null : kindIcon(item)}
         <span
-          className={`min-w-0 flex-1 ${tall ? "line-clamp-2 break-words" : "truncate pointer-coarse:whitespace-normal pointer-coarse:line-clamp-2 pointer-coarse:break-words"}`}
+          className={`min-w-0 flex-1 ${tall ? "line-clamp-2 break-words" : "truncate"}`}
           title={full}
         >
           {item.title}

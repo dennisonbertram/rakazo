@@ -207,7 +207,10 @@ export function UiBlockView({ block, onNavigate }: Props) {
                   {card.subtitle ? (
                     <p className="text-xs text-muted-foreground">{text(card.subtitle)}</p>
                   ) : null}
-                  {card.body ? markdown(card.body) : null}
+                  {card.body ? (
+                    // Links in the body sit above the card-wide link.
+                    <div className="[&_a]:relative [&_a]:z-10">{markdown(card.body)}</div>
+                  ) : null}
                 </Card>
               </li>
             );
