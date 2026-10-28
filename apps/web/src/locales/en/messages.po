@@ -11770,6 +11770,7 @@ msgstr "Stop speaking"
 msgid "Stop teaching"
 msgstr "Stop teaching"
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Stop tracking"
 msgstr "Stop tracking"
@@ -12542,9 +12543,15 @@ msgstr "Total incl. crypto"
 msgid "Tour"
 msgstr "Tour"
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Track"
 msgstr "Track"
+
+#: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/inbox/InboxRow.tsx
+msgid "Tracked"
+msgstr "Tracked"
 
 #. placeholder {0}: maskCurrencyWhenHidden(status.subject)
 #: src/pages/Inbox.tsx

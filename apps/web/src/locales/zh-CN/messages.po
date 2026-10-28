@@ -11770,6 +11770,7 @@ msgstr "停止朗读"
 msgid "Stop teaching"
 msgstr "停止示范"
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Stop tracking"
 msgstr ""
@@ -12542,8 +12543,14 @@ msgstr ""
 msgid "Tour"
 msgstr ""
 
+#: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/inbox/InboxRow.tsx
 msgid "Track"
+msgstr ""
+
+#: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/inbox/InboxRow.tsx
+msgid "Tracked"
 msgstr ""
 
 #. placeholder {0}: maskCurrencyWhenHidden(status.subject)

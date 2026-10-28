@@ -344,3 +344,10 @@ it("tracks an untracked row and offers Stop tracking, pressed, on a tracked one"
   await act(async () => stop?.click());
   expect(onTrack).toHaveBeenLastCalledWith("m1", false);
 });
+
+it("marks a tracked row with an eye by the time", async () => {
+  await show();
+  expect(document.querySelector('time [aria-label="Tracked"]')).toBeNull();
+  await show({ row: { ...row, tracked: true } });
+  expect(document.querySelector('time [aria-label="Tracked"]')).not.toBeNull();
+});
