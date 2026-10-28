@@ -106,6 +106,8 @@ export interface MercuryOptions {
   txns: Record<string, MercuryRow[]>;
   accounts?: Record<string, unknown>;
   treasury?: Record<string, unknown>;
+  /** Rows per Treasury account id, newest first, for getTreasuryTransactions. */
+  treasuryTxns?: Record<string, Array<Record<string, unknown>>>;
   /** Answer pages larger than this as truncated. */
   truncateAbove?: number;
   /** Return the cursor like the vendor documents it; the live server leaves `page` out. */
@@ -150,6 +152,11 @@ export function fakeMercury(
       return row;
     }
     if (name === "getTreasury") return options.treasury ?? mercuryTreasuryResponse;
+    if (name === "getTreasuryTransactions") {
+      const all = options.treasuryTxns?.[args.treasuryId as string] ?? [];
+      const from = Number(args.cursor ?? 0);
+      return { transactions: all.slice(from, from + Number(args.limit)) };
+    }
     if (name === "getTransactionById")
       return { transaction: { id: args.transactionId, attachments: options.attachments } };
     if (name === "getAttachment")

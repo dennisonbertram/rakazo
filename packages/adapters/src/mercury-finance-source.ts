@@ -73,6 +73,24 @@ const TransactionsSchema = z.object({
   page: z.object({ nextPage: z.string().nullish() }).nullish(),
 });
 
+/** Deposits, withdrawals, dividends and fees of one Treasury account (getTreasuryTransactions). */
+const TreasuryTransactionsSchema = z.object({
+  transactions: z.array(
+    z.object({
+      id: z.string(),
+      amount: z.number(),
+      type: z.string().nullish(),
+      status: z.string().nullish(),
+      createdAt: z.string().nullish(),
+      postedAt: z.string().nullish(),
+      description: z.string().nullish(),
+    }),
+  ),
+});
+
+const TREASURY_PAGE = 200;
+const TREASURY_MAX_PAGES = 100;
+
 const TransactionDetailSchema = z.object({
   transaction: z.object({
     attachments: z
@@ -104,7 +122,9 @@ const AttachmentSchema = z.object({
  * A listing row does not say whether it has attachments, so `hasReceipt` stays false unless the row
  * carries `attachmentsCount`; `receiptUrl` looks the attachment up on demand.
  */
-export function createMercuryFinanceSource(callTool: FinanceCallTool): FinanceSource {
+export function createMercuryFinanceSource(
+  callTool: FinanceCallTool,
+): FinanceSource {
   let accounts: Promise<z.infer<typeof AccountsSchema>["accounts"]> | undefined;
   let treasury: Promise<z.infer<typeof TreasurySchema>["accounts"]> | undefined;
   const loadAccounts = () =>
@@ -122,7 +142,9 @@ export function createMercuryFinanceSource(callTool: FinanceCallTool): FinanceSo
   const cashAccounts = async () =>
     (await loadAccounts()).filter(
       (a) =>
-        a.status === "active" && !a.isCredit && (a.kind === "checking" || a.kind === "savings"),
+        a.status === "active" &&
+        !a.isCredit &&
+        (a.kind === "checking" || a.kind === "savings"),
     );
 
   /** Shrinks when the tool truncates a page, and stays small for the rest of the sync. */
@@ -148,7 +170,8 @@ export function createMercuryFinanceSource(callTool: FinanceCallTool): FinanceSo
         }),
       );
       if (response.truncatedAt != null && response.truncatedAt !== false) {
-        if (limit <= MIN_PAGE_LIMIT) throw new Error("Mercury keeps truncating transaction pages");
+        if (limit <= MIN_PAGE_LIMIT)
+          throw new Error("Mercury keeps truncating transaction pages");
         limit = Math.max(MIN_PAGE_LIMIT, Math.floor(limit / 2));
         continue;
       }
@@ -159,41 +182,72 @@ export function createMercuryFinanceSource(callTool: FinanceCallTool): FinanceSo
       }
       const last = response.transactions.at(-1);
       const next =
-        response.page?.nextPage ?? (response.transactions.length >= limit ? last?.id : undefined);
+        response.page?.nextPage ??
+        (response.transactions.length >= limit ? last?.id : undefined);
       if (!next || fresh.length === 0) return rows;
       startAfter = next;
     }
     throw new Error("Mercury returned too many transaction pages");
   }
 
+  /**
+   * Treasury moves (deposits, withdrawals, dividends, fees) are not in listTransactions, so without
+   * them the account's balance history would be flat. They are stored as `treasury` kind, which
+   * classifies as internal_transfer, so spend, revenue and cash totals are unchanged.
+   * A failure here is skipped: the chart stays flat, but the rest of the sync still lands.
+   */
+  async function treasuryTransactions(): Promise<SourceTransaction[]> {
+    const rows: SourceTransaction[] = [];
+    try {
+      for (const account of (await loadTreasury()).filter(
+        (t) => t.status === "active",
+      )) {
+        for (let page = 0; page < TREASURY_MAX_PAGES; page += 1) {
+          const { transactions } = parseToolResponse(
+            TreasuryTransactionsSchema,
+            "getTreasuryTransactions",
+            await callTool("getTreasuryTransactions", {
+              treasuryId: account.id,
+              order: "desc",
+              limit: TREASURY_PAGE,
+              cursor: page * TREASURY_PAGE,
+            }),
+          );
+          for (const t of transactions)
+            rows.push(mapTreasuryTransaction(t, account.id));
+          if (transactions.length < TREASURY_PAGE) break;
+        }
+      }
+    } catch {
+      return [];
+    }
+    return rows;
+  }
+
   return {
     provider: "mercury",
 
     async fetchAccounts(): Promise<SourceAccount[]> {
-      const cash = (await cashAccounts()).map(
-        (a): SourceAccount => ({
-          provider: "mercury",
-          externalId: a.id,
-          name: a.name,
-          lastFour: a.lastFour || null,
-          kind: a.kind as "checking" | "savings",
-          balanceCents: dollarsToCents(a.availableBalance),
-          currency: "USD",
-        }),
-      );
+      const cash = (await cashAccounts()).map((a): SourceAccount => ({
+        provider: "mercury",
+        externalId: a.id,
+        name: a.name,
+        lastFour: a.lastFour || null,
+        kind: a.kind as "checking" | "savings",
+        balanceCents: dollarsToCents(a.availableBalance),
+        currency: "USD",
+      }));
       const treasuries = (await loadTreasury())
         .filter((t) => t.status === "active")
-        .map(
-          (t): SourceAccount => ({
-            provider: "mercury",
-            externalId: t.id,
-            name: "Mercury Treasury",
-            lastFour: null,
-            kind: "treasury",
-            balanceCents: dollarsToCents(t.availableBalance),
-            currency: "USD",
-          }),
-        );
+        .map((t): SourceAccount => ({
+          provider: "mercury",
+          externalId: t.id,
+          name: "Mercury Treasury",
+          lastFour: null,
+          kind: "treasury",
+          balanceCents: dollarsToCents(t.availableBalance),
+          currency: "USD",
+        }));
       return [...cash, ...treasuries];
     },
 
@@ -208,6 +262,7 @@ export function createMercuryFinanceSource(callTool: FinanceCallTool): FinanceSo
         });
         for (const t of [...pending, ...posted]) byId.set(t.externalId, t);
       }
+      for (const t of await treasuryTransactions()) byId.set(t.externalId, t);
       return [...byId.values()];
     },
 
@@ -216,7 +271,10 @@ export function createMercuryFinanceSource(callTool: FinanceCallTool): FinanceSo
         (t.netReturns ?? []).map((r) => ({
           accountExternalId: t.id,
           month: r.month.slice(0, 7),
-          dividendsCents: r.dividends.reduce((sum, d) => sum + dollarsToCents(d.amount), 0),
+          dividendsCents: r.dividends.reduce(
+            (sum, d) => sum + dollarsToCents(d.amount),
+            0,
+          ),
           // The tool reports the fee as a negative amount; stored as the positive cost.
           feeCents: Math.abs(dollarsToCents(r.treasuryFee)),
           netCents: dollarsToCents(r.netAmount),
@@ -257,7 +315,10 @@ function mapTransaction(
   const key = vendorKey(counterparty);
   // Mercury can leave a payment to Brex uncategorized; it is a card bill, so it gets the category
   // Mercury gives one elsewhere, and does not read as an unexplained 'Uncategorized' expense.
-  const cardBill = key === "brex" && t.amount < 0 && categorySlug(t.category) === "uncategorized";
+  const cardBill =
+    key === "brex" &&
+    t.amount < 0 &&
+    categorySlug(t.category) === "uncategorized";
   return {
     provider: "mercury",
     externalId: t.id,
@@ -269,12 +330,51 @@ function mapTransaction(
     counterparty,
     vendorKey: key,
     category: cardBill ? "Credit & Loan Payments" : t.category || null,
-    status: t.status === "sent" ? "posted" : t.status === "pending" ? "pending" : "other",
+    status:
+      t.status === "sent"
+        ? "posted"
+        : t.status === "pending"
+          ? "pending"
+          : "other",
     kind: t.kind || "other",
     cardLastFour: null,
     cardholder: null,
     memo: null,
     hasReceipt: (t.attachmentsCount ?? 0) > 0,
     dashboardUrl: t.dashboardLink || null,
+  };
+}
+
+/** A withdrawal or fee takes money out; the vendor may or may not sign the amount, so the type decides. */
+function mapTreasuryTransaction(
+  t: z.infer<typeof TreasuryTransactionsSchema>["transactions"][number],
+  accountExternalId: string,
+): SourceTransaction {
+  const type = (t.type ?? "").toLowerCase();
+  const out = /withdraw|fee/.test(type);
+  const cents = Math.abs(dollarsToCents(t.amount));
+  const status = (t.status ?? "").toLowerCase();
+  return {
+    provider: "mercury",
+    externalId: t.id,
+    accountExternalId,
+    postedAt: toIso(t.postedAt ?? t.createdAt ?? "", "getTreasuryTransactions"),
+    purchasedAt: null,
+    amountCents: out ? -cents : cents,
+    currency: "USD",
+    counterparty: "Mercury Treasury",
+    vendorKey: "mercury-treasury",
+    category: null,
+    status: /fail|cancel|reject|revers/.test(status)
+      ? "other"
+      : /pend|process/.test(status)
+        ? "pending"
+        : "posted",
+    kind: "treasury",
+    cardLastFour: null,
+    cardholder: null,
+    memo: t.description ?? null,
+    hasReceipt: false,
+    dashboardUrl: null,
   };
 }
