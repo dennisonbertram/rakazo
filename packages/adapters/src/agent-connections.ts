@@ -13,6 +13,7 @@ import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import {
   appendEventInTransaction,
   createThreadMessageInTransaction,
+  crossSpaceCommunicationAllowed,
   isUniqueViolation,
   runAsSystem,
 } from "@rakazo/db";
@@ -93,6 +94,10 @@ async function requestConnection(
     return { ok: false, error: "no agent can be reached at that address" };
   }
 
+  if (!(await crossSpaceCommunicationAllowed(deps.prisma, sender.id, target.id))) {
+    return { ok: false, error: "no agent can be reached at that address" };
+  }
+
   const existing = await deps.prisma.agentConnection.findUnique({
     where: {
       requesterBotId_targetBotId: { requesterBotId: sender.id, targetBotId: target.id },
@@ -123,6 +128,9 @@ async function requestConnection(
   let claimed: Awaited<ReturnType<typeof claimConnection>>;
   const claimConnection = () =>
     deps.prisma.$transaction(async (tx) => {
+      if (!(await crossSpaceCommunicationAllowed(tx, sender.id, target.id))) {
+        return { ok: false as const, error: "no agent can be reached at that address" };
+      }
       if (existing) {
         const locked = await tx.$queryRaw<Array<{ status: string }>>`
           SELECT status FROM agent_connections WHERE id = ${existing.id} FOR UPDATE
@@ -138,7 +146,7 @@ async function requestConnection(
         }
         await tx.agentConnection.update({
           where: { id: existing.id },
-          data: { status: "pending" },
+          data: { status: "pending", requestVersion: { increment: 1 } },
         });
       } else {
         try {
@@ -194,22 +202,83 @@ async function requestConnection(
   return { ok: true, status: "pending" };
 }
 
+/** Capture the exact request and requester shown on the owner's approval card. */
+export function prepareAgentConnectionResponse(
+  prisma: PrismaClient,
+  targetBotId: string,
+  accept: boolean,
+) {
+  return runAsSystem("prepare an agent connection response for its target bot", () =>
+    prepareResponse(prisma, targetBotId, accept),
+  );
+}
+
+async function prepareResponse(
+  prisma: PrismaClient,
+  targetBotId: string,
+  accept: boolean,
+) {
+  const pending = await prisma.agentConnection.findFirst({
+    where: { targetBotId, status: "pending" },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, requestVersion: true, requesterBotId: true },
+  });
+  if (!pending) return null;
+  const [requester, identity] = await Promise.all([
+    prisma.bot.findUnique({ where: { id: pending.requesterBotId }, select: { name: true } }),
+    prisma.messagingIdentity.findUnique({
+      where: { botId: pending.requesterBotId },
+      select: { address: true, provider: true },
+    }),
+  ]);
+  if (!requester || !identity) return null;
+  return {
+    accept,
+    connection_id: pending.id,
+    connection_version: pending.requestVersion,
+    requester_name: requester.name,
+    requester_address: identity.address,
+    requester_provider: identity.provider,
+  };
+}
+
 /** The target bot answers a pending request on its owner's instruction. */
-export async function respondAgentConnection(
+export function respondAgentConnection(
+  ...args: Parameters<typeof respondToConnection>
+): Promise<Result> {
+  return runAsSystem("respond to an agent connection in another Space", () =>
+    respondToConnection(...args),
+  );
+}
+
+async function respondToConnection(
   deps: AgentConnectionDeps,
   _run: ConnectionRun,
   sender: { id: string; name: string },
-  input: { accept: boolean },
+  input: { accept: boolean; connectionId: string; connectionVersion: number },
 ): Promise<Result> {
   const pending = await deps.prisma.agentConnection.findFirst({
-    where: { targetBotId: sender.id, status: "pending" },
+    where: {
+      targetBotId: sender.id,
+      status: "pending",
+      id: input.connectionId,
+      requestVersion: input.connectionVersion,
+    },
     orderBy: { updatedAt: "desc" },
   });
   if (!pending) return { ok: false, error: "no pending connection request" };
   const status = input.accept ? "approved" : "declined";
-  const { count } = await deps.prisma.agentConnection.updateMany({
-    where: { id: pending.id, status: "pending" },
-    data: { status },
+  const count = await deps.prisma.$transaction(async (tx) => {
+    if (
+      input.accept &&
+      !(await crossSpaceCommunicationAllowed(tx, pending.requesterBotId, sender.id))
+    )
+      return 0;
+    const result = await tx.agentConnection.updateMany({
+      where: { id: pending.id, status: "pending", requestVersion: input.connectionVersion },
+      data: { status },
+    });
+    return result.count;
   });
   // A revoke landing between the read and this write wins; never overwrite it.
   if (count === 0) return { ok: false, error: "connection request is no longer pending" };
@@ -291,6 +360,9 @@ async function deliverToConnectedAgent(
   if (!target || target.archivedAt || !target.thread) {
     return { ok: false, error: "that agent is not available" };
   }
+  if (!(await crossSpaceCommunicationAllowed(deps.prisma, sender.id, target.id))) {
+    return { ok: false, error: "no agent can be reached at that address" };
+  }
   // An external bot gets a message only if it repeats nothing this run read; no card route here.
   // A bot in another Space is another account's agent: always treated as external.
   const crossSpace = target.spaceId !== run.spaceId || target.userId !== run.userId;
@@ -319,6 +391,12 @@ async function deliverToConnectedAgent(
           select: { id: true },
         });
         if (already) return { replayed: true as const };
+      }
+      for (const threadId of [run.threadId, targetThreadId].sort()) {
+        await tx.$queryRaw`SELECT id FROM threads WHERE id = ${threadId} FOR UPDATE`;
+      }
+      if (!(await crossSpaceCommunicationAllowed(tx, sender.id, target.id))) {
+        return { ok: false as const, error: "no agent can be reached at that address" };
       }
       const senderStillRunning = await tx.run.findFirst({
         where: { id: run.id, status: "running" },

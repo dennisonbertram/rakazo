@@ -76,6 +76,7 @@ function mapBot(
     thinkingLevel?: string | null;
     teamChatAmbientEnabled?: boolean;
     teamChatRules?: string;
+    crossSpaceCommunication?: boolean;
     disabledBuiltinTools?: string[];
     audience?: string;
     externalMessageTargets?: string[];
@@ -124,6 +125,7 @@ function mapBot(
     thinkingLevel: (bot.thinkingLevel as Bot["thinkingLevel"]) ?? null,
     teamChatAmbientEnabled: bot.teamChatAmbientEnabled ?? false,
     teamChatRules: bot.teamChatRules ?? "",
+    crossSpaceCommunication: bot.crossSpaceCommunication ?? false,
     disabledBuiltinTools: bot.disabledBuiltinTools ?? [],
     audience: bot.audience === "external" ? "external" : "internal",
     externalMessageTargets: bot.externalMessageTargets ?? [],

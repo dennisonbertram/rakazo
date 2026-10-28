@@ -206,6 +206,7 @@ describe("archiveGroup", () => {
       $queryRaw: queryRaw,
       chatGroup: { findFirst, update: groupUpdate },
       run: { findMany: findManyRuns, updateMany: runUpdateMany },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: attemptUpdateMany },
       task: { updateMany: taskUpdateMany },
       computerExecutionLease: { findMany: leaseFindMany, updateMany: leaseUpdateMany },

@@ -1,6 +1,6 @@
 import { STUCK_WORK_EXPIRE_AFTER_MS } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
-import { createDb, createThreadEvents } from "@rakazo/db";
+import { createDb, createThreadEvents, runAsSystem } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { reconcileStuckWork } from "./stuck-work.js";
 
@@ -11,18 +11,23 @@ const describePostgres =
 describePostgres("expiry of unanswered approval cards (PostgreSQL)", () => {
   const suffix = `${process.pid}-${Date.now()}`;
   const ids = { user: `bae-user-${suffix}`, org: `bae-org-${suffix}`, space: `bae-sp-${suffix}` };
+  // Fixtures use the owner login; the reconciler runs as the runtime login, as a job does.
   let prisma: PrismaClient;
+  let app: ReturnType<typeof createDb>;
   let close: () => Promise<void>;
   let botId: string;
   let threadId: string;
   let n = 0;
 
   beforeAll(async () => {
-    const db = createDb(databaseUrl!);
+    const db = createDb(process.env.DATABASE_MIGRATION_URL || databaseUrl!);
+    app = createDb(databaseUrl!);
     prisma = db.prisma;
     close = async () => {
       await prisma.$disconnect();
       await db.pool.end();
+      await app.prisma.$disconnect();
+      await app.pool.end();
     };
     await prisma.user.create({
       data: { id: ids.user, name: "Tester", email: `${ids.user}@example.test` },
@@ -117,12 +122,14 @@ describePostgres("expiry of unanswered approval cards (PostgreSQL)", () => {
   }
 
   const tick = (hoursAfterPause: number) =>
-    reconcileStuckWork({
-      prisma,
-      jobs: { enqueue: async () => undefined } as never,
-      now: new Date(Date.now() + hoursAfterPause * 60 * 60_000),
-      batchSize: 500,
-    });
+    runAsSystem("stuck-work test", () =>
+      reconcileStuckWork({
+        prisma: app.prisma,
+        jobs: { enqueue: async () => undefined } as never,
+        now: new Date(Date.now() + hoursAfterPause * 60 * 60_000),
+        batchSize: 500,
+      }),
+    );
   const status = async (runId: string) =>
     (await prisma.run.findUniqueOrThrow({ where: { id: runId } })).status;
   const effectStatus = async (id: string) =>

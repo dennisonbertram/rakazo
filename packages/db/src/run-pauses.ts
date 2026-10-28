@@ -2,6 +2,7 @@ import type { RealtimeFanout } from "@rakazo/adapter-kit";
 import {
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
+  BOT_SECRET_VALUE_MAX_LENGTH,
   encodeLoginSecret,
   LoginSecretValue,
   MessageBlock as MessageBlockSchema,
@@ -32,6 +33,7 @@ import {
   notifyRealtime,
 } from "./events.js";
 import { createThreadMessageInTransaction } from "./messages.js";
+import { AnswerTooLongError } from "./run-secrets.js";
 
 const CHOICE_ASK_CHECKPOINT_KIND = "choice_ask_v1";
 
@@ -121,6 +123,31 @@ export async function closeApprovalCardsInTransaction(
       payload: { messageId: message.id, role: "bot", blocks },
     });
     closed += effectIds.length;
+  }
+  return closed;
+}
+
+/**
+ * Runs that ended without an answer (expired, or stopped by the user) leave no approval open: the
+ * unanswered cards close with `answer`, and when there was one, every effect still pending for
+ * those runs takes the same status, so nothing behind a card can run later.
+ */
+export async function settleApprovalsOfEndedRuns(
+  tx: Prisma.TransactionClient,
+  input: {
+    spaceId: string;
+    threadId: string;
+    botId: string;
+    runIds: string[];
+    answer: ClosedApprovalAnswer;
+  },
+): Promise<number> {
+  const closed = await closeApprovalCardsInTransaction(tx, input);
+  if (closed > 0) {
+    await tx.externalEffect.updateMany({
+      where: { runId: { in: input.runIds }, spaceId: input.spaceId, status: "intended" },
+      data: { status: input.answer },
+    });
   }
   return closed;
 }
@@ -443,6 +470,8 @@ async function commitAnswerRunInput(
     ? LoginSecretValue.safeParse({ username: input.username!.trim(), password: input.answer })
     : undefined;
   if (login && !login.success) return null;
+  if (secretAsk && input.answer.length > BOT_SECRET_VALUE_MAX_LENGTH)
+    throw new AnswerTooLongError();
   let approvalEffect: { id: string; kind: string; request?: unknown } | null = null;
   let approvalUserId: string | null = null;
   if (input.mailDenial && (!approvalAsk || input.answer !== "deny")) return null;

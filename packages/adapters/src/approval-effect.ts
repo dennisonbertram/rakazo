@@ -454,7 +454,11 @@ export function resolveDuplicateEffectGate(
       },
     };
   }
-  if (effect.status === "superseded" || effect.status === "expired") {
+  if (
+    effect.status === "superseded" ||
+    effect.status === "expired" ||
+    effect.status === "stopped"
+  ) {
     return { action: "return", result: { error: CLOSED_APPROVAL_MESSAGE } };
   }
   if (effect.status === "executing") {

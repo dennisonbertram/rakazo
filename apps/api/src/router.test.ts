@@ -4094,6 +4094,7 @@ describe("groups.archive", () => {
         updateMany: vi.fn(),
       },
       attempt: { updateMany: vi.fn() },
+      secret: { deleteMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: {
         findMany: vi

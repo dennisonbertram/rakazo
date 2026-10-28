@@ -96,7 +96,12 @@ describe("the images compose file", () => {
   it("does not make the app depend on object storage unless the profile runs", () => {
     for (const name of ["api", "worker"] as const) {
       const environment = compose.services[name]?.environment ?? {};
-      expect(Object.keys(environment).filter((key) => key.startsWith("RAKAZO_S3_"))).toEqual([]);
+      // A key with no value only passes through what .env sets; a value would switch the app to S3.
+      expect(
+        Object.entries(environment).filter(
+          ([key, value]) => key.startsWith("RAKAZO_S3_") && value !== null,
+        ),
+      ).toEqual([]);
       expect(compose.services[name]?.depends_on?.["seaweedfs-init"]).toEqual({
         condition: "service_completed_successfully",
         required: false,
@@ -166,9 +171,13 @@ describe("the images compose file", () => {
     }
   });
 
-  it("loads secrets from a colocated .env", () => {
-    expect(compose.services.api?.env_file).toEqual([".env"]);
-    expect(compose.services.worker?.env_file).toEqual([".env"]);
+  it("passes secrets from the --env-file by name instead of loading the whole file", () => {
+    for (const service of ["api", "worker"]) {
+      expect(compose.services[service]?.env_file).toBeUndefined();
+      // A key with no value is filled from the --env-file when set and left unset otherwise.
+      expect(compose.services[service]?.environment).toHaveProperty("ENCRYPTION_KEY", null);
+      expect(compose.services[service]?.environment).toHaveProperty("OPENROUTER_API_KEY", null);
+    }
   });
 
   it("defaults API and worker to Docker computers via the supervisor", () => {

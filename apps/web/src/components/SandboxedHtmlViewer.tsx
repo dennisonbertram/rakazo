@@ -1,12 +1,9 @@
+import { HTML_VIEWER_PATH } from "@rakazo/contracts/content-security-policy";
 import { useEffect, useRef, useState } from "react";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 
-const PREVIEW_CSP =
+export const PREVIEW_CSP =
   "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'; base-uri 'none'";
-
-// frame-src about: allows srcdoc and rejects navigations the sandbox and inner CSP do not block.
-const SHELL_CSP =
-  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-src about:; child-src 'none'; form-action 'none'; base-uri 'none'";
 
 const PREVIEW_GUARD = `<script>
 document.addEventListener("click", (event) => {
@@ -19,14 +16,6 @@ document.addEventListener("click", (event) => {
 }, true);
 document.addEventListener("submit", (event) => event.preventDefault(), true);
 </script>`;
-
-/** JSON-embed so user HTML cannot close the shell's script and run in it. */
-function embedScriptString(value: string): string {
-  return JSON.stringify(value)
-    .replace(/</g, "\\u003c")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
-}
 
 /**
  * The one script an email frame may run: it reports the message's height so the frame can fit it.
@@ -56,10 +45,6 @@ const previewCsp = (scripts: boolean, email: boolean) => {
 // address. The frame may load images from the app's own origin, never from the open web.
 const IMAGE_PROXY_PREFIX = "/api/inbox/image?";
 const proxyOrigin = () => window.location.origin;
-
-// A srcdoc frame inherits the shell's policy too, so email mode lifts the image block here as well.
-const shellCsp = (email: boolean) =>
-  email ? `${SHELL_CSP}; img-src data: ${proxyOrigin()}` : SHELL_CSP;
 
 // New-tab navigations are not covered by the shell's frame-src; the popup is not sandboxed.
 const POPUP_FLAGS = "allow-popups allow-popups-to-escape-sandbox";
@@ -158,15 +143,6 @@ function withPreviewDocument(html: string, scripts: boolean, email: boolean): st
   return `${meta}${referrer}${scripts ? PREVIEW_GUARD : ""}${body}`;
 }
 
-// The shell passes on height reports only from its own message frame, and only in the expected shape.
-const SHELL_HEIGHT_RELAY = `const preview=document.getElementById("preview");addEventListener("message",(e)=>{const d=e.data;if(e.source!==preview.contentWindow||!d||d.type!=="${EMAIL_HEIGHT_MESSAGE}"||typeof d.height!=="number")return;parent.postMessage({type:"${EMAIL_HEIGHT_MESSAGE}",height:d.height},"*")});`;
-
-function shellDocument(innerHtml: string, scripts: boolean, email: boolean): string {
-  const payload = embedScriptString(innerHtml);
-  const sandbox = email ? `allow-scripts ${POPUP_FLAGS}` : scripts ? "allow-scripts" : "";
-  return `<!DOCTYPE html><meta http-equiv="Content-Security-Policy" content="${shellCsp(email)}"><meta name="referrer" content="no-referrer"><style>html,body{height:100%;margin:0}iframe{width:100%;height:100%;border:0;background:#fff}</style><iframe id="preview" sandbox="${sandbox}" referrerpolicy="no-referrer" csp="${previewCsp(scripts, email)}"></iframe><script>${email ? SHELL_HEIGHT_RELAY : ""}document.getElementById("preview").srcdoc=${payload};</script>`;
-}
-
 /**
  * `scripts={false}` is for untrusted content such as email: the preview runs no script at all.
  * `email` shows a whole message: https images load and links open in a new tab, still with no
@@ -186,6 +162,20 @@ export function SandboxedHtmlViewer({
   const runScripts = scripts && !email;
   useHideAmounts(); // re-render, and so re-mask, when the switch flips
   const frame = useRef<HTMLIFrameElement>(null);
+  const preview = withPreviewDocument(html, runScripts, email);
+  const previewSandbox = email ? `allow-scripts ${POPUP_FLAGS}` : runScripts ? "allow-scripts" : "";
+  const csp = previewCsp(runScripts, email);
+  // The shell is a network document, so it does not inherit the app's CSP the way a srcdoc frame
+  // would. Every shell load starts empty, so each one gets the document again.
+  const [loads, setLoads] = useState(0);
+  useEffect(() => {
+    // The sandboxed shell has an opaque origin, so there is no narrower target origin to name.
+    if (loads > 0)
+      frame.current?.contentWindow?.postMessage(
+        { srcdoc: preview, sandbox: previewSandbox, csp },
+        "*",
+      );
+  }, [loads, preview, previewSandbox, csp]);
   // Key presses inside the sandboxed frame never reach this page, so Escape and j/k stop working
   // after a click in it (such as on a link, which opens in a new tab). When the person comes back,
   // focus moves from the frame to the dialog around it.
@@ -217,7 +207,8 @@ export function SandboxedHtmlViewer({
     <iframe
       ref={frame}
       title={title}
-      srcDoc={shellDocument(withPreviewDocument(html, runScripts, email), runScripts, email)}
+      src={HTML_VIEWER_PATH}
+      onLoad={() => setLoads((count) => count + 1)}
       sandbox={email ? `allow-scripts ${POPUP_FLAGS}` : "allow-scripts"}
       referrerPolicy="no-referrer"
       style={email && height ? { height } : undefined}

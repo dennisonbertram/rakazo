@@ -58,6 +58,7 @@ export default function BotSettingsScreen() {
   const [modelKey, setModelKey] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState("");
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [crossSpaceCommunication, setCrossSpaceCommunication] = useState(false);
   const [credentials, setCredentials] = useState<MobileModelCredential[]>([]);
   const [catalog, setCatalog] = useState<MobileModel[]>([]);
   const [me, setMe] = useState<MobileMe | null>(null);
@@ -93,6 +94,7 @@ export default function BotSettingsScreen() {
         );
         setThinkingLevel(next.thinkingLevel ?? "");
         setAutoSpeak(next.autoSpeak);
+        setCrossSpaceCommunication(next.crossSpaceCommunication ?? false);
         setNotifyOnFinish(next.notifyOnFinish);
       })
       .catch((err) => setError(errorText(err, t("Could not load bot"))));
@@ -345,6 +347,7 @@ export default function BotSettingsScreen() {
         modelId?: string | null;
         thinkingLevel?: ThinkingLevel | null;
         autoSpeak?: boolean;
+        crossSpaceCommunication?: boolean;
         notifyOnFinish?: boolean;
       } = { botId };
       if (profile.name !== bot.name) input.name = profile.name;
@@ -369,6 +372,8 @@ export default function BotSettingsScreen() {
           : null;
       }
       if (autoSpeak !== bot.autoSpeak) input.autoSpeak = autoSpeak;
+      if (crossSpaceCommunication !== (bot.crossSpaceCommunication ?? false))
+        input.crossSpaceCommunication = crossSpaceCommunication;
       if (notifyOnFinish !== bot.notifyOnFinish) input.notifyOnFinish = notifyOnFinish;
       if (computerMode !== bot.computerMode) {
         await rpc(
@@ -544,6 +549,16 @@ export default function BotSettingsScreen() {
             accessibilityLabel={t("Read replies aloud")}
             onValueChange={setAutoSpeak}
             value={autoSpeak}
+          />
+        </View>
+        <View style={styles.row}>
+          <Text style={[styles.rowLabel, { color: tokens.mutedForeground }]}>
+            {t("Allow cross-space bot communication")}
+          </Text>
+          <NativeSwitch
+            accessibilityLabel={t("Allow cross-space bot communication")}
+            onValueChange={setCrossSpaceCommunication}
+            value={crossSpaceCommunication}
           />
         </View>
         <View style={styles.row}>

@@ -9,6 +9,7 @@ import type { MessageBlock } from "@rakazo/contracts";
 import { AutomatedSenderPoliciesSchema } from "@rakazo/contracts";
 import { BOT_MESSAGE_MAX_HOPS, uiBlockText } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+import { clearEndedRunState } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import type { TeamChatEngagementJudge } from "./team-chat-judge.js";
 import {
@@ -1083,6 +1084,7 @@ export class TeamChatBridge {
             leaseExpiresAt: null,
           },
         });
+        await clearEndedRunState(this.deps.prisma, [sent.runId]);
         const taskId =
           sent.taskId ??
           (

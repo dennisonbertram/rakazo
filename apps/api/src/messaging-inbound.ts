@@ -19,6 +19,7 @@ import type {
 import {
   claimInboundMessage,
   createThreadMessage,
+  crossSpaceCommunicationAllowed,
   messagingInboundKey,
   normalizeMessagingLinkCode,
   redeemMessagingLinkCode,
@@ -464,6 +465,11 @@ async function applyOwnerCommand(
   const claimed = await deps.prisma.$transaction(async (tx) => {
     // The claim holds the connection row lock through commit, so a revoke
     // can never interleave with the confirmation writes.
+    if (
+      approved &&
+      !(await crossSpaceCommunicationAllowed(tx, target.connection.requesterBotId, identity.botId))
+    )
+      return false;
     const { count } = await tx.agentConnection.updateMany({
       where: { id: target.connection.id, status: "pending" },
       data: { status: approved ? "approved" : "declined" },

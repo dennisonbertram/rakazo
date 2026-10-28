@@ -37,6 +37,7 @@ function tx(options?: {
       ),
       create: vi.fn(async () => ({ id: "run-next" })),
     },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
     task: {
       updateMany: vi.fn(async () => ({ count: 1 })),

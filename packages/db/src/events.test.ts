@@ -1,7 +1,12 @@
 import type { RealtimeFanout } from "@rakazo/adapter-kit";
-import { AI_DISCLOSURE_VERSION, encodeLoginSecret } from "@rakazo/contracts";
+import {
+  AI_DISCLOSURE_VERSION,
+  BOT_SECRET_VALUE_MAX_LENGTH,
+  encodeLoginSecret,
+} from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "./client.js";
+import { CrossSpaceCommunicationBlockedError } from "./cross-space-communication.js";
 import {
   answerRunInput,
   answerWaitingRunWithTextInTransaction,
@@ -19,6 +24,7 @@ import {
   setMailApprovalOutcome,
 } from "./events.js";
 import { RunHistoryWriteError } from "./messages.js";
+import { AnswerTooLongError } from "./run-secrets.js";
 
 class TestFanout implements RealtimeFanout {
   subscriber: ((payload: string) => void) | undefined;
@@ -92,6 +98,7 @@ describe("finalizeRun", () => {
         findFirst: vi.fn(async () => null),
         updateMany: vi.fn(async () => ({ count: 1 })),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []) },
       task: { updateMany: vi.fn(async () => ({ count: 1 })) },
@@ -143,6 +150,7 @@ describe("finalizeRun", () => {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "run-reply" })),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []) },
       task: {
@@ -210,6 +218,7 @@ describe("finalizeRun", () => {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "run-reply" })),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []) },
       task: {
@@ -289,6 +298,7 @@ describe("finalizeRun", () => {
         updateMany: vi.fn(async () => ({ count: 1 })),
         create: vi.fn(async () => ({ id: "run-reply" })),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []) },
       task: {
@@ -594,6 +604,7 @@ describe("pauseRunForInput", () => {
           threadId: "thread-1",
         }),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -666,6 +677,7 @@ describe("pauseRunForInput", () => {
           threadId: "thread-1",
         }),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 9 }) },
       message: {
@@ -742,6 +754,7 @@ describe("pauseRunForInput", () => {
           threadId: "thread-1",
         }),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -824,6 +837,7 @@ describe("pauseRunForTakeover", () => {
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findUnique: vi.fn().mockResolvedValue({ status: "waiting_takeover" }),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -913,6 +927,7 @@ describe("pauseRunForTakeover", () => {
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findUnique: vi.fn().mockResolvedValue({ status: "waiting_takeover" }),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -971,6 +986,7 @@ describe("pauseRunForTakeover", () => {
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findUnique: vi.fn().mockResolvedValue({ status: "waiting_takeover" }),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -3065,6 +3081,7 @@ describe("clearThread", () => {
         findMany: vi.fn().mockResolvedValue([{ id: "run-1", taskId: "task-1" }]),
         updateMany: vi.fn(),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
@@ -3129,6 +3146,7 @@ describe("clearThread", () => {
         ]),
         updateMany: vi.fn(),
       },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
@@ -3792,4 +3810,74 @@ describe("answerRunInput on an AI data sharing request", () => {
       );
     },
   );
+});
+
+it("checks cross-space peer permission inside the message transaction before creating a run", async () => {
+  const tx = {
+    thread: { update: vi.fn(async () => ({ nextMessageSeq: 1 })) },
+    message: { create: vi.fn(async () => ({ id: "message-1", seq: 0 })) },
+    task: { create: vi.fn() },
+    run: { create: vi.fn(), findMany: vi.fn() },
+    $queryRaw: vi.fn(async () => [
+      { id: "sender", spaceId: "a", crossSpaceCommunication: true, archivedAt: null },
+      { id: "target", spaceId: "b", crossSpaceCommunication: false, archivedAt: null },
+    ]),
+  };
+  const prisma = {
+    message: { findUnique: vi.fn(async () => null) },
+    $transaction: vi.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
+  } as unknown as PrismaClient;
+  await expect(
+    sendUserMessage(prisma, {
+      spaceId: "b",
+      threadId: "thread",
+      botId: "target",
+      userId: "owner",
+      blocks: [{ kind: "text", text: "peer reply" }],
+      prompt: "peer reply",
+      trigger: "messaging",
+      crossSpaceSenderBotId: "sender",
+    }),
+  ).rejects.toBeInstanceOf(CrossSpaceCommunicationBlockedError);
+  expect(tx.task.create).not.toHaveBeenCalled();
+  expect(tx.run.create).not.toHaveBeenCalled();
+});
+
+describe("one-time secret answer limit", () => {
+  it("rejects a secret answer over the value limit without storing it", async () => {
+    const store = vi.fn();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      run: {
+        findFirst: vi.fn().mockResolvedValue({ botId: "bot-1", userId: "user-1" }),
+        updateMany: vi.fn(),
+      },
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [{ kind: "ask", text: "Code", input: "secret", status: "pending" }],
+        }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "x".repeat(BOT_SECRET_VALUE_MAX_LENGTH + 1),
+        },
+        undefined,
+        { store },
+      ),
+    ).rejects.toThrow(AnswerTooLongError);
+    expect(store).not.toHaveBeenCalled();
+    expect(tx.run.updateMany).not.toHaveBeenCalled();
+  });
 });

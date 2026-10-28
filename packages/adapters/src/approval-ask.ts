@@ -15,7 +15,12 @@ import {
   isZernioEndpoint,
   MAX_COMPOSE_BODY,
 } from "@rakazo/contracts";
-import { humanizeToolName, redactSecrets } from "@rakazo/core";
+import {
+  humanizeToolName,
+  providerLabel,
+  redactSecrets,
+  sanitizeMessagingLabel,
+} from "@rakazo/core";
 import { urlSite } from "@rakazo/core/egress";
 import { buildRawMessage, displayAddress, parseRecipients } from "./mail-compose.js";
 
@@ -23,6 +28,9 @@ const MAX_APPROVAL_SUMMARY_LENGTH = 500;
 const MAX_APPROVAL_DETAIL_LENGTH = 4_000;
 /** Longer fetch URLs are refused, so an approval card always shows the whole URL it sends. */
 export const MAX_FETCH_URL_LENGTH = 2_048;
+
+/** Markdown characters a card title would otherwise render (a requester's name is untrusted). */
+const CARD_TITLE_ESCAPED = /[\\`*_[\]<>~|]/g;
 
 export function buildApprovalAskBlock(
   effectId: string,
@@ -50,6 +58,30 @@ export function buildApprovalAskBlock(
     moneyNames?: MoneyNames;
   },
 ): MessageBlock {
+  if (toolName === "respond_agent_connection") {
+    // Shows who asked, from what was captured before the effect was recorded, not from the model.
+    const name = sanitizeMessagingLabel(String(args.requester_name ?? "agent")).replace(
+      CARD_TITLE_ESCAPED,
+      "\\$&",
+    );
+    return {
+      kind: "ask",
+      approvalEffectId: effectId,
+      text: redactSecrets(
+        `${args.accept === true ? "Approve" : "Decline"} connection with “${name}”?`,
+        secrets,
+      ),
+      detail: redactSecrets(
+        `${providerLabel(String(args.requester_provider ?? ""))}: ${String(args.requester_address ?? "").replace(/[\r\n]/g, " ")}`,
+        secrets,
+      ),
+      status: "pending",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "deny", label: "Deny" },
+      ],
+    };
+  }
   const fetchSite = webFetchSite(toolName, args);
   const summary =
     options?.schedule?.summary ??

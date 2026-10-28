@@ -206,6 +206,7 @@ export function BotSettings({
       runsOn?: ComputerHost;
       memoryScope?: "isolated" | "shared" | null;
       autoSpeak?: boolean;
+      crossSpaceCommunication?: boolean;
       voiceId?: string | null;
       modelProvider?: string | null;
       modelId?: string | null;
@@ -237,6 +238,9 @@ export function BotSettings({
   useEffect(() => setComputerMode(bot.computerMode), [bot.computerMode]);
   const [memoryScope, setMemoryScope] = useState(bot.memoryScope);
   const [autoSpeak, setAutoSpeak] = useState(bot.autoSpeak);
+  const [crossSpaceCommunication, setCrossSpaceCommunication] = useState(
+    bot.crossSpaceCommunication ?? false,
+  );
   const [voiceId, setVoiceId] = useState(bot.voiceId ?? "");
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [modelKey, setModelKey] = useState(
@@ -425,6 +429,7 @@ export function BotSettings({
           ? { externalComputerTools: patchOverrides.externalComputerTools }
           : {}),
         autoSpeak,
+        crossSpaceCommunication,
         voiceId: voiceId || null,
         modelProvider: selected?.provider ?? null,
         modelId: selected?.modelId ?? null,
@@ -870,6 +875,19 @@ export function BotSettings({
                   id={`${ids}-auto-speak`}
                   checked={autoSpeak}
                   onCheckedChange={(checked) => saveOnChange(() => setAutoSpeak(checked))}
+                />
+              </label>
+              <label
+                htmlFor={`${ids}-cross-space`}
+                className="mt-5 flex cursor-pointer items-center justify-between gap-3 text-[14px] text-foreground/75 pointer-coarse:min-h-11"
+              >
+                <Trans>Allow cross-space bot communication</Trans>
+                <Switch
+                  id={`${ids}-cross-space`}
+                  checked={crossSpaceCommunication}
+                  onCheckedChange={(checked) =>
+                    saveOnChange(() => setCrossSpaceCommunication(checked))
+                  }
                 />
               </label>
               {voices.length ? (

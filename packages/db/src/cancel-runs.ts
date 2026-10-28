@@ -1,8 +1,9 @@
 import type { Prisma } from "./client.js";
+import { clearEndedRunState } from "./run-secrets.js";
 
 /** The caller selects authorized runs and owns the surrounding transaction and cleanup. */
 export async function cancelRunsInTransaction(
-  tx: Pick<Prisma.TransactionClient, "run" | "attempt" | "task">,
+  tx: Pick<Prisma.TransactionClient, "run" | "attempt" | "task" | "secret">,
   runs: ReadonlyArray<{ id: string; taskId: string }>,
   cancelledAt: Date,
 ): Promise<void> {
@@ -25,4 +26,5 @@ export async function cancelRunsInTransaction(
     where: { id: { in: runs.map((run) => run.taskId) } },
     data: { status: "cancelled" },
   });
+  await clearEndedRunState(tx, runIds);
 }
