@@ -4877,6 +4877,18 @@ describe("Investors agent", () => {
         spawnKey: "investors-agent:someone",
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // The custom-page key is server-made; a client cannot send it.
+    await expect(
+      client.bots.create({
+        name: "Squatter",
+        title: "",
+        description: "",
+        instructions: "",
+        notifyOnFinish: true,
+        computerMode: "team" as const,
+        spawnKey: "custom-page:someone",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
 

@@ -945,6 +945,7 @@ msgid "Actions for {0} SAFE"
 msgstr ""
 
 #: src/components/finance/ExchangeGroup.tsx
+#: src/components/PageAgentsRow.tsx
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Actions for {name}"
@@ -1109,6 +1110,10 @@ msgstr "MCP sunucusu ekle"
 
 #: src/components/AutoFileEmailSetting.tsx
 msgid "Add new email attachments automatically"
+msgstr ""
+
+#: src/components/finance/charts.tsx
+msgid "Add note"
 msgstr ""
 
 #: src/components/AddSidebarPage.tsx
@@ -1629,12 +1634,21 @@ msgstr ""
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Inbox.tsx
+#: src/pages/shell/dialogs.tsx
 msgid "Archive"
 msgstr "Arşivle"
 
 #. placeholder {0}: counts.archive
 #: src/components/inbox/CleanupActionBar.tsx
 msgid "Archive {0}"
+msgstr ""
+
+#: src/pages/shell/dialogs.tsx
+msgid "Archive {count} email chats?"
+msgstr ""
+
+#: src/pages/shell/space-sidebar.tsx
+msgid "Archive all email chats"
 msgstr ""
 
 #: src/components/inbox/CleanupHistory.tsx
@@ -3485,6 +3499,10 @@ msgstr ""
 msgid "Could not approve this server"
 msgstr "Bu sunucu onaylanamadı"
 
+#: src/pages/Shell.tsx
+msgid "Could not archive {failed} email chats"
+msgstr ""
+
 #: src/pages/shell/message-cards.tsx
 msgid "Could not authorize this app"
 msgstr "Bu uygulama yetkilendirilemedi"
@@ -4684,6 +4702,11 @@ msgstr ""
 #: src/pages/shell/dialogs.tsx
 msgid "Delete memories too"
 msgstr "Hafızayı da sil"
+
+#. placeholder {0}: clip(n.text, 24)
+#: src/components/finance/charts.tsx
+msgid "Delete note: {0}"
+msgstr ""
 
 #: src/pages/Fundraising.tsx
 msgid "Delete SAFE?"
@@ -7092,6 +7115,10 @@ msgstr ""
 msgid "Mark {name} done"
 msgstr ""
 
+#: src/pages/shell/space-sidebar.tsx
+msgid "Mark all read"
+msgstr ""
+
 #: src/pages/BotContextMenu.tsx
 msgid "Mark as read"
 msgstr ""
@@ -7805,6 +7832,11 @@ msgstr ""
 msgid "New open-work item"
 msgstr "Yeni açık iş öğesi"
 
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
+msgid "New page"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Auth.tsx
 msgid "New password"
@@ -8407,7 +8439,12 @@ msgstr ""
 msgid "Not waiting for approval"
 msgstr ""
 
+#: src/components/finance/charts.tsx
+msgid "Note"
+msgstr ""
+
 #: src/components/ContactDialog.tsx
+#: src/components/finance/charts.tsx
 #: src/pages/ContactDetail.tsx
 msgid "Notes"
 msgstr ""
@@ -10498,6 +10535,7 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/ItemDialogs.tsx
+#: src/components/finance/charts.tsx
 #: src/components/finance/RenameAccountDialog.tsx
 #: src/components/finance/WalletDialog.tsx
 #: src/components/fundraising/RoundCard.tsx
@@ -11265,6 +11303,10 @@ msgstr ""
 #: src/components/call/VoiceChatCard.tsx
 msgid "Show transcript"
 msgstr "Dökümü göster"
+
+#: src/pages/shell/space-sidebar.tsx
+msgid "Show unused page agents"
+msgstr ""
 
 #: src/components/legal/LegalGraph.tsx
 msgid "Showing the {shown} most connected of {total} items."
@@ -12087,6 +12129,18 @@ msgstr ""
 msgid "The agent will be able to move money and change your {service} accounts. It asks before each change."
 msgstr ""
 
+#: src/lib/user-error.ts
+msgid "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models."
+msgstr ""
+
+#: src/lib/user-error.ts
+msgid "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models."
+msgstr ""
+
+#: src/lib/user-error.ts
+msgid "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "The AI your bots think with. They already have one, so change this only to use another AI company or your own key."
 msgstr ""
@@ -12175,6 +12229,10 @@ msgstr ""
 
 #: src/lib/user-error.ts
 msgid "The model provider did not accept your API key. Check it in Settings > Models."
+msgstr ""
+
+#: src/lib/user-error.ts
+msgid "The model provider is rate limiting requests. Try again in a few minutes."
 msgstr ""
 
 #: src/components/ComposeEmail.tsx

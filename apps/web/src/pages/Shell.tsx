@@ -322,6 +322,7 @@ import { Composer } from "./shell/composer";
 import { isStalePendingAskError } from "./shell/composer-error";
 import { DelegateWaitNotice } from "./shell/DelegateWaitNotice";
 import {
+  ArchiveBotsDialog,
   ClearConversationDialog,
   DeleteBotDialog,
   DeleteItemDialog,
@@ -393,6 +394,8 @@ const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
 const wideScreen = () => window.matchMedia(PANEL_DOCKED_QUERY).matches;
 /** How long "Sent to <group> · Open" stays under the composer after an @group message. */
 const FORWARDED_NOTICE_MS = 8000;
+const NEW_PAGE_INSTRUCTIONS =
+  "You build and keep this page. Ask the user what the page should show, then write it with page_write: lead with what matters, use charts and tables where they help, and keep it current when asked. Keep chat replies short and put the substance on the page.";
 
 function threadSnapshotSignal(parent: AbortSignal): AbortSignal {
   return AbortSignal.any([parent, AbortSignal.timeout(THREAD_SNAPSHOT_TIMEOUT_MS)]);
@@ -957,6 +960,7 @@ export function ShellPage() {
     botMenuAnchor.current = null;
   }, [botMenu]);
   const [deleteTarget, setDeleteTarget] = useState<Bot | null>(null);
+  const [archiveEmailTarget, setArchiveEmailTarget] = useState<string[] | null>(null);
   const [deleteGroupTarget, setDeleteGroupTarget] = useState<Group | null>(null);
   const [deleteSpaceTarget, setDeleteSpaceTarget] = useState<Space | null>(null);
   const [renameSpaceTarget, setRenameSpaceTarget] = useState<Space | null>(null);
@@ -1323,6 +1327,12 @@ export function ShellPage() {
       updateBotUnread(id, false);
     },
     [updateBotUnread],
+  );
+  const markBotsRead = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id) => markBotRead(id)));
+    },
+    [markBotRead],
   );
   const markBotUnread = useCallback(
     async (id: string) => {
@@ -3890,6 +3900,39 @@ export function ShellPage() {
     }
   }
 
+  /** A new agent whose job is to build and keep its own page; it opens with the page showing. */
+  async function createPage() {
+    try {
+      const bot = await rpc.bots.create({
+        name: uniqueBotName(
+          t`New page`,
+          bots.map((item) => item.name),
+        ),
+        title: "",
+        description: "",
+        instructions: NEW_PAGE_INSTRUCTIONS,
+        notifyOnFinish: true,
+        computerMode: "team",
+        page: true,
+      });
+      setBots((current) =>
+        current.some((item) => item.id === bot.id) ? current : [bot, ...current],
+      );
+      const destKey =
+        userId && bootstrapMe?.spaceId
+          ? rightPanelStorageKey(userId, bootstrapMe.spaceId, "bot", bot.id)
+          : null;
+      explicitPanelTarget.current = destKey;
+      pendingPanelRestore.current = null;
+      navigate(`/app/${bot.id}`);
+      setPanelState("page");
+      setRestoredPanelKey(destKey);
+      await refreshBots().catch(() => undefined);
+    } catch (error) {
+      setSendError(errorText(error, t`Failed to create bot`));
+    }
+  }
+
   async function bootComputer({
     botId: targetBotId,
     takeControl,
@@ -4704,6 +4747,9 @@ export function ShellPage() {
         bots={bots}
         initialBotsLoaded={initialBotsLoaded}
         createBot={createBot}
+        createPage={createPage}
+        markBotsRead={markBotsRead}
+        askArchiveBots={setArchiveEmailTarget}
         navigate={navigate}
         setPanel={setPanel}
         setNewSpaceOpen={setNewSpaceOpen}
@@ -6140,6 +6186,22 @@ export function ShellPage() {
 
         {pickerInfoTopic ? (
           <PickerInfoDialog topic={pickerInfoTopic} onClose={() => setPickerInfoTopic(null)} />
+        ) : null}
+
+        {archiveEmailTarget ? (
+          <ArchiveBotsDialog
+            count={archiveEmailTarget.length}
+            onCancel={() => setArchiveEmailTarget(null)}
+            onConfirm={async () => {
+              const results = await Promise.allSettled(
+                archiveEmailTarget.map((botId) => rpc.bots.archive({ botId })),
+              );
+              const failed = results.filter((result) => result.status === "rejected").length;
+              setArchiveEmailTarget(null);
+              if (failed > 0) setSendError(t`Could not archive ${failed} email chats`);
+              await refreshBots(true);
+            }}
+          />
         ) : null}
 
         {clearTarget ? (

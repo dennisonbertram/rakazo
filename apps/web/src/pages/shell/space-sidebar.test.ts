@@ -932,6 +932,62 @@ it("opens the command palette from expanded and rail Search", async () => {
   }
 });
 
+async function renderSidebar(props: Record<string, unknown>, check: (c: HTMLElement) => void) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  stubSidebarObservers();
+  Element.prototype.scrollIntoView ??= () => undefined;
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        createElement(
+          MemoryRouter,
+          null,
+          createElement(SidebarFixture, { mode: "expanded", ...props }),
+        ),
+      ),
+    );
+    check(container);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  }
+}
+
+it("lists Email chats directly below Page agents, before the other chats", async () => {
+  await renderSidebar({ pageAgents: true, crowded: true, emailChats: true }, (container) => {
+    const pageAgents = container.querySelector('[data-testid="sidebar-page-agents"]');
+    const emailChats = container.querySelector('[data-testid="sidebar-email-chats"]');
+    const chat = [...container.querySelectorAll("[data-roster-row]")].find((row) =>
+      row.textContent?.includes("Plain chat"),
+    );
+    if (!pageAgents || !emailChats || !chat) throw new Error("Expected both folds and a chat");
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(pageAgents.compareDocumentPosition(emailChats) & following).toBeTruthy();
+    expect(emailChats.compareDocumentPosition(chat) & following).toBeTruthy();
+  });
+});
+
+it("treats a page made with New page as a page agent, listed only when unused ones are shown", async () => {
+  await renderSidebar({ customPage: true }, (c) => {
+    expect(c.querySelector('[data-testid="sidebar-page-agents"]')).toBeNull();
+    expect(c.textContent).not.toContain("New page");
+  });
+  localStorage.setItem("rakazo.showUnusedPageAgents", "1");
+  await renderSidebar({ customPage: true }, (c) => {
+    expect(c.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
+  });
+});
+
 describe("foldRows", () => {
   const row = (id: string) => ({ depth: 0, item: { kind: "bot", chat: { id } } });
   const rows = [row("a"), row("b")];

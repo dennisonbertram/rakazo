@@ -159,6 +159,7 @@ import {
   BotSecretAuth,
   botAudienceEditable,
   ComputerCommandSchema,
+  customPageSpawnKey,
   encodeLoginSecret,
   FIRST_BOT_SPAWN_KEY,
   foldComputerCommands,
@@ -171,6 +172,7 @@ import {
   isCartaEndpoint,
   isCompanyAgentSpawnKey,
   isCompanyImporterSpawnKey,
+  isCustomPageSpawnKey,
   isDataRoomAgentSpawnKey,
   isFinanceAgentSpawnKey,
   isGranolaEndpoint,
@@ -2404,13 +2406,18 @@ export function createRouter(deps: RouterDeps) {
           isCartaAgentSpawnKey(input.spawnKey) ||
           isGtmAgentSpawnKey(input.spawnKey) ||
           isIntegrationAgentSpawnKey(input.spawnKey) ||
-          isVoiceAgentSpawnKey(input.spawnKey)
+          isVoiceAgentSpawnKey(input.spawnKey) ||
+          isCustomPageSpawnKey(input.spawnKey)
         ) {
           throw new ORPCError("BAD_REQUEST", { message: "Reserved spawn key" });
         }
         let bot: Bot;
         try {
-          bot = await repos.createBot(context.actor, input);
+          const { page, ...fields } = input;
+          bot = await repos.createBot(
+            context.actor,
+            page ? { ...fields, spawnKey: customPageSpawnKey(randomUUID()) } : fields,
+          );
         } catch (error) {
           throw mapSpaceLifecycleError(error);
         }
