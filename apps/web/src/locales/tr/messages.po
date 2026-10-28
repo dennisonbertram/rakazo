@@ -13814,3 +13814,11 @@ msgstr ""
 #: src/components/gtm/GtmCalendar.tsx
 msgid "Zernio queue unavailable"
 msgstr ""
+
+#: src/pages/McpConsent.tsx
+msgid "Connect {clientName}"
+msgstr ""
+
+#: src/pages/McpConsent.tsx
+msgid "Space"
+msgstr ""

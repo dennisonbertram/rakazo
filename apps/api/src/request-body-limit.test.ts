@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import {
   MAX_AUTH_REQUEST_BYTES,
+  MAX_MCP_REQUEST_BYTES,
   MAX_RPC_REQUEST_BYTES,
   mountApiRequestBodyLimits,
   requestBodyLimit,
@@ -27,6 +28,7 @@ describe("API request body limits", () => {
     mountApiRequestBodyLimits(app);
     app.post("/api/auth/sign-in/email", async (c) => c.json(await parse(c.req.raw)));
     app.post("/rpc/test", async (c) => c.json(await parse(c.req.raw)));
+    app.post("/mcp", async (c) => c.json(await parse(c.req.raw)));
     app.post("/api/voice/speak", async (c) => c.json(await parse(c.req.raw)));
 
     const request = (path: string, contentLength: number) =>
@@ -40,10 +42,12 @@ describe("API request body limits", () => {
       });
     const auth = await request("/api/auth/sign-in/email", MAX_AUTH_REQUEST_BYTES + 1);
     const rpc = await request("/rpc/test", MAX_RPC_REQUEST_BYTES + 1);
+    const mcp = await request("/mcp", MAX_MCP_REQUEST_BYTES + 1);
     const voice = await request("/api/voice/speak", MAX_RPC_REQUEST_BYTES + 1);
 
     expect(auth.status).toBe(413);
     expect(rpc.status).toBe(413);
+    expect(mcp.status).toBe(413);
     expect(voice.status).toBe(200);
     expect(parse).toHaveBeenCalledOnce();
   });

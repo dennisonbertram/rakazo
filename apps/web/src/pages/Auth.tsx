@@ -130,6 +130,8 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         setSearchParams({ verify: "email" });
         return;
       }
+      // An outside app sent the member here: Better Auth already named the next page.
+      if ((result.data as { redirect?: boolean } | null)?.redirect) return;
       clearSpaceSelection();
       navigate(mode === "up" ? "/onboarding" : signInNext(searchParams.get("next")));
     } catch {

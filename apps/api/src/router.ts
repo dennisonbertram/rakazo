@@ -21,6 +21,7 @@ import type {
   CodexLiveCatalog,
   ComputerExecutionLease,
   getBotSecretMetadata,
+  McpStdioPolicy,
 } from "@rakazo/adapters";
 import {
   acquireComputerExecutionLease,
@@ -82,6 +83,8 @@ import {
   listPiCatalog,
   listScratchpadItems,
   McpOAuthBroker,
+  mcpStdioAvailable,
+  mcpStdioRefusal,
   modelCredentialAuthKindsForSpace,
   modelCredentialDto,
   normalizeSecretDestination,
@@ -565,6 +568,7 @@ import {
   dismissFocus,
   markAppConnected,
   promptFocus,
+  SETUP_OPTIONS,
   seedBlankBotGreeting,
   startOnboarding,
 } from "./onboarding.js";
@@ -957,6 +961,19 @@ function mayUsePrivateEndpoint(actor: Actor, deps: Pick<RouterDeps, "env">): boo
   return actor.isDeploymentOwner || deps.env.mcpAllowPrivateEndpoint === true;
 }
 
+function mcpStdioPolicy(deps: Pick<RouterDeps, "env">): McpStdioPolicy {
+  return {
+    stdioEnabled: deps.env.mcpStdioEnabled,
+    allowedCommands: deps.env.mcpStdioAllowedCommands,
+  };
+}
+
+/** Refuse a stdio server this deployment would never run. */
+function assertMcpStdioCommand(command: string, deps: Pick<RouterDeps, "env">): void {
+  const refusal = mcpStdioRefusal(command, mcpStdioPolicy(deps));
+  if (refusal) throw new ORPCError("BAD_REQUEST", { message: refusal });
+}
+
 async function assertMcpRemoteEndpoint(
   endpoint: string | null | undefined,
   actor: Actor,
@@ -1169,15 +1186,36 @@ const BOT_INTRO_PROMPT =
  * message states how it read its own instructions. The executor gives the
  * "created" trigger no tools (see executor.ts), so this turn can only speak.
  */
-export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bot): Promise<void> {
+export async function enqueueBotIntroRun(
+  deps: RouterDeps,
+  actor: Actor,
+  bot: Bot,
+  options: { delayMs?: number } = {},
+): Promise<boolean> {
   const threadId = bot.threadId;
-  if (!threadId) return;
+  if (!threadId) return false;
   // Scripted is the deterministic test/eval runtime, not a real deployment: an
   // extra automatic run there competes with whatever response a test or eval
   // harness queued next, for a bot it doesn't otherwise get to opt out of.
-  if (deps.env.agentRuntime === "scripted") return;
-  if ((await modelSetup(deps, actor)).needsModel) return;
+  if (deps.env.agentRuntime === "scripted") return false;
+  if ((await modelSetup(deps, actor)).needsModel) return false;
+  const delayed = options.delayMs !== undefined;
   const run = await deps.prisma.$transaction(async (tx) => {
+    // A delayed intro follows edits to the profile. Reuse the intro run still waiting for its
+    // delay so a burst of edits becomes one run, pushed back each time.
+    const waiting = delayed
+      ? await tx.run.findFirst({
+          where: {
+            spaceId: actor.spaceId,
+            botId: bot.id,
+            threadId,
+            trigger: "created",
+            status: "queued",
+          },
+          select: { id: true },
+        })
+      : null;
+    if (waiting) return waiting;
     const task = await tx.task.create({
       data: {
         spaceId: actor.spaceId,
@@ -1202,7 +1240,38 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
       select: { id: true },
     });
   });
-  await deps.jobs.enqueue(runContinueJob(run.id));
+  // Same job key as every continue of this run, so a later call replaces the pending job and its delay.
+  await deps.jobs.enqueue({
+    ...runContinueJob(run.id),
+    ...(delayed ? { availableAt: new Date(Date.now() + options.delayMs!) } : {}),
+  });
+  return true;
+}
+
+/** How long profile edits settle before a bot that nobody has talked to yet introduces itself again. */
+const BOT_REINTRO_DELAY_MS = 4000;
+
+/**
+ * Until the user sends a first message, the greeting a bot was created with can go stale as they
+ * fill in its settings. Replace it with a fresh introduction that reflects the new profile.
+ */
+export async function reintroduceUnansweredBot(
+  deps: RouterDeps,
+  actor: Actor,
+  bot: Bot,
+): Promise<void> {
+  if (!bot.threadId || bot.spawnKey) return;
+  const asked = await deps.prisma.message.count({
+    where: { threadId: bot.threadId, role: "user" },
+  });
+  if (asked > 0) return;
+  if (!(await enqueueBotIntroRun(deps, actor, bot, { delayMs: BOT_REINTRO_DELAY_MS }))) return;
+  // The setup question no longer applies once the bot has been set up by hand.
+  await dismissFocus(
+    { prisma: deps.prisma, events: deps.events, connectors: deps.connectors },
+    actor,
+    bot.id,
+  );
 }
 
 async function resolveSpaceBoard(
@@ -2689,6 +2758,14 @@ export function createRouter(deps: RouterDeps) {
         const bots = await repos.listBots(context.actor);
         const bot = bots.find((b) => b.id === input.botId);
         if (!bot) throw new IsolationError();
+        const profileChanged = (["name", "title", "description", "instructions"] as const).some(
+          (key) => input[key] !== undefined && input[key] !== existing[key],
+        );
+        if (profileChanged) {
+          await reintroduceUnansweredBot(deps, context.actor, bot).catch((error) => {
+            getLogger().error("bot reintro", error);
+          });
+        }
         return bot;
       }),
       setComputer: authed.bots.setComputer.handler(async ({ context, input }) => {
@@ -5343,6 +5420,7 @@ export function createRouter(deps: RouterDeps) {
           );
         }),
         create: authed.mcp.servers.create.handler(async ({ context, input }) => {
+          if (input.transport === "stdio") assertMcpStdioCommand(input.command, deps);
           await assertMcpRemoteEndpoint(
             "endpoint" in input ? input.endpoint : null,
             context.actor,
@@ -5359,40 +5437,50 @@ export function createRouter(deps: RouterDeps) {
                 computerContext(context.actor, "mcp", "mcp.create"),
               )
             : null;
-          const row = await deps.prisma.$transaction(async (tx) => {
-            if (stored) {
-              await tx.secret.create({
+          const row = await deps.prisma
+            .$transaction(async (tx) => {
+              if (stored) {
+                await tx.secret.create({
+                  data: {
+                    id: stored.id,
+                    userId: context.actor.userId,
+                    spaceId: context.actor.spaceId,
+                    kind: "mcp",
+                    ciphertext: stored.ciphertext,
+                  },
+                });
+              }
+              return tx.mcpServer.create({
                 data: {
-                  id: stored.id,
-                  userId: context.actor.userId,
                   spaceId: context.actor.spaceId,
-                  kind: "mcp",
-                  ciphertext: stored.ciphertext,
+                  userId: context.actor.userId,
+                  slug: input.slug,
+                  name: input.name,
+                  description: input.description,
+                  transport: input.transport,
+                  endpoint: "endpoint" in input ? input.endpoint : null,
+                  command: "command" in input ? input.command : null,
+                  args: ("args" in input ? input.args : []) as Prisma.InputJsonValue,
+                  env: ("env" in input
+                    ? Object.fromEntries(Object.keys(input.env).map((key) => [key, true]))
+                    : {}) as Prisma.InputJsonValue,
+                  headers: ("headers" in input
+                    ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, true]))
+                    : {}) as Prisma.InputJsonValue,
+                  secretId: stored?.id,
+                  enabled: input.enabled,
                 },
               });
-            }
-            return tx.mcpServer.create({
-              data: {
-                spaceId: context.actor.spaceId,
-                userId: context.actor.userId,
-                slug: input.slug,
-                name: input.name,
-                description: input.description,
-                transport: input.transport,
-                endpoint: "endpoint" in input ? input.endpoint : null,
-                command: "command" in input ? input.command : null,
-                args: ("args" in input ? input.args : []) as Prisma.InputJsonValue,
-                env: ("env" in input
-                  ? Object.fromEntries(Object.keys(input.env).map((key) => [key, true]))
-                  : {}) as Prisma.InputJsonValue,
-                headers: ("headers" in input
-                  ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, true]))
-                  : {}) as Prisma.InputJsonValue,
-                secretId: stored?.id,
-                enabled: input.enabled,
-              },
+            })
+            .catch((error: unknown) => {
+              // The slug comes from the name, so this is a second server with the same name.
+              if (isUniqueViolation(error)) {
+                throw new ORPCError("CONFLICT", {
+                  message: "An MCP server with that name already exists.",
+                });
+              }
+              throw error;
             });
-          });
           // An existing Carta agent gets a newly added Carta server, with read tools only.
           if (isCartaEndpoint(row.endpoint))
             await assignToExistingCartaAgent(deps.prisma, context.actor);
@@ -5491,6 +5579,7 @@ export function createRouter(deps: RouterDeps) {
             if (!("config" in input) && existing.transport === "stdio") {
               throw new ORPCError("BAD_REQUEST", { message: "A remote MCP server is required" });
             }
+            if (config.transport === "stdio") assertMcpStdioCommand(config.command, deps);
             const nextEndpoint = "endpoint" in config ? config.endpoint : null;
             if (existing.endpoint !== nextEndpoint) {
               await assertMcpRemoteEndpoint(nextEndpoint, context.actor, deps);
@@ -5978,6 +6067,19 @@ export function createRouter(deps: RouterDeps) {
         return { ok: true as const };
       }),
       choose: authed.onboarding.choose.handler(async ({ context, input }) => {
+        // A new bot's setup question: the pick is the user's first message, so the bot sets itself up
+        // from it exactly as it does when they type. Sending closes the card.
+        const setup = SETUP_OPTIONS.find((option) => option.id === input.optionId);
+        if (setup) {
+          if ((await modelSetup(deps, context.actor)).needsModel) {
+            throw new ORPCError("BAD_REQUEST", { message: "Connect a model to start a run." });
+          }
+          const target = await resolveThreadTarget(deps.prisma, context.actor, {
+            botId: input.botId,
+          });
+          await sendThreadMessage(deps, context.actor, target, { text: setup.label });
+          return { ok: true as const };
+        }
         await chooseFocus(onboardingDeps, context.actor, input.botId, input.optionId);
         return { ok: true as const };
       }),
@@ -9454,6 +9556,7 @@ async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
     computerHost: computerHostFor(setup.settings?.computerHost, deps.env.sandboxProvider),
     canChooseHostComputer: actor.isDeploymentOwner && deps.env.sandboxProvider === "docker",
     sandboxProvider: deps.env.sandboxProvider,
+    mcpStdioEnabled: mcpStdioAvailable(mcpStdioPolicy(deps)),
     avatarStyle: user.avatarStyle === "robot" ? "robot" : "organic",
     timezone: user.timezone ?? null,
     tourSeen: Boolean(user.tourSeenAt),

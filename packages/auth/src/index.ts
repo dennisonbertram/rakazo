@@ -28,11 +28,15 @@ import {
   sessionForAuthHook,
   signedBearer,
 } from "./account-security.js";
+import type { McpAuthEnv } from "./mcp.js";
+import { mcpPlugins } from "./mcp.js";
 import type { OidcConfig } from "./oidc.js";
 import { oidcDiscovery } from "./oidc.js";
 import type { TokenKey } from "./token-storage.js";
 import { encryptStoredOAuthTokens, openIdToken, sealIdToken } from "./token-storage.js";
 
+export type { McpAuthEnv } from "./mcp.js";
+export { MCP_SCOPES, requireMcpAuth } from "./mcp.js";
 export type { OidcConfig } from "./oidc.js";
 
 export interface AuthEnv {
@@ -45,6 +49,8 @@ export interface AuthEnv {
   signupAllowlist: string | undefined;
   extraOrigins?: string[];
   email?: TransactionalEmailProvider;
+  /** Turns this server into the OAuth server for MCP clients. */
+  mcp?: McpAuthEnv;
   onEmailError?: (error: unknown) => void;
   beforeDeleteUser?: (userId: string) => Promise<void>;
   /**
@@ -459,6 +465,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
         disableOrganizationDeletion: true,
         creatorRole: "owner",
       }),
+      ...(env.mcp ? mcpPlugins(prisma, env.mcp) : []),
     ],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
