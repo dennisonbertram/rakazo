@@ -4,7 +4,7 @@ import type { RunActivityRow, RunStatus, WaitingOnYouItem } from "@rakazo/contra
 import { isAgedStuckWork } from "@rakazo/core";
 import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import type { ReactNode, Ref } from "react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { PhoneDateRange, PickFilter, SearchField, SortControl } from "../components/ListControls";
 import { RowsSkeleton } from "../components/RowsSkeleton";
 import type { ActivityListFilters, ActivitySort } from "../lib/activity-list-filters";
@@ -138,6 +138,16 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
 
   const filtersOn = activityFiltersActive(filters);
   const [showFilters, setShowFilters] = useState(false);
+  // A popover floats over the list, so a phone shows the filters inline above it instead.
+  const wide = useSyncExternalStore(
+    (notify) => {
+      const query = window.matchMedia?.("(min-width: 640px)");
+      query?.addEventListener("change", notify);
+      return () => query?.removeEventListener("change", notify);
+    },
+    () => window.matchMedia?.("(min-width: 640px)").matches ?? true,
+    () => true,
+  );
   const [showFinished, setShowFinished] = useState(false);
   const finishedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -219,7 +229,7 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
           <Trans>Activity</Trans>
         </h2>
         {/* A popover, so the filter form never takes the list's space. */}
-        <Popover open={showFilters} onOpenChange={setShowFilters}>
+        <Popover open={wide && showFilters} onOpenChange={setShowFilters}>
           <PopoverTrigger
             render={
               <Button
@@ -241,6 +251,11 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
           </PopoverContent>
         </Popover>
       </div>
+      {!wide && showFilters ? (
+        <div className="px-2.5 pb-2">
+          <ActivityFilters filters={filters} list={list} />
+        </div>
+      ) : null}
       <div ref={rowsRef} className="min-h-0 flex-1 overflow-y-auto" data-testid="activity-rows">
         {error ? (
           <div className="px-2.5 pb-2" role="alert">
