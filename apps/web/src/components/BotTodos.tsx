@@ -1,10 +1,13 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { WaitingOnYouItem } from "@rakazo/contracts";
-import { Checkbox } from "@rakazo/ui-web";
+import { Button, Checkbox } from "@rakazo/ui-web";
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { rpc } from "../lib/rpc";
 import { ScratchpadItemMeta } from "../pages/ScratchpadSection";
+
+/** Rows shown before "Show N more", so a long list does not push the page's own content below the fold. */
+const VISIBLE = 3;
 
 /** How a to-do names the person themselves (matches the server's waiting-on-you rule). */
 const ONE_SELF = ["you", "me", "user"];
@@ -18,6 +21,7 @@ export function BotTodos({ hideDueBetween }: { hideDueBetween?: { from: Date; to
   const headingId = useId();
   const [items, setItems] = useState<WaitingOnYouItem[]>([]);
   const [error, setError] = useState("");
+  const [all, setAll] = useState(false);
   useEffect(() => {
     let live = true;
     Promise.resolve()
@@ -35,6 +39,8 @@ export function BotTodos({ hideDueBetween }: { hideDueBetween?: { from: Date; to
     return due < hideDueBetween.from || due >= hideDueBetween.to;
   });
   if (shown.length === 0) return null;
+  const rows = all ? shown : shown.slice(0, VISIBLE);
+  const hidden = shown.length - rows.length;
 
   const done = (item: WaitingOnYouItem) => {
     setError("");
@@ -58,7 +64,7 @@ export function BotTodos({ hideDueBetween }: { hideDueBetween?: { from: Date; to
         </p>
       ) : null}
       <ul>
-        {shown.map((item) => (
+        {rows.map((item) => (
           <li
             key={item.id}
             className="flex items-start gap-2.5 border-t border-border py-1.5 pointer-coarse:min-h-11 pointer-coarse:items-center"
@@ -70,7 +76,7 @@ export function BotTodos({ hideDueBetween }: { hideDueBetween?: { from: Date; to
               className="mt-0.5 pointer-coarse:mt-0 pointer-coarse:size-6"
             />
             <div className="min-w-0 flex-1">
-              <Link to={`/app/${item.botId}`} dir="auto" className="text-sm hover:underline">
+              <Link to={`/app/${item.botId}`} dir="auto" className="rk-tap text-sm hover:underline">
                 {item.title}
               </Link>
               <span className="ms-2 text-xs text-muted-foreground/80">{item.botName}</span>
@@ -87,6 +93,16 @@ export function BotTodos({ hideDueBetween }: { hideDueBetween?: { from: Date; to
           </li>
         ))}
       </ul>
+      {hidden > 0 ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ms-2.5 text-muted-foreground"
+          onClick={() => setAll(true)}
+        >
+          {t`Show ${hidden} more`}
+        </Button>
+      ) : null}
     </section>
   );
 }

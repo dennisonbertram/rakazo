@@ -11248,6 +11248,10 @@ msgstr ""
 msgid "Show {count} action items"
 msgstr ""
 
+#: src/components/BotTodos.tsx
+msgid "Show {hidden} more"
+msgstr ""
+
 #: src/pages/Inbox.tsx
 msgid "Show {hiddenReplies} more"
 msgstr ""

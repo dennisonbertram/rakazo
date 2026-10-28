@@ -1,5 +1,14 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+} from "@rakazo/ui-web";
 import { useEffect, useState } from "react";
 import { authClient } from "../lib/auth";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
@@ -30,6 +39,8 @@ function PasskeyList() {
   const passkeys = authClient.useListPasskeys();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The passkey waiting for the person to confirm its removal; a deleted passkey cannot be restored.
+  const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
   async function run(call: () => Promise<{ error: unknown }>) {
     setPending(true);
     setError(null);
@@ -76,9 +87,7 @@ function PasskeyList() {
                   size="sm"
                   disabled={pending}
                   aria-label={t`Remove passkey ${label}`}
-                  onClick={() =>
-                    void run(() => authClient.passkey.deletePasskey({ id: passkey.id }))
-                  }
+                  onClick={() => setRemoving({ id: passkey.id, label })}
                 >
                   <Trans>Remove</Trans>
                 </Button>
@@ -87,6 +96,30 @@ function PasskeyList() {
           })}
         </ul>
       ) : null}
+      <AlertDialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="break-words">
+              {removing ? t`Remove ${removing.label}?` : null}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              <Trans>Cancel</Trans>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                const id = removing?.id;
+                setRemoving(null);
+                if (id) void run(() => authClient.passkey.deletePasskey({ id }));
+              }}
+            >
+              <Trans>Remove</Trans>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {error ? (
         <p role="alert" className="mt-2 text-sm text-destructive">
           {error}
