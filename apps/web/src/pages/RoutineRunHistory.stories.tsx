@@ -9,6 +9,7 @@ const run = (n: number, status: RoutineRun["status"], chat = true): RoutineRun =
   botId: "bot_demo",
   groupId: null,
   status,
+  error: status === "failed" ? "504: request timed out" : null,
   createdAt: `2026-01-0${n}T09:00:00.000Z`,
   startedAt: `2026-01-0${n}T09:00:05.000Z`,
   completedAt: status === "completed" || status === "failed" ? `2026-01-0${n}T09:01:35.000Z` : null,

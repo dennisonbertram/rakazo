@@ -17,6 +17,7 @@ import {
   nextCronDate,
   nextCronDateAcross,
   ONCE_ROUTINE_CRON,
+  unevenInterval,
 } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { resumeWatch, syncWatchState, watchLimitError } from "@rakazo/db";
@@ -88,6 +89,37 @@ export function compactScheduleInput(input: Record<string, unknown>): Record<str
   );
 }
 
+const ISO_DATE_TIME =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/i;
+
+/**
+ * Date.parse rolls an impossible calendar date over (February 30 becomes March 2), so a
+ * mistyped run time would be scheduled for the wrong day. Check the written parts first.
+ */
+function parseIsoInstant(text: string): Date {
+  const value = text.trim();
+  const parts = ISO_DATE_TIME.exec(value);
+  if (parts) {
+    const [year, month, day, hour, minute, second] = parts
+      .slice(1, 7)
+      .map((part) => (part === undefined ? 0 : Number(part)));
+    const check = new Date(0);
+    check.setUTCFullYear(year ?? 0, (month ?? 1) - 1, day ?? 1);
+    check.setUTCHours(hour ?? 0, minute ?? 0, second ?? 0);
+    if (
+      check.getUTCFullYear() !== year ||
+      check.getUTCMonth() !== (month ?? 1) - 1 ||
+      check.getUTCDate() !== day ||
+      check.getUTCHours() !== hour ||
+      check.getUTCMinutes() !== minute ||
+      check.getUTCSeconds() !== second
+    ) {
+      return new Date(Number.NaN);
+    }
+  }
+  return new Date(value);
+}
+
 export function resolveScheduleTiming(
   input: {
     cron?: unknown;
@@ -154,7 +186,7 @@ export function resolveScheduleTiming(
       }
       nextRunAt = new Date(Date.now() + delayMinutes * 60_000);
     } else {
-      const parsed = new Date(String(input.runAt ?? ""));
+      const parsed = parseIsoInstant(String(input.runAt ?? ""));
       if (!Number.isFinite(parsed.getTime())) {
         return { ok: false, error: "runAt must be a valid ISO datetime." };
       }
@@ -230,6 +262,9 @@ export interface ScheduleToolDeps {
   jobs: JobPublisher;
 }
 
+/** Each routine is an unattended model run, so a looping bot must not stack them. */
+export const MAX_ACTIVE_ROUTINES_PER_BOT = 50;
+
 /** Persist and enqueue a bot routine that wakes in the originating thread. */
 export async function createScheduleFromTool(
   deps: ScheduleToolDeps,
@@ -248,6 +283,26 @@ export async function createScheduleFromTool(
   const prompt = input.prompt.trim();
   if (!name) return { error: "name is required." };
   if (!prompt) return { error: "prompt is required." };
+
+  const active = await deps.prisma.routine.findMany({
+    where: { spaceId: input.spaceId, botId: input.botId, active: true },
+    select: { id: true, name: true, threadId: true },
+  });
+  // Match per thread: schedule_update in a group only reaches this thread's routines.
+  const sameName = active.find(
+    (row) =>
+      row.threadId === input.threadId && row.name.trim().toLowerCase() === name.toLowerCase(),
+  );
+  if (sameName) {
+    return {
+      error: `An active routine named "${sameName.name}" already exists (${sameName.id}). Update or cancel it instead.`,
+    };
+  }
+  if (active.length >= MAX_ACTIVE_ROUTINES_PER_BOT) {
+    return {
+      error: `This bot already has ${MAX_ACTIVE_ROUTINES_PER_BOT} active routines. Cancel one before adding another.`,
+    };
+  }
 
   // Without an explicit zone, times are the owner's local time.
   const timezone =
@@ -734,7 +789,14 @@ export async function updateScheduleFromTool(
     !isOneShotRoutineCrons(crons) &&
     (timezone !== existing.timezone || (enabled && !nextRunAt))
   ) {
-    nextRunAt = nextCronDateAcross(crons, new Date(), timezone);
+    // An uneven step (every 7 hours) recurs by a fixed gap that no timezone moves, so a new
+    // zone alone keeps the next run where it was instead of restarting the count from now.
+    const due = existing.nextRunAt;
+    const step = crons.length === 1 ? unevenInterval(crons[0] ?? "") : undefined;
+    nextRunAt =
+      due && due.getTime() > Date.now() && step && step.unit !== "days"
+        ? due
+        : nextCronDateAcross(crons, new Date(), timezone);
   }
   if (
     enabled &&

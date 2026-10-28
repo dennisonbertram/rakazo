@@ -3412,6 +3412,162 @@ describe("createRunExecutor", () => {
     expect(enqueue).toHaveBeenCalledTimes(wake.enqueueCount);
   });
 
+  it("stores the next 30-day run from the scheduled anchor after a fire", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-01-31T00:00:01Z"));
+    const scheduledAt = new Date("2026-01-31T00:00:00Z");
+    const enqueue = vi.fn(async () => undefined);
+    const cancel = vi.fn(async () => undefined);
+    const append = vi.fn(async () => undefined);
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const taskCreate = vi.fn(async () => ({ id: "task-1" }));
+    const runCreate = vi.fn(async () => ({ id: "run-1" }));
+    const prisma = {
+      routine: {
+        findUnique: vi.fn(async () => ({
+          id: "routine-1",
+          spaceId: "ws-1",
+          botId: "bot-1",
+          prompt: "say hi",
+          crons: ["0 0 */30 * *"],
+          timezone: "UTC",
+          active: true,
+          nextRunAt: scheduledAt,
+          threadId: "group-thread-1",
+        })),
+      },
+      bot: {
+        findUnique: vi.fn(async () => ({
+          id: "bot-1",
+          thread: { id: "thread-1" },
+        })),
+      },
+      thread: {
+        findFirst: vi.fn(async () => ({ id: "group-thread-1" })),
+      },
+      agentSkill: {
+        findMany: vi.fn(async () => []),
+      },
+      botSkillSetting: { findMany: vi.fn(async () => []) },
+      $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
+        callback({
+          routine: {
+            updateMany,
+            findUnique: vi.fn(async () => ({
+              modelProvider: null,
+              modelId: null,
+              thinkingLevel: null,
+            })),
+          },
+          task: { create: taskCreate },
+          run: { create: runCreate },
+        }),
+      ),
+    } as unknown as PrismaClient;
+    const executor = createRunExecutor({
+      prisma,
+      jobs: { enqueue, cancel, close: vi.fn(async () => undefined) },
+      events: { append },
+    } as unknown as Parameters<typeof createRunExecutor>[0]);
+
+    try {
+      await executor.wakeRoutine("routine-1", scheduledAt.toISOString());
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ nextRunAt: new Date("2026-03-02T00:00:00Z") }),
+      }),
+    );
+  });
+
+  it("treats a second claim of the same occurrence as a no-op that still schedules the next wakeup", async () => {
+    const scheduledAt = new Date(Date.now() - 1_000);
+    const enqueue = vi.fn(async () => undefined);
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const duplicate = Object.assign(new Error("Unique constraint failed"), {
+      code: "P2002",
+      meta: { target: ["spaceId", "clientNonce"] },
+    });
+    const prisma = {
+      routine: {
+        findUnique: vi.fn(async () => ({
+          id: "routine-1",
+          spaceId: "ws-1",
+          botId: "bot-1",
+          prompt: "say hi",
+          crons: ["0 9 * * *"],
+          timezone: "UTC",
+          active: true,
+          nextRunAt: scheduledAt,
+          threadId: null,
+        })),
+        updateMany,
+      },
+      bot: { findUnique: vi.fn(async () => ({ id: "bot-1", thread: { id: "thread-1" } })) },
+      agentSkill: { findMany: vi.fn(async () => []) },
+      botSkillSetting: { findMany: vi.fn(async () => []) },
+      $transaction: vi.fn(async () => {
+        throw duplicate;
+      }),
+    } as unknown as PrismaClient;
+    const executor = createRunExecutor({
+      prisma,
+      jobs: { enqueue, cancel: vi.fn(), close: vi.fn(async () => undefined) },
+      events: { append: vi.fn(async () => undefined) },
+    } as unknown as Parameters<typeof createRunExecutor>[0]);
+
+    await expect(executor.wakeRoutine("routine-1", scheduledAt.toISOString())).resolves.toBe(
+      undefined,
+    );
+
+    // The rolled-back claim is redone on its own, so the schedule moves past this occurrence.
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "routine-1", nextRunAt: scheduledAt }),
+        data: expect.objectContaining({ nextRunAt: expect.any(Date) }),
+      }),
+    );
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ name: "routine.wakeup" }));
+  });
+
+  it("still throws on a unique violation that is not the occurrence nonce", async () => {
+    const scheduledAt = new Date(Date.now() - 1_000);
+    const other = Object.assign(new Error("Unique constraint failed"), {
+      code: "P2002",
+      meta: { target: ["somethingElse"] },
+    });
+    const prisma = {
+      routine: {
+        findUnique: vi.fn(async () => ({
+          id: "routine-1",
+          spaceId: "ws-1",
+          botId: "bot-1",
+          prompt: "say hi",
+          crons: ["0 9 * * *"],
+          timezone: "UTC",
+          active: true,
+          nextRunAt: scheduledAt,
+          threadId: null,
+        })),
+      },
+      bot: { findUnique: vi.fn(async () => ({ id: "bot-1", thread: { id: "thread-1" } })) },
+      agentSkill: { findMany: vi.fn(async () => []) },
+      botSkillSetting: { findMany: vi.fn(async () => []) },
+      $transaction: vi.fn(async () => {
+        throw other;
+      }),
+    } as unknown as PrismaClient;
+    const executor = createRunExecutor({
+      prisma,
+      jobs: { enqueue: vi.fn(), cancel: vi.fn(), close: vi.fn(async () => undefined) },
+      events: { append: vi.fn(async () => undefined) },
+    } as unknown as Parameters<typeof createRunExecutor>[0]);
+
+    await expect(executor.wakeRoutine("routine-1", scheduledAt.toISOString())).rejects.toBe(other);
+  });
+
   it("deactivates one-shot routines after wake without scheduling another wakeup", async () => {
     const scheduledAt = new Date(Date.now() - 1_000);
     const enqueue = vi.fn(async () => undefined);
