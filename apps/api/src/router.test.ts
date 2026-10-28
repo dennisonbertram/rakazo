@@ -3566,6 +3566,7 @@ describe("bot model auth on save", () => {
       event: { create: vi.fn(async () => ({ seq: 1 })) },
     };
     const prisma = {
+      $queryRaw: vi.fn(async () => []),
       bot: {
         findFirst: vi.fn(async (args: { where: { spaceId?: string; userId?: string } }) =>
           args.where.spaceId === bot.spaceId && args.where.userId === bot.userId ? bot : null,
