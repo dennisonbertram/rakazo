@@ -134,7 +134,9 @@ export function credentialIssue(input: {
   return null;
 }
 
-export type AuthErrorCopy = Record<CredentialField, string> & { fallback: string };
+export type AuthErrorCopy = Record<CredentialField, string> & {
+  fallback: string;
+};
 
 /**
  * Copy for a failed auth response body (`{ code, message }`). Request validation failures name
@@ -155,16 +157,54 @@ export function authErrorMessage(body: unknown, copy: AuthErrorCopy): string {
 /** A provider's raw "401" for a run. */
 export const KEY_REJECTED_PATTERN = /^401\b|"code":\s*401\b/;
 
+export type RunErrorCopy = {
+  keyRejected: string;
+  generic: string;
+  /** `resetsOn` is the limit's reset date as the reader's locale writes it, or null when unknown. */
+  spendLimit: (resetsOn: string | null) => string;
+  outOfCredits: string;
+  rateLimited: string;
+};
+
+const RATE_WORDING = /rate.?limit|too many requests/i;
+const CREDIT_WORDING =
+  /insufficient (?:credits?|funds|balance)|out of credits|payment required|billing|add (?:credits|funds)|credit balance/i;
+const LIMIT_WORDING = /limit exceeded|spending limit|monthly limit|usage limit|quota|budget/i;
+
+/** The HTTP status a provider error starts with (`403: {...}`) or carries as `"code":403`. */
+function runErrorStatus(error: string): number | null {
+  const match = /^(\d{3})\b/.exec(error.trim()) ?? /"code":\s*(\d{3})\b/.exec(error);
+  return match ? Number(match[1]) : null;
+}
+
+/** When a spending limit resets, from the error's `resets_at` field or "resets <date>" text. */
+function runErrorResetDate(error: string): string | null {
+  const raw =
+    /"resets_at":\s*"([^"]+)"/.exec(error)?.[1] ??
+    /\bresets?\s+(\d{4}-\d{2}-\d{2}\S*)/.exec(error)?.[1];
+  const date = raw ? new Date(raw.replace(/[.,;)]+$/, "")) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString(undefined, {
+        dateStyle: "medium",
+        timeZone: "UTC",
+      })
+    : null;
+}
+
 /** A stored run error as a person reads it; one mapping for the panel, the toast and the push. */
-export function plainRunError(
-  error: string,
-  copy: { keyRejected: string; generic: string },
-): string {
-  return KEY_REJECTED_PATTERN.test(error)
-    ? copy.keyRejected
-    : isInternalRunError(error)
-      ? copy.generic
-      : error;
+export function plainRunError(error: string, copy: RunErrorCopy): string {
+  if (KEY_REJECTED_PATTERN.test(error)) return copy.keyRejected;
+  const status = runErrorStatus(error);
+  const quotaStatus = status === 402 || status === 403 || status === 429;
+  if (
+    /"(?:scope|limit_source)":\s*"[^"]*limit/.test(error) ||
+    (quotaStatus && LIMIT_WORDING.test(error) && !RATE_WORDING.test(error))
+  )
+    return copy.spendLimit(runErrorResetDate(error));
+  if (status === 429 && RATE_WORDING.test(error)) return copy.rateLimited;
+  if (status === 402 || (quotaStatus && CREDIT_WORDING.test(error))) return copy.outOfCredits;
+  if (status === 429) return copy.rateLimited;
+  return isInternalRunError(error) ? copy.generic : error;
 }
 
 /** True when a delegate agent's reply reached this thread after the run began: the answer is on screen. */

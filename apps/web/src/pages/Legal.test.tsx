@@ -660,6 +660,26 @@ it("shows why the last scan failed and scans again from the one Scan now button"
   expect(rpcMock.scanNow).toHaveBeenCalledTimes(1);
 });
 
+it("names a spending limit instead of the generic failure, with no raw error text", async () => {
+  rpcMock.overview.mockResolvedValue({
+    ...overview,
+    agent: {
+      ...overview.agent,
+      lastScanRun: {
+        id: id(8),
+        status: "failed",
+        error:
+          '403: {"message":"Key limit exceeded (monthly limit). Manage it using https://example.test/keys/abc123","code":403,"metadata":{"scope":"key_limit","resets_at":"2026-11-01T00:00:00.000Z"}}',
+      },
+    },
+  });
+  await render(<LegalPage />);
+  const text = container.querySelector('[data-testid="scan-failed"]')?.textContent ?? "";
+  expect(text).toContain("Last scan failed: The AI key hit its spending limit. It resets");
+  expect(text).toContain("Settings > Models.");
+  expect(text).not.toMatch(/abc123|https?:|Something went wrong/);
+});
+
 it("offers the OpenRouter key field when the last scan's key was rejected", async () => {
   rpcMock.overview.mockResolvedValue({
     ...overview,
