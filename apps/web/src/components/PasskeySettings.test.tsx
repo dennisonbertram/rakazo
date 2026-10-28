@@ -15,6 +15,17 @@ vi.mock("@lingui/react/macro", () => ({
 }));
 vi.mock("@rakazo/ui-web", () => ({
   Button: (props: React.ComponentProps<"button">) => <button type="button" {...props} />,
+  AlertDialog: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? <div role="alertdialog">{children}</div> : null,
+  AlertDialogContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  AlertDialogCancel: (props: React.ComponentProps<"button">) => <button type="button" {...props} />,
+  AlertDialogAction: ({
+    variant: _v,
+    ...props
+  }: React.ComponentProps<"button"> & { variant?: string }) => <button type="button" {...props} />,
 }));
 vi.mock("../lib/auth-capabilities", () => ({ fetchAuthCapabilities: vi.fn() }));
 vi.mock("../lib/auth", () => ({
@@ -71,5 +82,12 @@ it("lists passkeys, adds one and removes one", async () => {
   await act(async () => button("Add passkey").click());
   expect(authClient.passkey.addPasskey).toHaveBeenCalled();
   await act(async () => button("Remove").click());
+  // Removing asks first; a deleted passkey cannot be restored.
+  expect(authClient.passkey.deletePasskey).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("Remove Laptop?");
+  await act(async () => button("Cancel").click());
+  expect(authClient.passkey.deletePasskey).not.toHaveBeenCalled();
+  await act(async () => button("Remove").click());
+  await act(async () => [...host.querySelectorAll("button")].at(-1)!.click());
   expect(authClient.passkey.deletePasskey).toHaveBeenCalledWith({ id: "pk1" });
 });

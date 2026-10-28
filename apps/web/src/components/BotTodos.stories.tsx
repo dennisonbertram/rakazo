@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { MemoryRouter } from "react-router-dom";
 import { mockRpc } from "../lib/__mocks__/rpc";
 import { BotTodos } from "./BotTodos";
 
@@ -9,11 +8,9 @@ const meta = {
   component: BotTodos,
   decorators: [
     (Story) => (
-      <MemoryRouter>
-        <div className="w-96">
-          <Story />
-        </div>
-      </MemoryRouter>
+      <div className="w-96 max-w-full">
+        <Story />
+      </div>
     ),
   ],
 } satisfies Meta<typeof BotTodos>;
@@ -56,3 +53,22 @@ export const Default: Story = {
 
 /** Nothing waiting: the component renders nothing. */
 export const Empty: Story = { beforeEach: () => mockRpc({ "scratchpad.waitingOnYou": [] }) };
+
+/** Five items: three show, the rest sit behind "Show 2 more". */
+export const Many: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "scratchpad.waitingOnYou": Array.from({ length: 5 }, (_, i) => ({
+        id: `m${i}`,
+        botId: "bot_ada",
+        botName: "Ada",
+        title:
+          i === 2
+            ? "Review the sample board deck and send every comment back before the call"
+            : `Sample item ${i + 1}`,
+        waitingOn: "you",
+        dueAt: i === 0 ? new Date(Date.now() - 2 * day).toISOString() : null,
+      })),
+      "scratchpad.update": {},
+    }),
+};

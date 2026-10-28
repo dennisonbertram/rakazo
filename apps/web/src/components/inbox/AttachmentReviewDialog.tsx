@@ -86,7 +86,7 @@ export function AttachmentReviewDialog({
         <DialogTitle dir="auto" className="min-w-0 truncate pe-8 text-sm font-medium">
           {attachment.filename}
         </DialogTitle>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto" aria-live="polite">
+        <div className="mt-2 flex min-h-0 flex-1 flex-col gap-3 overflow-auto" aria-live="polite">
           {turns.map((turn, index) =>
             turn.role === "user" ? (
               <p
@@ -135,6 +135,7 @@ export function AttachmentReviewDialog({
             value={draft}
             maxLength={2000}
             aria-label={t`Ask about this file`}
+            placeholder={t`Ask about this file`}
             disabled={turns.length === 0}
             onChange={(event) => setDraft(event.target.value)}
           />

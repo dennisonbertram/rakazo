@@ -88,7 +88,7 @@ export const Cards: Story = story({
     {
       title: "Quarterly planning",
       subtitle: "Thursday 10:00",
-      body: "Review **goals** and staffing.",
+      body: "Review **goals** and [staffing](/app/calendar).",
       badge: "Today",
       href: "/app/calendar",
     },

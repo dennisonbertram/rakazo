@@ -3,7 +3,7 @@ import { NotificationToaster } from "@rakazo/ui-web";
 import { useEffect, useRef } from "react";
 import { useLocation, useMatch, useNavigate } from "react-router-dom";
 import { lookupBotApp } from "../lib/agent-app";
-import { hasApprovalToasts } from "../lib/approval-toasts";
+import { clearApprovalToasts, hasApprovalToasts } from "../lib/approval-toasts";
 import { authClient } from "../lib/auth";
 import { openChatBotId } from "../lib/docked-agent";
 import { i18n } from "../lib/i18n";
@@ -92,7 +92,11 @@ export function AppToaster() {
   const signedIn = Boolean(userId);
   useEffect(() => {
     // Signed out, every notifications call is a 401.
-    if (!signedIn) return;
+    if (!signedIn) {
+      // Log out leaves the toast host mounted, so the last session's approvals must go with it.
+      clearApprovalToasts();
+      return;
+    }
     const controller = new AbortController();
     // The browser switch, loaded once and reloaded when the settings change.
     let browserOn: Promise<boolean> | undefined;
