@@ -59,12 +59,15 @@ export function BotTodos({ hideDueBetween }: { hideDueBetween?: { from: Date; to
       ) : null}
       <ul>
         {shown.map((item) => (
-          <li key={item.id} className="flex items-start gap-2.5 border-t border-border py-1.5">
+          <li
+            key={item.id}
+            className="flex items-start gap-2.5 border-t border-border py-1.5 pointer-coarse:min-h-11 pointer-coarse:items-center"
+          >
             <Checkbox
               aria-label={item.title}
               checked={false}
               onCheckedChange={() => done(item)}
-              className="mt-0.5"
+              className="mt-0.5 pointer-coarse:mt-0 pointer-coarse:size-6"
             />
             <div className="min-w-0 flex-1">
               <Link to={`/app/${item.botId}`} dir="auto" className="text-sm hover:underline">
