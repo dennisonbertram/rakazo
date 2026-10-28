@@ -23,6 +23,7 @@ export const ProductEventType = z.enum([
   "thread.delegate_pending",
   "thread.call.ended",
   "run.started",
+  "run.steering.claimed",
   "run.checkpointed",
   /** payload: RunPhase */
   "run.phase",
