@@ -4892,6 +4892,36 @@ describe("Investors agent", () => {
   });
 });
 
+describe("Hiding a bot", () => {
+  it("looks the bot up within the actor's space and user, so another user's bot is not found", async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const deps = {
+      prisma: { bot: { findFirst } } as unknown as PrismaClient,
+      env: { defaultProvider: "fake", defaultModel: "fake-model" },
+      dataDir: "/tmp/rakazo-router-test",
+    } as unknown as RouterDeps;
+    const actor = {
+      spaceId: "workspace-1",
+      userId: "user-1",
+      email: "user@rakazo.test",
+      isDeploymentOwner: false,
+    } satisfies Actor;
+    const client = createRouterClient(createRouter(deps), { context: { actor } });
+    await expect(
+      client.bots.update({ botId: "someone-elses-bot", hidden: true }),
+    ).rejects.toThrow();
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "someone-elses-bot",
+          spaceId: "workspace-1",
+          userId: "user-1",
+        }),
+      }),
+    );
+  });
+});
+
 describe("GTM scratchpad RPC", () => {
   const actor = {
     spaceId: "space-1",

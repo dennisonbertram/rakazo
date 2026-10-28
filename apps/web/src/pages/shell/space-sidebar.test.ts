@@ -142,6 +142,19 @@ describe("sidebarGroupsForSpaces", () => {
     ).toEqual(["a"]);
   });
 
+  it("leaves a hidden bot out of every group", () => {
+    const hidden = { ...chat("h", "Hidden one"), hiddenAt: "2026-01-01T00:00:00.000Z" };
+    const pinnedHidden = { ...chat("p", "Pinned hidden"), pinned: true, hiddenAt: "2026-01-01" };
+    const groups = sidebarGroupsForSpaces(
+      [space("a", "Acme", { bots: [chat("c", "Chief"), hidden, pinnedHidden] })],
+      "",
+      "a",
+      "Personal",
+    );
+    const names = groups.flatMap((g) => g.bots.map((item) => item.chat.name));
+    expect(names).toEqual(["Chief"]);
+  });
+
   it("names the only space above its chats, beside its actions", () => {
     const [group] = sidebarGroupsForSpaces([space("space-1", "Personal", { canRename: true })], "");
 

@@ -590,6 +590,7 @@ describe("createRepos.listSpaceBotsForSpaces", () => {
         color: "#123456",
         notifyOnFinish: false,
         pinned: true,
+        hiddenAt: null,
         sectionId: null,
         unread: true,
         parentBotId: null,

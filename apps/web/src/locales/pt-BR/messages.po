@@ -292,6 +292,11 @@ msgstr ""
 msgid "{0} has not answered"
 msgstr ""
 
+#. placeholder {0}: hideUndo.name
+#: src/pages/Shell.tsx
+msgid "{0} hidden"
+msgstr ""
+
 #. placeholder {0}: source.itemCount
 #: src/pages/CompanyImport.tsx
 msgid "{0} items"
@@ -5613,6 +5618,10 @@ msgid "Failed to create bot"
 msgstr ""
 
 #: src/pages/Shell.tsx
+msgid "Failed to hide bot"
+msgstr ""
+
+#: src/pages/Shell.tsx
 msgid "Failed to send message"
 msgstr "Ocorreu um erro ao enviar a mensagem"
 
@@ -6133,6 +6142,10 @@ msgstr ""
 msgid "Hi, this is how I'll sound when I read replies out loud."
 msgstr "Olá, é assim que vou soar quando ler as respostas em voz alta."
 
+#: src/components/HiddenBotsList.tsx
+msgid "Hidden bots"
+msgstr ""
+
 #: src/components/data-room/PathBar.tsx
 msgid "Hidden folders"
 msgstr ""
@@ -6151,6 +6164,10 @@ msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Hide done"
+msgstr ""
+
+#: src/pages/BotContextMenu.tsx
+msgid "Hide from sidebar"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -11222,6 +11239,10 @@ msgstr ""
 #: src/components/computer/TerminalApp.tsx
 msgid "Shell"
 msgstr "Shell"
+
+#: src/components/HiddenBotsList.tsx
+msgid "Show"
+msgstr ""
 
 #: src/components/investors/ActionItems.tsx
 msgid "Show {count} action items"

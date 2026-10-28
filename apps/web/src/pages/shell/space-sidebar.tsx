@@ -116,6 +116,8 @@ type SidebarChat = {
   title?: string | null;
   preview?: string | null;
   pinned: boolean;
+  /** Set when the person left the bot out of the sidebar. */
+  hiddenAt?: string | null;
   sectionId: string | null;
   position?: number | null;
   parentBotId?: string | null;
@@ -219,6 +221,7 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
     const headless = spaceLabel === null;
     const otherSpace = showSpaceNames && space.id !== currentSpaceId;
     const visibleBots = space.bots
+      .filter((bot) => !bot.hiddenAt)
       .filter((bot) => !(otherSpace && untouched?.(bot)))
       .filter((bot) =>
         `${bot.name} ${bot.title ?? ""} ${bot.preview ?? ""}`.toLowerCase().includes(needle),

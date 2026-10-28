@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AvatarStyle, SpaceMemoryConfig } from "@rakazo/contracts";
+import type { AvatarStyle, Bot, SpaceMemoryConfig } from "@rakazo/contracts";
 import {
   Button,
   Dialog,
@@ -60,6 +60,8 @@ export function SettingsOverlay({
   notice,
   avatarStyle,
   onAvatarStyleChange,
+  hiddenBots,
+  onShowBot,
   timezone,
   onTimezoneChange,
   isDeploymentOwner = false,
@@ -89,6 +91,8 @@ export function SettingsOverlay({
   notice?: string;
   avatarStyle: AvatarStyle;
   onAvatarStyleChange: (style: AvatarStyle) => Promise<void>;
+  hiddenBots?: readonly Pick<Bot, "id" | "name" | "color">[];
+  onShowBot?: (botId: string) => void;
   timezone?: string;
   onTimezoneChange?: (timezone: string) => Promise<void>;
   isDeploymentOwner?: boolean;
@@ -329,6 +333,8 @@ export function SettingsOverlay({
                   name={name}
                   avatarStyle={avatarStyle}
                   onAvatarStyleChange={onAvatarStyleChange}
+                  hiddenBots={hiddenBots}
+                  onShowBot={onShowBot}
                   timezone={timezone}
                   onTimezoneChange={onTimezoneChange}
                   messagingEnabled={messagingEnabled}

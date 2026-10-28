@@ -2657,6 +2657,9 @@ export function createRouter(deps: RouterDeps) {
             notifyOnFinish: input.notifyOnFinish,
             color: input.color,
             pinned: input.pinned,
+            ...(input.hidden !== undefined
+              ? { hiddenAt: input.hidden ? new Date() : null }
+              : {}),
             memoryScope: input.memoryScope,
             sectionId: input.sectionId,
             voiceId: input.voiceId,
@@ -9351,6 +9354,7 @@ async function memberSpaceNavigation(
           color: bot.color,
           notifyOnFinish: bot.notifyOnFinish,
           pinned: bot.pinned,
+          hiddenAt: bot.hiddenAt ?? null,
           sectionId: bot.sectionId,
           unread: bot.unread,
           preview: bot.preview,

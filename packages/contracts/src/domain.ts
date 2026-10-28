@@ -106,6 +106,8 @@ export const BotSchema = z.object({
   /** Order within its folder; bots and groups share one scale. Null: not ordered by hand yet. */
   position: z.number().int().nullable().optional(),
   archivedAt: z.string().nullable(),
+  /** Left out of the sidebar chat list by the person; the bot keeps working. */
+  hiddenAt: z.string().nullable().optional(),
   unread: z.boolean(),
   parentBotId: Id.nullable(),
   memoryScope: MemoryScopeSchema.nullable(),
@@ -235,6 +237,7 @@ export const SpaceBotSchema = BotSchema.pick({
   color: true,
   notifyOnFinish: true,
   pinned: true,
+  hiddenAt: true,
   sectionId: true,
   position: true,
   unread: true,
@@ -402,6 +405,8 @@ export const UpdateBotInput = z
     notifyOnFinish: z.boolean().optional(),
     color: BotAvatarValueSchema.optional(),
     pinned: z.boolean().optional(),
+    /** Leaves the bot out of the sidebar chat list (or puts it back). */
+    hidden: z.boolean().optional(),
     memoryScope: MemoryScopeSchema.nullable().optional(),
     sectionId: Id.nullable().optional(),
     voiceId: z.string().max(120).nullable().optional(),

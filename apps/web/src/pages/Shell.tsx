@@ -631,6 +631,7 @@ export function ShellPage() {
   const savingBotOrderRef = useRef(0);
   const [botSections, setBotSections] = useState<BotSection[]>([]);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [hideUndo, setHideUndo] = useState<{ id: string; name: string } | null>(null);
   const [folderUndo, setFolderUndo] = useState<SidebarSnapshot | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [archivedBots, setArchivedBots] = useState<Bot[]>([]);
@@ -5926,6 +5927,21 @@ export function ShellPage() {
                     setBotMenu(null);
                   }
             }
+            onHide={
+              contextBot
+                ? () => {
+                    const { id, name } = contextBot;
+                    setBotMenu(null);
+                    void rpc.bots
+                      .update({ botId: id, hidden: true })
+                      .then(() => refreshBots())
+                      .then(() => setHideUndo({ id, name }))
+                      .catch((error: unknown) =>
+                        setSendError(errorText(error, t`Failed to hide bot`)),
+                      );
+                  }
+                : undefined
+            }
             onArchive={() => {
               setBotMenu(null);
               const request = contextBot
@@ -6130,6 +6146,21 @@ export function ShellPage() {
           />
         ) : null}
 
+        {hideUndo ? (
+          <SidebarUndoNotice
+            message={t`${hideUndo.name} hidden`}
+            onUndo={() => {
+              const { id } = hideUndo;
+              setHideUndo(null);
+              void rpc.bots
+                .update({ botId: id, hidden: false })
+                .then(() => refreshBots())
+                .catch(() => undefined);
+            }}
+            onDismiss={() => setHideUndo(null)}
+          />
+        ) : null}
+
         {folderUndo ? (
           <SidebarUndoNotice
             message={t`Chats grouped into folders`}
@@ -6271,6 +6302,13 @@ export function ShellPage() {
             modelProvider={settingsModelProvider}
             notice={settingsNotice}
             avatarStyle={bootstrapMe?.avatarStyle ?? DEFAULT_AVATAR_STYLE}
+            hiddenBots={bots.filter((bot) => bot.hiddenAt)}
+            onShowBot={(botId) => {
+              void rpc.bots
+                .update({ botId, hidden: false })
+                .then(() => refreshBots())
+                .catch(() => undefined);
+            }}
             isDeploymentOwner={bootstrapMe?.isDeploymentOwner === true}
             billingEnabled={bootstrapMe?.billingEnabled === true}
             sandboxProvider={bootstrapMe?.sandboxProvider}
