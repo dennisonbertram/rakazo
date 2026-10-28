@@ -1178,14 +1178,17 @@ export function SpaceSidebar({
               ).filter((row) => !inActivity(row));
               const pageAgentRows = foldable ? listedRows.filter(isPageAgent) : [];
               const emailChatRows = foldable ? listedRows.filter(isEmailChat) : [];
+              // The header stays while any page agent exists, even all hidden as unused, so its menu stays reachable.
+              const hasPageAgents =
+                foldable && nestedRows.some((row) => isPageAgent(row) && !inActivity(row));
               const displayRows: (
                 | (typeof nestedRows)[number]
                 | { foldHeader: "page" | "email" }
               )[] =
-                pageAgentRows.length || emailChatRows.length
+                hasPageAgents || emailChatRows.length
                   ? [
                       // Page agents sit first, right under the folders above, with Email chats directly below them.
-                      ...(pageAgentRows.length ? [{ foldHeader: "page" as const }] : []),
+                      ...(hasPageAgents ? [{ foldHeader: "page" as const }] : []),
                       ...foldRows(pageAgentRows, pageAgentsOpen, active?.id, !pageMode),
                       ...(emailChatRows.length ? [{ foldHeader: "email" as const }] : []),
                       ...foldRows(emailChatRows, emailChatsOpen, active?.id),

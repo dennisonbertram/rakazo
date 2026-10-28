@@ -726,7 +726,8 @@ it("hides an unused idle page agent and reveals it when active", async () => {
   try {
     await act(async () => root.render(renderFixture(false)));
 
-    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).toBeNull();
+    // The header stays (its menu holds New page), but the untouched agent is not listed.
+    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Inbox agent");
 
     await act(async () => root.render(renderFixture(true)));
@@ -821,7 +822,7 @@ it("folds email chats separately and reveals the active email chat", async () =>
     const emailChats = container.querySelector<HTMLButtonElement>(
       '[data-testid="sidebar-email-chats"]',
     );
-    expect(pageAgents).toBeNull();
+    expect(pageAgents).not.toBeNull();
     expect(emailChats?.textContent).toContain("Email chats");
     expect(emailChats?.getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).not.toContain("Client email");
@@ -829,7 +830,7 @@ it("folds email chats separately and reveals the active email chat", async () =>
     await act(async () => emailChats?.click());
     expect(emailChats?.getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("Client email");
-    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).toBeNull();
+    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
 
     await act(async () => emailChats?.click());
     expect(emailChats?.getAttribute("aria-expanded")).toBe("false");
@@ -945,7 +946,10 @@ it("opens the command palette from expanded and rail Search", async () => {
   }
 });
 
-async function renderSidebar(props: Record<string, unknown>, check: (c: HTMLElement) => void) {
+async function renderSidebar(
+  props: Record<string, unknown>,
+  check: (c: HTMLElement) => void | Promise<void>,
+) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("matchMedia", () => ({
     matches: false,
@@ -967,7 +971,7 @@ async function renderSidebar(props: Record<string, unknown>, check: (c: HTMLElem
         ),
       ),
     );
-    check(container);
+    await check(container);
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -991,13 +995,19 @@ it("lists Email chats directly below Page agents, before the other chats", async
 });
 
 it("treats a page made with New page as a page agent, listed only when unused ones are shown", async () => {
-  await renderSidebar({ customPage: true }, (c) => {
-    expect(c.querySelector('[data-testid="sidebar-page-agents"]')).toBeNull();
+  const open = async (c: HTMLElement) => {
+    const fold = c.querySelector<HTMLButtonElement>('[data-testid="sidebar-page-agents"]');
+    expect(fold).not.toBeNull();
+    await act(async () => fold?.click());
+  };
+  await renderSidebar({ customPage: true }, async (c) => {
+    await open(c);
     expect(c.textContent).not.toContain("New page");
   });
   localStorage.setItem("rakazo.showUnusedPageAgents", "1");
-  await renderSidebar({ customPage: true }, (c) => {
-    expect(c.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
+  await renderSidebar({ customPage: true }, async (c) => {
+    await open(c);
+    expect(c.textContent).toContain("New page");
   });
 });
 
