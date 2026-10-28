@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type {
   CreateMcpTokenInput,
+  McpActivityCall,
   McpConnection,
   McpConnectionList,
   UpdateMcpConnectionInput,
@@ -114,6 +115,32 @@ export async function createToken(
     }),
   );
   return { connection: dto(row), token };
+}
+
+/** The last 20 calls of one of the member's connections. */
+export function listActivity(
+  prisma: PrismaClient,
+  actor: { userId: string },
+  id: string,
+): Promise<McpActivityCall[]> {
+  return acrossSpaces(async () => {
+    const owned = await prisma.mcpConnection.findFirst({
+      where: { id, userId: actor.userId },
+      select: { id: true },
+    });
+    if (!owned) throw new McpConnectionNotFound();
+    const rows = await prisma.mcpCallLog.findMany({
+      where: { connectionId: id },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { tool: true, outcome: true, createdAt: true },
+    });
+    return rows.map((row) => ({
+      tool: row.tool,
+      outcome: row.outcome === "ok" || row.outcome === "rate_limited" ? row.outcome : "error",
+      createdAt: row.createdAt.toISOString(),
+    }));
+  });
 }
 
 const ownLive = (id: string, userId: string) => ({ id, userId, revokedAt: null });

@@ -497,10 +497,22 @@ describePostgres("row-level security (PostgreSQL)", () => {
           data: { notificationId: notification.id, channel: "push", nextAttemptAt: new Date() },
         }),
       );
-      keep(
+      const mcpConnection = keep(
         "mcpConnection",
         await o.mcpConnection.create({
           data: { spaceId: t.spaceId, userId: t.userId, kind: "oauth", label: `c-${tag}` },
+        }),
+      );
+      keep(
+        "mcpCallLog",
+        await o.mcpCallLog.create({
+          data: {
+            connectionId: mcpConnection.id,
+            spaceId: t.spaceId,
+            tool: "contacts_list",
+            outcome: "ok",
+            durationMs: 1,
+          },
         }),
       );
       keep(

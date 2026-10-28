@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import {
   createToken,
+  listActivity,
   listConnections,
   McpConnectionNotFound,
   McpSpaceForbidden,
@@ -30,6 +31,9 @@ export function createMcpConnectionsRoutes({ deps, authed }: RouteContext) {
     ),
     update: authed.mcpConnections.update.handler(({ context, input }) =>
       owned(() => updateConnection(deps.prisma, context.actor, input)),
+    ),
+    activity: authed.mcpConnections.activity.handler(({ context, input }) =>
+      owned(() => listActivity(deps.prisma, context.actor, input.id)),
     ),
     revoke: authed.mcpConnections.revoke.handler(({ context, input }) =>
       owned(async () => {

@@ -356,10 +356,31 @@ model McpConnection {
   createdAt     DateTime  @default(now())
   lastUsedAt    DateTime?
   revokedAt     DateTime?
+  /// Start of the minute that `rateCount` counts calls in (fixed-window rate limit).
+  rateWindowStart DateTime?
+  rateCount     Int       @default(0)
+  calls         McpCallLog[]
 
   @@index([spaceId])
   @@index([userId, spaceId, oauthClientId])
   @@map("mcp_connections")
+}
+
+/// One tool call from an outside MCP client. Never holds arguments or results.
+model McpCallLog {
+  id           String        @id @default(cuid())
+  connectionId String
+  connection   McpConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  spaceId      String
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tool         String
+  /// "ok", "error" or "rate_limited".
+  outcome      String
+  durationMs   Int
+  createdAt    DateTime      @default(now())
+
+  @@index([connectionId, createdAt])
+  @@map("mcp_call_log")
 }
 
 model Verification {
@@ -479,6 +500,7 @@ model Space {
   notifications               Notification[]
   notificationEndpoints       NotificationEndpoint[]
   aiDataConsents              AiDataConsent[]
+  mcpCallLogs                 McpCallLog[]
   mcpConnections              McpConnection[]
   id                          String                       @id
   organizationId              String
