@@ -89,12 +89,12 @@ import type { FinishedShellCommand } from "./shell-command-stream.js";
 import { deliverFinishedShells } from "./shell-command-stream.js";
 import { isThinkingSignatureMismatch, withoutThinkingBlocks } from "./thinking-signatures.js";
 import { textContentArg } from "./tool-text.js";
-import { fetchPairedWithDispatcher } from "./undici-fetch.js";
 import {
   restoreTurnCheckpoint,
   serializeTurnCheckpoint,
   unresolvedTurnCheckpointCalls,
 } from "./turn-checkpoint.js";
+import { fetchPairedWithDispatcher } from "./undici-fetch.js";
 
 const running = new Map<string, { controller: AbortController; work: Promise<void> }>();
 interface ToolCallBudget {
