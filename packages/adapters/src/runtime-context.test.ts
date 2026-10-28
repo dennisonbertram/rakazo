@@ -17,7 +17,7 @@ function fixture(count = 30) {
     id: `message-${index}`,
     createdAt: "2026-01-01T00:00:00Z",
     role: "user" as const,
-    content: `Original discussion ${index}: ${"synthetic history ".repeat(30)}`,
+    content: `Original discussion ${index}: ${"synthetic history ".repeat(100)}`,
   }));
   const request: AgentRunRequest = {
     botId: "bot",
