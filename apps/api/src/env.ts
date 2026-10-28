@@ -26,6 +26,11 @@ export interface AppEnv {
   webOrigin: string;
   privacyPolicyUrl?: string;
   apiUrl: string;
+  /**
+   * Public HTTPS address of the API when outside AI clients connect from the internet
+   * (for example a Tailscale Funnel host). Unset serves MCP at `apiUrl`, which is enough on localhost.
+   */
+  publicMcpUrl: string | undefined;
   apiHost: string;
   signupsEnabled: string | undefined;
   signupAllowlist: string | undefined;
@@ -176,6 +181,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     webOrigin: source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
     privacyPolicyUrl: optional(source.PRIVACY_POLICY_URL),
     apiUrl: source.API_URL ?? "http://127.0.0.1:3100",
+    publicMcpUrl: publicMcpUrl(source.PUBLIC_MCP_URL),
     apiHost: source.API_HOST ?? "127.0.0.1",
     signupsEnabled: source.SIGNUPS_ENABLED,
     signupAllowlist: source.SIGNUP_ALLOWLIST,
@@ -265,6 +271,12 @@ function required(source: NodeJS.ProcessEnv, key: string): string {
   const value = source[key];
   if (!value) throw new Error(`Missing ${key}`);
   return value;
+}
+
+function publicMcpUrl(value: string | undefined): string | undefined {
+  const trimmed = optional(value)?.replace(/\/+$/, "");
+  if (trimmed && !URL.canParse(trimmed)) throw new Error("PUBLIC_MCP_URL must be an absolute URL");
+  return trimmed;
 }
 
 function optional(value: string | undefined): string | undefined {

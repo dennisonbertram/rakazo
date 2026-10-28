@@ -498,6 +498,12 @@ describePostgres("row-level security (PostgreSQL)", () => {
         }),
       );
       keep(
+        "mcpConnection",
+        await o.mcpConnection.create({
+          data: { spaceId: t.spaceId, userId: t.userId, kind: "oauth", label: `c-${tag}` },
+        }),
+      );
+      keep(
         "transcriptionSelection",
         await o.transcriptionSelection.create({
           data: { userId: t.userId, provider: "p", secretId: t.personalSecretId },

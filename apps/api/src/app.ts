@@ -160,6 +160,7 @@ import {
 } from "./investor-portal.js";
 import { mountLocalSettings } from "./local-settings.js";
 import { mountMailPushRoute } from "./mail-push.js";
+import { mountMcpDiscovery, mountMcpServer } from "./mcp-server.js";
 import {
   createMessagingInboundHandler,
   teamChatSenderCanWakeMessageRoutines,
@@ -488,12 +489,15 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const notifications = new ExpoPushProvider(prisma, (sessionId) =>
     pushSessionExpiresAt(prisma, sessionId),
   );
+  // Localhost needs no setting: MCP clients reach the API where it listens.
+  const mcpBaseUrl = (env.publicMcpUrl ?? env.apiUrl).replace(/\/+$/, "");
   const auth = createAuth(prisma, {
     passwordAuth: env.passwordAuth,
     oidc: env.oidc,
     secret: env.authSecret,
     baseURL: env.authUrl,
     webOrigin: env.webOrigin,
+    mcp: { issuer: mcpBaseUrl, resource: `${mcpBaseUrl}/mcp`, webOrigin: env.webOrigin },
     signupsEnabled: env.signupsEnabled,
     signupAllowlist: env.signupAllowlist,
     email,
@@ -901,6 +905,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       return c.json({ error: "Not available in version 1" }, 404);
     }
     return auth.handler(emptyAuthBodyAsJson(c.req.raw));
+  });
+  mountMcpDiscovery(app, { auth, baseUrl: mcpBaseUrl, authUrl: env.authUrl });
+  mountMcpServer(app, {
+    prisma,
+    auth,
+    baseUrl: mcpBaseUrl,
+    jwksUrl: `${env.apiUrl.replace(/\/+$/, "")}${"/api/auth"}/jwks`,
   });
   mountLocalSettings(app, { token: env.desktopStackToken, prisma, rpc });
   const requestSession = async (request: Request) => {

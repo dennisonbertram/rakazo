@@ -1100,3 +1100,55 @@ The optional marketing site in `apps/www` can be hosted separately.
 ## Connect mobile clients
 
 The iOS and Android app can also point at a self-hosted origin at runtime. On the sign-in screen, tap **Use a custom server** and enter the same HTTPS origin as `WEB_ORIGIN` (for example `https://app.example.com`). Store builds still default to `EXPO_PUBLIC_API_URL`; the in-app setting is an override for people running their own API. Changing the server signs the device out of any previous session.
+
+## Connect outside AI clients (MCP)
+
+The API serves a Model Context Protocol endpoint at `/mcp` for AI clients such as Claude Code,
+claude.ai, ChatGPT and MCP Inspector. A client signs in through OAuth: the member approves it on
+a page of the web app and chooses one Space, and the client then sees only that Space. The
+connection is checked again on every call, so a member who leaves the Space, or a connection that
+is revoked, stops working on the next call. This first version has one tool, `agents_list`.
+
+### On localhost
+
+Nothing to set. Point a client at the API address, for example
+`claude mcp add --transport http praci http://127.0.0.1:<API port>/mcp`, then sign in from the
+client (`/mcp` in Claude Code). The approval page opens on `WEB_ORIGIN`.
+
+### From the internet with Tailscale Funnel
+
+Unverified: these commands have not been run. Check the flags against your Tailscale version
+(`tailscale funnel --help`), and whether Funnel keeps the path prefix when it proxies.
+
+Only the endpoints a client calls are public. The web app, `/rpc` and the rest of `/api` stay
+private. The approval page is not public either: the member opens it from a browser that can
+reach `WEB_ORIGIN`, and the client's own browser redirect brings them there.
+
+1. Pick the public address, `https://<machine>.<tailnet>.ts.net`, and set it in `.env`:
+
+   ```
+   PUBLIC_MCP_URL=https://<machine>.<tailnet>.ts.net
+   ```
+
+   It becomes the OAuth issuer and the base of the token and registration endpoints. Leave
+   `BETTER_AUTH_URL` and `WEB_ORIGIN` unchanged: the session cookie belongs to the web origin.
+2. Restart the API so it reads the setting.
+3. Expose three path prefixes of the API port. `<API port>` is where the API listens: `3200` on a dev stack, or the port of `API_URL`:
+
+   ```bash
+   tailscale funnel --bg --set-path /mcp http://127.0.0.1:<API port>/mcp
+   tailscale funnel --bg --set-path /.well-known http://127.0.0.1:<API port>/.well-known
+   tailscale funnel --bg --set-path /api/auth/oauth2 http://127.0.0.1:<API port>/api/auth/oauth2
+   ```
+
+4. Check the public address from another network. Both must return JSON:
+
+   ```bash
+   curl https://<machine>.<tailnet>.ts.net/.well-known/oauth-protected-resource/mcp
+   curl https://<machine>.<tailnet>.ts.net/.well-known/oauth-authorization-server
+   ```
+
+   In the second, `authorization_endpoint` should point at `WEB_ORIGIN`, and `token_endpoint` and
+   `registration_endpoint` at the public address.
+5. Add the connector in the client with `https://<machine>.<tailnet>.ts.net/mcp`.
+6. To stop exposing it: `tailscale funnel reset`, and unset `PUBLIC_MCP_URL`.

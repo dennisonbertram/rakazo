@@ -41,6 +41,11 @@ model User {
   notificationEndpoints       NotificationEndpoint[]
   accountExports              AccountExport[]
   passkeys                    Passkey[]
+  oauthClients                OauthClient[]
+  oauthAccessTokens           OauthAccessToken[]
+  oauthRefreshTokens          OauthRefreshToken[]
+  oauthConsents               OauthConsent[]
+  mcpConnections              McpConnection[]
   id                          String                       @id
   name                        String
   email                       String
@@ -98,6 +103,8 @@ model Session {
   userId               String
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeOrganizationId String?
+  oauthAccessTokens    OauthAccessToken[]
+  oauthRefreshTokens   OauthRefreshToken[]
 
   @@unique([token])
   @@index([userId])
@@ -142,6 +149,217 @@ model Passkey {
   @@index([userId])
   @@index([credentialID])
   @@map("passkey")
+}
+
+/// Better Auth JWT plugin signing keys; the OAuth provider signs MCP access tokens with them.
+model Jwks {
+  id         String    @id
+  publicKey  String
+  privateKey String
+  createdAt  DateTime
+  expiresAt  DateTime?
+  alg        String?
+  crv        String?
+
+  @@map("jwks")
+}
+
+/// An outside application registered with the OAuth provider (MCP clients register themselves).
+model OauthClient {
+  id                               String                @id
+  clientId                         String                @unique
+  clientSecret                     String?
+  clientDiscoveryId                String?
+  disabled                         Boolean?              @default(false)
+  skipConsent                      Boolean?
+  enableEndSession                 Boolean?
+  subjectType                      String?
+  scopes                           String[]
+  clientCredentialsScopes          String[]
+  userId                           String?
+  user                             User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                        DateTime?
+  updatedAt                        DateTime?
+  name                             String?
+  uri                              String?
+  icon                             String?
+  contacts                         String[]
+  tos                              String?
+  policy                           String?
+  softwareId                       String?
+  softwareVersion                  String?
+  softwareStatement                String?
+  redirectUris                     String[]
+  postLogoutRedirectUris           String[]
+  backchannelLogoutUri             String?
+  backchannelLogoutSessionRequired Boolean?
+  tokenEndpointAuthMethod          String?
+  applicationType                  String?
+  jwks                             String?
+  jwksUri                          String?
+  grantTypes                       String[]
+  responseTypes                    String[]
+  requirePKCE                      Boolean?
+  dpopBoundAccessTokens            Boolean?              @default(false)
+  referenceId                      String?
+  metadata                         Json?
+  accessTokens                     OauthAccessToken[]
+  refreshTokens                    OauthRefreshToken[]
+  consents                         OauthConsent[]
+  resources                        OauthClientResource[]
+
+  @@index([userId])
+  @@map("oauth_client")
+}
+
+/// A protected resource the OAuth provider issues tokens for (the MCP endpoint).
+model OauthResource {
+  id                            String                @id
+  identifier                    String                @unique
+  name                          String
+  accessTokenTtl                Int?
+  refreshTokenTtl               Int?
+  signingAlgorithm              String?
+  signingKeyId                  String?
+  /// A list, or null to inherit the provider's scopes. Better Auth writes null, which a Postgres list cannot hold.
+  allowedScopes                 Json?
+  customClaims                  Json?
+  dpopBoundAccessTokensRequired Boolean?              @default(false)
+  disabled                      Boolean?              @default(false)
+  createdAt                     DateTime?
+  updatedAt                     DateTime?
+  policyVersion                 Int?                  @default(1)
+  metadata                      Json?
+  clients                       OauthClientResource[]
+
+  @@map("oauth_resource")
+}
+
+model OauthClientResource {
+  id         String        @id
+  clientId   String
+  client     OauthClient   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  resourceId String
+  resource   OauthResource @relation(fields: [resourceId], references: [identifier], onDelete: Cascade)
+  metadata   Json?
+  createdAt  DateTime?
+
+  @@unique([clientId, resourceId])
+  @@index([clientId])
+  @@index([resourceId])
+  @@map("oauth_client_resource")
+}
+
+model OauthRefreshToken {
+  id                      String             @id
+  token                   String             @unique
+  clientId                String
+  client                  OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  sessionId               String?
+  session                 Session?           @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  userId                  String
+  user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referenceId             String?
+  authorizationCodeId     String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  expiresAt               DateTime
+  createdAt               DateTime
+  revoked                 DateTime?
+  rotatedAt               DateTime?
+  rotationReplayResponse  String?
+  rotationReplayExpiresAt DateTime?
+  authTime                DateTime?
+  confirmation            Json?
+  scopes                  String[]
+  accessTokens            OauthAccessToken[]
+
+  @@index([clientId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([authorizationCodeId])
+  @@map("oauth_refresh_token")
+}
+
+model OauthAccessToken {
+  id                      String             @id
+  token                   String?            @unique
+  clientId                String
+  client                  OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  sessionId               String?
+  session                 Session?           @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  userId                  String?
+  user                    User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referenceId             String?
+  authorizationCodeId     String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  refreshId               String?
+  refresh                 OauthRefreshToken? @relation(fields: [refreshId], references: [id], onDelete: Cascade)
+  expiresAt               DateTime
+  createdAt               DateTime
+  revoked                 DateTime?
+  confirmation            Json?
+  scopes                  String[]
+
+  @@index([clientId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([authorizationCodeId])
+  @@index([refreshId])
+  @@map("oauth_access_token")
+}
+
+/// What a user allowed a client to do. `referenceId` is the Space the user chose.
+model OauthConsent {
+  id                      String      @id
+  clientId                String
+  client                  OauthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  userId                  String?
+  user                    User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referenceId             String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  scopes                  String[]
+  createdAt               DateTime
+  updatedAt               DateTime
+
+  @@index([clientId])
+  @@index([userId])
+  @@map("oauth_consent")
+}
+
+/// Single-use client assertion ids (private_key_jwt); unused by the public MCP clients.
+model OauthClientAssertion {
+  id        String   @id
+  expiresAt DateTime
+
+  @@map("oauth_client_assertion")
+}
+
+/// One outside client connected to one Space by one member. Every MCP call re-checks it.
+model McpConnection {
+  id            String    @id @default(cuid())
+  spaceId       String
+  space         Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "oauth" or "pat" (personal access token).
+  kind          String
+  label         String
+  clientName    String?
+  oauthClientId String?
+  /// SHA-256 of a personal access token; null for OAuth connections.
+  tokenHash     String?   @unique
+  tokenPrefix   String?
+  readOnly      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+
+  @@index([spaceId])
+  @@index([userId, spaceId, oauthClientId])
+  @@map("mcp_connections")
 }
 
 model Verification {
@@ -261,6 +479,7 @@ model Space {
   notifications               Notification[]
   notificationEndpoints       NotificationEndpoint[]
   aiDataConsents              AiDataConsent[]
+  mcpConnections              McpConnection[]
   id                          String                       @id
   organizationId              String
   organization                Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
