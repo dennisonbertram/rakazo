@@ -12495,10 +12495,6 @@ msgstr ""
 msgid "Tool"
 msgstr ""
 
-#: src/components/AskCard.tsx
-msgid "Tool name"
-msgstr ""
-
 #: src/lib/run-phase.ts
 msgid "tools"
 msgstr ""

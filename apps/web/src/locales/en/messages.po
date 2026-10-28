@@ -12495,10 +12495,6 @@ msgstr "Too large to search inside"
 msgid "Tool"
 msgstr "Tool"
 
-#: src/components/AskCard.tsx
-msgid "Tool name"
-msgstr "Tool name"
-
 #: src/lib/run-phase.ts
 msgid "tools"
 msgstr "tools"

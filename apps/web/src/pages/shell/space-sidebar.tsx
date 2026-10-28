@@ -1549,6 +1549,12 @@ export function SpaceSidebar({
                                       });
                                     }}
                                     className={`relative flex w-full items-center ${
+                                      // Folded page agents are leaves: on a phone the fold's indent only truncates their names.
+                                      foldable &&
+                                      (isPageAgent(displayRow) || isEmailChat(displayRow))
+                                        ? "max-sm:ps-2.5!"
+                                        : ""
+                                    } ${
                                       rail
                                         ? "justify-center rounded-xl px-0 py-1"
                                         : compact

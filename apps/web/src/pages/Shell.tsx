@@ -5261,14 +5261,14 @@ export function ShellPage() {
               <div
                 className={`sticky top-[-17px] z-10 -mx-5 -mt-[17px] mb-4 flex items-center justify-between bg-background px-5 ${TOP_BAR_HEIGHT}`}
               >
-                {/* On a phone this panel covers the chat header, so it carries the way to the sidebar. */}
+                {/* Between phone and desktop this panel covers the chat header, so it carries the way to the sidebar. A phone panel is a full sheet that closes back to the chat. */}
                 <div className="flex min-w-0 items-center gap-2">
                   <Button
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t`Open navigation`}
                     onClick={() => setMobileSidebarOpen(true)}
-                    className="-ms-1.5 text-foreground/75 lg:hidden"
+                    className="-ms-1.5 text-foreground/75 max-sm:hidden lg:hidden"
                   >
                     <Menu size={19} strokeWidth={1.7} />
                   </Button>
