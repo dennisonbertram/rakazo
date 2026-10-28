@@ -52,6 +52,7 @@ import {
   ownerOnlyCredentialAskMessageIds,
   planSidebarMove,
   resolveComposerSendPlan,
+  runErrorAction,
   runThreadSubscription,
   searchHitThreadTarget,
   speechFromBlocks,
@@ -4599,6 +4600,7 @@ export function ShellPage() {
               }
               sendError={sendError}
               runError={displayedRunError}
+              runErrorFix={runErrorAction(activeSnapshot?.run?.error)}
               runErrorId={displayedRunErrorId}
               onRunErrorPresented={handleRunErrorPresented}
               onDismissError={dismissComposerError}
