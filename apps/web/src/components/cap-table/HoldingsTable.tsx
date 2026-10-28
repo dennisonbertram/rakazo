@@ -140,7 +140,7 @@ export function HoldingsTable({
         </div>
       ) : (
         <Table compact className="table-fixed">
-          <TableHeader>
+          <TableHeader className="max-sm:hidden">
             <TableHeadRow>
               <TableHead className="ps-2" {...head("holder")}>
                 <Trans>Holder</Trans>

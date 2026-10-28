@@ -5,7 +5,7 @@ import { isAgedStuckWork } from "@rakazo/core";
 import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import type { ReactNode, Ref } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { PickFilter, SearchField, SortControl } from "../components/ListControls";
+import { PhoneDateRange, PickFilter, SearchField, SortControl } from "../components/ListControls";
 import { RowsSkeleton } from "../components/RowsSkeleton";
 import type { ActivityListFilters, ActivitySort } from "../lib/activity-list-filters";
 import {
@@ -404,7 +404,8 @@ function ActivityFilters({
   ];
 
   return (
-    <div className="flex flex-col gap-2">
+    // On a phone, search and the one Filters button share a row; From, To and Reset live in its sheet.
+    <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-stretch">
       <SearchField
         value={filters.query}
         onChange={(value) => list.setParam(param("q"), value)}
@@ -412,7 +413,7 @@ function ActivityFilters({
         label={t`Search activity`}
         name="activity-search"
       />
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="contents sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
         <PickFilter
           label={t`Status`}
           value={filters.status === "all" ? undefined : filters.status}
@@ -428,7 +429,20 @@ function ActivityFilters({
           onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
         />
       </div>
-      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80">
+      <PhoneDateRange
+        label={t`Dates`}
+        from={filters.dateRange.from || undefined}
+        to={filters.dateRange.to || undefined}
+        // One edge changes per edit; "Clear all" empties both in one go.
+        onChange={(from, to) =>
+          from === undefined && to === undefined
+            ? list.clear(param("from"), param("to"))
+            : from !== (filters.dateRange.from || undefined)
+              ? list.setParam(param("from"), from)
+              : list.setParam(param("to"), to)
+        }
+      />
+      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80 max-sm:hidden">
         <Trans>From</Trans>
         <Input
           type="date"
@@ -440,7 +454,7 @@ function ActivityFilters({
           className="w-40 rounded-xl bg-card text-[13px] dark:bg-input"
         />
       </div>
-      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80">
+      <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground/80 max-sm:hidden">
         <Trans>To</Trans>
         <Input
           type="date"
@@ -457,7 +471,7 @@ function ActivityFilters({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 self-start rounded-full px-2 text-[12px]"
+          className="h-7 self-start rounded-full px-2 text-[12px] max-sm:hidden"
           data-testid="activity-reset-filters"
           onClick={() => list.clear(...["q", "status", "from", "to"].map(param))}
         >

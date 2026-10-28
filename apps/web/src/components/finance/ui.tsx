@@ -839,7 +839,7 @@ export function TransactionTable({
     // A fixed layout: every column but Counterparty has a set width, so opening a vendor, hiding
     // amounts or a longer name moves no column.
     <Table compact className="table-fixed">
-      <TableHeader>
+      <TableHeader className={sort ? "max-sm:hidden" : undefined}>
         <TableHeadRow>
           {/* Named in both views: an opened vendor's rows show their dates and status here. */}
           <TableHead className="hidden w-[4.5rem] @md:table-cell" {...sortHead("date")}>

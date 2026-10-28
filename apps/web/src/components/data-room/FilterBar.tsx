@@ -18,7 +18,14 @@ import {
 import { ChevronDown, Folder, FolderPlus, ListFilter, WandSparkles, X } from "lucide-react";
 import type { FormEvent, ReactElement, ReactNode } from "react";
 import { useState } from "react";
-import { PickFilter, SearchField, SortControl, Tip, usePhone } from "../ListControls";
+import {
+  PhoneDateRange,
+  PickFilter,
+  SearchField,
+  SortControl,
+  Tip,
+  usePhone,
+} from "../ListControls";
 import { PAGE_GUTTER_X } from "../PageHeader";
 import type { FolderNode } from "./folders";
 import { typeLabel } from "./format";
@@ -296,7 +303,7 @@ export function FilterBar({
   ].filter(Boolean).length;
   const sortControl = (
     <SortControl
-      inline
+      inline={!phone}
       fields={fields.map((name) => [name, labels[name]])}
       field={field}
       fieldLabel={labels[field]}
@@ -314,7 +321,7 @@ export function FilterBar({
       {/* Stats count by the filters only, so there is no search box; the Filters button and pills then start at the left edge. */}
       {statsView ? null : (
         <SearchField
-          className="order-1 min-w-0 flex-1 basis-48 pointer-coarse:h-11 @min-[800px]/bd:me-1.5 @min-[800px]/bd:w-80 @min-[800px]/bd:flex-none"
+          className="order-1 max-sm:order-none min-w-0 flex-1 basis-48 max-sm:flex-[1_1_11rem] pointer-coarse:h-11 @min-[800px]/bd:me-1.5 @min-[800px]/bd:w-80 @min-[800px]/bd:flex-none"
           value={query}
           onChange={onQuery}
           placeholder={phone ? t`Search` : t`Search names and text`}
@@ -322,20 +329,23 @@ export function FilterBar({
           name="data-room-search"
         />
       )}
-      <Button
-        variant="outline"
-        size="sm"
-        className="order-1 h-8 rounded-full @min-[640px]/bd:hidden"
-        aria-expanded={pillsOpen}
-        aria-controls="data-room-filters"
-        onClick={() => setPillsOpen(!pillsOpen)}
-      >
-        <ListFilter aria-hidden="true" />
-        <Trans>Filters</Trans>
-        {activeFilters > 0 ? <span className="tabular-nums">{activeFilters}</span> : null}
-      </Button>
+      {/* A phone has the shared Filters sheet instead (below); a narrow page wider than that unfolds the pills. */}
+      {phone ? null : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="order-1 h-8 rounded-full @min-[640px]/bd:hidden"
+          aria-expanded={pillsOpen}
+          aria-controls="data-room-filters"
+          onClick={() => setPillsOpen(!pillsOpen)}
+        >
+          <ListFilter aria-hidden="true" />
+          <Trans>Filters</Trans>
+          {activeFilters > 0 ? <span className="tabular-nums">{activeFilters}</span> : null}
+        </Button>
+      )}
       {/* The failed filter stays named in the main row, so one tap clears it; wider, its pill shows below. */}
-      {filters.status ? (
+      {filters.status && !phone ? (
         <Button
           variant="secondary"
           size="sm"
@@ -406,10 +416,9 @@ export function FilterBar({
       <div
         id="data-room-filters"
         data-testid="data-room-filters"
-        className={`order-4 flex basis-full flex-wrap ${pillsOpen ? "" : "@max-[639px]/bd:hidden"} items-center gap-1.5 *:min-h-8 *:shrink-0 empty:hidden @min-[960px]/bd:order-3 @min-[960px]/bd:min-w-0 @min-[960px]/bd:basis-0 @min-[960px]/bd:flex-1`}
+        className={`${phone ? "contents" : `order-4 flex basis-full flex-wrap ${pillsOpen ? "" : "@max-[639px]/bd:hidden"}`} items-center gap-1.5 *:min-h-8 *:shrink-0 empty:hidden @min-[960px]/bd:order-3 @min-[960px]/bd:min-w-0 @min-[960px]/bd:basis-0 @min-[960px]/bd:flex-1`}
       >
         <PickFilter
-          inline
           label={t`Type`}
           value={filters.docType}
           options={withValue(types, filters.docType).map((type) => [type, typeLabel(type)])}
@@ -417,27 +426,40 @@ export function FilterBar({
           onChange={(docType) => onFilters({ ...filters, docType })}
         />
         <PickFilter
-          inline
           label={t`Party`}
           value={filters.party}
           options={withValue(parties, filters.party).map((party) => [party, party])}
           empty={t`No documents here name a party`}
           onChange={(party) => onFilters({ ...filters, party })}
         />
-        <DateFilter
-          filters={filters}
-          hasDates={hasDates}
-          onChange={(from, to) =>
-            onFilters({
-              ...filters,
-              docDateFrom: from && `${from}T00:00:00.000Z`,
-              docDateTo: to && `${to}T23:59:59.999Z`,
-            })
-          }
-        />
+        {phone ? (
+          <PhoneDateRange
+            label={t`Document date`}
+            from={filters.docDateFrom?.slice(0, 10)}
+            to={filters.docDateTo?.slice(0, 10)}
+            onChange={(from, to) =>
+              onFilters({
+                ...filters,
+                docDateFrom: from && `${from}T00:00:00.000Z`,
+                docDateTo: to && `${to}T23:59:59.999Z`,
+              })
+            }
+          />
+        ) : (
+          <DateFilter
+            filters={filters}
+            hasDates={hasDates}
+            onChange={(from, to) =>
+              onFilters({
+                ...filters,
+                docDateFrom: from && `${from}T00:00:00.000Z`,
+                docDateTo: to && `${to}T23:59:59.999Z`,
+              })
+            }
+          />
+        )}
         {filters.status ? (
           <PickFilter
-            inline
             label={t`Status`}
             value={filters.status}
             options={[["failed", t`Failed`]]}
@@ -446,7 +468,6 @@ export function FilterBar({
         ) : null}
         {filters.legalUnchecked ? (
           <PickFilter
-            inline
             label={t`Legal`}
             value="unchecked"
             options={[["unchecked", t`Not checked`]]}
@@ -455,7 +476,6 @@ export function FilterBar({
         ) : null}
         {sources.length > 1 || filters.source ? (
           <PickFilter
-            inline
             label={t`Source`}
             value={filters.source}
             options={withValue(sources, filters.source).map((source) => [
@@ -466,7 +486,8 @@ export function FilterBar({
           />
         ) : null}
         {/* On a phone Sort ends the filter row; alone it took a row of its own above the chips. */}
-        {pillsOpen && !statsView ? (
+        {phone && !statsView ? sortControl : null}
+        {pillsOpen && !phone && !statsView ? (
           <div className="ms-auto flex items-center gap-0.5 @min-[640px]/bd:hidden">
             {sortControl}
           </div>
@@ -478,7 +499,7 @@ export function FilterBar({
           {trailing}
         </div>
       ) : null}
-      {statsView ? null : (
+      {statsView || phone ? null : (
         <div className="order-3 ms-auto flex min-h-8 shrink-0 items-center gap-0.5 @max-[639px]/bd:hidden @min-[960px]/bd:order-4">
           {sortControl}
         </div>

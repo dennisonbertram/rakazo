@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { ContactDialog, contactKindNames } from "../components/ContactDialog";
-import { PickFilter, SearchField } from "../components/ListControls";
+import { PickFilter, SearchField, SortControl } from "../components/ListControls";
 import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
@@ -105,6 +105,12 @@ export function ContactsPage({
     field === "default"
       ? found
       : sortBy(found, (c) => (field === "kind" ? names[c.kind] : c[field]) || null, dir);
+  const sortFields: [Exclude<typeof field, "default">, string][] = [
+    ["name", t`Name`],
+    ["email", t`Email`],
+    ["organization", t`Organization`],
+    ["kind", t`Kind`],
+  ];
   const sortHead = (target: (typeof CONTACT_SORTS)[number]) => ({
     sortDirection: field === target ? dir : null,
     onSort: () => list.toggleSort(target),
@@ -176,6 +182,17 @@ export function ContactsPage({
                 ])}
                 onChange={(next) => list.setParam("kind", next)}
               />
+              {/* Wide, the column headers sort; on a phone the Filters sheet does. */}
+              <span className="sm:hidden">
+                <SortControl
+                  fields={sortFields}
+                  field={field as Exclude<typeof field, "default">}
+                  fieldLabel={sortFields.find(([name]) => name === field)?.[1] ?? t`Default`}
+                  direction={field === "default" ? undefined : dir}
+                  onField={(next) => list.setSort({ field: next, dir: "asc" })}
+                  onDirection={(next) => list.setSort({ field, dir: next })}
+                />
+              </span>
             </div>
             {shown.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-8 text-center">
@@ -198,7 +215,7 @@ export function ContactsPage({
             ) : (
               <div>
                 <Table compact className="table-fixed">
-                  <TableHeader>
+                  <TableHeader className="max-sm:hidden">
                     <TableHeadRow>
                       <TableHead className="ps-2" {...sortHead("name")}>
                         <Trans>Name</Trans>

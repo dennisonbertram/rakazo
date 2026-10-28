@@ -4544,6 +4544,10 @@ msgstr ""
 msgid "Date window"
 msgstr ""
 
+#: src/pages/ActivityList.tsx
+msgid "Dates"
+msgstr ""
+
 #: src/lib/billing.ts
 #: src/pages/RoutineSchedule.tsx
 msgid "day"
@@ -4574,6 +4578,7 @@ msgid "Decline"
 msgstr "Rechazar"
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/pages/Contacts.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Default"
@@ -5778,6 +5783,7 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/data-room/FilterBar.tsx
 #: src/components/gtm/EmailItemCard.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/CompanyImportScope.tsx
@@ -12424,6 +12430,7 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/investors/UpdateEditor.tsx

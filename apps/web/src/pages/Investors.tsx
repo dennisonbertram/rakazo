@@ -1507,6 +1507,7 @@ export function InvestorsPage({
                 <SectionCard title={t`Contacts`}>
                   <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <Tabs
+                      className="max-sm:basis-full"
                       value={tab}
                       onValueChange={(next) =>
                         setParam("kind", next === "investor" ? undefined : String(next))

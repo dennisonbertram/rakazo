@@ -8,6 +8,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
+  Input,
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
@@ -43,7 +44,15 @@ type SortSpec = {
   onField: (field: string) => void;
   onDirection: (direction: "asc" | "desc") => void;
 };
-type Spec = PickSpec | SortSpec;
+type RangeSpec = {
+  kind: "range";
+  label: string;
+  /** Days as YYYY-MM-DD. */
+  from: string | undefined;
+  to: string | undefined;
+  onChange: (from: string | undefined, to: string | undefined) => void;
+};
+type Spec = PickSpec | SortSpec | RangeSpec;
 type Entry = { marker: HTMLElement; root: Element; spec: Spec };
 
 // On a phone the PickFilters and the SortControl of one toolbar do not each take room: they
@@ -136,16 +145,26 @@ function FilterSheet({ group }: { group: [string, Entry][] }) {
     string,
     Entry & { spec: PickSpec },
   ][];
+  const ranges = group.filter(([, e]) => e.spec.kind === "range") as [
+    string,
+    Entry & { spec: RangeSpec },
+  ][];
   const sort = group.find(([, e]) => e.spec.kind === "sort") as
     | [string, Entry & { spec: SortSpec }]
     | undefined;
   const fieldLabel = sort?.[1].spec.fieldLabel ?? "";
-  const active = picks.filter(([, e]) => e.spec.value);
-  const shown = (spec: PickSpec) =>
-    spec.options.find(([option]) => option === spec.value)?.[1] ?? spec.value;
+  const active = [
+    ...picks.filter(([, e]) => e.spec.value),
+    ...ranges.filter(([, e]) => e.spec.from || e.spec.to),
+  ];
+  const shown = (spec: PickSpec | RangeSpec) =>
+    spec.kind === "range"
+      ? `${spec.from ?? "…"} – ${spec.to ?? "…"}`
+      : (spec.options.find(([option]) => option === spec.value)?.[1] ?? spec.value);
   const set = (id: string, value: string | undefined) => {
     const spec = latest(id);
     if (spec?.kind === "pick") spec.onChange(value);
+    if (spec?.kind === "range" && !value) spec.onChange(undefined, undefined);
   };
   return (
     <>
@@ -219,6 +238,32 @@ function FilterSheet({ group }: { group: [string, Entry][] }) {
                 {spec.options.length === 0 && spec.empty ? (
                   <p className="text-sm text-muted-foreground">{spec.empty}</p>
                 ) : null}
+              </fieldset>
+            ))}
+            {ranges.map(([id, { spec }]) => (
+              <fieldset key={id} className="m-0 flex flex-col gap-1.5 border-0 p-0">
+                <legend className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  {spec.label}
+                </legend>
+                {(["from", "to"] as const).map((edge) => (
+                  <div key={edge} className="flex items-center justify-between gap-2 text-sm">
+                    {edge === "from" ? <Trans>From</Trans> : <Trans>To</Trans>}
+                    <Input
+                      type="date"
+                      name={`${id}-${edge}`}
+                      aria-label={edge === "from" ? t`From` : t`To`}
+                      value={spec[edge] ?? ""}
+                      onChange={(event) => {
+                        const now = latest(id);
+                        if (now?.kind !== "range") return;
+                        const value = event.target.value || undefined;
+                        if (edge === "from") now.onChange(value, now.to);
+                        else now.onChange(now.from, value);
+                      }}
+                      className="w-44"
+                    />
+                  </div>
+                ))}
               </fieldset>
             ))}
             {sort ? (
@@ -329,7 +374,7 @@ export function SearchField({
 }) {
   return (
     // On a phone the search shares its row with the Filters button, whatever width the page gave it.
-    <InputGroup data-list-search className={`${className ?? ""} max-sm:min-w-0 max-sm:flex-1`}>
+    <InputGroup data-list-search className={`max-sm:min-w-0 max-sm:flex-1 ${className ?? ""}`}>
       <InputGroupAddon>
         <Search aria-hidden="true" />
       </InputGroupAddon>
@@ -447,6 +492,12 @@ export function PickFilter({
       ) : null}
     </span>
   );
+}
+
+/** A date range (YYYY-MM-DD) that lives in the phone sheet; it renders nothing on a wider screen, where the page has its own control. */
+export function PhoneDateRange(props: Omit<RangeSpec, "kind">) {
+  const slot = usePhoneGroup({ kind: "range", ...props }, undefined);
+  return slot ? <PhoneSlot slot={slot} /> : null;
 }
 
 /** The "Sort: <field>" dropdown and, once a field is chosen, the direction arrow. */

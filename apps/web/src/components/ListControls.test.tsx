@@ -13,7 +13,7 @@ vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
 
-import { PickFilter, SearchField, SortControl } from "./ListControls";
+import { PhoneDateRange, PickFilter, SearchField, SortControl } from "./ListControls";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -115,4 +115,41 @@ it("wider than a phone keeps the pills and the sort menu in place", () => {
   setPhone(false);
   toolbar(undefined);
   expect(buttons(container)).toEqual(["Kind", "Sort: Name", ""]);
+});
+
+it("on a phone a date range sits in the sheet, counts as a filter, and clears with Clear all", () => {
+  setPhone(true);
+  const onRange = vi.fn();
+  act(() =>
+    root.render(
+      <div>
+        <SearchField
+          value=""
+          onChange={() => undefined}
+          placeholder="Search"
+          label="Search"
+          name="s"
+        />
+        <PhoneDateRange label="Dates" from="2026-01-02" to={undefined} onChange={onRange} />
+      </div>,
+    ),
+  );
+  expect(buttons(container)).toEqual(["Filters1", "Dates: 2026-01-02 – …"]);
+  act(() => container.querySelector<HTMLButtonElement>("[data-testid=filters-button]")?.click());
+  const sheet = document.querySelector("[data-slot=sheet-content]") as HTMLElement;
+  expect(sheet.querySelectorAll("input[type=date]")).toHaveLength(2);
+  act(() =>
+    [...sheet.querySelectorAll("button")].find((b) => b.textContent === "Clear all")?.click(),
+  );
+  expect(onRange).toHaveBeenCalledWith(undefined, undefined);
+});
+
+it("wider than a phone a date range renders nothing", () => {
+  setPhone(false);
+  act(() =>
+    root.render(
+      <PhoneDateRange label="Dates" from={undefined} to={undefined} onChange={() => undefined} />,
+    ),
+  );
+  expect(container.innerHTML).toBe("");
 });
