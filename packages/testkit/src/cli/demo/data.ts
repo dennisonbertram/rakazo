@@ -1382,7 +1382,18 @@ function demoExchangeFetch(input: string | URL | Request): Response | null {
  * Pass `fetch` to `createApp` as `cryptoFetch` so Crypto never calls the network.
  */
 export function demoCrypto() {
+  // 30 invented daily prices ending today: ETH drifts up with a wobble, USDC stays flat.
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const daily = (price: (daysAgo: number) => number) =>
+    Array.from({ length: 30 }, (_, i) => ({
+      timestamp: nowSeconds - (29 - i) * 86_400,
+      price: price(29 - i),
+    }));
   const rpc = fakeRpc({
+    history: {
+      "coingecko:ethereum": daily((n) => 2_500 - n * 12 + (n % 3) * 20),
+      [`ethereum:${USDC_ETHEREUM}`]: daily(() => 1),
+    },
     chains: {
       1: {
         balances: {

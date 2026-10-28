@@ -217,6 +217,7 @@ function setup(
     financeExchangeConnection: t("financeExchangeConnection"),
     financeExchangeBalance: t("financeExchangeBalance"),
     financeExchangeSnapshot: t("financeExchangeSnapshot"),
+    cryptoPriceDay: { findMany: async () => [] },
   };
   const enqueue = vi.fn(async () => undefined);
   const createBot = vi.fn(async () => ({ id: "finance-bot" }));
