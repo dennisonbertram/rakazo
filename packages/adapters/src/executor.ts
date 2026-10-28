@@ -10312,6 +10312,11 @@ async function failRun(
         keyRejected:
           "The model provider did not accept your API key. Check it in Settings > Models.",
         generic: "Something went wrong. Try again.",
+        spendLimit: (resetsOn) =>
+          `The AI key hit its spending limit.${resetsOn ? ` It resets ${resetsOn}.` : ""} Raise the limit with your provider or use another key in Settings > Models.`,
+        outOfCredits:
+          "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.",
+        rateLimited: "The model provider is rate limiting requests. Try again in a few minutes.",
       }).slice(0, 180),
       botId: bot.id,
       threadId: run.threadId,
