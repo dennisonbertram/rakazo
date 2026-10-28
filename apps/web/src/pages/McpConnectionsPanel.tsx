@@ -12,8 +12,9 @@ import {
   TableHeadRow,
   TableRow,
 } from "@rakazo/ui-web";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { rpc } from "../lib/rpc";
+import { McpConnectionActivity } from "./McpConnectionActivity";
 import { McpTokenDialog } from "./McpTokenDialog";
 
 export function McpConnectionsPanel() {
@@ -21,6 +22,7 @@ export function McpConnectionsPanel() {
   const [list, setList] = useState<McpConnectionList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [activityId, setActivityId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -91,46 +93,66 @@ export function McpConnectionsPanel() {
             </TableHeader>
             <TableBody>
               {list.connections.map((connection) => (
-                <TableRow key={connection.id}>
-                  <TableCell>
-                    <span className="font-medium">{connection.label}</span>
-                    {connection.tokenPrefix ? (
-                      <span className="ml-2 font-mono text-xs text-muted-foreground">
-                        {connection.tokenPrefix}…
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{connection.kind === "pat" ? t`Token` : t`OAuth`}</TableCell>
-                  <TableCell>{connection.spaceName}</TableCell>
-                  <TableCell>{date(connection.createdAt)}</TableCell>
-                  <TableCell>
-                    {connection.lastUsedAt ? date(connection.lastUsedAt) : t`Never`}
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      size="sm"
-                      aria-label={t`Read-only ${connection.label}`}
-                      checked={connection.readOnly}
-                      onCheckedChange={(readOnly) =>
-                        void change(() =>
-                          rpc.mcpConnections.update({ id: connection.id, readOnly }),
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={t`Revoke ${connection.label}`}
-                      onClick={() =>
-                        void change(() => rpc.mcpConnections.revoke({ id: connection.id }))
-                      }
-                    >
-                      <Trans>Revoke</Trans>
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <Fragment key={connection.id}>
+                  <TableRow>
+                    <TableCell>
+                      <span className="font-medium">{connection.label}</span>
+                      {connection.tokenPrefix ? (
+                        <span className="ml-2 font-mono text-xs text-muted-foreground">
+                          {connection.tokenPrefix}…
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{connection.kind === "pat" ? t`Token` : t`OAuth`}</TableCell>
+                    <TableCell>{connection.spaceName}</TableCell>
+                    <TableCell>{date(connection.createdAt)}</TableCell>
+                    <TableCell>
+                      {connection.lastUsedAt ? date(connection.lastUsedAt) : t`Never`}
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        size="sm"
+                        aria-label={t`Read-only ${connection.label}`}
+                        checked={connection.readOnly}
+                        onCheckedChange={(readOnly) =>
+                          void change(() =>
+                            rpc.mcpConnections.update({ id: connection.id, readOnly }),
+                          )
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-expanded={activityId === connection.id}
+                        aria-label={t`Activity ${connection.label}`}
+                        onClick={() =>
+                          setActivityId(activityId === connection.id ? null : connection.id)
+                        }
+                      >
+                        <Trans>Activity</Trans>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={t`Revoke ${connection.label}`}
+                        onClick={() =>
+                          void change(() => rpc.mcpConnections.revoke({ id: connection.id }))
+                        }
+                      >
+                        <Trans>Revoke</Trans>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {activityId === connection.id ? (
+                    <TableRow>
+                      <TableCell colSpan={7}>
+                        <McpConnectionActivity connectionId={connection.id} />
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </Fragment>
               ))}
             </TableBody>
           </Table>

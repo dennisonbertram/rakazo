@@ -42,3 +42,11 @@ export const UpdateMcpConnectionInput = z.object({
   label: label.optional(),
 });
 export type UpdateMcpConnectionInput = z.infer<typeof UpdateMcpConnectionInput>;
+
+/** One recorded call: which tool, how it ended and when. Never its arguments or result. */
+export const McpActivityCallSchema = z.object({
+  tool: z.string(),
+  outcome: z.enum(["ok", "error", "rate_limited"]),
+  createdAt: z.string(),
+});
+export type McpActivityCall = z.infer<typeof McpActivityCallSchema>;

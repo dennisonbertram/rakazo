@@ -24,10 +24,10 @@ describePostgres("MCP per-call checks (PostgreSQL)", () => {
       }),
     );
   const agents = async (userId: string, spaceId: string) => {
-    const { actor } = await resolveMcpCall(prisma, claims(userId, spaceId));
+    const call = await resolveMcpCall(prisma, claims(userId, spaceId));
     const response = await handleMcpRequest(
       prisma,
-      actor,
+      call,
       new Request("http://mcp.test/mcp", {
         method: "POST",
         headers: {
