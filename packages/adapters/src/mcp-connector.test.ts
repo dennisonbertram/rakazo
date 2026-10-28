@@ -764,6 +764,79 @@ describe("MCP connector session cache", () => {
     await connector.close();
   });
 
+  describe("a server the user has to fix", () => {
+    const context = {
+      spaceId: "w1",
+      userId: "u1",
+      botId: "bot-1",
+      signal: new AbortController().signal,
+    } as never;
+    const connectorWith = (network = TEST_NETWORK) =>
+      new McpConnector(
+        { botMcpServer: { findMany: vi.fn(async () => [ASSIGNMENT]) } } as never,
+        {} as never,
+        { network },
+      );
+
+    it("warns instead of reporting an error when the server rejects the credentials", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response("unauthorized", { status: 401 })),
+      );
+      const connector = connectorWith();
+      const error = vi.spyOn(getLogger(), "error");
+      const warn = vi.spyOn(getLogger(), "warn");
+      try {
+        expect(await connector.discoverTools(context)).toEqual([]);
+        expect(error).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          "mcp discovery failed for server demo",
+          expect.objectContaining({ reason: expect.any(String) }),
+        );
+      } finally {
+        await connector.close();
+      }
+    });
+
+    it("warns when the host no longer resolves", async () => {
+      vi.stubGlobal("fetch", mcpFetch({ failNext: false, initializations: 0 }));
+      const connector = connectorWith({
+        ...TEST_NETWORK,
+        resolveHostname: async () => {
+          throw Object.assign(new Error("getaddrinfo ENOTFOUND mcp.example.test"), {
+            code: "ENOTFOUND",
+          });
+        },
+      });
+      const error = vi.spyOn(getLogger(), "error");
+      const warn = vi.spyOn(getLogger(), "warn");
+      try {
+        expect(await connector.discoverTools(context)).toEqual([]);
+        expect(error).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith("mcp discovery failed for server demo", {
+          reason: expect.stringContaining("ENOTFOUND"),
+        });
+      } finally {
+        await connector.close();
+      }
+    });
+
+    it("still reports an unexpected server failure as an error", async () => {
+      vi.stubGlobal("fetch", mcpFetch({ failNext: true, initializations: 0 }));
+      const connector = connectorWith();
+      const error = vi.spyOn(getLogger(), "error");
+      try {
+        expect(await connector.discoverTools(context)).toEqual([]);
+        expect(error).toHaveBeenCalledWith(
+          "mcp discovery failed for server demo:",
+          expect.any(String),
+        );
+      } finally {
+        await connector.close();
+      }
+    });
+  });
+
   it("leaves no discovery event when the failure happens outside a run", async () => {
     vi.stubGlobal("fetch", mcpFetch({ failNext: true, initializations: 0 }));
     const append = vi.fn().mockResolvedValue(undefined);

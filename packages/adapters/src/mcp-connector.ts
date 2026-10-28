@@ -1,3 +1,4 @@
+import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult, ListToolsResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import type {
@@ -56,6 +57,38 @@ type PendingSession = {
   invalidated?: boolean;
   ref?: string;
 };
+
+/**
+ * A failure the user resolves rather than a bug: `reconnect` needs new credentials or
+ * config, `unreachable` a host that is down or gone. Both are logged as warnings, so they
+ * stay out of error reporting.
+ */
+type ExpectedFailure = "reconnect" | "unreachable";
+const UNREACHABLE_CODES = new Set([
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+function expectedFailure(error: unknown, depth = 0): ExpectedFailure | undefined {
+  if (depth > 5 || !(error instanceof Error)) return undefined;
+  // A redacted connect failure carries the classification its message loses.
+  const { expected, code } = error as { expected?: ExpectedFailure; code?: unknown };
+  if (expected) return expected;
+  if (error instanceof UnauthorizedError || code === 401 || code === 403) return "reconnect";
+  if (typeof code === "string" && UNREACHABLE_CODES.has(code)) return "unreachable";
+  const inner = error instanceof AggregateError ? error.errors : [error.cause];
+  for (const cause of inner) {
+    const kind = expectedFailure(cause, depth + 1);
+    if (kind) return kind;
+  }
+  return undefined;
+}
 
 const TOOL_LIST_TTL_MS = 30_000;
 type ToolListEntry = {
@@ -350,10 +383,15 @@ export class McpConnector implements ConnectorProvider {
             }));
         } catch (error) {
           // A single unavailable server must not hide tools from other connectors.
-          getLogger().error(
-            `mcp discovery failed for server ${assignment.server.slug}:`,
-            sanitizeConnectorError(error),
-          );
+          if (expectedFailure(error))
+            getLogger().warn(`mcp discovery failed for server ${assignment.server.slug}`, {
+              reason: sanitizeConnectorError(error),
+            });
+          else
+            getLogger().error(
+              `mcp discovery failed for server ${assignment.server.slug}:`,
+              sanitizeConnectorError(error),
+            );
           // Capture material before eviction so the audited reason stays redacted, the
           // same reason execute() captures it before callTool.
           const key = this.sessionKey(assignment.server, context);
@@ -934,7 +972,7 @@ export class McpConnector implements ConnectorProvider {
       // Keep the transport's HTTP status for withHttpStatus.
       throw Object.assign(
         new Error(sanitizeConnectorError(error, oauthMaterialSecrets(material))),
-        { code: (error as { code?: unknown } | null)?.code },
+        { code: (error as { code?: unknown } | null)?.code, expected: expectedFailure(error) },
       );
     }
   }
