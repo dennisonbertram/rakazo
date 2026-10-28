@@ -1191,6 +1191,8 @@ model Routine {
   thinkingLevel   String?
   lastRunAt       DateTime?
   nextRunAt       DateTime?
+  /// Runs in a row the model provider refused for the account; each one spaces out the schedule.
+  accountFailures Int       @default(0)
   /// Server adds silent-reply guidance; a quiet run that says nothing shows "Nothing to report".
   quiet           Boolean   @default(false)
   /// WatchSpecSchema JSON ({ kind: "page", url, intervalMinutes }) or null.

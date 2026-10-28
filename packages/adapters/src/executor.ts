@@ -493,6 +493,7 @@ import { selectMemoryTools } from "./memory-tools.js";
 import { MESSAGING_AI_DISCLOSURE } from "./messaging-delivery.js";
 import {
   isCatalogModelChoice,
+  PINNED_PROVIDER_NOT_CONNECTED,
   pinnedModelCredentialError,
   routineRunModelPin,
   runModelChoice,
@@ -538,6 +539,11 @@ import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { assertSafeRemoteUrl } from "./remote-mcp.js";
 import { loadReplyContext, messageToAgentHistoryText } from "./reply-context.js";
+import {
+  backOffRoutineAfterAccountError,
+  clearRoutineBackoff,
+  isModelAccountRefusal,
+} from "./routine-backoff.js";
 import { notifyThreadEvent } from "./run-notification.js";
 import {
   commitConsumedRunSecret,
@@ -1224,7 +1230,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
     );
     if (validationError) throw new Error(validationError);
     const credential = await findModelCredential(deps.prisma, scope, provider, modelId);
-    if (!credential) throw new Error("Connect that model provider first");
+    if (!credential) throw new Error(PINNED_PROVIDER_NOT_CONNECTED);
     // Free-form selections must keep the preference that owns this modelId. A
     // intervening delete/change can make findModelCredential fall back to another
     // same-provider credential; reject that mismatch instead of mixing baseUrl.
@@ -2511,7 +2517,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const { credential, thinkingLevel } = selected;
         const runModelProvider = selected.provider ?? runtimeFallback?.provider;
         const runModelId = selected.id ?? runtimeFallback?.id;
-        const failRunBeforeModel = async (message: string) => {
+        // A missing or refused connection of the user's own fails every scheduled run alike.
+        const failRunBeforeModel = async (message: string, accountFailure = false) => {
+          const failed = await failRunBeforeModelOnce(message);
+          if (failed && accountFailure && run.trigger === "routine" && run.routineId) {
+            await backOffRoutineAfterAccountError(deps, run.routineId);
+          }
+        };
+        const failRunBeforeModelOnce = async (message: string): Promise<boolean> => {
           const failed = await deps.events.finalizeRun({
             spaceId: run.spaceId,
             threadId: thread.id,
@@ -2524,7 +2537,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             outcome: "failed",
             error: message,
           });
-          if (!failed) return;
+          if (!failed) return false;
           if (failed.continuationRunId) {
             await deps.jobs
               .enqueue(runContinueJob(failed.continuationRunId))
@@ -2549,20 +2562,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
               threadId: thread.id,
             });
           }
+          return true;
         };
         if (pinError) {
-          await failRunBeforeModel(pinError);
+          await failRunBeforeModel(pinError, pinError === PINNED_PROVIDER_NOT_CONNECTED);
           return;
         }
         if (
           run.modelPinned &&
           (selected.provider !== modelChoice.modelProvider || selected.id !== modelChoice.modelId)
         ) {
-          await failRunBeforeModel("Connect that model provider first");
+          await failRunBeforeModel(PINNED_PROVIDER_NOT_CONNECTED, true);
           return;
         }
         if (!runModelProvider || !runModelId) {
-          await failRunBeforeModel(MISSING_MODEL_MESSAGE);
+          await failRunBeforeModel(MISSING_MODEL_MESSAGE, true);
           return;
         }
         // An incompatible saved model is a configuration error. Record it on the run.
@@ -2584,6 +2598,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (!isTerminalModelSetupError(error)) throw error;
           await failRunBeforeModel(
             error instanceof Error ? error.message : "Connect the provider again.",
+            isRetiredModelCredentialError(error),
           );
           return;
         }
@@ -8676,6 +8691,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     : [{ kind: "text", text: stuckText }],
                 });
                 if (!stopped) return;
+                if (run.trigger === "routine" && run.routineId) {
+                  await clearRoutineBackoff(deps, run.routineId);
+                }
                 if (stopped.continuationRunId) {
                   await deps.jobs
                     .enqueue(runContinueJob(stopped.continuationRunId))
@@ -8945,6 +8963,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ),
           });
           if (!completed) return;
+          if (run.trigger === "routine" && run.routineId) {
+            await clearRoutineBackoff(deps, run.routineId);
+          }
           if (completed.continuationRunId) {
             await deps.jobs
               .enqueue(runContinueJob(completed.continuationRunId))
@@ -9053,6 +9074,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (message !== rawMessage) getLogger().error("run failed", { runId, error: rawMessage });
           await settleRunningHelpers();
           await failRun(deps, run, bot, attempt.id, workerId, fence, message, error);
+          // A refusal of the deployment's own key is the operator's problem, not the user's.
+          if (
+            run.trigger === "routine" &&
+            run.routineId &&
+            credential &&
+            isModelAccountRefusal(error)
+          ) {
+            await backOffRoutineAfterAccountError(deps, run.routineId);
+          }
         }
       } catch (setupError) {
         const computerBusy = setupError instanceof ComputerBusyError;

@@ -30,6 +30,20 @@ interface Scenario {
   toolCalls?: number;
   botMessages?: number;
   retryEnqueueFails?: boolean;
+  personalKey?: boolean;
+  pinnedTo?: { provider: string; modelId: string };
+}
+
+function personalCredential(scenario: Scenario) {
+  return scenario.personalKey
+    ? {
+        id: "personal",
+        provider: "openrouter",
+        secretId: "personal-secret",
+        defaultModel: "deepseek/deepseek-v4-flash-0731",
+        userPreferences: [],
+      }
+    : null;
 }
 
 async function failRun(scenario: Scenario) {
@@ -46,6 +60,13 @@ async function failRun(scenario: Scenario) {
     routineId: trigger === "routine" ? "routine-1" : null,
     retryOfRunId: scenario.retryOfRunId ?? null,
     leaseFence: 0,
+    ...(scenario.pinnedTo
+      ? {
+          modelPinned: true,
+          modelProvider: scenario.pinnedTo.provider,
+          modelId: scenario.pinnedTo.modelId,
+        }
+      : {}),
   };
   const runtimeRun = vi.fn(async function* () {
     yield* [];
@@ -116,9 +137,35 @@ async function failRun(scenario: Scenario) {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     aiDataConsent: { findUnique: vi.fn(async () => ({ version: AI_DISCLOSURE_VERSION })) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
-    spaceModelPreference: { findFirst: vi.fn(async () => null) },
-    secret: { findFirst: vi.fn(async () => null) },
-    userModelCredential: { findFirst: vi.fn(async () => null) },
+    spaceModelPreference: {
+      findFirst: vi.fn(async () =>
+        scenario.personalKey
+          ? {
+              isDefault: true,
+              modelId: "deepseek/deepseek-v4-flash-0731",
+              thinkingLevel: null,
+              credential: {
+                id: "personal",
+                userId: "user-1",
+                provider: "openrouter",
+                label: "Personal",
+                secretId: "personal-secret",
+                createdAt: new Date(0),
+                updatedAt: new Date(0),
+              },
+            }
+          : null,
+      ),
+    },
+    secret: {
+      findFirst: vi.fn(async () =>
+        scenario.personalKey ? { id: "personal-secret", ciphertext: "fixture-ciphertext" } : null,
+      ),
+    },
+    userModelCredential: {
+      findFirst: vi.fn(async () => personalCredential(scenario)),
+      findMany: vi.fn(async () => (scenario.personalKey ? [personalCredential(scenario)] : [])),
+    },
     spaceBackupModel: { findMany: vi.fn(async () => []) },
     deploymentSettings: {
       findUnique: vi.fn(async () => ({
@@ -133,6 +180,7 @@ async function failRun(scenario: Scenario) {
     scratchpadItem: { findMany: vi.fn(async () => []) },
     externalEffect: { findMany: vi.fn(async () => []) },
     artifact: { findMany: vi.fn(async () => []) },
+    $transaction: vi.fn(async () => null),
   };
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
   const enqueue = vi.fn(async (job: { name: string }) => {
@@ -142,6 +190,7 @@ async function failRun(scenario: Scenario) {
   const executor = createRunExecutor({
     prisma,
     deploymentModelKey: "fake-deployment-key",
+    secretStore: { load: vi.fn(async () => "fixture-personal-key"), put: vi.fn() },
     runtime: { describe: () => ({ capabilities: { scripted: false } }), run: runtimeRun },
     sandbox: {
       describe: () => ({ capabilities: { graphical: false } }),
@@ -162,12 +211,15 @@ async function failRun(scenario: Scenario) {
 
   await executor.continueRun(run.id, "worker-1");
   expect(finalizeRun).toHaveBeenCalledWith(
-    expect.objectContaining({ outcome: "failed", error: scenario.error.message }),
+    expect.objectContaining({
+      outcome: "failed",
+      error: scenario.pinnedTo ? "Connect that model provider first" : scenario.error.message,
+    }),
   );
   const retries = enqueue.mock.calls
     .map(([job]) => job)
     .filter((job) => job.name === "routine.retry");
-  return { retries, send };
+  return { retries, send, prisma };
 }
 
 const overloaded = () =>
@@ -259,6 +311,43 @@ describe("retrying a routine run after a transient model failure", () => {
     const { retries } = await failRun({ error: overloaded(), trigger: "user" });
 
     expect(retries).toEqual([]);
+  });
+});
+
+describe("backing off a routine after its model connection refuses it", () => {
+  const refusedKey = () =>
+    new Error('401: {"error":{"message":"Invalid API key","code":401}}');
+
+  it("counts a refusal of the user's own key", async () => {
+    const { prisma } = await failRun({ error: refusedKey(), personalKey: true });
+
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+  });
+
+  it("counts a run pinned to a provider the user has no connection for", async () => {
+    const { prisma } = await failRun({
+      error: refusedKey(),
+      pinnedTo: { provider: "anthropic", modelId: "claude-sonnet-4-5" },
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["the deployment's own key", { error: refusedKey() }],
+    [
+      "a rate limit",
+      {
+        error: new Error('429: {"error":{"message":"Rate limit reached"}}'),
+        personalKey: true,
+      },
+    ],
+    ["a transient failure", { error: overloaded(), personalKey: true }],
+    ["a chat run", { error: refusedKey(), personalKey: true, trigger: "user" }],
+  ] satisfies Array<[string, Scenario]>)("does not count %s", async (_label, scenario) => {
+    const { prisma } = await failRun(scenario);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
 
