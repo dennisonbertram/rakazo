@@ -11,6 +11,7 @@ import {
 import { ChevronDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { StatusMark } from "../sidebar-glance";
+import { STICKY_GROUP_HEADER } from "../sticky-group-header";
 import { useFolderDnd } from "./SidebarDnd";
 
 /**
@@ -62,7 +63,7 @@ export function FolderHeader({
       ref={dnd?.setNodeRef}
       data-sidebar-folder={id}
       data-drop-into={dnd?.dropsInto ? "" : undefined}
-      className={`group/folder relative mt-1 flex items-center rounded-lg ${
+      className={`group/folder ${collapsed ? "relative" : `${STICKY_GROUP_HEADER} top-0`} mt-1 flex items-center rounded-lg ${
         dnd?.isDragging ? "opacity-50" : ""
       } ${dnd?.dropsFolder ? "border-t-2 border-ring" : ""} data-drop-into:bg-sidebar-accent data-drop-into:ring-2 data-drop-into:ring-ring`}
     >

@@ -50,3 +50,32 @@ it("keeps the rename open with an error when another folder has the name", async
     "A folder with that name already exists",
   );
 });
+
+it("pins the header while its folder is open, not when collapsed", async () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const render = (collapsed: boolean) =>
+    act(async () =>
+      root.render(
+        <FolderHeader
+          id="f1"
+          name="Tool Agents"
+          count={4}
+          collapsed={collapsed}
+          editing={false}
+          onToggle={() => undefined}
+          onStartRename={() => undefined}
+          onRename={() => undefined}
+          onCancelRename={() => undefined}
+          onDelete={() => undefined}
+        />,
+      ),
+    );
+  await render(false);
+  const header = container.querySelector("[data-sidebar-folder]")!;
+  expect(header.classList.contains("sticky")).toBe(true);
+  expect(header.classList.contains("bg-sidebar")).toBe(true);
+  await render(true);
+  expect(header.classList.contains("sticky")).toBe(false);
+});
