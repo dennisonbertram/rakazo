@@ -1,0 +1,44 @@
+import * as z from "zod";
+import { Id } from "./ids.js";
+
+export const MCP_CONNECTION_LABEL_MAX_LENGTH = 80;
+
+const label = z.string().trim().min(1).max(MCP_CONNECTION_LABEL_MAX_LENGTH);
+
+/** One outside client the member connected to a Space: an OAuth client or a personal access token. */
+export const McpConnectionSchema = z.object({
+  id: Id,
+  kind: z.enum(["oauth", "pat"]),
+  label: z.string(),
+  spaceId: Id,
+  spaceName: z.string(),
+  readOnly: z.boolean(),
+  /** Start of a personal access token, for telling tokens apart; never enough to use it. */
+  tokenPrefix: z.string().nullable(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+});
+export type McpConnection = z.infer<typeof McpConnectionSchema>;
+
+export const McpConnectionListSchema = z.object({
+  connections: z.array(McpConnectionSchema),
+  /** The member's Spaces, for the Space choice of a new token. */
+  spaces: z.array(z.object({ id: Id, name: z.string(), current: z.boolean() })),
+  /** Where outside clients reach this server. */
+  mcpUrl: z.string(),
+});
+export type McpConnectionList = z.infer<typeof McpConnectionListSchema>;
+
+export const CreateMcpTokenInput = z.object({
+  spaceId: Id,
+  label,
+  readOnly: z.boolean().default(true),
+});
+export type CreateMcpTokenInput = z.infer<typeof CreateMcpTokenInput>;
+
+export const UpdateMcpConnectionInput = z.object({
+  id: Id,
+  readOnly: z.boolean().optional(),
+  label: label.optional(),
+});
+export type UpdateMcpConnectionInput = z.infer<typeof UpdateMcpConnectionInput>;

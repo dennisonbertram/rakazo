@@ -583,6 +583,7 @@ import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
 import type { RouterDeps } from "./routes/context.js";
 import { asTenant, createRouteContext } from "./routes/context.js";
+import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
 
 import { listRoutineRuns } from "./routine-runs.js";
@@ -1673,6 +1674,7 @@ export function createRouter(deps: RouterDeps) {
     health: os.health.handler(async () => ({ ok: true as const, version: "0.1.0" })),
     me: authed.me.handler(async ({ context }): Promise<Me> => meDto(deps, context.actor)),
     billing: createBillingRoutes(routeContext),
+    mcpConnections: createMcpConnectionsRoutes(routeContext),
     preferences: {
       update: authed.preferences.update.handler(async ({ context, input }): Promise<Me> => {
         if (input.timezone !== undefined && !isValidTimezone(input.timezone)) {

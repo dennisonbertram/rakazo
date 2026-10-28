@@ -325,6 +325,12 @@ import {
 } from "./legal.js";
 import { McpOauthClientSchema } from "./mcp.js";
 import {
+  CreateMcpTokenInput,
+  McpConnectionListSchema,
+  McpConnectionSchema,
+  UpdateMcpConnectionInput,
+} from "./mcp-connections.js";
+import {
   MeetingConnectInputSchema,
   MeetingsStatusSchema,
   StoredMeetingsPageSchema,
@@ -483,6 +489,16 @@ export const appContract = {
   },
   health: oc.output(z.object({ ok: z.literal(true), version: z.string() })),
   me: oc.output(MeSchema),
+  /** Outside AI clients connected to the member's Spaces. Every call is limited to the caller's own connections. */
+  mcpConnections: {
+    list: oc.output(McpConnectionListSchema),
+    /** The token appears in this reply only; the server keeps a hash. */
+    createToken: oc
+      .input(CreateMcpTokenInput)
+      .output(z.object({ connection: McpConnectionSchema, token: z.string() })),
+    update: oc.input(UpdateMcpConnectionInput).output(McpConnectionSchema),
+    revoke: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+  },
   billing: {
     status: oc.output(BillingStatusSchema),
     checkout: oc.output(z.object({ url: z.string().url() })),

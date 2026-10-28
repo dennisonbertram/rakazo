@@ -847,6 +847,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       mcpAllowPrivateEndpoint: env.mcpAllowPrivateEndpoint,
       mcpStdioEnabled: env.mcpStdioEnabled,
       mcpStdioAllowedCommands: env.mcpStdioAllowedCommands,
+      mcpUrl: `${mcpBaseUrl}/mcp`,
       mailWritesDisabled: env.mailWritesDisabled,
     },
   });

@@ -85149,6 +85149,823 @@
         ]
       }
     },
+    "/rpc/mcpConnections/createToken": {
+      "post": {
+        "operationId": "rpc_mcpConnections_createToken",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "spaceId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "readOnly": {
+                        "default": true,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "spaceId",
+                      "label"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "connection": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "$ref": "#/components/schemas/RpcMcpConnectionsCreateTokenOutputSchema0"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "oauth",
+                                "pat"
+                              ]
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "spaceId": {
+                              "$ref": "#/components/schemas/RpcMcpConnectionsCreateTokenOutputSchema0"
+                            },
+                            "spaceName": {
+                              "type": "string"
+                            },
+                            "readOnly": {
+                              "type": "boolean"
+                            },
+                            "tokenPrefix": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "lastUsedAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind",
+                            "label",
+                            "spaceId",
+                            "spaceName",
+                            "readOnly",
+                            "tokenPrefix",
+                            "createdAt",
+                            "lastUsedAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "token": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "connection",
+                        "token"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/mcpConnections/list": {
+      "post": {
+        "operationId": "rpc_mcpConnections_list",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "connections": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "$ref": "#/components/schemas/RpcMcpConnectionsListOutputSchema0"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "oauth",
+                                  "pat"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "spaceId": {
+                                "$ref": "#/components/schemas/RpcMcpConnectionsListOutputSchema0"
+                              },
+                              "spaceName": {
+                                "type": "string"
+                              },
+                              "readOnly": {
+                                "type": "boolean"
+                              },
+                              "tokenPrefix": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "lastUsedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "label",
+                              "spaceId",
+                              "spaceName",
+                              "readOnly",
+                              "tokenPrefix",
+                              "createdAt",
+                              "lastUsedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "spaces": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "$ref": "#/components/schemas/RpcMcpConnectionsListOutputSchema0"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "current": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "current"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "mcpUrl": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "connections",
+                        "spaces",
+                        "mcpUrl"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/mcpConnections/revoke": {
+      "post": {
+        "operationId": "rpc_mcpConnections_revoke",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/mcpConnections/update": {
+      "post": {
+        "operationId": "rpc_mcpConnections_update",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "readOnly": {
+                        "type": "boolean"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcMcpConnectionsUpdateOutputSchema0"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "oauth",
+                            "pat"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "spaceId": {
+                          "$ref": "#/components/schemas/RpcMcpConnectionsUpdateOutputSchema0"
+                        },
+                        "spaceName": {
+                          "type": "string"
+                        },
+                        "readOnly": {
+                          "type": "boolean"
+                        },
+                        "tokenPrefix": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "lastUsedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "label",
+                        "spaceId",
+                        "spaceName",
+                        "readOnly",
+                        "tokenPrefix",
+                        "createdAt",
+                        "lastUsedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/me": {
       "post": {
         "operationId": "rpc_me",
@@ -129842,6 +130659,18 @@
       "RpcMcpServersUpdateInputSchema12": {
         "type": "string",
         "maxLength": 4096
+      },
+      "RpcMcpConnectionsCreateTokenOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcMcpConnectionsListOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcMcpConnectionsUpdateOutputSchema0": {
+        "type": "string",
+        "minLength": 1
       },
       "RpcMeOutputSchema0": {
         "type": "string",
