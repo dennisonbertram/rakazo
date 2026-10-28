@@ -204,6 +204,9 @@ import {
   FinanceAccountsOutputSchema,
   FinanceBurnOutputSchema,
   FinanceCategoryOutputSchema,
+  FinanceChartNoteAddInputSchema,
+  FinanceChartNoteSchema,
+  FinanceChartNotesInputSchema,
   FinanceConnectInputSchema,
   FinanceConnectOutputSchema,
   FinanceCryptoConnectInputSchema,
@@ -1886,6 +1889,9 @@ export const appContract = {
     runway: oc.output(FinanceRunwayOutputSchema),
     preferences: oc.output(FinancePreferencesSchema),
     setPreferences: oc.input(FinancePreferencesSchema).output(FinancePreferencesSchema),
+    chartNotes: oc.input(FinanceChartNotesInputSchema).output(z.array(FinanceChartNoteSchema)),
+    chartNoteAdd: oc.input(FinanceChartNoteAddInputSchema).output(FinanceChartNoteSchema),
+    chartNoteDelete: oc.input(z.object({ id: z.string().min(1).max(100) })).output(z.object({})),
     cryptoHistory: oc
       .input(FinanceCryptoHistoryInputSchema)
       .output(FinanceCryptoHistoryOutputSchema),
