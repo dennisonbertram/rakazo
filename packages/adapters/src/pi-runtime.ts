@@ -2402,8 +2402,29 @@ function retryAfterMs(error: unknown): number | undefined {
   return match[1] || match[3] ? value : value * 1000;
 }
 
+/** An explicit statement that the account is out of credits, balance, quota or a usage window. */
+const EXHAUSTION_SIGNAL =
+  /insufficient[ _](?:credits?|funds|balance|quota)|(?:out of|no (?:more|remaining)) (?:credits?|balance|quota)|credits? (?:have been |are |is )?(?:exhausted|depleted|used up)|(?:credit )?balance (?:is )?(?:too )?(?:low|empty|insufficient|exhausted|depleted)|(?:low|empty|insufficient|exhausted|depleted) (?:credit )?balance|(?:purchase|buy|add) more credits|(?:exceeded|exhausted|used up) your (?:current )?quota|quota (?:exceeded|exhausted)|(?:reached|hit) your (?:[a-z0-9()-]+ ){0,4}usage limit|usage limit (?:reached|exceeded)|out of budget/;
+
+/** Terminal wording that outranks an exhaustion phrase: invalid input, auth, cancellation or a short rate window. */
+const NOT_EXHAUSTION =
+  /not (?:yet )?(?:reached|hit)|unsupported parameter|invalid[ _](?:api[ _]key|parameter|param|input|argument|tool|schema|credential)|validation|must be|context[ _-](?:length|window)|too many tokens|model not found|bad request|unauthori[sz]ed|forbidden|access denied|permission (?:is )?(?:denied|refused|declined)|(?:expired|revoked|missing) (?:api )?(?:key|credential|token)|authentication (?:failed|failure|denied|expired|invalid)|abort|cancel|\bper[- ](?:second|minute)\b|\b(?:rpm|tpm)\b|concurrent/;
+
+/**
+ * Providers report an exhausted account as 400, 402 or 403. A 4xx counts only when the response
+ * says so explicitly and nothing marks it as an auth, permission or input failure. A 401 never
+ * counts, even when it wraps an exhaustion message.
+ */
+export function isAccountExhaustion(error: unknown): boolean {
+  const { text, statuses } = errorFacts(error);
+  if (statuses.has(401)) return false;
+  if (![400, 402, 403].some((status) => statuses.has(status))) return false;
+  return EXHAUSTION_SIGNAL.test(text) && !NOT_EXHAUSTION.test(text);
+}
+
 /** Only provider availability failures may advance the user's explicit chain. */
 export function isRetryableProviderUnavailable(error: unknown): boolean {
+  if (isAccountExhaustion(error)) return true;
   const { text, statuses } = errorFacts(error);
   if (
     [400, 401, 403].some((status) => statuses.has(status)) ||
@@ -2696,11 +2717,14 @@ function fallbackAwareModelStream(
               firstRetryableError ??= event;
               // A silent stream is retried once on the same model.
               const idle = event.error.errorMessage === MODEL_STREAM_IDLE_TIMEOUT_MESSAGE;
-              const backoff = idle
-                ? recoveredIdle
-                  ? undefined
-                  : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
-                : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
+              // An exhausted account stays exhausted; retrying the same model cannot help.
+              const backoff = isAccountExhaustion(event.error)
+                ? undefined
+                : idle
+                  ? recoveredIdle
+                    ? undefined
+                    : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
+                  : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
               if (idle && backoff !== undefined) {
                 recoveredIdle = true;
                 startedAt = Date.now();

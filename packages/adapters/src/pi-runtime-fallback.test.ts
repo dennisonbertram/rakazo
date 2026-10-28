@@ -1787,6 +1787,22 @@ describe("provider availability classification", () => {
       false,
     ],
     ["quota exhaustion", { status: 402, message: "provider quota exhausted" }, true],
+    [
+      "400 insufficient credits",
+      { status: 400, message: "You have insufficient credits to make this request." },
+      true,
+    ],
+    ["403 quota exceeded", { status: 403, message: "Quota exceeded for this account." }, true],
+    [
+      "400 invalid parameter mentioning credits",
+      { status: 400, message: "Invalid parameter: credits must be a positive integer." },
+      false,
+    ],
+    [
+      "401 wrapping an exhaustion message",
+      { status: 401, message: "You have insufficient credits to make this request." },
+      false,
+    ],
     ["plain status", new Error("503 provider unavailable"), true],
     ["SDK connection error", new Error("Connection error."), true],
     ["undici fetch failure", new Error("fetch failed ECONNRESET"), true],
