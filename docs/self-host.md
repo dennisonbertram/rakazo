@@ -215,7 +215,7 @@ WEB_ORIGIN=https://app.example.com
 API_URL=https://app.example.com
 ```
 
-Cookies and CORS follow those origins. To also serve the app from another browser origin (for example a Tailscale name), list it in `BETTER_AUTH_TRUSTED_ORIGINS` (comma-separated http(s) origins; invalid entries stop the API at startup). Passkeys stay bound to `WEB_ORIGIN`. `SIGNUPS_ENABLED` seeds whether registration is open
+Cookies and CORS follow those origins. To also serve the app from another browser origin (for example a Tailscale name), list it in `RAKAZO_TRUSTED_ORIGINS` (comma-separated http(s) origins; invalid entries stop the API at startup). Passkeys stay bound to `WEB_ORIGIN`. `SIGNUPS_ENABLED` seeds whether registration is open
 when the API starts for the first time and is not reapplied on restart. A non-empty
 `SIGNUP_ALLOWLIST` is applied on every API start, replacing the allowlist stored for the deployment.
 Leave it empty to keep that stored list.

@@ -7,17 +7,33 @@ const base = {
 };
 
 describe("loadEnv", () => {
-  it("parses BETTER_AUTH_TRUSTED_ORIGINS into http(s) origins and rejects anything else", () => {
+  it("lowercases a listed host", () => {
+    expect(
+      loadEnv({ ...base, RAKAZO_TRUSTED_ORIGINS: "https://App.Example.test/" }).trustedOrigins,
+    ).toEqual(["https://app.example.test"]);
+  });
+
+  it("parses RAKAZO_TRUSTED_ORIGINS into http(s) origins and rejects anything else", () => {
     expect(loadEnv(base).trustedOrigins).toEqual([]);
     expect(
       loadEnv({
         ...base,
-        BETTER_AUTH_TRUSTED_ORIGINS: " https://box.ts.net/ , http://192.168.1.5:5273 ,",
+        RAKAZO_TRUSTED_ORIGINS: " https://box.ts.net/ , http://192.168.1.5:5273 ,",
       }).trustedOrigins,
     ).toEqual(["https://box.ts.net", "http://192.168.1.5:5273"]);
-    for (const bad of ["not a url", "ftp://box.ts.net", "rakazo://", "*"])
-      expect(() => loadEnv({ ...base, BETTER_AUTH_TRUSTED_ORIGINS: bad }), bad).toThrow(
-        /BETTER_AUTH_TRUSTED_ORIGINS/,
+    for (const bad of [
+      "not a url",
+      "ftp://box.ts.net",
+      "rakazo://",
+      "*",
+      "https://*",
+      "https://*.example.test",
+      "https://app.example.test?evil.test",
+      "https://app.example.test/path",
+      "https://user@app.example.test",
+    ])
+      expect(() => loadEnv({ ...base, RAKAZO_TRUSTED_ORIGINS: bad }), bad).toThrow(
+        /RAKAZO_TRUSTED_ORIGINS/,
       );
   });
   it("keeps the ticket board off unless explicitly enabled", () => {

@@ -24,7 +24,7 @@ export interface AppEnv {
   authSecret: string;
   authUrl: string;
   webOrigin: string;
-  /** Extra browser origins trusted like `webOrigin` (BETTER_AUTH_TRUSTED_ORIGINS). */
+  /** Extra browser origins trusted like `webOrigin` (RAKAZO_TRUSTED_ORIGINS). */
   trustedOrigins: string[];
   privacyPolicyUrl?: string;
   apiUrl: string;
@@ -176,7 +176,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     authSecret,
     authUrl: source.BETTER_AUTH_URL ?? source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
     webOrigin: source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
-    trustedOrigins: parseTrustedOrigins(source.BETTER_AUTH_TRUSTED_ORIGINS),
+    trustedOrigins: parseTrustedOrigins(source.RAKAZO_TRUSTED_ORIGINS),
     privacyPolicyUrl: optional(source.PRIVACY_POLICY_URL),
     apiUrl: source.API_URL ?? "http://127.0.0.1:3100",
     apiHost: source.API_HOST ?? "127.0.0.1",
@@ -279,9 +279,16 @@ function parseTrustedOrigins(value: string | undefined): string[] {
     .map((entry) => {
       try {
         const url = new URL(entry);
-        if (url.protocol === "http:" || url.protocol === "https:") return url.origin;
+        // Exact origins only: no path, query, credentials or wildcard (Better Auth expands `*`).
+        const exact = entry.replace(/\/$/, "").toLowerCase() === url.origin;
+        if (
+          (url.protocol === "http:" || url.protocol === "https:") &&
+          exact &&
+          !entry.includes("*")
+        )
+          return url.origin;
       } catch {}
-      throw new Error(`BETTER_AUTH_TRUSTED_ORIGINS has an invalid origin: ${entry}`);
+      throw new Error(`RAKAZO_TRUSTED_ORIGINS has an invalid origin: ${entry}`);
     });
 }
 
