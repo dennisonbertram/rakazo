@@ -2592,6 +2592,7 @@ function fallbackAwareModelStream(
   const run = async () => {
     let buffered: AssistantMessageEvent[] = [];
     let retries = 0;
+    let recoveredIdle = false;
     let firstRetryableError: Extract<AssistantMessageEvent, { type: "error" }> | undefined;
     while (!signalAborted()) {
       const target = state.getActive();
@@ -2642,9 +2643,16 @@ function fallbackAwareModelStream(
                 break;
               }
               firstRetryableError ??= event;
-              const backoff = isProviderTimeout(event.error)
-                ? undefined
-                : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
+              // A silent stream is retried once on the same model; other timeouts are not.
+              const idle = event.error.errorMessage === MODEL_STREAM_IDLE_TIMEOUT_MESSAGE;
+              const backoff = idle
+                ? recoveredIdle
+                  ? undefined
+                  : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
+                : isProviderTimeout(event.error)
+                  ? undefined
+                  : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
+              if (idle) recoveredIdle = true;
               const requested = retryAfterMs(event.error);
               // A server asking for a longer wait than we allow is not worth retrying.
               const delay =
