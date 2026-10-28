@@ -62,12 +62,22 @@ function lineRange(min: number, max: number) {
     // A round step (1, 2 or 5 times a power of ten) keeps the three gridline labels evenly spaced; the middle one is the balance.
     const unit = 10 ** Math.floor(Math.log10(Math.max(min / 10, 100)));
     const step = [1, 2, 5, 10].map((m) => m * unit).find((s) => s >= min / 10) ?? 10 * unit;
-    return { step, floor: min - step, top: min + step };
+    // Round ticks around the balance, not the balance plus or minus a step, so labels read "$200k", "$250k".
+    const floor = Math.floor((min - step / 2) / step) * step;
+    return {
+      step,
+      floor,
+      top: Math.max(floor + 2 * step, Math.ceil((min + step / 2) / step) * step),
+    };
   }
   if (min > 0 && max - min < max / 2) {
     const { step } = niceScale(max - min);
     const floor = Math.floor(min / step) * step;
-    return { step, floor, top: Math.max(floor + step, Math.ceil(max / step) * step) };
+    return {
+      step,
+      floor,
+      top: Math.max(floor + step, Math.ceil(max / step) * step),
+    };
   }
   return niceRange(min, Math.max(max, 0));
 }
@@ -299,13 +309,19 @@ export function LineChart({
     <Chart height={height} label={label}>
       {(width) => {
         if (values.length === 0) return null;
-        const left = axes ? 46 : 4;
         const right = axes ? 10 : 4;
         const top = axes ? 10 : 4;
         const bottom = axes ? 30 : 4;
         const maxValue = Math.max(...values, 0);
         // A balance can dip below zero; the axis reaches down to it instead of clipping the line.
         const scale = lineRange(Math.min(...values), maxValue);
+        // The gutter fits the widest axis label (12 px text, about 7 px a character), whatever the amounts.
+        const left = axes
+          ? Math.max(
+              46,
+              Math.max(axisMoney(scale.top).length, axisMoney(scale.floor).length) * 7 + 10,
+            )
+          : 4;
         const hi = axes ? scale.top : maxValue;
         const lo = axes ? scale.floor : Math.min(...values);
         const x = (i: number) =>
@@ -582,10 +598,22 @@ export function BurnLines({
           ? [
               { key: "out", name: <Trans>Out</Trans>, cents: shown.outCents },
               ...(shown.revenueCents > 0
-                ? [{ key: "rev", name: <Trans>Revenue</Trans>, cents: shown.revenueCents }]
+                ? [
+                    {
+                      key: "rev",
+                      name: <Trans>Revenue</Trans>,
+                      cents: shown.revenueCents,
+                    },
+                  ]
                 : []),
               ...(shown.financingCents > 0
-                ? [{ key: "fin", name: <Trans>Financing</Trans>, cents: shown.financingCents }]
+                ? [
+                    {
+                      key: "fin",
+                      name: <Trans>Financing</Trans>,
+                      cents: shown.financingCents,
+                    },
+                  ]
                 : []),
             ]
           : [];
@@ -686,8 +714,16 @@ export function BurnLines({
             />
             {single
               ? [
-                  { key: "out", cents: series[0]?.outCents ?? 0, tone: "foreground" },
-                  { key: "rev", cents: series[0]?.revenueCents ?? 0, tone: "muted-foreground" },
+                  {
+                    key: "out",
+                    cents: series[0]?.outCents ?? 0,
+                    tone: "foreground",
+                  },
+                  {
+                    key: "rev",
+                    cents: series[0]?.revenueCents ?? 0,
+                    tone: "muted-foreground",
+                  },
                 ]
                   .filter((b) => b.cents > 0)
                   .map((b, j, all) => {
