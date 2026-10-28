@@ -2598,6 +2598,21 @@ model FinanceCryptoHolding {
   @@map("finance_crypto_holdings")
 }
 
+/// A token's USD price on one UTC day, for the Holdings sparkline. Prices are public, so this table
+/// has no space or user and is shared; the crypto sync writes it (the last price that day wins).
+model CryptoPriceDay {
+  chainId      Int
+  /// Lowercase contract address; "" for the chain's native coin.
+  tokenAddress String
+  /// UTC day, YYYY-MM-DD.
+  day          String
+  /// USD per whole token as a decimal string.
+  usdPrice     String
+
+  @@id([chainId, tokenAddress, day])
+  @@map("crypto_price_days")
+}
+
 /// Per user and space: what counts as cash for runway. "bank" (default) | "stablecoins" | "all".
 model FinancePreference {
   id           String   @id @default(cuid())
