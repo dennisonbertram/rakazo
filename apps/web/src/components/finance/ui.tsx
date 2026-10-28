@@ -374,7 +374,7 @@ export function DetailHead({
                     <Link
                       to={crumb.to}
                       state={crumbState(crumb)}
-                      className="hover:text-foreground hover:underline"
+                      className="rk-tap hover:text-foreground hover:underline"
                     >
                       {crumb.label}
                     </Link>
@@ -733,15 +733,15 @@ function TransactionRow({ row }: { row: FinanceTransaction }) {
       <TableCell className="hidden w-[4.5rem] whitespace-nowrap pe-2 text-muted-foreground @md:table-cell">
         {shortDay(txnDay(row))}
       </TableCell>
-      <TableCell className="min-w-0 break-words py-3 @md:py-2">
+      <TableCell className="min-w-0 break-words py-3 pointer-coarse:py-1 @md:py-2">
         <Link
           state={{ ...back, preview: row }}
           to={financePath.transaction(row.id)}
-          className="outline-none hover:underline focus-visible:underline"
+          className="rk-tap max-w-full outline-none hover:underline focus-visible:underline"
         >
           {row.counterparty}
         </Link>
-        {/* Narrow, the date and category sit under the name instead of taking columns from it. The whole row opens the transaction, so the link needs no 44 px box of its own. */}
+        {/* Narrow, the date and category sit under the name instead of taking columns from it. */}
         <div className="truncate text-xs text-muted-foreground @md:hidden">
           {shortDay(txnDay(row))} · {categoryLabel(row)}
         </div>
@@ -1109,7 +1109,7 @@ export function KvRow({ label, children }: { label: ReactNode; children: ReactNo
 /** A link inside a detail value, with a trailing chevron. */
 export function ValueLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <Link to={to} className="rk-tap hover:underline">
+    <Link to={to} className="rk-tap hover:underline pointer-coarse:-my-3">
       {children} <span aria-hidden="true">›</span>
     </Link>
   );

@@ -154,10 +154,10 @@ export function HoldingsTable({
               <TableHead className="hidden w-24 text-end @lg:table-cell" {...head("invested")}>
                 <Trans>Invested</Trans>
               </TableHead>
-              <TableHead className="w-24 pe-0 text-end" {...head("diluted")}>
+              <TableHead className="w-16 pe-0 text-end @lg:w-24" {...head("diluted")}>
                 <Trans>Fully diluted</Trans>
               </TableHead>
-              <TableHead className="w-10">
+              <TableHead className="w-11 @lg:w-10">
                 <span className="sr-only">
                   <Trans>Actions</Trans>
                 </span>
@@ -178,7 +178,7 @@ export function HoldingsTable({
                     {row.contact ? (
                       <button
                         type="button"
-                        className="block max-w-full truncate text-start font-medium underline-offset-2 hover:underline"
+                        className="line-clamp-2 max-w-full text-start font-medium break-words underline-offset-2 hover:underline"
                         title={row.name}
                         onClick={() => onOpenContact((row.contact as { id: string }).id)}
                       >
@@ -186,7 +186,7 @@ export function HoldingsTable({
                       </button>
                     ) : (
                       <span
-                        className={`block truncate font-medium ${row.pool ? "text-muted-foreground" : ""}`}
+                        className={`line-clamp-2 font-medium break-words ${row.pool ? "text-muted-foreground" : ""}`}
                         title={row.name}
                       >
                         {row.name}
@@ -212,10 +212,11 @@ export function HoldingsTable({
                   <TableCell className="hidden text-end tabular-nums @lg:table-cell">
                     {invested}
                   </TableCell>
-                  <TableCell className="pe-0 text-end tabular-nums">
+                  {/* The header is hidden on a phone, so the fixed table takes these widths from the row. */}
+                  <TableCell className="w-16 pe-0 text-end tabular-nums @lg:w-24">
                     {percentFigure(row.percent, 1)}
                   </TableCell>
-                  <TableCell className="pe-0 text-end">
+                  <TableCell className="w-11 pe-0 text-end @lg:w-10">
                     {row.pool ? null : (
                       <DropdownMenu>
                         <DropdownMenuTrigger

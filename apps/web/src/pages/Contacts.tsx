@@ -23,6 +23,7 @@ import { PickFilter, SearchField, SortControl } from "../components/ListControls
 import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
+import { emailBreaks } from "../lib/email-breaks";
 import { sortBy, useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import {
@@ -214,22 +215,22 @@ export function ContactsPage({
               </div>
             ) : (
               <div>
-                <Table compact className="table-fixed">
+                <Table compact className="@md:table-fixed">
                   <TableHeader className="max-sm:hidden">
                     <TableHeadRow>
                       <TableHead className="ps-2" {...sortHead("name")}>
                         <Trans>Name</Trans>
                       </TableHead>
-                      <TableHead className="hidden w-[34%] @md:table-cell" {...sortHead("email")}>
+                      <TableHead className="hidden w-[30%] @md:table-cell" {...sortHead("email")}>
                         <Trans>Email</Trans>
                       </TableHead>
                       <TableHead
-                        className="hidden w-[26%] @lg:table-cell"
+                        className="hidden w-[22%] @lg:table-cell"
                         {...sortHead("organization")}
                       >
                         <Trans>Organization</Trans>
                       </TableHead>
-                      <TableHead className="w-24 @md:w-28" {...sortHead("kind")}>
+                      <TableHead className="w-px whitespace-nowrap @md:w-28" {...sortHead("kind")}>
                         <Trans>Kind</Trans>
                       </TableHead>
                     </TableHeadRow>
@@ -248,20 +249,20 @@ export function ContactsPage({
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <ContactAvatar name={contact.name} src={contact.photoUrl} size="sm" />
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <button
                                 type="button"
                                 title={contact.name}
                                 data-row-open
-                                className="block max-w-full truncate rounded-sm text-start font-medium outline-none hover:underline"
+                                className="line-clamp-2 max-w-full rounded-sm text-start font-medium break-words outline-none hover:underline @md:block @md:truncate"
                               >
                                 {contact.name}
                               </button>
                               {/* Without room for the Email column, organization and email show here; the email is the identifier, so the organization gives way first. */}
-                              <div className="flex gap-1 text-xs text-muted-foreground @md:hidden">
+                              <div className="flex flex-wrap gap-x-1 text-xs text-muted-foreground @md:hidden">
                                 {contact.organization ? (
                                   <span
-                                    className="max-w-[40%] min-w-12 truncate"
+                                    className="max-w-full truncate"
                                     title={contact.organization}
                                   >
                                     {contact.organization}
@@ -271,8 +272,8 @@ export function ContactsPage({
                                   <span aria-hidden="true">·</span>
                                 ) : null}
                                 {contact.email ? (
-                                  <span className="min-w-0 truncate" title={contact.email}>
-                                    {contact.email}
+                                  <span className="min-w-0 break-words" title={contact.email}>
+                                    {emailBreaks(contact.email)}
                                   </span>
                                 ) : null}
                               </div>
