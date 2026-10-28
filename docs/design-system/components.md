@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 307 of 307
-- Web and shared components: 796
+- Web and shared component files with stories: 310 of 310
+- Web and shared components: 802
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -374,8 +374,10 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | NextDeadline, Title, Status, MoreButton, LegalContracts | [apps/web/src/pages/legal/LegalContracts.tsx](../../apps/web/src/pages/legal/LegalContracts.tsx) | [LegalContracts.stories.tsx](../../apps/web/src/pages/legal/LegalContracts.stories.tsx) | web |
 | LegalDeadlines | [apps/web/src/pages/legal/LegalDeadlines.tsx](../../apps/web/src/pages/legal/LegalDeadlines.tsx) | [LegalDeadlines.stories.tsx](../../apps/web/src/pages/legal/LegalDeadlines.stories.tsx) | web |
 | LocalSettingsPage | [apps/web/src/pages/LocalSettings.tsx](../../apps/web/src/pages/LocalSettings.tsx) | [LocalSettings.stories.tsx](../../apps/web/src/pages/LocalSettings.stories.tsx) | web |
+| McpConnectionsPanel | [apps/web/src/pages/McpConnectionsPanel.tsx](../../apps/web/src/pages/McpConnectionsPanel.tsx) | [McpConnectionsPanel.stories.tsx](../../apps/web/src/pages/McpConnectionsPanel.stories.tsx) | web |
 | McpConsent, McpConsentPage | [apps/web/src/pages/McpConsent.tsx](../../apps/web/src/pages/McpConsent.tsx) | [McpConsent.stories.tsx](../../apps/web/src/pages/McpConsent.stories.tsx) | web |
 | McpOAuthCallbackPage | [apps/web/src/pages/McpOAuthCallback.tsx](../../apps/web/src/pages/McpOAuthCallback.tsx) | [McpOAuthCallback.stories.tsx](../../apps/web/src/pages/McpOAuthCallback.stories.tsx) | web |
+| CopyBox, McpTokenReveal, McpTokenDialog | [apps/web/src/pages/McpTokenDialog.tsx](../../apps/web/src/pages/McpTokenDialog.tsx) | [McpTokenDialog.stories.tsx](../../apps/web/src/pages/McpTokenDialog.stories.tsx) | web |
 | SerenitySettingsForm | [apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx) | [SerenitySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.stories.tsx) | web |
 | SupermemorySettingsForm | [apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx) | [SupermemorySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.stories.tsx) | web |
 | ScopePicker, MemorySettingsOverlay | [apps/web/src/pages/MemorySettingsOverlay.tsx](../../apps/web/src/pages/MemorySettingsOverlay.tsx) | [MemorySettingsOverlay.stories.tsx](../../apps/web/src/pages/MemorySettingsOverlay.stories.tsx) | web |

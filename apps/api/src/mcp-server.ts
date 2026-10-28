@@ -4,6 +4,7 @@ import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { IsolationError, requireMembership, runAsSystem, runAsTenant } from "@rakazo/db";
 import type { Hono } from "hono";
+import { hashToken, PAT_PREFIX } from "./mcp-connections.js";
 
 /** The caller may not use MCP right now; the message is safe to show the client. */
 export class McpAccessError extends Error {
@@ -22,16 +23,53 @@ export interface McpTokenClaims {
   space_id?: unknown;
 }
 
+/** Calls are limited to one write of `lastUsedAt` per connection per minute. */
+const LAST_USED_INTERVAL_MS = 60_000;
+
+type Connection = NonNullable<Awaited<ReturnType<PrismaClient["mcpConnection"]["findFirst"]>>>;
+
 /**
- * Runs before every call. The token proves who signed in and what they approved; the
- * connection row decides whether that approval still stands, and membership decides whether
- * the person is still in the Space. Nothing here is cached, so revoking or leaving takes
- * effect on the next call.
+ * The checks every call passes, whatever the credential: membership decides whether the person
+ * is still in the Space, then the call is recorded as the tenant. The connection row was already
+ * found by the caller, so it is known not to be revoked. Nothing here is cached, so revoking or
+ * leaving takes effect on the next call.
  */
+async function admit(prisma: PrismaClient, connection: Connection, now = new Date()) {
+  let actor: Actor;
+  try {
+    actor = await requireMembership(prisma, connection.userId, connection.spaceId);
+  } catch (error) {
+    if (error instanceof IsolationError) {
+      throw new McpAccessError("No access to this space", 403);
+    }
+    throw error;
+  }
+  // Conditional, so several API processes write at most once a minute between them.
+  await runAsTenant(actor, () =>
+    prisma.mcpConnection.updateMany({
+      where: {
+        id: connection.id,
+        OR: [
+          { lastUsedAt: null },
+          { lastUsedAt: { lt: new Date(now.getTime() - LAST_USED_INTERVAL_MS) } },
+        ],
+      },
+      data: { lastUsedAt: now },
+    }),
+  );
+  return {
+    actor,
+    connectionId: connection.id,
+    scopes: connection.readOnly ? ["mcp:read"] : ["mcp:read", "mcp:write"],
+  };
+}
+
+/** An OAuth access token proves who signed in and what they approved; the connection row says if that still stands. */
 export async function resolveMcpCall(
   prisma: PrismaClient,
   claims: McpTokenClaims,
-): Promise<{ actor: Actor; connectionId: string }> {
+  now = new Date(),
+) {
   const { sub, azp, space_id: spaceId } = claims;
   if (typeof sub !== "string" || typeof azp !== "string" || typeof spaceId !== "string") {
     throw new McpAccessError("This token is not bound to a space", 401);
@@ -43,16 +81,18 @@ export async function resolveMcpCall(
     }),
   );
   if (!connection) throw new McpAccessError("This connection was revoked", 401);
-  let actor: Actor;
-  try {
-    actor = await requireMembership(prisma, connection.userId, connection.spaceId);
-  } catch (error) {
-    if (error instanceof IsolationError) {
-      throw new McpAccessError("No access to this space", 403);
-    }
-    throw error;
-  }
-  return { actor, connectionId: connection.id };
+  return admit(prisma, connection, now);
+}
+
+/** A personal access token is found by its hash and then passes the same checks. */
+export async function resolvePatCall(prisma: PrismaClient, token: string, now = new Date()) {
+  const connection = await runAsSystem("mcp token lookup", () =>
+    prisma.mcpConnection.findFirst({
+      where: { tokenHash: hashToken(token), kind: "pat", revokedAt: null },
+    }),
+  );
+  if (!connection) throw new McpAccessError("This token is not valid", 401);
+  return admit(prisma, connection, now);
 }
 
 /** The bots the member sees in this Space: id, name and a short description when there is one. */
@@ -107,34 +147,33 @@ const MCP_PATH = "/mcp";
 export function mountMcpServer(app: Hono, mount: McpMount) {
   const resource = `${mount.baseUrl}${MCP_PATH}`;
   const metadata = `${mount.baseUrl}/.well-known/oauth-protected-resource${MCP_PATH}`;
-  const post = requireMcpAuth(
+  const denied = (error: McpAccessError) =>
+    new Response(
+      JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: error.message }, id: null }),
+      {
+        status: error.status,
+        headers: {
+          "content-type": "application/json",
+          ...(error.status === 401
+            ? {
+                "www-authenticate": `Bearer error="invalid_token", resource_metadata="${metadata}"`,
+              }
+            : {}),
+        },
+      },
+    );
+  const answer = async (request: Request, resolve: () => ReturnType<typeof resolveMcpCall>) => {
+    try {
+      const { actor } = await resolve();
+      return await handleMcpRequest(mount.prisma, actor, request);
+    } catch (error) {
+      if (error instanceof McpAccessError) return denied(error);
+      throw error;
+    }
+  };
+  const oauth = requireMcpAuth(
     mount.auth,
-    async (request, claims) => {
-      try {
-        const { actor } = await resolveMcpCall(mount.prisma, claims);
-        return await handleMcpRequest(mount.prisma, actor, request);
-      } catch (error) {
-        if (!(error instanceof McpAccessError)) throw error;
-        return new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: { code: -32000, message: error.message },
-            id: null,
-          }),
-          {
-            status: error.status,
-            headers: {
-              "content-type": "application/json",
-              ...(error.status === 401
-                ? {
-                    "www-authenticate": `Bearer error="invalid_token", resource_metadata="${metadata}"`,
-                  }
-                : {}),
-            },
-          },
-        );
-      }
-    },
+    (request, claims) => answer(request, () => resolveMcpCall(mount.prisma, claims)),
     {
       resource,
       issuer: mount.baseUrl,
@@ -142,7 +181,13 @@ export function mountMcpServer(app: Hono, mount: McpMount) {
       requiredScopes: ["mcp:read"],
     },
   );
-  app.post(MCP_PATH, (c) => post(c.req.raw));
+  // A personal access token is a bearer token too; everything else is an OAuth access token.
+  app.post(MCP_PATH, (c) => {
+    const token = c.req.header("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
+    return token?.startsWith(PAT_PREFIX)
+      ? answer(c.req.raw, () => resolvePatCall(mount.prisma, token))
+      : oauth(c.req.raw);
+  });
   app.all(MCP_PATH, (c) => c.body(null, 405, { allow: "POST" }));
 }
 

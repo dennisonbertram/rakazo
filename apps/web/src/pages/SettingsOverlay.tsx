@@ -15,6 +15,7 @@ import {
   Cpu,
   CreditCard,
   Monitor,
+  Plug,
   Settings,
   ShieldCheck,
   XIcon,
@@ -31,6 +32,7 @@ import {
   UsageSettingsPanel,
 } from "./AccountSettingsOverlay";
 import { BillingSettingsPanel } from "./BillingSettingsPanel";
+import { McpConnectionsPanel } from "./McpConnectionsPanel";
 import { MemorySettingsOverlay } from "./MemorySettingsOverlay";
 import { ModelSettingsOverlay } from "./ModelSettingsOverlay";
 import { VoiceSettingsOverlay } from "./VoiceSettingsOverlay";
@@ -42,7 +44,8 @@ export type SettingsSection =
   | "memory"
   | "voice"
   | "computer"
-  | "billing";
+  | "billing"
+  | "connections";
 
 type NavItem = {
   id: SettingsSection;
@@ -170,6 +173,7 @@ export function SettingsOverlay({
     { id: "models", label: t`Models`, icon: Cpu },
     ...(showComputer ? [{ id: "computer" as const, label: t`Computer`, icon: Monitor }] : []),
     ...(billingEnabled ? [{ id: "billing" as const, label: t`Billing`, icon: CreditCard }] : []),
+    { id: "connections", label: t`Connections`, icon: Plug },
   ];
 
   const memoryItem: NavItem = { id: "memory", label: t`Memory`, icon: Brain };
@@ -355,6 +359,7 @@ export function SettingsOverlay({
                 />
               ) : null}
               {section === "billing" && billingEnabled ? <BillingSettingsPanel /> : null}
+              {section === "connections" ? <McpConnectionsPanel /> : null}
               {section === "models" || section === "voice" ? (
                 <>
                   {notice && section === "voice" ? (
