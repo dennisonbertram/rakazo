@@ -1109,6 +1109,8 @@ a page of the web app and chooses one Space, and the client then sees only that 
 connection is checked again on every call, so a member who leaves the Space, or a connection that
 is revoked, stops working on the next call. This first version has one tool, `agents_list`.
 
+A client that cannot sign in through OAuth can use a personal access token instead. In **Settings > Connections**, choose **Create token**, name it, pick one Space and leave **Read-only** on unless the client needs to write. The token is shown once. Send it as `Authorization: Bearer <token>`; the same dialog shows the full `claude mcp add` command. The Connections list also shows each OAuth client, with its Space and last use, and **Revoke** ends either kind on the next call.
+
 ### On localhost
 
 Nothing to set. Point a client at the API address, for example
