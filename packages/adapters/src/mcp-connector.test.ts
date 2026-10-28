@@ -846,6 +846,34 @@ describe("MCP connector session cache", () => {
       }
     });
 
+    it("warns when a stdio server cannot run on this deployment", async () => {
+      const connector = new McpConnector(
+        {
+          botMcpServer: {
+            findMany: vi.fn(async () => [
+              {
+                ...ASSIGNMENT,
+                server: { ...SERVER, transport: "stdio", endpoint: null, command: "npx" },
+              },
+            ]),
+          },
+        } as never,
+        {} as never,
+        { network: TEST_NETWORK, stdioEnabled: false },
+      );
+      const error = vi.spyOn(getLogger(), "error");
+      const warn = vi.spyOn(getLogger(), "warn");
+      try {
+        expect(await connector.discoverTools(context)).toEqual([]);
+        expect(error).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith("mcp discovery failed for server demo", {
+          reason: "Stdio MCP servers aren't available here",
+        });
+      } finally {
+        await connector.close();
+      }
+    });
+
     it("still reports an unexpected server failure as an error", async () => {
       vi.stubGlobal("fetch", mcpFetch({ failNext: true, initializations: 0 }));
       const connector = connectorWith();

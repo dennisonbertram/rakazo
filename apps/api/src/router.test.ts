@@ -1069,6 +1069,25 @@ describe("MCP loopback endpoints", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it("refuses a stdio server this deployment can't run", async () => {
+    const { create, handler } = mcpDeps();
+    const { response } = await handler.handle(
+      rpc("mcp/servers/create", {
+        transport: "stdio",
+        slug: "files",
+        name: "Files",
+        command: "npx",
+        args: [],
+        env: {},
+      }),
+      { prefix: "/rpc", context: { actor: actor(true) } },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response?.text()).toContain("Stdio MCP servers aren't available here");
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("refuses to start OAuth against a stored loopback endpoint for a non-owner", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);

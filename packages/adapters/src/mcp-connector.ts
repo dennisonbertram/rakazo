@@ -38,7 +38,7 @@ import {
 } from "./lazy-tool-catalog.js";
 import type { McpOAuthBroker, OAuthMaterial } from "./mcp-oauth.js";
 import { oauthMaterialSecrets } from "./mcp-oauth.js";
-import { McpSession } from "./mcp-transport.js";
+import { McpSession, mcpStdioRefusal } from "./mcp-transport.js";
 import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { secretRefMatches } from "./secret-changes.js";
@@ -911,7 +911,9 @@ export class McpConnector implements ConnectorProvider {
       const args = Array.isArray(server.args) ? server.args.map(String) : [];
       const env = { ...(material.env ?? {}) };
       if (server.transport === "stdio") {
-        if (!this.options.stdioEnabled) throw new Error("MCP stdio is disabled");
+        // Only a deployment change or an edit to the server fixes a refusal, so wait for one.
+        const refusal = mcpStdioRefusal(String(server.command ?? ""), this.options);
+        if (refusal) throw Object.assign(new Error(refusal), { expected: "reconnect" });
         await session.connectStdio({
           command: String(server.command ?? ""),
           args,

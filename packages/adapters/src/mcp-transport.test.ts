@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoredMcpOAuthProvider } from "./mcp-oauth.js";
 import {
   McpSession,
+  mcpStdioRefusal,
   secureFetch,
   validateUrl,
   withEndpointOriginFallback,
@@ -749,5 +750,30 @@ describe("MCP transport seam", () => {
       }),
     ).rejects.toThrow("fetch failed");
     expect(inner).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("stdio policy", () => {
+  it.each([
+    [{}, "npx", "Stdio MCP servers aren't available here"],
+    [{ stdioEnabled: true, allowedCommands: [] }, "npx", "Stdio MCP servers aren't available here"],
+    [
+      { stdioEnabled: false, allowedCommands: ["npx"] },
+      "npx",
+      "Stdio MCP servers aren't available here",
+    ],
+    [
+      { stdioEnabled: true, allowedCommands: ["uvx"] },
+      "npx",
+      "This stdio command isn't allowed here",
+    ],
+    [
+      { stdioEnabled: true, allowedCommands: ["npx"] },
+      " ",
+      "This stdio command isn't allowed here",
+    ],
+    [{ stdioEnabled: true, allowedCommands: ["npx"] }, "npx", undefined],
+  ])("refuses %o running %j with %j", (policy, command, expected) => {
+    expect(mcpStdioRefusal(command, policy)).toBe(expected);
   });
 });

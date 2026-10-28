@@ -21,6 +21,7 @@ import type {
   CodexLiveCatalog,
   ComputerExecutionLease,
   getBotSecretMetadata,
+  McpStdioPolicy,
 } from "@rakazo/adapters";
 import {
   acquireComputerExecutionLease,
@@ -82,6 +83,8 @@ import {
   listPiCatalog,
   listScratchpadItems,
   McpOAuthBroker,
+  mcpStdioAvailable,
+  mcpStdioRefusal,
   modelCredentialAuthKindsForSpace,
   modelCredentialDto,
   normalizeSecretDestination,
@@ -950,6 +953,19 @@ function connectionContext(
 /** Loopback / LAN / Docker-network endpoints: the deployment owner, or everyone under the flag. */
 function mayUsePrivateEndpoint(actor: Actor, deps: Pick<RouterDeps, "env">): boolean {
   return actor.isDeploymentOwner || deps.env.mcpAllowPrivateEndpoint === true;
+}
+
+function mcpStdioPolicy(deps: Pick<RouterDeps, "env">): McpStdioPolicy {
+  return {
+    stdioEnabled: deps.env.mcpStdioEnabled,
+    allowedCommands: deps.env.mcpStdioAllowedCommands,
+  };
+}
+
+/** Refuse a stdio server this deployment would never run. */
+function assertMcpStdioCommand(command: string, deps: Pick<RouterDeps, "env">): void {
+  const refusal = mcpStdioRefusal(command, mcpStdioPolicy(deps));
+  if (refusal) throw new ORPCError("BAD_REQUEST", { message: refusal });
 }
 
 async function assertMcpRemoteEndpoint(
@@ -5330,6 +5346,7 @@ export function createRouter(deps: RouterDeps) {
           );
         }),
         create: authed.mcp.servers.create.handler(async ({ context, input }) => {
+          if (input.transport === "stdio") assertMcpStdioCommand(input.command, deps);
           await assertMcpRemoteEndpoint(
             "endpoint" in input ? input.endpoint : null,
             context.actor,
@@ -5478,6 +5495,7 @@ export function createRouter(deps: RouterDeps) {
             if (!("config" in input) && existing.transport === "stdio") {
               throw new ORPCError("BAD_REQUEST", { message: "A remote MCP server is required" });
             }
+            if (config.transport === "stdio") assertMcpStdioCommand(config.command, deps);
             const nextEndpoint = "endpoint" in config ? config.endpoint : null;
             if (existing.endpoint !== nextEndpoint) {
               await assertMcpRemoteEndpoint(nextEndpoint, context.actor, deps);
@@ -9431,6 +9449,7 @@ async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
     computerHost: computerHostFor(setup.settings?.computerHost, deps.env.sandboxProvider),
     canChooseHostComputer: actor.isDeploymentOwner && deps.env.sandboxProvider === "docker",
     sandboxProvider: deps.env.sandboxProvider,
+    mcpStdioEnabled: mcpStdioAvailable(mcpStdioPolicy(deps)),
     avatarStyle: user.avatarStyle === "robot" ? "robot" : "organic",
     timezone: user.timezone ?? null,
     tourSeen: Boolean(user.tourSeenAt),

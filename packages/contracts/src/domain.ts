@@ -1761,6 +1761,8 @@ export const MeSchema = z.object({
   computerHost: z.enum(["docker", "this-mac"]).nullable(),
   canChooseHostComputer: z.boolean(),
   sandboxProvider: z.string(),
+  /** Whether this deployment runs stdio MCP servers. Absent from older servers. */
+  mcpStdioEnabled: z.boolean().optional(),
   avatarStyle: AvatarStyleSchema,
   /** IANA time zone last reported by one of the user's clients; null before the first report. */
   timezone: z.string().nullable(),
