@@ -251,6 +251,10 @@ describe("plainRunError", () => {
     outOfCredits: "CREDITS",
     rateLimited: "RATE",
   };
+  it("shows the cut-reply message as written", () => {
+    const cut = "The model hit its output limit before finishing its reply.";
+    expect(plainRunError(cut, copy)).toBe(cut);
+  });
   it("hides a provider 401 JSON body", () => {
     expect(plainRunError('401: {"message":"User not found.","code":401}', copy)).toBe("KEY");
   });

@@ -129750,7 +129750,7 @@
       },
       "RpcMcpServersCreateInputSchema7": {
         "type": "string",
-        "pattern": "^[A-Za-z0-9-]+$"
+        "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
       },
       "RpcMcpServersCreateInputSchema8": {
         "type": "string",
@@ -129825,7 +129825,7 @@
       },
       "RpcMcpServersUpdateInputSchema8": {
         "type": "string",
-        "pattern": "^[A-Za-z0-9-]+$"
+        "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
       },
       "RpcMcpServersUpdateInputSchema9": {
         "type": "string",
