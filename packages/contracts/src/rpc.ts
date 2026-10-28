@@ -326,6 +326,7 @@ import {
 import { McpOauthClientSchema } from "./mcp.js";
 import {
   CreateMcpTokenInput,
+  McpActivityCallSchema,
   McpConnectionListSchema,
   McpConnectionSchema,
   UpdateMcpConnectionInput,
@@ -498,6 +499,8 @@ export const appContract = {
       .output(z.object({ connection: McpConnectionSchema, token: z.string() })),
     update: oc.input(UpdateMcpConnectionInput).output(McpConnectionSchema),
     revoke: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    /** The last 20 calls of one connection, newest first. */
+    activity: oc.input(z.object({ id: Id })).output(z.array(McpActivityCallSchema)),
   },
   billing: {
     status: oc.output(BillingStatusSchema),
