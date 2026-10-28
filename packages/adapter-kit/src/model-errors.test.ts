@@ -206,3 +206,31 @@ describe("provider availability classification", () => {
     expect(isRetryableProviderUnavailable(error)).toBe(expected);
   });
 });
+
+describe("explicit account exhaustion", () => {
+  it.each([
+    [
+      "400 insufficient credits",
+      { status: 400, message: "You have insufficient credits to make this request." },
+    ],
+    ["403 quota exceeded", { status: 403, message: "Quota exceeded for this account." }],
+  ])("advances to a backup but is not retried on the same model: %s", (_label, error) => {
+    expect(isRetryableProviderUnavailable(error)).toBe(true);
+    expect(isTransientModelError(error)).toBe(false);
+  });
+
+  it.each([
+    { status: 400, message: "Invalid parameter: credits must be a positive integer." },
+    { status: 401, message: "You have insufficient credits to make this request." },
+  ])("does not advance on a non-exhaustion 4xx: %j", (error) => {
+    expect(isRetryableProviderUnavailable(error)).toBe(false);
+  });
+
+  it("retries OpenAI's server-side processing failure", () => {
+    expect(
+      isTransientModelError(
+        "Codex error: An error occurred while processing your request. You can retry your request.",
+      ),
+    ).toBe(true);
+  });
+});

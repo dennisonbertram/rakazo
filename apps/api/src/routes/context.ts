@@ -155,6 +155,8 @@ export interface RouterDeps {
     imageTag?: string;
     integrationsCatalogUrl?: string;
     mcpAllowPrivateEndpoint?: boolean;
+    /** Where outside AI clients reach this server's `/mcp`; shown with a new token. */
+    mcpUrl?: string;
     mcpStdioEnabled?: boolean;
     mcpStdioAllowedCommands?: readonly string[];
     mailWritesDisabled?: boolean;

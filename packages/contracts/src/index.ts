@@ -43,6 +43,7 @@ export * from "./legal-groups.js";
 export * from "./local-settings.js";
 export * from "./markdown-text.js";
 export * from "./mcp.js";
+export * from "./mcp-connections.js";
 export * from "./meetings.js";
 export * from "./messaging-setup.js";
 export * from "./model-backups.js";

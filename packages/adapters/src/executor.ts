@@ -1719,6 +1719,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
     },
 
     async continueRun(runId: string, workerId: string) {
+      // A stopping process must not claim work it cannot finish. The row stays queued or
+      // expired for a worker that is still running.
+      if (deps.shutdownSignal?.aborted) return;
       const run = await deps.prisma.run.findUnique({ where: { id: runId } });
       if (!run) return;
       if (isTerminal(run.status as RunStatus)) return;
@@ -9143,6 +9146,25 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         }
       } catch (setupError) {
+        if (deps.shutdownSignal?.aborted) {
+          // An abort while stopping is not a setup failure: requeue without spending the
+          // retry budget or leaving an error on the run.
+          await phases.requeued(
+            { kind: "retrying", name: "the worker restarted" },
+            "worker shutdown",
+            false,
+          );
+          const released = await writeComputerRunRequeue(
+            deps,
+            runId,
+            workerId,
+            fence,
+            resumeCheckpoint,
+            heldForTakeover,
+          ).catch(() => false);
+          if (released) await deps.jobs.enqueue(runContinueJob(runId)).catch(() => undefined);
+          return;
+        }
         const computerBusy = setupError instanceof ComputerBusyError;
         const retryForever = computerBusy || isTooManyDatabaseConnections(setupError);
         const streak = await phases.requeued(

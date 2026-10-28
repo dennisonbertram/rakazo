@@ -239,6 +239,9 @@ function fixture(
   });
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
   let calls: ToolCall[] = [];
+  let afterCalls: (() => void) | undefined;
+  let shutdownSignal: AbortSignal | undefined;
+  const enqueue = vi.fn(async () => undefined);
   let runtimeRequest: AgentRunRequest | undefined;
   const runtimeRun = vi.fn(async function* (request: AgentRunRequest) {
     runtimeRequest = request;
@@ -246,6 +249,7 @@ function fixture(
       const result = await request.executeTool!(call.name, call.args, call.executionId);
       results.push(result);
     }
+    afterCalls?.();
     yield { type: "done" as const, text: "Done" };
   });
   const executor = createRunExecutor({
@@ -266,7 +270,10 @@ function fixture(
     },
     memoryProviders: { resolve: async () => null },
     events: { append: vi.fn(async () => undefined), pauseRunForInput, finalizeRun },
-    jobs: { enqueue: vi.fn(async () => undefined) },
+    jobs: { enqueue },
+    get shutdownSignal() {
+      return shutdownSignal;
+    },
     artifacts: options.artifacts,
     secrets: [],
   } as unknown as Parameters<typeof createRunExecutor>[0]);
@@ -279,6 +286,17 @@ function fixture(
     connectorExecute,
     connectorDiscoverTools,
     externalEffect,
+    runRow: run,
+    enqueue,
+    finalizeRun,
+    setShutdown(next: AbortSignal | undefined, onToolsDone?: () => void) {
+      shutdownSignal = next;
+      afterCalls = onToolsDone;
+    },
+    async continueRaw() {
+      run.status = "queued";
+      await executor.continueRun(run.id, "worker-1");
+    },
     get runtimeRequest() {
       return runtimeRequest;
     },
@@ -597,6 +615,47 @@ describe("mutating tool effect idempotency keys", () => {
       }),
     );
     expect(f.results[1]).toEqual({ ok: true });
+  });
+
+  it("requeues a run that shutdown interrupts after a tool effect, and resumes without repeating it", async () => {
+    const f = fixture("run-shutdown");
+    const call = {
+      name: "remember",
+      args: { path: "MEMORY.md", content: "durable fact" },
+      executionId: "toolu_before",
+    };
+    f.setCalls([call]);
+    const shutdown = new AbortController();
+    f.setShutdown(shutdown.signal, () => shutdown.abort(new Error("Worker shutting down")));
+    await f.continueRaw();
+
+    expect(f.memoryCommit).toHaveBeenCalledOnce();
+    expect(f.effects).toHaveLength(1);
+    expect(f.effects[0]?.status).toBe("completed");
+    // Queued with no lease or error, a continue job exists, and nothing was failed.
+    expect(f.runRow).toMatchObject({ status: "queued", leaseOwner: null, error: null });
+    expect(f.enqueue).toHaveBeenCalledWith(expect.objectContaining({ name: "run.continue" }));
+    expect(f.finalizeRun).not.toHaveBeenCalled();
+
+    // Another worker resumes; the model repeats the call under a new provider id.
+    f.setShutdown(undefined);
+    f.setCalls([{ ...call, executionId: "toolu_after" }]);
+    await f.continueRaw();
+
+    expect(f.memoryCommit).toHaveBeenCalledOnce();
+    expect(f.effects).toHaveLength(1);
+    expect(f.results[1]).toEqual({ ok: true });
+    expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+  });
+
+  it("does not claim a run once shutdown has started", async () => {
+    const f = fixture("run-stopping");
+    const shutdown = new AbortController();
+    shutdown.abort();
+    f.setShutdown(shutdown.signal);
+    await f.continueRaw();
+    expect(f.runRow.status).toBe("queued");
+    expect(f.finalizeRun).not.toHaveBeenCalled();
   });
 
   it("replays the same logical effect when restart assigns a new tool-call id", async () => {
