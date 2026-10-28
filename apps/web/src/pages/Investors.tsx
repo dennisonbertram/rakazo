@@ -76,6 +76,7 @@ import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { StillLoading } from "../components/ShellSkeleton";
 import { hasConnectedCarta } from "../lib/carta-agent";
+import { emailBreaks } from "../lib/email-breaks";
 import { shareCount, shortDay, usdFigure } from "../lib/finance-format";
 import { useHideAmounts } from "../lib/hide-amounts-preference";
 import { FIRST_PARTY_MCP } from "../lib/integrations";
@@ -513,8 +514,8 @@ function ContactRow({
           ) : null}
           {contact.organization && contact.email ? <span aria-hidden="true">·</span> : null}
           {contact.email ? (
-            <span className="min-w-0 break-all" title={contact.email}>
-              {contact.email}
+            <span className="min-w-0 break-words" title={contact.email}>
+              {emailBreaks(contact.email)}
             </span>
           ) : null}
         </span>

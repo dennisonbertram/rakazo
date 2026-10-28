@@ -23,6 +23,7 @@ import { PickFilter, SearchField, SortControl } from "../components/ListControls
 import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
+import { emailBreaks } from "../lib/email-breaks";
 import { sortBy, useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import {
@@ -253,7 +254,7 @@ export function ContactsPage({
                                 type="button"
                                 title={contact.name}
                                 data-row-open
-                                className="line-clamp-2 max-w-full rounded-sm text-start font-medium break-words outline-none hover:underline"
+                                className="line-clamp-2 max-w-full rounded-sm text-start font-medium break-words outline-none hover:underline @md:block @md:truncate"
                               >
                                 {contact.name}
                               </button>
@@ -271,8 +272,8 @@ export function ContactsPage({
                                   <span aria-hidden="true">·</span>
                                 ) : null}
                                 {contact.email ? (
-                                  <span className="min-w-0 break-all" title={contact.email}>
-                                    {contact.email}
+                                  <span className="min-w-0 break-words" title={contact.email}>
+                                    {emailBreaks(contact.email)}
                                   </span>
                                 ) : null}
                               </div>

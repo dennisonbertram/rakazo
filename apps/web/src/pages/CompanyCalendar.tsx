@@ -127,16 +127,17 @@ export function CompanyCalendar({
         >
           <Trans>Agenda</Trans>
         </Button>
-        <div className="flex items-center gap-2 text-sm pointer-coarse:min-h-11">
+        <label
+          htmlFor={anniversariesId}
+          className="flex items-center gap-2 text-sm pointer-coarse:min-h-11"
+        >
           <Checkbox
             id={anniversariesId}
             checked={anniversaries}
             onCheckedChange={(checked) => setAnniversaries(checked === true)}
           />
-          <label htmlFor={anniversariesId}>
-            <Trans>Anniversaries</Trans>
-          </label>
-        </div>
+          <Trans>Anniversaries</Trans>
+        </label>
       </div>
       <fieldset className="flex flex-wrap gap-1 border-0 p-0">
         <legend className="sr-only">
