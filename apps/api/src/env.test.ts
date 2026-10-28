@@ -7,6 +7,19 @@ const base = {
 };
 
 describe("loadEnv", () => {
+  it("parses BETTER_AUTH_TRUSTED_ORIGINS into http(s) origins and rejects anything else", () => {
+    expect(loadEnv(base).trustedOrigins).toEqual([]);
+    expect(
+      loadEnv({
+        ...base,
+        BETTER_AUTH_TRUSTED_ORIGINS: " https://box.ts.net/ , http://192.168.1.5:5273 ,",
+      }).trustedOrigins,
+    ).toEqual(["https://box.ts.net", "http://192.168.1.5:5273"]);
+    for (const bad of ["not a url", "ftp://box.ts.net", "rakazo://", "*"])
+      expect(() => loadEnv({ ...base, BETTER_AUTH_TRUSTED_ORIGINS: bad }), bad).toThrow(
+        /BETTER_AUTH_TRUSTED_ORIGINS/,
+      );
+  });
   it("keeps the ticket board off unless explicitly enabled", () => {
     expect(loadEnv(base).ticketBoardEnabled).toBe(false);
     for (const value of ["false", "1", ""])
