@@ -98668,6 +98668,12 @@
                                   "cancelled"
                                 ]
                               },
+                              "error": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "$ref": "#/components/schemas/RpcRoutinesHistoryOutputSchema1"
                               },
@@ -98722,6 +98728,7 @@
                               "botId",
                               "groupId",
                               "status",
+                              "error",
                               "createdAt",
                               "startedAt",
                               "completedAt",
@@ -130491,7 +130498,9 @@
         }
       },
       "RpcRoutinesCreateInputSchema5": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
       },
       "RpcRoutinesCreateInputSchema6": {
         "default": true,
@@ -130763,7 +130772,9 @@
         }
       },
       "RpcRoutinesUpdateInputSchema5": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
       },
       "RpcRoutinesUpdateInputSchema6": {
         "type": "boolean"

@@ -388,11 +388,15 @@ export class MessagingSendError extends Error {
   override readonly name = "MessagingSendError";
   readonly permanent: boolean;
   readonly retryAfterMs: number | null;
+  /** The iMessage adapters mark a send that may have gone out; callers still read it here. */
+  readonly retryable?: boolean;
 
   constructor(cause: unknown, options: { permanent: boolean; retryAfterMs: number | null }) {
     super(cause instanceof Error ? cause.message : String(cause), { cause });
     this.permanent = options.permanent;
     this.retryAfterMs = options.retryAfterMs;
+    const retryable = (cause as { retryable?: unknown } | null)?.retryable;
+    if (typeof retryable === "boolean") this.retryable = retryable;
   }
 }
 
