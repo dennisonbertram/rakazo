@@ -292,6 +292,11 @@ msgstr ""
 msgid "{0} has not answered"
 msgstr ""
 
+#. placeholder {0}: hideUndo.name
+#: src/pages/Shell.tsx
+msgid "{0} hidden"
+msgstr ""
+
 #. placeholder {0}: source.itemCount
 #: src/pages/CompanyImport.tsx
 msgid "{0} items"
@@ -945,6 +950,7 @@ msgid "Actions for {0} SAFE"
 msgstr ""
 
 #: src/components/finance/ExchangeGroup.tsx
+#: src/components/PageAgentsRow.tsx
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Actions for {name}"
@@ -1109,6 +1115,10 @@ msgstr "Agregar servidor MCP"
 
 #: src/components/AutoFileEmailSetting.tsx
 msgid "Add new email attachments automatically"
+msgstr ""
+
+#: src/components/finance/charts.tsx
+msgid "Add note"
 msgstr ""
 
 #: src/components/AddSidebarPage.tsx
@@ -1629,12 +1639,21 @@ msgstr ""
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Inbox.tsx
+#: src/pages/shell/dialogs.tsx
 msgid "Archive"
 msgstr "Archivar"
 
 #. placeholder {0}: counts.archive
 #: src/components/inbox/CleanupActionBar.tsx
 msgid "Archive {0}"
+msgstr ""
+
+#: src/pages/shell/dialogs.tsx
+msgid "Archive {count} email chats?"
+msgstr ""
+
+#: src/pages/shell/space-sidebar.tsx
+msgid "Archive all email chats"
 msgstr ""
 
 #: src/components/inbox/CleanupHistory.tsx
@@ -3485,6 +3504,10 @@ msgstr ""
 msgid "Could not approve this server"
 msgstr "No se pudo aprobar este servidor"
 
+#: src/pages/Shell.tsx
+msgid "Could not archive {failed} email chats"
+msgstr ""
+
 #: src/pages/shell/message-cards.tsx
 msgid "Could not authorize this app"
 msgstr "No se pudo autorizar esta app"
@@ -4685,6 +4708,11 @@ msgstr ""
 msgid "Delete memories too"
 msgstr "Eliminar también las memorias"
 
+#. placeholder {0}: clip(n.text, 24)
+#: src/components/finance/charts.tsx
+msgid "Delete note: {0}"
+msgstr ""
+
 #: src/pages/Fundraising.tsx
 msgid "Delete SAFE?"
 msgstr ""
@@ -5590,6 +5618,10 @@ msgid "Failed to create bot"
 msgstr ""
 
 #: src/pages/Shell.tsx
+msgid "Failed to hide bot"
+msgstr ""
+
+#: src/pages/Shell.tsx
 msgid "Failed to send message"
 msgstr "No se pudo enviar el mensaje"
 
@@ -6110,6 +6142,10 @@ msgstr ""
 msgid "Hi, this is how I'll sound when I read replies out loud."
 msgstr "Hola, así sonaré cuando lea las respuestas en voz alta."
 
+#: src/components/HiddenBotsList.tsx
+msgid "Hidden bots"
+msgstr ""
+
 #: src/components/data-room/PathBar.tsx
 msgid "Hidden folders"
 msgstr ""
@@ -6128,6 +6164,10 @@ msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Hide done"
+msgstr ""
+
+#: src/pages/BotContextMenu.tsx
+msgid "Hide from sidebar"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -7092,6 +7132,10 @@ msgstr ""
 msgid "Mark {name} done"
 msgstr ""
 
+#: src/pages/shell/space-sidebar.tsx
+msgid "Mark all read"
+msgstr ""
+
 #: src/pages/BotContextMenu.tsx
 msgid "Mark as read"
 msgstr ""
@@ -7805,6 +7849,11 @@ msgstr ""
 msgid "New open-work item"
 msgstr "Nuevo elemento de trabajo abierto"
 
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
+msgid "New page"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Auth.tsx
 msgid "New password"
@@ -8407,7 +8456,12 @@ msgstr ""
 msgid "Not waiting for approval"
 msgstr ""
 
+#: src/components/finance/charts.tsx
+msgid "Note"
+msgstr ""
+
 #: src/components/ContactDialog.tsx
+#: src/components/finance/charts.tsx
 #: src/pages/ContactDetail.tsx
 msgid "Notes"
 msgstr ""
@@ -10498,6 +10552,7 @@ msgstr ""
 
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/ItemDialogs.tsx
+#: src/components/finance/charts.tsx
 #: src/components/finance/RenameAccountDialog.tsx
 #: src/components/finance/WalletDialog.tsx
 #: src/components/fundraising/RoundCard.tsx
@@ -11185,6 +11240,10 @@ msgstr ""
 msgid "Shell"
 msgstr "Shell"
 
+#: src/components/HiddenBotsList.tsx
+msgid "Show"
+msgstr ""
+
 #: src/components/investors/ActionItems.tsx
 msgid "Show {count} action items"
 msgstr ""
@@ -11265,6 +11324,10 @@ msgstr ""
 #: src/components/call/VoiceChatCard.tsx
 msgid "Show transcript"
 msgstr "Mostrar la transcripción"
+
+#: src/pages/shell/space-sidebar.tsx
+msgid "Show unused page agents"
+msgstr ""
 
 #: src/components/legal/LegalGraph.tsx
 msgid "Showing the {shown} most connected of {total} items."
@@ -12087,6 +12150,18 @@ msgstr ""
 msgid "The agent will be able to move money and change your {service} accounts. It asks before each change."
 msgstr ""
 
+#: src/lib/user-error.ts
+msgid "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models."
+msgstr ""
+
+#: src/lib/user-error.ts
+msgid "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models."
+msgstr ""
+
+#: src/lib/user-error.ts
+msgid "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "The AI your bots think with. They already have one, so change this only to use another AI company or your own key."
 msgstr ""
@@ -12175,6 +12250,10 @@ msgstr ""
 
 #: src/lib/user-error.ts
 msgid "The model provider did not accept your API key. Check it in Settings > Models."
+msgstr ""
+
+#: src/lib/user-error.ts
+msgid "The model provider is rate limiting requests. Try again in a few minutes."
 msgstr ""
 
 #: src/components/ComposeEmail.tsx

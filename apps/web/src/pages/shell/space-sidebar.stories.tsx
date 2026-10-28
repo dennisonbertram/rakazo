@@ -141,6 +141,7 @@ export function SidebarFixture({
   crowded = false,
   singlePageAgent = false,
   emailChats = false,
+  customPage = false,
   activePageAgent = false,
   activeEmailChat = false,
   activityMode = false,
@@ -162,6 +163,8 @@ export function SidebarFixture({
   crowded?: boolean;
   singlePageAgent?: boolean;
   emailChats?: boolean;
+  /** An idle page agent the person made with New page. */
+  customPage?: boolean;
   activePageAgent?: boolean;
   activeEmailChat?: boolean;
   activityMode?: boolean;
@@ -199,7 +202,10 @@ export function SidebarFixture({
           crowded ? { ...bot, preview: "Ready" } : bot,
         )
       : []),
-    ...(emailChats ? emailChatBots : []),
+    ...(emailChats ? [...emailChatBots, makeBot({ id: "bot_plain", name: "Plain chat" })] : []),
+    ...(customPage
+      ? [makeBot({ id: "bot_custom_page", name: "New page", spawnKey: "custom-page:demo" })]
+      : []),
   ];
   const [, setDeleteTarget] = useState<ReturnType<typeof makeBot> | null>(null);
   const [, setDeleteGroupTarget] = useState<typeof operationsGroup | null>(null);
@@ -237,6 +243,9 @@ export function SidebarFixture({
     bots: fixtureBots,
     initialBotsLoaded: true,
     createBot: async () => undefined,
+    createPage: async () => undefined,
+    markBotsRead: async () => undefined,
+    askArchiveBots: () => undefined,
     navigate,
     setPanel: () => undefined,
     setNewSpaceOpen,

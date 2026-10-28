@@ -292,6 +292,11 @@ msgstr "{0} handling"
 msgid "{0} has not answered"
 msgstr "{0} has not answered"
 
+#. placeholder {0}: hideUndo.name
+#: src/pages/Shell.tsx
+msgid "{0} hidden"
+msgstr "{0} hidden"
+
 #. placeholder {0}: source.itemCount
 #: src/pages/CompanyImport.tsx
 msgid "{0} items"
@@ -945,6 +950,7 @@ msgid "Actions for {0} SAFE"
 msgstr "Actions for {0} SAFE"
 
 #: src/components/finance/ExchangeGroup.tsx
+#: src/components/PageAgentsRow.tsx
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Actions for {name}"
@@ -1110,6 +1116,10 @@ msgstr "Add MCP server"
 #: src/components/AutoFileEmailSetting.tsx
 msgid "Add new email attachments automatically"
 msgstr "Add new email attachments automatically"
+
+#: src/components/finance/charts.tsx
+msgid "Add note"
+msgstr "Add note"
 
 #: src/components/AddSidebarPage.tsx
 msgid "Add page"
@@ -1629,6 +1639,7 @@ msgstr "apps, connections"
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Inbox.tsx
+#: src/pages/shell/dialogs.tsx
 msgid "Archive"
 msgstr "Archive"
 
@@ -1636,6 +1647,14 @@ msgstr "Archive"
 #: src/components/inbox/CleanupActionBar.tsx
 msgid "Archive {0}"
 msgstr "Archive {0}"
+
+#: src/pages/shell/dialogs.tsx
+msgid "Archive {count} email chats?"
+msgstr "Archive {count} email chats?"
+
+#: src/pages/shell/space-sidebar.tsx
+msgid "Archive all email chats"
+msgstr "Archive all email chats"
 
 #: src/components/inbox/CleanupHistory.tsx
 msgid "Archive future mail"
@@ -3485,6 +3504,10 @@ msgstr "Could not approve skill"
 msgid "Could not approve this server"
 msgstr "Could not approve this server"
 
+#: src/pages/Shell.tsx
+msgid "Could not archive {failed} email chats"
+msgstr "Could not archive {failed} email chats"
+
 #: src/pages/shell/message-cards.tsx
 msgid "Could not authorize this app"
 msgstr "Could not authorize this app"
@@ -4685,6 +4708,11 @@ msgstr "Delete holder"
 msgid "Delete memories too"
 msgstr "Delete memories too"
 
+#. placeholder {0}: clip(n.text, 24)
+#: src/components/finance/charts.tsx
+msgid "Delete note: {0}"
+msgstr "Delete note: {0}"
+
 #: src/pages/Fundraising.tsx
 msgid "Delete SAFE?"
 msgstr "Delete SAFE?"
@@ -5590,6 +5618,10 @@ msgid "Failed to create bot"
 msgstr "Failed to create bot"
 
 #: src/pages/Shell.tsx
+msgid "Failed to hide bot"
+msgstr "Failed to hide bot"
+
+#: src/pages/Shell.tsx
 msgid "Failed to send message"
 msgstr "Failed to send message"
 
@@ -6110,6 +6142,10 @@ msgstr "Help me with \"{title}\", due {due}."
 msgid "Hi, this is how I'll sound when I read replies out loud."
 msgstr "Hi, this is how I'll sound when I read replies out loud."
 
+#: src/components/HiddenBotsList.tsx
+msgid "Hidden bots"
+msgstr "Hidden bots"
+
 #: src/components/data-room/PathBar.tsx
 msgid "Hidden folders"
 msgstr "Hidden folders"
@@ -6129,6 +6165,10 @@ msgstr "Hide amounts"
 #: src/pages/Investors.tsx
 msgid "Hide done"
 msgstr "Hide done"
+
+#: src/pages/BotContextMenu.tsx
+msgid "Hide from sidebar"
+msgstr "Hide from sidebar"
 
 #: src/pages/Auth.tsx
 msgid "Hide password"
@@ -7092,6 +7132,10 @@ msgstr "Manual setup required"
 msgid "Mark {name} done"
 msgstr "Mark {name} done"
 
+#: src/pages/shell/space-sidebar.tsx
+msgid "Mark all read"
+msgstr "Mark all read"
+
 #: src/pages/BotContextMenu.tsx
 msgid "Mark as read"
 msgstr "Mark as read"
@@ -7805,6 +7849,11 @@ msgstr "New message"
 msgid "New open-work item"
 msgstr "New open-work item"
 
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
+msgid "New page"
+msgstr "New page"
+
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Auth.tsx
 msgid "New password"
@@ -8407,7 +8456,12 @@ msgstr "Not used yet"
 msgid "Not waiting for approval"
 msgstr "Not waiting for approval"
 
+#: src/components/finance/charts.tsx
+msgid "Note"
+msgstr "Note"
+
 #: src/components/ContactDialog.tsx
+#: src/components/finance/charts.tsx
 #: src/pages/ContactDetail.tsx
 msgid "Notes"
 msgstr "Notes"
@@ -10498,6 +10552,7 @@ msgstr "Sandbox"
 
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/ItemDialogs.tsx
+#: src/components/finance/charts.tsx
 #: src/components/finance/RenameAccountDialog.tsx
 #: src/components/finance/WalletDialog.tsx
 #: src/components/fundraising/RoundCard.tsx
@@ -11185,6 +11240,10 @@ msgstr "Sheets"
 msgid "Shell"
 msgstr "Shell"
 
+#: src/components/HiddenBotsList.tsx
+msgid "Show"
+msgstr "Show"
+
 #: src/components/investors/ActionItems.tsx
 msgid "Show {count} action items"
 msgstr "Show {count} action items"
@@ -11265,6 +11324,10 @@ msgstr "Show tool activity"
 #: src/components/call/VoiceChatCard.tsx
 msgid "Show transcript"
 msgstr "Show transcript"
+
+#: src/pages/shell/space-sidebar.tsx
+msgid "Show unused page agents"
+msgstr "Show unused page agents"
 
 #: src/components/legal/LegalGraph.tsx
 msgid "Showing the {shown} most connected of {total} items."
@@ -12087,6 +12150,18 @@ msgstr "The agent will be able to change your {service} data. It asks before eac
 msgid "The agent will be able to move money and change your {service} accounts. It asks before each change."
 msgstr "The agent will be able to move money and change your {service} accounts. It asks before each change."
 
+#: src/lib/user-error.ts
+msgid "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models."
+msgstr "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models."
+
+#: src/lib/user-error.ts
+msgid "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models."
+msgstr "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models."
+
+#: src/lib/user-error.ts
+msgid "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models."
+msgstr "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models."
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "The AI your bots think with. They already have one, so change this only to use another AI company or your own key."
 msgstr "The AI your bots think with. They already have one, so change this only to use another AI company or your own key."
@@ -12176,6 +12251,10 @@ msgstr "The model provider did not accept your API key."
 #: src/lib/user-error.ts
 msgid "The model provider did not accept your API key. Check it in Settings > Models."
 msgstr "The model provider did not accept your API key. Check it in Settings > Models."
+
+#: src/lib/user-error.ts
+msgid "The model provider is rate limiting requests. Try again in a few minutes."
+msgstr "The model provider is rate limiting requests. Try again in a few minutes."
 
 #: src/components/ComposeEmail.tsx
 msgid "The original message didn't load."
