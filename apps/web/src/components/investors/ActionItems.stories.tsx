@@ -30,6 +30,12 @@ export const UpdateDraft: Story = {
   args: { drafts: [draft("u1", "Example Co · 2026-09 update", "2026-10-01T09:00:00.000Z")] },
 };
 
+/** Phone: one line with a count until opened. */
+export const CollapsedOnPhone: Story = {
+  args: { drafts: [draft("u1", "Example Co · 2026-09 update", "2026-10-01T09:00:00.000Z")] },
+  globals: { viewport: { value: "mobile1" } },
+};
+
 export const SeveralDrafts: Story = {
   args: {
     drafts: [

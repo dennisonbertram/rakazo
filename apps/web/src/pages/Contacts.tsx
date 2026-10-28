@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import type { Contact, ContactKind } from "@rakazo/contracts";
 import { ContactKindSchema } from "@rakazo/contracts";
 import {
+  Badge,
   Button,
   ContactAvatar,
   Table,
@@ -74,7 +75,11 @@ export function ContactsPage({
   }, []);
   useEffect(load, [load]);
   const container = useRef<HTMLDivElement>(null);
-  const { savedId, setSavedId, setFocusId, deleted } = useContactNotices(load, container, contacts);
+  const { notify, savedId, setSavedId, setFocusId, deleted } = useContactNotices(
+    load,
+    container,
+    contacts,
+  );
   // An Undo clicked here for a contact deleted on its page restores it from that page's hook.
   useEffect(() => {
     const onRestored = (event: Event) => {
@@ -207,7 +212,7 @@ export function ContactsPage({
                       >
                         <Trans>Organization</Trans>
                       </TableHead>
-                      <TableHead className="w-28" {...sortHead("kind")}>
+                      <TableHead className="w-24 @md:w-28" {...sortHead("kind")}>
                         <Trans>Kind</Trans>
                       </TableHead>
                     </TableHeadRow>
@@ -235,12 +240,24 @@ export function ContactsPage({
                               >
                                 {contact.name}
                               </button>
-                              {/* Without room for the Email column, the organization (else the email) shows here. */}
-                              <div
-                                className="truncate text-xs text-muted-foreground @md:hidden"
-                                title={contact.organization ?? contact.email ?? undefined}
-                              >
-                                {contact.organization ?? contact.email}
+                              {/* Without room for the Email column, organization and email show here; the email is the identifier, so the organization gives way first. */}
+                              <div className="flex gap-1 text-xs text-muted-foreground @md:hidden">
+                                {contact.organization ? (
+                                  <span
+                                    className="max-w-[40%] min-w-12 truncate"
+                                    title={contact.organization}
+                                  >
+                                    {contact.organization}
+                                  </span>
+                                ) : null}
+                                {contact.organization && contact.email ? (
+                                  <span aria-hidden="true">·</span>
+                                ) : null}
+                                {contact.email ? (
+                                  <span className="min-w-0 truncate" title={contact.email}>
+                                    {contact.email}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -257,7 +274,9 @@ export function ContactsPage({
                         >
                           {contact.organization}
                         </TableCell>
-                        <TableCell>{names[contact.kind]}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{names[contact.kind]}</Badge>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -286,6 +305,11 @@ export function ContactsPage({
             onClose={() => setEditing(null)}
             onSaved={(saved) => {
               load();
+              if (editing === "new") {
+                // A search or kind filter would hide the new contact.
+                list.clear("q", "kind");
+                notify(t`Added ${saved.name}`);
+              }
               setSavedId(saved.id);
             }}
             onDeleted={deleted}
