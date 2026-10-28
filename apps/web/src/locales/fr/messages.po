@@ -9302,6 +9302,22 @@ msgstr ""
 msgid "Previously rejected name"
 msgstr ""
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Price"
+msgstr ""
+
+#: src/components/finance/Sparkline.tsx
+msgid "Price down"
+msgstr ""
+
+#: src/components/finance/Sparkline.tsx
+msgid "Price flat"
+msgstr ""
+
+#: src/components/finance/Sparkline.tsx
+msgid "Price up"
+msgstr ""
+
 #: src/pages/Inbox.tsx
 msgid "Primary"
 msgstr ""
@@ -12597,6 +12613,10 @@ msgstr ""
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Treat like a person"
 msgstr "Traiter comme une personne"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Trend"
+msgstr ""
 
 #: src/pages/BillingSettingsPanel.tsx
 msgid "Trial"

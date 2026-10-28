@@ -25,9 +25,10 @@ import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { LineChart } from "../../components/finance/charts";
 import { ExchangeGroup } from "../../components/finance/ExchangeGroup";
+import { Sparkline } from "../../components/finance/Sparkline";
 import { DetailPage, Kpi, Section, useFinanceQuery } from "../../components/finance/ui";
 import { useTypeNames, WalletDialog, walletName } from "../../components/finance/WalletDialog";
-import { chainName, shortAddress, tokenAmount } from "../../lib/crypto-format";
+import { chainName, shortAddress, tokenAmount, tokenPrice } from "../../lib/crypto-format";
 import { dayMonth, money } from "../../lib/finance-format";
 import { financePath } from "../../lib/finance-route";
 import { useHideAmounts } from "../../lib/hide-amounts-preference";
@@ -268,6 +269,14 @@ export function FinanceCryptoPage() {
                       <Trans>Balance</Trans>
                     </TableHead>
                     <TableHead className="text-end">
+                      <Trans>Price</Trans>
+                    </TableHead>
+                    <TableHead className="max-sm:hidden">
+                      <span className="sr-only">
+                        <Trans>Trend</Trans>
+                      </span>
+                    </TableHead>
+                    <TableHead className="text-end">
                       <Trans>Value</Trans>
                     </TableHead>
                   </TableHeadRow>
@@ -286,6 +295,12 @@ export function FinanceCryptoPage() {
                       </TableCell>
                       <TableCell className="text-end tabular-nums">
                         {tokenAmount(h.rawBalance, h.decimals)}
+                      </TableCell>
+                      <TableCell className="text-end tabular-nums">
+                        {h.usdPrice === null ? "—" : tokenPrice(h.usdPrice)}
+                      </TableCell>
+                      <TableCell className="max-sm:hidden">
+                        <Sparkline values={h.priceHistory ?? []} />
                       </TableCell>
                       <TableCell className="text-end tabular-nums">
                         {h.usdValueCents === null ? "—" : money(h.usdValueCents)}

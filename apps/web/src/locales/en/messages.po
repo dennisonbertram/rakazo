@@ -9302,6 +9302,22 @@ msgstr "Previous week"
 msgid "Previously rejected name"
 msgstr "Previously rejected name"
 
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Price"
+msgstr "Price"
+
+#: src/components/finance/Sparkline.tsx
+msgid "Price down"
+msgstr "Price down"
+
+#: src/components/finance/Sparkline.tsx
+msgid "Price flat"
+msgstr "Price flat"
+
+#: src/components/finance/Sparkline.tsx
+msgid "Price up"
+msgstr "Price up"
+
 #: src/pages/Inbox.tsx
 msgid "Primary"
 msgstr "Primary"
@@ -12597,6 +12613,10 @@ msgstr "Treasury yield"
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Treat like a person"
 msgstr "Treat like a person"
+
+#: src/pages/finance/FinanceCrypto.tsx
+msgid "Trend"
+msgstr "Trend"
 
 #: src/pages/BillingSettingsPanel.tsx
 msgid "Trial"

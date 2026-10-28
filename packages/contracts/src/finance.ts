@@ -168,6 +168,8 @@ export const CryptoHoldingSchema = z.object({
   usdPrice: z.string().nullable(),
   /** Whole USD cents, rounded half up; null when unpriced. */
   usdValueCents: Cents.nullable(),
+  /** Daily USD price per whole token over the last 30 days, oldest first; empty without enough history. */
+  priceHistory: z.array(z.number()).optional(),
   syncedAt: IsoDate,
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainName, shortAddress, tokenAmount } from "./crypto-format";
+import { chainName, shortAddress, tokenAmount, tokenPrice } from "./crypto-format";
 
 describe("tokenAmount", () => {
   it("places the decimal point without floats", () => {
@@ -18,4 +18,11 @@ it("shortens addresses and names chains", () => {
   expect(shortAddress("0x1234567890abcdef1234567890abcdef12345678")).toBe("0x1234…5678");
   expect(chainName(8453)).toBe("Base");
   expect(chainName(999)).toBe("Chain 999");
+});
+
+it("formats a token price to the cent, or to four digits below a dollar", () => {
+  expect(tokenPrice("2000", "en-US")).toBe("$2,000.00");
+  expect(tokenPrice("1", "en-US")).toBe("$1.00");
+  expect(tokenPrice("0.5", "en-US")).toBe("$0.50");
+  expect(tokenPrice("0.00001234567", "en-US")).toBe("$0.00001235");
 });

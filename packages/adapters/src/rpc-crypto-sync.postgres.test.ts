@@ -183,6 +183,51 @@ describePostgres("crypto sync (PostgreSQL)", () => {
     expect(state.lastError).toBe("Base: the RPC endpoint is not responding");
   });
 
+  it("records today's price and a 30-day backfill once per token, shared across users", async () => {
+    const owner = `cry-hist-${suffix}`;
+    await prisma.user.create({
+      data: { id: owner, name: owner, email: `${owner}@rakazo.test`, emailVerified: false },
+    });
+    await addServer(owner);
+    await addWallet(owner, WALLET_B);
+    const day = 86_400;
+    const now = new Date("2026-03-10T12:00:00Z");
+    const stamp = (daysAgo: number) => Math.floor(now.getTime() / 1000) - daysAgo * day;
+    fake = fakeRpc({
+      chains: { 1: { balances: { [WALLET_B]: 10n ** 18n } } },
+      prices: PRICES,
+      history: {
+        "coingecko:ethereum": [4, 3, 2, 1, 0].map((n) => ({
+          timestamp: stamp(n),
+          price: 1900 + n,
+        })),
+      },
+    });
+    const run = () =>
+      syncCryptoHoldings(
+        { prisma, fetch: fake.fetch, callGapMs: 0, retryDelayMs: 0, now: () => now },
+        { spaceId, userId: owner },
+        { force: true },
+      );
+    expect(await run()).toMatchObject({ ok: true, outcome: "synced" });
+    const days = () =>
+      prisma.cryptoPriceDay.findMany({
+        // Other tests sync at the real date into the same shared table.
+        where: { chainId: 1, tokenAddress: "", day: { lt: "2026-04" } },
+        orderBy: { day: "asc" },
+      });
+    // Four earlier days from the history, then today's live price (2000), not the history's.
+    expect((await days()).map((d) => [d.day, d.usdPrice])).toEqual([
+      ["2026-03-06", "1904"],
+      ["2026-03-07", "1903"],
+      ["2026-03-08", "1902"],
+      ["2026-03-09", "1901"],
+      ["2026-03-10", "2000"],
+    ]);
+    // History is fetched once for the one short token.
+    expect(fake.calls.filter((c) => c === "history")).toHaveLength(1);
+  });
+
   it("fails and keeps rows when prices cannot be read", async () => {
     const owner = `${userId}-price`;
     await prisma.user.create({

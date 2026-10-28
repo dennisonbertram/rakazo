@@ -55,6 +55,7 @@ const base: FinanceCryptoOutput = {
       rawBalance: "1500000000000000000",
       usdPrice: "2000",
       usdValueCents: 300_000,
+      priceHistory: [1800, 1850, 1900, 1950, 1920, 2000],
       syncedAt: "2026-01-01T00:00:00.000Z",
     },
     {
@@ -67,6 +68,7 @@ const base: FinanceCryptoOutput = {
       rawBalance: "800000000000",
       usdPrice: "1",
       usdValueCents: 80_000_000,
+      priceHistory: [1, 1, 1.0001, 1, 0.9999, 1],
       syncedAt: "2026-01-01T00:00:00.000Z",
     },
     {

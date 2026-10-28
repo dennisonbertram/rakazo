@@ -30,6 +30,18 @@ export function decimalAmount(amount: string, locale?: string): string {
   return tokenAmount(`${match[1]}${fraction}`.replace(/^0+(?=\d)/, ""), fraction.length, locale);
 }
 
+/** USD per token: two decimals from a dollar up, four significant digits below (a $0.00004 token stays readable). */
+export function tokenPrice(usdPrice: string, locale?: string): string {
+  const price = Number(usdPrice);
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits:
+      price >= 1 || !(price > 0) ? 2 : Math.min(10, 3 - Math.floor(Math.log10(price))),
+  }).format(price);
+}
+
 export const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 export const chainName = (chainId: number) =>

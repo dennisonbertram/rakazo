@@ -47435,6 +47435,12 @@
                                   }
                                 ]
                               },
+                              "priceHistory": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              },
                               "syncedAt": {
                                 "$ref": "#/components/schemas/RpcFinanceCryptoOutputSchema2"
                               }
