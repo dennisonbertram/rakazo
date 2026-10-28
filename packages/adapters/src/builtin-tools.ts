@@ -89,7 +89,7 @@ const scheduleCreateProperties = {
   prompt: {
     type: "string",
     description:
-      "Concrete steps for when the schedule fires: name the connected plugin tools to call (e.g. GITHUB_LIST_RELEASES for owner/repo), what to extract, and how to report. Prefer plugin tools over computer browser or web search for app data.",
+      'Concrete steps for when the schedule fires: name the connected plugin tools to call (e.g. GITHUB_LIST_RELEASES for owner/repo), what to extract, and how to report. Prefer plugin tools over computer browser or web search for app data. This prompt is all a future run knows: state the user\'s full standing request, and write anything decided only for this time as a rule ("2 oat milk, or 2 almond milk if oat milk is out of stock", not "2 almond milk").',
   },
   timezone: {
     type: "string",
@@ -123,7 +123,10 @@ const scheduleTimingSpecs = {
     enum: ["minutes", "hours", "days"],
     description: "Unit for every (minimum 1 minute).",
   },
-  runAt: { type: "string", description: "ISO datetime for a one-shot schedule." },
+  runAt: {
+    type: "string",
+    description: "ISO datetime for a one-shot schedule; without an offset, read in timezone.",
+  },
   delayMinutes: {
     type: "number",
     description: "Minutes from now for a one-shot schedule.",
@@ -134,12 +137,20 @@ const scheduleTimingSpecs = {
   },
 };
 
+const startAtSpec = {
+  type: "string",
+  description:
+    "ISO date or datetime a repeating schedule starts; the first run is the first match at or after it. Without an offset, read in timezone. If you already did this period's work yourself, set startAt so the first run does not repeat it.",
+};
+
 function scheduleCreateBranch(active: readonly (keyof typeof scheduleTimingSpecs)[]) {
   const activeNames = new Set<string>(active);
   const properties: Record<string, unknown> = { ...scheduleCreateProperties };
   for (const name of scheduleTimingNames) {
     properties[name] = activeNames.has(name) ? scheduleTimingSpecs[name] : blankScheduleTiming;
   }
+  properties.startAt =
+    activeNames.has("cron") || activeNames.has("every") ? startAtSpec : blankScheduleTiming;
   return {
     type: "object",
     properties,
@@ -1941,7 +1952,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "schedule_create",
     description:
-      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone. For "tell me if X changes" or "let me know when this page updates", use watch_create instead: a cron job that reports "no change" wastes a run and a message every time.',
+      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". One-shot (runAt, delayMinutes, or delaySeconds) is free and runs without asking. Repeating (cron or every/unit, min 1 minute, optionally from startAt) pauses for the user to approve a card that shows the schedule and the full prompt, so write the prompt as the exact instructions to run each time. The prompt is only the work to do ("draft the investor note and post it here"), never the timing ("every Monday at 9"), which goes in cron or every/unit. Times are in the user\'s time zone unless you pass timezone. For "tell me if X changes" or "let me know when this page updates", use watch_create instead: a cron job that reports "no change" wastes a run and a message every time.',
     inputSchema: scheduleCreateInputSchema,
   },
   {
@@ -2010,7 +2021,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "schedule_update",
     description:
-      "Change a schedule you made, keeping its id and run history. Send only what changes. prompt replaces the whole saved prompt, so include everything it should say. schedule is one timing method (cron, every+unit, runAt, delayMinutes, or delaySeconds). enabled false pauses it. Returns the saved schedule; read it back before telling the user. Making a schedule repeat, or changing the prompt of a repeating one, pauses for the user to approve a card; other changes run without asking.",
+      "Change a schedule you made, keeping its id and run history. Send only what changes. prompt replaces the whole saved prompt, so include everything it should say. schedule is one timing method (cron, every+unit, runAt, delayMinutes, or delaySeconds); startAt alone moves the next run of the current repeat, and with cron or every+unit it sets when the repeat starts. enabled false pauses it. Returns the saved schedule; read it back before telling the user. Making a schedule repeat, or changing the prompt of a repeating one, pauses for the user to approve a card; other changes run without asking.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2018,7 +2029,7 @@ export const builtinAgentTools: ConnectorTool[] = [
         prompt: { type: "string", description: "The complete new prompt." },
         schedule: {
           type: "object",
-          properties: scheduleTimingSpecs,
+          properties: { ...scheduleTimingSpecs, startAt: startAtSpec },
           additionalProperties: false,
         },
         timezone: { type: "string", description: "IANA timezone for cron times." },
