@@ -1,4 +1,5 @@
 import { mcp, requireMcpAuth } from "@better-auth/mcp";
+import { getOAuthProviderState } from "@better-auth/oauth-provider";
 import type { PrismaClient } from "@rakazo/db";
 import type { BetterAuthPlugin } from "better-auth";
 import {
@@ -25,11 +26,28 @@ export interface McpAuthEnv {
   webOrigin: string;
 }
 
-const pickKey = (sessionId: string) => `mcp-space-${sessionId}`;
+/** A pick belongs to one session and one client, so a client cannot use another's. */
+export const pickKey = (sessionId: string, clientId: string) =>
+  `mcp-space-${sessionId}-${clientId}`;
 
-async function pickedSpace(prisma: PrismaClient, sessionId: string, now = new Date()) {
+const clientOf = (oauthQuery: unknown) =>
+  new URLSearchParams(String(oauthQuery ?? "")).get("client_id") ?? undefined;
+
+/** The client of the signed authorize query this request carries, if it carries one. */
+async function requestClient() {
+  const state = await getOAuthProviderState();
+  return state?.query ? clientOf(state.query) : undefined;
+}
+
+export async function pickedSpace(
+  prisma: PrismaClient,
+  sessionId: string,
+  clientId: string | undefined,
+  now = new Date(),
+) {
+  if (!clientId) return undefined;
   const row = await prisma.verification.findFirst({
-    where: { identifier: pickKey(sessionId), expiresAt: { gt: now } },
+    where: { identifier: pickKey(sessionId, clientId), expiresAt: { gt: now } },
     orderBy: { createdAt: "desc" },
   });
   return row?.value;
@@ -67,13 +85,16 @@ function mcpSpace(prisma: PrismaClient): BetterAuthPlugin {
         async (ctx) => {
           const spaceId = (ctx.body as { spaceId?: unknown } | null)?.spaceId;
           if (typeof spaceId !== "string") throw new APIError("BAD_REQUEST");
+          const clientId = clientOf((ctx.body as { oauth_query?: unknown }).oauth_query);
+          if (!clientId) throw new APIError("BAD_REQUEST", { message: "Missing client" });
           const { session, user } = ctx.context.session;
           await requireSpaceMember(prisma, user.id, spaceId);
-          await prisma.verification.deleteMany({ where: { identifier: pickKey(session.id) } });
+          const identifier = pickKey(session.id, clientId);
+          await prisma.verification.deleteMany({ where: { identifier } });
           await prisma.verification.create({
             data: {
               id: crypto.randomUUID(),
-              identifier: pickKey(session.id),
+              identifier,
               value: spaceId,
               expiresAt: new Date(Date.now() + PICK_SECONDS * 1000),
             },
@@ -89,13 +110,11 @@ function mcpSpace(prisma: PrismaClient): BetterAuthPlugin {
           handler: createAuthMiddleware(async (ctx) => {
             const session = await getSessionFromCtx(ctx);
             if (!session) throw new APIError("UNAUTHORIZED");
-            const spaceId = await pickedSpace(prisma, session.session.id);
+            const clientId = clientOf(ctx.body?.oauth_query);
+            if (!clientId) throw new APIError("BAD_REQUEST", { message: "Missing client" });
+            const spaceId = await pickedSpace(prisma, session.session.id, clientId);
             if (!spaceId) throw new APIError("BAD_REQUEST", { message: "Choose a space" });
             await requireSpaceMember(prisma, session.user.id, spaceId);
-            const clientId = new URLSearchParams(String(ctx.body?.oauth_query ?? "")).get(
-              "client_id",
-            );
-            if (!clientId) throw new APIError("BAD_REQUEST", { message: "Missing client" });
             const existing = await prisma.mcpConnection.findFirst({
               where: {
                 userId: session.user.id,
@@ -128,9 +147,10 @@ function mcpSpace(prisma: PrismaClient): BetterAuthPlugin {
           matcher: (ctx) => ctx.path === "/oauth2/consent",
           handler: createAuthMiddleware(async (ctx) => {
             const session = await getSessionFromCtx(ctx);
-            if (session) {
+            const clientId = clientOf(ctx.body?.oauth_query);
+            if (session && clientId) {
               await prisma.verification.deleteMany({
-                where: { identifier: pickKey(session.session.id) },
+                where: { identifier: pickKey(session.session.id, clientId) },
               });
             }
           }),
@@ -158,9 +178,11 @@ export function mcpPlugins(prisma: PrismaClient, env: McpAuthEnv): BetterAuthPlu
       clientRegistrationDefaultApplicationType: "infer",
       postLogin: {
         page,
-        shouldRedirect: async ({ session }) => !(await pickedSpace(prisma, session.id)),
+        // A fresh authorize request carries no client state yet, so it always shows the page.
+        shouldRedirect: async ({ session }) =>
+          !(await pickedSpace(prisma, session.id, await requestClient())),
         consentReferenceId: async ({ session }) => {
-          const spaceId = await pickedSpace(prisma, session.id);
+          const spaceId = await pickedSpace(prisma, session.id, await requestClient());
           if (!spaceId) throw new APIError("BAD_REQUEST", { message: "Choose a space" });
           return spaceId;
         },

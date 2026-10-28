@@ -1133,7 +1133,7 @@ reach `WEB_ORIGIN`, and the client's own browser redirect brings them there.
    It becomes the OAuth issuer and the base of the token and registration endpoints. Leave
    `BETTER_AUTH_URL` and `WEB_ORIGIN` unchanged: the session cookie belongs to the web origin.
 2. Restart the API so it reads the setting.
-3. Expose three path prefixes of the API port (`<API port>` is where the API listens):
+3. Expose three path prefixes of the API port. `<API port>` is where the API listens: `3200` on a dev stack, or the port of `API_URL`:
 
    ```bash
    tailscale funnel --bg --set-path /mcp http://127.0.0.1:<API port>/mcp
