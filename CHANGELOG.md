@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Compose runs database migrations in a one-shot `migrate` service, the only one given the database owner login. Code running in the API or worker can no longer read that login from the container and bypass row-level security.
 - The API and worker can run as a separate, least-privilege database login (`rakazo_app`) with row-level security on the tables that hold Space and user content, so a query that forgets its Space filter returns nothing from another Space. Migrations run as the owner (`DATABASE_MIGRATION_URL`). With only `DATABASE_URL` set, everything keeps working as before and the API and worker warn that row-level security is not enforced. See [database roles](docs/self-host.md#database-roles).
 - Message bubbles in the web/PWA transcript use more of a wide window's width (70%/74% caps raised to 84%/88%, still leaving room for the hover-actions gutter), instead of leaving a quarter to a third of a long message's row empty.
 - Every run's system instructions now state the current date and time (UTC), so bots judge deadlines, recency and scheduling from the real present instead of guessing it from training data or quoted timestamps.

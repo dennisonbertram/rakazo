@@ -65,13 +65,23 @@ services:
       timeout: 5s
       retries: 30
 
+  # Applies migrations as the database owner and exits. Only this container gets the owner login.
+  migrate:
+    image: ${TOPOLOGY_APP_IMAGE:-rakazo/app:topology}
+    command: ["pnpm", "db:migrate"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://rakazo_app:topology-only-runtime-password@postgres:5432/rakazo
+      DATABASE_MIGRATION_URL: postgres://rakazo:topology-only-password@postgres:5432/rakazo
+    depends_on:
+      app-image:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
   api:
     image: ${TOPOLOGY_APP_IMAGE:-rakazo/app:topology}
-    command:
-      - bash
-      - -lc
-      # The owner URL lives only in this command, so neither process environment holds it.
-      - DATABASE_MIGRATION_URL=postgres://rakazo:topology-only-password@postgres:5432/rakazo pnpm db:migrate && exec pnpm --filter @rakazo/api start
+    command: ["pnpm", "--filter", "@rakazo/api", "start"]
     environment: &app-environment
       NODE_ENV: production
       DATABASE_URL: postgres://rakazo_app:topology-only-runtime-password@postgres:5432/rakazo
@@ -111,6 +121,8 @@ services:
     volumes:
       - appdata:/data
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       app-image:
         condition: service_completed_successfully
       postgres:

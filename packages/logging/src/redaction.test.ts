@@ -187,4 +187,19 @@ describe("redaction", () => {
     expect(redacted).toContain('"token":"[Redacted]"');
     expect(redacted).toContain('"authorization":"[Redacted]"');
   });
+
+  it("redacts user profile paths in free text", () => {
+    expect(redactSensitiveText("cannot open /home/example-user/app.db")).toBe(
+      "cannot open /[user]/app.db",
+    );
+    expect(redactSensitiveText("cannot open /Users/example-user/app.db")).toBe(
+      "cannot open /[user]/app.db",
+    );
+    expect(redactSensitiveText("cannot open C:\\Users\\example-user\\app.db")).toBe(
+      "cannot open [user]\\app.db",
+    );
+    expect(redactSensitiveText("cannot open c:/users/example-user/app.db")).toBe(
+      "cannot open [user]/app.db",
+    );
+  });
 });
