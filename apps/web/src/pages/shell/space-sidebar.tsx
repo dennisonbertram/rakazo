@@ -78,6 +78,7 @@ import {
   SortableRow,
 } from "../../components/sidebar-folders/SidebarDnd";
 import { glanceBadge, rowStatusKind, StatusMark } from "../../components/sidebar-glance";
+import { STICKY_GROUP_HEADER } from "../../components/sticky-group-header";
 import { FirstRunTour } from "../../components/tour/FirstRunTour";
 import { clearTourStep } from "../../components/tour/TourPopover";
 import type { AgentApp } from "../../lib/agent-app";
@@ -1057,7 +1058,7 @@ export function SpaceSidebar({
         <div
           ref={sidebarScrollRef}
           tabIndex={-1}
-          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 lg:snap-y lg:snap-proximity lg:scroll-pt-3 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
+          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 lg:snap-y lg:snap-proximity lg:scroll-pt-10 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
         >
           {activityMode && !rail ? (
             <button
@@ -1217,8 +1218,8 @@ export function SpaceSidebar({
                       data-roster-item={group.key}
                       className={
                         group.title && hasSpaceActions
-                          ? `grid pt-3 pb-0.5${group.showLock ? " mt-3" : ""}`
-                          : `flex items-center pt-3 pb-0.5${group.title ? "" : " justify-end"}`
+                          ? `grid pt-3 pb-0.5${group.showLock ? " mt-3" : ""}${collapsed ? "" : ` ${STICKY_GROUP_HEADER} top-0`}`
+                          : `flex items-center pt-3 pb-0.5${group.title ? "" : " justify-end"}${group.title && !collapsed ? ` ${STICKY_GROUP_HEADER} top-0` : ""}`
                       }
                     >
                       {group.title ? (
@@ -1340,6 +1341,7 @@ export function SpaceSidebar({
                                 )
                               }
                               heldFor={heldFor}
+                              belowHeading={!folder && Boolean(group.title)}
                               onToggle={() =>
                                 email
                                   ? setEmailChatsOpen((open) => !open)

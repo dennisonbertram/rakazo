@@ -2,6 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { ChevronDown } from "lucide-react";
 import { useRef } from "react";
 import { needsAnswerLabel } from "../lib/roster-status";
+import { STICKY_GROUP_HEADER } from "./sticky-group-header";
 
 /**
  * One folded row in the chat list: every page and integration agent, or every email chat. Each page already opens
@@ -14,6 +15,7 @@ export function PageAgentsRow({
   count,
   needsYou,
   heldFor,
+  belowHeading,
   onToggle,
 }: {
   /** The row's name; defaults to "Page agents". */
@@ -24,6 +26,8 @@ export function PageAgentsRow({
   needsYou: boolean;
   /** Set when a run is held for the owner; other reasons for the dot read "New". */
   heldFor?: "answer" | "takeover" | null;
+  /** The group's own pinned heading sits above this row: stop just under it instead of covering it. */
+  belowHeading?: boolean;
   onToggle: () => void;
 }) {
   const { t } = useLingui();
@@ -41,7 +45,7 @@ export function PageAgentsRow({
         if (!open) rowRef.current?.scrollIntoView?.({ block: "start" });
         onToggle();
       }}
-      className={`mb-1 flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-start text-[13px] font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${open ? "sticky top-0 z-10 bg-sidebar" : ""}`}
+      className={`mb-1 flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-start text-[13px] font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${open ? `${STICKY_GROUP_HEADER} ${belowHeading ? "top-10.5" : "top-0"}` : ""}`}
     >
       <ChevronDown
         size={14}
