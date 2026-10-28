@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { McpConnectionList } from "@rakazo/contracts";
+import type { McpConnectionList, McpPendingAction } from "@rakazo/contracts";
 import {
   Button,
   Skeleton,
@@ -14,6 +14,7 @@ import {
 } from "@rakazo/ui-web";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { rpc } from "../lib/rpc";
+import { McpActionCard } from "./McpActionCard";
 import { McpConnectionActivity } from "./McpConnectionActivity";
 import { McpTokenDialog } from "./McpTokenDialog";
 
@@ -23,10 +24,17 @@ export function McpConnectionsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [activityId, setActivityId] = useState<string | null>(null);
+  const [pending, setPending] = useState<McpPendingAction[]>([]);
+  const [deciding, setDeciding] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setList(await rpc.mcpConnections.list());
+      const [connections, actions] = await Promise.all([
+        rpc.mcpConnections.list(),
+        rpc.mcpConnections.pendingActions(),
+      ]);
+      setList(connections);
+      setPending(actions ?? []);
     } catch {
       setError(t`Could not load connections`);
     }
@@ -55,6 +63,26 @@ export function McpConnectionsPanel() {
           <Trans>Create token</Trans>
         </Button>
       </div>
+      {pending.length > 0 ? (
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium">
+            <Trans>Waiting for approval</Trans>
+          </h3>
+          {pending.map((action) => (
+            <McpActionCard
+              key={action.id}
+              action={action}
+              busy={deciding === action.id}
+              onDecide={(decision) => {
+                setDeciding(action.id);
+                void change(() =>
+                  rpc.mcpConnections.decideAction({ id: action.id, decision }),
+                ).finally(() => setDeciding(null));
+              }}
+            />
+          ))}
+        </section>
+      ) : null}
       {!list && !error ? <Skeleton className="h-24 w-full" /> : null}
       {list?.connections.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">

@@ -360,6 +360,7 @@ model McpConnection {
   rateWindowStart DateTime?
   rateCount     Int       @default(0)
   calls         McpCallLog[]
+  actions       ExternalAction[]
 
   @@index([spaceId])
   @@index([userId, spaceId, oauthClientId])
@@ -374,13 +375,35 @@ model McpCallLog {
   spaceId      String
   space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   tool         String
-  /// "ok", "error" or "rate_limited".
+  /// "ok", "error", "rate_limited", "pending" (waiting for approval) or "blocked".
   outcome      String
   durationMs   Int
   createdAt    DateTime      @default(now())
 
   @@index([connectionId, createdAt])
   @@map("mcp_call_log")
+}
+
+/// A write an outside MCP client asked for that the Space's rules say a person must approve first.
+model ExternalAction {
+  id           String        @id @default(cuid())
+  spaceId      String
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  connectionId String
+  connection   McpConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  tool         String
+  args         Json
+  /// "pending", "approved" (claimed, running), "denied", "expired", "done" or "failed".
+  status       String        @default("pending")
+  result       Json?
+  createdAt    DateTime      @default(now())
+  decidedAt    DateTime?
+
+  @@index([spaceId, userId, status])
+  @@index([connectionId, createdAt])
+  @@index([status, createdAt])
+  @@map("external_actions")
 }
 
 model Verification {
@@ -501,6 +524,7 @@ model Space {
   notificationEndpoints       NotificationEndpoint[]
   aiDataConsents              AiDataConsent[]
   mcpCallLogs                 McpCallLog[]
+  externalActions             ExternalAction[]
   mcpConnections              McpConnection[]
   id                          String                       @id
   organizationId              String
