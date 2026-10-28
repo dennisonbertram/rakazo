@@ -165,6 +165,7 @@ export const ES_MESSAGES: Record<string, string> = {
   "Could not speak": "No se pudo leer en voz alta",
   "Could not update reaction": "No se pudo actualizar la reacción",
   "Could not remember": "No se pudo recordar",
+  "Mark as unread": "Marcar como no leído",
   Created: "Creado",
   "Delete…": "Eliminar…",
   Denied: "Denegado",
