@@ -805,6 +805,7 @@ msgid "1 SAFE found in Legal"
 msgstr ""
 
 #: src/components/EmailCards.tsx
+#: src/pages/Calendar.tsx
 msgid "3 days"
 msgstr ""
 
@@ -2728,6 +2729,7 @@ msgstr ""
 msgid "Clear {sourceName} filter"
 msgstr ""
 
+#: src/components/ListControls.tsx
 #: src/pages/DataRoom.tsx
 msgid "Clear all"
 msgstr ""
@@ -4971,6 +4973,7 @@ msgstr ""
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/sidebar-glance.tsx
 #: src/components/tour/TourPopover.tsx
@@ -5624,6 +5627,8 @@ msgid "Filter memory"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
+#: src/pages/Calendar.tsx
 msgid "Filters"
 msgstr "Filtres"
 
@@ -10658,6 +10663,7 @@ msgstr ""
 msgid "Scroll sideways to see the whole graph."
 msgstr ""
 
+#: src/components/data-room/FilterBar.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx

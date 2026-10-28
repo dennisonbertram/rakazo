@@ -805,6 +805,7 @@ msgid "1 SAFE found in Legal"
 msgstr "1 SAFE found in Legal"
 
 #: src/components/EmailCards.tsx
+#: src/pages/Calendar.tsx
 msgid "3 days"
 msgstr "3 days"
 
@@ -2728,6 +2729,7 @@ msgstr "Clear {rangeLabel}"
 msgid "Clear {sourceName} filter"
 msgstr "Clear {sourceName} filter"
 
+#: src/components/ListControls.tsx
 #: src/pages/DataRoom.tsx
 msgid "Clear all"
 msgstr "Clear all"
@@ -4971,6 +4973,7 @@ msgstr "Don't share"
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/sidebar-glance.tsx
 #: src/components/tour/TourPopover.tsx
@@ -5624,6 +5627,8 @@ msgid "Filter memory"
 msgstr "Filter memory"
 
 #: src/components/data-room/FilterBar.tsx
+#: src/components/ListControls.tsx
+#: src/pages/Calendar.tsx
 msgid "Filters"
 msgstr "Filters"
 
@@ -10658,6 +10663,7 @@ msgstr "Scheduling"
 msgid "Scroll sideways to see the whole graph."
 msgstr "Scroll sideways to see the whole graph."
 
+#: src/components/data-room/FilterBar.tsx
 #: src/components/inbox/InboxShortcuts.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationSetup.tsx
