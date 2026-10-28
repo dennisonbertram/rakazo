@@ -928,6 +928,8 @@ export function ShellPage() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   // The bot just made with "New bot", whose settings open with its name selected.
   const [namingBotId, setNamingBotId] = useState<string | null>(null);
+  // What the user chose for each bot's More settings toggle; survives the panel being rebuilt.
+  const [manualFold, setManualFold] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const desktop = window.matchMedia(SIDEBAR_DOCKED_QUERY);
@@ -5507,8 +5509,11 @@ export function ShellPage() {
               <BotSettings
                 key={active.id}
                 bot={active}
-                focusName={namingBotId === active.id}
-                onUnfold={() => setNamingBotId(null)}
+                focusName={manualFold[active.id] ?? namingBotId === active.id}
+                foldable={active.id in manualFold || namingBotId === active.id}
+                onFoldedChange={(folded) =>
+                  setManualFold((current) => ({ ...current, [active.id]: folded }))
+                }
                 notificationsOff={notificationsOff}
                 onOpenNotificationSettings={() => openSettings("general")}
                 memoryProviderConfigured={memoryProviderConfig != null}

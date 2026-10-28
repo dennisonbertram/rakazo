@@ -408,18 +408,18 @@ describe("BotSettings for a bot just created with New bot", () => {
   });
 });
 
-describe("BotSettings More settings keeps its state across a remount", () => {
-  it("stays open when the panel is rebuilt after a save, because the parent owns the folded state", async () => {
-    // Mirrors Shell: it keeps "naming" while the panel is open and rebuilds the panel (new key)
-    // when the bot list refreshes after an autosave.
+describe("BotSettings More settings toggles and keeps its state across a remount", () => {
+  it("opens, stays open when rebuilt, then closes when pressed again", async () => {
+    // Mirrors Shell: the parent keeps the choice and rebuilds the panel (new key) after a save.
     function Parent({ generation }: { generation: number }) {
-      const [naming, setNaming] = useState(true);
+      const [folded, setFolded] = useState(true);
       return (
         <BotSettings
           key={generation}
           bot={bot("")}
-          focusName={naming}
-          onUnfold={() => setNaming(false)}
+          focusName={folded}
+          foldable
+          onFoldedChange={setFolded}
           memoryProviderConfigured={false}
           onSkillsChange={() => undefined}
           onSave={onSave}
@@ -428,15 +428,19 @@ describe("BotSettings More settings keeps its state across a remount", () => {
         />
       );
     }
+    const toggle = () =>
+      [...container.querySelectorAll("button")].find((b) =>
+        b.textContent?.includes("More settings"),
+      );
     await act(async () => root.render(<Parent generation={0} />));
-    const more = [...container.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("More settings"),
-    );
-    await act(async () => more?.click());
+    expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => toggle()?.click());
     expect(container.querySelector("textarea")).not.toBeNull();
-    // The bot list refreshed after the name saved and the panel was rebuilt.
     await act(async () => root.render(<Parent generation={1} />));
     expect(container.querySelector("textarea")).not.toBeNull();
+    expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => toggle()?.click());
+    expect(container.querySelector("textarea")).toBeNull();
   });
 });
 
