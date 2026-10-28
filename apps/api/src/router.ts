@@ -421,6 +421,9 @@ import {
   financeBalanceSeries,
   financeBurn,
   financeCategory,
+  financeChartNoteAdd,
+  financeChartNoteDelete,
+  financeChartNotes,
   financeConnect,
   financeCryptoHistory,
   financeMonth,
@@ -8502,6 +8505,15 @@ export function createRouter(deps: RouterDeps) {
       ),
       setPreferences: authed.finance.setPreferences.handler(({ context, input }) =>
         financeSetPreferences(financeDeps, context.actor, input),
+      ),
+      chartNotes: authed.finance.chartNotes.handler(({ context, input }) =>
+        financeChartNotes(financeDeps, context.actor, input),
+      ),
+      chartNoteAdd: authed.finance.chartNoteAdd.handler(({ context, input }) =>
+        financeChartNoteAdd(financeDeps, context.actor, input),
+      ),
+      chartNoteDelete: authed.finance.chartNoteDelete.handler(({ context, input }) =>
+        financeChartNoteDelete(financeDeps, context.actor, input),
       ),
       cryptoHistory: authed.finance.cryptoHistory.handler(({ context, input }) =>
         financeCryptoHistory(financeDeps, context.actor, input),

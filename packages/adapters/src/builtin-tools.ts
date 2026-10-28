@@ -969,7 +969,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "finance_overview",
     description:
-      "The user's cash, monthly burn, runway and spend this week, month, quarter and year with comparisons, from their synced Mercury and Brex data (the same numbers as the Finance page). Dollars. Start here.",
+      "The user's cash, monthly burn, runway and spend this week, month, quarter and year with comparisons, from their synced Mercury and Brex data (the same numbers as the Finance page), plus any notes the team pinned to days on the Burn chart. Dollars. Start here.",
     inputSchema: { type: "object", properties: {} },
     readOnly: true,
   },
