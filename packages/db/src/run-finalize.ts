@@ -14,6 +14,7 @@ import {
   delegatePendingIds,
   expireDelegatedApprovalsInTransaction,
 } from "./run-pauses.js";
+import { clearEndedRunState } from "./run-secrets.js";
 import { createPendingSteeringRun } from "./steering.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
@@ -196,6 +197,8 @@ async function finalizeRunOnce(
       payload: input.outcome === "completed" ? {} : { error: failure },
     });
     await tx.event.deleteMany({ where: { runId: input.runId, type: "thread.progress" } });
+    // An ended run never reads its waiting one-time answer.
+    if (writableRun) await clearEndedRunState(tx, [input.runId]);
     if (input.outcome === "completed") {
       await tx.steeringMessage.deleteMany({
         where: { runId: input.runId, claimedAt: { not: null } },

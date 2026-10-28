@@ -34,6 +34,7 @@ import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
 import {
   answerWaitingRunWithTextInTransaction,
   appendEventInTransaction,
+  clearEndedRunState,
   createDataRoomRepos,
   createGroupRepos,
   createRepos,
@@ -43,6 +44,7 @@ import {
   expireComputerExecutionLeases,
   IsolationError,
   lockOwnedGroup,
+  settleApprovalsOfEndedRuns,
   touchGroupUpdatedAt,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -274,6 +276,10 @@ export async function cancelSupersededQueuedRuns(
     where: { id: { in: superseded.map((run) => run.id) } },
     data: { status: "cancelled", completedAt: now },
   });
+  await clearEndedRunState(
+    tx,
+    superseded.map((run) => run.id),
+  );
   await tx.task.updateMany({
     where: { id: { in: superseded.map((run) => run.taskId) } },
     data: { status: "cancelled" },
@@ -613,6 +619,7 @@ function messagesWithLiveEvents(
 
 function mapRun(run: {
   id: string;
+  userId?: string;
   botId: string;
   threadId: string;
   taskId: string;
@@ -629,6 +636,7 @@ function mapRun(run: {
 }) {
   return {
     id: run.id,
+    ...(run.userId ? { userId: run.userId } : {}),
     botId: run.botId,
     threadId: run.threadId,
     taskId: run.taskId,
@@ -1216,6 +1224,22 @@ export async function stopThreadRuns(
 ) {
   const { runIds, computers, leases, eventSeq } = await deps.prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
+    // A stopped run answers no card: close each open approval and the effects behind it, so a
+    // stored card can never be approved later. Closed before the runs are cancelled, because a
+    // cancelled run can no longer write to the thread. Grouped by bot: each card event names one.
+    const stopping = await tx.run.findMany({
+      where: { threadId: target.threadId, status: { in: [...ACTIVE_RUN_STATUSES] } },
+      select: { id: true, botId: true },
+    });
+    for (const botId of new Set(stopping.map((run) => run.botId))) {
+      await settleApprovalsOfEndedRuns(tx, {
+        spaceId: actor.spaceId,
+        threadId: target.threadId,
+        botId,
+        runIds: stopping.filter((run) => run.botId === botId).map((run) => run.id),
+        answer: "stopped",
+      });
+    }
     const cancelled = await tx.run.updateManyAndReturn({
       where: {
         threadId: target.threadId,
@@ -1225,6 +1249,7 @@ export async function stopThreadRuns(
       select: { id: true, botId: true },
     });
     const ids = cancelled.map((run) => run.id);
+    await clearEndedRunState(tx, ids);
     await tx.steeringMessage.deleteMany({
       where: {
         botId: { in: target.kind === "bot" ? [target.botId] : target.memberBotIds },

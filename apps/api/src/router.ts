@@ -215,6 +215,7 @@ import {
 } from "@rakazo/core";
 import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
 import {
+  AnswerTooLongError,
   addSidebarFolder,
   addSidebarPage,
   appendEventInTransaction,
@@ -245,6 +246,7 @@ import {
   createRepos,
   createSpaceForMember,
   createThreadMessageInTransaction,
+  crossSpaceCommunicationAllowed,
   defaultModelCredentialCandidates,
   deleteContact,
   deleteEmptySpaceForMember,
@@ -2657,6 +2659,9 @@ export function createRouter(deps: RouterDeps) {
               ? { teamChatAmbientEnabled: input.teamChatAmbientEnabled }
               : {}),
             ...(input.teamChatRules !== undefined ? { teamChatRules: input.teamChatRules } : {}),
+            ...(input.crossSpaceCommunication !== undefined
+              ? { crossSpaceCommunication: input.crossSpaceCommunication }
+              : {}),
             ...(input.disabledBuiltinTools !== undefined
               ? { disabledBuiltinTools: input.disabledBuiltinTools }
               : {}),
@@ -3380,6 +3385,8 @@ export function createRouter(deps: RouterDeps) {
             username: input.username,
           })
           .catch((error: unknown) => {
+            if (error instanceof AnswerTooLongError)
+              throw new ORPCError("BAD_REQUEST", { message: error.message });
             // A typed credential its destination cannot carry (e.g. a header with a line break).
             throw mapBotSecretInputError(error);
           });
@@ -4949,13 +4956,18 @@ export function createRouter(deps: RouterDeps) {
         const result = await updateTicket(ticketDeps, {
           ...input,
           spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
           ownerBotId: input.assigneeBotId,
         });
         if ("error" in result) throw new ORPCError("BAD_REQUEST", { message: result.error });
         return result.ticket;
       }),
       move: boardEnabled.tickets.move.handler(async ({ context, input }) => {
-        const result = await updateTicket(ticketDeps, { ...input, spaceId: context.actor.spaceId });
+        const result = await updateTicket(ticketDeps, {
+          ...input,
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+        });
         if ("error" in result) throw new ORPCError("BAD_REQUEST", { message: result.error });
         return result.ticket;
       }),
@@ -7451,6 +7463,16 @@ export function createRouter(deps: RouterDeps) {
               // The claim holds the connection row lock through commit, so a
               // revoke either beats it or waits — it can never interleave with
               // the confirmation write below.
+              if (
+                input.accept &&
+                !(await crossSpaceCommunicationAllowed(
+                  tx,
+                  connection.requesterBotId,
+                  connection.targetBotId,
+                ))
+              ) {
+                throw new ORPCError("FORBIDDEN");
+              }
               const { count } = await tx.agentConnection.updateMany({
                 where: { id: connection.id, status: "pending" },
                 data: { status: input.accept ? "approved" : "declined" },

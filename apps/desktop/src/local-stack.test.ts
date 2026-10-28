@@ -463,6 +463,8 @@ describe("LocalStackController", () => {
     for (const call of calls) {
       expect(call.env).not.toHaveProperty("RAKAZO_IMAGE");
       expect(call.env).not.toHaveProperty("RAKAZO_COMPUTER_IMAGE");
+      // Docker Desktop cannot take the restricted-egress host rules, so the app opts out.
+      expect(call.env.SANDBOX_COMPUTER_EGRESS).toBe("open");
     }
   });
 

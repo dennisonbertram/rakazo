@@ -22,8 +22,10 @@ const runTriggers = new Set<string>(RUN_TRIGGERS);
 
 function runFromStartedEvent(event: ProductEvent, previous: Run | undefined): Run {
   const trigger = event.payload.trigger;
+  const userId = typeof event.payload.userId === "string" ? event.payload.userId : previous?.userId;
   return {
     id: event.runId ?? previous?.id ?? event.id,
+    ...(userId ? { userId } : {}),
     botId: event.botId,
     threadId: event.threadId,
     taskId: previous?.taskId ?? event.runId ?? event.id,
