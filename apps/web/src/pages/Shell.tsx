@@ -5508,6 +5508,7 @@ export function ShellPage() {
                 key={active.id}
                 bot={active}
                 focusName={namingBotId === active.id}
+                onUnfold={() => setNamingBotId(null)}
                 notificationsOff={notificationsOff}
                 onOpenNotificationSettings={() => openSettings("general")}
                 memoryProviderConfigured={memoryProviderConfig != null}

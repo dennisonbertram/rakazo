@@ -173,6 +173,7 @@ export function BotSettings({
   onExport,
   onClear,
   focusName = false,
+  onUnfold,
   hostComputer,
   messageTargets = [],
   notificationsOff = false,
@@ -188,6 +189,8 @@ export function BotSettings({
   hostComputer?: { defaultHost: ComputerHost };
   /** A bot just created as "New bot": focus and select its name so it gets named first. */
   focusName?: boolean;
+  /** More settings was pressed: the parent stops asking for the name-only view, so a rebuilt panel stays open. */
+  onUnfold?: () => void;
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
   /** The check-in setting changed, so its managed routine appeared, changed or went away. */
   onCheckInChange?: () => void;
@@ -566,7 +569,10 @@ export function BotSettings({
           variant="ghost"
           size="sm"
           className="mt-4 -ms-2.5 text-muted-foreground"
-          onClick={() => setUnfolded(true)}
+          onClick={() => {
+            setUnfolded(true);
+            onUnfold?.();
+          }}
         >
           <Trans>More settings</Trans>
           <ChevronDown aria-hidden="true" className="size-4" />
