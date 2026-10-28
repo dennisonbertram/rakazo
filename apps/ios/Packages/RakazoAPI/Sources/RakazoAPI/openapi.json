@@ -8251,13 +8251,13 @@
                         "groups": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema20"
+                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
                           }
                         },
                         "botSections": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema30"
+                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
                           }
                         },
                         "archivedBots": {
@@ -8269,7 +8269,7 @@
                         "archivedGroups": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema20"
+                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
                           }
                         },
                         "thread": {
@@ -8302,7 +8302,7 @@
                                         "maximum": 9007199254740991
                                       },
                                       "role": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema32"
                                       },
                                       "blocks": {
                                         "type": "array",
@@ -8499,13 +8499,13 @@
                                                   "type": "object",
                                                   "properties": {
                                                     "name": {
-                                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema32"
-                                                    },
-                                                    "origin": {
                                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema33"
                                                     },
-                                                    "auth": {
+                                                    "origin": {
                                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema34"
+                                                    },
+                                                    "auth": {
+                                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema35"
                                                     }
                                                   },
                                                   "required": [
@@ -9032,16 +9032,16 @@
                                               "type": "object",
                                               "properties": {
                                                 "kind": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema35"
-                                                },
-                                                "name": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema36"
                                                 },
-                                                "spec": {
+                                                "name": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema37"
                                                 },
-                                                "data": {
+                                                "spec": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema38"
+                                                },
+                                                "data": {
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema39"
                                                 }
                                               },
                                               "required": [
@@ -9115,7 +9115,7 @@
                                                   "maxItems": 20,
                                                   "type": "array",
                                                   "items": {
-                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema40"
+                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema41"
                                                   }
                                                 }
                                               },
@@ -9139,7 +9139,7 @@
                                                   "minItems": 1,
                                                   "type": "array",
                                                   "items": {
-                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema41"
+                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
                                                   }
                                                 }
                                               },
@@ -9167,10 +9167,10 @@
                                                           "const": "overview"
                                                         },
                                                         "cashCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                         },
                                                         "burnCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                         },
                                                         "runwayMonths": {
                                                           "type": [
@@ -9179,7 +9179,7 @@
                                                           ]
                                                         },
                                                         "monthSpendCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                         }
                                                       },
                                                       "required": [
@@ -9209,13 +9209,13 @@
                                                           "type": "string"
                                                         },
                                                         "totalCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                         },
                                                         "rows": {
                                                           "maxItems": 5,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                           }
                                                         }
                                                       },
@@ -9247,13 +9247,13 @@
                                                           "maximum": 9007199254740991
                                                         },
                                                         "totalCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                         },
                                                         "rows": {
                                                           "maxItems": 5,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
                                                           }
                                                         }
                                                       },
@@ -9273,16 +9273,16 @@
                                                           "const": "recurring"
                                                         },
                                                         "monthlyCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                         },
                                                         "upcomingCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                         },
                                                         "rows": {
                                                           "maxItems": 5,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                           }
                                                         }
                                                       },
@@ -9316,16 +9316,16 @@
                                                       "type": "object",
                                                       "properties": {
                                                         "type": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
-                                                        },
-                                                        "title": {
                                                           "$ref": "#/components/schemas/RpcBootstrapOutputSchema46"
                                                         },
+                                                        "title": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                                        },
                                                         "columns": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
                                                         },
                                                         "rows": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
                                                         }
                                                       },
                                                       "required": [
@@ -9347,7 +9347,7 @@
                                                           "maxItems": 20,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema52"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
                                                           }
                                                         }
                                                       },
@@ -9365,14 +9365,14 @@
                                                           "const": "summary"
                                                         },
                                                         "title": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
                                                         },
                                                         "items": {
                                                           "minItems": 1,
                                                           "maxItems": 20,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
                                                           }
                                                         }
                                                       },
@@ -9394,7 +9394,7 @@
                                                           "maxItems": 6,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema56"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema57"
                                                           }
                                                         }
                                                       },
@@ -9416,7 +9416,7 @@
                                                           "maxItems": 20,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema57"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema58"
                                                           }
                                                         }
                                                       },
@@ -9443,10 +9443,10 @@
                                                           ]
                                                         },
                                                         "title": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
                                                         },
                                                         "body": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
                                                         }
                                                       },
                                                       "required": [
@@ -9617,7 +9617,7 @@
                                                   "type": "string"
                                                 },
                                                 "intent": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema58"
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
                                                 }
                                               },
                                               "required": [
@@ -9645,7 +9645,7 @@
                                                   "type": "string"
                                                 },
                                                 "intent": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema58"
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
                                                 },
                                                 "returnToMessageId": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -9701,7 +9701,7 @@
                                             "type": "object",
                                             "properties": {
                                               "role": {
-                                                "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
+                                                "$ref": "#/components/schemas/RpcBootstrapOutputSchema32"
                                               },
                                               "botId": {
                                                 "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -9802,13 +9802,13 @@
                                 "members": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema26"
+                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
                                   }
                                 },
                                 "run": {
                                   "anyOf": [
                                     {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
                                     },
                                     {
                                       "type": "null"
@@ -9818,7 +9818,7 @@
                                 "activeRuns": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
+                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
                                   }
                                 },
                                 "delegatePending": {
@@ -9857,7 +9857,7 @@
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
                                     },
                                     "mode": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema16"
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema17"
                                     },
                                     "kind": {
                                       "type": "string",
@@ -10033,7 +10033,7 @@
                               "thinkingLevel": {
                                 "anyOf": [
                                   {
-                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema18"
+                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema19"
                                   },
                                   {
                                     "type": "null"
@@ -10071,7 +10071,7 @@
                                             "maxLength": 2048
                                           },
                                           "intervalMinutes": {
-                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
                                           }
                                         },
                                         "required": [
@@ -10110,10 +10110,10 @@
                                           "arguments": {
                                             "type": "object",
                                             "propertyNames": {
-                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
                                             },
                                             "additionalProperties": {
-                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
                                             }
                                           },
                                           "appName": {
@@ -10121,7 +10121,7 @@
                                             "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
                                           },
                                           "intervalMinutes": {
-                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
                                           }
                                         },
                                         "required": [
@@ -10312,6 +10312,9 @@
                                     "pinned": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema6"
                                     },
+                                    "hiddenAt": {
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema9"
+                                    },
                                     "sectionId": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema7"
                                     },
@@ -10319,28 +10322,28 @@
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema8"
                                     },
                                     "unread": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema9"
-                                    },
-                                    "parentBotId": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema10"
                                     },
-                                    "spawnKey": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema19"
-                                    },
-                                    "preview": {
+                                    "parentBotId": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema11"
                                     },
-                                    "status": {
+                                    "spawnKey": {
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema20"
+                                    },
+                                    "preview": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema12"
                                     },
-                                    "runPhase": {
+                                    "status": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema13"
                                     },
+                                    "runPhase": {
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema14"
+                                    },
                                     "runErrorId": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema15"
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema16"
                                     },
                                     "updatedAt": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema17"
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema18"
                                     }
                                   },
                                   "required": [
@@ -10376,28 +10379,28 @@
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
                                     },
                                     "name": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
-                                    },
-                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema22"
                                     },
-                                    "sectionId": {
+                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema23"
                                     },
-                                    "position": {
+                                    "sectionId": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema24"
                                     },
-                                    "members": {
+                                    "position": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema25"
                                     },
-                                    "preview": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
+                                    "members": {
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema26"
                                     },
-                                    "unread": {
+                                    "preview": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema28"
                                     },
-                                    "updatedAt": {
+                                    "unread": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema29"
+                                    },
+                                    "updatedAt": {
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema30"
                                     }
                                   },
                                   "required": [
@@ -10458,10 +10461,10 @@
                                     "automatedSenderPolicies": {
                                       "type": "object",
                                       "propertyNames": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema64"
                                       },
                                       "additionalProperties": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema64"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema65"
                                       }
                                     },
                                     "automatedSenders": {
@@ -10522,7 +10525,7 @@
                               "botSections": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema30"
+                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
                                 }
                               }
                             },
@@ -12700,6 +12703,9 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 120
+                      },
+                      "page": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -12781,6 +12787,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -13231,6 +13243,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -13676,6 +13694,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -14105,6 +14129,12 @@
                             ]
                           },
                           "archivedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "hiddenAt": {
                             "type": [
                               "string",
                               "null"
@@ -14540,6 +14570,12 @@
                             ]
                           },
                           "archivedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "hiddenAt": {
                             "type": [
                               "string",
                               "null"
@@ -15652,6 +15688,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -16034,50 +16076,53 @@
                       "pinned": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema7"
                       },
-                      "memoryScope": {
+                      "hidden": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema8"
                       },
-                      "sectionId": {
+                      "memoryScope": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema9"
                       },
-                      "voiceId": {
+                      "sectionId": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema10"
                       },
-                      "autoSpeak": {
+                      "voiceId": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema11"
                       },
-                      "modelProvider": {
+                      "autoSpeak": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema12"
                       },
-                      "modelId": {
+                      "modelProvider": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema13"
                       },
-                      "thinkingLevel": {
+                      "modelId": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema14"
                       },
-                      "teamChatAmbientEnabled": {
+                      "thinkingLevel": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema15"
                       },
-                      "teamChatRules": {
+                      "teamChatAmbientEnabled": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema16"
                       },
-                      "crossSpaceCommunication": {
+                      "teamChatRules": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema17"
                       },
-                      "disabledBuiltinTools": {
+                      "crossSpaceCommunication": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema18"
                       },
-                      "audience": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema20"
+                      "disabledBuiltinTools": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
                       },
-                      "externalMessageTargets": {
+                      "audience": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema21"
                       },
-                      "externalComputerTools": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema22"
                       },
-                      "runsOn": {
+                      "externalComputerTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema24"
                       }
                     },
                     "required": [
@@ -16159,6 +16204,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -17730,6 +17781,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -18492,6 +18549,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -23102,6 +23165,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -34735,6 +34804,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -41725,6 +41800,12 @@
                                     "null"
                                   ]
                                 },
+                                "hiddenAt": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "unread": {
                                   "type": "boolean"
                                 },
@@ -45918,6 +45999,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -62977,6 +63064,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -64601,6 +64694,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -65394,6 +65493,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -72164,6 +72269,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -79097,6 +79208,12 @@
                           ]
                         },
                         "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
                           "type": [
                             "string",
                             "null"
@@ -107178,6 +107295,12 @@
                               "pinned": {
                                 "type": "boolean"
                               },
+                              "hiddenAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "sectionId": {
                                 "anyOf": [
                                   {
@@ -107740,11 +107863,14 @@
                                       "null"
                                     ]
                                   },
-                                  "unread": {
+                                  "hiddenAt": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema8"
                                   },
-                                  "parentBotId": {
+                                  "unread": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema9"
+                                  },
+                                  "parentBotId": {
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema10"
                                   },
                                   "memoryScope": {
                                     "anyOf": [
@@ -107764,16 +107890,16 @@
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
                                   },
                                   "preview": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema10"
-                                  },
-                                  "status": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema11"
                                   },
-                                  "runPhase": {
+                                  "status": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema12"
                                   },
-                                  "runErrorId": {
+                                  "runPhase": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema13"
+                                  },
+                                  "runErrorId": {
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema14"
                                   },
                                   "computerMode": {
                                     "type": "string",
@@ -107797,7 +107923,7 @@
                                     ]
                                   },
                                   "updatedAt": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema14"
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema15"
                                   },
                                   "createdAt": {
                                     "type": "string"
@@ -107881,7 +108007,7 @@
                                     "type": "boolean"
                                   },
                                   "spawnKey": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema15"
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema16"
                                   }
                                 },
                                 "required": [
@@ -107936,16 +108062,16 @@
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
                                   },
                                   "name": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema16"
-                                  },
-                                  "pinned": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema17"
                                   },
-                                  "sectionId": {
+                                  "pinned": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema18"
                                   },
-                                  "position": {
+                                  "sectionId": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema19"
+                                  },
+                                  "position": {
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema20"
                                   },
                                   "archivedAt": {
                                     "type": [
@@ -107954,19 +108080,19 @@
                                     ]
                                   },
                                   "members": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema20"
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema21"
                                   },
                                   "threadId": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
                                   },
                                   "preview": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema21"
-                                  },
-                                  "unread": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema22"
                                   },
-                                  "updatedAt": {
+                                  "unread": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema23"
+                                  },
+                                  "updatedAt": {
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema24"
                                   },
                                   "createdAt": {
                                     "type": "string"
@@ -107992,13 +108118,13 @@
                             "externalConversations": {
                               "type": "array",
                               "items": {
-                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema24"
+                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema25"
                               }
                             },
                             "botSections": {
                               "type": "array",
                               "items": {
-                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema30"
+                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema31"
                               }
                             }
                           },
@@ -108066,6 +108192,9 @@
                                     "pinned": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema5"
                                     },
+                                    "hiddenAt": {
+                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema8"
+                                    },
                                     "sectionId": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema6"
                                     },
@@ -108073,28 +108202,28 @@
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema7"
                                     },
                                     "unread": {
-                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema8"
-                                    },
-                                    "parentBotId": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema9"
                                     },
-                                    "spawnKey": {
-                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema15"
-                                    },
-                                    "preview": {
+                                    "parentBotId": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema10"
                                     },
-                                    "status": {
+                                    "spawnKey": {
+                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema16"
+                                    },
+                                    "preview": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema11"
                                     },
-                                    "runPhase": {
+                                    "status": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema12"
                                     },
-                                    "runErrorId": {
+                                    "runPhase": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema13"
                                     },
-                                    "updatedAt": {
+                                    "runErrorId": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema14"
+                                    },
+                                    "updatedAt": {
+                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema15"
                                     }
                                   },
                                   "required": [
@@ -108130,28 +108259,28 @@
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
                                     },
                                     "name": {
-                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema16"
-                                    },
-                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema17"
                                     },
-                                    "sectionId": {
+                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema18"
                                     },
-                                    "position": {
+                                    "sectionId": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema19"
                                     },
-                                    "members": {
+                                    "position": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema20"
                                     },
-                                    "preview": {
+                                    "members": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema21"
                                     },
-                                    "unread": {
+                                    "preview": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema22"
                                     },
-                                    "updatedAt": {
+                                    "unread": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema23"
+                                    },
+                                    "updatedAt": {
+                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema24"
                                     }
                                   },
                                   "required": [
@@ -108171,13 +108300,13 @@
                               "externalConversations": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema24"
+                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema25"
                                 }
                               },
                               "botSections": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema30"
+                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema31"
                                 }
                               }
                             },
@@ -119322,6 +119451,12 @@
                             "null"
                           ]
                         },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "unread": {
                           "type": "boolean"
                         },
@@ -121742,11 +121877,14 @@
               "null"
             ]
           },
-          "unread": {
+          "hiddenAt": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema9"
           },
-          "parentBotId": {
+          "unread": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema10"
+          },
+          "parentBotId": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema11"
           },
           "memoryScope": {
             "anyOf": [
@@ -121766,19 +121904,19 @@
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
           },
           "preview": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema11"
-          },
-          "status": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema12"
           },
-          "runPhase": {
+          "status": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema13"
           },
+          "runPhase": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema14"
+          },
           "runErrorId": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema15"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema16"
           },
           "computerMode": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema16"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema17"
           },
           "runsOn": {
             "anyOf": [
@@ -121795,7 +121933,7 @@
             ]
           },
           "updatedAt": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema17"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema18"
           },
           "createdAt": {
             "type": "string"
@@ -121824,7 +121962,7 @@
           "thinkingLevel": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RpcBootstrapOutputSchema18"
+                "$ref": "#/components/schemas/RpcBootstrapOutputSchema19"
               },
               {
                 "type": "null"
@@ -121870,7 +122008,7 @@
             "type": "boolean"
           },
           "spawnKey": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema19"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema20"
           }
         },
         "required": [
@@ -121950,9 +122088,15 @@
         ]
       },
       "RpcBootstrapOutputSchema9": {
-        "type": "boolean"
+        "type": [
+          "string",
+          "null"
+        ]
       },
       "RpcBootstrapOutputSchema10": {
+        "type": "boolean"
+      },
+      "RpcBootstrapOutputSchema11": {
         "anyOf": [
           {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -121962,24 +122106,24 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema11": {
-        "type": "string"
-      },
       "RpcBootstrapOutputSchema12": {
         "type": "string"
       },
       "RpcBootstrapOutputSchema13": {
+        "type": "string"
+      },
+      "RpcBootstrapOutputSchema14": {
         "default": null,
         "anyOf": [
           {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema14"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema15"
           },
           {
             "type": "null"
           }
         ]
       },
-      "RpcBootstrapOutputSchema14": {
+      "RpcBootstrapOutputSchema15": {
         "type": "object",
         "properties": {
           "kind": {
@@ -122014,7 +122158,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema15": {
+      "RpcBootstrapOutputSchema16": {
         "default": null,
         "anyOf": [
           {
@@ -122025,17 +122169,17 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema16": {
+      "RpcBootstrapOutputSchema17": {
         "type": "string",
         "enum": [
           "team",
           "dedicated"
         ]
       },
-      "RpcBootstrapOutputSchema17": {
+      "RpcBootstrapOutputSchema18": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema18": {
+      "RpcBootstrapOutputSchema19": {
         "type": "string",
         "enum": [
           "off",
@@ -122047,13 +122191,13 @@
           "max"
         ]
       },
-      "RpcBootstrapOutputSchema19": {
+      "RpcBootstrapOutputSchema20": {
         "type": [
           "string",
           "null"
         ]
       },
-      "RpcBootstrapOutputSchema20": {
+      "RpcBootstrapOutputSchema21": {
         "type": "object",
         "properties": {
           "id": {
@@ -122063,16 +122207,16 @@
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
           },
           "name": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
-          },
-          "pinned": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema22"
           },
-          "sectionId": {
+          "pinned": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema23"
           },
-          "position": {
+          "sectionId": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema24"
+          },
+          "position": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema25"
           },
           "archivedAt": {
             "type": [
@@ -122081,19 +122225,19 @@
             ]
           },
           "members": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema25"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema26"
           },
           "threadId": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
           },
           "preview": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
-          },
-          "unread": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema28"
           },
-          "updatedAt": {
+          "unread": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema29"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema30"
           },
           "createdAt": {
             "type": "string"
@@ -122115,13 +122259,13 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema21": {
+      "RpcBootstrapOutputSchema22": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema22": {
+      "RpcBootstrapOutputSchema23": {
         "type": "boolean"
       },
-      "RpcBootstrapOutputSchema23": {
+      "RpcBootstrapOutputSchema24": {
         "anyOf": [
           {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -122131,7 +122275,7 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema24": {
+      "RpcBootstrapOutputSchema25": {
         "anyOf": [
           {
             "type": "integer",
@@ -122143,13 +122287,13 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema25": {
+      "RpcBootstrapOutputSchema26": {
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema26"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
         }
       },
-      "RpcBootstrapOutputSchema26": {
+      "RpcBootstrapOutputSchema27": {
         "type": "object",
         "properties": {
           "botId": {
@@ -122172,16 +122316,16 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema27": {
-        "type": "string"
-      },
       "RpcBootstrapOutputSchema28": {
-        "type": "boolean"
+        "type": "string"
       },
       "RpcBootstrapOutputSchema29": {
-        "type": "string"
+        "type": "boolean"
       },
       "RpcBootstrapOutputSchema30": {
+        "type": "string"
+      },
+      "RpcBootstrapOutputSchema31": {
         "type": "object",
         "properties": {
           "id": {
@@ -122216,7 +122360,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema31": {
+      "RpcBootstrapOutputSchema32": {
         "type": "string",
         "enum": [
           "user",
@@ -122224,16 +122368,16 @@
           "system"
         ]
       },
-      "RpcBootstrapOutputSchema32": {
+      "RpcBootstrapOutputSchema33": {
         "type": "string",
         "pattern": "^[a-z][a-z0-9_-]{0,63}$"
       },
-      "RpcBootstrapOutputSchema33": {
+      "RpcBootstrapOutputSchema34": {
         "default": "",
         "type": "string",
         "maxLength": 2048
       },
-      "RpcBootstrapOutputSchema34": {
+      "RpcBootstrapOutputSchema35": {
         "oneOf": [
           {
             "type": "object",
@@ -122314,29 +122458,29 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema35": {
+      "RpcBootstrapOutputSchema36": {
         "type": "string",
         "const": "chart"
       },
-      "RpcBootstrapOutputSchema36": {
+      "RpcBootstrapOutputSchema37": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema37": {
+      "RpcBootstrapOutputSchema38": {
         "type": "object",
         "propertyNames": {
           "type": "string"
         },
         "additionalProperties": {}
       },
-      "RpcBootstrapOutputSchema38": {
+      "RpcBootstrapOutputSchema39": {
         "maxItems": 5000,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema39"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema40"
         }
       },
-      "RpcBootstrapOutputSchema39": {},
-      "RpcBootstrapOutputSchema40": {
+      "RpcBootstrapOutputSchema40": {},
+      "RpcBootstrapOutputSchema41": {
         "type": "object",
         "properties": {
           "id": {
@@ -122383,7 +122527,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema41": {
+      "RpcBootstrapOutputSchema42": {
         "type": "object",
         "properties": {
           "from": {
@@ -122416,12 +122560,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema42": {
+      "RpcBootstrapOutputSchema43": {
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
       },
-      "RpcBootstrapOutputSchema43": {
+      "RpcBootstrapOutputSchema44": {
         "type": "object",
         "properties": {
           "key": {
@@ -122431,7 +122575,7 @@
             "type": "string"
           },
           "cents": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
           }
         },
         "required": [
@@ -122441,7 +122585,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema44": {
+      "RpcBootstrapOutputSchema45": {
         "type": "object",
         "properties": {
           "id": {
@@ -122454,7 +122598,7 @@
             "type": "string"
           },
           "cents": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
           }
         },
         "required": [
@@ -122465,27 +122609,27 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema45": {
+      "RpcBootstrapOutputSchema46": {
         "type": "string",
         "const": "table"
       },
-      "RpcBootstrapOutputSchema46": {
-        "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
-      },
       "RpcBootstrapOutputSchema47": {
+        "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+      },
+      "RpcBootstrapOutputSchema48": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcBootstrapOutputSchema48": {
+      "RpcBootstrapOutputSchema49": {
         "minItems": 1,
         "maxItems": 8,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
         }
       },
-      "RpcBootstrapOutputSchema49": {
+      "RpcBootstrapOutputSchema50": {
         "type": "object",
         "properties": {
           "label": {
@@ -122505,14 +122649,14 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema50": {
+      "RpcBootstrapOutputSchema51": {
         "maxItems": 50,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema52"
         }
       },
-      "RpcBootstrapOutputSchema51": {
+      "RpcBootstrapOutputSchema52": {
         "type": "array",
         "items": {
           "anyOf": [
@@ -122526,14 +122670,14 @@
           ]
         }
       },
-      "RpcBootstrapOutputSchema52": {
+      "RpcBootstrapOutputSchema53": {
         "type": "object",
         "properties": {
           "heading": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
           },
           "body": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
           }
         },
         "required": [
@@ -122542,16 +122686,16 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema53": {
+      "RpcBootstrapOutputSchema54": {
         "type": "string",
         "minLength": 1,
         "maxLength": 4000
       },
-      "RpcBootstrapOutputSchema54": {
+      "RpcBootstrapOutputSchema55": {
         "type": "object",
         "properties": {
           "label": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema56"
           },
           "value": {
             "type": "string",
@@ -122564,16 +122708,16 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema55": {
+      "RpcBootstrapOutputSchema56": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcBootstrapOutputSchema56": {
+      "RpcBootstrapOutputSchema57": {
         "type": "object",
         "properties": {
           "label": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema56"
           },
           "value": {
             "type": "string",
@@ -122591,18 +122735,18 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema57": {
+      "RpcBootstrapOutputSchema58": {
         "type": "object",
         "properties": {
           "title": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
           },
           "subtitle": {
             "type": "string",
             "maxLength": 200
           },
           "body": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
           },
           "badge": {
             "type": "string",
@@ -122618,7 +122762,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema58": {
+      "RpcBootstrapOutputSchema59": {
         "type": "string",
         "enum": [
           "request",
@@ -122628,7 +122772,7 @@
           "fyi"
         ]
       },
-      "RpcBootstrapOutputSchema59": {
+      "RpcBootstrapOutputSchema60": {
         "type": "object",
         "properties": {
           "id": {
@@ -122709,7 +122853,7 @@
           "phase": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RpcBootstrapOutputSchema14"
+                "$ref": "#/components/schemas/RpcBootstrapOutputSchema15"
               },
               {
                 "type": "null"
@@ -122749,7 +122893,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema60": {
+      "RpcBootstrapOutputSchema61": {
         "anyOf": [
           {
             "type": "number",
@@ -122765,10 +122909,10 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema61": {
+      "RpcBootstrapOutputSchema62": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema62": {
+      "RpcBootstrapOutputSchema63": {
         "anyOf": [
           {
             "type": "string"
@@ -122785,7 +122929,7 @@
           {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
             }
           },
           {
@@ -122794,27 +122938,27 @@
               "type": "string"
             },
             "additionalProperties": {
-              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
             }
           }
         ]
       },
-      "RpcBootstrapOutputSchema63": {
+      "RpcBootstrapOutputSchema64": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcBootstrapOutputSchema64": {
+      "RpcBootstrapOutputSchema65": {
         "type": "object",
         "properties": {
           "name": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema65"
-          },
-          "mode": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema66"
           },
-          "rollupHours": {
+          "mode": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema67"
+          },
+          "rollupHours": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema68"
           }
         },
         "required": [
@@ -122823,12 +122967,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema65": {
+      "RpcBootstrapOutputSchema66": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcBootstrapOutputSchema66": {
+      "RpcBootstrapOutputSchema67": {
         "type": "string",
         "enum": [
           "ignore",
@@ -122837,7 +122981,7 @@
           "user"
         ]
       },
-      "RpcBootstrapOutputSchema67": {
+      "RpcBootstrapOutputSchema68": {
         "type": "integer",
         "minimum": 1,
         "maximum": 720
@@ -122996,6 +123140,9 @@
         "type": "boolean"
       },
       "RpcBotsUpdateInputSchema8": {
+        "type": "boolean"
+      },
+      "RpcBotsUpdateInputSchema9": {
         "anyOf": [
           {
             "type": "string",
@@ -123009,7 +123156,7 @@
           }
         ]
       },
-      "RpcBotsUpdateInputSchema9": {
+      "RpcBotsUpdateInputSchema10": {
         "anyOf": [
           {
             "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
@@ -123019,7 +123166,7 @@
           }
         ]
       },
-      "RpcBotsUpdateInputSchema10": {
+      "RpcBotsUpdateInputSchema11": {
         "anyOf": [
           {
             "type": "string",
@@ -123030,10 +123177,10 @@
           }
         ]
       },
-      "RpcBotsUpdateInputSchema11": {
+      "RpcBotsUpdateInputSchema12": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema12": {
+      "RpcBotsUpdateInputSchema13": {
         "anyOf": [
           {
             "type": "string",
@@ -123045,7 +123192,7 @@
           }
         ]
       },
-      "RpcBotsUpdateInputSchema13": {
+      "RpcBotsUpdateInputSchema14": {
         "anyOf": [
           {
             "type": "string",
@@ -123057,7 +123204,7 @@
           }
         ]
       },
-      "RpcBotsUpdateInputSchema14": {
+      "RpcBotsUpdateInputSchema15": {
         "anyOf": [
           {
             "type": "string",
@@ -123076,46 +123223,46 @@
           }
         ]
       },
-      "RpcBotsUpdateInputSchema15": {
+      "RpcBotsUpdateInputSchema16": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema16": {
+      "RpcBotsUpdateInputSchema17": {
         "type": "string",
         "maxLength": 4000
       },
-      "RpcBotsUpdateInputSchema17": {
+      "RpcBotsUpdateInputSchema18": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema18": {
+      "RpcBotsUpdateInputSchema19": {
         "maxItems": 129,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
+          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema20"
         }
       },
-      "RpcBotsUpdateInputSchema19": {
+      "RpcBotsUpdateInputSchema20": {
         "type": "string",
         "minLength": 1,
         "maxLength": 64
       },
-      "RpcBotsUpdateInputSchema20": {
+      "RpcBotsUpdateInputSchema21": {
         "type": "string",
         "enum": [
           "internal",
           "external"
         ]
       },
-      "RpcBotsUpdateInputSchema21": {
+      "RpcBotsUpdateInputSchema22": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema22": {
+      "RpcBotsUpdateInputSchema23": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema23": {
+      "RpcBotsUpdateInputSchema24": {
         "anyOf": [
           {
             "type": "string",
@@ -131299,9 +131446,15 @@
         ]
       },
       "RpcSpacesListOutputSchema8": {
-        "type": "boolean"
+        "type": [
+          "string",
+          "null"
+        ]
       },
       "RpcSpacesListOutputSchema9": {
+        "type": "boolean"
+      },
+      "RpcSpacesListOutputSchema10": {
         "anyOf": [
           {
             "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
@@ -131311,13 +131464,13 @@
           }
         ]
       },
-      "RpcSpacesListOutputSchema10": {
-        "type": "string"
-      },
       "RpcSpacesListOutputSchema11": {
         "type": "string"
       },
       "RpcSpacesListOutputSchema12": {
+        "type": "string"
+      },
+      "RpcSpacesListOutputSchema13": {
         "default": null,
         "anyOf": [
           {
@@ -131360,7 +131513,7 @@
           }
         ]
       },
-      "RpcSpacesListOutputSchema13": {
+      "RpcSpacesListOutputSchema14": {
         "default": null,
         "anyOf": [
           {
@@ -131371,22 +131524,22 @@
           }
         ]
       },
-      "RpcSpacesListOutputSchema14": {
+      "RpcSpacesListOutputSchema15": {
         "type": "string"
       },
-      "RpcSpacesListOutputSchema15": {
+      "RpcSpacesListOutputSchema16": {
         "type": [
           "string",
           "null"
         ]
       },
-      "RpcSpacesListOutputSchema16": {
+      "RpcSpacesListOutputSchema17": {
         "type": "string"
       },
-      "RpcSpacesListOutputSchema17": {
+      "RpcSpacesListOutputSchema18": {
         "type": "boolean"
       },
-      "RpcSpacesListOutputSchema18": {
+      "RpcSpacesListOutputSchema19": {
         "anyOf": [
           {
             "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
@@ -131396,7 +131549,7 @@
           }
         ]
       },
-      "RpcSpacesListOutputSchema19": {
+      "RpcSpacesListOutputSchema20": {
         "anyOf": [
           {
             "type": "integer",
@@ -131408,7 +131561,7 @@
           }
         ]
       },
-      "RpcSpacesListOutputSchema20": {
+      "RpcSpacesListOutputSchema21": {
         "type": "array",
         "items": {
           "type": "object",
@@ -131434,16 +131587,16 @@
           "additionalProperties": false
         }
       },
-      "RpcSpacesListOutputSchema21": {
-        "type": "string"
-      },
       "RpcSpacesListOutputSchema22": {
-        "type": "boolean"
+        "type": "string"
       },
       "RpcSpacesListOutputSchema23": {
-        "type": "string"
+        "type": "boolean"
       },
       "RpcSpacesListOutputSchema24": {
+        "type": "string"
+      },
+      "RpcSpacesListOutputSchema25": {
         "type": "object",
         "properties": {
           "id": {
@@ -131485,10 +131638,10 @@
           "automatedSenderPolicies": {
             "type": "object",
             "propertyNames": {
-              "$ref": "#/components/schemas/RpcSpacesListOutputSchema25"
+              "$ref": "#/components/schemas/RpcSpacesListOutputSchema26"
             },
             "additionalProperties": {
-              "$ref": "#/components/schemas/RpcSpacesListOutputSchema26"
+              "$ref": "#/components/schemas/RpcSpacesListOutputSchema27"
             }
           },
           "automatedSenders": {
@@ -131545,22 +131698,22 @@
         ],
         "additionalProperties": false
       },
-      "RpcSpacesListOutputSchema25": {
+      "RpcSpacesListOutputSchema26": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcSpacesListOutputSchema26": {
+      "RpcSpacesListOutputSchema27": {
         "type": "object",
         "properties": {
           "name": {
-            "$ref": "#/components/schemas/RpcSpacesListOutputSchema27"
-          },
-          "mode": {
             "$ref": "#/components/schemas/RpcSpacesListOutputSchema28"
           },
-          "rollupHours": {
+          "mode": {
             "$ref": "#/components/schemas/RpcSpacesListOutputSchema29"
+          },
+          "rollupHours": {
+            "$ref": "#/components/schemas/RpcSpacesListOutputSchema30"
           }
         },
         "required": [
@@ -131569,12 +131722,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcSpacesListOutputSchema27": {
+      "RpcSpacesListOutputSchema28": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcSpacesListOutputSchema28": {
+      "RpcSpacesListOutputSchema29": {
         "type": "string",
         "enum": [
           "ignore",
@@ -131583,12 +131736,12 @@
           "user"
         ]
       },
-      "RpcSpacesListOutputSchema29": {
+      "RpcSpacesListOutputSchema30": {
         "type": "integer",
         "minimum": 1,
         "maximum": 720
       },
-      "RpcSpacesListOutputSchema30": {
+      "RpcSpacesListOutputSchema31": {
         "type": "object",
         "properties": {
           "id": {
