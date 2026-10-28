@@ -27,7 +27,13 @@ import type { PrismaClient } from "@rakazo/db";
 import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
-import { createRouter, enqueueBotIntroRun, HEARTBEAT_MS, SESSION_RECHECK_MS } from "./router.js";
+import {
+  createRouter,
+  enqueueBotIntroRun,
+  HEARTBEAT_MS,
+  reintroduceUnansweredBot,
+  SESSION_RECHECK_MS,
+} from "./router.js";
 
 describe("account preferences", () => {
   function preferencesDeps(avatarStyle: string) {
@@ -2369,14 +2375,29 @@ describe("bot intro run", () => {
   } satisfies Actor;
   const bot = { id: "bot-1", threadId: "thread-1" } as unknown as Bot;
 
-  function introDeps(options: { agentRuntime?: string; hasCredential?: boolean } = {}) {
+  function introDeps(
+    options: {
+      agentRuntime?: string;
+      hasCredential?: boolean;
+      userMessages?: number;
+      waitingRunId?: string;
+    } = {},
+  ) {
     let calls = 0;
     const create = vi.fn(({ data }: { data: object }) => {
       calls += 1;
       return Promise.resolve({ id: `record-${calls}`, ...data });
     });
     const enqueue = vi.fn().mockResolvedValue(undefined);
-    const tx = { task: { create }, run: { create } };
+    const findWaiting = vi.fn(async () =>
+      options.waitingRunId ? { id: options.waitingRunId } : null,
+    );
+    const tx = {
+      task: { create },
+      run: { create, findFirst: findWaiting },
+      $executeRaw: vi.fn(),
+      message: { findMany: vi.fn(async () => []) },
+    };
     const preference =
       (options.hasCredential ?? true)
         ? { isDefault: true, modelId: "model-1", credential: { id: "cred-1", provider: "test" } }
@@ -2387,11 +2408,14 @@ describe("bot intro run", () => {
         $transaction: vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
         spaceModelPreference,
         deploymentSettings: { findUnique: vi.fn().mockResolvedValue(null) },
+        message: { count: vi.fn(async () => options.userMessages ?? 0) },
+        bot: { findFirst: vi.fn(async () => ({ id: "bot-1", thread: { id: "thread-1" } })) },
       },
+      events: { notify: vi.fn() },
       jobs: { enqueue },
       env: { agentRuntime: options.agentRuntime ?? "pi" },
     } as unknown as RouterDeps;
-    return { create, enqueue, deps };
+    return { create, enqueue, deps, findWaiting };
   }
 
   it("queues an invisible-prompt run so the bot states how it read its role", async () => {
@@ -2448,6 +2472,57 @@ describe("bot intro run", () => {
 
     expect(create).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  describe("after the profile is edited", () => {
+    it("queues a delayed introduction while the user has not written yet", async () => {
+      const { create, enqueue, deps } = introDeps();
+
+      await reintroduceUnansweredBot(deps, actor, bot);
+
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(enqueue).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          payload: { runId: "record-2" },
+          replaceKey: "run:record-2",
+          availableAt: expect.any(Date),
+        }),
+      );
+      const { availableAt } = enqueue.mock.calls[0]?.[0] as { availableAt: Date };
+      expect(availableAt.getTime()).toBeGreaterThan(Date.now() + 1000);
+    });
+
+    it("pushes back the intro run already waiting instead of starting another for a burst of edits", async () => {
+      const { create, enqueue, deps } = introDeps({ waitingRunId: "run-waiting" });
+
+      await reintroduceUnansweredBot(deps, actor, bot);
+
+      expect(create).not.toHaveBeenCalled();
+      expect(enqueue).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          payload: { runId: "run-waiting" },
+          replaceKey: "run:run-waiting",
+          availableAt: expect.any(Date),
+        }),
+      );
+    });
+
+    it("does nothing once the user has sent a message", async () => {
+      const { create, enqueue, deps } = introDeps({ userMessages: 1 });
+
+      await reintroduceUnansweredBot(deps, actor, bot);
+
+      expect(create).not.toHaveBeenCalled();
+      expect(enqueue).not.toHaveBeenCalled();
+    });
+
+    it("does nothing for a bot made by an agent or page", async () => {
+      const { enqueue, deps } = introDeps();
+
+      await reintroduceUnansweredBot(deps, actor, { ...bot, spawnKey: "page:x" } as Bot);
+
+      expect(enqueue).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -3504,6 +3579,8 @@ describe("bot model auth on save", () => {
       secret: { findFirst: secretFindFirst },
       // listBots looks for delegate runs that wait for approval.
       run: { findMany: vi.fn(async () => []) },
+      // The new-bot introduction only asks whether the user has written yet.
+      message: { count: vi.fn(async () => 1) },
       $transaction: vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
     };
     const deps = {
@@ -3524,6 +3601,7 @@ describe("bot model auth on save", () => {
       preferenceFindFirst,
       secretFindFirst,
       botUpdate,
+      userMessageCount: prisma.message.count,
       handler: new RPCHandler(createRouter(deps)),
     };
   }
@@ -3552,6 +3630,17 @@ describe("bot model auth on save", () => {
         data: expect.objectContaining({ name: "Ada renamed", modelId: spark }),
       }),
     );
+  });
+
+  it("checks whether the new bot needs a fresh introduction only when its profile text changes", async () => {
+    const { userMessageCount, handler } = saveDeps({ modelId: spark, preferences: () => null });
+
+    await call(handler, "bots/update", { botId: "bot-1", color: "#112233" });
+    await call(handler, "bots/update", { botId: "bot-1", name: "Ada" });
+    expect(userMessageCount).not.toHaveBeenCalled();
+
+    await call(handler, "bots/update", { botId: "bot-1", name: "Ada renamed" });
+    expect(userMessageCount).toHaveBeenCalledOnce();
   });
 
   it("rejects setting Codex Spark on the space's ChatGPT subscription credential", async () => {

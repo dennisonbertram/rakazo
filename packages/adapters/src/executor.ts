@@ -45,6 +45,7 @@ import {
   AI_DISCLOSURE_VERSION,
   ATTACHMENT_MAX_BYTES,
   BOT_DESCRIPTION_MAX_LENGTH,
+  BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
   BOT_TITLE_MAX_LENGTH,
   BotSecretName,
@@ -2693,6 +2694,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // An external bot is told nothing about tools it is not offered, and gets none of the
         // automatic private context (memory, tickets, recall, environment, connected apps).
         const externalBot = bot.audience === "external";
+        // Only the user typing in this bot's own chat may rewrite the bot's standing instructions.
+        const userTypedInOwnChat =
+          (run.trigger === "user" || run.trigger === "follow_up") &&
+          !thread.groupId &&
+          run.userId === bot.userId;
         const instructionDisabledTools = externalBot
           ? new Set([
               ...disabledBuiltinTools,
@@ -7108,7 +7114,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return spawned;
           }
           if (name === "update_bot") {
-            const parsed = parseUpdateBotPatch(args, bot.name);
+            const parsed = parseUpdateBotPatch(args, bot.name, { userTyped: userTypedInOwnChat });
             if ("error" in parsed) return finish(parsed);
             const patch = parsed.patch;
             const wantsImage = args.artifact_id !== undefined || args.use_attached_image === true;
@@ -7795,6 +7801,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     agentSkillsLine: restrictedContext ? undefined : agentSkillsLine,
                     taughtSkillsLine: restrictedContext ? undefined : taughtSkillsLine,
                     replyGuidance: runReplyGuidance(run.trigger),
+                    botSetupGuidance:
+                      userTypedInOwnChat &&
+                      !bot.description.trim() &&
+                      !bot.instructions.trim() &&
+                      bot.audience !== "external"
+                        ? BOT_SETUP_GUIDANCE
+                        : undefined,
                     quietGuidance,
                     disabledBuiltinTools: instructionDisabledTools,
                   })
@@ -8749,6 +8762,7 @@ export type UpdateBotPatch = {
   name?: string;
   title?: string;
   description?: string;
+  instructions?: string;
   color?: string;
   notifyOnFinish?: boolean;
 };
@@ -8759,11 +8773,32 @@ function hasUpdateBotAvatarArgs(args: Record<string, unknown>): boolean {
   );
 }
 
+/**
+ * `userTyped` is true only when this run came from the user typing in this bot's own chat. A bot's
+ * standing instructions outlive the run, so a routine, another bot or text read from mail or the web
+ * must not be able to rewrite them.
+ */
 export function parseUpdateBotPatch(
   args: Record<string, unknown>,
   currentName: string,
+  options: { userTyped?: boolean } = {},
 ): { error: string } | { patch: UpdateBotPatch } {
   const patch: UpdateBotPatch = {};
+  if (args.instructions !== undefined) {
+    if (!options.userTyped) {
+      return {
+        error:
+          "instructions can only be changed while the user is typing to you in your own chat. Ask the user to change them in your settings.",
+      };
+    }
+    const next = String(args.instructions).trim();
+    if (next.length > BOT_INSTRUCTIONS_MAX_LENGTH) {
+      return {
+        error: `instructions must be at most ${BOT_INSTRUCTIONS_MAX_LENGTH} characters.`,
+      };
+    }
+    patch.instructions = next;
+  }
   if (args.name !== undefined) patch.name = String(args.name);
   if (args.title !== undefined) patch.title = String(args.title);
   if (args.description !== undefined) patch.description = String(args.description);
@@ -9611,6 +9646,10 @@ export function directoryDescription(
 export const PLAIN_CAPABILITY_GUIDANCE =
   'When you tell the user what you can do, describe it in plain words (for example "check bank transactions"), never as raw tool names. Name an email by its subject and a record by its name, never by its id. Speak to the user as "you", never by their name or as "the user".';
 
+/** Only while a bot has no description and no instructions and the user is typing in its own chat. */
+export const BOT_SETUP_GUIDANCE =
+  "You have no description or instructions yet, so set yourself up from what the user says they want you for. Call update_bot once with a fitting name, title, a one-sentence description, an avatar color, and instructions written in the second person that cover your role, how you work and what you need from the user. Then reply in one or two lines saying what you will do, and ask only for what you need to start.";
+
 export const NOT_CONNECTED_GUIDANCE =
   'If the user asks about mail, calendar or files and you have no tool for it because the account is not connected, say so and end with [Open Integrations](/app/integrations). If the user asks to pay a bill or change something at their bank and no bank agent is among your teammates, do not say no payment connection exists. If no bank is connected, say "Add a bank account in Finance" and end with [Open Finance](/app/finance); do not mention Integrations in that reply. The same goes for a question about cash, balance, spending or runway with no bank connected. If a bank is connected but has no agent yet, say that turning on Allow changes for the bank under Integrations sets it up. End with the link given for that bank in the Facts, or [Open Integrations](/app/integrations) when it has none.';
 
@@ -9707,6 +9746,8 @@ export function userTurnInstructions(parts: {
   agentSkillsLine: string | undefined;
   taughtSkillsLine: string | undefined;
   replyGuidance: string;
+  /** Set while the bot is unconfigured and the user is typing in its own chat; see BOT_SETUP_GUIDANCE. */
+  botSetupGuidance?: string | undefined;
   /** Added for quiet routines; follows replyGuidance. */
   quietGuidance?: string | undefined;
   disabledBuiltinTools?: ReadonlySet<string>;
@@ -9742,6 +9783,9 @@ export function userTurnInstructions(parts: {
       "update_bot",
       "update_bot updates this bot's own name (chat header / list label), title, description, avatar, and notifyOnFinish. When the user asks you to rename yourself, change your title or description, change your profile picture, or turn finish notifications on or off, call update_bot — do not claim you changed them without the tool. Pass color for a hex or encoded shape, artifact_id for an image in this space, or use_attached_image when they attached a picture on this message.",
     ),
+    parts.botSetupGuidance && builtinOffered(parts.disabledBuiltinTools, "update_bot")
+      ? parts.botSetupGuidance
+      : undefined,
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "run_subagent",
