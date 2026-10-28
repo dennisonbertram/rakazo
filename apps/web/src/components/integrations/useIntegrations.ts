@@ -45,6 +45,8 @@ export type IntegrationsData = {
   catalogFailed: boolean;
   /** The server offers the by-domain catalog search. */
   feedEnabled: boolean;
+  /** The deployment runs stdio MCP servers, so the local-command route is offered. */
+  mcpStdioEnabled?: boolean;
   refresh: () => Promise<void>;
 };
 
@@ -61,6 +63,7 @@ const EMPTY: Omit<IntegrationsData, "refresh"> = {
   financeSources: [],
   setup: null,
   feedEnabled: false,
+  mcpStdioEnabled: false,
   catalogFailed: false,
 };
 
@@ -104,6 +107,7 @@ export function useIntegrations(): IntegrationsData {
         feed,
         finance,
         meetings,
+        me,
       ] = await Promise.all([
         rpc.connections.catalog({}).catch(() => null),
         rpc.connections.list().catch(() => []),
@@ -118,6 +122,9 @@ export function useIntegrations(): IntegrationsData {
         rpc.finance.overview().catch(() => null),
         Promise.resolve()
           .then(() => rpc.meetings.status())
+          .catch(() => null),
+        Promise.resolve()
+          .then(() => rpc.me())
           .catch(() => null),
       ]);
       const live = connections.filter((row) => row.status !== "revoked");
@@ -162,6 +169,7 @@ export function useIntegrations(): IntegrationsData {
         setup,
         meetings,
         feedEnabled: feed.enabled,
+        mcpStdioEnabled: me?.mcpStdioEnabled === true,
       });
     } catch (err) {
       if (mounted.current && ownerRef.current === requestedFor)

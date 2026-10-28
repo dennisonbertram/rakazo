@@ -1,3 +1,5 @@
+import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
+import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult, ListToolsResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import type {
   AdapterContext,
@@ -36,7 +38,7 @@ import {
 } from "./lazy-tool-catalog.js";
 import type { McpOAuthBroker, OAuthMaterial } from "./mcp-oauth.js";
 import { oauthMaterialSecrets } from "./mcp-oauth.js";
-import { McpSession } from "./mcp-transport.js";
+import { McpSession, mcpStdioRefusal } from "./mcp-transport.js";
 import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { secretRefMatches } from "./secret-changes.js";
@@ -56,12 +58,57 @@ type PendingSession = {
   ref?: string;
 };
 
+/**
+ * A failure the user resolves rather than a bug: `reconnect` needs new credentials or
+ * config, `unreachable` a host that is down or gone. Both are logged as warnings, so they
+ * stay out of error reporting.
+ */
+type ExpectedFailure = "reconnect" | "unreachable";
+const UNREACHABLE_CODES = new Set([
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+function expectedFailure(error: unknown, depth = 0): ExpectedFailure | undefined {
+  if (depth > 5 || !(error instanceof Error)) return undefined;
+  // A redacted connect failure carries the classification its message loses.
+  const { expected, code } = error as { expected?: ExpectedFailure; code?: unknown };
+  if (expected) return expected;
+  if (error instanceof UnauthorizedError || code === 401 || code === 403) return "reconnect";
+  // A name that no longer resolves (an expired tunnel) needs a new address, not a retry.
+  if (code === "ENOTFOUND") return "reconnect";
+  if (typeof code === "string" && UNREACHABLE_CODES.has(code)) return "unreachable";
+  const inner = error instanceof AggregateError ? error.errors : [error.cause];
+  for (const cause of inner) {
+    const kind = expectedFailure(cause, depth + 1);
+    if (kind) return kind;
+  }
+  return undefined;
+}
+
 const TOOL_LIST_TTL_MS = 30_000;
 type ToolListEntry = {
   result?: ListToolsResult;
   expiresAt: number;
   pending?: Promise<ListToolsResult>;
 };
+
+/** Whether the server rejected the request because it no longer knows the session. */
+function sessionGone(error: unknown): boolean {
+  if (!(error instanceof StreamableHTTPError)) return false;
+  return (
+    error.code === 404 ||
+    (error.code === 400 &&
+      /\bBad Request: (?:Server not initialized|No valid session ID(?: provided| or initialization request)?|Mcp-Session-Id header is required)(?="|$)/i.test(
+        error.message,
+      ))
+  );
+}
 
 /** Runtime MCP connector. Authorization is re-checked against the bot assignment on every call. */
 /**
@@ -210,6 +257,8 @@ export class McpConnector implements ConnectorProvider {
   private readonly sessions = new Map<string, SessionEntry>();
   private readonly connecting = new Map<string, PendingSession>();
   private readonly toolLists = new WeakMap<McpSession, ToolListEntry>();
+  private readonly inFlight = new WeakMap<McpSession, number>();
+  private readonly expired = new WeakSet<McpSession>();
   // Discovery runs more than once per run: once up front, then again on every lazy
   // catalog access. Each attempt needs its own executionId.
   private discoverySeq = 0;
@@ -293,8 +342,9 @@ export class McpConnector implements ConnectorProvider {
         const startedAt = Date.now();
         try {
           context.onConnecting?.(assignment.server.name || assignment.server.slug);
-          const session = await this.sessionFor(assignment.server, context);
-          const listed = await this.cachedTools(session, context.signal);
+          const listed = await this.withSession(assignment.server, context, (session) =>
+            this.cachedTools(session, context.signal),
+          );
           reportAllowlistDrift(assignment, listed.tools, context);
           return listed.tools
             .filter((tool) => assignmentAllowsTool(assignment, tool.name, tool.annotations))
@@ -334,10 +384,15 @@ export class McpConnector implements ConnectorProvider {
             }));
         } catch (error) {
           // A single unavailable server must not hide tools from other connectors.
-          getLogger().error(
-            `mcp discovery failed for server ${assignment.server.slug}:`,
-            sanitizeConnectorError(error),
-          );
+          if (expectedFailure(error))
+            getLogger().warn(`mcp discovery failed for server ${assignment.server.slug}`, {
+              reason: sanitizeConnectorError(error),
+            });
+          else
+            getLogger().error(
+              `mcp discovery failed for server ${assignment.server.slug}:`,
+              sanitizeConnectorError(error),
+            );
           // Capture material before eviction so the audited reason stays redacted, the
           // same reason execute() captures it before callTool.
           const key = this.sessionKey(assignment.server, context);
@@ -461,9 +516,17 @@ export class McpConnector implements ConnectorProvider {
         const preset = integrationPresetForEndpoint(assignment.server.endpoint);
         const fixedClassification =
           preset?.reads.includes(route.toolName) || preset?.forcedWrites.includes(route.toolName);
-        const listed = fixedClassification
-          ? await this.cachedTools(session, context.signal)
-          : await session.listTools({ signal: context.signal });
+        const listed = await this.withSession(
+          assignment.server,
+          context,
+          (current) => {
+            listedSession = current;
+            return fixedClassification
+              ? this.cachedTools(current, context.signal)
+              : current.listTools({ signal: context.signal });
+          },
+          session,
+        );
         annotations = listed.tools.find((tool) => tool.name === route.toolName)?.annotations;
       } catch (error) {
         yield { type: "error", message: sanitizeConnectorError(error) };
@@ -557,9 +620,16 @@ export class McpConnector implements ConnectorProvider {
         yield { type: "error", message: denied };
         return;
       }
-      const result = await session.callTool(route.toolName, call.args, {
-        signal: context.signal,
-      });
+      // A session the server expired is replaced once; the gate above already passed.
+      const result = await this.withSession(
+        opened,
+        context,
+        (current) => {
+          material = this.sessions.get(sessionKey)?.material ?? material;
+          return current.callTool(route.toolName, call.args, { signal: context.signal });
+        },
+        session,
+      );
       const secrets = material ? oauthMaterialSecrets(material) : [];
       yield { type: "result", data: redactConnectorPayload(result, secrets) };
     } catch (error) {
@@ -602,7 +672,15 @@ export class McpConnector implements ConnectorProvider {
     }
     await options.beforeCall?.();
     try {
-      return await session.callTool(toolName, args, { signal: context.signal });
+      return await this.withSession(
+        server,
+        context,
+        (current) => {
+          material = this.sessions.get(sessionKey)?.material ?? material;
+          return current.callTool(toolName, args, { signal: context.signal });
+        },
+        session,
+      );
     } catch (error) {
       const secrets = material ? oauthMaterialSecrets(material) : [];
       await this.evict(sessionKey);
@@ -621,10 +699,11 @@ export class McpConnector implements ConnectorProvider {
   ): Promise<Tool[]> {
     const sessionKey = this.sessionKey(server, context);
     try {
-      const session = await this.sessionFor(server, context);
-      const listed = options.fresh
-        ? await session.listTools({ signal: context.signal })
-        : await this.cachedTools(session, context.signal);
+      const listed = await this.withSession(server, context, (session) =>
+        options.fresh
+          ? session.listTools({ signal: context.signal })
+          : this.cachedTools(session, context.signal),
+      );
       return structuredClone(listed.tools);
     } catch (error) {
       await this.evict(sessionKey);
@@ -688,6 +767,37 @@ export class McpConnector implements ConnectorProvider {
     const result = await pending;
     signal?.throwIfAborted();
     return result;
+  }
+
+  /**
+   * Streamable HTTP servers answer 404 for a session they expired or lost on restart; many
+   * (including the SDK's own "Server not initialized") answer 400 naming the session instead.
+   * The request never ran there, so it is sent once more on a fresh session instead of failing.
+   */
+  private async withSession<T>(
+    server: McpServer,
+    context: AdapterContext,
+    use: (session: McpSession) => Promise<T>,
+    first?: McpSession,
+  ): Promise<T> {
+    for (let attempt = 0; ; attempt += 1) {
+      const session = attempt === 0 && first ? first : await this.sessionFor(server, context);
+      this.inFlight.set(session, (this.inFlight.get(session) ?? 0) + 1);
+      try {
+        return await use(session);
+      } catch (error) {
+        if (attempt !== 0 || !sessionGone(error)) throw error;
+        const sessionKey = this.sessionKey(server, context);
+        // Stop reusing the expired session immediately, but let its other requests
+        // receive their own responses before closing the shared SDK client.
+        if (this.sessions.get(sessionKey)?.session === session) this.sessions.delete(sessionKey);
+        this.expired.add(session);
+      } finally {
+        const remaining = (this.inFlight.get(session) ?? 1) - 1;
+        this.inFlight.set(session, remaining);
+        if (remaining === 0 && this.expired.has(session)) await session.close();
+      }
+    }
   }
 
   private async sessionFor(server: McpServer, context: AdapterContext): Promise<McpSession> {
@@ -801,7 +911,9 @@ export class McpConnector implements ConnectorProvider {
       const args = Array.isArray(server.args) ? server.args.map(String) : [];
       const env = { ...(material.env ?? {}) };
       if (server.transport === "stdio") {
-        if (!this.options.stdioEnabled) throw new Error("MCP stdio is disabled");
+        // Only a deployment change or an edit to the server fixes a refusal, so wait for one.
+        const refusal = mcpStdioRefusal(String(server.command ?? ""), this.options);
+        if (refusal) throw Object.assign(new Error(refusal), { expected: "reconnect" });
         await session.connectStdio({
           command: String(server.command ?? ""),
           args,
@@ -863,7 +975,7 @@ export class McpConnector implements ConnectorProvider {
       // Keep the transport's HTTP status for withHttpStatus.
       throw Object.assign(
         new Error(sanitizeConnectorError(error, oauthMaterialSecrets(material))),
-        { code: (error as { code?: unknown } | null)?.code },
+        { code: (error as { code?: unknown } | null)?.code, expected: expectedFailure(error) },
       );
     }
   }

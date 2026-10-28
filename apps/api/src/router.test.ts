@@ -1069,6 +1069,39 @@ describe("MCP loopback endpoints", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it("reports a second server with the same name as a conflict", async () => {
+    const { create, handler } = mcpDeps();
+    create.mockRejectedValueOnce(
+      Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
+    );
+    const { response } = await handler.handle(rpc("mcp/servers/create", createInput), {
+      prefix: "/rpc",
+      context: { actor: actor(true) },
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response?.text()).toContain("An MCP server with that name already exists.");
+  });
+
+  it("refuses a stdio server this deployment can't run", async () => {
+    const { create, handler } = mcpDeps();
+    const { response } = await handler.handle(
+      rpc("mcp/servers/create", {
+        transport: "stdio",
+        slug: "files",
+        name: "Files",
+        command: "npx",
+        args: [],
+        env: {},
+      }),
+      { prefix: "/rpc", context: { actor: actor(true) } },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response?.text()).toContain("Stdio MCP servers aren't available here");
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("refuses to start OAuth against a stored loopback endpoint for a non-owner", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);

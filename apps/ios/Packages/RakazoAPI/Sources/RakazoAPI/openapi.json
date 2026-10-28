@@ -8188,6 +8188,9 @@
                             "sandboxProvider": {
                               "type": "string"
                             },
+                            "mcpStdioEnabled": {
+                              "type": "boolean"
+                            },
                             "avatarStyle": {
                               "type": "string",
                               "enum": [
@@ -85150,6 +85153,9 @@
                         "sandboxProvider": {
                           "type": "string"
                         },
+                        "mcpStdioEnabled": {
+                          "type": "boolean"
+                        },
                         "avatarStyle": {
                           "type": "string",
                           "enum": [
@@ -97916,6 +97922,9 @@
                         },
                         "sandboxProvider": {
                           "type": "string"
+                        },
+                        "mcpStdioEnabled": {
+                          "type": "boolean"
                         },
                         "avatarStyle": {
                           "type": "string",
