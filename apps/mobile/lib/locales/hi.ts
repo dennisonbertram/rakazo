@@ -163,6 +163,7 @@ export const HI_MESSAGES: Record<string, string> = {
   "Could not speak": "बोलकर नहीं सुनाया जा सका",
   "Could not update reaction": "रिएक्शन अपडेट नहीं हो सका",
   "Could not remember": "याद नहीं रखा जा सका",
+  "Mark as unread": "अपठित के रूप में चिह्नित करें",
   Created: "बनाया गया",
   "Delete…": "हटाएँ…",
   Denied: "अस्वीकृत",

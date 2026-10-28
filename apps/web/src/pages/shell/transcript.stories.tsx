@@ -44,6 +44,7 @@ const baseProps = {
   onOpenBot: noop,
   onAnswer: asyncNoop,
   onReply: noop,
+  onMarkUnread: noop,
   onQuote: noop,
   onReact: asyncNoop,
   onJumpToMessage: noop,

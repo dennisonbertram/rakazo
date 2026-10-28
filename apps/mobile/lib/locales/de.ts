@@ -172,6 +172,7 @@ export const DE_MESSAGES: Record<string, string> = {
   "Could not speak": "Vorlesen fehlgeschlagen",
   "Could not update reaction": "Reaktion konnte nicht aktualisiert werden",
   "Could not remember": "Konnte nicht gemerkt werden",
+  "Mark as unread": "Als ungelesen markieren",
   Created: "Erstellt",
   "Delete…": "Löschen…",
   Denied: "Abgelehnt",

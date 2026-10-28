@@ -4,7 +4,11 @@ import type { PrismaClient } from "@rakazo/db";
 import { createDb, createThreadMessage } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ThreadTarget } from "./thread-target.js";
-import { setThreadUnreadState, threadSnapshotForReader } from "./thread-target.js";
+import {
+  markThreadUnreadFrom,
+  setThreadUnreadState,
+  threadSnapshotForReader,
+} from "./thread-target.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describePostgres =
@@ -158,6 +162,23 @@ describePostgres("thread read boundary (PostgreSQL)", () => {
     const bobs = await thread(bob);
     await setThreadUnreadState(prisma, alice, target(bobs), false);
     expect(await read(bobs)).toEqual({ lastReadSeq: -1, unread: true });
+  });
+
+  it("marking unread from a message moves the boundary just before it, for the caller only", async () => {
+    const id = await thread(alice);
+    await setThreadUnreadState(prisma, alice, target(id), false);
+    await markThreadUnreadFrom(prisma, alice, target(id), mid(id, 2));
+    expect(await read(id)).toEqual({ lastReadSeq: 1, unread: true });
+    // Unknown message, another thread's message, another user and another space change nothing.
+    const other = await thread(alice);
+    await setThreadUnreadState(prisma, alice, target(id), false);
+    await expect(markThreadUnreadFrom(prisma, alice, target(id), "nope")).rejects.toThrow();
+    await expect(markThreadUnreadFrom(prisma, alice, target(id), mid(other, 2))).rejects.toThrow();
+    await expect(markThreadUnreadFrom(prisma, bob, target(id), mid(id, 2))).rejects.toThrow();
+    await expect(
+      markThreadUnreadFrom(prisma, aliceElsewhere, target(id), mid(id, 2)),
+    ).rejects.toThrow();
+    expect(await read(id)).toEqual({ lastReadSeq: 4, unread: false });
   });
 
   it("markUnread puts the newest other-party message back after the boundary", async () => {

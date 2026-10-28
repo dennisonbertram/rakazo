@@ -1415,6 +1415,29 @@ export async function threadSnapshotForReader(
 }
 
 /**
+ * Marks the thread unread from one of its messages: the read boundary moves to just before it, so
+ * the next open puts the "New" divider at the first reply from it. A message that is not in this
+ * thread is NOT_FOUND. One statement scoped to the caller's space and user.
+ * (Upstream elie222/rakazo f6a1ef222, #1933.)
+ */
+export async function markThreadUnreadFrom(
+  prisma: PrismaClient,
+  actor: Actor,
+  target: ThreadTarget,
+  messageId: string,
+) {
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    UPDATE threads SET "unread" = true, "lastReadSeq" = m."seq" - 1
+    FROM messages m
+    WHERE m."id" = ${messageId} AND m."threadId" = threads.id
+      AND threads.id = ${target.threadId} AND threads."spaceId" = ${actor.spaceId}
+      AND threads."userId" = ${actor.userId}
+    RETURNING threads.id`;
+  if (rows.length === 0) throw new ORPCError("NOT_FOUND");
+  if (rows.length > 1) throw new IsolationError();
+}
+
+/**
  * Marking read moves the read boundary forward to the message `upToMessageId` (the newest when
  * omitted), never backward, and clears `unread` at the newest message or when the reader reports
  * `toEnd`. An id that is not in this thread changes nothing. Marking unread moves the boundary back

@@ -300,6 +300,7 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Could not update notifications": "无法更新通知",
   "Could not update reaction": "无法更新反应",
   "Could not remember": "无法记住",
+  "Mark as unread": "标为未读",
   "Couldn't update avatars": "无法更新头像",
   Create: "创建",
   "Create group": "创建群组",
