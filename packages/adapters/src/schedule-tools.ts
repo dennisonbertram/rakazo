@@ -17,6 +17,7 @@ import {
   nextCronDate,
   nextCronDateAcross,
   ONCE_ROUTINE_CRON,
+  unevenInterval,
 } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { resumeWatch, syncWatchState, watchLimitError } from "@rakazo/db";
@@ -734,7 +735,14 @@ export async function updateScheduleFromTool(
     !isOneShotRoutineCrons(crons) &&
     (timezone !== existing.timezone || (enabled && !nextRunAt))
   ) {
-    nextRunAt = nextCronDateAcross(crons, new Date(), timezone);
+    // An uneven step (every 7 hours) recurs by a fixed gap that no timezone moves, so a new
+    // zone alone keeps the next run where it was instead of restarting the count from now.
+    const due = existing.nextRunAt;
+    const step = crons.length === 1 ? unevenInterval(crons[0] ?? "") : undefined;
+    nextRunAt =
+      due && due.getTime() > Date.now() && step && step.unit !== "days"
+        ? due
+        : nextCronDateAcross(crons, new Date(), timezone);
   }
   if (
     enabled &&

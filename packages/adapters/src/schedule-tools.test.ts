@@ -581,6 +581,56 @@ describe("routine from a forced skill", () => {
     expect(prisma.routine.delete).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { cron: "0 */7 * * *", keeps: true },
+    { cron: "0 9 * * *", keeps: false },
+  ])(
+    "on a timezone-only change, keeps the next run of $cron: $keeps",
+    async ({ cron, keeps }) => {
+      const due = new Date(Date.now() + 3 * 3_600_000);
+      const update = vi.fn(async (args: { data: Record<string, unknown> }) => ({
+        id: "r1",
+        spaceId: "s",
+        botId: "b",
+        name: "Note",
+        prompt: "x",
+        crons: [cron],
+        active: true,
+        threadId: null,
+        watch: null,
+        ...args.data,
+      }));
+      const prisma = {
+        routine: {
+          findFirst: vi.fn(async () => ({
+            id: "r1",
+            prompt: "x",
+            timezone: "UTC",
+            crons: [cron],
+            active: true,
+            nextRunAt: due,
+            managedKind: null,
+          })),
+          update,
+        },
+      };
+      const deps = {
+        prisma,
+        events: { append: vi.fn() },
+        jobs: { enqueue: vi.fn(), cancel: vi.fn() },
+      } as never;
+      await updateScheduleFromTool(deps, {
+        spaceId: "s",
+        botId: "b",
+        userId: "u",
+        id: "r1",
+        timezone: "Pacific/Auckland",
+      });
+      const nextRunAt = update.mock.calls[0]![0].data.nextRunAt as Date;
+      expect(nextRunAt.getTime() === due.getTime()).toBe(keeps);
+    },
+  );
+
   it("names the group an updated routine posts in", async () => {
     const prisma = {
       routine: {
