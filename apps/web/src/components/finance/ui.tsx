@@ -1020,7 +1020,7 @@ export function Chip({ to, on, children }: { to: string; on?: boolean; children:
       to={to}
       aria-current={on ? "true" : undefined}
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs",
+        "inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-xs pointer-coarse:min-h-11",
         on
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
