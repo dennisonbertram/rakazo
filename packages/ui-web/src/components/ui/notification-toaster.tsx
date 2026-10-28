@@ -212,7 +212,7 @@ function ToastList({
       const panelOpen = Boolean(document.querySelector("[data-toast-panel]"));
       const panelReserve =
         lift > 0 && isPhone() && panelOpen
-          ? window.innerHeight - viewport.getBoundingClientRect().top
+          ? window.innerHeight - viewport.getBoundingClientRect().top + GAP_ABOVE_PX
           : 0;
       document.documentElement.style.setProperty("--toast-panel-reserve", `${panelReserve}px`);
       const beside = besidePanel();

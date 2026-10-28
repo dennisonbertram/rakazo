@@ -481,10 +481,11 @@ export function CalendarPage({
   const isGrid = view === "day" || view === "week";
   useEffect(() => {
     const el = scroller.current;
-    if (!el || !isGrid) return;
+    if (!el || !isGrid || loading) return;
     const hour = start <= today && today < end ? Math.max(new Date().getHours() - 1, 0) : 7;
-    el.scrollTop = hour * HOUR_PX;
-  }, [isGrid, start, end, today]);
+    // The hour line sits right under the sticky day header, which grows once all-day items load; back up a little so its label is not half hidden.
+    el.scrollTop = Math.max(hour * HOUR_PX - 8, 0);
+  }, [isGrid, start, end, today, loading]);
 
   const todos = <BotTodos hideDueBetween={{ from: startOf(start), to: startOf(end) }} />;
   const filters = (
@@ -533,7 +534,7 @@ export function CalendarPage({
                 <th
                   key={day}
                   scope="col"
-                  className="p-1 text-start text-xs font-normal text-muted-foreground sm:p-2"
+                  className="p-1 text-start text-xs font-normal text-muted-foreground max-sm:text-center sm:p-2"
                 >
                   {new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" }).format(
                     new Date(Date.UTC(2024, 0, 7 + day)),
@@ -822,12 +823,12 @@ export function CalendarPage({
         <Button variant="outline" size="sm" onClick={() => list.clear("date")}>
           <Trans>Today</Trans>
         </Button>
-        {/* On a phone Schedule keeps the arrows' room, so the title and the view switch stay put. */}
+        {/* Schedule has no arrows (it always starts today), so its title takes their room. */}
         <Button
           variant="ghost"
           size="icon-sm"
           aria-label={t`Previous`}
-          className={view === "schedule" ? (phone ? "invisible" : "hidden") : undefined}
+          className={view === "schedule" ? "hidden" : undefined}
           onClick={() => step(-1)}
         >
           <ChevronLeft size={16} aria-hidden="true" />
@@ -836,7 +837,7 @@ export function CalendarPage({
           variant="ghost"
           size="icon-sm"
           aria-label={t`Next`}
-          className={view === "schedule" ? (phone ? "invisible" : "hidden") : undefined}
+          className={view === "schedule" ? "hidden" : undefined}
           onClick={() => step(1)}
         >
           <ChevronRight size={16} aria-hidden="true" />

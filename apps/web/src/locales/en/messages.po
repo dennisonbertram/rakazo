@@ -9087,10 +9087,6 @@ msgstr "Pick a model from the list or enter a model id served by this endpoint."
 msgid "Pick a provider below and connect it."
 msgstr "Pick a provider below and connect it."
 
-#: src/pages/RoutineEditor.tsx
-msgid "Pick when this runs, for example every Monday morning."
-msgstr "Pick when this runs, for example every Monday morning."
-
 #: src/components/sidebar-folders/SidebarDnd.tsx
 msgid "Picked up {item}."
 msgstr "Picked up {item}."
