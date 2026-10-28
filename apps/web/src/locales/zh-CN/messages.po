@@ -1364,6 +1364,10 @@ msgstr ""
 msgid "Allow changes in {service}?"
 msgstr ""
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Allow cross-space bot communication"
+msgstr ""
+
 #: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "允许一次"
@@ -11803,6 +11807,7 @@ msgstr "停止示范"
 msgid "Stop tracking"
 msgstr ""
 
+#: src/components/AskCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Stopped"
 msgstr ""

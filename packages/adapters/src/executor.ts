@@ -146,6 +146,7 @@ import {
   PrivateFragments,
   parseSkillMd,
   plainRunError,
+  plainTextFromMarkdown,
   planActionGate,
   promptInvokesSkill,
   quietRoutineGuidance,
@@ -159,6 +160,7 @@ import {
   toolRequiresExplicitApproval,
   toolResultTaintsRun,
   truncatedPlainText,
+  truncatePlainText,
   unattendedToolRequiresApproval,
   userTurnMessageForRun,
   VOICE_AGENT_INSTRUCTIONS,
@@ -200,6 +202,7 @@ import { createUiArtifact } from "@rakazo/ui-artifact";
 import {
   connectAgent,
   messageConnectedAgent,
+  prepareAgentConnectionResponse,
   respondAgentConnection,
 } from "./agent-connections.js";
 import {
@@ -269,6 +272,7 @@ import {
   forgetBotSecret,
   listBotSecrets,
   loadBotCommandEnvironment,
+  loadLoginPasswordRedactions,
   normalizeSecretDestination,
   requestWithBotSecret,
   resolveLoginFill,
@@ -1635,6 +1639,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           agentSkills,
           agentSecretRows,
           initialBotCommandEnvironment,
+          savedLoginPasswordRedactions,
         ] = await Promise.all([
           deps.prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } }),
           loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId),
@@ -1689,6 +1694,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           voiceAgent
             ? Promise.resolve({})
             : loadBotCommandEnvironment(deps.prisma, deps.secretStore, run),
+          loadLoginPasswordRedactions(deps.prisma, deps.secretStore, run),
         ]);
         const voiceWorkspaceReadAllowed =
           voiceAgent &&
@@ -1863,6 +1869,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         runSecrets.push(...Object.values(agentEnvironment));
         // Encoded forms too: read_file redacts with these values before any shell command runs.
         runSecrets.push(...commandCredentialRedactions(initialBotCommandEnvironment));
+        // A login filled in an earlier run may still be on its page, and anything this run reads
+        // or is given may contain it, so every run hides its saved passwords before the model runs.
+        runSecrets.push(...savedLoginPasswordRedactions);
         const agentEnvironmentInstruction = restrictedContext
           ? undefined
           : formatAgentEnvironmentInstruction({
@@ -2017,7 +2026,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: bot.id,
           type: "run.started",
           runId,
-          payload: { trigger: run.trigger, routineId: run.routineId },
+          payload: { trigger: run.trigger, routineId: run.routineId, userId: run.userId },
         });
 
         const discoveredPromise =
@@ -3130,6 +3139,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }),
           // Cross-owner agent connections only exist for chat-linked bots.
           ...(hasMessagingIdentity &&
+          bot.crossSpaceCommunication === true &&
           bot.audience !== "external" &&
           !voiceAgent &&
           !gtmAgent &&
@@ -3462,8 +3472,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
             visualActionKey,
           );
           unchangedVisualStreak = guard.streak;
+          // A browser window's title is the page title, which can echo a signed-in username.
+          const activeWindow = observation.activeWindow;
           const result = observationToolResult(
-            observation,
+            activeWindow?.title
+              ? {
+                  ...observation,
+                  activeWindow: {
+                    ...activeWindow,
+                    title: redactSecrets(activeWindow.title, runSecrets),
+                  },
+                }
+              : observation,
             note,
             lastComputerFrameId,
             visualActionKey ? { unchangedVisualCount: guard.streak.count } : undefined,
@@ -4113,6 +4133,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? { disclosure: MESSAGING_AI_DISCLOSURE }
                 : {}),
             };
+          }
+          if (name === "respond_agent_connection") {
+            if (nextApprovedTool !== name) {
+              const request = await prepareAgentConnectionResponse(
+                deps.prisma,
+                bot.id,
+                Boolean(args.accept),
+              );
+              if (!request) return { error: "no pending connection request" };
+              args = request;
+            } else if (
+              typeof args.requester_name !== "string" ||
+              typeof args.requester_address !== "string" ||
+              typeof args.requester_provider !== "string"
+            ) {
+              return { error: "connection request is no longer pending" };
+            }
+            effectRequest = args;
           }
           const viaConnector = !BUILTIN_AGENT_TOOL_NAMES.has(name) && !COMPANY_TOOL_NAMES.has(name);
           const builtinDenial = viaConnector ? null : await googleBuiltinDenial(name);
@@ -5172,7 +5210,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               path: requestedPath,
               entries: entries.map((entry) => ({
                 ...entry,
-                path: displayBotWorkspacePath(computerMode, bot.id, requestedPath, entry.path),
+                // A file name can carry a value an earlier command or page wrote.
+                path: redactSecrets(
+                  displayBotWorkspacePath(computerMode, bot.id, requestedPath, entry.path),
+                  runSecrets,
+                ),
               })),
             };
           }
@@ -5324,7 +5366,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               }
               return finish({ ok: true, path: outPath, attached });
             } catch (error) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message = redactSecrets(
+                error instanceof Error ? error.message : String(error),
+                runSecrets,
+              );
               getLogger().error(`render_plot failed for bot ${bot.id}: ${message}`);
               return finish({
                 error: message,
@@ -6233,6 +6278,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               await updateTicket(deps, {
                 spaceId: run.spaceId,
                 botId: bot.id,
+                userId: run.userId,
                 id: String(args.id ?? ""),
                 title: args.title !== undefined ? String(args.title) : undefined,
                 description: args.description !== undefined ? String(args.description) : undefined,
@@ -6631,6 +6677,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               await semanticMemory.forget(
                 {
                   id: String(args.id ?? ""),
+                  scope: memoryScope!,
+                  botId: bot.id,
                   ...(typeof args.entity === "string" && args.entity.trim()
                     ? { entity: args.entity.trim() }
                     : {}),
@@ -6967,8 +7015,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
             await notifyRun(deps, run, {
               kind: "help",
-              title: `${bot.name} needs a code`,
-              body: String(args.label ?? "Code"),
+              ...secretAskNotification(bot.name, String(args.label ?? "Code"), runSecrets),
               botId: bot.id,
               threadId: thread.id,
             });
@@ -7259,7 +7306,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               deps,
               { ...run, sourceMessageId: run.sourceMessageId },
               { id: bot.id, name: bot.name },
-              { accept: Boolean(args.accept) },
+              {
+                accept: Boolean(args.accept),
+                connectionId: String(args.connection_id ?? ""),
+                connectionVersion: Number(args.connection_version ?? 0),
+              },
             );
             if (!result.ok) return finish({ error: result.error });
             return finish(result);
@@ -9616,7 +9667,7 @@ export async function loadFinanceConnectionLine(
 
 /** Shown while the first mail sort runs, so an empty To do list is not read as "no tasks". */
 export const MAIL_SORTING_LINE =
-  "Facts: some of the user's mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as \"some recent mail is still being sorted\", and end with [Open Inbox](/app/inbox).";
+  'Facts: some of the user\'s mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as "some recent mail is still being sorted", and end with [Open Inbox](/app/inbox).';
 
 export function userTurnInstructions(parts: {
   botInstructions: string;
@@ -9940,6 +9991,17 @@ export function completionNotificationPreview(text: string): string {
   return truncatedPlainText(text, COMPLETION_NOTIFICATION_MAX_CHARS);
 }
 
+/** A secret card can ask for a code or a login, so the title stays generic and the label short. */
+export function secretAskNotification(botName: string, label: string, runSecrets: string[]) {
+  // Strip and redact before shortening so no protected value is left half-shown.
+  const text = plainTextFromMarkdown(redactSecrets(label, runSecrets), { maxSource: Infinity });
+  const body = truncatePlainText(
+    redactSecrets(text, runSecrets),
+    COMPLETION_NOTIFICATION_MAX_CHARS,
+  );
+  return { title: `${botName} needs an answer`, body };
+}
+
 export function completionMarksUnread(
   trigger: string,
   text: string,
@@ -10241,6 +10303,11 @@ async function failRun(
         keyRejected:
           "The model provider did not accept your API key. Check it in Settings > Models.",
         generic: "Something went wrong. Try again.",
+        spendLimit: (resetsOn) =>
+          `The AI key hit its spending limit.${resetsOn ? ` It resets ${resetsOn}.` : ""} Raise the limit with your provider or use another key in Settings > Models.`,
+        outOfCredits:
+          "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.",
+        rateLimited: "The model provider is rate limiting requests. Try again in a few minutes.",
       }).slice(0, 180),
       botId: bot.id,
       threadId: run.threadId,

@@ -645,7 +645,15 @@ const SENT: Array<[string, string, string, string, number]> = [
   ],
 ];
 for (const [to, subject, text, thread, days] of SENT) {
-  MAIL.push({ thread, agoMs: days * DAY_MS, from: ME, to, subject, text, sent: true });
+  MAIL.push({
+    thread,
+    agoMs: days * DAY_MS,
+    from: ME,
+    to,
+    subject,
+    text,
+    sent: true,
+  });
 }
 
 const SALES_MAIL: Mail[] = [
@@ -696,7 +704,10 @@ function toMessages(prefix: string, mail: Mail[], now: Date): EmulatedMessage[] 
       ...(BULK_SENDER.test(item.from)
         ? {
             headers: [
-              { name: "List-Unsubscribe", value: "<mailto:unsubscribe@lists.example.test>" },
+              {
+                name: "List-Unsubscribe",
+                value: "<mailto:unsubscribe@lists.example.test>",
+              },
               { name: "List-Id", value: "<updates.lists.example.test>" },
             ],
           }
@@ -892,7 +903,10 @@ function monthDay(now: Date, monthsAgo: number, day: number): Date {
  * Last month's statement for a bank with no integration, as a CSV export, so Accounts shows a
  * statement account (named from the statement, and renamable) and the monthly reminder.
  */
-export function demoStatementCsv(now = new Date()): { fileName: string; body: string } {
+export function demoStatementCsv(now = new Date()): {
+  fileName: string;
+  body: string;
+} {
   const day = (d: number) => monthDay(now, 1, d).toISOString().slice(0, 10);
   const month = day(1).slice(0, 7);
   const rows = [
@@ -1075,7 +1089,8 @@ export function demoFinance(now = new Date()) {
         id: "mock-trs-3333",
         status: "active",
         createdAt: monthDay(now, 12, 1).toISOString(),
-        availableBalance: 1_150_000,
+        // A $100,000 withdrawal is pending: available is below the posted balance.
+        availableBalance: 1_050_000,
         currentBalance: 1_150_000,
         netReturns: Array.from({ length: 6 }, (_, i) => {
           const month = monthDay(now, i + 1, 1)
@@ -1116,10 +1131,34 @@ export function demoFinance(now = new Date()) {
     txns: { [MERCURY_CHECKING]: checking, [MERCURY_SAVINGS]: [] },
     accounts: mercuryAccounts,
     treasury,
+    treasuryTxns: {
+      "mock-trs-3333": Array.from({ length: 6 }, (_, i) => [
+        {
+          id: `mock-trs-div-${i}`,
+          type: "dividendPosted",
+          amount: 4_100 + i * 35,
+          canonicalDay: monthDay(now, i + 1, 1)
+            .toISOString()
+            .slice(0, 10),
+        },
+        {
+          id: `mock-trs-fee-${i}`,
+          type: "mercuryFeePosted",
+          amount: -95,
+          canonicalDay: monthDay(now, i + 1, 2)
+            .toISOString()
+            .slice(0, 10),
+        },
+      ]).flat(),
+    },
   });
   // Not yet cleared: shows as Pending on the dashboard and on its transaction page.
   const pendingAt = new Date(now.getTime() - DAY_MS);
-  const pendingMoney = { value: "612.40", currency: "USD", display: "$612.40 USD" };
+  const pendingMoney = {
+    value: "612.40",
+    currency: "USD",
+    display: "$612.40 USD",
+  };
   expenses.unshift(
     brexExpense("mock-brex-pending", {
       purchased_at: pendingAt.toISOString(),
@@ -1140,7 +1179,11 @@ export function demoFinance(now = new Date()) {
   const euroAt = monthDay(now, 1, 21);
   const euros = { value: "380.00", currency: "EUR", display: "€380.00 EUR" };
   const depositAt = monthDay(now, 1, 24);
-  const deposit = { value: "4200.00", currency: "USD", display: "$4,200.00 USD" };
+  const deposit = {
+    value: "4200.00",
+    currency: "USD",
+    display: "$4,200.00 USD",
+  };
   expenses.push(
     brexExpense("mock-brex-eur", {
       purchased_at: euroAt.toISOString(),
@@ -1158,7 +1201,11 @@ export function demoFinance(now = new Date()) {
       purchased_at: depositAt.toISOString(),
       posted_at: new Date(depositAt.getTime() + DAY_MS).toISOString(),
       merchant: { id: "pmch_venue", name: "Harborview Event Space (Mock)" },
-      vendor: { id: "pmch_venue", name: "Harborview Event Space (Mock)", email: null },
+      vendor: {
+        id: "pmch_venue",
+        name: "Harborview Event Space (Mock)",
+        email: null,
+      },
       merchant_category: { id: "pmca_events", name: "Events" },
       memo: "Invoice 4417 — $4,200 deposit (Mock)",
       original_amount: deposit,
@@ -1221,7 +1268,12 @@ const DEMO_FINANCE_TOOLS = {
     getAttachment: obj({ attachmentId: str }, ["attachmentId"]),
     // The emulated Mercury only records this call, so a Mercury agent's write approval can be tried.
     requestSendMoney: obj(
-      { accountId: str, recipientId: str, amount: { type: "number" }, note: str },
+      {
+        accountId: str,
+        recipientId: str,
+        amount: { type: "number" },
+        note: str,
+      },
       ["accountId", "recipientId", "amount"],
     ),
   },
@@ -1293,9 +1345,21 @@ function demoExchangeFetch(input: string | URL | Request): Response | null {
     if (url.pathname.endsWith("/accounts"))
       return json({
         accounts: [
-          { currency: "USD", available_balance: { value: "12000.00" }, hold: { value: "0" } },
-          { currency: "BTC", available_balance: { value: "0.35" }, hold: { value: "0" } },
-          { currency: "USDC", available_balance: { value: "25000" }, hold: { value: "0" } },
+          {
+            currency: "USD",
+            available_balance: { value: "12000.00" },
+            hold: { value: "0" },
+          },
+          {
+            currency: "BTC",
+            available_balance: { value: "0.35" },
+            hold: { value: "0" },
+          },
+          {
+            currency: "USDC",
+            available_balance: { value: "25000" },
+            hold: { value: "0" },
+          },
         ],
         has_next: false,
       });
@@ -1304,7 +1368,10 @@ function demoExchangeFetch(input: string | URL | Request): Response | null {
     if (url.pathname.endsWith("/GetApiKeyInfo"))
       return json({ error: [], result: { permissions: ["query-funds"] } });
     if (url.pathname.endsWith("/Balance"))
-      return json({ error: [], result: { ZUSD: "5000.0000", XETH: "1.2000000000" } });
+      return json({
+        error: [],
+        result: { ZUSD: "5000.0000", XETH: "1.2000000000" },
+      });
   }
   return null;
 }
@@ -1335,7 +1402,9 @@ export function demoCrypto() {
         },
         tokens: {
           [USDC_ETHEREUM]: { [DEMO_WALLET.address]: 40_000_000_000n },
-          [LINK_ETHEREUM]: { [DEMO_ENS_WALLET.address]: 120_000_000_000_000_000_000n },
+          [LINK_ETHEREUM]: {
+            [DEMO_ENS_WALLET.address]: 120_000_000_000_000_000_000n,
+          },
         },
         contracts: [DEMO_WALLET.address],
       },
@@ -1612,7 +1681,11 @@ export const DEMO_CAP_TABLE = {
  */
 export function demoCarta(webOrigin?: string): EmulatedMcpServer {
   const noInput = { type: "object", properties: {} };
-  const account = { id: "mock-demo-company", name: DEMO_COMPANY, note: MOCK_NOTE };
+  const account = {
+    id: "mock-demo-company",
+    name: DEMO_COMPANY,
+    note: MOCK_NOTE,
+  };
   const capTable = {
     note: `${MOCK_NOTE}: an invented cap table, not a real company.`,
     ...DEMO_CAP_TABLE,
@@ -1650,7 +1723,9 @@ export function demoCarta(webOrigin?: string): EmulatedMcpServer {
   };
   return {
     ...(webOrigin
-      ? { authorizeUrl: `${webOrigin}/mcp/oauth/callback?code=mock-demo-carta-code` }
+      ? {
+          authorizeUrl: `${webOrigin}/mcp/oauth/callback?code=mock-demo-carta-code`,
+        }
       : {}),
     tools: (Object.keys(tools) as (keyof typeof tools)[]).map((name) => ({
       name,
@@ -1736,10 +1811,22 @@ export const DEMO_DOCUMENT_FACETS: Record<
     daysAgo: 150,
     parties: ["Quill Capital (Mock)"],
   },
-  "MOCK Q3 Board Deck.pdf": { docType: "presentation", daysAgo: 3, parties: [] },
+  "MOCK Q3 Board Deck.pdf": {
+    docType: "presentation",
+    daysAgo: 3,
+    parties: [],
+  },
   "MOCK Budget FY27.csv": { docType: "spreadsheet", daysAgo: 20, parties: [] },
-  "MOCK Investor Update Draft.pdf": { docType: "investor", daysAgo: 1, parties: [] },
-  "MOCK Cap Table Summary.csv": { docType: "spreadsheet", daysAgo: 1, parties: [] },
+  "MOCK Investor Update Draft.pdf": {
+    docType: "investor",
+    daysAgo: 1,
+    parties: [],
+  },
+  "MOCK Cap Table Summary.csv": {
+    docType: "spreadsheet",
+    daysAgo: 1,
+    parties: [],
+  },
   "MOCK Product Roadmap.pdf": { docType: "report", daysAgo: 30, parties: [] },
   "MOCK Invoice NW-1044 - Acme Servo Supply.pdf": {
     docType: "invoice",
@@ -1868,7 +1955,11 @@ const MORE_DOCUMENTS: (DemoDocument & {
       `MOCK Mercury Statement - ${month}.pdf`,
       `Mercury Mock checking statement for ${month}. Opening balance and closing balance for Northwind Robotics Mock.`,
     ),
-    facets: { docType: "statement", daysAgo: 75 - index * 30, parties: ["Mercury (Mock)"] },
+    facets: {
+      docType: "statement",
+      daysAgo: 75 - index * 30,
+      parties: ["Mercury (Mock)"],
+    },
   })),
   ...Array.from({ length: 12 }, (_, index) => ({
     ...doc(
@@ -1887,7 +1978,11 @@ const MORE_DOCUMENTS: (DemoDocument & {
         `MOCK Invoice ${3000 + index} - ${vendor}.pdf`,
         `Invoice ${3000 + index} from ${vendor} Mock to Northwind Robotics Mock. Amount due ${400 + index * 25} dollars.`,
       ),
-      facets: { docType: "invoice", daysAgo: 20 + index * 14, parties: [`${vendor} (Mock)`] },
+      facets: {
+        docType: "invoice",
+        daysAgo: 20 + index * 14,
+        parties: [`${vendor} (Mock)`],
+      },
     };
   }),
   ...["Offer Letter - Sam Engineer", "Offer Letter - Jo Designer", "Employee Handbook"].map(
@@ -1906,7 +2001,11 @@ const MORE_DOCUMENTS: (DemoDocument & {
       `MOCK Pilot Agreement - ${party}.pdf`,
       `Pilot agreement between Northwind Robotics Mock and ${party} Mock. Term 6 months.`,
     ),
-    facets: { docType: "contract", daysAgo: 200 + index * 30, parties: [`${party} (Mock)`] },
+    facets: {
+      docType: "contract",
+      daysAgo: 200 + index * 30,
+      parties: [`${party} (Mock)`],
+    },
   })),
   ...["Pitch Deck v1", "Pitch Deck v2", "Old Budget"].map((name, index) => ({
     ...doc(
@@ -2157,7 +2256,10 @@ export const DEMO_CHIEF_HISTORY: Array<{ role: "user" | "bot"; text: string }> =
     role: "bot",
     text: "Bolt Freight (Mock). Their NDA upload failed, so it is worth asking them to send it again.",
   },
-  { role: "user", text: "Draft a short thank-you to Priya Placeholder for the intro." },
+  {
+    role: "user",
+    text: "Draft a short thank-you to Priya Placeholder for the intro.",
+  },
   {
     role: "bot",
     text: 'Here is a draft: "Thanks for the intro to Acme Ventures (Mock), Priya. We are meeting next week."',
@@ -2389,10 +2491,22 @@ export const DEMO_LEGAL = {
   /** Deadlines added by hand, not tied to a contract: one overdue, one coming up. */
   manualDeadlines: [
     { title: "Q3 board consent signature", kind: "compliance", dueInDays: -5 },
-    { title: "Trademark office action response", kind: "filing", dueInDays: 28 },
-    { title: "Delaware franchise tax and annual report", kind: "filing", dueInDays: 47 },
+    {
+      title: "Trademark office action response",
+      kind: "filing",
+      dueInDays: 28,
+    },
+    {
+      title: "Delaware franchise tax and annual report",
+      kind: "filing",
+      dueInDays: 47,
+    },
     { title: "Refresh the 409A valuation", kind: "compliance", dueInDays: 72 },
-    { title: "Pay Cascade Robotics onboarding fee", kind: "payment", dueInDays: 9 },
+    {
+      title: "Pay Cascade Robotics onboarding fee",
+      kind: "payment",
+      dueInDays: 9,
+    },
   ],
 } as const;
 
