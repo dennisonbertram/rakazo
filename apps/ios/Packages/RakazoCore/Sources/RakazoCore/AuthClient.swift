@@ -147,6 +147,12 @@ public enum AuthClientError: LocalizedError, Sendable, Equatable {
   }
 }
 
+public struct AuthorizedRequest: Sendable {
+  public let request: HTTPRequest
+  public let generation: UInt64
+  public let hadSpace: Bool
+}
+
 public actor AuthClient {
   private static let authResponseLimit = 64 * 1024
   private static let originHeader = "rakazo://"
@@ -177,6 +183,40 @@ public actor AuthClient {
       generation: generation,
       sessionEnded: sessionEnded
     )
+  }
+
+  /// Builds a request for the signed-in session. Pass `generation` and `hadSpace` back to
+  /// `handleUnauthorized` if the server answers 401.
+  public func authorized(
+    path: String,
+    method: String,
+    body: Data?,
+    contentType: String?,
+    spaceID: String?,
+    timeout: TimeInterval = 8
+  ) throws -> AuthorizedRequest {
+    guard let token else { throw AuthClientError.unauthorized }
+    var headers = ["authorization": "Bearer \(token)", "origin": Self.originHeader]
+    if let contentType { headers["content-type"] = contentType }
+    if let spaceID, !spaceID.isEmpty { headers["x-rakazo-space-id"] = spaceID }
+    let url = try makeURL(endpoint: validatedEndpoint(), path: path)
+    return AuthorizedRequest(
+      request: HTTPRequest(
+        url: url, method: method, headers: headers, body: body, timeout: timeout),
+      generation: generation,
+      hadSpace: headers["x-rakazo-space-id"] != nil
+    )
+  }
+
+  /// Decides what a 401 means. Without a space header the session itself was rejected, so it
+  /// is invalidated, but only if no newer session replaced the one that sent the request.
+  public func handleUnauthorized(generation requestGeneration: UInt64, hadSpace: Bool) -> RPCError
+  {
+    guard requestGeneration == generation else { return .stale }
+    if hadSpace { return .spaceRejected }
+    // Storage failures here still end the in-memory session; the next restore re-checks it.
+    try? invalidateSession(endpoint)
+    return .unauthorized
   }
 
   public func restore() async throws {
