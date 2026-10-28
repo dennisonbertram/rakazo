@@ -40,3 +40,21 @@ export function rowsBelow(
   }
   return count;
 }
+
+/**
+ * How far to grow the "+N more" bar upward so it hides the whole of a row it would otherwise cut
+ * in half, so no half row shows behind it.
+ */
+export function moreBarCover(
+  scrollers: (HTMLElement | null)[],
+  rowSelector = "[data-roster-chat],[data-roster-fold],[data-roster-head]",
+) {
+  const scroller = scrollingList(scrollers);
+  if (!scroller) return 0;
+  const edge = scroller.getBoundingClientRect().bottom - moreBarHeight();
+  for (const row of scroller.querySelectorAll<HTMLElement>(rowSelector)) {
+    const box = row.getBoundingClientRect();
+    if (box.top < edge - 0.5 && box.bottom > edge + 0.5) return Math.ceil(edge - box.top);
+  }
+  return 0;
+}

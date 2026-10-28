@@ -260,7 +260,7 @@ it("shows the organization and the email under the name", async () => {
     { ...contact("c4", "Di", "other"), email: null },
   ]);
   await show();
-  const under = [...container.querySelectorAll("tbody td:first-child div.flex.gap-1")].map(
+  const under = [...container.querySelectorAll("tbody td:first-child div.flex.flex-wrap")].map(
     (div) => div.textContent,
   );
   expect(under).toEqual(["Acme Corp·ada@example.test", "cy@example.test", "Acme Corp"]);

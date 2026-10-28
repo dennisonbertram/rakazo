@@ -505,15 +505,15 @@ function ContactRow({
           {contact.name}
         </span>
         {/* The email is the identifier, so the organization gives way first. */}
-        <span className="flex gap-1 text-xs text-muted-foreground">
+        <span className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
           {contact.organization ? (
-            <span className="max-w-[40%] min-w-12 truncate" title={contact.organization}>
+            <span className="max-w-full truncate" title={contact.organization}>
               {contact.organization}
             </span>
           ) : null}
           {contact.organization && contact.email ? <span aria-hidden="true">·</span> : null}
           {contact.email ? (
-            <span className="min-w-0 truncate" title={contact.email}>
+            <span className="min-w-0 break-all" title={contact.email}>
               {contact.email}
             </span>
           ) : null}

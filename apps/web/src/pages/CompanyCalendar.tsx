@@ -87,7 +87,7 @@ export function CompanyCalendar({
       <Link
         key={item.id}
         to="/app/legal?view=deadlines"
-        className="block truncate py-1 text-start text-xs underline underline-offset-4 sm:text-sm"
+        className="block truncate py-1 text-start text-xs pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center underline underline-offset-4 sm:text-sm"
       >
         {content(item)}
       </Link>
@@ -95,7 +95,7 @@ export function CompanyCalendar({
       <button
         key={item.id}
         type="button"
-        className="block w-full truncate py-1 text-start text-xs underline underline-offset-4 sm:text-sm"
+        className="block w-full truncate py-1 text-start text-xs pointer-coarse:min-h-11 underline underline-offset-4 sm:text-sm"
         onClick={() => void open(item)}
       >
         {content(item)}
@@ -127,7 +127,7 @@ export function CompanyCalendar({
         >
           <Trans>Agenda</Trans>
         </Button>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm pointer-coarse:min-h-11">
           <Checkbox
             id={anniversariesId}
             checked={anniversaries}

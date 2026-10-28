@@ -103,7 +103,7 @@ import type { ContextMenuPosition } from "../BotContextMenu";
 import type { SettingsSection } from "../SettingsOverlay";
 import { BotCreatePicker, pickerInitialFocus } from "./bot-picker";
 import { moveRosterFocus, rosterRowId, syncRosterTabStops } from "./roster-tab-stops";
-import { moreBarHeight, rowsBelow } from "./rows-below";
+import { moreBarCover, moreBarHeight, rowsBelow } from "./rows-below";
 import { SidebarHeaderRow } from "./sidebar-header-row";
 
 type SidebarChat = {
@@ -593,6 +593,7 @@ export function SpaceSidebar({
   useEffect(() => syncRosterTabStops(sidebarRef.current, rosterStopId.current));
   // "+N more" over the foot of the list while rows remain below the fold.
   const [hiddenRows, setHiddenRows] = useState(0);
+  const [barCover, setBarCover] = useState(0);
   useEffect(() => {
     const scrollers = [sidebarPaneRef.current, sidebarScrollRef.current];
     let frame = 0;
@@ -600,6 +601,7 @@ export function SpaceSidebar({
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         setHiddenRows(rowsBelow(scrollers));
+        setBarCover(moreBarCover(scrollers));
       });
     };
     measure();
@@ -1632,11 +1634,7 @@ export function SpaceSidebar({
                                               />
                                             ) : null}
                                             {!compact ? (
-                                              <span
-                                                className={`text-[12px] leading-[18px] text-muted-foreground tabular-nums ${
-                                                  item.kind === "bot" ? "pointer-coarse:hidden" : ""
-                                                }`}
-                                              >
+                                              <span className="text-[12px] leading-[18px] text-muted-foreground tabular-nums pointer-coarse:hidden">
                                                 {formatRosterTime(item.chat.updatedAt)}
                                               </span>
                                             ) : null}
@@ -1834,13 +1832,13 @@ export function SpaceSidebar({
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 z-10 h-4 bg-linear-to-t from-sidebar to-transparent"
-            style={{ bottom: moreBarHeight() }}
+            style={{ bottom: moreBarHeight() + barCover }}
           />
           <button
             type="button"
             data-testid="sidebar-more-rows"
             className="absolute inset-x-0 bottom-0 z-10 flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            style={{ height: moreBarHeight() }}
+            style={{ height: moreBarHeight() + barCover }}
             onClick={() => {
               const pane = sidebarPaneRef.current;
               const list = sidebarScrollRef.current;
