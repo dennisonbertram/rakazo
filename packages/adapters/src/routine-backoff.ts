@@ -84,7 +84,9 @@ export async function clearRoutineBackoff(
   // here must never turn a completed run into a failed one.
   let held = 0;
   try {
-    held = await deps.prisma.routine.count({ where: { id: routineId, accountFailures: { gt: 0 } } });
+    held = await deps.prisma.routine.count({
+      where: { id: routineId, accountFailures: { gt: 0 } },
+    });
   } catch (error) {
     getLogger().error("routine.backoff_clear", error);
     return;

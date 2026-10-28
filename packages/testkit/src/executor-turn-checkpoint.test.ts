@@ -19,11 +19,7 @@ vi.mock("../../adapters/src/computer-lifecycle.js", async (original) => ({
   }),
 }));
 
-function fixture(
-  model: AgentRunModel,
-  toolName = "fixture_write",
-  requireApproval = true,
-) {
+function fixture(model: AgentRunModel, toolName = "fixture_write", requireApproval = true) {
   const run = {
     id: "fixture-run",
     botId: "fixture-bot",

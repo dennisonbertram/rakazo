@@ -1,8 +1,8 @@
 import type { AdapterContext, MessagingSurface } from "@rakazo/adapter-kit";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
-import type { MessagingDeliveryDeps } from "./messaging-delivery.js";
 import { MessagingSendError } from "./chat-sdk-surface.js";
+import type { MessagingDeliveryDeps } from "./messaging-delivery.js";
 import {
   applyMessagingOutboundStatus,
   deliverMessagingOutbound,

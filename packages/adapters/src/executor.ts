@@ -195,9 +195,9 @@ import {
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
   parseComputerMode,
+  RUN_TURN_CHECKPOINT_KIND,
   readHistory,
   recordUsage,
-  RUN_TURN_CHECKPOINT_KIND,
   retireModelCredential,
   runAsSystem,
   SpaceLimitError,
@@ -9393,6 +9393,19 @@ async function scheduleRoutineRetry(
   }
 }
 
+/** A run's stored error as the failure notice reads it. */
+function failureNoticeBody(message: string): string {
+  return plainRunError(message, {
+    keyRejected: "The model provider did not accept your API key. Check it in Settings > Models.",
+    generic: "Something went wrong. Try again.",
+    spendLimit: (resetsOn) =>
+      `The AI key hit its spending limit.${resetsOn ? ` It resets ${resetsOn}.` : ""} Raise the limit with your provider or use another key in Settings > Models.`,
+    outOfCredits:
+      "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.",
+    rateLimited: "The model provider is rate limiting requests. Try again in a few minutes.",
+  }).slice(0, 180);
+}
+
 async function notifyFailedRoutineRun(
   deps: ExecutorDeps,
   failed: Parameters<typeof notifyRun>[1] & { error: string | null },
@@ -9408,11 +9421,7 @@ async function notifyFailedRoutineRun(
     {
       kind: "failure",
       title: `${bot.name} failed`,
-      body: plainRunError(failed.error ?? "", {
-        keyRejected:
-          "The model provider did not accept your API key. Check it in Settings > Models.",
-        generic: "Something went wrong. Try again.",
-      }).slice(0, 180),
+      body: failureNoticeBody(failed.error ?? ""),
       botId: failed.botId,
       threadId: failed.threadId,
     },
@@ -10894,16 +10903,7 @@ async function failRun(
     await notifyRun(deps, run, {
       kind: "failure",
       title: `${bot.name} failed`,
-      body: plainRunError(message, {
-        keyRejected:
-          "The model provider did not accept your API key. Check it in Settings > Models.",
-        generic: "Something went wrong. Try again.",
-        spendLimit: (resetsOn) =>
-          `The AI key hit its spending limit.${resetsOn ? ` It resets ${resetsOn}.` : ""} Raise the limit with your provider or use another key in Settings > Models.`,
-        outOfCredits:
-          "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.",
-        rateLimited: "The model provider is rate limiting requests. Try again in a few minutes.",
-      }).slice(0, 180),
+      body: failureNoticeBody(message),
       botId: bot.id,
       threadId: run.threadId,
     });

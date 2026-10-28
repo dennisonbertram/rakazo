@@ -4,12 +4,11 @@ import { createWhatsAppAdapter, splitMessage, WhatsAppApiError } from "@chat-ada
 import type { MessagingInboundMessage, MessagingOutboundStatus } from "@rakazo/adapter-kit";
 import { asRecord } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
-import type { Adapter } from "chat";
 import { createLarkAdapter, Domain } from "chat-adapter-lark";
 import { createSendblueAdapter } from "chat-adapter-sendblue";
+import type { ClientOptions as SendblueClientOptions } from "sendblue";
 import type { BlueBubblesPollState } from "./bluebubbles-adapter.js";
 import { BlueBubblesAdapter, bluebubblesTransport } from "./bluebubbles-adapter.js";
-import type { ClientOptions as SendblueClientOptions } from "sendblue";
 import type { MessagingPlatform } from "./chat-sdk-surface.js";
 import { PhotonAdapter, photonTransport } from "./photon-adapter.js";
 import { isVitestRuntime } from "./test-runtime.js";

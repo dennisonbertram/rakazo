@@ -3,13 +3,7 @@ import { AI_DISCLOSURE_VERSION } from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type * as BotMessagesModule from "./bot-messages.js";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
-import { ComputerBusyError, IN_LINE_BEHIND_SAME_BOT } from "./computer-lifecycle.js";
-import {
-  createRunExecutor,
-  REQUEUE_LIMIT,
-  requeueLimitReached,
-  runPhaseWriter,
-} from "./executor.js";
+import { createRunExecutor } from "./executor.js";
 
 const lifecycle = vi.hoisted(() => ({
   provision: vi.fn(async (): Promise<unknown> => ({ id: "computer-1", kind: "desktop" })),
@@ -189,7 +183,8 @@ async function continueRun(events: unknown[], fail = false, trigger = "user") {
   await executor.continueRun("run-1", "worker-1");
   const helperSaves = savedEvents.filter(
     (event) =>
-      event.type === "thread.subagent" && (event.payload as { status?: string }).status === "failed",
+      event.type === "thread.subagent" &&
+      (event.payload as { status?: string }).status === "failed",
   );
   return { run, finalizeRun, pauseRunForInput, helperSaves, prisma, append };
 }

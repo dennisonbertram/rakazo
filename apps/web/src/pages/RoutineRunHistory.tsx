@@ -5,8 +5,8 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { rpc } from "../lib/rpc";
-import { runErrorText } from "../lib/user-error";
 import { formatToolActivityDuration } from "../lib/tool-activity-view";
+import { runErrorText } from "../lib/user-error";
 import { statusLabel, statusTone } from "./ActivityList";
 
 export function RoutineRunHistory({

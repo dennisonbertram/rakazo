@@ -1322,7 +1322,8 @@ export type Run = z.infer<typeof RunSchema>;
 export const MISSING_TOOL_FINAL_RESPONSE_ERROR = "This agent could not finish. Try again.";
 
 /** Resumed without its saved turn, the model did not call the action the user approved. */
-export const APPROVED_ACTION_NOT_RUN_ERROR = "The model did not run the approved action. Try again.";
+export const APPROVED_ACTION_NOT_RUN_ERROR =
+  "The model did not run the approved action. Try again.";
 
 export const ThreadMessagePageSchema = z.object({
   threadId: Id,

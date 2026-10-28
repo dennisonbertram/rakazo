@@ -315,8 +315,7 @@ describe("retrying a routine run after a transient model failure", () => {
 });
 
 describe("backing off a routine after its model connection refuses it", () => {
-  const refusedKey = () =>
-    new Error('401: {"error":{"message":"Invalid API key","code":401}}');
+  const refusedKey = () => new Error('401: {"error":{"message":"Invalid API key","code":401}}');
 
   it("counts a refusal of the user's own key", async () => {
     const { prisma } = await failRun({ error: refusedKey(), personalKey: true });
