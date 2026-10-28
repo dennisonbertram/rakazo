@@ -266,9 +266,7 @@ describe("runtime context policy", () => {
         expect(firstWhole).toBeLessThan(10);
         expect(whole).toEqual(whole.map((_, index) => index >= firstWhole));
         for (const page of pages.slice(0, firstWhole))
-          expect(JSON.stringify(page.content)).toContain(
-            "Tool result truncated to fit context",
-          );
+          expect(JSON.stringify(page.content)).toContain("Tool result truncated to fit context");
       }
       expect(policy.getDecision()!.estimatedInputTokens).toBeLessThanOrEqual(contextWindow - 4096);
     },
@@ -318,9 +316,7 @@ describe("runtime context policy", () => {
         if (contextWindow === 65_536 || i === 3)
           expect(result.content).toEqual([{ type: "text", text: bodies[i] }]);
         else
-          expect(JSON.stringify(result.content)).toContain(
-            "Tool result truncated to fit context",
-          );
+          expect(JSON.stringify(result.content)).toContain("Tool result truncated to fit context");
       }
       expect(policy.getDecision()!.estimatedInputTokens).toBeLessThanOrEqual(contextWindow - 1024);
     },

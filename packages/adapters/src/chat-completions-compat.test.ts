@@ -266,7 +266,7 @@ describe("developer role", () => {
   const roles = (provider: string) => {
     const options = withChatCompletionsCompatibility(
       { api: "openai-completions", id: "m", baseUrl: "http://x", provider } as Model<Api>,
-      {},
+      {} as SimpleStreamOptions,
     );
     return Promise.resolve(options.onPayload?.(payload, {} as Model<Api>)).then((next) =>
       messages(next ?? payload).map((message) => message.role),

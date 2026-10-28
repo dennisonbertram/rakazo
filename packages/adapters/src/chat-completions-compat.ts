@@ -8,13 +8,13 @@ import type { Api, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
  * after every other payload hook, so each chat-completions provider gets the same shape.
  */
 export function withChatCompletionsCompatibility<O extends SimpleStreamOptions>(
-  model: Pick<Model<Api>, "api" | "id" | "baseUrl" | "provider">,
+  model: Pick<Model<Api>, "api" | "id" | "baseUrl"> & Partial<Pick<Model<Api>, "provider">>,
   options: O,
 ): O {
   if (model.api !== "openai-completions") return options;
   const previous = options.onPayload;
   const stringContent = requiresStringContent(model);
-  const systemRole = !DEVELOPER_ROLE_PROVIDERS.has(model.provider);
+  const systemRole = model.provider !== undefined && !DEVELOPER_ROLE_PROVIDERS.has(model.provider);
   return {
     ...options,
     async onPayload(payload, requestModel) {
