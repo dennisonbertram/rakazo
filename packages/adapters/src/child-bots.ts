@@ -13,6 +13,7 @@ import { ACTIVE_RUN_STATUSES, chainedRunMode } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
 import {
   cancelRunsInTransaction,
+  clearEndedRunState,
   computerScopeKey,
   createRepos,
   createThreadMessageInTransaction,
@@ -220,7 +221,7 @@ type LifecycleBot = {
   id: string;
   spaceId: string;
   name: string;
-  userId?: string;
+  userId: string;
   archivedAt: Date | null;
   computerId?: string | null;
   webhookSecretId?: string | null;
@@ -345,7 +346,14 @@ export async function archiveBot(
 ) {
   const [dedicated, activeRuns, activeRoutines] = await Promise.all([
     deps.prisma.computer.findUnique({
-      where: { scopeKey: computerScopeKey("dedicated", bot.spaceId, bot.id) },
+      where: {
+        scopeKey: computerScopeKey({
+          mode: "dedicated",
+          spaceId: bot.spaceId,
+          userId: bot.userId,
+          botId: bot.id,
+        }),
+      },
     }),
     deps.prisma.run.findMany({
       where: { botId: bot.id, status: { in: [...ACTIVE_RUN_STATUSES] } },
@@ -363,6 +371,7 @@ export async function archiveBot(
       where: { id: { in: runIds } },
       data: { status: "cancelled", completedAt: now },
     });
+    await clearEndedRunState(tx, runIds);
     await tx.task.updateMany({
       where: { runs: { some: { id: { in: runIds } } } },
       data: { status: "cancelled" },
@@ -422,7 +431,14 @@ export async function destroyBot(
 ) {
   const [dedicated, activeRuns, routines] = await Promise.all([
     deps.prisma.computer.findUnique({
-      where: { scopeKey: computerScopeKey("dedicated", bot.spaceId, bot.id) },
+      where: {
+        scopeKey: computerScopeKey({
+          mode: "dedicated",
+          spaceId: bot.spaceId,
+          userId: bot.userId,
+          botId: bot.id,
+        }),
+      },
     }),
     deps.prisma.run.findMany({
       where: { botId: bot.id, status: { in: [...ACTIVE_RUN_STATUSES] } },
@@ -435,6 +451,7 @@ export async function destroyBot(
     where: { id: { in: runIds } },
     data: { status: "cancelled", completedAt: new Date() },
   });
+  await clearEndedRunState(deps.prisma, runIds);
   await Promise.allSettled([
     ...activeRuns.map((run) => deps.jobs.cancel(runJobKey(run.id))),
     ...routines.map((routine) => deps.jobs.cancel(routineJobKey(routine.id))),
@@ -800,9 +817,12 @@ async function removeTeamBotWorkspace(
   context: AdapterContext,
 ) {
   if (!isTeamBotFolderName(bot.id)) return;
-  // Look the computer up by space: a bot moved to its own computer can still have a folder here.
+  // Look the owner's Team Computer up by scope: a bot moved to its own computer can still have
+  // a folder there. Any other team computer in the space drops it on boot (botDeletion).
   const computer = await deps.prisma.computer.findUnique({
-    where: { scopeKey: computerScopeKey("team", bot.spaceId) },
+    where: {
+      scopeKey: computerScopeKey({ mode: "team", spaceId: bot.spaceId, userId: bot.userId }),
+    },
   });
   if (!computer) return;
   // Remote providers keep a stored copy that only the server writes, and replacement computers

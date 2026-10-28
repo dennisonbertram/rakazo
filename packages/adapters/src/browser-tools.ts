@@ -88,7 +88,13 @@ export async function browserActFromTool(
         : { error: "Saved logins are unavailable here." };
       if ("error" in resolved) return { ok: false, completed: 0, error: resolved.error };
       if (resolved.markUsed) markUsed.push(resolved.markUsed);
-      actions.push({ kind: "fill", ref: step.ref, text: resolved.text, origin: resolved.origin });
+      actions.push({
+        kind: "fill",
+        ref: step.ref,
+        text: resolved.text,
+        origin: resolved.origin,
+        field: step.field,
+      });
     }
     const result = await browser.act(computer, { actions, signal: context.signal }, context);
     // A login counts as used only once the page action succeeded.

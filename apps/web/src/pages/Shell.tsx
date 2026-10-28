@@ -49,6 +49,7 @@ import {
   matchesArtifactQuery,
   nestRosterByParent,
   newClientId,
+  ownerOnlyCredentialAskMessageIds,
   planSidebarMove,
   resolveComposerSendPlan,
   runThreadSubscription,
@@ -2648,6 +2649,10 @@ export function ShellPage() {
   }, []);
   const currentRuns = activeThreadRuns(activeSnapshot);
   const answerableAskMessageId = latestAnswerableAskMessageId(activeSnapshot);
+  const ownerOnlyAskMessageIds = useMemo(
+    () => ownerOnlyCredentialAskMessageIds(activeSnapshot, userId),
+    [activeSnapshot, userId],
+  );
   const waitingOnApproval = Boolean(
     activeSnapshot?.delegatePending?.length ||
       (answerableAskMessageId &&
@@ -4384,6 +4389,7 @@ export function ShellPage() {
                 olderCursor={activeSnapshot?.olderCursor ?? null}
                 loadingOlder={loadingOlder}
                 answerableAskMessageId={answerableAskMessageId}
+                ownerOnlyAskMessageIds={ownerOnlyAskMessageIds}
                 running={transcriptRunning}
                 workingBots={workingBots}
                 workingActivity={soleWorkingActivity}

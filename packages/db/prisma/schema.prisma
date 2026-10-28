@@ -587,6 +587,7 @@ model Bot {
   webhookSecretId        String?
   teamChatAmbientEnabled Boolean               @default(false)
   teamChatRules          String                @default("")
+  crossSpaceCommunication Boolean              @default(false)
   routines               Routine[]
   scratchpadItems        ScratchpadItem[]
   taughtSkills           TaughtSkill[]
@@ -1913,6 +1914,7 @@ model MessagingPollCursor {
 }
 
 model AgentConnection {
+  requestVersion Int      @default(1)
   id             String   @id @default(cuid())
   requesterBotId String
   targetBotId    String
@@ -2607,6 +2609,21 @@ model FinancePreference {
 
   @@unique([spaceId, userId])
   @@map("finance_preferences")
+}
+
+/// A note a space member pinned to a day on the Finance Burn chart. Shown on whichever bucket holds the day; read by the Finance agent.
+model FinanceChartNote {
+  id        String   @id @default(cuid())
+  spaceId   String
+  /// The author; only they can delete it.
+  userId    String
+  /// YYYY-MM-DD, the start of the bucket it was added to.
+  day       String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([spaceId, day])
+  @@map("finance_chart_notes")
 }
 
 /// One wallet's priced crypto value for one UTC day, rewritten by every sync that day (the last value wins).
