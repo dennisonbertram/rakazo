@@ -164,6 +164,7 @@ export const KO_MESSAGES: Record<string, string> = {
   "Could not speak": "음성으로 읽지 못했습니다",
   "Could not update reaction": "반응을 업데이트할 수 없습니다",
   "Could not remember": "기억하지 못했습니다",
+  "Mark as unread": "읽지 않음으로 표시",
   Created: "생성됨",
   "Delete…": "삭제…",
   Denied: "거부됨",
