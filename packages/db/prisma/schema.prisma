@@ -966,6 +966,7 @@ model Message {
   @@unique([threadId, clientNonce])
   @@index([threadId, seq])
   @@index([replyToMessageId])
+  @@index([runId, seq])
   @@map("messages")
 }
 
@@ -1067,6 +1068,8 @@ model Run {
   @@index([trigger, status, messagingMirroredAt, updatedAt])
   @@index([trigger, status, teamChatMirroredAt, updatedAt])
   @@index([spaceId, botId])
+  @@index([botId])
+  @@index([taskId])
   @@index([sourceMessageId])
   @@index([threadId, status, createdAt])
   @@index([routineId])
@@ -1710,6 +1713,7 @@ model ComputerExecutionLease {
   @@unique([computerId, botId])
   @@index([runId])
   @@index([computerId, expiresAt])
+  @@index([botId, expiresAt])
   @@map("computer_execution_leases")
 }
 
@@ -2232,6 +2236,7 @@ model ExternalMessage {
 
   @@unique([externalConversationId, providerEventId])
   @@index([status, nextAttemptAt])
+  @@index([externalConversationId, senderIsBot, createdAt])
   @@map("external_messages")
 }
 
