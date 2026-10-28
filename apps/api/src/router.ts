@@ -21,6 +21,7 @@ import type {
   CodexLiveCatalog,
   ComputerExecutionLease,
   getBotSecretMetadata,
+  McpStdioPolicy,
 } from "@rakazo/adapters";
 import {
   acquireComputerExecutionLease,
@@ -82,6 +83,8 @@ import {
   listPiCatalog,
   listScratchpadItems,
   McpOAuthBroker,
+  mcpStdioAvailable,
+  mcpStdioRefusal,
   modelCredentialAuthKindsForSpace,
   modelCredentialDto,
   normalizeSecretDestination,
@@ -953,6 +956,19 @@ function connectionContext(
 /** Loopback / LAN / Docker-network endpoints: the deployment owner, or everyone under the flag. */
 function mayUsePrivateEndpoint(actor: Actor, deps: Pick<RouterDeps, "env">): boolean {
   return actor.isDeploymentOwner || deps.env.mcpAllowPrivateEndpoint === true;
+}
+
+function mcpStdioPolicy(deps: Pick<RouterDeps, "env">): McpStdioPolicy {
+  return {
+    stdioEnabled: deps.env.mcpStdioEnabled,
+    allowedCommands: deps.env.mcpStdioAllowedCommands,
+  };
+}
+
+/** Refuse a stdio server this deployment would never run. */
+function assertMcpStdioCommand(command: string, deps: Pick<RouterDeps, "env">): void {
+  const refusal = mcpStdioRefusal(command, mcpStdioPolicy(deps));
+  if (refusal) throw new ORPCError("BAD_REQUEST", { message: refusal });
 }
 
 async function assertMcpRemoteEndpoint(
@@ -5333,6 +5349,7 @@ export function createRouter(deps: RouterDeps) {
           );
         }),
         create: authed.mcp.servers.create.handler(async ({ context, input }) => {
+          if (input.transport === "stdio") assertMcpStdioCommand(input.command, deps);
           await assertMcpRemoteEndpoint(
             "endpoint" in input ? input.endpoint : null,
             context.actor,
@@ -5349,40 +5366,50 @@ export function createRouter(deps: RouterDeps) {
                 computerContext(context.actor, "mcp", "mcp.create"),
               )
             : null;
-          const row = await deps.prisma.$transaction(async (tx) => {
-            if (stored) {
-              await tx.secret.create({
+          const row = await deps.prisma
+            .$transaction(async (tx) => {
+              if (stored) {
+                await tx.secret.create({
+                  data: {
+                    id: stored.id,
+                    userId: context.actor.userId,
+                    spaceId: context.actor.spaceId,
+                    kind: "mcp",
+                    ciphertext: stored.ciphertext,
+                  },
+                });
+              }
+              return tx.mcpServer.create({
                 data: {
-                  id: stored.id,
-                  userId: context.actor.userId,
                   spaceId: context.actor.spaceId,
-                  kind: "mcp",
-                  ciphertext: stored.ciphertext,
+                  userId: context.actor.userId,
+                  slug: input.slug,
+                  name: input.name,
+                  description: input.description,
+                  transport: input.transport,
+                  endpoint: "endpoint" in input ? input.endpoint : null,
+                  command: "command" in input ? input.command : null,
+                  args: ("args" in input ? input.args : []) as Prisma.InputJsonValue,
+                  env: ("env" in input
+                    ? Object.fromEntries(Object.keys(input.env).map((key) => [key, true]))
+                    : {}) as Prisma.InputJsonValue,
+                  headers: ("headers" in input
+                    ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, true]))
+                    : {}) as Prisma.InputJsonValue,
+                  secretId: stored?.id,
+                  enabled: input.enabled,
                 },
               });
-            }
-            return tx.mcpServer.create({
-              data: {
-                spaceId: context.actor.spaceId,
-                userId: context.actor.userId,
-                slug: input.slug,
-                name: input.name,
-                description: input.description,
-                transport: input.transport,
-                endpoint: "endpoint" in input ? input.endpoint : null,
-                command: "command" in input ? input.command : null,
-                args: ("args" in input ? input.args : []) as Prisma.InputJsonValue,
-                env: ("env" in input
-                  ? Object.fromEntries(Object.keys(input.env).map((key) => [key, true]))
-                  : {}) as Prisma.InputJsonValue,
-                headers: ("headers" in input
-                  ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, true]))
-                  : {}) as Prisma.InputJsonValue,
-                secretId: stored?.id,
-                enabled: input.enabled,
-              },
+            })
+            .catch((error: unknown) => {
+              // The slug comes from the name, so this is a second server with the same name.
+              if (isUniqueViolation(error)) {
+                throw new ORPCError("CONFLICT", {
+                  message: "An MCP server with that name already exists.",
+                });
+              }
+              throw error;
             });
-          });
           // An existing Carta agent gets a newly added Carta server, with read tools only.
           if (isCartaEndpoint(row.endpoint))
             await assignToExistingCartaAgent(deps.prisma, context.actor);
@@ -5481,6 +5508,7 @@ export function createRouter(deps: RouterDeps) {
             if (!("config" in input) && existing.transport === "stdio") {
               throw new ORPCError("BAD_REQUEST", { message: "A remote MCP server is required" });
             }
+            if (config.transport === "stdio") assertMcpStdioCommand(config.command, deps);
             const nextEndpoint = "endpoint" in config ? config.endpoint : null;
             if (existing.endpoint !== nextEndpoint) {
               await assertMcpRemoteEndpoint(nextEndpoint, context.actor, deps);
@@ -9443,6 +9471,7 @@ async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
     computerHost: computerHostFor(setup.settings?.computerHost, deps.env.sandboxProvider),
     canChooseHostComputer: actor.isDeploymentOwner && deps.env.sandboxProvider === "docker",
     sandboxProvider: deps.env.sandboxProvider,
+    mcpStdioEnabled: mcpStdioAvailable(mcpStdioPolicy(deps)),
     avatarStyle: user.avatarStyle === "robot" ? "robot" : "organic",
     timezone: user.timezone ?? null,
     tourSeen: Boolean(user.tourSeenAt),

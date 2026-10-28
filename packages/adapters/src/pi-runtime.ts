@@ -73,7 +73,9 @@ import type { RuntimeContextDecision } from "./runtime-context.js";
 import { createRuntimeContextPolicy, VERBATIM_TOOL_RESULTS } from "./runtime-context.js";
 import type { FinishedShellCommand } from "./shell-command-stream.js";
 import { deliverFinishedShells } from "./shell-command-stream.js";
+import { isThinkingSignatureMismatch, withoutThinkingBlocks } from "./thinking-signatures.js";
 import { textContentArg } from "./tool-text.js";
+import { fetchPairedWithDispatcher } from "./undici-fetch.js";
 
 const running = new Map<string, { controller: AbortController; work: Promise<void> }>();
 interface ToolCallBudget {
@@ -137,6 +139,8 @@ export function maxToolCallsPerTurn(env: NodeJS.ProcessEnv = process.env): numbe
 }
 
 interface PiAgentRuntimeOptions {
+  /** Explicit transport for tests and synthetic wire diagnostics. */
+  modelFetch?: typeof globalThis.fetch;
   /** Directory where Pi JSONL sessions are written. Omit to disable recording. */
   sessionRoot?: string;
   modelCallObserver?: ModelCallObserver;
@@ -152,10 +156,12 @@ interface PiAgentRuntimeOptions {
 
 export class PiAgentRuntime implements AgentRuntime {
   private readonly sessionRecorder?: PiSessionRecorder;
+  private readonly modelFetch?: typeof globalThis.fetch;
   private readonly modelCallObserver?: ModelCallObserver;
   private readonly onContextDecision?: PiAgentRuntimeOptions["onContextDecision"];
 
   constructor(options: PiAgentRuntimeOptions = {}) {
+    this.modelFetch = options.modelFetch;
     this.modelCallObserver = options.modelCallObserver;
     this.onContextDecision = options.onContextDecision;
     this.sessionRecorder = options.sessionRoot
@@ -245,6 +251,7 @@ export class PiAgentRuntime implements AgentRuntime {
         const host: ToolHost = {
           queue,
           context,
+          modelFetch: this.modelFetch,
           onContextDecision: this.onContextDecision,
           modelCallObserver: this.modelCallObserver,
           request,
@@ -394,7 +401,11 @@ export class PiAgentRuntime implements AgentRuntime {
         agent = new Agent({
           sessionId: conversationSessionId(request.threadId, request.botId),
           steeringMode: "all",
-          streamFn: (_m, ctx, options) => fallbackAwareModelStream(fallbackState, ctx, options),
+          streamFn: (_m, ctx, options) =>
+            fallbackAwareModelStream(fallbackState, ctx, {
+              ...options,
+              fetch: this.modelFetch ?? options?.fetch,
+            }),
           getApiKey: hasBackups
             ? async () => activeStreamTarget.credentials?.accessToken ?? activeStreamTarget.apiKey
             : async () => apiKey,
@@ -1502,7 +1513,11 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
       );
     },
     sessionId: conversationSessionId(host.request.threadId, host.request.botId, agentId),
-    streamFn: (_m, ctx, options) => fallbackAwareModelStream(retryState, ctx, options),
+    streamFn: (_m, ctx, options) =>
+      fallbackAwareModelStream(retryState, ctx, {
+        ...options,
+        fetch: host.modelFetch ?? options?.fetch,
+      }),
     getApiKey: async () =>
       hasBackups
         ? (selectedModel.credentials?.accessToken ?? selectedModel.apiKey)
@@ -2203,6 +2218,7 @@ interface EventQueue {
 
 interface ToolHost {
   context?: Partial<AdapterContext>;
+  modelFetch?: typeof globalThis.fetch;
   onContextDecision?: PiAgentRuntimeOptions["onContextDecision"];
   modelCallObserver?: ModelCallObserver;
   queue: EventQueue;
@@ -2314,6 +2330,8 @@ interface FallbackStreamState {
   nextIndex: number;
   onSwitch(target: RuntimeModelTarget): Promise<void>;
   isProviderFailure(message: AssistantMessage): boolean;
+  /** Set once a provider rejected replayed thinking signatures; see thinking-signatures.ts. */
+  dropThinkingBlocks?: boolean;
   stream(
     target: RuntimeModelTarget,
     context: TranscriptContext,
@@ -2377,10 +2395,6 @@ function retryAfterMs(error: unknown): number | undefined {
   return match[1] || match[3] ? value : value * 1000;
 }
 
-function isProviderTimeout(error: unknown): boolean {
-  return /timed? out|timeout/.test(errorFacts(error).text);
-}
-
 /** Only provider availability failures may advance the user's explicit chain. */
 export function isRetryableProviderUnavailable(error: unknown): boolean {
   const { text, statuses } = errorFacts(error);
@@ -2415,7 +2429,7 @@ export function isRetryableProviderUnavailable(error: unknown): boolean {
     return true;
   if ([...statuses].some((status) => status >= 400 && status < 600)) return false;
   if (CONNECTION_FAILURE.test(text)) return true;
-  return /rate.?limit|too many requests|quota|overload|capacity|temporarily unavailable|service unavailable|retry[- ](?:after|delay)|server error|upstream error|gateway timeout|timed? out|timeout|connection reset|connection refused|network error|max retries exceeded|\bterminated\b/.test(
+  return /rate.?limit|too many requests|quota|overload|capacity|temporarily unavailable|service unavailable|retry[- ](?:after|delay)|server error|upstream error|gateway timeout|timed? out|timeout|connection reset|connection refused|network error|max retries exceeded|stream ended without finish_reason|\bterminated\b/.test(
     text,
   );
 }
@@ -2502,6 +2516,10 @@ function fallbackAwareModelStream(
   const output = new AssistantMessageEventStream();
   let lastPartial: AssistantMessage | undefined;
   const signal = options?.signal ? AbortSignal.any([state.signal, options.signal]) : state.signal;
+  // Once a signature is rejected, requests omit those thinking blocks. Backup fit
+  // must use that same context, or a usable backup can be skipped on discarded text.
+  const requestContext = () =>
+    state.dropThinkingBlocks ? withoutThinkingBlocks(context) : context;
   const signalAborted = () => signal.aborted;
   const finishWithThrownError = (target: RuntimeModelTarget, error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -2573,7 +2591,7 @@ function fallbackAwareModelStream(
         if (
           !fallbackSupportsContext(
             candidate,
-            context,
+            requestContext(),
             options,
             state.request.model.thinkingLevel,
             state.request.tools,
@@ -2591,8 +2609,20 @@ function fallbackAwareModelStream(
   const run = async () => {
     let buffered: AssistantMessageEvent[] = [];
     let retries = 0;
+    let recoveredIdle = false;
+    // Same-model retries and their backoff share one request budget. A post-header
+    // idle stream renews it once, since the idle bound can outlast the budget.
+    let startedAt = Date.now();
+    const timeoutMs = options?.timeoutMs ?? MODEL_STREAM_TIMEOUT_MS;
     let firstRetryableError: Extract<AssistantMessageEvent, { type: "error" }> | undefined;
     while (!signalAborted()) {
+      const remainingMs = timeoutMs - (Date.now() - startedAt);
+      if (retries > 0 && firstRetryableError && remainingMs <= 0) {
+        output.push(firstRetryableError);
+        output.end(firstRetryableError.error);
+        return;
+      }
+      const attemptOptions = retries > 0 ? { ...options, timeoutMs: remainingMs } : options;
       const target = state.getActive();
       lastPartial = undefined;
       let sawPartialOutput = false;
@@ -2611,8 +2641,10 @@ function fallbackAwareModelStream(
         const reasoning = thinkingLevel === "off" ? undefined : thinkingLevel;
         stream = state.stream(
           target,
-          context,
-          state.request.fallbackModels?.length ? { ...options, apiKey, reasoning } : options,
+          requestContext(),
+          state.request.fallbackModels?.length
+            ? { ...attemptOptions, apiKey, reasoning }
+            : attemptOptions,
         );
       } catch (error) {
         finishWithThrownError(target, error);
@@ -2623,6 +2655,20 @@ function fallbackAwareModelStream(
           if (event.type === "error") {
             let terminalEvent = event;
             const hasTerminalPartialOutput = assistantHasPartialOutput(event.error);
+            if (
+              !sawPartialOutput &&
+              !hasTerminalPartialOutput &&
+              event.reason === "error" &&
+              !signalAborted() &&
+              !state.dropThinkingBlocks &&
+              isThinkingSignatureMismatch(event.error.errorMessage)
+            ) {
+              // Later calls in this run skip the stale thinking up front instead of failing first.
+              state.dropThinkingBlocks = true;
+              buffered = [];
+              restart = true;
+              break;
+            }
             if (
               !sawPartialOutput &&
               !hasTerminalPartialOutput &&
@@ -2641,16 +2687,24 @@ function fallbackAwareModelStream(
                 break;
               }
               firstRetryableError ??= event;
-              const backoff = isProviderTimeout(event.error)
-                ? undefined
+              // A silent stream is retried once on the same model.
+              const idle = event.error.errorMessage === MODEL_STREAM_IDLE_TIMEOUT_MESSAGE;
+              const backoff = idle
+                ? recoveredIdle
+                  ? undefined
+                  : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
                 : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
+              if (idle && backoff !== undefined) {
+                recoveredIdle = true;
+                startedAt = Date.now();
+              }
               const requested = retryAfterMs(event.error);
               // A server asking for a longer wait than we allow is not worth retrying.
               const delay =
                 backoff === undefined || (requested ?? 0) > MAX_RETRY_AFTER_MS
                   ? undefined
                   : (requested ?? backoff + Math.floor(Math.random() * (backoff / 4)));
-              if (delay !== undefined) {
+              if (delay !== undefined && Date.now() - startedAt + delay < timeoutMs) {
                 retries += 1;
                 state.request.onModelRetry?.(
                   isConnectionFailure(event.error)
@@ -2659,9 +2713,11 @@ function fallbackAwareModelStream(
                 );
                 await abortableDelay(delay, signal);
                 if (failIfAborted(target)) return;
-                buffered = [];
-                restart = true;
-                break;
+                if (Date.now() - startedAt < timeoutMs) {
+                  buffered = [];
+                  restart = true;
+                  break;
+                }
               }
               terminalEvent = firstRetryableError;
               if (isConnectionFailure(terminalEvent.error)) {
@@ -2781,8 +2837,8 @@ function isCodexModel(model: Pick<Model<Api>, "api" | "provider">): boolean {
   return model.provider === "openai-codex" || model.api === "openai-codex-responses";
 }
 
-/** Abort reason recorded when a Codex stream goes silent past the idle bound. */
-export const CODEX_STREAM_IDLE_TIMEOUT_MESSAGE = "Codex stream idle timeout";
+/** Abort reason recorded when a model stream goes silent past the idle bound. */
+export const MODEL_STREAM_IDLE_TIMEOUT_MESSAGE = "Model stream idle timeout";
 
 interface StreamIdleWatchdog {
   /** Composed abort signal to hand to the provider request. */
@@ -2813,7 +2869,7 @@ interface StreamIdleWatchdog {
  * so when the watchdog fired the wrapper relabels the terminal error as an
  * idle timeout rather than a caller abort.
  */
-export function codexStreamIdleWatchdog(
+export function modelStreamIdleWatchdog(
   upstream: AbortSignal | undefined,
   idleTimeoutMs: number = MODEL_STREAM_IDLE_TIMEOUT_MS,
 ): StreamIdleWatchdog {
@@ -2832,7 +2888,7 @@ export function codexStreamIdleWatchdog(
       timer = undefined;
       if (controller.signal.aborted) return;
       timedOut = true;
-      controller.abort(new Error(CODEX_STREAM_IDLE_TIMEOUT_MESSAGE));
+      controller.abort(new Error(MODEL_STREAM_IDLE_TIMEOUT_MESSAGE));
     }, idleTimeoutMs);
     timer.unref?.();
   };
@@ -2859,7 +2915,7 @@ export function codexStreamIdleWatchdog(
       ? {
           ...message,
           stopReason: "error",
-          errorMessage: CODEX_STREAM_IDLE_TIMEOUT_MESSAGE,
+          errorMessage: MODEL_STREAM_IDLE_TIMEOUT_MESSAGE,
         }
       : message;
 
@@ -2920,7 +2976,7 @@ function boundRetryableErrorBody(response: Response, idleTimeoutMs: number): Res
       const outcome = await Promise.race([read, timeout]);
       clear();
       if (outcome.kind === "timeout") {
-        const error = new Error(CODEX_STREAM_IDLE_TIMEOUT_MESSAGE);
+        const error = new Error(MODEL_STREAM_IDLE_TIMEOUT_MESSAGE);
         void reader.cancel(error).catch(() => undefined);
         controller.error(error);
         return;
@@ -2947,12 +3003,18 @@ function boundRetryableErrorBody(response: Response, idleTimeoutMs: number): Res
   });
 }
 
-function codexRequestFetch(
+function modelRequestFetch(
   fetchImpl: ModelsSimpleStreamOptions["fetch"],
   idleTimeoutMs: number,
 ): NonNullable<ModelsSimpleStreamOptions["fetch"]> {
   return async (input, init) => {
-    const response = fetchImpl ? await fetchImpl(input, init) : await globalThis.fetch(input, init);
+    // Compatible providers attach a package undici Agent after this wrapper is
+    // installed. Pair that dispatcher without replacing other providers' fetch.
+    const transport =
+      init && "dispatcher" in init
+        ? fetchPairedWithDispatcher(fetchImpl)
+        : (fetchImpl ?? globalThis.fetch);
+    const response = await transport(input, init);
     return boundRetryableErrorBody(response, idleTimeoutMs);
   };
 }
@@ -2967,23 +3029,21 @@ export function reliableModelStream(
   runStream?: (options: ModelsSimpleStreamOptions) => AssistantMessageEventStream,
   cacheRetention?: ModelsSimpleStreamOptions["cacheRetention"],
 ): AssistantMessageEventStream {
-  const watchdog = isCodexModel(model) ? codexStreamIdleWatchdog(options?.signal) : undefined;
+  const watchdog = modelStreamIdleWatchdog(options?.signal);
   try {
     const preparedOptions = reliableStreamOptions(
       model,
-      watchdog
-        ? {
-            ...options,
-            signal: watchdog.signal,
-            fetch: codexRequestFetch(options?.fetch, MODEL_STREAM_IDLE_TIMEOUT_MS),
-            // Only a 2xx arms the shared watchdog. Error bodies are bounded by
-            // the fetch wrapper, and a caller-supplied hook still sees every status.
-            onResponse: (response, requestModel) => {
-              if (response.status >= 200 && response.status < 300) watchdog.ping();
-              return options?.onResponse?.(response, requestModel);
-            },
-          }
-        : options,
+      {
+        ...options,
+        signal: watchdog.signal,
+        fetch: modelRequestFetch(options?.fetch, MODEL_STREAM_IDLE_TIMEOUT_MS),
+        // Only a 2xx arms the shared watchdog. Error bodies are bounded by
+        // the fetch wrapper, and a caller-supplied hook still sees every status.
+        onResponse: (response, requestModel) => {
+          if (response.status >= 200 && response.status < 300) watchdog.ping();
+          return options?.onResponse?.(response, requestModel);
+        },
+      },
       configuredMaxTokens,
       accessToken,
       cacheRetention,
@@ -2991,9 +3051,9 @@ export function reliableModelStream(
     const stream = runStream
       ? runStream(preparedOptions)
       : models.streamSimple(model, context, preparedOptions);
-    return watchdog ? watchdog.wrap(stream) : stream;
+    return watchdog.wrap(stream);
   } catch (error) {
-    watchdog?.dispose();
+    watchdog.dispose();
     throw error;
   }
 }

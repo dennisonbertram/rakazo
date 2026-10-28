@@ -230,6 +230,7 @@ export * from "./third-party-connector-emulator.js";
 export * from "./ticket-changes.js";
 export * from "./ticket-tools.js";
 export * from "./tool-runner.js";
+export { dispatcherFetch } from "./undici-fetch.js";
 export * from "./voice-agent-tools.js";
 export * from "./voice-factory.js";
 export * from "./wakeup.js";

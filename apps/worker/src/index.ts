@@ -138,15 +138,18 @@ async function main() {
   const webOrigin = process.env.WEB_ORIGIN ?? "http://127.0.0.1:5173";
   const encryptionKey = resolveEncryptionKey(process.env);
   const mcpOAuth = new McpOAuthBroker(prisma, secrets, {}, allowPrivateEndpoint);
+  const mcpStdio = {
+    stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
+    allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean),
+  };
   const mcp = new McpConnector(
     prisma,
     secrets,
     {
-      stdioEnabled: process.env.MCP_STDIO_ENABLED === "true",
-      allowedCommands: (process.env.MCP_STDIO_ALLOWED_COMMANDS ?? "")
-        .split(",")
-        .map((v) => v.trim())
-        .filter(Boolean),
+      ...mcpStdio,
       events,
       allowPrivateEndpoint,
     },
@@ -256,6 +259,7 @@ async function main() {
     ].filter(Boolean),
     secretStore: secrets,
     mcpAllowPrivateEndpoint: allowPrivateEndpoint,
+    mcpStdio,
     deploymentModelKey,
     deploymentModelConfigured,
     dataDir,
