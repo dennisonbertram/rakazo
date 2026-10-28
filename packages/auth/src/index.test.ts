@@ -210,6 +210,24 @@ describe("resolveSignupPolicy", () => {
   });
 });
 
+describe("session lifetime", () => {
+  it("lasts 90 days and renews after a day of use, keeping the one-day fresh window", async () => {
+    const auth = createAuth({} as never, {
+      secret: "test-secret-that-is-long-enough-for-better-auth",
+      baseURL: "http://127.0.0.1:3100",
+      webOrigin: "http://127.0.0.1:5173",
+      signupsEnabled: undefined,
+      signupAllowlist: undefined,
+    });
+    const { sessionConfig } = await auth.$context;
+    expect(sessionConfig).toMatchObject({
+      expiresIn: 90 * 24 * 60 * 60,
+      updateAge: 24 * 60 * 60,
+      freshAge: 24 * 60 * 60,
+    });
+  });
+});
+
 describe("bearer sessions", () => {
   const secret = "offline-auth-secret-at-least-32-characters";
   const token = "fakeSessionToken0123456789abcdef";

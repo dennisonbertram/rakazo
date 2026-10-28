@@ -21,6 +21,7 @@ import type {
   FinanceAccountsOutput,
   FinanceBurnOutput,
   FinanceCategoryOutput,
+  FinanceChartNote,
   FinanceConnectInput,
   FinanceConnectOutput,
   FinanceMonthOutput,
@@ -835,6 +836,60 @@ export async function financePreferences(
   actor: Actor,
 ): Promise<FinancePreferences> {
   return { runwayCrypto: await loadRunwayCrypto(deps.prisma, actor) };
+}
+
+const toChartNote = (
+  row: { id: string; day: string; text: string; userId: string },
+  actor: Actor,
+): FinanceChartNote => ({
+  id: row.id,
+  day: row.day,
+  text: row.text,
+  mine: row.userId === actor.userId,
+});
+
+/** Notes on the Burn chart for a day range: every member of the Space sees them. */
+export async function financeChartNotes(
+  deps: FinanceDeps,
+  actor: Actor,
+  input: { from: string; to: string },
+): Promise<FinanceChartNote[]> {
+  const rows = await deps.prisma.financeChartNote.findMany({
+    where: { spaceId: actor.spaceId, day: { gte: input.from, lte: input.to } },
+    orderBy: [{ day: "asc" }, { createdAt: "asc" }],
+    take: 500,
+  });
+  return rows.map((row) => toChartNote(row, actor));
+}
+
+export async function financeChartNoteAdd(
+  deps: FinanceDeps,
+  actor: Actor,
+  input: { day: string; text: string },
+): Promise<FinanceChartNote> {
+  const row = await deps.prisma.financeChartNote.create({
+    data: { spaceId: actor.spaceId, userId: actor.userId, day: input.day, text: input.text },
+  });
+  return toChartNote(row, actor);
+}
+
+/** Only the author deletes a note; another member of the Space gets FORBIDDEN, another Space NOT_FOUND. */
+export async function financeChartNoteDelete(
+  deps: FinanceDeps,
+  actor: Actor,
+  input: { id: string },
+): Promise<Record<string, never>> {
+  const row = await deps.prisma.financeChartNote.findFirst({
+    where: { id: input.id, spaceId: actor.spaceId },
+    select: { userId: true },
+  });
+  if (!row) throw notFound();
+  if (row.userId !== actor.userId)
+    throw new ORPCError("FORBIDDEN", { message: "Only the author can delete this note" });
+  await deps.prisma.financeChartNote.deleteMany({
+    where: { id: input.id, spaceId: actor.spaceId, userId: actor.userId },
+  });
+  return {};
 }
 
 export async function financeSetPreferences(

@@ -660,6 +660,22 @@ export type RunwayCryptoScope = z.infer<typeof RunwayCryptoScopeSchema>;
 export const FinancePreferencesSchema = z.object({ runwayCrypto: RunwayCryptoScopeSchema });
 export type FinancePreferences = z.infer<typeof FinancePreferencesSchema>;
 
+/** A note pinned to a day on the Burn chart. Every member of the Space sees it; only its author can delete it. */
+export const FinanceChartNoteSchema = z.object({
+  id: z.string(),
+  /** YYYY-MM-DD, the start of the bucket it was added to. */
+  day: DayId,
+  text: z.string(),
+  mine: z.boolean(),
+});
+export type FinanceChartNote = z.infer<typeof FinanceChartNoteSchema>;
+export const FinanceChartNotesInputSchema = z.object({ from: DayId, to: DayId });
+export const FINANCE_CHART_NOTE_MAX = 500;
+export const FinanceChartNoteAddInputSchema = z.object({
+  day: DayId.refine((d) => new Date(`${d}T00:00:00Z`).toISOString().startsWith(d), "Not a date"),
+  text: z.string().trim().min(1).max(FINANCE_CHART_NOTE_MAX),
+});
+
 /** End-of-day crypto value from stored daily snapshots; days before the first snapshot are absent. */
 export const CryptoBalancePointSchema = z.object({
   day: DayId,

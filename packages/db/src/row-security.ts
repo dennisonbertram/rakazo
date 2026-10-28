@@ -150,6 +150,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "FinanceWallet",
   "FinanceCryptoHolding",
   "FinancePreference",
+  "FinanceChartNote",
   "FinanceCryptoSnapshot",
   "FinanceExchangeConnection",
   "FinanceExchangeBalance",

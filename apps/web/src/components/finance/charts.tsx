@@ -1,6 +1,21 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { CashPoint } from "@rakazo/contracts";
+import type { CashPoint, FinanceChartNote } from "@rakazo/contracts";
+import { FINANCE_CHART_NOTE_MAX } from "@rakazo/contracts";
+import {
+  Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Textarea,
+} from "@rakazo/ui-web";
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import {
   axisMoney,
@@ -12,6 +27,7 @@ import {
   weekdayShort,
 } from "../../lib/finance-format";
 import { useHideAmounts } from "../../lib/hide-amounts-preference";
+import { errorText } from "../../lib/user-error";
 
 /** Gridline step and top value (in cents) so about three to four lines cover `max`. */
 export function niceScale(max: number): { step: number; top: number } {
@@ -433,6 +449,21 @@ function monotoneSegments(pts: [number, number][]): string[] {
   });
 }
 
+/** Index of the bucket that holds `day` (start and end inclusive), or -1 when none does. */
+export function noteBucketIndex(series: readonly { start: string; end: string }[], day: string) {
+  return series.findIndex((p) => p.start <= day && day <= p.end);
+}
+
+/** Notes pinned to days on the Burn chart, with what saving and deleting one does. */
+export type BurnNotes = {
+  notes: readonly FinanceChartNote[];
+  onAdd: (day: string, text: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+};
+
+const clip = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, max - 1)}…` : text;
+
 /**
  * Out, revenue and financing for each bucket as lines (Out has a gradient under it); each bucket
  * opens its detail. A bucket still running is a hollow dot, not part of the line.
@@ -443,16 +474,23 @@ export function BurnLines({
   height = 230,
   onOpen,
   label,
+  notes,
 }: {
   series: CashPoint[];
   granularity?: BarGranularity;
   height?: number;
   onOpen: (point: CashPoint) => void;
   label: string;
+  /** Right-click (or the context-menu key) on a period adds a note; marked periods list theirs. */
+  notes?: BurnNotes;
 }) {
   useHideAmounts();
   const gradient = useId();
   const [active, setActive] = useState<number | null>(null);
+  // The period the context menu was opened on, and the note being written for one.
+  const [menuAt, setMenuAt] = useState<number | null>(null);
+  const [draft, setDraft] = useState<{ index: number; text: string; error: string } | null>(null);
+  const [saving, setSaving] = useState(false);
   // Periods before the first one with money in or out are flat zeros that only take width.
   const firstUsed = allSeries.findIndex((m) => m.outCents || m.revenueCents || m.financingCents);
   const trim =
@@ -488,7 +526,24 @@ export function BurnLines({
   // Each month is a control and must be 44 px wide on touch: a narrow phone scrolls the chart.
   const minWidth =
     touch && granularity === "month" ? left + right + Math.max(series.length, minSlots) * 44 : 0;
-  return (
+  const noteLists = series.map(
+    (p) => notes?.notes.filter((n) => noteBucketIndex([p], n.day) === 0) ?? [],
+  );
+  const menuName = (i: number) => barLabels(series, granularity)[i] ?? "";
+  async function saveDraft() {
+    const point = draft && series[draft.index];
+    if (!draft || !point || !notes) return;
+    setSaving(true);
+    try {
+      await notes.onAdd(point.start, draft.text.trim());
+      setDraft(null);
+    } catch (cause) {
+      setDraft({ ...draft, error: errorText(cause) });
+    } finally {
+      setSaving(false);
+    }
+  }
+  const chart = (
     <Chart height={height} label={label} minWidth={minWidth}>
       {(width) => {
         // Where the last label on each row ends (lower row first). It lives in this callback, which
@@ -534,8 +589,9 @@ export function BurnLines({
                 : []),
             ]
           : [];
-        const tipW = 140;
-        const tipH = 12 + 16 * (rows.length + 1);
+        const shownNotes = active === null ? [] : (noteLists[active] ?? []);
+        const tipW = shownNotes.length > 0 ? 210 : 140;
+        const tipH = 12 + 16 * (rows.length + 1 + shownNotes.length);
         const tipX =
           active !== null && cx(active) + 10 + tipW > width - right
             ? Math.max(cx(active) - 10 - tipW, 0)
@@ -737,6 +793,7 @@ export function BurnLines({
               const name = names[i] ?? "";
               const showLabel = (series.length - 1 - i) % labelEvery === 0;
               const open = () => onOpen(m);
+              const here = noteLists[i] ?? [];
               return (
                 // biome-ignore lint/a11y/useSemanticElements: an SVG group cannot be an <a> that the router can drive
                 <g
@@ -744,7 +801,10 @@ export function BurnLines({
                   // Pointer events go to the touch target below; keyboard access to every period stays.
                   role="link"
                   tabIndex={0}
-                  aria-label={`${granularity === "day" ? dayMonth(m.start) : name}: ${money(m.outCents)}`}
+                  aria-label={`${granularity === "day" ? dayMonth(m.start) : name}: ${money(m.outCents)}${
+                    here.length > 0 ? `. ${t`Notes`}: ${here.map((n) => n.text).join("; ")}` : ""
+                  }`}
+                  onContextMenu={() => setMenuAt(i)}
                   onKeyDown={keyActivate(open)}
                   onFocus={() => setActive(i)}
                   onBlur={() => setActive(null)}
@@ -764,6 +824,12 @@ export function BurnLines({
                     height={base - top}
                     className="fill-transparent"
                   />
+                  {here.length > 0 ? (
+                    <g data-testid="burn-note-marker">
+                      <title>{here.map((n) => n.text).join("\n")}</title>
+                      <circle cx={cx(i)} cy={base - 6} r={3.5} className="fill-primary" />
+                    </g>
+                  ) : null}
                   {showLabel ? (
                     <AxisLabel x={cx(i)} y={height - 8} bold={m.partial === true}>
                       {name}
@@ -847,6 +913,17 @@ export function BurnLines({
                 >
                   {granularity === "day" ? dayMonth(shown.start) : (names[active] ?? "")}
                 </text>
+                {shownNotes.map((n, j) => (
+                  <text
+                    key={n.id}
+                    x={tipX + 10}
+                    y={top + 34 + 16 * (rows.length + j)}
+                    fontSize={12}
+                    className="fill-foreground"
+                  >
+                    {clip(n.text, 28)}
+                  </text>
+                ))}
                 {rows.map((r, j) => (
                   <g key={r.key}>
                     <text
@@ -874,6 +951,54 @@ export function BurnLines({
         );
       }}
     </Chart>
+  );
+  if (!notes) return chart;
+  const mine = menuAt === null ? [] : (noteLists[menuAt] ?? []).filter((n) => n.mine);
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger>{chart}</ContextMenuTrigger>
+        <ContextMenuContent side="bottom" align="start">
+          <ContextMenuItem
+            onClick={() => menuAt !== null && setDraft({ index: menuAt, text: "", error: "" })}
+          >
+            <Trans>Add note</Trans>
+          </ContextMenuItem>
+          {mine.map((n) => (
+            <ContextMenuItem
+              key={n.id}
+              variant="destructive"
+              onClick={() => void notes.onDelete(n.id)}
+            >
+              {t`Delete note: ${clip(n.text, 24)}`}
+            </ContextMenuItem>
+          ))}
+        </ContextMenuContent>
+      </ContextMenu>
+      <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <Trans>Add note</Trans>
+            </DialogTitle>
+            <DialogDescription>{draft ? menuName(draft.index) : ""}</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            aria-label={t`Note`}
+            value={draft?.text ?? ""}
+            maxLength={FINANCE_CHART_NOTE_MAX}
+            autoFocus
+            onChange={(e) => draft && setDraft({ ...draft, text: e.target.value, error: "" })}
+          />
+          {draft?.error ? <p className="text-sm text-destructive">{draft.error}</p> : null}
+          <DialogFooter>
+            <Button disabled={saving || !draft?.text.trim()} onClick={() => void saveDraft()}>
+              <Trans>Save</Trans>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

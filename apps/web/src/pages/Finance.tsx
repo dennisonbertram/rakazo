@@ -409,6 +409,13 @@ function Overview({
   const previousRange = range({ start: totals.previousStart, end: totals.previousEnd });
   const bars = data.cashSeries[period];
   const barGranularity = BAR_GRANULARITY[period];
+  // Notes pinned to the days this chart covers; they follow the period because they are dates.
+  const noteFrom = bars[0]?.start ?? "";
+  const noteTo = bars.at(-1)?.end ?? "";
+  const chartNotes = useFinanceQuery(
+    () => (noteFrom ? rpc.finance.chartNotes({ from: noteFrom, to: noteTo }) : Promise.resolve([])),
+    [noteFrom, noteTo],
+  );
   const subs = data.subscriptions;
   const monthlyTotal = money(subs.totalMonthlyCents);
   const yieldAmount = data.treasuryYieldLastMonth
@@ -699,6 +706,17 @@ function Overview({
                 series={bars}
                 granularity={barGranularity}
                 label={t`Cash out and cash in over time`}
+                notes={{
+                  notes: chartNotes.data ?? [],
+                  onAdd: async (day, text) => {
+                    await rpc.finance.chartNoteAdd({ day, text });
+                    chartNotes.reload();
+                  },
+                  onDelete: async (id) => {
+                    await rpc.finance.chartNoteDelete({ id });
+                    chartNotes.reload();
+                  },
+                }}
                 onOpen={(p) =>
                   navigate(
                     barGranularity === "month"
