@@ -1069,6 +1069,20 @@ describe("MCP loopback endpoints", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it("reports a second server with the same name as a conflict", async () => {
+    const { create, handler } = mcpDeps();
+    create.mockRejectedValueOnce(
+      Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
+    );
+    const { response } = await handler.handle(rpc("mcp/servers/create", createInput), {
+      prefix: "/rpc",
+      context: { actor: actor(true) },
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response?.text()).toContain("An MCP server with that name already exists.");
+  });
+
   it("refuses a stdio server this deployment can't run", async () => {
     const { create, handler } = mcpDeps();
     const { response } = await handler.handle(

@@ -5363,40 +5363,50 @@ export function createRouter(deps: RouterDeps) {
                 computerContext(context.actor, "mcp", "mcp.create"),
               )
             : null;
-          const row = await deps.prisma.$transaction(async (tx) => {
-            if (stored) {
-              await tx.secret.create({
+          const row = await deps.prisma
+            .$transaction(async (tx) => {
+              if (stored) {
+                await tx.secret.create({
+                  data: {
+                    id: stored.id,
+                    userId: context.actor.userId,
+                    spaceId: context.actor.spaceId,
+                    kind: "mcp",
+                    ciphertext: stored.ciphertext,
+                  },
+                });
+              }
+              return tx.mcpServer.create({
                 data: {
-                  id: stored.id,
-                  userId: context.actor.userId,
                   spaceId: context.actor.spaceId,
-                  kind: "mcp",
-                  ciphertext: stored.ciphertext,
+                  userId: context.actor.userId,
+                  slug: input.slug,
+                  name: input.name,
+                  description: input.description,
+                  transport: input.transport,
+                  endpoint: "endpoint" in input ? input.endpoint : null,
+                  command: "command" in input ? input.command : null,
+                  args: ("args" in input ? input.args : []) as Prisma.InputJsonValue,
+                  env: ("env" in input
+                    ? Object.fromEntries(Object.keys(input.env).map((key) => [key, true]))
+                    : {}) as Prisma.InputJsonValue,
+                  headers: ("headers" in input
+                    ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, true]))
+                    : {}) as Prisma.InputJsonValue,
+                  secretId: stored?.id,
+                  enabled: input.enabled,
                 },
               });
-            }
-            return tx.mcpServer.create({
-              data: {
-                spaceId: context.actor.spaceId,
-                userId: context.actor.userId,
-                slug: input.slug,
-                name: input.name,
-                description: input.description,
-                transport: input.transport,
-                endpoint: "endpoint" in input ? input.endpoint : null,
-                command: "command" in input ? input.command : null,
-                args: ("args" in input ? input.args : []) as Prisma.InputJsonValue,
-                env: ("env" in input
-                  ? Object.fromEntries(Object.keys(input.env).map((key) => [key, true]))
-                  : {}) as Prisma.InputJsonValue,
-                headers: ("headers" in input
-                  ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, true]))
-                  : {}) as Prisma.InputJsonValue,
-                secretId: stored?.id,
-                enabled: input.enabled,
-              },
+            })
+            .catch((error: unknown) => {
+              // The slug comes from the name, so this is a second server with the same name.
+              if (isUniqueViolation(error)) {
+                throw new ORPCError("CONFLICT", {
+                  message: "An MCP server with that name already exists.",
+                });
+              }
+              throw error;
             });
-          });
           // An existing Carta agent gets a newly added Carta server, with read tools only.
           if (isCartaEndpoint(row.endpoint))
             await assignToExistingCartaAgent(deps.prisma, context.actor);
