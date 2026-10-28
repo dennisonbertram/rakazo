@@ -498,6 +498,7 @@ export function CalendarPage({
         name="calendar-search"
       />
       <PickFilter
+        inline
         label={t`Kind`}
         value={kind}
         anyLabel={t`All`}
@@ -505,6 +506,7 @@ export function CalendarPage({
         onChange={(next) => list.setParam("kind", next)}
       />
       <PickFilter
+        inline
         label={t`Bot`}
         value={botId}
         anyLabel={t`All`}
