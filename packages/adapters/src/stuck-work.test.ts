@@ -534,6 +534,7 @@ function expireClient(run: ReturnType<typeof candidate>, options?: { cancelled?:
       findFirst: vi.fn(async () => null),
       create: vi.fn(async () => ({ id: "run-next" })),
     },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
     task: {
       updateMany: vi.fn(async () => ({ count: 1 })),

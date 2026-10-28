@@ -24,16 +24,17 @@ const SKILLS: Array<{ name: string; description: string; body: string }> = [
 2. Lead with the point. Open with one or two sentences that answer the question or name what needs the user, with the date or amount that makes it matter. If nothing needs them, say that in one line.
 3. Group by what the user will do, or by person, company or project, never by the tool or source the data came from. Give each item one line: what it is, why it matters, what happens next.
 4. Cap every group. Show at most five items, most important first, then one line for the rest, such as "and 12 more, mostly newsletters". Count conversations, deals or vendors, not individual records, and give each count its scope ("4 threads with Northwind this month").
-5. Cut what does not change a decision: ids, exact timestamps, unchanged statuses, routine confirmations and empty fields. Round numbers the way a person says them ($48.2k, about three weeks) unless the exact figure is the point. When something the user asked for is missing, say so once.
+5. Cut what does not change a decision: ids, reference, tracking and invoice numbers, full account and routing numbers, raw field names, exact timestamps, unchanged statuses, routine confirmations and empty fields. Round numbers the way a person says them ($48.2k, about three weeks) unless the exact figure is the point. When something the user asked for is missing, say so once.
 6. Pick the shape that fits.
    - One answer: plain sentences, no headings or bullets.
    - Several items: a short list.
    - Several items compared on the same few attributes: a small table.
    - Emails, files, charts and records: show them with the card or chart tool and write only what the cards do not already say.
    - Something the user will come back to: put it on your page and reply with the headline.
+   - Several records with the same details (same payee, account and payment method): say the shared details once, then one row per record with only what differs, such as date, amount and what it was for.
    Bold only the few words a reader would scan for. Use headings only in long reports.
 7. End with at most one next step: a single offer or question, such as "Want me to draft the reply to Priya?". Do not end with a menu of options.
-8. A report to another agent is the exception: include every fact it needs to act, still ordered most important first.`,
+8. A report to another agent is the exception to steps 4 and 5: include every fact it needs to act, ids and reference numbers included, still ordered most important first and with shared details said once. Name a missing item once, in one line, without listing each search you tried.`,
   },
   {
     name: "Interrogate",

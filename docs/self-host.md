@@ -38,9 +38,8 @@ Optional: set `OPENROUTER_API_KEY` or connect a model in the UI after signup.
 A provider that authenticates from the host needs no key: for Amazon Bedrock with an ECS task,
 IRSA or EC2 instance role, opt in with `PI_DEFAULT_CREDENTIALS=host` and set
 `PI_DEFAULT_PROVIDER=amazon-bedrock`, `PI_DEFAULT_MODEL` and `AWS_REGION`. With an instance
-role, also complete both steps in [Restricted computer egress](#restricted-computer-egress):
-`SANDBOX_COMPUTER_EGRESS=restricted` alone does not stop bot computers reading the role's
-credentials from the metadata endpoint.
+role, keep [restricted computer egress](#restricted-computer-egress) on so bot computers
+cannot read the role's credentials from the metadata endpoint.
 Auto Review uses that LLM checker by default. To use TypeSafe Jev instead, set
 `RAKAZO_AUTO_REVIEW_PROVIDER=jev` and `TYPESAFE_API_KEY`. Core still runs with neither.
 
@@ -89,48 +88,53 @@ supervisor at startup naming the variable, rather than surfacing later as a fail
 
 ### Restricted computer egress
 
-Docker computers have full outbound access by default — the public internet plus the Docker
-host's own addresses, the LAN, and link-local cloud metadata endpoints such as
-`169.254.169.254`. On a cloud VM that last path is instance-credential theft for anything a
-bot runs. Restricted mode keeps public internet egress (browsing, DNS, apt, git over SSH)
-while dropping computer traffic to every non-public destination and to the host itself.
+Docker computers default to restricted egress: the public internet (browsing, DNS, apt, git
+over SSH) but not the Docker host, the LAN, or link-local cloud metadata such as
+`169.254.169.254`, which on a cloud VM would hand instance credentials to anything a bot runs.
 
-It takes two parts, both opt-in:
+It takes two parts:
 
-1. Set `SANDBOX_COMPUTER_EGRESS=restricted` in `.env` and recreate the supervisor. Each
-   computer network then gets a deterministic host bridge name (`rakazo-c…`) instead of a
-   generic `br-*`.
-2. Apply the host ruleset once per Docker host:
+1. `SANDBOX_COMPUTER_EGRESS=restricted`, the Compose default, gives each computer network a
+   deterministic host bridge name (`rakazo-c…`) instead of a generic `br-*`.
+2. The host ruleset, applied once per Docker host:
 
    ```bash
    sudo bash infra/compose/restrict-computer-egress.sh
    ```
 
-   On a no-checkout install, download it first:
-   `curl -fsSLO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/restrict-computer-egress.sh`.
-   The script drops forwarded traffic from `rakazo-c*` bridges to all non-public IPv4/IPv6
+   `install-images.sh` downloads and runs it (asking for sudo) and records the result in
+   `.env`. Where the rules cannot be installed (macOS, Windows, Docker Desktop, rootless
+   Docker, no iptables, or a failed run) it writes `SANDBOX_COMPUTER_EGRESS=open` and says
+   why. The script drops forwarded traffic from `rakazo-c*` bridges to all non-public IPv4/IPv6
    destinations via the `DOCKER-USER` chain, adds an `INPUT` drop so computers cannot open
    connections to the host (established replies to host-initiated control and screen
    connections still flow), and installs a systemd oneshot so the rules return after a
    reboot. `--print` shows the exact rules without changing anything; `--remove` uninstalls.
+
+Before the first restricted computer starts, the supervisor checks that the host drops
+connections from a `rakazo-c*` bridge. Without the ruleset, computers fail to start with an
+error naming the script instead of running unrestricted; run the script (no restart needed)
+or set `SANDBOX_COMPUTER_EGRESS=open` and recreate the supervisor. A host-run supervisor
+(`pnpm dev`) and the desktop app's **This computer** stack default to open: Docker Desktop
+keeps its bridges in a VM the host rules cannot reach.
 
 Screen streaming is unaffected: the supervisor and web proxy join each computer's bridge,
 and the ruleset exempts traffic whose in- and out-interface are both `rakazo-c*` before
 any drop (that exemption is load-bearing on hosts where `br_netfilter` feeds bridged
 frames through `FORWARD`). Rules match interface names rather than subnets, so computer
 create/delete cycles need no firewall maintenance; deleting a computer removes its
-traffic from the match and nothing else. A computer provisioned before the flag flips
+traffic from the match and nothing else. A computer provisioned while egress was open
 is replaced on its next provision — resuming it on an unnamed bridge would bypass the
 restriction.
 
-To disable restricted egress, set `SANDBOX_COMPUTER_EGRESS=open`, recreate the
-supervisor, and run `sudo bash infra/compose/restrict-computer-egress.sh --remove`.
-The flag alone does not uninstall the host rules, which keep matching the still-named
-`rakazo-c*` bridges until removed.
+If computers must reach LAN services, an internal proxy, or endpoints bound to the host,
+set `SANDBOX_COMPUTER_EGRESS=open`, recreate the supervisor, and run
+`sudo bash infra/compose/restrict-computer-egress.sh --remove`. The flag alone does not
+uninstall the host rules, which keep matching the still-named `rakazo-c*` bridges until
+removed.
 
-Do not enable restricted egress if computers must reach LAN services, an internal proxy,
-or endpoints bound to the host. Requires Linux Docker Engine with the iptables backend —
-Docker Desktop, rootless Docker, and `firewall-backend: nftables` are unsupported. The
+The ruleset requires Linux Docker Engine with the iptables backend; Docker Desktop, rootless
+Docker, and `firewall-backend: nftables` are unsupported. The
 `SANDBOX_SCREEN_NETWORK=internal` topology shares one network instead of per-bot bridges,
 so the mode does not apply there.
 
@@ -410,7 +414,17 @@ Each user can also connect their own OpenAI-compatible endpoint from **Connect a
 **Settings → Models** on web and mobile. Choose **OpenAI-compatible**, enter the server base URL
 (for example `http://127.0.0.1:8000/v1`), the exact model id, and an optional API key.
 Public hosts and ordinary hostnames need `RAKAZO_OPENAI_COMPAT_ALLOW_PUBLIC=1` and HTTPS.
-Literal private IP, loopback, and `host.docker.internal` targets do not. If that endpoint's model
+Literal private IP, loopback, and `host.docker.internal` targets do not.
+For a self-hosted endpoint whose hostname resolves to private IPs, set
+`RAKAZO_OPENAI_COMPAT_PRIVATE_HOSTS=models.example.test,other.example.test` in the deployment
+environment for both API and worker, then recreate those containers. Entries are exact hostnames
+(case-insensitive, optional trailing dot), not URLs, suffixes, or wildcards. These hosts do not
+need `RAKAZO_OPENAI_COMPAT_ALLOW_PUBLIC`; every DNS answer must be private, and metadata and
+link-local destinations remain blocked. This applies to discovery and model requests.
+HTTPS still validates the hostname's certificate. Like private IP endpoints, trusted hostnames
+also permit HTTP with API keys; use HTTPS unless the network is trusted. Only allow hosts you
+control.
+If that endpoint's model
 accepts images, enable **Supports images** under **Advanced** when connecting so attachments and
 screenshot computer tools stay available. Existing connections default to disabled. For centrally
 managed endpoints, the deployment-wide fallback remains
@@ -435,6 +449,8 @@ support. Existing token limits still apply; effort is not a separate reasoning-t
 Do not commit `.env`. Never put `COMPOSIO_API_KEY`, OpenRouter keys, or provider tokens in git, logs, or chat.
 
 Optional messaging platforms (iMessage, Slack, WhatsApp, Telegram, Feishu/Lark) mount when their env credentials are set — see `.env.example`. Point a Feishu/Lark bot event subscription at `/api/v1/messaging/webhook/lark` (webhook/HTTP inbound only; do not enable long connection). Groups stay iMessage-only.
+
+The Compose files pass the API and worker only the settings each one reads, listed by name, rather than the whole `.env`. A setting whose name you choose, such as `TELEGRAM_BOT_TOKEN_<NAME>`, therefore needs its own line: add it under `api` and `worker` `environment` in an override file layered after the base file (and in `RAKAZO_COMPOSE_FILE` when the updater is enabled), with no value so Compose fills it from `.env`.
 
 ### iMessage through Photon
 
@@ -483,7 +499,9 @@ The Electron desktop app is a client of the same API. Docker and E2B still apply
 - **Desktop provider** / **This Mac** runs commands on the API/worker host. Docker stays the default.
   The Electron app asks once; if you choose This Mac, bots can use working directories under your home
   folder. Do not enable it on a public or shared service. macOS does not show its own permission
-  dialog for this.
+  dialog for this. Commands get only a minimal shell environment (no server secrets), and
+  `SANDBOX_PROVIDER=desktop` is refused unless `NODE_ENV` is `development` or `test` or the process
+  runs inside the Electron app, so a production server never runs bot commands on itself.
 - **Fake** is only an emulator for verification.
 - **None** boots the product without a computer host (fallback when Docker/supervisor is not
   configured, or when a remote provider is selected without its API key).
@@ -685,9 +703,9 @@ docker compose --env-file .env -f infra/compose/docker-compose.prod.yml exec api
 ```
 
 Passing `GIT_SHA` is what makes `/internal/health` report a `"revision"`; a locally built image has no
-other way to know its commit. Prebuilt images from the registry bake it in at publish time, so when
-you switch to a release tag you should leave `GIT_SHA` unset — a value in `.env` would override what
-the image already knows.
+other way to know its commit. Prebuilt images from the registry bake it in at publish time, so
+switching to a release tag needs nothing more: the containers report the revision the image was built
+from, not a `GIT_SHA` in `.env`.
 
 Once a release has been published you can switch this host to prebuilt images by setting
 `RAKAZO_IMAGE_TAG` to that release tag and running `pull` followed by `up -d --wait --pull never`.
@@ -1082,3 +1100,55 @@ The optional marketing site in `apps/www` can be hosted separately.
 ## Connect mobile clients
 
 The iOS and Android app can also point at a self-hosted origin at runtime. On the sign-in screen, tap **Use a custom server** and enter the same HTTPS origin as `WEB_ORIGIN` (for example `https://app.example.com`). Store builds still default to `EXPO_PUBLIC_API_URL`; the in-app setting is an override for people running their own API. Changing the server signs the device out of any previous session.
+
+## Connect outside AI clients (MCP)
+
+The API serves a Model Context Protocol endpoint at `/mcp` for AI clients such as Claude Code,
+claude.ai, ChatGPT and MCP Inspector. A client signs in through OAuth: the member approves it on
+a page of the web app and chooses one Space, and the client then sees only that Space. The
+connection is checked again on every call, so a member who leaves the Space, or a connection that
+is revoked, stops working on the next call. This first version has one tool, `agents_list`.
+
+### On localhost
+
+Nothing to set. Point a client at the API address, for example
+`claude mcp add --transport http praci http://127.0.0.1:<API port>/mcp`, then sign in from the
+client (`/mcp` in Claude Code). The approval page opens on `WEB_ORIGIN`.
+
+### From the internet with Tailscale Funnel
+
+Unverified: these commands have not been run. Check the flags against your Tailscale version
+(`tailscale funnel --help`), and whether Funnel keeps the path prefix when it proxies.
+
+Only the endpoints a client calls are public. The web app, `/rpc` and the rest of `/api` stay
+private. The approval page is not public either: the member opens it from a browser that can
+reach `WEB_ORIGIN`, and the client's own browser redirect brings them there.
+
+1. Pick the public address, `https://<machine>.<tailnet>.ts.net`, and set it in `.env`:
+
+   ```
+   PUBLIC_MCP_URL=https://<machine>.<tailnet>.ts.net
+   ```
+
+   It becomes the OAuth issuer and the base of the token and registration endpoints. Leave
+   `BETTER_AUTH_URL` and `WEB_ORIGIN` unchanged: the session cookie belongs to the web origin.
+2. Restart the API so it reads the setting.
+3. Expose three path prefixes of the API port. `<API port>` is where the API listens: `3200` on a dev stack, or the port of `API_URL`:
+
+   ```bash
+   tailscale funnel --bg --set-path /mcp http://127.0.0.1:<API port>/mcp
+   tailscale funnel --bg --set-path /.well-known http://127.0.0.1:<API port>/.well-known
+   tailscale funnel --bg --set-path /api/auth/oauth2 http://127.0.0.1:<API port>/api/auth/oauth2
+   ```
+
+4. Check the public address from another network. Both must return JSON:
+
+   ```bash
+   curl https://<machine>.<tailnet>.ts.net/.well-known/oauth-protected-resource/mcp
+   curl https://<machine>.<tailnet>.ts.net/.well-known/oauth-authorization-server
+   ```
+
+   In the second, `authorization_endpoint` should point at `WEB_ORIGIN`, and `token_endpoint` and
+   `registration_endpoint` at the public address.
+5. Add the connector in the client with `https://<machine>.<tailnet>.ts.net/mcp`.
+6. To stop exposing it: `tailscale funnel reset`, and unset `PUBLIC_MCP_URL`.

@@ -60,7 +60,12 @@ import {
   teachRecordingTtlMs,
 } from "@rakazo/core";
 import type { createRepos, PrismaClient, ThreadEvents } from "@rakazo/db";
-import { expireComputerExecutionLeases, IsolationError, isUniqueViolation } from "@rakazo/db";
+import {
+  clearEndedRunState,
+  expireComputerExecutionLeases,
+  IsolationError,
+  isUniqueViolation,
+} from "@rakazo/db";
 
 export interface TaughtSkillsDeps {
   prisma: PrismaClient;
@@ -152,6 +157,10 @@ async function cancelActiveRuns(
     where: { botId, status: { in: [...ACTIVE_RUN_STATUSES] } },
     data: { status: "cancelled", completedAt: new Date() },
   });
+  await clearEndedRunState(
+    deps.prisma,
+    activeRuns.map((run) => run.id),
+  );
   await expireComputerExecutionLeases(deps.prisma, { botId });
   await deps.prisma.computer.updateMany({
     where: { executionBotId: botId },

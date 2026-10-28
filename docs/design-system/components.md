@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 306 of 306
-- Web and shared components: 794
+- Web and shared component files with stories: 307 of 307
+- Web and shared components: 796
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -208,6 +208,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | CountCryptoButton | [apps/web/src/components/finance/CountCryptoButton.tsx](../../apps/web/src/components/finance/CountCryptoButton.tsx) | [CountCryptoButton.stories.tsx](../../apps/web/src/components/finance/CountCryptoButton.stories.tsx) | web |
 | ExchangeGroup | [apps/web/src/components/finance/ExchangeGroup.tsx](../../apps/web/src/components/finance/ExchangeGroup.tsx) | [ExchangeGroup.stories.tsx](../../apps/web/src/components/finance/ExchangeGroup.stories.tsx) | web |
 | RenameAccountDialog | [apps/web/src/components/finance/RenameAccountDialog.tsx](../../apps/web/src/components/finance/RenameAccountDialog.tsx) | [RenameAccountDialog.stories.tsx](../../apps/web/src/components/finance/RenameAccountDialog.stories.tsx) | web |
+| Sparkline | [apps/web/src/components/finance/Sparkline.tsx](../../apps/web/src/components/finance/Sparkline.tsx) | [Sparkline.stories.tsx](../../apps/web/src/components/finance/Sparkline.stories.tsx) | web |
 | StatementImport | [apps/web/src/components/finance/StatementImport.tsx](../../apps/web/src/components/finance/StatementImport.tsx) | [StatementImport.stories.tsx](../../apps/web/src/components/finance/StatementImport.stories.tsx) | web |
 | StatementReminderBanner | [apps/web/src/components/finance/StatementReminderBanner.tsx](../../apps/web/src/components/finance/StatementReminderBanner.tsx) | [StatementReminderBanner.stories.tsx](../../apps/web/src/components/finance/StatementReminderBanner.stories.tsx) | web |
 | CheckLine, Row, StatementGroup | [apps/web/src/components/finance/StatementReviewCard.tsx](../../apps/web/src/components/finance/StatementReviewCard.tsx) | [StatementReviewCard.stories.tsx](../../apps/web/src/components/finance/StatementReviewCard.stories.tsx) | web |
@@ -352,7 +353,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | FinancePage, Dashboard, EmptyState, DashboardSkeleton, Overview, ShowAll, HoverRow, UpcomingRow, SubscriptionsTable | [apps/web/src/pages/Finance.tsx](../../apps/web/src/pages/Finance.tsx) | [Finance.stories.tsx](../../apps/web/src/pages/Finance.stories.tsx) | web |
 | AccountTable, CryptoGroup, FinanceAccountsPage, FinanceAccountPage | [apps/web/src/pages/finance/FinanceAccounts.tsx](../../apps/web/src/pages/finance/FinanceAccounts.tsx) | [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx) | web |
 | FinanceBurnPage, FinanceMonthPage, Counted, FinanceRunwayPage | [apps/web/src/pages/finance/FinanceBurn.tsx](../../apps/web/src/pages/finance/FinanceBurn.tsx) | [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx) | web |
-| RemoveDialog, WalletRows, FinanceCryptoPage | [apps/web/src/pages/finance/FinanceCrypto.tsx](../../apps/web/src/pages/finance/FinanceCrypto.tsx) | [FinanceCrypto.stories.tsx](../../apps/web/src/pages/finance/FinanceCrypto.stories.tsx) | web |
+| RemoveDialog, WalletRows, UnpricedRows, FinanceCryptoPage | [apps/web/src/pages/finance/FinanceCrypto.tsx](../../apps/web/src/pages/finance/FinanceCrypto.tsx) | [FinanceCrypto.stories.tsx](../../apps/web/src/pages/finance/FinanceCrypto.stories.tsx) | web |
 | FinanceNotFound | [apps/web/src/pages/finance/FinanceNotFound.tsx](../../apps/web/src/pages/finance/FinanceNotFound.tsx) | [FinanceNotFound.stories.tsx](../../apps/web/src/pages/finance/FinanceNotFound.stories.tsx) | web |
 | FinanceSpendPage, FinanceCategoryPage, FinanceRecurringPage, FinanceVendorPage | [apps/web/src/pages/finance/FinanceSpend.tsx](../../apps/web/src/pages/finance/FinanceSpend.tsx) | [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx) | web |
 | ReceiptIcon, ReceiptThumb, CheckReceipt, FinanceTransactionPage, FinanceReceiptPage | [apps/web/src/pages/finance/FinanceTransaction.tsx](../../apps/web/src/pages/finance/FinanceTransaction.tsx) | [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |
@@ -373,6 +374,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | NextDeadline, Title, Status, MoreButton, LegalContracts | [apps/web/src/pages/legal/LegalContracts.tsx](../../apps/web/src/pages/legal/LegalContracts.tsx) | [LegalContracts.stories.tsx](../../apps/web/src/pages/legal/LegalContracts.stories.tsx) | web |
 | LegalDeadlines | [apps/web/src/pages/legal/LegalDeadlines.tsx](../../apps/web/src/pages/legal/LegalDeadlines.tsx) | [LegalDeadlines.stories.tsx](../../apps/web/src/pages/legal/LegalDeadlines.stories.tsx) | web |
 | LocalSettingsPage | [apps/web/src/pages/LocalSettings.tsx](../../apps/web/src/pages/LocalSettings.tsx) | [LocalSettings.stories.tsx](../../apps/web/src/pages/LocalSettings.stories.tsx) | web |
+| McpConsent, McpConsentPage | [apps/web/src/pages/McpConsent.tsx](../../apps/web/src/pages/McpConsent.tsx) | [McpConsent.stories.tsx](../../apps/web/src/pages/McpConsent.stories.tsx) | web |
 | McpOAuthCallbackPage | [apps/web/src/pages/McpOAuthCallback.tsx](../../apps/web/src/pages/McpOAuthCallback.tsx) | [McpOAuthCallback.stories.tsx](../../apps/web/src/pages/McpOAuthCallback.stories.tsx) | web |
 | SerenitySettingsForm | [apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx) | [SerenitySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.stories.tsx) | web |
 | SupermemorySettingsForm | [apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx) | [SupermemorySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.stories.tsx) | web |

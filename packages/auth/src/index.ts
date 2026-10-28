@@ -28,11 +28,15 @@ import {
   sessionForAuthHook,
   signedBearer,
 } from "./account-security.js";
+import type { McpAuthEnv } from "./mcp.js";
+import { mcpPlugins } from "./mcp.js";
 import type { OidcConfig } from "./oidc.js";
 import { oidcDiscovery } from "./oidc.js";
 import type { TokenKey } from "./token-storage.js";
 import { encryptStoredOAuthTokens, openIdToken, sealIdToken } from "./token-storage.js";
 
+export type { McpAuthEnv } from "./mcp.js";
+export { MCP_SCOPES, requireMcpAuth } from "./mcp.js";
 export type { OidcConfig } from "./oidc.js";
 
 export interface AuthEnv {
@@ -45,6 +49,8 @@ export interface AuthEnv {
   signupAllowlist: string | undefined;
   extraOrigins?: string[];
   email?: TransactionalEmailProvider;
+  /** Turns this server into the OAuth server for MCP clients. */
+  mcp?: McpAuthEnv;
   onEmailError?: (error: unknown) => void;
   beforeDeleteUser?: (userId: string) => Promise<void>;
   /**
@@ -66,6 +72,14 @@ export interface AuthEnv {
   /** Runs when a password change replaces the caller's own session instead of ending it. */
   afterReplaceSession?: (previous: AuthSession, session: AuthSession) => Promise<void>;
 }
+
+/**
+ * A session lasts 90 days from its last renewal, and renews once a day of use
+ * (any session read). Web, desktop and mobile share it: cookies and bearer
+ * tokens both name the same session row. `freshAge` stays at Better Auth's one day.
+ */
+export const SESSION_LIFETIME_SECONDS = 60 * 60 * 24 * 90;
+export const SESSION_RENEW_AFTER_SECONDS = 60 * 60 * 24;
 
 type AuthSession = { id: string; userId: string };
 
@@ -288,6 +302,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
       },
     },
     rateLimit: authRateLimitOptions(),
+    session: { expiresIn: SESSION_LIFETIME_SECONDS, updateAge: SESSION_RENEW_AFTER_SECONDS },
     database: prismaAdapter(prisma, { provider: "postgresql" }),
     emailAndPassword: {
       enabled: env.passwordAuth !== false,
@@ -450,6 +465,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
         disableOrganizationDeletion: true,
         creatorRole: "owner",
       }),
+      ...(env.mcp ? mcpPlugins(prisma, env.mcp) : []),
     ],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {

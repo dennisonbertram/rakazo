@@ -61,6 +61,9 @@ const PasswordResetPage = lazy(() =>
 const OnboardingPage = lazy(() =>
   import("./pages/Onboarding").then((module) => ({ default: module.OnboardingPage })),
 );
+const McpConsentPage = lazy(() =>
+  import("./pages/McpConsent").then((module) => ({ default: module.McpConsentPage })),
+);
 const WelcomePage = lazy(() =>
   import("./pages/Welcome").then((module) => ({ default: module.WelcomePage })),
 );
@@ -237,6 +240,7 @@ function SessionApp() {
             }
           >
             <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/oauth/consent" element={<McpConsentPage />} />
             <Route path="/app" element={<ShellPage />} />
             <Route path="/app/g/:groupId" element={<ShellPage />} />
             <Route path="/app/artifacts" element={<ShellPage />} />
