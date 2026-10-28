@@ -457,8 +457,8 @@ it("on a phone, pads an open side panel by the toast height when a composer lift
     viewport()!.getBoundingClientRect = () =>
       ({ top: 500, bottom: 600, left: 0, right: 400, height: 100, width: 400 }) as DOMRect;
     await add(1);
-    // innerHeight 768 - 500: everything the toast covers of the panel.
-    expect(document.documentElement.style.getPropertyValue("--toast-panel-reserve")).toBe("268px");
+    // innerHeight 768 - 500, plus the 8px the toast floats above the edge.
+    expect(document.documentElement.style.getPropertyValue("--toast-panel-reserve")).toBe("276px");
   } finally {
     vi.unstubAllGlobals();
   }

@@ -790,7 +790,7 @@ export function SpaceSidebar({
       ) : null}
       <div
         ref={sidebarPaneRef}
-        className="flex min-h-0 flex-1 flex-col max-lg:overflow-y-auto lg:contents short:lg:flex short:lg:overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto"
       >
         {bootstrapMe === undefined ? null : (
           // Waiting for the account (undefined) keeps pages the user hid from flashing in.
@@ -1632,7 +1632,11 @@ export function SpaceSidebar({
                                               />
                                             ) : null}
                                             {!compact ? (
-                                              <span className="text-[12px] leading-[18px] text-muted-foreground tabular-nums">
+                                              <span
+                                                className={`text-[12px] leading-[18px] text-muted-foreground tabular-nums ${
+                                                  item.kind === "bot" ? "pointer-coarse:hidden" : ""
+                                                }`}
+                                              >
                                                 {formatRosterTime(item.chat.updatedAt)}
                                               </span>
                                             ) : null}

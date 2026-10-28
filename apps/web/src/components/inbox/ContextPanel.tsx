@@ -81,6 +81,8 @@ function Item({
 }
 
 const linkClass = "underline-offset-2 hover:underline focus-visible:underline";
+/** The contact line is 16px tall; a touch gets a 44px target without moving the line. */
+const tapLinkClass = `${linkClass} pointer-coarse:inline-block pointer-coarse:py-3.5 pointer-coarse:-my-3.5`;
 
 /**
  * What the user already has about one address. The facts come first and carry no model; the
@@ -139,7 +141,7 @@ function PersonFacts({ email }: { email: string }) {
         <p className="text-xs text-muted-foreground">
           {identity ? (
             facts.contactId ? (
-              <Link to={`/app/contacts/${facts.contactId}`} dir="auto" className={linkClass}>
+              <Link to={`/app/contacts/${facts.contactId}`} dir="auto" className={tapLinkClass}>
                 {identity}
               </Link>
             ) : (

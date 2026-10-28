@@ -186,7 +186,7 @@ function McpCard({
         to={managePath}
       />
       <UsedBy bots={data.bots.filter((bot) => assigned.includes(bot.id))} />
-      <div className="mt-auto flex min-h-7 items-center gap-2">
+      <div className="mt-auto flex min-h-7 items-center gap-2 max-sm:basis-full max-sm:empty:hidden">
         {keyLine && keyStatus ? (
           <GranolaStatusLine status={keyStatus} />
         ) : (
@@ -229,7 +229,7 @@ function GranolaKeyCard({
   return (
     <Card>
       <CardHead name="Granola" sub={description} to={GRANOLA_PATH} />
-      <div className="mt-auto flex min-h-7 items-center gap-2">
+      <div className="mt-auto flex min-h-7 items-center gap-2 max-sm:basis-full max-sm:empty:hidden">
         <GranolaStatusLine status={status} />
       </div>
     </Card>
@@ -269,7 +269,7 @@ function AppCard({
       {app.status === "failed" || app.status === "connecting" ? null : (
         <UsedBy bots={agentsFor(data.bots, working ? data.access[working.id] : undefined)} />
       )}
-      <div className="mt-auto flex min-h-7 items-center gap-2">
+      <div className="mt-auto flex min-h-7 items-center gap-2 max-sm:basis-full max-sm:empty:hidden">
         <StatusBadge status={app.status} quiet />
         {app.status === "connected" && app.provider.toUpperCase() === "GMAIL" ? (
           <OpenPageLink to="/app/inbox">

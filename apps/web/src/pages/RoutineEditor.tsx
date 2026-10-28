@@ -900,11 +900,6 @@ export function RoutineEditor({
         {nextRun ? (
           <p className="mt-2 text-xs text-muted-foreground/70">{t`Next run ${nextRun}`}</p>
         ) : null}
-        {!hasTriggers ? (
-          <p className="mt-2 text-xs text-muted-foreground/70">
-            <Trans>Pick when this runs, for example every Monday morning.</Trans>
-          </p>
-        ) : null}
       </div>
 
       <label

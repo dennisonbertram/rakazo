@@ -155,7 +155,7 @@ export function AskAgentButton() {
   if (!onAskAgent) return null;
   return (
     <div className="ms-auto">
-      <AskBotButton botName={agentName ?? "Finance agent"} onClick={onAskAgent} />
+      <AskBotButton compact botName={agentName ?? "Finance agent"} onClick={onAskAgent} />
     </div>
   );
 }
