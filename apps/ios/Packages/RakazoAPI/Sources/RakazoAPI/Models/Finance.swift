@@ -10,9 +10,9 @@ public struct FinanceSource: Sendable, Hashable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? ""
-    status = try c.decodeIfPresent(String.self, forKey: .status) ?? "unknown"
-    lastSyncedAt = try c.decodeIfPresent(String.self, forKey: .lastSyncedAt)
+    provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? ""
+    status = try container.decodeIfPresent(String.self, forKey: .status) ?? "unknown"
+    lastSyncedAt = try container.decodeIfPresent(String.self, forKey: .lastSyncedAt)
   }
 }
 
@@ -28,10 +28,10 @@ public struct FinanceUpcoming: Sendable, Hashable, Identifiable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    key = try c.decode(String.self, forKey: .key)
-    name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
-    dates = try c.decodeIfPresent([String].self, forKey: .dates) ?? []
-    amountCents = try c.decodeIfPresent(Int.self, forKey: .amountCents) ?? 0
+    key = try container.decode(String.self, forKey: .key)
+    name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+    dates = try container.decodeIfPresent([String].self, forKey: .dates) ?? []
+    amountCents = try container.decodeIfPresent(Int.self, forKey: .amountCents) ?? 0
   }
 }
 
@@ -58,20 +58,20 @@ public struct FinanceOverview: Sendable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    sources = try c.decodeIfPresent([FinanceSource].self, forKey: .sources) ?? []
+    sources = try container.decodeIfPresent([FinanceSource].self, forKey: .sources) ?? []
     agentBotID = try? container.nestedContainer(keyedBy: AgentKeys.self, forKey: .agent)
       .decodeIfPresent(String.self, forKey: .botId)
-    cashCents = try c.nestedContainer(keyedBy: CashKeys.self, forKey: .cash)
+    cashCents = try container.nestedContainer(keyedBy: CashKeys.self, forKey: .cash)
       .decodeIfPresent(Int.self, forKey: .cashCents) ?? 0
-    hasCashAccounts = try c.decodeIfPresent(Bool.self, forKey: .hasCashAccounts) ?? false
-    monthlyBurnCents = try c.nestedContainer(keyedBy: BurnKeys.self, forKey: .burn)
+    hasCashAccounts = try container.decodeIfPresent(Bool.self, forKey: .hasCashAccounts) ?? false
+    monthlyBurnCents = try container.nestedContainer(keyedBy: BurnKeys.self, forKey: .burn)
       .decodeIfPresent(Int.self, forKey: .monthlyCents) ?? 0
     runwayMonths = try? container.nestedContainer(keyedBy: RunwayKeys.self, forKey: .runway)
       .decodeIfPresent(Double.self, forKey: .months)
     upcoming = (try? container.nestedContainer(keyedBy: UpcomingKeys.self, forKey: .upcoming)
       .decodeIfPresent([FinanceUpcoming].self, forKey: .items)) ?? []
-    excludedNonUsdCount = try c.decodeIfPresent(Int.self, forKey: .excludedNonUsdCount) ?? 0
-    lastSyncedAt = try c.decodeIfPresent(String.self, forKey: .lastSyncedAt)
+    excludedNonUsdCount = try container.decodeIfPresent(Int.self, forKey: .excludedNonUsdCount) ?? 0
+    lastSyncedAt = try container.decodeIfPresent(String.self, forKey: .lastSyncedAt)
   }
 
   /// A connected source exists (even when it holds no accounts yet).
@@ -94,13 +94,13 @@ public struct FinanceAccount: Sendable, Hashable, Identifiable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? ""
-    name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
-    lastFour = try c.decodeIfPresent(String.self, forKey: .lastFour)
-    kind = try c.decodeIfPresent(String.self, forKey: .kind) ?? ""
-    balanceCents = try c.decodeIfPresent(Int.self, forKey: .balanceCents) ?? 0
-    currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
+    id = try container.decode(String.self, forKey: .id)
+    provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? ""
+    name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+    lastFour = try container.decodeIfPresent(String.self, forKey: .lastFour)
+    kind = try container.decodeIfPresent(String.self, forKey: .kind) ?? ""
+    balanceCents = try container.decodeIfPresent(Int.self, forKey: .balanceCents) ?? 0
+    currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
   }
 }
 
@@ -114,9 +114,9 @@ public struct FinanceAccounts: Sendable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    totalCashCents = try c.decodeIfPresent(Int.self, forKey: .totalCashCents) ?? 0
-    cash = try c.decodeIfPresent([FinanceAccount].self, forKey: .cash) ?? []
-    cards = try c.decodeIfPresent([FinanceAccount].self, forKey: .cards) ?? []
+    totalCashCents = try container.decodeIfPresent(Int.self, forKey: .totalCashCents) ?? 0
+    cash = try container.decodeIfPresent([FinanceAccount].self, forKey: .cash) ?? []
+    cards = try container.decodeIfPresent([FinanceAccount].self, forKey: .cards) ?? []
   }
 }
 
@@ -131,9 +131,9 @@ public struct FinanceBurnMonth: Sendable, Hashable, Identifiable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    month = try c.decode(String.self, forKey: .month)
-    outCents = try c.decodeIfPresent(Int.self, forKey: .outCents) ?? 0
-    partial = try c.decodeIfPresent(Bool.self, forKey: .partial) ?? false
+    month = try container.decode(String.self, forKey: .month)
+    outCents = try container.decodeIfPresent(Int.self, forKey: .outCents) ?? 0
+    partial = try container.decodeIfPresent(Bool.self, forKey: .partial) ?? false
   }
 }
 
@@ -146,8 +146,8 @@ public struct FinanceBurn: Sendable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    monthlyCents = try c.decodeIfPresent(Int.self, forKey: .monthlyCents) ?? 0
-    series = try c.decodeIfPresent([FinanceBurnMonth].self, forKey: .series) ?? []
+    monthlyCents = try container.decodeIfPresent(Int.self, forKey: .monthlyCents) ?? 0
+    series = try container.decodeIfPresent([FinanceBurnMonth].self, forKey: .series) ?? []
   }
 }
 
@@ -162,9 +162,9 @@ public struct FinanceCategory: Sendable, Hashable, Identifiable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    key = try c.decode(String.self, forKey: .key)
-    label = try c.decodeIfPresent(String.self, forKey: .label) ?? key
-    cents = try c.decodeIfPresent(Int.self, forKey: .cents) ?? 0
+    key = try container.decode(String.self, forKey: .key)
+    label = try container.decodeIfPresent(String.self, forKey: .label) ?? key
+    cents = try container.decodeIfPresent(Int.self, forKey: .cents) ?? 0
   }
 }
 
@@ -191,19 +191,19 @@ public struct FinanceTransaction: Sendable, Hashable, Identifiable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? ""
-    postedAt = try c.decodeIfPresent(String.self, forKey: .postedAt) ?? ""
-    amountCents = try c.decodeIfPresent(Int.self, forKey: .amountCents) ?? 0
-    currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
-    counterparty = try c.decodeIfPresent(String.self, forKey: .counterparty) ?? ""
-    category = try c.decodeIfPresent(String.self, forKey: .category)
-    status = try c.decodeIfPresent(String.self, forKey: .status) ?? "other"
-    classification = try c.decodeIfPresent(String.self, forKey: .classification) ?? "spend"
-    cardLastFour = try c.decodeIfPresent(String.self, forKey: .cardLastFour)
-    cardholder = try c.decodeIfPresent(String.self, forKey: .cardholder)
-    memo = try c.decodeIfPresent(String.self, forKey: .memo)
-    hasReceipt = try c.decodeIfPresent(Bool.self, forKey: .hasReceipt) ?? false
+    id = try container.decode(String.self, forKey: .id)
+    provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? ""
+    postedAt = try container.decodeIfPresent(String.self, forKey: .postedAt) ?? ""
+    amountCents = try container.decodeIfPresent(Int.self, forKey: .amountCents) ?? 0
+    currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
+    counterparty = try container.decodeIfPresent(String.self, forKey: .counterparty) ?? ""
+    category = try container.decodeIfPresent(String.self, forKey: .category)
+    status = try container.decodeIfPresent(String.self, forKey: .status) ?? "other"
+    classification = try container.decodeIfPresent(String.self, forKey: .classification) ?? "spend"
+    cardLastFour = try container.decodeIfPresent(String.self, forKey: .cardLastFour)
+    cardholder = try container.decodeIfPresent(String.self, forKey: .cardholder)
+    memo = try container.decodeIfPresent(String.self, forKey: .memo)
+    hasReceipt = try container.decodeIfPresent(Bool.self, forKey: .hasReceipt) ?? false
   }
 }
 
@@ -218,10 +218,10 @@ public struct FinanceSpend: Sendable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    period = try c.decodeIfPresent(String.self, forKey: .period) ?? "month"
-    totalCents = try c.decodeIfPresent(Int.self, forKey: .totalCents) ?? 0
-    categories = try c.decodeIfPresent([FinanceCategory].self, forKey: .categories) ?? []
-    transactions = try c.decodeIfPresent([FinanceTransaction].self, forKey: .transactions) ?? []
+    period = try container.decodeIfPresent(String.self, forKey: .period) ?? "month"
+    totalCents = try container.decodeIfPresent(Int.self, forKey: .totalCents) ?? 0
+    categories = try container.decodeIfPresent([FinanceCategory].self, forKey: .categories) ?? []
+    transactions = try container.decodeIfPresent([FinanceTransaction].self, forKey: .transactions) ?? []
   }
 }
 
@@ -238,9 +238,9 @@ public struct FinanceTransactionDetail: Sendable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    transaction = try c.decode(FinanceTransaction.self, forKey: .transaction)
-    vendorName = try c.decodeIfPresent(String.self, forKey: .vendorName)
-    account = try c.decodeIfPresent(FinanceAccount.self, forKey: .account)
-    vendorIsSubscription = try c.decodeIfPresent(Bool.self, forKey: .vendorIsSubscription) ?? false
+    transaction = try container.decode(FinanceTransaction.self, forKey: .transaction)
+    vendorName = try container.decodeIfPresent(String.self, forKey: .vendorName)
+    account = try container.decodeIfPresent(FinanceAccount.self, forKey: .account)
+    vendorIsSubscription = try container.decodeIfPresent(Bool.self, forKey: .vendorIsSubscription) ?? false
   }
 }
