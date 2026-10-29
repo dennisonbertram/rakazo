@@ -214,11 +214,18 @@ final class ThreadModel {
   func archive(_ app: AppModel) async -> Bool {
     guard case .bot(let id) = target else { return false }
     do {
-      try await ManageClient.archive(.bot(id), name: title, app: app, onChange: {})
+      try await ManageClient.archive(.bot(id), name: title, app: app) {
+        NotificationCenter.default.post(name: .agentsChanged, object: nil)
+      }
       return true
     } catch {
       archiveError = error.localizedDescription
       return false
     }
   }
+}
+
+extension Notification.Name {
+  /// Posted when an agent is archived or restored from a thread, so Home reloads its list.
+  static let agentsChanged = Notification.Name("praci.agentsChanged")
 }
