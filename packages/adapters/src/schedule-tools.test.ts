@@ -1,5 +1,5 @@
 import { ONCE_ROUTINE_CRON } from "@rakazo/core";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cancelScheduleFromTool,
   compactScheduleInput,
@@ -17,6 +17,40 @@ import {
 } from "./schedule-tools.js";
 
 describe("resolveScheduleTiming", () => {
+  it("reads a runAt without an offset in the routine's timezone", () => {
+    const runAt = `${new Date().getUTCFullYear() + 1}-11-02T10:00`;
+    expect(resolveScheduleTiming({ runAt }, "Europe/Berlin")).toMatchObject({
+      nextRunAt: new Date(`${new Date().getUTCFullYear() + 1}-11-02T09:00:00Z`),
+    });
+  });
+
+  it("starts a repeat at the first match at or after startAt", () => {
+    const year = new Date().getUTCFullYear() + 1;
+    expect(
+      resolveScheduleTiming({ cron: "0 10 * * 1", startAt: `${year}-11-04` }, "Europe/Berlin"),
+    ).toMatchObject({ ok: true, oneShot: false });
+    const daily = resolveScheduleTiming(
+      { cron: "0 10 * * *", startAt: `${year}-11-04T10:00` },
+      "UTC",
+    );
+    expect(daily).toMatchObject({ nextRunAt: new Date(`${year}-11-04T10:00:00Z`) });
+  });
+
+  it("rejects a past startAt, a bad one, and startAt on a one-shot", () => {
+    expect(resolveScheduleTiming({ cron: "0 10 * * *", startAt: "2020-01-01" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("startAt is in the past"),
+    });
+    expect(resolveScheduleTiming({ cron: "0 10 * * *", startAt: "soon" })).toEqual({
+      ok: false,
+      error: "startAt must be an ISO date or datetime.",
+    });
+    expect(resolveScheduleTiming({ delayMinutes: 5, startAt: "2099-01-01" })).toEqual({
+      ok: false,
+      error: "startAt is only for repeating schedules.",
+    });
+  });
+
   it.each(["2030-02-30T10:00Z", "2030-04-31T10:00+05:30", "2030-06-15T24:00:00Z"])(
     "rejects an impossible runAt instead of rolling it over: %s",
     (runAt) => {
@@ -79,7 +113,9 @@ describe("resolveScheduleTiming", () => {
   it("rejects one-shot schedules in the past", () => {
     expect(resolveScheduleTiming({ runAt: new Date(Date.now() - 60_000).toISOString() })).toEqual({
       ok: false,
-      error: "One-shot schedules must run in the future.",
+      error: expect.stringMatching(
+        /^One-shot schedules must run in the future\. It is now .* in UTC\.$/,
+      ),
     });
   });
 
@@ -739,6 +775,143 @@ describe("routine from a forced skill", () => {
     });
     const nextRunAt = update.mock.calls[0]![0].data.nextRunAt as Date;
     expect(nextRunAt.getTime() === due.getTime()).toBe(keeps);
+  });
+
+  describe("a later start", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ now: new Date("2026-10-28T12:00:00Z") });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const run = async (
+      existing: { crons: string[]; timezone: string; nextRunAt: Date },
+      input: Record<string, unknown>,
+    ) => {
+      const update = vi.fn(async (args: { data: Record<string, unknown> }) => ({
+        id: "r1",
+        spaceId: "s",
+        botId: "b",
+        name: "Note",
+        prompt: "x",
+        active: true,
+        threadId: null,
+        watch: null,
+        ...existing,
+        ...args.data,
+      }));
+      const prisma = {
+        routine: {
+          findFirst: vi.fn(async () => ({
+            id: "r1",
+            prompt: "x",
+            active: true,
+            managedKind: null,
+            ...existing,
+          })),
+          update,
+        },
+      };
+      const deps = {
+        prisma,
+        events: { append: vi.fn() },
+        jobs: { enqueue: vi.fn(), cancel: vi.fn() },
+      } as never;
+      const result = await updateScheduleFromTool(deps, {
+        spaceId: "s",
+        botId: "b",
+        userId: "u",
+        id: "r1",
+        ...input,
+      });
+      return { result, update };
+    };
+
+    it.each([
+      [
+        "0 10 * * 1",
+        "Europe/Berlin",
+        "2026-11-16T09:00:00.000Z",
+        "Europe/London",
+        "2026-11-16T10:00:00.000Z",
+      ],
+      [
+        "0 10 * * 1",
+        "Europe/London",
+        "2026-11-16T10:00:00.000Z",
+        "Europe/Berlin",
+        "2026-11-16T09:00:00.000Z",
+      ],
+      [
+        "30 2 * * 0",
+        "UTC",
+        "2027-03-28T02:30:00.000Z",
+        "Europe/Berlin",
+        "2027-03-28T01:30:00.000Z",
+      ],
+      [
+        "0 * * * *",
+        "Asia/Kolkata",
+        "2026-11-02T00:30:00.000Z",
+        "Europe/Berlin",
+        "2026-11-02T01:00:00.000Z",
+      ],
+      [
+        "0 * * * *",
+        "Europe/Berlin",
+        "2026-11-02T01:00:00.000Z",
+        "Asia/Kolkata",
+        "2026-11-01T20:30:00.000Z",
+      ],
+      [
+        "0 */7 * * *",
+        "Europe/Berlin",
+        "2026-11-20T03:00:00.000Z",
+        "Europe/London",
+        "2026-11-20T03:00:00.000Z",
+      ],
+      [
+        "0 0 */3 * *",
+        "Europe/Berlin",
+        "2026-11-02T23:00:00.000Z",
+        "America/New_York",
+        "2026-11-03T05:00:00.000Z",
+      ],
+    ])(
+      "keeps a start set for later (%s) when only the timezone changes from %s",
+      async (cron, from, next, to, moved) => {
+        const { result } = await run(
+          { crons: [cron], timezone: from, nextRunAt: new Date(next) },
+          { timezone: to },
+        );
+        expect(result).toMatchObject({ ok: true, nextRunAt: moved });
+      },
+    );
+
+    it("moves the next run of the current repeat with startAt alone", async () => {
+      const { result, update } = await run(
+        { crons: ["0 9 * * 1"], timezone: "UTC", nextRunAt: new Date("2026-11-02T09:00:00Z") },
+        { schedule: { startAt: "2026-11-16" } },
+      );
+      expect(result).toMatchObject({ ok: true, nextRunAt: "2026-11-16T09:00:00.000Z" });
+    });
+
+    it("leaves the timing alone on a prompt-only edit, so a run's advance is kept", async () => {
+      const { update } = await run(
+        { crons: ["0 9 * * 1"], timezone: "UTC", nextRunAt: new Date("2026-11-02T09:00:00Z") },
+        { prompt: "New prompt" },
+      );
+      expect(update.mock.calls[0]![0].data).toEqual({ prompt: "New prompt" });
+    });
+
+    it("does not start a watch or a one-time reminder from startAt alone", async () => {
+      const once = await run(
+        { crons: ["@once"], timezone: "UTC", nextRunAt: new Date("2026-11-02T09:00:00Z") },
+        { schedule: { startAt: "2026-11-16" } },
+      );
+      expect(once.result).toEqual({ error: "Give cron or every/unit along with startAt." });
+    });
   });
 
   it("names the group an updated routine posts in", async () => {

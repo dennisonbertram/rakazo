@@ -24,14 +24,10 @@ struct AuthenticationView: View {
           Text("Praci")
             .font(.headline)
             .foregroundStyle(color(.mutedForeground))
-          if model.isSignedIn {
-            signedIn
-          } else {
-            Text(title)
-              .font(.largeTitle.bold())
-              .accessibilityAddTraits(.isHeader)
-            authentication
-          }
+          Text(title)
+            .font(.largeTitle.bold())
+            .accessibilityAddTraits(.isHeader)
+          authentication
           AuthStatus(error: model.errorMessage, notice: model.notice)
           Button("Use a custom server") { showingServer = true }
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -171,22 +167,6 @@ struct AuthenticationView: View {
           .disabled(model.busy)
       }
     }
-  }
-
-  private var signedIn: some View {
-    VStack(spacing: 20) {
-      ContentUnavailableView {
-        Label("Signed in", systemImage: "checkmark.circle")
-      } description: {
-        Text(model.endpoint.host() ?? model.endpoint.absoluteString)
-      }
-      Button("Sign out", role: .destructive) { Task { await model.signOut() } }
-        .buttonStyle(.bordered)
-        .disabled(model.busy)
-        .accessibilityIdentifier("signOut")
-      if model.busy { ProgressView() }
-    }
-    .frame(maxWidth: .infinity)
   }
 
   private func primaryButton(

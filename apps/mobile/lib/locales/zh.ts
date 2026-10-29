@@ -969,4 +969,13 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Paused: the page could not be checked": "已暂停：无法检查该页面",
   "Paused: too many checks today": "已暂停：今天检查次数过多",
   Watches: "监视",
+  "Allow cross-space bot communication": "允许跨空间的 Bot 通信",
+  "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.":
+    "AI 账户额度已用完。请向服务商充值，或在设置 > 模型中使用其他密钥。",
+  "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models.":
+    "AI 密钥已达到支出上限，将于 {resetsOn} 重置。请向服务商提高上限，或在设置 > 模型中使用其他密钥。",
+  "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models.":
+    "AI 密钥已达到支出上限。请向服务商提高上限，或在设置 > 模型中使用其他密钥。",
+  "The model provider is rate limiting requests. Try again in a few minutes.":
+    "模型服务商正在限制请求频率。请几分钟后重试。",
 };
