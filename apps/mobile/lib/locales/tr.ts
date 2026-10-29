@@ -943,4 +943,13 @@ export const TR_MESSAGES: Record<string, string> = {
   "Paused: the page could not be checked": "Duraklatıldı: sayfa kontrol edilemedi",
   "Paused: too many checks today": "Duraklatıldı: bugün çok fazla kontrol yapıldı",
   Watches: "İzliyor",
+  "Allow cross-space bot communication": "Alanlar arası bot iletişimine izin ver",
+  "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.":
+    "Yapay zeka hesabının kredisi bitti. Sağlayıcınızdan kredi ekleyin veya Ayarlar > Modeller bölümünde başka bir anahtar kullanın.",
+  "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models.":
+    "Yapay zeka anahtarı harcama sınırına ulaştı. Sınır {resetsOn} sıfırlanır. Sağlayıcınızdan sınırı artırın veya Ayarlar > Modeller bölümünde başka bir anahtar kullanın.",
+  "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models.":
+    "Yapay zeka anahtarı harcama sınırına ulaştı. Sağlayıcınızdan sınırı artırın veya Ayarlar > Modeller bölümünde başka bir anahtar kullanın.",
+  "The model provider is rate limiting requests. Try again in a few minutes.":
+    "Model sağlayıcısı istekleri sınırlıyor. Birkaç dakika sonra tekrar deneyin.",
 };

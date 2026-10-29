@@ -948,4 +948,13 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   "Paused: the page could not be checked": "Pausado: não foi possível verificar a página",
   "Paused: too many checks today": "Pausado: verificações demais hoje",
   Watches: "Monitora",
+  "Allow cross-space bot communication": "Permitir comunicação de bots entre espaços",
+  "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.":
+    "A conta de IA ficou sem créditos. Adicione créditos com seu provedor ou use outra chave em Configurações > Modelos.",
+  "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models.":
+    "A chave de IA atingiu o limite de gastos. Ele é redefinido {resetsOn}. Aumente o limite com seu provedor ou use outra chave em Configurações > Modelos.",
+  "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models.":
+    "A chave de IA atingiu o limite de gastos. Aumente o limite com seu provedor ou use outra chave em Configurações > Modelos.",
+  "The model provider is rate limiting requests. Try again in a few minutes.":
+    "O provedor do modelo está limitando as solicitações. Tente novamente em alguns minutos.",
 };
