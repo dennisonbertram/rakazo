@@ -35,6 +35,7 @@ export const LongText: Story = {
     action: {
       ...contactAction,
       tool: "scratchpad_add",
+      botName: "Chief",
       args: {
         botId: "bot-1",
         title: "Follow up with the auditors about the revised engagement letter and fee schedule",
