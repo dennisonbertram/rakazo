@@ -47,6 +47,7 @@ export function createMcpConnectionsRoutes({ deps, authed }: RouteContext) {
       try {
         return await decideExternalAction(deps.prisma, context.actor, input.id, input.decision, {
           alwaysAllow: input.alwaysAllow,
+          agents: { events: deps.events, jobs: deps.jobs },
         });
       } catch (error) {
         if (error instanceof ExternalActionNotPending) {

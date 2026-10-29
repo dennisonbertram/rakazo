@@ -91,6 +91,18 @@ export const FromRoutine: Story = {
   ),
 };
 
+/** A message sent by an outside MCP client names its connection above the bubble. */
+export const ViaClient: Story = {
+  render: () => (
+    <div className="h-[560px]">
+      <Transcript
+        {...baseProps}
+        messages={[{ ...message(1, "user", "What is on my plate today?"), via: "Claude Code" }]}
+      />
+    </div>
+  ),
+};
+
 export const Unread: Story = {
   render: () => (
     <div className="h-[560px]">

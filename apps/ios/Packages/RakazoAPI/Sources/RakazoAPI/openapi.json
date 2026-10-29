@@ -9758,6 +9758,9 @@
                                       "callId": {
                                         "type": "string"
                                       },
+                                      "via": {
+                                        "type": "string"
+                                      },
                                       "createdAt": {
                                         "type": "string"
                                       }
@@ -44662,6 +44665,9 @@
                               "callId": {
                                 "type": "string"
                               },
+                              "via": {
+                                "type": "string"
+                              },
                               "createdAt": {
                                 "type": "string"
                               }
@@ -61771,6 +61777,9 @@
                                 "type": "string"
                               },
                               "callId": {
+                                "type": "string"
+                              },
+                              "via": {
                                 "type": "string"
                               },
                               "createdAt": {
@@ -101706,7 +101715,8 @@
                                   "messaging",
                                   "cloud_agent",
                                   "created",
-                                  "tickets"
+                                  "tickets",
+                                  "mcp"
                                 ]
                               },
                               "notificationsEnabled": {
@@ -113715,6 +113725,9 @@
                               "callId": {
                                 "type": "string"
                               },
+                              "via": {
+                                "type": "string"
+                              },
                               "createdAt": {
                                 "type": "string"
                               }
@@ -116088,6 +116101,9 @@
                                 "type": "string"
                               },
                               "callId": {
+                                "type": "string"
+                              },
+                              "via": {
                                 "type": "string"
                               },
                               "createdAt": {
@@ -124165,7 +124181,8 @@
               "messaging",
               "cloud_agent",
               "created",
-              "tickets"
+              "tickets",
+              "mcp"
             ]
           },
           "routineId": {
@@ -133623,7 +133640,8 @@
               "messaging",
               "cloud_agent",
               "created",
-              "tickets"
+              "tickets",
+              "mcp"
             ]
           },
           "routineId": {

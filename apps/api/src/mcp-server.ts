@@ -1,4 +1,4 @@
-import type { McpJsonTool } from "@rakazo/adapters";
+import type { McpAgentDeps, McpJsonTool } from "@rakazo/adapters";
 import {
   actionStatus,
   callMcpReadTool,
@@ -110,12 +110,13 @@ export async function resolvePatCall(prisma: PrismaClient, token: string, now = 
 export async function listAgents(prisma: PrismaClient, actor: Actor) {
   const bots = await prisma.bot.findMany({
     where: { spaceId: actor.spaceId, userId: actor.userId, archivedAt: null },
-    select: { id: true, name: true, description: true },
+    select: { id: true, name: true, description: true, thread: { select: { id: true } } },
     orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
   });
   return bots.map((bot) => ({
     id: bot.id,
     name: bot.name,
+    ...(bot.thread ? { threadId: bot.thread.id } : {}),
     ...(bot.description ? { description: bot.description } : {}),
   }));
 }
@@ -205,6 +206,7 @@ export async function runMcpTool(
   name: string,
   args: Record<string, unknown>,
   events?: NotificationEvents,
+  agents?: McpAgentDeps,
 ) {
   const started = Date.now();
   const log = (outcome: "ok" | "error" | "rate_limited" | "pending" | "blocked") =>
@@ -236,7 +238,7 @@ export async function runMcpTool(
         await log("error");
         return text({ error: "This connection is read-only" }, true);
       }
-      const written = await submitMcpWrite(prisma, caller, name, args, events);
+      const written = await submitMcpWrite(prisma, caller, name, args, events, agents);
       await log(written.outcome);
       return text(written.result, written.outcome === "error" || written.outcome === "blocked");
     }
@@ -267,6 +269,7 @@ export function handleMcpRequest(
   call: McpCall,
   request: Request,
   events?: NotificationEvents,
+  agents?: McpAgentDeps,
 ) {
   return runAsTenant(call.actor, () =>
     serveMcpRequest(request, {
@@ -278,7 +281,7 @@ export function handleMcpRequest(
         serveJsonTools(
           server,
           mcpTools(["mcp:read", "mcp:write"]),
-          (name, args) => runMcpTool(prisma, call, name, args, events),
+          (name, args) => runMcpTool(prisma, call, name, args, events, agents),
           mcpTools(call.scopes),
         ),
     }),
@@ -294,6 +297,8 @@ export interface McpMount {
   jwksUrl: string;
   /** Tells the member's open clients that an action is waiting for approval. */
   notificationEvents?: NotificationEvents;
+  /** Starts agent runs for agent_send. */
+  agents?: McpAgentDeps;
 }
 
 const MCP_PATH = "/mcp";
@@ -324,6 +329,7 @@ export function mountMcpServer(app: Hono, mount: McpMount) {
         await resolve(),
         request,
         mount.notificationEvents,
+        mount.agents,
       );
     } catch (error) {
       if (error instanceof McpAccessError) return denied(error);

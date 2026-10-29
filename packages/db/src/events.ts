@@ -213,7 +213,7 @@ export interface SendUserMessageInput {
   userId: string;
   blocks: MessageBlock[];
   prompt: string;
-  trigger: "user" | "follow_up" | "webhook" | "messaging";
+  trigger: "user" | "follow_up" | "webhook" | "messaging" | "mcp";
   clientNonce?: string;
   linkMessageToRun?: boolean;
   /**

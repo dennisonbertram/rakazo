@@ -9,12 +9,15 @@ import {
   wrapUntrustedText,
 } from "./mcp-read-tools.js";
 
+/** Allowlisted tools that are not bot tools: they read or start a bot thread instead. */
+const NOT_BOT_TOOLS = ["thread_read", "agent_send"];
+
 describe("MCP read tools", () => {
   it("exposes only bot tools that are marked read-only, or listed with a reason", () => {
     const names = Object.keys(MCP_READ_TOOLS);
     const descriptors = mcpReadToolDescriptors();
     expect(descriptors.map((tool) => tool.name).sort()).toEqual([...names].sort());
-    for (const name of names) {
+    for (const name of names.filter((n) => !NOT_BOT_TOOLS.includes(n))) {
       const tool = builtinAgentTools.find((candidate) => candidate.name === name);
       expect(tool, name).toBeDefined();
       if (MCP_READ_EXCEPTIONS[name]) expect(tool?.readOnly, name).not.toBe(true);
@@ -37,7 +40,7 @@ describe("MCP read tools", () => {
         .map((tool) => tool.name)
         .sort(),
     ).toEqual([...names].sort());
-    for (const name of names) {
+    for (const name of names.filter((n) => !NOT_BOT_TOOLS.includes(n))) {
       const tool = builtinAgentTools.find((candidate) => candidate.name === name);
       expect(tool, name).toBeDefined();
       expect(tool?.readOnly, name).not.toBe(true);

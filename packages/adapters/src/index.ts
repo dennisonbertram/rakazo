@@ -149,6 +149,7 @@ export * from "./mail-sync.js";
 export * from "./mail-sync-job.js";
 export * from "./mail-tools.js";
 export * from "./mail-unsubscribe.js";
+export * from "./mcp-agent-tools.js";
 export * from "./mcp-connector.js";
 export * from "./mcp-emulator.js";
 export * from "./mcp-http-server.js";

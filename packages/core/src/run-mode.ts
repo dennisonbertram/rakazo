@@ -5,7 +5,7 @@
  * | Run is created by                                                    | unattended |
  * | user, reaction, call_end, skill; follow_up with no source run        | false      |
  * | any run caused by another run (follow_up, spawn, resume, bot_message)| copy source|
- * | routine, webhook, messaging, cloud_agent, created, tickets, unknown  | true       |
+ * | routine, webhook, messaging, cloud_agent, created, tickets, mcp, unknown | true  |
  */
 const OWNER_LIVE_TRIGGERS = new Set(["user", "reaction", "call_end", "skill"]);
 
@@ -21,7 +21,7 @@ export function newRunUnattended(input: {
 }
 
 /** Triggers whose prompt carries outside content. */
-const EXTERNAL_CONTENT_TRIGGERS = new Set(["webhook", "messaging"]);
+const EXTERNAL_CONTENT_TRIGGERS = new Set(["webhook", "messaging", "mcp"]);
 
 /**
  * `Run.externalTaint`: the run's prompt carries outside content, so every call outside the
