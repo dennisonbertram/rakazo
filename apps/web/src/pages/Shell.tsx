@@ -1718,7 +1718,7 @@ export function ShellPage() {
           groupId ?? botId ?? "",
         );
         if (otherSpaceId && selectSpace(otherSpaceId)) {
-          window.location.assign(window.location.pathname);
+          window.location.assign(window.location.pathname + window.location.search);
           return;
         }
         if (groupId) {

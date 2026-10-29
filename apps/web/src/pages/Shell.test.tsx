@@ -94,6 +94,7 @@ it("maps ?settings= to a settings section", () => {
 it("carries a pending ?settings= link through the first-chat redirect", () => {
   const bots = [{ id: "b1", spawnKey: null }];
   expect(firstThreadRoute(bots, [], "?settings=privacy")).toBe("/app/b1?settings=privacy");
+  expect(firstThreadRoute(bots, [], "?settings=connections")).toBe("/app/b1?settings=connections");
   expect(firstThreadRoute(bots, [], "?m=1")).toBe("/app/b1");
   expect(firstThreadRoute([], [], "?settings=general")).toBe("/app?settings=general");
 });
