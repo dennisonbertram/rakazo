@@ -13,7 +13,7 @@ struct RoutinesScreen: View {
   }
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { routines in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { routines in
       if routines.isEmpty {
         ContentUnavailableView("No routines yet", systemImage: "clock.arrow.circlepath")
       } else {
@@ -37,7 +37,7 @@ struct RoutinesScreen: View {
         }
         .listStyle(.plain)
       }
-    }
+    })
     .background(Color.token(.background))
     .navigationTitle(botName.map { "\($0) routines" } ?? "Routines")
     .navigationBarTitleDisplayMode(.inline)

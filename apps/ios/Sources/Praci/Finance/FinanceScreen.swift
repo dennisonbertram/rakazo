@@ -8,7 +8,7 @@ struct FinanceScreen: View {
   @State private var model = FinanceModel()
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { data in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { data in
       if data.overview.isConnected || data.overview.hasCashAccounts {
         content(data)
       } else {
@@ -22,7 +22,7 @@ struct FinanceScreen: View {
             .accessibilityIdentifier("financeConnect")
         }
       }
-    }
+    })
     .navigationTitle("Finance")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {

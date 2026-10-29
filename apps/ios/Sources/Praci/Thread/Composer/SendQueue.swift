@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 import RakazoAPI
@@ -31,8 +32,6 @@ private struct SendResult: Decodable, Sendable { var seq: Int }
 @MainActor
 @Observable
 final class SendQueue {
-  // ponytail: one app-wide queue; switching space or server drops the other scope's unsent
-  // messages (OutboxDisk.load keeps one scope), so give each scope its own folder if that matters.
   static let shared = SendQueue()
 
   private(set) var attempts: [SendAttempt] = []
@@ -41,8 +40,10 @@ final class SendQueue {
   /// True while the last try could not reach the server.
   private(set) var offline = false
 
-  @ObservationIgnored private let disk: OutboxDisk
+  @ObservationIgnored private let root: URL
+  @ObservationIgnored private var disk: OutboxDisk
   @ObservationIgnored private var scope: OutboxScope?
+  @ObservationIgnored private var confirming: Task<Void, Never>?
   @ObservationIgnored private var drainTask: Task<Void, Never>?
   @ObservationIgnored private let retryDelay: Duration
 
@@ -51,6 +52,7 @@ final class SendQueue {
       .appendingPathComponent("outbox", isDirectory: true),
     retryDelay: Duration = .seconds(5)
   ) {
+    root = directory
     disk = OutboxDisk(directory: directory)
     self.retryDelay = retryDelay
   }
@@ -63,23 +65,63 @@ final class SendQueue {
     accepted.filter { $0.payload.originThreadKey == key && ($0.acceptedSeq ?? 0) > cursor }
   }
 
-  /// Loads what an earlier launch left behind when the account or space changed, then drains.
+  /// Loads what an earlier launch left for this server, user and space, then drains. Each scope
+  /// has its own folder, so another account never reads or sends these messages. Until the
+  /// server confirms who is signed in, nothing is sent.
   func bind(_ app: AppModel) {
-    let next = OutboxScope(
-      apiBase: app.authentication.endpoint.absoluteString, userID: "device",
-      cacheSession: "ios", spaceID: app.spaceID)
-    if next != scope {
-      scope = next
-      attempts = disk.load(session: 0, scope: next)
-      accepted = []
+    rescope(app)
+    if !app.userConfirmed, confirming == nil {
+      confirming = Task { [weak self, retryDelay] in
+        while !Task.isCancelled {
+          await app.confirmUser()
+          if app.userConfirmed { break }
+          try? await Task.sleep(for: retryDelay)
+        }
+        guard !Task.isCancelled else { return }
+        self?.confirming = nil
+        self?.rescope(app)
+        self?.kick(app)
+      }
     }
     kick(app)
+  }
+
+  /// Sign-out, server change or user change: drop the queue from memory and stop sending.
+  func unbind() {
+    confirming?.cancel()
+    confirming = nil
+    drainTask?.cancel()
+    drainTask = nil
+    scope = nil
+    attempts = []
+    accepted = []
+    offline = false
+  }
+
+  private func currentScope(_ app: AppModel) -> OutboxScope? {
+    guard let user = app.userID else { return nil }
+    return OutboxScope(
+      apiBase: app.authentication.endpoint.absoluteString, userID: user, cacheSession: "ios",
+      spaceID: app.spaceID)
+  }
+
+  private func rescope(_ app: AppModel) {
+    let next = currentScope(app)
+    guard next != scope else { return }
+    unbind()
+    scope = next
+    guard let next else { return }
+    var digest = SHA256()
+    digest.update(data: Data("\(next.apiBase)\n\(next.userID)\n\(next.spaceID ?? "")".utf8))
+    let name = digest.finalize().map { String(format: "%02x", $0) }.joined()
+    disk = OutboxDisk(directory: root.appendingPathComponent(name, isDirectory: true))
+    attempts = disk.load(session: 0, scope: next)
   }
 
   /// Adds a send. Returns an error message when it cannot be kept (disk full or unwritable).
   func enqueue(_ payload: SendPayload, _ app: AppModel) -> String? {
     bind(app)
-    guard let scope else { return nil }
+    guard let scope else { return "Couldn’t save the message. Try again." }
     var attempt = SendAttempt(
       clientNonce: UUID().uuidString, payload: payload, scope: scope, session: 0)
     do {
@@ -104,17 +146,17 @@ final class SendQueue {
   }
 
   func kick(_ app: AppModel) {
-    guard drainTask == nil else { return }
+    guard drainTask == nil, app.userConfirmed, scope == currentScope(app) else { return }
     drainTask = Task { [weak self] in
       await self?.drain(app)
-      self?.drainTask = nil
+      if !Task.isCancelled { self?.drainTask = nil }
     }
   }
 
   // MARK: Delivery
 
   private func drain(_ app: AppModel) async {
-    while !Task.isCancelled, let next = attempts.first(where: { $0.state == .queued }) {
+    while !Task.isCancelled, scope == currentScope(app), let next = attempts.first(where: { $0.state == .queued }) {
       let outcome = await deliver(next.clientNonce, app)
       offline = outcome?.pausesQueue == true
       if outcome?.pausesQueue == true { try? await Task.sleep(for: retryDelay) }

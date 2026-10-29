@@ -31,10 +31,10 @@ func financeRunway(_ months: Double?, hidden: Bool) -> String {
 /// `2025-11` becomes a short month name; anything else is returned unchanged.
 func financeMonthLabel(_ month: String, locale: Locale = .current) -> String {
   let parts = month.split(separator: "-")
-  guard parts.count == 2, let m = Int(parts[1]), (1...12).contains(m) else { return month }
+  guard parts.count == 2, let number = Int(parts[1]), (1...12).contains(number) else { return month }
   var calendar = Calendar(identifier: .gregorian)
   calendar.locale = locale
-  return calendar.shortMonthSymbols[m - 1]
+  return calendar.shortMonthSymbols[number - 1]
 }
 
 /// `Oct 16` for a day (`2026-10-16`) or an ISO date-time.

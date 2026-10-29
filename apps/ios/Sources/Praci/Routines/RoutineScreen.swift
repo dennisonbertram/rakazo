@@ -12,9 +12,9 @@ struct RoutineScreen: View {
   }
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { routine in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { routine in
       content(routine)
-    }
+    })
     .background(Color.token(.background))
     .navigationTitle(model.state.value?.name ?? "Routine")
     .navigationBarTitleDisplayMode(.inline)

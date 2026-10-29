@@ -17,11 +17,17 @@ final class AppModel {
     didSet { defaults.set(spaceID, forKey: spaceKey) }
   }
 
+  /// The signed-in user, which scopes the unsent-message queue. Cached for offline starts and
+  /// confirmed by the server once per session (`confirmUser`).
+  private(set) var userID: String?
+  private(set) var userConfirmed = false
+
   @ObservationIgnored private let rpc: RPCClient
   @ObservationIgnored private let transport: any HTTPTransport
   @ObservationIgnored private let defaults: UserDefaults
 
   private var spaceKey: String { "spaceID.\(authentication.endpoint.absoluteString)" }
+  private var userKey: String { "userID.\(authentication.endpoint.absoluteString)" }
 
   init(
     authentication: AuthenticationModel,
@@ -33,6 +39,16 @@ final class AppModel {
     self.defaults = defaults
     rpc = RPCClient(auth: authentication.client, transport: transport)
     spaceID = defaults.string(forKey: "spaceID.\(authentication.endpoint.absoluteString)")
+    userID = defaults.string(forKey: "userID.\(authentication.endpoint.absoluteString)")
+  }
+
+  /// Asks the server who is signed in. A different user than the cached one replaces it.
+  func confirmUser() async {
+    struct Profile: Decodable, Sendable { var userId: String }
+    guard let profile: Profile = try? await call("me") else { return }
+    userID = profile.userId
+    userConfirmed = true
+    defaults.set(profile.userId, forKey: userKey)
   }
 
   func call<O: Decodable>(_ procedure: String, timeout: TimeInterval = 8) async throws -> O {
@@ -96,10 +112,21 @@ final class AppModel {
     path = []
     showingSettings = false
     spaceID = nil
+    forgetUser()
   }
 
   func reloadSpace() {
     spaceID = defaults.string(forKey: spaceKey)
+    forgetUser()
+    userID = defaults.string(forKey: userKey)
+  }
+
+  /// Unsent messages stay on disk under their owner's scope, but leave memory.
+  private func forgetUser() {
+    defaults.removeObject(forKey: userKey)
+    userID = nil
+    userConfirmed = false
+    SendQueue.shared.unbind()
   }
 
   private func send<I: Encodable & Sendable, O: Decodable>(

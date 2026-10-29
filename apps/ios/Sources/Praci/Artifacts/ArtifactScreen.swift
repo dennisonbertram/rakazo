@@ -14,9 +14,9 @@ struct ArtifactScreen: View {
   }
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { detail in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { detail in
       preview(detail)
-    }
+    })
     .background(Color.token(.background))
     .navigationTitle(model.state.value?.summary.title ?? "Artifact")
     .navigationBarTitleDisplayMode(.inline)
@@ -65,13 +65,13 @@ struct ArtifactScreen: View {
           selection: Binding(
             get: { model.selectedVersion ?? 0 },
             set: { number in
-              if let v = model.versions.first(where: { $0.version == number }) {
-                Task { await model.select(v, app: app) }
+              if let picked = model.versions.first(where: { $0.version == number }) {
+                Task { await model.select(picked, app: app) }
               }
             })
         ) {
-          ForEach(model.versions) { v in
-            Text("v\(v.version) · \(rowTimestamp(v.createdAt))").tag(v.version)
+          ForEach(model.versions) { entry in
+            Text("v\(entry.version) · \(rowTimestamp(entry.createdAt))").tag(entry.version)
           }
         }
       }

@@ -159,6 +159,7 @@ struct ImageBlockView: View {
   let block: MessageBlock
   @Environment(AppModel.self) private var app
   @State private var state: Loadable<UIImage> = .idle
+  @State private var attempt = 0
 
   private struct Input: Encodable, Sendable { var artifactId: String }
   private struct Output: Decodable, Sendable { var contentBase64: String }
@@ -171,7 +172,7 @@ struct ImageBlockView: View {
           .clipShape(RoundedRectangle(cornerRadius: 14))
           .accessibilityLabel(block.fields["alt"]?.stringValue ?? block.fields["name"]?.stringValue ?? "Image")
       case .failed:
-        Button("Couldn’t load image. Try again") { state = .idle }
+        Button("Couldn’t load image. Try again") { attempt += 1 }
           .font(.footnote)
           .frame(maxWidth: .infinity, minHeight: 80)
           .background(Color.token(.card), in: RoundedRectangle(cornerRadius: 14))
@@ -186,14 +187,11 @@ struct ImageBlockView: View {
     .task(id: loadKey) { await load() }
   }
 
-  private var loadKey: String {
-    "\(block.fields["artifactId"]?.stringValue ?? "")|\(isIdle)"
-  }
-
-  private var isIdle: Bool { if case .idle = state { true } else { false } }
+  // The key must not depend on `state`: changing it would cancel the request this task started.
+  private var loadKey: String { "\(block.fields["artifactId"]?.stringValue ?? "")|\(attempt)" }
 
   private func load() async {
-    guard case .idle = state, let id = block.fields["artifactId"]?.stringValue else { return }
+    guard let id = block.fields["artifactId"]?.stringValue else { return }
     state = .loading
     do {
       let out: Output = try await app.call("artifacts/getById", input: Input(artifactId: id), timeout: 30)

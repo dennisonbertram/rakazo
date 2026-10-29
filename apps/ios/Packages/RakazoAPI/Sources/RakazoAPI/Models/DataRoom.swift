@@ -111,7 +111,10 @@ public struct DataRoomUploadResult: Sendable, Decodable {
   }
 }
 
-public struct DataRoomOK: Sendable, Decodable { public let ok: Bool }
+public struct DataRoomOK: Sendable, Decodable {
+  // swiftlint:disable:next identifier_name
+  public let ok: Bool  // wire-format field name
+}
 
 // MARK: Inputs
 

@@ -210,12 +210,11 @@ final class ThreadModel {
     await refresh(app)
   }
 
-  /// Archives the agent; true when it worked so the screen can return to Home.
+  /// Archives the agent, returns to Home and offers Undo; true when it worked.
   func archive(_ app: AppModel) async -> Bool {
     guard case .bot(let id) = target else { return false }
-    struct Input: Encodable, Sendable { var botId: String }
     do {
-      let _: JSONValue = try await app.call("bots/archive", input: Input(botId: id))
+      try await ManageClient.archive(.bot(id), name: title, app: app, onChange: {})
       return true
     } catch {
       archiveError = error.localizedDescription

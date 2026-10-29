@@ -20,14 +20,14 @@ public enum LegalDay {
   public static func today(_ now: Date = Date(), timeZone: TimeZone = .current) -> String {
     var local = Calendar(identifier: .gregorian)
     local.timeZone = timeZone
-    let c = local.dateComponents([.year, .month, .day], from: now)
-    return String(format: "%04d-%02d-%02d", c.year ?? 1970, c.month ?? 1, c.day ?? 1)
+    let parts = local.dateComponents([.year, .month, .day], from: now)
+    return String(format: "%04d-%02d-%02d", parts.year ?? 1970, parts.month ?? 1, parts.day ?? 1)
   }
 
   /// Whole days from `from` to `to`; negative when `to` is earlier.
-  public static func days(from: String, to: String) -> Int? {
-    guard let a = date(from), let b = date(to) else { return nil }
-    return calendar.dateComponents([.day], from: a, to: b).day
+  public static func days(from: String, to end: String) -> Int? {
+    guard let first = date(from), let last = date(end) else { return nil }
+    return calendar.dateComponents([.day], from: first, to: last).day
   }
 
   /// Overdue, or due within `dueSoonDays` days. The same rule as the web badge.

@@ -57,17 +57,17 @@ public struct Routine: Sendable, Identifiable, Hashable, Decodable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    botId = try c.decode(String.self, forKey: .botId)
-    name = try c.decode(String.self, forKey: .name)
-    prompt = try c.decodeIfPresent(String.self, forKey: .prompt) ?? ""
-    crons = try c.decodeIfPresent([String].self, forKey: .crons) ?? []
-    timezone = try c.decodeIfPresent(String.self, forKey: .timezone) ?? "UTC"
-    active = try c.decodeIfPresent(Bool.self, forKey: .active) ?? true
-    lastRunAt = try c.decodeIfPresent(String.self, forKey: .lastRunAt)
-    nextRunAt = try c.decodeIfPresent(String.self, forKey: .nextRunAt)
-    status = try c.decodeIfPresent(RoutineStatus.self, forKey: .status)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    botId = try container.decode(String.self, forKey: .botId)
+    name = try container.decode(String.self, forKey: .name)
+    prompt = try container.decodeIfPresent(String.self, forKey: .prompt) ?? ""
+    crons = try container.decodeIfPresent([String].self, forKey: .crons) ?? []
+    timezone = try container.decodeIfPresent(String.self, forKey: .timezone) ?? "UTC"
+    active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+    lastRunAt = try container.decodeIfPresent(String.self, forKey: .lastRunAt)
+    nextRunAt = try container.decodeIfPresent(String.self, forKey: .nextRunAt)
+    status = try container.decodeIfPresent(RoutineStatus.self, forKey: .status)
   }
 
   /// A paused routine has `active == false`; the server may also set a reason when it paused it.
@@ -148,16 +148,16 @@ public enum CronText {
   ]
 
   public static func describe(_ cron: String) -> String {
-    let f = cron.split(separator: " ").map(String.init)
-    guard f.count == 5, let minute = Int(f[0]), let hour = Int(f[1]), f[3] == "*",
+    let fields = cron.split(separator: " ").map(String.init)
+    guard fields.count == 5, let minute = Int(fields[0]), let hour = Int(fields[1]), fields[3] == "*",
       (0..<60).contains(minute), (0..<24).contains(hour)
     else { return cron }
     let time = clock(hour: hour, minute: minute)
-    switch (f[2], f[4]) {
+    switch (fields[2], fields[4]) {
     case ("*", "*"): return "Every day at \(time)"
     case ("*", "1-5"): return "Weekdays at \(time)"
-    case ("*", let d) where Int(d).map({ (0...7).contains($0) }) == true:
-      return "Every \(days[Int(d)!]) at \(time)"
+    case ("*", let weekday) where Int(weekday).map({ (0...7).contains($0) }) == true:
+      return "Every \(days[Int(weekday)!]) at \(time)"
     case (let dom, "*") where Int(dom).map({ (1...31).contains($0) }) == true:
       return "Monthly on day \(dom) at \(time)"
     default: return cron
@@ -169,7 +169,7 @@ public enum CronText {
   }
 
   private static func clock(hour: Int, minute: Int) -> String {
-    let h = hour % 12 == 0 ? 12 : hour % 12
-    return String(format: "%d:%02d %@", h, minute, hour < 12 ? "AM" : "PM")
+    let twelve = hour % 12 == 0 ? 12 : hour % 12
+    return String(format: "%d:%02d %@", twelve, minute, hour < 12 ? "AM" : "PM")
   }
 }

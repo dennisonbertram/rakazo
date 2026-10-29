@@ -59,9 +59,9 @@ func decodesRoutinesAndHistory() throws {
 @Test
 func routineToleratesMissingFieldsAndUnknownStatus() throws {
   let json = #"{"json":{"id":"r","botId":"b","name":"N","status":{"pausedReason":"x"}}}"#
-  let r = try JSONDecoder().decode(RPCEnvelope<Routine>.self, from: Data(json.utf8)).json
-  #expect(r.crons.isEmpty)
-  #expect(r.pausedReason == .unknown("x"))
+  let routine = try JSONDecoder().decode(RPCEnvelope<Routine>.self, from: Data(json.utf8)).json
+  #expect(routine.crons.isEmpty)
+  #expect(routine.pausedReason == .unknown("x"))
 }
 
 @Test

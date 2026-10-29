@@ -9,7 +9,7 @@ struct FinanceTransactionScreen: View {
   @State private var state: Loadable<FinanceTransactionDetail> = .idle
 
   var body: some View {
-    LoadableView(state: state, retry: { Task { await load() } }) { detail in
+    LoadableView(state: state, retry: { Task { await load() } }, content: { detail in
       List {
         Section {
           LabeledContent(
@@ -37,7 +37,7 @@ struct FinanceTransactionScreen: View {
         }
       }
       .navigationTitle(detail.vendorName ?? detail.transaction.counterparty)
-    }
+    })
     .navigationBarTitleDisplayMode(.inline)
     .task { await load() }
   }

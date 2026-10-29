@@ -33,9 +33,9 @@ final class FinanceModel {
       async let overview: FinanceOverview = app.call("finance/overview")
       async let accounts: FinanceAccounts = app.call("finance/accounts")
       async let burn: FinanceBurn = app.call("finance/burn")
-      async let me: Me = app.call("me")
+      async let profile: Me = app.call("me")
       let data = try await FinanceData(overview: overview, accounts: accounts, burn: burn)
-      hideAmounts = try await me.hideAmounts
+      hideAmounts = try await profile.hideAmounts
       state = .loaded(data)
       errorMessage = nil
       await loadSpend(app)
@@ -71,8 +71,8 @@ final class FinanceModel {
     let previous = hideAmounts
     hideAmounts = value
     do {
-      let me: Me = try await app.call("preferences/update", input: HideAmountsUpdate(hideAmounts: value))
-      hideAmounts = me.hideAmounts
+      let profile: Me = try await app.call("preferences/update", input: HideAmountsUpdate(hideAmounts: value))
+      hideAmounts = profile.hideAmounts
     } catch {
       hideAmounts = previous
       errorMessage = error.localizedDescription

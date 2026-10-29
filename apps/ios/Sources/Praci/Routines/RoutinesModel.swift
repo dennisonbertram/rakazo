@@ -27,8 +27,8 @@ final class RoutinesModel {
     do {
       let updated: Routine = try await app.call(
         "routines/update", input: RoutineActiveInput(routineId: routine.id, active: active))
-      if case .loaded(var list) = state, let i = list.firstIndex(where: { $0.id == updated.id }) {
-        list[i] = updated
+      if case .loaded(var list) = state, let index = list.firstIndex(where: { $0.id == updated.id }) {
+        list[index] = updated
         state = .loaded(list)
       }
     } catch {

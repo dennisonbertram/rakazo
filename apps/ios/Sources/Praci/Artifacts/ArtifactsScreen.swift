@@ -14,13 +14,13 @@ struct ArtifactsScreen: View {
   }
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { items in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { items in
       if items.isEmpty {
         ContentUnavailableView("No artifacts yet", systemImage: "doc.text")
       } else {
         list
       }
-    }
+    })
     .background(Color.token(.background))
     .navigationTitle(botName.map { "\($0) artifacts" } ?? "Artifacts")
     .navigationBarTitleDisplayMode(.inline)

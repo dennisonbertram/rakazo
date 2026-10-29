@@ -7,25 +7,25 @@ private func decode<T: Decodable>(_ type: T.Type, _ name: String) throws -> T {
   try JSONDecoder().decode(RPCEnvelope<T>.self, from: loadFixture(named: name)).json
 }
 
-private let us = Locale(identifier: "en_US")
+private let enUS = Locale(identifier: "en_US")
 
 @Test
 func decodesLegalOverview() throws {
-  let o = try decode(LegalOverview.self, "legal-overview")
-  #expect(o.contracts.count == 3)
-  #expect(o.deadlines.count == 3)
-  #expect(o.counts.openDeadlines == 9)
-  #expect(o.contracts[0].valueCents == "310000")
-  #expect(o.deadlines[0].removalProposed == false)
-  #expect(o.isScanRunning)
+  let overview = try decode(LegalOverview.self, "legal-overview")
+  #expect(overview.contracts.count == 3)
+  #expect(overview.deadlines.count == 3)
+  #expect(overview.counts.openDeadlines == 9)
+  #expect(overview.contracts[0].valueCents == "310000")
+  #expect(overview.deadlines[0].removalProposed == false)
+  #expect(overview.isScanRunning)
 }
 
 @Test
 func decodesConsentAndNoModelBlocker() throws {
-  let c = try decode(LegalConsent.self, "legal-consent")
-  #expect(!c.allowed)
-  #expect(!c.needsModel)
-  #expect(c.recipients.first?.name == "OpenRouter")
+  let consent = try decode(LegalConsent.self, "legal-consent")
+  #expect(!consent.allowed)
+  #expect(!consent.needsModel)
+  #expect(consent.recipients.first?.name == "OpenRouter")
 }
 
 @Test
@@ -38,23 +38,23 @@ func dueSoonMatchesWebBoundary() {
 
 @Test
 func moneyKeepsEveryDigit() {
-  #expect(legalMoney(cents: "1234567", currency: "USD", locale: us) == "$12,345.67")
-  #expect(legalMoney(cents: "5000000", currency: "USD", locale: us) == "$50,000")
-  #expect(legalMoney(cents: "123456789012345678", currency: "USD", locale: us) == "$1,234,567,890,123,456.78")
+  #expect(legalMoney(cents: "1234567", currency: "USD", locale: enUS) == "$12,345.67")
+  #expect(legalMoney(cents: "5000000", currency: "USD", locale: enUS) == "$50,000")
+  #expect(legalMoney(cents: "123456789012345678", currency: "USD", locale: enUS) == "$1,234,567,890,123,456.78")
 }
 
 @Test
 func groupsContractsByTypeThenNextDeadline() throws {
-  let o = try decode(LegalOverview.self, "legal-overview")
-  let groups = o.contracts.groupedByType()
+  let overview = try decode(LegalOverview.self, "legal-overview")
+  let groups = overview.contracts.groupedByType()
   #expect(groups.map(\.type) == groups.map(\.type).sorted())
   #expect(groups.flatMap(\.contracts).count == 3)
 }
 
 @Test
 func decodesCapTableAndEmptySnapshot() throws {
-  let t = try decode(CapTableResult.self, "cap-table")
-  let snapshot = try #require(t.snapshot)
+  let table = try decode(CapTableResult.self, "cap-table")
+  let snapshot = try #require(table.snapshot)
   #expect(snapshot.holders.count == 5)
   #expect(snapshot.holders.sortedByOwnership().first?.percent == 40)
   #expect(snapshot.holders.sortedByOwnership().last?.percent == nil)
@@ -64,7 +64,7 @@ func decodesCapTableAndEmptySnapshot() throws {
 
 @Test
 func formatsPercentAndDollars() {
-  #expect(capPercent(11.5, locale: us) == "11.5%")
-  #expect(capPercent(40, locale: us) == "40%")
-  #expect(capUSD(250000, locale: us) == "$250,000")
+  #expect(capPercent(11.5, locale: enUS) == "11.5%")
+  #expect(capPercent(40, locale: enUS) == "40%")
+  #expect(capUSD(250000, locale: enUS) == "$250,000")
 }

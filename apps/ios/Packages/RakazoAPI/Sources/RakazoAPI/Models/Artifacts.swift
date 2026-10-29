@@ -81,18 +81,18 @@ public struct ArtifactSummary: Sendable, Identifiable, Hashable, Decodable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    botId = try c.decodeIfPresent(String.self, forKey: .botId)
-    groupId = try c.decodeIfPresent(String.self, forKey: .groupId)
-    runId = try c.decodeIfPresent(String.self, forKey: .runId)
-    name = try c.decode(String.self, forKey: .name)
-    description = try c.decodeIfPresent(String.self, forKey: .description)
-    mimeType = try c.decodeIfPresent(String.self, forKey: .mimeType) ?? "application/octet-stream"
-    size = try c.decodeIfPresent(Int.self, forKey: .size) ?? 0
-    version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
-    createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt) ?? ""
-    versionCount = try c.decodeIfPresent(Int.self, forKey: .versionCount)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    botId = try container.decodeIfPresent(String.self, forKey: .botId)
+    groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
+    runId = try container.decodeIfPresent(String.self, forKey: .runId)
+    name = try container.decode(String.self, forKey: .name)
+    description = try container.decodeIfPresent(String.self, forKey: .description)
+    mimeType = try container.decodeIfPresent(String.self, forKey: .mimeType) ?? "application/octet-stream"
+    size = try container.decodeIfPresent(Int.self, forKey: .size) ?? 0
+    version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+    createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt) ?? ""
+    versionCount = try container.decodeIfPresent(Int.self, forKey: .versionCount)
   }
 }
 

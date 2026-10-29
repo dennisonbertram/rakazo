@@ -13,7 +13,7 @@ struct LegalScreen: View {
   }
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { overview in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { overview in
       List {
         Section {
           Picker("View", selection: $tab) {
@@ -30,7 +30,7 @@ struct LegalScreen: View {
         }
       }
       .refreshable { await model.load(app) }
-    }
+    })
     .navigationTitle("Legal")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
@@ -97,7 +97,8 @@ struct LegalScreen: View {
   }
 
   private func lastScanText(_ overview: LegalOverview) -> String {
-    guard let at = overview.agent.lastScanAt, let date = try? Date(at, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    guard let scanned = overview.agent.lastScanAt,
+      let date = try? Date(scanned, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
     else { return String(localized: "Not scanned yet") }
     return date.formatted(.relative(presentation: .named))
   }
@@ -114,7 +115,11 @@ struct LegalScreen: View {
     ForEach(overview.contracts.groupedByType()) { group in
       Section(group.type) {
         ForEach(group.contracts) { contract in
-          NavigationLink { ContractDetailView(contract: contract, model: model) } label: { ContractRow(contract: contract, model: model) }
+          NavigationLink {
+            ContractDetailView(contract: contract, model: model)
+          } label: {
+            ContractRow(contract: contract, model: model)
+          }
         }
       }
     }
@@ -246,8 +251,8 @@ private struct ContractDetailView: View {
         row("Type", contract.contractType)
         row("Status", contract.status.capitalized)
         if !contract.counterparties.isEmpty { row("Parties", contract.counterparties.joined(separator: ", ")) }
-        if let d = contract.effectiveDate { row("Starts", LegalDay.display(d)) }
-        if let d = contract.expirationDate { row("Ends", LegalDay.display(d)) }
+        if let start = contract.effectiveDate { row("Starts", LegalDay.display(start)) }
+        if let end = contract.expirationDate { row("Ends", LegalDay.display(end)) }
         if contract.autoRenews { row("Renews", "Automatically") }
         if let days = contract.renewalNoticeDays { row("Notice", "\(days) days") }
         if let law = contract.governingLaw { row("Governing law", law) }
@@ -259,11 +264,11 @@ private struct ContractDetailView: View {
       let deadlines = model.openDeadlines.filter { $0.contractId == contract.id }
       if !deadlines.isEmpty {
         Section("Deadlines") {
-          ForEach(deadlines) { d in
+          ForEach(deadlines) { deadline in
             NavigationLink {
-              DeadlineDetailView(deadline: d, model: model)
+              DeadlineDetailView(deadline: deadline, model: model)
             } label: {
-              LabeledContent(d.title) { Text(LegalDay.display(d.dueDate)) }
+              LabeledContent(deadline.title) { Text(LegalDay.display(deadline.dueDate)) }
             }
           }
         }

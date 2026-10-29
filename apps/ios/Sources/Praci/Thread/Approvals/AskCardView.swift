@@ -175,17 +175,9 @@ enum AskOutcomeText {
     }
   }
 
-  // swiftlint:disable:next cyclomatic_complexity
   /// A button title: known approval ids get fixed words, anything else keeps the server's label.
   static func label(for action: AskAction, in ask: AskBlock) -> Text {
-    if ask.share {
-      if action.id == "allow" { return Text("Share") }
-      if action.id == "deny" { return Text("Don’t share") }
-    }
-    if ask.isConsent {
-      if action.id == "allow" { return Text("Allow") }
-      if action.id == "deny" { return Text("Not now") }
-    }
+    if let fixed = fixedLabel(for: action, in: ask) { return fixed }
     guard ask.isApproval, action.outcome == nil else { return Text(verbatim: action.label) }
     switch action.id {
     // A payment's label already carries the amount ("Send $300.00"): keep it.
@@ -194,5 +186,17 @@ enum AskOutcomeText {
     case "deny": return Text("Deny")
     default: return Text(verbatim: action.label)
     }
+  }
+
+  private static func fixedLabel(for action: AskAction, in ask: AskBlock) -> Text? {
+    if ask.share {
+      if action.id == "allow" { return Text("Share") }
+      if action.id == "deny" { return Text("Don’t share") }
+    }
+    if ask.isConsent {
+      if action.id == "allow" { return Text("Allow") }
+      if action.id == "deny" { return Text("Not now") }
+    }
+    return nil
   }
 }

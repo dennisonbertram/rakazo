@@ -9,7 +9,7 @@ struct AgentPageScreen: View {
   @State private var botName: String?
 
   var body: some View {
-    LoadableView(state: state, retry: { Task { await load() } }) { page in
+    LoadableView(state: state, retry: { Task { await load() } }, content: { page in
       if let page, !page.content.isEmpty {
         ScrollView {
           VStack(alignment: .leading, spacing: 12) {
@@ -24,7 +24,7 @@ struct AgentPageScreen: View {
       } else {
         ContentUnavailableView("No page yet", systemImage: "doc.text")
       }
-    }
+    })
     .background(Color.token(.background))
     .navigationTitle(botName ?? "Page")
     .navigationBarTitleDisplayMode(.inline)
