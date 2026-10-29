@@ -116,6 +116,7 @@ struct ComposerView: View {
       }
       .accessibilityLabel("Cancel reply")
     }
+    .fixedSize(horizontal: false, vertical: true)
     .padding(.horizontal, 12)
     .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
     .accessibilityIdentifier("replyStrip")
