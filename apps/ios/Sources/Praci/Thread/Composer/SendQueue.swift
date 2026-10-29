@@ -48,8 +48,7 @@ final class SendQueue {
   @ObservationIgnored private let retryDelay: Duration
 
   init(
-    directory: URL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent("outbox", isDirectory: true),
+    directory: URL = OutboxDisk.standardRoot(),
     retryDelay: Duration = .seconds(5)
   ) {
     root = directory
@@ -124,11 +123,16 @@ final class SendQueue {
     guard let scope else { return "Couldn’t save the message. Try again." }
     var attempt = SendAttempt(
       clientNonce: UUID().uuidString, payload: payload, scope: scope, session: 0)
+    let tooMany = "Too many unsent messages. Try again later."
+    if attempts.count >= OutboxLimits.maxEntries { return tooMany }
     do {
-      guard try disk.admit(&attempt) else { return "Too many unsent messages. Try again later." }
-    } catch { return "Couldn’t save the message on this device." }
+      guard try disk.admit(&attempt) else { return tooMany }
+      try disk.save(attempts + [attempt])
+    } catch {
+      disk.forget(attempt)
+      return "Couldn’t save the message on this device."
+    }
     attempts.append(attempt)
-    disk.save(attempts)
     kick(app)
     return nil
   }
@@ -142,7 +146,7 @@ final class SendQueue {
     guard let attempt = attempts.first(where: { $0.clientNonce == nonce }) else { return }
     attempts.removeAll { $0.clientNonce == nonce }
     disk.forget(attempt)
-    disk.save(attempts)
+    try? disk.save(attempts)
   }
 
   func kick(_ app: AppModel) {
@@ -186,7 +190,7 @@ final class SendQueue {
     } catch {
       let (outcome, message) = Self.outcome(for: error)
       update(nonce) { $0.state = outcome.state; $0.error = message }
-      disk.save(attempts)
+      try? disk.save(attempts)
       return outcome
     }
   }
@@ -195,7 +199,7 @@ final class SendQueue {
     guard var done = attempts.first(where: { $0.clientNonce == nonce }) else { return }
     attempts.removeAll { $0.clientNonce == nonce }
     disk.forget(done)
-    disk.save(attempts)
+    try? disk.save(attempts)
     done.acceptedSeq = seq
     accepted = Array((accepted + [done]).suffix(5))
   }

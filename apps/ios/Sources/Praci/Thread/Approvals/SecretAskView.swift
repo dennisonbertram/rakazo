@@ -78,7 +78,7 @@ struct SecretAskView: View {
     secret = ""
     username = ""
     Task {
-      await approval.answer(value, id: "secret", username: name, messageID: messageID, app: app, thread: model)
+      await approval.answer(value, id: "secret", secret: true, username: name, messageID: messageID, app: app, thread: model)
     }
   }
 }

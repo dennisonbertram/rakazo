@@ -19,9 +19,17 @@ final class ApprovalModel {
     set { if !newValue { failure = nil } }
   }
 
+  /// Shown for a failed secret answer: a server message may echo what was submitted.
+  static let secretFailure = String(localized: "Couldn’t save the credential. Try again.")
+
+  static func failureMessage(_ error: any Error, secret: Bool) -> String {
+    secret ? secretFailure : error.localizedDescription
+  }
+
   /// Runs one request for the card. `work` must not retain a secret beyond its own call.
   func run(
-    _ id: String, app: AppModel, thread: ThreadModel, work: () async throws -> Void
+    _ id: String, secret: Bool = false, app: AppModel, thread: ThreadModel,
+    work: () async throws -> Void
   ) async {
     guard pending == nil else { return }
     pending = id
@@ -36,14 +44,14 @@ final class ApprovalModel {
       sentAnswer = nil
       await thread.refresh(app)
     } catch {
-      failure = error.localizedDescription
+      failure = Self.failureMessage(error, secret: secret)
     }
   }
 
   /// `id` names the action for the busy state and `sentAnswer`; a typed answer or a secret must
   /// pass a fixed id here so its text is never kept.
   func answer(
-    _ answer: String, id: String? = nil, username: String? = nil, mail: MailAnswerEdits? = nil,
+    _ answer: String, id: String? = nil, secret: Bool = false, username: String? = nil, mail: MailAnswerEdits? = nil,
     messageID: String, app: AppModel, thread: ThreadModel
   ) async {
     guard let runID = thread.storedMessages.first(where: { $0.id == messageID })?.runId else {
@@ -57,7 +65,7 @@ final class ApprovalModel {
     case .group(let id): input.groupId = id
     }
     let sent = input
-    await run(id ?? answer, app: app, thread: thread) {
+    await run(id ?? answer, secret: secret, app: app, thread: thread) {
       let _: JSONValue = try await app.call("threads/answer", input: sent)
     }
   }

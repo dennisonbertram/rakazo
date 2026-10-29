@@ -141,6 +141,40 @@ struct SendQueueTests {
     #expect(queue.attempts.map(\.payload.displayText) == ["in s2"])
   }
 
+  @Test func refusesTheTwentyFirstMessageAndKeepsTheFirstTwentyOnDisk() async throws {
+    let transport = await offlineTransport()
+    let app = try await makeApp(transport)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let queue = queue(in: directory)
+    queue.bind(app)
+    await settle(queue) { app.userConfirmed }
+    for index in 0 ..< OutboxLimits.maxEntries {
+      #expect(queue.enqueue(payload("m\(index)"), app) == nil)
+    }
+    #expect(queue.enqueue(payload("one too many"), app) == "Too many unsent messages. Try again later.")
+    #expect(queue.attempts.count == OutboxLimits.maxEntries)
+    let restarted = self.queue(in: directory)
+    restarted.bind(app)
+    #expect(restarted.attempts.count == OutboxLimits.maxEntries)
+  }
+
+  @Test func failedMetadataWriteReturnsAnErrorAndKeepsNothing() async throws {
+    let transport = await offlineTransport()
+    let app = try await makeApp(transport)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let queue = queue(in: directory)
+    queue.bind(app)
+    await settle(queue) { app.userConfirmed }
+    #expect(queue.enqueue(payload("first"), app) == nil)
+    let scopeDirectory = try #require(
+      try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)
+    let metadata = scopeDirectory.appendingPathComponent("sends-v4.json")
+    try FileManager.default.removeItem(at: metadata)
+    try FileManager.default.createDirectory(at: metadata, withIntermediateDirectories: true)
+    #expect(queue.enqueue(payload("second"), app) != nil)
+    #expect(queue.attempts.map(\.payload.displayText) == ["first"])
+  }
+
   @Test func unreachableServerKeepsTheMessageQueuedThenSendsItWithTheSameNonce() async throws {
     let transport = RoutedTransport()
     await transport.set("aiConsent/status") { json(consentOK) }
