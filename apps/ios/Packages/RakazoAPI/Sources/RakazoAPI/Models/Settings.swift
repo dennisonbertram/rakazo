@@ -87,3 +87,5 @@ public struct UsageSummary: Sendable, Hashable, Decodable {
     try container.decodeIfPresent(Double.self, forKey: key).map { Int($0.rounded()) }
   }
 }
+
+// `rpc_bots_restore` and `rpc_groups_restore` return `{ ok: true }`: see OKResult in Connections.swift.
