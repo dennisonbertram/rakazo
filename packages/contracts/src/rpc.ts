@@ -1442,6 +1442,8 @@ export const appContract = {
           token: z.string().min(8).max(512).regex(/^\S+$/),
           /** This device's previous token, removed when the token rotated. */
           replacesToken: z.string().min(8).max(512).regex(/^\S+$/).optional(),
+          /** Which push service issued the token. A client that omits it is an Expo client. */
+          platform: z.enum(["expo", "apns"]).optional(),
         }),
       )
       .output(z.object({ ok: z.literal(true) })),

@@ -30,6 +30,7 @@ import {
   createJobReconciler,
   createMessagingContextLoader,
   createPostgresReconciliationLeadership,
+  createPushChannel,
   createRoutineRetryNoticeReconciler,
   createRunExecutor,
   createRunSandbox,
@@ -38,7 +39,6 @@ import {
   createWebProvider,
   databaseCapacityBackoffMs,
   deleteExpiredTeachData,
-  ExpoPushProvider,
   GraphileJobPublisher,
   GraphileJobWorkerHost,
   ImessageNotificationChannel,
@@ -215,8 +215,10 @@ async function main() {
   // One provider instance so emulator launches and polls share the same Map.
   const cloudAgent = createCloudAgentConnection();
   // The outbox worker sends phone pushes through this channel.
-  const notifications = new ExpoPushProvider(prisma, (sessionId) =>
-    pushSessionExpiresAt(prisma, sessionId),
+  const notifications = createPushChannel(
+    prisma,
+    (sessionId) => pushSessionExpiresAt(prisma, sessionId),
+    process.env,
   );
   const shutdown = new AbortController();
   const mail = createMailProvider({ prisma, connectors: stack.connector });

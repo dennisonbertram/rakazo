@@ -48,6 +48,7 @@ import {
   createMailUnsubscriber,
   createMessagingContextLoader,
   createMessagingTeamChatSender,
+  createPushChannel,
   createRpcClient,
   createRunExecutor,
   createRunSandbox,
@@ -61,7 +62,6 @@ import {
   describeTeachSteps,
   destroyBot,
   EmailEmulator,
-  ExpoPushProvider,
   GraphileJobPublisher,
   gmailPushConfigFromEnv,
   ImessageNotificationChannel,
@@ -486,8 +486,10 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       : new PiAgentRuntime({
           sessionRoot: env.piSessionRecording ? piSessionsRoot(env.dataDir) : undefined,
         }));
-  const notifications = new ExpoPushProvider(prisma, (sessionId) =>
-    pushSessionExpiresAt(prisma, sessionId),
+  const notifications = createPushChannel(
+    prisma,
+    (sessionId) => pushSessionExpiresAt(prisma, sessionId),
+    process.env,
   );
   // Localhost needs no setting: MCP clients reach the API where it listens.
   const mcpBaseUrl = (env.publicMcpUrl ?? env.apiUrl).replace(/\/+$/, "");

@@ -20,17 +20,19 @@ final class AuthenticationModel {
   private(set) var errorMessage: String?
   private(set) var notice: String?
 
-  @ObservationIgnored private let client: AuthClient
+  @ObservationIgnored let client: AuthClient
+  @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let browser = SSOBrowser()
   @ObservationIgnored private var started = false
   @ObservationIgnored private var lastHandledSessionGeneration: UInt64?
   private static let endpointKey = "serverOrigin"
 
-  init() {
-    let saved = UserDefaults.standard.string(forKey: Self.endpointKey)
+  init(client: AuthClient? = nil, defaults: UserDefaults = .standard) {
+    let saved = defaults.string(forKey: Self.endpointKey)
     let endpoint = saved.flatMap { try? ServerEndpoint.normalize($0) } ?? ServerEndpoint.defaultURL
     self.endpoint = endpoint
-    client = AuthClient(endpoint: endpoint, storage: KeychainSessionStorage())
+    self.defaults = defaults
+    self.client = client ?? AuthClient(endpoint: endpoint, storage: KeychainSessionStorage())
   }
 
   func start() async {
@@ -138,7 +140,7 @@ final class AuthenticationModel {
     do {
       try await client.changeServer(to: endpoint)
       await sync()
-      UserDefaults.standard.set(self.endpoint.absoluteString, forKey: Self.endpointKey)
+      defaults.set(self.endpoint.absoluteString, forKey: Self.endpointKey)
       page = .signIn
       password = ""
       email = ""
@@ -178,7 +180,7 @@ final class AuthenticationModel {
     }
   }
 
-  private func sync() async {
+  func sync() async {
     let snapshot = await client.snapshot()
     endpoint = snapshot.endpoint
     isSignedIn = snapshot.isSignedIn

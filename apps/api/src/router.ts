@@ -603,10 +603,10 @@ import {
   shouldForwardPeerThreadEvent,
 } from "./thread-message-pages.js";
 import {
+  markThreadUnreadFrom,
   reactToThreadMessage,
   resolveThreadTarget,
   sendThreadMessage,
-  markThreadUnreadFrom,
   setThreadUnreadState,
   stopThreadRuns,
   threadHead,
@@ -2729,9 +2729,7 @@ export function createRouter(deps: RouterDeps) {
             notifyOnFinish: input.notifyOnFinish,
             color: input.color,
             pinned: input.pinned,
-            ...(input.hidden !== undefined
-              ? { hiddenAt: input.hidden ? new Date() : null }
-              : {}),
+            ...(input.hidden !== undefined ? { hiddenAt: input.hidden ? new Date() : null } : {}),
             memoryScope: input.memoryScope,
             sectionId: input.sectionId,
             voiceId: input.voiceId,
@@ -9067,6 +9065,7 @@ export function createRouter(deps: RouterDeps) {
         try {
           await savePushToken(deps.prisma, context.actor.userId, input.token, sessionId, {
             replacesToken: input.replacesToken,
+            platform: input.platform,
             sessionActive: async () => {
               const expiresAt = await pushSessionExpiresAt(deps.prisma, sessionId);
               return expiresAt !== null && expiresAt.getTime() > Date.now();
