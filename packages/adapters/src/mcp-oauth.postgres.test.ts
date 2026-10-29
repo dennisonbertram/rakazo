@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createDb } from "@rakazo/db";
+import { createDb, runAsSystem, runAsTenant } from "@rakazo/db";
 import { afterAll, describe, expect, it } from "vitest";
 import type { OAuthMaterial } from "./mcp-oauth.js";
 import { McpOAuthBroker } from "./mcp-oauth.js";
@@ -59,19 +59,28 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
       userId: id,
       signal: new AbortController().signal,
     });
-    await prisma.secret.create({
-      data: { id: stored.id, userId: id, spaceId: id, kind: "mcp", ciphertext: stored.ciphertext },
-    });
-    const server = await prisma.mcpServer.create({
-      data: {
-        spaceId: id,
-        userId: id,
-        slug: "oauth",
-        name: "OAuth",
-        transport: "streamable_http",
-        endpoint: "https://mcp.example.test/mcp",
-        secretId: stored.id,
-      },
+    // The fixture is created as the owner of the data, outside any tenant.
+    const server = await runAsSystem("MCP OAuth test fixture", async () => {
+      await prisma.secret.create({
+        data: {
+          id: stored.id,
+          userId: id,
+          spaceId: id,
+          kind: "mcp",
+          ciphertext: stored.ciphertext,
+        },
+      });
+      return prisma.mcpServer.create({
+        data: {
+          spaceId: id,
+          userId: id,
+          slug: "oauth",
+          name: "OAuth",
+          transport: "streamable_http",
+          endpoint: "https://mcp.example.test/mcp",
+          secretId: stored.id,
+        },
+      });
     });
     return { server, context: { spaceId: id, userId: id } };
   }
@@ -129,12 +138,13 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
         }),
     });
     const seeded = await Promise.all([1, 2, 3].map(() => seed(expiredMaterial())));
-    const providers = await Promise.all(
-      seeded.map(({ server, context }) => broker.providerFor(server, context)),
-    );
-
+    // The app runs this code for a member inside their tenant, as a job or request does.
     const started = Date.now();
-    const tokens = await Promise.all(providers.map((provider) => provider?.tokens()));
+    const tokens = await Promise.all(
+      seeded.map(({ server, context }) =>
+        runAsTenant(context, async () => (await broker.providerFor(server, context))?.tokens()),
+      ),
+    );
 
     expect(tokens.map((token) => token?.access_token)).toEqual([
       "access-1",
@@ -143,9 +153,9 @@ describePostgres("MCP OAuth refresh (PostgreSQL contract)", () => {
     ]);
     expect(Date.now() - started).toBeLessThan(5_000);
     for (const { server } of seeded) {
-      const row = await db.prisma.secret.findFirstOrThrow({
-        where: { mcpServers: { some: { id: server.id } } },
-      });
+      const row = await runAsSystem("MCP OAuth test read", () =>
+        db.prisma.secret.findFirstOrThrow({ where: { mcpServers: { some: { id: server.id } } } }),
+      );
       expect(
         JSON.parse(await secrets.load(row.ciphertext, row.id)).oauth.tokens.refresh_token,
       ).toBe("refresh-1");

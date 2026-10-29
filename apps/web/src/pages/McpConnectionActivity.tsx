@@ -22,7 +22,13 @@ export function McpConnectionActivity({ connectionId }: { connectionId: string }
   }, [connectionId]);
 
   const outcome = (call: McpActivityCall) =>
-    call.outcome === "ok" ? t`OK` : call.outcome === "error" ? t`Failed` : t`Rate limited`;
+    ({
+      ok: t`OK`,
+      error: t`Failed`,
+      rate_limited: t`Rate limited`,
+      pending: t`Waiting for approval`,
+      blocked: t`Blocked`,
+    })[call.outcome];
   const time = (iso: string) =>
     new Date(iso).toLocaleString(i18n.locale || "en", { dateStyle: "medium", timeStyle: "short" });
 
@@ -46,7 +52,13 @@ export function McpConnectionActivity({ connectionId }: { connectionId: string }
       {calls.map((call) => (
         <li key={`${call.createdAt}-${call.tool}`} className="flex items-baseline gap-3">
           <span className="font-mono">{call.tool}</span>
-          <span className={call.outcome === "ok" ? "text-muted-foreground" : "text-destructive"}>
+          <span
+            className={
+              call.outcome === "ok" || call.outcome === "pending"
+                ? "text-muted-foreground"
+                : "text-destructive"
+            }
+          >
             {outcome(call)}
           </span>
           <span className="ml-auto text-muted-foreground">{time(call.createdAt)}</span>

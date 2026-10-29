@@ -516,6 +516,18 @@ describePostgres("row-level security (PostgreSQL)", () => {
         }),
       );
       keep(
+        "externalAction",
+        await o.externalAction.create({
+          data: {
+            spaceId: t.spaceId,
+            userId: t.userId,
+            connectionId: mcpConnection.id,
+            tool: "contacts_add",
+            args: {},
+          },
+        }),
+      );
+      keep(
         "transcriptionSelection",
         await o.transcriptionSelection.create({
           data: { userId: t.userId, provider: "p", secretId: t.personalSecretId },

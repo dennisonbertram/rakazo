@@ -87,12 +87,14 @@ it("maps ?settings= to a settings section", () => {
   expect(settingsSectionFromParam("general")).toBe("general");
   expect(settingsSectionFromParam("models")).toBe("models");
   expect(settingsSectionFromParam("voice")).toBe("voice");
+  expect(settingsSectionFromParam("connections")).toBe("connections");
   expect(settingsSectionFromParam("nope")).toBe("general");
 });
 
 it("carries a pending ?settings= link through the first-chat redirect", () => {
   const bots = [{ id: "b1", spawnKey: null }];
   expect(firstThreadRoute(bots, [], "?settings=privacy")).toBe("/app/b1?settings=privacy");
+  expect(firstThreadRoute(bots, [], "?settings=connections")).toBe("/app/b1?settings=connections");
   expect(firstThreadRoute(bots, [], "?m=1")).toBe("/app/b1");
   expect(firstThreadRoute([], [], "?settings=general")).toBe("/app?settings=general");
 });

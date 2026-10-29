@@ -945,3 +945,12 @@ it("requires human confirmation to approve an agent connection", () => {
   expect(toolRequiresExplicitApproval("respond_agent_connection")).toBe(true);
   expect(toolRequiresApproval("respond_agent_connection", false)).toBe(true);
 });
+
+describe("bot approval of contact tools (unchanged by MCP writes)", () => {
+  it("allows a bot's contacts_add with no rule, and asks for contacts_save by default", () => {
+    const add = resolveActionApprovalDetail({ toolName: "contacts_add", rules: [], botId: "b1" });
+    expect(add).toMatchObject({ decision: "allow", source: "default" });
+    expect(toolRequiresApproval("contacts_add", false)).toBe(false);
+    expect(toolRequiresApproval("contacts_save", false)).toBe(true);
+  });
+});

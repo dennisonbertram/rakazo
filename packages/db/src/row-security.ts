@@ -153,6 +153,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "FinanceChartNote",
   "McpConnection",
   "McpCallLog",
+  "ExternalAction",
   "FinanceCryptoSnapshot",
   "FinanceExchangeConnection",
   "FinanceExchangeBalance",

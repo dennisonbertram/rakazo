@@ -1,6 +1,7 @@
 import type { McpConnectionList } from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { mockRpc } from "../lib/__mocks__/rpc";
+import { contactAction } from "./McpActionCard.stories";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
 
 const spaces = [
@@ -64,6 +65,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const WithConnections: Story = {};
+
+export const WaitingForApproval: Story = {
+  beforeEach: () =>
+    mockRpc({ "mcpConnections.list": list, "mcpConnections.pendingActions": [contactAction] }),
+};
 
 export const Empty: Story = {
   beforeEach: () => mockRpc({ "mcpConnections.list": { ...list, connections: [] } }),

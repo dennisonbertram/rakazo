@@ -326,9 +326,11 @@ import {
 import { McpOauthClientSchema } from "./mcp.js";
 import {
   CreateMcpTokenInput,
+  McpActionDecisionInput,
   McpActivityCallSchema,
   McpConnectionListSchema,
   McpConnectionSchema,
+  McpPendingActionSchema,
   UpdateMcpConnectionInput,
 } from "./mcp-connections.js";
 import {
@@ -501,6 +503,12 @@ export const appContract = {
     revoke: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
     /** The last 20 calls of one connection, newest first. */
     activity: oc.input(z.object({ id: Id })).output(z.array(McpActivityCallSchema)),
+    /** Changes outside clients asked for that wait for this member's approval. */
+    pendingActions: oc.output(z.array(McpPendingActionSchema)),
+    /** Approving runs the change once; a second answer to the same action is a conflict. */
+    decideAction: oc
+      .input(McpActionDecisionInput)
+      .output(z.object({ status: z.enum(["done", "failed", "denied"]) })),
   },
   billing: {
     status: oc.output(BillingStatusSchema),
