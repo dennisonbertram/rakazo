@@ -348,6 +348,7 @@ import {
   NotificationSchema,
   NotificationSignalSchema,
 } from "./notification.js";
+import { OmiConnectInputSchema, OmiDisconnectInputSchema, OmiStatusSchema } from "./omi.js";
 import {
   BotPageGetInputSchema,
   BotPageSaveInputSchema,
@@ -1759,6 +1760,14 @@ export const appContract = {
       .output(StoredMeetingsPageSchema),
     /** Deletes one of the caller's meetings with its to-dos; sync does not bring it back. */
     delete: oc.input(z.object({ meetingId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  omi: {
+    /** Creates or reuses the caller's one Omi connection for this space and its agent. */
+    connect: oc.input(OmiConnectInputSchema).output(z.object({ connectionId: Id })),
+    /** The caller's Omi connection with upload and recording counts; null before connecting. */
+    status: oc.output(OmiStatusSchema),
+    /** Revokes the connection; recordings stay unless `deleteRecordings` is true. */
+    disconnect: oc.input(OmiDisconnectInputSchema).output(z.object({ ok: z.literal(true) })),
   },
   devin: {
     /** Any member reads the space's cached sessions; a read older than a minute refreshes them first. */
