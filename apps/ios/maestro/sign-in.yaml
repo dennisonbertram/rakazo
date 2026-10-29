@@ -24,4 +24,4 @@ appId: com.rakazo.app.dev
 - tapOn:
     text: Sign in
     index: 1
-- assertVisible: Signed in
+- assertVisible: Home
