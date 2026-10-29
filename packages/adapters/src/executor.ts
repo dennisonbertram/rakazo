@@ -169,7 +169,7 @@ import {
   VOICE_AGENT_INSTRUCTIONS,
   withInboxAgentStandIn,
 } from "@rakazo/core";
-import { normalizedHttpUrl, sitesInText, urlSite } from "@rakazo/core/egress";
+import { normalizedHttpUrl, SITE_GATED_TOOLS, sitesInText, urlSite } from "@rakazo/core/egress";
 import {
   approvalEffectKey,
   isToolEffectIdempotencyKey,
@@ -3918,7 +3918,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trustedSitesPromise ??= (async () => {
             const sites = sitesInText(await loadOwnerWords());
             const rows = await deps.prisma.externalEffect.findMany({
-              where: { runId, kind: "web_fetch", status: { in: PASSED_EFFECT_STATUSES } },
+              where: { runId, kind: { in: [...SITE_GATED_TOOLS] }, status: { in: PASSED_EFFECT_STATUSES } },
               select: { request: true },
             });
             for (const row of rows) {
@@ -4548,8 +4548,30 @@ export function createRunExecutor(deps: ExecutorDeps) {
             connectorKind,
             readOnly: declaredReadOnly,
           });
+          // browser_act carries no URL: it is judged by the site the page is on right now, so a
+          // redirect or a clicked link that landed elsewhere is caught. If the page cannot be
+          // read, the action does not run.
+          let pageOrigin: string | undefined;
+          if (name === "browser_act" && pageBrowserAllowed) {
+            const page = await browser
+              .snapshot(computer, { signal: context.signal }, context)
+              .catch(() => {
+                context.signal.throwIfAborted();
+                return undefined;
+              });
+            if (!page || page.error || page.fallback) {
+              return {
+                ok: false,
+                error: "The current page could not be read, so nothing was done.",
+              };
+            }
+            const current = normalizedHttpUrl(page.url);
+            pageOrigin = current ? new URL(current).origin : undefined;
+          }
           const fetchUrl =
-            name === "web_fetch" ? normalizedHttpUrl(String(args.url ?? "")) : undefined;
+            name === "web_fetch" || name === "browser_navigate"
+              ? normalizedHttpUrl(String(args.url ?? ""))
+              : pageOrigin;
           const fetchSite = fetchUrl ? urlSite(fetchUrl) : undefined;
           if (name === "web_fetch" && !fetchSite) return { error: "url must be an http(s) URL" };
           if (fetchUrl && fetchUrl.length > MAX_FETCH_URL_LENGTH)
@@ -4986,7 +5008,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 data: { status: "denied" },
               });
             }
-            return { error: `Fetching ${fetchSite} needs approval, and a webhook run cannot ask.` };
+            return {
+              error: `${name === "web_fetch" ? "Fetching" : "Opening"} ${fetchSite} needs approval, and a webhook run cannot ask.`,
+            };
           }
 
           const needsApproval = gateDecision === "ask";

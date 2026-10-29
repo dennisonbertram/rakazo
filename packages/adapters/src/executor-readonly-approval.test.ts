@@ -31,6 +31,7 @@ import { ChatSdkMessagingSurface } from "./chat-sdk-surface.js";
 import { ConnectorRegistry } from "./composio-connector.js";
 import { ComposioEmulator } from "./composio-emulator.js";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
+import type * as ComputerWorkspaceModule from "./computer-workspace.js";
 import { DestinationEmulator } from "./destination-emulator.js";
 import {
   createRunExecutor,
@@ -41,6 +42,7 @@ import {
   MEETING_TAINT_FREE_TOOLS,
   withExternalBotPrompt,
 } from "./executor.js";
+import { FakeBrowserProvider } from "./fake-browser.js";
 import { FakeWebProvider } from "./fake-web.js";
 import { fakeMercury, fakeMercuryMcpFetch } from "./finance-fake-tools.js";
 import type * as InboxTriageModule from "./inbox-triage.js";
@@ -50,10 +52,15 @@ import { createEmulatedPhotonPlatform, PhotonEmulator } from "./photon-emulator.
 import { PipedreamConnector } from "./pipedream-connector.js";
 import { ThirdPartyConnectorEmulator } from "./third-party-connector-emulator.js";
 
+vi.mock("./computer-workspace.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof ComputerWorkspaceModule>()),
+  checkpointRunComputerWorkspace: async () => undefined,
+}));
+const computerKind = vi.hoisted(() => ({ value: "desktop" }));
 vi.mock("./computer-lifecycle.js", async (importOriginal) => ({
   ...(await importOriginal<typeof ComputerLifecycleModule>()),
   acquireComputerExecutionLease: async () => null,
-  provisionComputer: async () => ({ id: "computer-1", kind: "desktop" }),
+  provisionComputer: async () => ({ id: "computer-1", kind: computerKind.value }),
 }));
 
 /** What the Inbox's consent check reports; by default mail may be read. */
@@ -205,9 +212,12 @@ function fixture({
   availableTools,
   executeToolName = "demo_execute_tool",
   parallel = false,
+  pageBrowser,
 }: {
   /** The model's calls arrive together, as the pi runtime runs them. */
   parallel?: boolean;
+  /** Turns the page browser on, backed by this fake. */
+  pageBrowser?: FakeBrowserProvider;
   /** The catalog wrapper the model calls when `catalog` is set. */
   executeToolName?: string;
   /** A bot_message run started by bot `peer-1`: whether that bot is in the run's space and user, and whether the bot is its server's agent. */
@@ -569,7 +579,7 @@ function fixture({
     spaceBackupModel: {
       findMany: vi.fn(async () => [{ provider: "openrouter", modelId: "backup/model" }]),
     },
-    taughtSkill: { findMany: vi.fn(async () => []) },
+    taughtSkill: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
     agentSecret: { findMany: vi.fn(async () => []) },
     botSecret: { findMany: vi.fn(async () => []) },
     agentSkill: { findMany: vi.fn(async () => skillRows) },
@@ -678,7 +688,8 @@ function fixture({
         catalog ? resolveCatalogCall(call, catalogEntries([tool])) : undefined,
       execute,
     },
-    sandbox: { describe: () => ({ capabilities: { graphical: false } }) },
+    sandbox: { describe: () => ({ capabilities: { graphical: pageBrowser !== undefined } }) },
+    ...(pageBrowser ? { browser: pageBrowser } : {}),
     memory: {
       read: async (request: { scope: string; path?: string }) => {
         const documents =
@@ -4790,6 +4801,146 @@ describe("outbound destinations", () => {
     expect(reviewMock).not.toHaveBeenCalled();
     expect(f.execute).toHaveBeenCalledTimes(2);
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+});
+
+describe("browser site gate", () => {
+  beforeEach(() => {
+    computerKind.value = "container";
+  });
+  afterEach(() => {
+    computerKind.value = "desktop";
+  });
+
+  const nav = (url: string, executionId = "call-1") => ({
+    name: "browser_navigate",
+    args: { url },
+    executionId,
+  });
+  const act = {
+    name: "browser_act",
+    args: { actions: [{ kind: "click", ref: "e1" }] },
+    executionId: "call-1",
+  };
+  const page = (url: string) => ({ url, title: "", tree: "", elements: [] });
+  const setup = (options: Parameters<typeof fixture>[0] = {}) => {
+    const pageBrowser = new FakeBrowserProvider({
+      pages: {
+        "https://example.com/": { title: "Home", html: "<html><title>Home</title></html>" },
+        "https://attacker.test/": { title: "X", html: "<html><title>X</title></html>" },
+      },
+    });
+    const navigate = vi.spyOn(pageBrowser, "navigate");
+    const actSpy = vi.spyOn(pageBrowser, "act");
+    return {
+      f: fixture({ builtin: true, pageBrowser, ...options }),
+      pageBrowser,
+      navigate,
+      actSpy,
+    };
+  };
+  const pausedCard = (f: ReturnType<typeof fixture>) =>
+    (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: Array<Record<string, unknown>> }][]
+    )[0]?.[0].blocks[0];
+
+  it("opens a site the owner named", async () => {
+    const { f, navigate } = setup({ sourceText: "Open https://example.com" });
+    f.setCalls([nav("https://example.com/")]);
+    await f.run();
+    expect(navigate).toHaveBeenCalledOnce();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("asks before opening a new site, with Always allow for that site", async () => {
+    const { f, navigate } = setup();
+    f.setCalls([nav("https://attacker.test/")]);
+    await f.run();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+    expect(pausedCard(f)).toMatchObject({
+      site: "attacker.test",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always", label: "Always allow attacker.test" },
+        { id: "deny", label: "Deny" },
+      ],
+    });
+    expect(f.effects[0]).toMatchObject({
+      kind: "browser_navigate",
+      request: { url: "https://attacker.test/" },
+    });
+  });
+
+  it("holds a new site for the owner in an unattended run", async () => {
+    const { f, navigate } = setup({ trigger: "routine", unattended: true });
+    f.setCalls([nav("https://attacker.test/")]);
+    await f.run();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+  });
+
+  it("refuses a new site in a webhook run", async () => {
+    const { f, navigate } = setup({ trigger: "webhook" });
+    f.setCalls([nav("https://attacker.test/")]);
+    await f.run();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({
+      error: "Opening attacker.test needs approval, and a webhook run cannot ask.",
+    });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("opens a site that has a rule saved from web_fetch", async () => {
+    const { f, navigate } = setup({
+      rules: [{ effect: "always_allow", matchKind: "site", matchValue: "example.com" }],
+    });
+    f.setCalls([nav("https://example.com/")]);
+    await f.run();
+    expect(navigate).toHaveBeenCalledOnce();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("asks before acting when the page is now on a new site", async () => {
+    const { f, pageBrowser, actSpy } = setup();
+    vi.spyOn(pageBrowser, "snapshot").mockResolvedValue(page("https://attacker.test/landing?x=1"));
+    f.setCalls([act]);
+    await f.run();
+    expect(actSpy).not.toHaveBeenCalled();
+    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+    expect(pausedCard(f)).toMatchObject({ site: "attacker.test" });
+    expect(f.effects[0]).toMatchObject({
+      kind: "browser_act",
+      request: { url: "https://attacker.test" },
+    });
+  });
+
+  it("holds an action on a new site for the owner in an unattended run", async () => {
+    const { f, pageBrowser, actSpy } = setup({ trigger: "routine", unattended: true });
+    vi.spyOn(pageBrowser, "snapshot").mockResolvedValue(page("https://attacker.test/"));
+    f.setCalls([act]);
+    await f.run();
+    expect(actSpy).not.toHaveBeenCalled();
+    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+  });
+
+  it("acts on a page whose site is allowed", async () => {
+    const { f, pageBrowser, actSpy } = setup({
+      rules: [{ effect: "always_allow", matchKind: "site", matchValue: "example.com" }],
+    });
+    vi.spyOn(pageBrowser, "snapshot").mockResolvedValue(page("https://www.example.com/a"));
+    f.setCalls([act]);
+    await f.run();
+    expect(actSpy).toHaveBeenCalledOnce();
+  });
+
+  it("does not act when the current page cannot be read", async () => {
+    const { f, pageBrowser, actSpy } = setup();
+    pageBrowser.snapshotError = new Error("gone");
+    f.setCalls([act]);
+    await f.run();
+    expect(actSpy).not.toHaveBeenCalled();
+    expect(f.results[0]).toMatchObject({ ok: false });
   });
 });
 
