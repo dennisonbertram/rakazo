@@ -70,6 +70,10 @@ struct DataRoomItemScreen: View {
       }
     }
     .quickLookPreview($preview)
+    .onDisappear {
+      if let preview { DataRoomFiles.discard(preview) }
+      preview = nil
+    }
     .confirmationDialog("Delete this file?", isPresented: $confirmDelete, titleVisibility: .visible) {
       Button("Delete", role: .destructive) { Task { await delete() } }
     }
