@@ -45,7 +45,12 @@ final class ThreadModel {
   private var readHeld = false
   private var markingRead = false
 
-  init(target: ThreadTarget) { self.target = target }
+  let composer: ComposerModel
+
+  init(target: ThreadTarget) {
+    self.target = target
+    composer = ComposerModel(target: target)
+  }
 
   var snapshot: ThreadSnapshot? { state.value }
 
@@ -205,16 +210,22 @@ final class ThreadModel {
     await refresh(app)
   }
 
-  /// Archives the agent; true when it worked so the screen can return to Home.
+  /// Archives the agent, returns to Home and offers Undo; true when it worked.
   func archive(_ app: AppModel) async -> Bool {
     guard case .bot(let id) = target else { return false }
-    struct Input: Encodable, Sendable { var botId: String }
     do {
-      let _: JSONValue = try await app.call("bots/archive", input: Input(botId: id))
+      try await ManageClient.archive(.bot(id), name: title, app: app) {
+        NotificationCenter.default.post(name: .agentsChanged, object: nil)
+      }
       return true
     } catch {
       archiveError = error.localizedDescription
       return false
     }
   }
+}
+
+extension Notification.Name {
+  /// Posted when an agent is archived or restored from a thread, so Home reloads its list.
+  static let agentsChanged = Notification.Name("praci.agentsChanged")
 }

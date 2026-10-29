@@ -40,7 +40,7 @@ func restoresForIdempotentRetry() throws {
   defer { disk.clear() }
   var original = attempt()
   #expect(try disk.admit(&original))
-  disk.save([original])
+  try disk.save([original])
   try Data("orphan".utf8).write(to: file(disk, "delivered-0"))
   var restored = try #require(disk.load(session: 2, scope: scope).first)
   #expect(restored.state == .queued)
@@ -65,17 +65,19 @@ func restoresForIdempotentRetry() throws {
     OutboxScope(apiBase: scope.apiBase, userID: "user-a", cacheSession: "namespace-b", spaceID: "space-a"),
   ]
 )
-func rejectsDifferentOwner(other: OutboxScope) {
+func rejectsDifferentOwner(other: OutboxScope) throws {
   let disk = tempDisk()
   defer { disk.clear() }
-  disk.save([attempt()])
+  try disk.save([attempt()])
   #expect(disk.load(session: 2, scope: other).isEmpty)
 }
 
-@Test("caps the persisted count and wipes every entry")
-func capsCountAndWipes() {
+@Test("saves up to the entry limit, refuses more, and wipes every entry")
+func capsCountAndWipes() throws {
   let disk = tempDisk()
-  disk.save((0 ..< (OutboxLimits.maxEntries + 5)).map { attempt("nonce-\($0)") })
+  let all = (0 ..< (OutboxLimits.maxEntries + 1)).map { attempt("nonce-\($0)") }
+  #expect(throws: OutboxError.storageUnavailable) { try disk.save(all) }
+  try disk.save(Array(all.prefix(OutboxLimits.maxEntries)))
   #expect(disk.load(session: 2, scope: scope).count == OutboxLimits.maxEntries)
   disk.clear()
   #expect(!FileManager.default.fileExists(atPath: disk.root.path))
@@ -132,7 +134,7 @@ func hydrateMissingAttachment() throws {
 func pendingStoredAsQueued() throws {
   let disk = tempDisk()
   defer { disk.clear() }
-  disk.save([attempt()])
+  try disk.save([attempt()])
   let text = try String(contentsOf: file(disk, "sends-v4.json"), encoding: .utf8)
   #expect(text.contains("\"queued\""))
   #expect(!text.contains("pending"))
@@ -156,4 +158,32 @@ func classifiesFailures(status: Int?, unreachable: Bool, state: SendState, pause
     SendOutcome.classify(status: status, unreachable: unreachable)
       == SendOutcome(state: state, pausesQueue: pauses)
   )
+}
+
+@Test("save throws when the metadata file cannot be written")
+func saveThrowsOnWriteFailure() throws {
+  let disk = tempDisk()
+  defer { disk.clear() }
+  try FileManager.default.createDirectory(
+    at: file(disk, "sends-v4.json"), withIntermediateDirectories: true)
+  #expect(throws: OutboxError.storageUnavailable) { try disk.save([attempt()]) }
+}
+
+@Test("moves outbox scope folders from the old caches location once")
+func migratesFromCaches() throws {
+  let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+  defer { try? FileManager.default.removeItem(at: base) }
+  let old = base.appendingPathComponent("caches/outbox")
+  let legacy = OutboxDisk(directory: old.appendingPathComponent("scope-1"))
+  var item = attempt()
+  #expect(try legacy.admit(&item))
+  try legacy.save([item])
+  let root = OutboxDisk.standardRoot(
+    support: base.appendingPathComponent("support"), legacy: old)
+  #expect(root.path.hasSuffix("support/outbox"))
+  #expect(!FileManager.default.fileExists(atPath: old.path))
+  let moved = OutboxDisk(directory: root.appendingPathComponent("scope-1"))
+  #expect(moved.load(session: 1, scope: scope).map(\.clientNonce) == ["nonce-a"])
+  let values = try root.resourceValues(forKeys: [.isExcludedFromBackupKey])
+  #expect(values.isExcludedFromBackup == true)
 }

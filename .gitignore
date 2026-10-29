@@ -58,3 +58,5 @@ playwright-report-www
 .demo
 .demo-credentials.local
 .env*
+# SwiftPM resolutions for the iOS packages are local build output.
+apps/ios/Packages/*/Package.resolved

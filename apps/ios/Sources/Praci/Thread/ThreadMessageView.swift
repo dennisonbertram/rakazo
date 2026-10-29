@@ -5,6 +5,7 @@ import SwiftUI
 struct ThreadMessageView: View {
   let message: ThreadMessage
   let model: ThreadModel
+  var reactions: [ReactionCount] = []
   /// The sender's name and avatar are drawn only in group threads, on a sender's first message.
   let showsSender: Bool
   let showsTime: Bool
@@ -29,6 +30,7 @@ struct ThreadMessageView: View {
       ForEach(Array(message.blocks.enumerated()), id: \.offset) { _, block in
         blockView(block)
       }
+      if !reactions.isEmpty { reactionRow }
       if showsTime, !message.createdAt.isEmpty, isStoredMessage(id: message.id) {
         Text(rowTimestamp(message.createdAt)).font(.caption).monospacedDigit()
           .foregroundStyle(Color.token(.mutedForeground))
@@ -44,6 +46,20 @@ struct ThreadMessageView: View {
       }
     }
     .accessibilityIdentifier("threadMessage")
+  }
+
+  private var reactionRow: some View {
+    HStack(spacing: 4) {
+      ForEach(reactions, id: \.emoji) { reaction in
+        Text(reaction.count > 1 ? "\(reaction.emoji) \(reaction.count)" : reaction.emoji)
+          .font(.caption)
+          .padding(.horizontal, 8).padding(.vertical, 2)
+          .background(Color.token(.muted), in: Capsule())
+          .overlay(Capsule().stroke(Color.token(.border)))
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("messageReactions")
   }
 
   // One case per block kind.
