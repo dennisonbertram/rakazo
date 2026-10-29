@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
@@ -31,7 +31,8 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
-import { installSessionPermissions } from "./session-permissions.js";
+import { createBluetoothPicker } from "./bluetooth-picker.js";
+import { installSessionPermissions, isAppWebContents } from "./session-permissions.js";
 import {
   DEFAULT_LOCAL_WEB_URL,
   desktopStackImageTag,
@@ -122,6 +123,50 @@ function permissionTarget() {
   if (mainWindow === null || mainWindow.isDestroyed()) return null;
   const url = appWindowTargets.get(mainWindow);
   return url === undefined ? null : { webContents: mainWindow.webContents, url };
+}
+
+function installBluetooth(win: BrowserWindow) {
+  const file = path.join(app.getPath("userData"), "bluetooth-device.json");
+  const picker = createBluetoothPicker({
+    readSaved: () => {
+      try {
+        const id = JSON.parse(readFileSync(file, "utf8")).deviceId;
+        return typeof id === "string" ? id : null;
+      } catch {
+        return null;
+      }
+    },
+    writeSaved: (deviceId) => {
+      try {
+        writeFileSync(file, JSON.stringify({ deviceId }));
+      } catch {
+        // Not remembering the device only means the chooser shows again.
+      }
+    },
+    choose: async (names) => {
+      const { response } = await dialog.showMessageBox(win, {
+        message: "Choose a device",
+        buttons: [...names, "Cancel"],
+        cancelId: names.length,
+      });
+      return response < names.length ? response : -1;
+    },
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: (timer) => clearTimeout(timer as NodeJS.Timeout),
+  });
+  win.webContents.on("select-bluetooth-device", (event, devices, callback) => {
+    event.preventDefault();
+    if (!isAppWebContents(win.webContents, permissionTarget)) callback("");
+    else picker.select(devices, callback);
+  });
+  win.once("closed", () => picker.cancel());
+  win.webContents.session.setBluetoothPairingHandler((details, callback) => {
+    if (details.pairingKind !== "confirm" || !isAppWebContents(win.webContents, permissionTarget)) {
+      callback({ confirmed: false });
+      return;
+    }
+    void picker.confirmPairing(details.deviceId).then((confirmed) => callback({ confirmed }));
+  });
 }
 
 function markOnce(name: string) {
@@ -260,6 +305,7 @@ function createWindow(url: string, partition: string | null) {
   });
   mainWindow = win;
   appWindowTargets.set(win, url);
+  installBluetooth(win);
   const targetOrigin = safeOrigin(url);
   // Intentional OAuth flows open the provider's authorize page via a named
   // window; give those and same-origin popups a normal frame. Everything else
