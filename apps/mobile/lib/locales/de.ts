@@ -992,4 +992,13 @@ export const DE_MESSAGES: Record<string, string> = {
   "Paused: the page could not be checked": "Pausiert: Die Seite konnte nicht geprüft werden",
   "Paused: too many checks today": "Pausiert: heute zu viele Prüfungen",
   Watches: "Überwacht",
+  "Allow cross-space bot communication": "Space-übergreifende Bot-Kommunikation erlauben",
+  "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.":
+    "Das KI-Konto hat kein Guthaben mehr. Lade Guthaben bei deinem Anbieter auf oder verwende in Einstellungen > Modelle einen anderen Schlüssel.",
+  "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models.":
+    "Der KI-Schlüssel hat sein Ausgabenlimit erreicht. Es wird {resetsOn} zurückgesetzt. Erhöhe das Limit bei deinem Anbieter oder verwende in Einstellungen > Modelle einen anderen Schlüssel.",
+  "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models.":
+    "Der KI-Schlüssel hat sein Ausgabenlimit erreicht. Erhöhe das Limit bei deinem Anbieter oder verwende in Einstellungen > Modelle einen anderen Schlüssel.",
+  "The model provider is rate limiting requests. Try again in a few minutes.":
+    "Der Modellanbieter begrenzt die Anfragen. Versuche es in ein paar Minuten erneut.",
 };

@@ -994,4 +994,14 @@ export const RU_MESSAGES: Record<string, string> = {
   "Paused: the page could not be checked": "Приостановлено: не удалось проверить страницу",
   "Paused: too many checks today": "Приостановлено: сегодня слишком много проверок",
   Watches: "Следит за",
+  "Allow cross-space bot communication":
+    "Разрешить обмен сообщениями между ботами из разных пространств",
+  "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.":
+    "На аккаунте ИИ закончились кредиты. Пополните баланс у провайдера или используйте другой ключ в разделе Настройки > Модели.",
+  "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models.":
+    "Ключ ИИ достиг лимита расходов. Лимит сбросится {resetsOn}. Увеличьте лимит у провайдера или используйте другой ключ в разделе Настройки > Модели.",
+  "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models.":
+    "Ключ ИИ достиг лимита расходов. Увеличьте лимит у провайдера или используйте другой ключ в разделе Настройки > Модели.",
+  "The model provider is rate limiting requests. Try again in a few minutes.":
+    "Провайдер модели ограничивает частоту запросов. Повторите попытку через несколько минут.",
 };
