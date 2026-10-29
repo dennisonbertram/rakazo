@@ -4,12 +4,17 @@ import RakazoCore
 final class FakeStorage: SessionStorage, @unchecked Sendable {
   var session: StoredSession?
   var cleared = false
+  var failWrites = false
 
   init(session: StoredSession? = nil) { self.session = session }
 
   func load() throws -> StoredSession? { session }
-  func save(_ session: StoredSession) throws { self.session = session }
+  func save(_ session: StoredSession) throws {
+    if failWrites { throw AuthClientError.storageFailure }
+    self.session = session
+  }
   func clear() throws {
+    if failWrites { throw AuthClientError.storageFailure }
     cleared = true
     session = nil
   }

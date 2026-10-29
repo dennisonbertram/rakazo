@@ -69,6 +69,9 @@ final class AuthenticationModel {
     await sync()
   }
 
+  /// Shows a message on the sign-in screen, such as after the account was deleted.
+  func showNotice(_ text: String) { notice = text }
+
   func navigate(to page: Page) {
     guard !busy else { return }
     self.page = page

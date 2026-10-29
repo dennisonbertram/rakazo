@@ -15,6 +15,7 @@ struct RootView: View {
       if !signedIn { app.reset() }
     }
     .onChange(of: app.authentication.endpoint) { _, _ in app.reloadSpace() }
+    .consentSheet(app.consent)
     .onOpenURL { app.open($0) }
   }
 }

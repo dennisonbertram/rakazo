@@ -70,7 +70,7 @@ struct BotAvatarView: View {
 }
 
 extension Color {
-  fileprivate init(hex: String) {
+  init(hex: String) {
     var digits = String(hex.dropFirst())
     if digits.count == 3 { digits = digits.map { "\($0)\($0)" }.joined() }
     let value = UInt32(digits, radix: 16) ?? 0

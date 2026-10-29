@@ -8,6 +8,11 @@ final class AppModel {
   let authentication: AuthenticationModel
   var path: [Route] = []
   var showingSettings = false
+  /// Asks for AI data consent. Before any request that sends data to an AI provider (sending a
+  /// thread message, running a cleanup, and so on), call
+  /// `try await app.consent.ensure(procedure: "<rpc name>", app: app)`; it returns at once when
+  /// consent exists, shows the consent sheet otherwise, and throws if the user declines.
+  let consent = ConsentPrompter()
   var spaceID: String? {
     didSet { defaults.set(spaceID, forKey: spaceKey) }
   }
