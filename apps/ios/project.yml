@@ -47,6 +47,8 @@ targets:
           - CFBundleURLSchemes:
               - rakazo
         NSLocalNetworkUsageDescription: Connect to your Praci server on your local network.
+        NSMicrophoneUsageDescription: Talk to your agent.
+        NSSpeechRecognitionUsageDescription: Turn your speech into messages.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
   PraciTests:
@@ -54,9 +56,15 @@ targets:
     platform: iOS
     sources:
       - Tests/PraciTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.rakazo.app.tests
     dependencies:
       - target: Praci
       - package: RakazoCore
+      - package: RakazoAPI
 schemes:
   Praci:
     build:
