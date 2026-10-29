@@ -19,6 +19,14 @@ function httpOrigin(value: string | undefined): string | null {
   }
 }
 
+/** True when the contents is the app's own window showing the app's own origin. */
+export function isAppWebContents(contents: WebContents, getApp: () => AppPermissionTarget | null) {
+  const app = getApp();
+  if (!app || contents !== app.webContents || contents.isDestroyed()) return false;
+  const origin = httpOrigin(app.url);
+  return origin !== null && httpOrigin(contents.getURL()) === origin;
+}
+
 /** Install before loading any content, including setup, storage probes and OAuth popups. */
 export function installSessionPermissions(
   targetSession: Session,
