@@ -1926,6 +1926,8 @@ model NotificationEndpoint {
   address   String
   deviceId  String
   sessionId String?
+  /// Which push service the address belongs to: "expo" or "apns". Only used by the push channel.
+  platform  String   @default("expo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
