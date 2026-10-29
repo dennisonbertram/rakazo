@@ -86031,6 +86031,9 @@
                           "connectionLabel": {
                             "type": "string"
                           },
+                          "botName": {
+                            "type": "string"
+                          },
                           "createdAt": {
                             "type": "string"
                           }
