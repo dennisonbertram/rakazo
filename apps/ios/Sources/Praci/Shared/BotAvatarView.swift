@@ -38,7 +38,7 @@ struct BotAvatarView: View {
   }
 
   private func initialText(_ style: Color) -> some View {
-    Text(String(name.prefix(1)).uppercased())
+    Text(BotAvatar.initial(of: name))
       .font(.system(size: size * 0.45, weight: .semibold))
       .foregroundStyle(style)
       .frame(width: size, height: size)

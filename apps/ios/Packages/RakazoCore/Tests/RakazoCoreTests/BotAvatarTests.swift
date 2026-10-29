@@ -3,6 +3,15 @@ import Testing
 @testable import RakazoCore
 
 @Suite struct BotAvatarTests {
+  @Test func initialSkipsPunctuationAndParentheses() {
+    #expect(BotAvatar.initial(of: "[MOCK] Notice of Stockholder Action") == "M")
+    #expect(BotAvatar.initial(of: "(Draft) legal") == "L")
+    #expect(BotAvatar.initial(of: "  - 2fa helper") == "2")
+    #expect(BotAvatar.initial(of: "élan") == "É")
+    #expect(BotAvatar.initial(of: "[] !!") == "?")
+    #expect(BotAvatar.initial(of: "") == "?")
+  }
+
   // packages/contracts/src/bot-avatar.test.ts
   @Test func parsesHexEncodedShapesAndDataImages() {
     #expect(BotAvatar.parse("#8B5CF6") == .color("#8B5CF6"))

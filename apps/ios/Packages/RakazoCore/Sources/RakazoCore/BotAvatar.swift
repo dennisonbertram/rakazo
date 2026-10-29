@@ -34,6 +34,14 @@ public enum BotAvatar {
     return .other(raw)
   }
 
+  /// One uppercase letter or digit for a name: parenthesised text and leading punctuation or
+  /// symbols are skipped (as in the web `initials()`); "?" when the name has none.
+  public static func initial(of name: String) -> String {
+    let visible = name.replacingOccurrences(of: #"\([^)]*\)"#, with: " ", options: .regularExpression)
+    guard let first = visible.first(where: { $0.isLetter || $0.isNumber }) else { return "?" }
+    return String(first).uppercased()
+  }
+
   /// The stored value after picking a colour: a shape is kept, an uploaded image is not overwritten.
   public static func recolor(_ current: String, to color: String) -> String {
     switch parse(current) {

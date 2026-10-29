@@ -172,7 +172,7 @@ func errorFrameWithStatus401EndsTheStreamAsUnauthorized() async throws {
     Data(
       #"event: error\#ndata: {"json":{"defined":false,"code":"UNAUTHORIZED","status":401,"message":"x"}}\#n\#n"#
         .utf8))
-  await settle()
+  await eventually { await collector.finished }
   #expect(await collector.finished)
   #expect((await collector.error as? RPCError) == .unauthorized)
   #expect(await harness.recorder.resyncs == 0)
@@ -184,7 +184,7 @@ func http401OnOpenEndsTheStreamAsUnauthorized() async throws {
   let harness = try await Harness()
   await harness.transport.enqueue(.status(401))
   let collector = harness.collect()
-  await settle()
+  await eventually { await collector.finished }
   #expect((await collector.error as? RPCError) == .unauthorized)
 }
 

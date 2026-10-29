@@ -88,6 +88,15 @@ actor FakeStreamTransport: StreamTransport {
   }
 }
 
+/// Polls until `condition` holds (up to 10 s of real time). Use instead of `settle()` when the
+/// test waits for something that must happen, so a loaded machine only makes it slower.
+func eventually(_ condition: () async -> Bool) async {
+  for _ in 0..<2000 {
+    if await condition() { return }
+    try? await Task.sleep(for: .milliseconds(5))
+  }
+}
+
 actor Recorder {
   var resyncs = 0
   func resync() { resyncs += 1 }
