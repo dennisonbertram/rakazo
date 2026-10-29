@@ -23,6 +23,15 @@ func decodesBootstrap() throws {
 }
 
 @Test
+func rosterRowsCarryTheStoredAvatarValue() throws {
+  let b = try decode(Bootstrap.self, "home-bootstrap")
+  let roster = Roster(bots: b.bots, groups: b.groups, sections: b.botSections)
+  let rows = roster.pinned + roster.agents + roster.sections.flatMap(\.rows)
+  #expect(rows.compactMap(\.color).contains("#3EC5A8"))
+  #expect(b.bots.first?.color == "#3EC5A8")
+}
+
+@Test
 func decodesNoModelMe() throws {
   let me = try decode(Me.self, "home-me-no-model")
   #expect(me.needsModel)

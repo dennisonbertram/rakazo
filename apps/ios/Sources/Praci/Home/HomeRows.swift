@@ -3,22 +3,32 @@ import SwiftUI
 
 struct AgentRowView: View {
   let row: RosterRow
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   var body: some View {
     HStack(spacing: 12) {
-      BotAvatarView(name: row.name, avatar: nil, size: 40)
+      BotAvatarView(name: row.name, avatar: row.color, size: 40)
       VStack(alignment: .leading, spacing: 2) {
-        HStack {
-          Text(row.name).font(.headline).lineLimit(1)
-          Spacer(minLength: 8)
-          if row.unread {
-            Circle().fill(Color.token(.primary)).frame(width: 8, height: 8)
-              .accessibilityLabel("Unread")
+        let stamp = Text(rowTimestamp(row.updatedAt)).font(.subheadline)
+          .foregroundStyle(Color.token(.mutedForeground))
+        let dot = Circle().fill(Color.token(.primary)).frame(width: 8, height: 8)
+          .accessibilityLabel("Unread")
+        if dynamicTypeSize.isAccessibilitySize {
+          // Large text: name gets the full width, time sits on its own line.
+          HStack(alignment: .firstTextBaseline) {
+            if row.unread { dot }
+            Text(row.name).font(.headline).lineLimit(2)
           }
-          Text(rowTimestamp(row.updatedAt)).font(.subheadline)
-            .foregroundStyle(Color.token(.mutedForeground))
+          stamp
+        } else {
+          HStack {
+            Text(row.name).font(.headline).lineLimit(1)
+            Spacer(minLength: 8)
+            if row.unread { dot }
+            stamp
+          }
         }
-        Text(subtitle).font(.subheadline).lineLimit(1)
+        Text(subtitle).font(.subheadline).lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
           .foregroundStyle(Color.token(.mutedForeground))
       }
     }

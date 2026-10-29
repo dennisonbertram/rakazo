@@ -21,7 +21,7 @@ struct BotAvatarView: View {
     case .shape(let color, let index, let eyeColor):
       shape(color: color, index: index, eyeColor: eyeColor)
     case .color(let color):
-      initial.background(Color(hex: color), in: Circle())
+      initialText(.white).background(Color(hex: color), in: Circle())
     case .image(let url):
       if let image = Self.image(from: url) {
         Image(uiImage: image).resizable().scaledToFill().clipShape(Circle())
@@ -34,11 +34,14 @@ struct BotAvatarView: View {
   }
 
   private var initial: some View {
+    initialText(Color.token(.foreground)).background(Color.token(.muted), in: Circle())
+  }
+
+  private func initialText(_ style: Color) -> some View {
     Text(String(name.prefix(1)).uppercased())
       .font(.system(size: size * 0.45, weight: .semibold))
-      .foregroundStyle(Color.token(.foreground))
+      .foregroundStyle(style)
       .frame(width: size, height: size)
-      .background(Color.token(.muted), in: Circle())
   }
 
   private func shape(color: String, index: Int, eyeColor: String) -> some View {

@@ -1,3 +1,4 @@
+import RakazoUI
 import SwiftUI
 
 @main
@@ -9,6 +10,7 @@ struct PraciApp: App {
     WindowGroup {
       RootView()
         .environment(app)
+        .tint(Color.token(.primary))
         .task { await app.authentication.start() }
         .onChange(of: scenePhase) { _, phase in
           if phase == .active {
