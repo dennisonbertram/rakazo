@@ -169,6 +169,12 @@ public enum AccountDeletionProof: Sendable, Equatable {
   case emailedCode(String)
 }
 
+/// Deleting an account succeeds on the server first; clearing this device can still fail.
+public enum AccountDeletionOutcome: Sendable, Equatable {
+  case deleted
+  case deletedLocalCleanupFailed
+}
+
 /// A refusal from the account endpoints, with the server's own message when it gave one.
 public struct AccountRequestError: Error, Sendable, Equatable, LocalizedError {
   public let status: Int
@@ -196,6 +202,10 @@ public actor AuthClient {
   private var sessionEnded = false
   private var cachedCapabilities: AuthCapabilities?
   private var activeSSOAttempt: UUID?
+  /// True while a change-password request is in flight. The server revokes the old session
+  /// before it answers, so a 401 for the old token in that window is expected and must not
+  /// end the session the reply is about to replace.
+  private var passwordChangeInFlight = false
 
   public init(
     endpoint: URL,
@@ -245,6 +255,7 @@ public actor AuthClient {
   {
     guard requestGeneration == generation else { return .stale }
     if hadSpace { return .spaceRejected }
+    if passwordChangeInFlight { return .stale }
     // Storage failures here still end the in-memory session; the next restore re-checks it.
     try? invalidateSession(endpoint)
     return .unauthorized
@@ -522,16 +533,15 @@ public actor AuthClient {
   public func changePassword(current: String, new: String) async throws {
     guard !current.isEmpty else { throw AuthClientError.invalidPassword }
     guard new.utf16.count >= 8 else { throw AuthClientError.invalidPassword }
+    guard !passwordChangeInFlight else { throw AuthClientError.staleRequest }
     let operationGeneration = generation
     let currentEndpoint = try validatedEndpoint()
     let response = try await sendSigned(
       path: "/api/auth/change-password",
       method: "POST",
-      payload: ["currentPassword": current, "newPassword": new, "revokeOtherSessions": true]
+      payload: ["currentPassword": current, "newPassword": new, "revokeOtherSessions": true],
+      replacingSession: true
     )
-    guard endpoint == currentEndpoint, generation == operationGeneration else {
-      throw AuthClientError.staleRequest
-    }
     guard (200..<300).contains(response.statusCode) else { throw accountError(response) }
     guard let token = tokenFromAuthResponse(response: response, body: jsonObject(response.body)),
       !token.isEmpty
@@ -550,10 +560,11 @@ public actor AuthClient {
     guard (200..<300).contains(response.statusCode) else { throw accountError(response) }
   }
 
-  /// Deletes the account on the server, then forgets the session on this device.
-  public func deleteAccount(_ proof: AccountDeletionProof) async throws {
+  /// Deletes the account on the server, then forgets the session on this device. A failure to
+  /// clear this device after the server succeeded is reported as an outcome, not thrown.
+  @discardableResult
+  public func deleteAccount(_ proof: AccountDeletionProof) async throws -> AccountDeletionOutcome {
     let currentEndpoint = try validatedEndpoint()
-    let operationGeneration = generation
     let payload: [String: Any]
     switch proof {
     case .password(let password):
@@ -566,32 +577,49 @@ public actor AuthClient {
     }
     let response = try await sendSigned(
       path: "/api/auth/delete-user", method: "POST", payload: payload)
-    guard endpoint == currentEndpoint, generation == operationGeneration else {
-      throw AuthClientError.staleRequest
-    }
     guard (200..<300).contains(response.statusCode) else { throw accountError(response) }
     token = nil
     activeSSOAttempt = nil
     generation &+= 1
     sessionEnded = false
-    if !wipeStoredSession(endpoint: currentEndpoint) { throw AuthClientError.storageFailure }
+    return wipeStoredSession(endpoint: currentEndpoint) ? .deleted : .deletedLocalCleanupFailed
   }
 
-  private func sendSigned(path: String, method: String, payload: [String: Any]? = nil)
-    async throws -> HTTPResponse
-  {
+  /// Sends a signed account request. The session changing while it was out is a stale request,
+  /// and a 401 means the server rejected this session, which ends it.
+  private func sendSigned(
+    path: String, method: String, payload: [String: Any]? = nil, replacingSession: Bool = false
+  ) async throws -> HTTPResponse {
     guard let token else { throw AuthClientError.unauthorized }
     let currentEndpoint = try validatedEndpoint()
-    return try await send(
-      path: path,
-      endpoint: currentEndpoint,
-      method: method,
-      bearer: token,
-      body: payload.map { try? JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) }
-        ?? nil,
-      headers: payload == nil ? [:] : ["content-type": "application/json"],
-      maximumResponseBytes: Self.authResponseLimit
-    )
+    let requestGeneration = generation
+    if replacingSession { passwordChangeInFlight = true }
+    let response: HTTPResponse
+    do {
+      response = try await send(
+        path: path,
+        endpoint: currentEndpoint,
+        method: method,
+        bearer: token,
+        body: payload.map {
+          try? JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys])
+        } ?? nil,
+        headers: payload == nil ? [:] : ["content-type": "application/json"],
+        maximumResponseBytes: Self.authResponseLimit
+      )
+    } catch {
+      if replacingSession { passwordChangeInFlight = false }
+      throw error
+    }
+    if replacingSession { passwordChangeInFlight = false }
+    guard endpoint == currentEndpoint, generation == requestGeneration else {
+      throw AuthClientError.staleRequest
+    }
+    if response.statusCode == 401 {
+      try? invalidateSession(currentEndpoint)
+      throw AuthClientError.unauthorized
+    }
+    return response
   }
 
   private func accountError(_ response: HTTPResponse) -> AccountRequestError {
@@ -737,6 +765,7 @@ public actor AuthClient {
       throw AuthClientError.staleRequest
     }
     if response.statusCode == 401 {
+      if passwordChangeInFlight { throw AuthClientError.staleRequest }
       try invalidateSession(currentEndpoint)
       throw AuthClientError.unauthorized
     }

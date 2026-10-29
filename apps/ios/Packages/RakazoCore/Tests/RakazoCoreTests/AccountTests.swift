@@ -114,3 +114,92 @@ func accountSecurityReadsTheSignInOptions() async throws {
   #expect(security == AccountSecurity(hasPassword: false, passwordChangeEnabled: true, emailDeletion: true))
   try await client.requestAccountDeletionCode()
 }
+
+/// Holds the change-password response until the test releases it.
+private actor GatedTransport: HTTPTransport {
+  private var responses: [HTTPResponse]
+  private var gate: CheckedContinuation<HTTPResponse, Never>?
+  private var gateWaiter: CheckedContinuation<Void, Never>?
+  init(_ responses: [HTTPResponse]) { self.responses = responses }
+
+  func send(_ request: HTTPRequest, maximumResponseBytes: Int) async throws -> HTTPResponse {
+    if request.url.path == "/api/auth/change-password" {
+      gateWaiter?.resume()
+      gateWaiter = nil
+      return await withCheckedContinuation { gate = $0 }
+    }
+    return responses.isEmpty ? HTTPResponse(statusCode: 500) : responses.removeFirst()
+  }
+
+  func waitUntilHeld() async {
+    if gate != nil { return }
+    await withCheckedContinuation { gateWaiter = $0 }
+  }
+
+  func release(_ response: HTTPResponse) {
+    gate?.resume(returning: response)
+    gate = nil
+  }
+}
+
+@Test
+func anOldTokenRejectionDuringChangePasswordDoesNotDropTheReplacement() async throws {
+  let transport = GatedTransport([sessionOK])
+  let storage = FakeStorage(session: StoredSession(endpoint: testEndpoint, token: "tok-1"))
+  let client = AuthClient(endpoint: testEndpoint, storage: storage, transport: transport)
+  try await client.restore()
+  let generation = (await client.snapshot()).generation
+  let change = Task { try await client.changePassword(current: "old-password", new: "new-password") }
+  await transport.waitUntilHeld()
+  // The server already revoked tok-1, so a concurrent RPC gets 401.
+  _ = await client.handleUnauthorized(generation: generation, hadSpace: false)
+  await transport.release(rpcResponse(#"{"token":"tok-2"}"#))
+  try await change.value
+  #expect((await client.snapshot()).isSignedIn)
+  #expect(storage.session?.token == "tok-2")
+}
+
+@Test
+func signOutDuringChangePasswordStillWins() async throws {
+  let transport = GatedTransport([sessionOK, rpcResponse("{}")])
+  let storage = FakeStorage(session: StoredSession(endpoint: testEndpoint, token: "tok-1"))
+  let client = AuthClient(endpoint: testEndpoint, storage: storage, transport: transport)
+  try await client.restore()
+  let change = Task { try await client.changePassword(current: "old-password", new: "new-password") }
+  await transport.waitUntilHeld()
+  try await client.signOut()
+  await transport.release(rpcResponse(#"{"token":"tok-2"}"#))
+  await #expect(throws: AuthClientError.staleRequest) { try await change.value }
+  #expect(!(await client.snapshot()).isSignedIn)
+  #expect(storage.session == nil)
+}
+
+@Test
+func accountEndpoint401EndsTheSessionInsteadOfBecomingARequestError() async throws {
+  for call in 0..<4 {
+    let transport = FakeTransport([sessionOK, rpcResponse(#"{"message":"Unauthorized"}"#, status: 401)])
+    let storage = FakeStorage()
+    let client = try await signedInClient(transport, storage: storage)
+    await #expect(throws: AuthClientError.unauthorized) {
+      switch call {
+      case 0: _ = try await client.accountSecurity()
+      case 1: try await client.changePassword(current: "old-password", new: "new-password")
+      case 2: try await client.requestAccountDeletionCode()
+      default: _ = try await client.deleteAccount(.password("old-password"))
+      }
+    }
+    #expect(!(await client.snapshot()).isSignedIn)
+    #expect(storage.session == nil)
+  }
+}
+
+@Test
+func deleteAccountReportsLocalCleanupFailureSeparatelyFromServerSuccess() async throws {
+  let transport = FakeTransport([sessionOK, rpcResponse(#"{"success":true}"#)])
+  let storage = FakeStorage()
+  let client = try await signedInClient(transport, storage: storage)
+  storage.failWrites = true
+  let outcome = try await client.deleteAccount(.password("old-password"))
+  #expect(outcome == .deletedLocalCleanupFailed)
+  #expect(!(await client.snapshot()).isSignedIn)
+}
