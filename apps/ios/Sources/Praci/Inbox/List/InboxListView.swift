@@ -8,6 +8,7 @@ struct InboxListView: View {
   let list: InboxList
   let open: (InboxRow) -> Void
   let goToSettings: () -> Void
+  @State private var showCleanup = false
 
   var body: some View {
     let groups = groupInbox(list.rows, now: .now)
@@ -28,6 +29,18 @@ struct InboxListView: View {
       if list.rows.isEmpty { EmptyInbox(model: model, list: list, goToSettings: goToSettings) }
     }
     .accessibilityIdentifier("inboxList")
+    .toolbar {
+      ToolbarItem {
+        Menu {
+          Button { showCleanup = true } label: { Label("Cleanup", systemImage: "checklist") }
+            .accessibilityIdentifier("inboxCleanup")
+        } label: {
+          Label("More", systemImage: "ellipsis")
+        }
+        .accessibilityIdentifier("inboxMore")
+      }
+    }
+    .navigationDestination(isPresented: $showCleanup) { CleanupScreen() }
   }
 
   @ViewBuilder
