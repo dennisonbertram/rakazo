@@ -40,4 +40,22 @@ struct ThreadModelTests {
       messages: [ThreadMessage(id: "m-prev", seq: 12), ThreadMessage(id: "m-user", seq: 14, role: "user")])
     #expect(ThreadModel.merged(fresh, keeping: old).messages.map(\.id) == ["m-prev", "m-user"])
   }
+
+  /// A refresh that was requested before a live event can answer after it. Replacing the
+  /// snapshot would drop that event's message for good; the stream will not resend it.
+  @Test func staleRefreshKeepsMessagesFromNewerEvents() {
+    let live = ThreadSnapshot(
+      threadId: "thread-1", cursor: 9, messages: [
+        ThreadMessage(id: "m-prev", seq: 12),
+        ThreadMessage(id: "m-user", seq: 8, role: "user"),
+        ThreadMessage(id: "m-bot", seq: 9),
+      ])
+    let stale = ThreadSnapshot(
+      threadId: "thread-1", cursor: 5, messages: [ThreadMessage(id: "m-prev", seq: 12)],
+      lastReadSeq: 12)
+    let result = ThreadModel.merged(stale, keeping: live)
+    #expect(result.messages.map(\.id) == ["m-prev", "m-user", "m-bot"])
+    #expect(result.cursor == 9)
+    #expect(result.lastReadSeq == 12)
+  }
 }

@@ -89,9 +89,9 @@ struct ThreadScreen: View {
           nearBottom: geometry.visibleRect.maxY >= geometry.contentSize.height - 48,
           height: geometry.contentSize.height)
       } action: { old, new in
-        if new.height != old.height {
+        if new.height != old.height && atBottom {
           // New content makes the bottom move away; keep following when the reader was there.
-          if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+          proxy.scrollTo(Self.bottomID, anchor: .bottom)
         } else {
           atBottom = new.nearBottom
           if new.nearBottom { Task { await model.markRead(app) } }

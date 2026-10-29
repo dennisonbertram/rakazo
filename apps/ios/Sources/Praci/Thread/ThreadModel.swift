@@ -130,6 +130,12 @@ final class ThreadModel {
 
   /// A refresh replaces the newest page; older pages the reader already loaded stay.
   static func merged(_ fresh: ThreadSnapshot, keeping old: ThreadSnapshot?) -> ThreadSnapshot {
+    // The response is older than events already folded in; keep them, take only the read mark.
+    if let old, old.threadId == fresh.threadId, old.cursor > fresh.cursor {
+      var kept = old
+      kept.lastReadSeq = fresh.lastReadSeq ?? old.lastReadSeq
+      return kept
+    }
     guard let old, old.threadId == fresh.threadId,
       let firstSeq = fresh.messages.first(where: { isStoredMessage(id: $0.id) })?.seq
     else { return fresh }
