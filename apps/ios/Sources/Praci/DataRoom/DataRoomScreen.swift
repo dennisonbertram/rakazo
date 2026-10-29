@@ -22,13 +22,39 @@ struct PickedFile: Transferable {
 }
 
 enum DataRoomFiles {
-  static func copyToTemporary(_ source: URL) throws -> URL {
+  private static var protection: [FileAttributeKey: Any] {
+    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+  }
+
+  /// A fresh, unguessable folder with file protection, so a name from outside never picks the path.
+  static func newTemporaryFolder(prefix: String) throws -> URL {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "dataroom-upload-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    let destination = folder.appendingPathComponent(source.lastPathComponent)
+      "\(prefix)-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: folder, withIntermediateDirectories: true, attributes: protection)
+    return folder
+  }
+
+  /// Keeps only a plain file name: no separators, no traversal, never empty.
+  static func safeName(_ name: String) -> String {
+    let cleaned = name.replacingOccurrences(of: "\\", with: "/")
+      .split(separator: "/").last.map(String.init) ?? ""
+    let plain = String(cleaned.unicodeScalars.filter { $0.value >= 32 && $0 != ":" })
+      .trimmingCharacters(in: .whitespaces)
+    return plain.isEmpty || plain.allSatisfy({ $0 == "." }) ? "file" : String(plain.prefix(200))
+  }
+
+  static func copyToTemporary(_ source: URL) throws -> URL {
+    let folder = try newTemporaryFolder(prefix: "dataroom-upload")
+    let destination = folder.appendingPathComponent(safeName(source.lastPathComponent))
     try FileManager.default.copyItem(at: source, to: destination)
+    try? FileManager.default.setAttributes(protection, ofItemAtPath: destination.path)
     return destination
+  }
+
+  /// Removes a temporary file together with its private folder.
+  static func discard(_ file: URL) {
+    try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
   }
 }
 
@@ -43,6 +69,7 @@ struct DataRoomListView: View {
   @State private var newFolderName = ""
   @State private var itemToDelete: DataRoomItem?
   @State private var folderToDelete: DataRoomFolder?
+  @State private var importTask: Task<Void, Never>?
 
   init(folder: DataRoomFolder?) {
     self.folder = folder
@@ -72,6 +99,10 @@ struct DataRoomListView: View {
       }
       .photosPicker(isPresented: $showingPhotos, selection: $photos, matching: .any(of: [.images, .videos]))
       .onChange(of: photos) { importPhotos() }
+      .onChange(of: app.authentication.isSignedIn) { endTransfers() }
+      .onChange(of: app.userID) { endTransfers() }
+      .onChange(of: app.spaceID) { endTransfers() }
+      .onDisappear { if !app.authentication.isSignedIn { endTransfers() } }
   }
 
   private var core: some View {
@@ -228,22 +259,34 @@ struct DataRoomListView: View {
     }
   }
 
+  /// Stops picks that are still loading and discards uploads of the previous account.
+  private func endTransfers() {
+    importTask?.cancel()
+    importTask = nil
+    model.cancelAllUploads()
+  }
+
   private func importFiles(_ result: Result<[URL], any Error>) {
     switch result {
     case .failure(let error):
       model.errorMessage = error.localizedDescription
     case .success(let urls):
-      var files: [(url: URL, name: String)] = []
-      for url in urls {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        if let copy = try? DataRoomFiles.copyToTemporary(url) {
-          files.append((copy, copy.lastPathComponent))
-        } else {
-          model.errorMessage = "Couldn’t read \(url.lastPathComponent)."
+      importTask?.cancel()
+      importTask = Task {
+        // The scope is taken before any copy, so the files can only go to the account that picked them.
+        guard let scope = await DataRoomScope.capture(app) else { return }
+        var files: [(url: URL, name: String)] = []
+        for url in urls {
+          let scoped = url.startAccessingSecurityScopedResource()
+          defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+          if let copy = try? DataRoomFiles.copyToTemporary(url) {
+            files.append((copy, copy.lastPathComponent))
+          } else {
+            model.errorMessage = "Couldn’t read \(url.lastPathComponent)."
+          }
         }
+        await finishImport(files, scope)
       }
-      model.upload(files, app)
     }
   }
 
@@ -251,17 +294,28 @@ struct DataRoomListView: View {
     let picked = photos
     photos = []
     guard !picked.isEmpty else { return }
-    Task {
+    importTask?.cancel()
+    importTask = Task {
+      guard let scope = await DataRoomScope.capture(app) else { return }
       var files: [(url: URL, name: String)] = []
       for photo in picked {
         if let file = try? await photo.loadTransferable(type: PickedFile.self) {
           files.append((file.url, file.url.lastPathComponent))
-        } else {
+        } else if !Task.isCancelled {
           model.errorMessage = "Couldn’t read that photo."
         }
       }
-      model.upload(files, app)
+      await finishImport(files, scope)
     }
+  }
+
+  /// Uploads the picks only if the session is still the one they were picked in.
+  private func finishImport(_ files: [(url: URL, name: String)], _ scope: DataRoomScope) async {
+    guard !Task.isCancelled, await DataRoomScope.capture(app) == scope else {
+      files.forEach { DataRoomFiles.discard($0.url) }
+      return
+    }
+    model.upload(files, scope: scope, app)
   }
 }
 

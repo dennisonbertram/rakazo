@@ -13,6 +13,7 @@ final class DataRoomModel {
     let id = UUID()
     let file: URL
     let name: String
+    let scope: DataRoomScope
     var fraction = 0.0
     var failure: String?
   }
@@ -177,9 +178,9 @@ final class DataRoomModel {
   // MARK: Upload
 
   /// Copies picked files into the app's temporary folder, then uploads them one after another.
-  func upload(_ files: [(url: URL, name: String)], _ app: AppModel) {
+  func upload(_ files: [(url: URL, name: String)], scope: DataRoomScope, _ app: AppModel) {
     for file in files {
-      let upload = Upload(file: file.url, name: file.name)
+      let upload = Upload(file: file.url, name: file.name, scope: scope)
       uploads.append(upload)
       start(upload.id, app)
     }
@@ -198,9 +199,17 @@ final class DataRoomModel {
     removeUpload(id)
   }
 
+  /// Cancels every upload and deletes its temporary file, when the session ends or changes.
+  func cancelAllUploads() {
+    uploadTasks.values.forEach { $0.cancel() }
+    uploadTasks = [:]
+    uploads.forEach { DataRoomFiles.discard($0.file) }
+    uploads = []
+  }
+
   private func removeUpload(_ id: UUID) {
     if let upload = uploads.first(where: { $0.id == id }) {
-      try? FileManager.default.removeItem(at: upload.file)
+      DataRoomFiles.discard(upload.file)
     }
     uploads.removeAll { $0.id == id }
   }
@@ -214,7 +223,7 @@ final class DataRoomModel {
       do {
         let result = try await DataRoomTransfer(app: app).upload(
           file: upload.file, name: upload.name, mimeType: mime, folderID: folderID,
-          progress: { fraction in
+          scope: upload.scope, progress: { fraction in
             Task { @MainActor in self?.setProgress(id, fraction) }
           })
         guard let self else { return }
@@ -226,6 +235,9 @@ final class DataRoomModel {
           notice = "\(upload.name) is already in the data room."
         }
         await load(app)
+      } catch DataRoomTransferError.scopeChanged {
+        self?.removeUpload(id)
+        self?.uploadTasks[id] = nil
       } catch is CancellationError {
       } catch let error as URLError where error.code == .cancelled {
       } catch {
