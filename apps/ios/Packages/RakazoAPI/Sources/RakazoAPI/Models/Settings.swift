@@ -88,7 +88,4 @@ public struct UsageSummary: Sendable, Hashable, Decodable {
   }
 }
 
-/// `rpc_bots_restore` and `rpc_groups_restore` return `{ ok: true }`.
-public struct OKResult: Sendable, Decodable {
-  public let ok: Bool
-}
+// `rpc_bots_restore` and `rpc_groups_restore` return `{ ok: true }`: see OKResult in Connections.swift.
