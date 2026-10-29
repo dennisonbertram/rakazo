@@ -87,8 +87,3 @@ public struct UsageSummary: Sendable, Hashable, Decodable {
     try c.decodeIfPresent(Double.self, forKey: key).map { Int($0.rounded()) }
   }
 }
-
-/// `rpc_bots_restore` and `rpc_groups_restore` return `{ ok: true }`.
-public struct OKResult: Sendable, Decodable {
-  public let ok: Bool
-}
