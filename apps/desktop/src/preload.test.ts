@@ -40,6 +40,7 @@ describe("desktop preload bridge", () => {
     ]);
     expect(Object.keys(bridge.window).sort()).toEqual([
       "close",
+      "focus",
       "minimize",
       "state",
       "toggleMaximize",
@@ -50,6 +51,7 @@ describe("desktop preload bridge", () => {
     await bridge.oauth.cancel?.("https://provider.example.com/authorize");
     await bridge.window.close();
     await bridge.window.minimize();
+    await bridge.window.focus?.();
     await bridge.window.toggleMaximize();
     await bridge.window.state();
     await bridge.update.state();
@@ -61,6 +63,7 @@ describe("desktop preload bridge", () => {
       "desktop.oauth.cancel",
       "desktop.window.close",
       "desktop.window.minimize",
+      "desktop.window.focus",
       "desktop.window.toggleMaximize",
       "desktop.window.state",
       "desktop.update.state",
