@@ -232,6 +232,17 @@ audio{width:100%;max-width:100%}
 .chooser .dev{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--sidebar-accent)}
 .chooser .acts{display:flex;gap:8px;justify-content:flex-end}
 .menu{position:absolute;right:0;top:36px;z-index:4}
+.chip{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--fg);white-space:nowrap}
+.chip.meet{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.chip.trash{border:1px dashed var(--border);color:var(--muted-fg);font-weight:500}
+.chip.sorting{border-color:var(--border)}
+.seg.trashed .grow{color:var(--muted-fg)}
+details.mn{position:relative}
+details.mn summary{list-style:none;display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;border-radius:8px;color:var(--muted-fg);cursor:pointer}
+details.mn summary::-webkit-details-marker{display:none}
+details.mn summary:hover{background:var(--muted)}
+details.mn .pop{position:absolute;right:0;top:34px;z-index:4;min-width:170px}
+.sub-row2{padding-left:44px}
 .rel{position:relative}
 </style>
 </head>
@@ -242,8 +253,10 @@ audio{width:100%;max-width:100%}
   <a href="#screen-connect">2 Connect</a>
   <a href="#screen-connected">3 Connected</a>
   <a href="#screen-dataroom">4 Data room</a>
-  <a href="#screen-chat">5 Omi agent</a>
-  <a href="#screen-approval">6 Granted agent</a>
+  <a href="#screen-meetings">5 Meetings</a>
+  <a href="#screen-trash">6 Trash</a>
+  <a href="#screen-chat">7 Omi agent</a>
+  <a href="#screen-approval">8 Granted agent</a>
   <button class="pill" id="theme" type="button">Light / dark</button>
 </nav>
 <div class="screens">
@@ -299,20 +312,22 @@ audio{width:100%;max-width:100%}
 <section class="screen" id="screen-connected">
   <header class="sh"><h2>3 Omi: connected</h2>
     <div class="sw" role="group" aria-label="State">
-      <button class="pill on" data-s="down">Downloading</button><button class="pill" data-s="synced">Synced</button><button class="pill" data-s="menu">Menu</button><button class="pill" data-s="reconnect">Reconnect</button><button class="pill" data-s="nokey">No transcription key</button><button class="pill" data-s="paused">Out of range</button>
+      <button class="pill on" data-s="down">Downloading</button><button class="pill" data-s="synced">Synced</button><button class="pill" data-s="menu">Menu</button><button class="pill" data-s="reconnect">Reconnect</button><button class="pill" data-s="nokey">No transcription key</button><button class="pill" data-s="paused">Out of range</button><button class="pill" data-s="sort">Sorting</button>
     </div></header>
   <!--
   Reconnect: after a reload the browser has dropped the Bluetooth permission for the session, so reconnecting needs one user click.
   Paused: the pendant keeps the recording; the page resumes from the saved minute when the pendant is back in range. No error colour, nothing is lost.
   No transcription key: recordings still download and wait; transcription starts once a key is added. The link goes to Voice in Settings.
   The "Delete recordings from pendant after upload" switch defaults to on.
+  Sorting: after transcription the Omi agent sorts each stretch of a recording into Meeting (becomes a meeting record, shows in Meetings, can create Inbox to-dos), Note (kept as a transcript in the private Omi Data room folder) or Trash (not searchable by agents, audio still backed up, can be restored). Full audio is always backed up. The row menu lets the user correct a call; moving a row re-files it.
+  The Today list shows in every state. The newest row shows the shimmer chip only in the Sorting state.
   The agent section is the IntegrationAgentSection pattern; "Who can read recordings" is the only addition. Omi folder access: the Omi agent always, other agents only when granted here.
   -->
   <div class="win" data-sidebar="Integrations">
     <div class="pane">
       <div class="dhead"><span class="logo xl">O</span><h1 style="margin:0">Omi</h1></div>
       <div class="card" style="max-width:460px;margin-top:14px">
-        <div data-st="down">
+        <div data-st="down sort">
           <div class="pr" style="padding:0;border:0"><div class="grow"><b>Omi</b> <span class="mut">· Battery 82%</span><div class="bar"><i style="width:37%"></i></div><small>Downloading 14 of 38 min</small></div></div>
         </div>
         <div data-st="synced menu" hidden>
@@ -331,6 +346,16 @@ audio{width:100%;max-width:100%}
           <div class="pr" style="padding:0;border:0"><div class="grow"><span style="color:var(--warning)">●</span> Paused · 14 of 38 min saved<div class="bar paused"><i style="width:37%"></i></div></div></div>
         </div>
       </div>
+      <div class="card" style="max-width:460px;margin-top:14px;padding:14px 0 6px">
+        <div class="cap" style="margin:0 14px 2px">Today</div>
+        <div class="panel" style="border:0">
+          <div class="pr seg" data-st="sort" hidden><div class="grow">12:34 · Recording</div><span class="chip sorting"><span class="shim">Sorting…</span></span></div>
+          <div class="pr seg"><div class="grow">09:14–09:32 · Pricing review with Dana</div><span class="chip meet">Meeting</span><details class="mn"><summary aria-label="More">⋯</summary><div class="pop"><button class="btn sm ghost" style="justify-content:flex-start;text-align:left">Move to Note</button><button class="btn sm ghost" style="justify-content:flex-start;text-align:left">Move to Trash</button></div></details></div>
+          <div class="pr seg"><div class="grow">10:05–10:11 · Idea for onboarding email</div><span class="chip ">Note</span><details class="mn"><summary aria-label="More">⋯</summary><div class="pop"><button class="btn sm ghost" style="justify-content:flex-start;text-align:left">Move to Meeting</button><button class="btn sm ghost" style="justify-content:flex-start;text-align:left">Move to Trash</button></div></details></div>
+          <div class="pr seg trashed"><div class="grow">11:40–12:30 · Background noise</div><span class="chip trash">Trash</span><details class="mn"><summary aria-label="More">⋯</summary><div class="pop"><button class="btn sm ghost" style="justify-content:flex-start;text-align:left">Move to Meeting</button><button class="btn sm ghost" style="justify-content:flex-start;text-align:left">Move to Note</button></div></details></div>
+        </div>
+        <div class="pr" style="border-top:1px solid var(--border)"><a class="grow" href="#screen-trash" style="text-decoration:none">Trash <span class="mut">· 2</span></a></div>
+      </div>
       <div class="card" style="max-width:460px;margin-top:14px">
         <div class="pr" style="padding:0;border:0"><div class="grow">Delete recordings from pendant after upload</div><button class="tgl" role="switch" aria-checked="true" aria-label="Delete recordings from pendant after upload"></button></div>
       </div>
@@ -346,30 +371,31 @@ audio{width:100%;max-width:100%}
 
 <!-- 4 -->
 <section class="screen" id="screen-dataroom">
-  <header class="sh"><h2>4 Data room: Omi folder</h2></header>
+  <header class="sh"><h2>4 Data room: Omi notes</h2></header>
   <!--
   The Omi folder is private: it is not in search results or the Data room agent's reach, and other agents see it only when granted on the Omi page. The lock glyph marks that.
-  Row status: Transcribing while the server works, Ready once the transcript is saved, Failed with Retry. Delete removes the audio and the transcript together.
+  Notes holds the transcripts of stretches sorted as Note. Audio holds the full recordings, always backed up, including trashed stretches.
+  Row status: Transcribing while the server works, Ready once the transcript is saved, Failed with Retry. Delete removes the note and its audio range together.
+  The player opens at the note's range inside the full recording (static here).
   -->
   <div class="win" data-sidebar="Data room" data-omi="1">
     <div class="pane">
-      <h1>Omi</h1>
+      <h1>Notes</h1>
       <div class="dr" style="margin-top:12px">
         <div class="panel">
-          <div class="pr sel"><div class="grow">29 Oct, 09:14 · 18 min</div><span class="badge ok">Ready</span></div>
+          <div class="pr sel"><div class="grow">Idea for onboarding email<small>29 Oct, 10:05 · 6 min</small></div><span class="badge ok">Ready</span></div>
           <div class="pr"><div class="grow">29 Oct, 08:02 · 4 min</div><span class="badge pend">Transcribing</span></div>
           <div class="pr"><div class="grow">28 Oct, 17:40 · 26 min</div><span class="badge err">Failed</span><button class="btn sm">Retry</button></div>
-          <div class="pr"><div class="grow">28 Oct, 12:15 · 9 min</div><span class="badge ok">Ready</span></div>
+          <div class="pr"><div class="grow">Shopping and errands<small>28 Oct, 12:15 · 9 min</small></div><span class="badge ok">Ready</span></div>
         </div>
         <div class="card">
-          <div class="pr" style="padding:0;border:0"><b class="grow">29 Oct, 09:14 · 18 min</b><button class="btn sm bad">Delete</button></div>
+          <div class="pr" style="padding:0;border:0"><b class="grow">Idea for onboarding email</b><button class="btn sm bad">Delete</button></div>
+          <div class="mut">From recording 29 Oct, 09:14 · 10:05–10:11</div>
           <audio controls aria-label="Recording"></audio>
           <dl class="tr">
             <dt class="sp" style="display:none"></dt>
-            <b>0:04</b><span><b style="color:var(--fg)">Speaker 1</b> Morning. Did you get a chance to look at the rollout dates?</span>
-            <b>0:11</b><span><b style="color:var(--fg)">Speaker 2</b> Yes. I can send you the updated plan by Friday.</span>
-            <b>0:19</b><span><b style="color:var(--fg)">Speaker 1</b> Great, please also include the budget.</span>
-            <b>0:26</b><span><b style="color:var(--fg)">Speaker 2</b> I will. I will also share it with Sam.</span>
+            <b>10:05</b><span><b style="color:var(--fg)">Speaker 1</b> What if the welcome email asked one question instead of listing features?</span>
+            <b>10:09</b><span><b style="color:var(--fg)">Speaker 1</b> Something like: what are you trying to get done this week?</span>
           </dl>
         </div>
       </div>
@@ -378,8 +404,45 @@ audio{width:100%;max-width:100%}
 </section>
 
 <!-- 5 -->
+<section class="screen" id="screen-meetings">
+  <header class="sh"><h2>5 Meetings</h2></header>
+  <!--
+  The existing stored-meetings list. Omi meetings (a stretch sorted as Meeting) appear next to Granola ones, with a small source label. Opening an Omi meeting shows the transcript and to-dos like a Granola meeting.
+  -->
+  <div class="win" data-sidebar="Meetings">
+    <div class="pane">
+      <h1>Meetings</h1>
+      <div class="panel mail" style="margin-top:12px">
+        <div class="pr"><div class="grow">Pricing review with Dana<small>29 Oct, 09:14</small></div><span class="mut">Omi</span></div>
+        <div class="pr"><div class="grow">Board prep<small>28 Oct</small></div><span class="mut">Granola</span></div>
+        <div class="pr"><div class="grow">Weekly sync with Sam<small>27 Oct</small></div><span class="mut">Granola</span></div>
+        <div class="pr"><div class="grow">Hiring debrief<small>27 Oct, 15:30</small></div><span class="mut">Omi</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="screen" id="screen-trash">
+  <header class="sh"><h2>6 Omi: trash</h2></header>
+  <!--
+  Trashed stretches are not searchable by any agent. The audio is still backed up, so Restore re-files the stretch as a Note and it is transcribed again if needed.
+  -->
+  <div class="win" data-sidebar="Integrations">
+    <div class="pane">
+      <a class="back" href="#screen-connected" style="display:inline-flex;align-items:center;text-decoration:none">‹ Omi</a>
+      <h1>Trash</h1>
+      <div class="panel" style="margin-top:12px;max-width:560px">
+        <div class="pr"><div class="grow">11:40–12:30 · Background noise<small>29 Oct</small></div><button class="btn sm">Restore</button></div>
+        <div class="pr"><div class="grow">16:02–16:20 · Street and traffic<small>28 Oct</small></div><button class="btn sm">Restore</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
 <section class="screen" id="screen-chat">
-  <header class="sh"><h2>5 Omi agent</h2></header>
+  <header class="sh"><h2>7 Omi agent</h2></header>
   <!-- The citation chip opens the recording in the Data room, same pattern as the Granola citation. -->
   <div class="win" data-sidebar="Omi agent" data-bots="Omi agent">
     <div class="pane">
@@ -393,9 +456,9 @@ audio{width:100%;max-width:100%}
   </div>
 </section>
 
-<!-- 6 -->
+<!-- 8 -->
 <section class="screen" id="screen-approval">
-  <header class="sh"><h2>6 Granted agent asks to send</h2></header>
+  <header class="sh"><h2>8 Granted agent asks to send</h2></header>
   <!--
   Chief of staff was granted Omi on the Omi page, read a recording, and now wants to send mail. Sending always asks: the card has no "Always allow", same as the integration agents.
   -->
@@ -433,7 +496,8 @@ audio{width:100%;max-width:100%}
   document.querySelectorAll('[data-sidebar]').forEach(function(w){
     var a=w.dataset.sidebar,b0=w.dataset.bots,bots=(b0===undefined?'':b0).split('|').filter(Boolean);
     var h='<div class="side"><div class="row" style="color:var(--muted-fg)">Search</div><div class="row">Inbox</div><div class="row'+(a==='Data room'&&!w.dataset.omi?' active':'')+'">Data room</div>';
-    if(w.dataset.omi)h+='<div class="row sub-row active">Omi '+lock+'</div>';
+    if(w.dataset.omi)h+='<div class="row sub-row">Omi '+lock+'</div><div class="row sub-row2 active">Notes</div><div class="row sub-row2">Audio</div>';
+    h+='<div class="row'+(a==='Meetings'?' active':'')+'">Meetings</div>';
     if(bots.length)h+='<div class="lbl">Bots</div>';
     bots.forEach(function(b){h+='<div class="row'+(a===b?' active':'')+'"><span class="av bot">'+b[0]+'</span>'+b+'</div>'});
     h+='<div style="flex:1"></div><div class="row'+(a==='Integrations'?' active':'')+'">Integrations</div></div>';
