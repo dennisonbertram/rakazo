@@ -147,6 +147,33 @@ public enum AuthClientError: LocalizedError, Sendable, Equatable {
   }
 }
 
+/// `GET /api/auth/account-security`: which ways this account can prove itself.
+public struct AccountSecurity: Sendable, Equatable {
+  public let hasPassword: Bool
+  public let passwordChangeEnabled: Bool
+  /// The server can email a deletion code.
+  public let emailDeletion: Bool
+
+  public init(hasPassword: Bool, passwordChangeEnabled: Bool, emailDeletion: Bool) {
+    self.hasPassword = hasPassword
+    self.passwordChangeEnabled = passwordChangeEnabled
+    self.emailDeletion = emailDeletion
+  }
+}
+
+/// What the person typed to confirm deleting the account.
+public enum AccountDeletionProof: Sendable, Equatable {
+  case password(String)
+  case emailedCode(String)
+}
+
+/// A refusal from the account endpoints, with the server's own message when it gave one.
+public struct AccountRequestError: Error, Sendable, Equatable, LocalizedError {
+  public let status: Int
+  public let message: String?
+  public var errorDescription: String? { message }
+}
+
 public struct AuthorizedRequest: Sendable {
   public let request: HTTPRequest
   public let generation: UInt64
@@ -469,6 +496,101 @@ public actor AuthClient {
     if !localClearSucceeded {
       throw AuthClientError.storageFailure
     }
+  }
+
+  public func accountSecurity() async throws -> AccountSecurity {
+    let response = try await sendSigned(path: "/api/auth/account-security", method: "GET")
+    guard (200..<300).contains(response.statusCode) else { throw accountError(response) }
+    guard let object = jsonObject(response.body),
+      let hasPassword = strictJSONBoolean(object["hasPassword"])
+    else { throw AuthClientError.invalidResponse }
+    return AccountSecurity(
+      hasPassword: hasPassword,
+      passwordChangeEnabled: strictJSONBoolean(object["passwordChangeEnabled"]) ?? true,
+      emailDeletion: strictJSONBoolean(object["emailDeletion"]) ?? false
+    )
+  }
+
+  /// Changes the password and revokes every other session. The server also replaces this
+  /// device's session, so the new token is adopted here and the person stays signed in.
+  public func changePassword(current: String, new: String) async throws {
+    guard !current.isEmpty else { throw AuthClientError.invalidPassword }
+    guard new.utf16.count >= 8 else { throw AuthClientError.invalidPassword }
+    let operationGeneration = generation
+    let currentEndpoint = try validatedEndpoint()
+    let response = try await sendSigned(
+      path: "/api/auth/change-password",
+      method: "POST",
+      payload: ["currentPassword": current, "newPassword": new, "revokeOtherSessions": true]
+    )
+    guard endpoint == currentEndpoint, generation == operationGeneration else {
+      throw AuthClientError.staleRequest
+    }
+    guard (200..<300).contains(response.statusCode) else { throw accountError(response) }
+    guard let token = tokenFromAuthResponse(response: response, body: jsonObject(response.body)),
+      !token.isEmpty
+    else {
+      // The server revoked this session and gave no replacement.
+      try invalidateSession(currentEndpoint)
+      throw AuthClientError.missingSession
+    }
+    try adopt(token: token, endpoint: currentEndpoint, operationGeneration: operationGeneration)
+  }
+
+  /// Emails a deletion code to accounts without a password.
+  public func requestAccountDeletionCode() async throws {
+    let response = try await sendSigned(
+      path: "/api/auth/request-account-deletion", method: "POST", payload: [:])
+    guard (200..<300).contains(response.statusCode) else { throw accountError(response) }
+  }
+
+  /// Deletes the account on the server, then forgets the session on this device.
+  public func deleteAccount(_ proof: AccountDeletionProof) async throws {
+    let currentEndpoint = try validatedEndpoint()
+    let operationGeneration = generation
+    let payload: [String: Any]
+    switch proof {
+    case .password(let password):
+      guard !password.isEmpty else { throw AuthClientError.invalidPassword }
+      payload = ["password": password]
+    case .emailedCode(let code):
+      let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty else { throw AuthClientError.invalidPassword }
+      payload = ["token": trimmed]
+    }
+    let response = try await sendSigned(
+      path: "/api/auth/delete-user", method: "POST", payload: payload)
+    guard endpoint == currentEndpoint, generation == operationGeneration else {
+      throw AuthClientError.staleRequest
+    }
+    guard (200..<300).contains(response.statusCode) else { throw accountError(response) }
+    token = nil
+    activeSSOAttempt = nil
+    generation &+= 1
+    sessionEnded = false
+    if !wipeStoredSession(endpoint: currentEndpoint) { throw AuthClientError.storageFailure }
+  }
+
+  private func sendSigned(path: String, method: String, payload: [String: Any]? = nil)
+    async throws -> HTTPResponse
+  {
+    guard let token else { throw AuthClientError.unauthorized }
+    let currentEndpoint = try validatedEndpoint()
+    return try await send(
+      path: path,
+      endpoint: currentEndpoint,
+      method: method,
+      bearer: token,
+      body: payload.map { try? JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) }
+        ?? nil,
+      headers: payload == nil ? [:] : ["content-type": "application/json"],
+      maximumResponseBytes: Self.authResponseLimit
+    )
+  }
+
+  private func accountError(_ response: HTTPResponse) -> AccountRequestError {
+    let message = jsonObject(response.body)?["message"] as? String
+    return AccountRequestError(status: response.statusCode, message: message)
   }
 
   public func beginSSO() async throws -> SSOChallenge {
