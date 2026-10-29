@@ -1053,6 +1053,15 @@ app.whenReady().then(async () => {
       win.maximize();
     }
   });
+  ipcMain.handle("desktop.window.focus", (event) => {
+    const win = windowFrom(event);
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    // macOS keeps another app in front unless the whole app is activated.
+    app.focus({ steal: true });
+  });
   ipcMain.handle("desktop.window.state", (event) => {
     const win = windowFrom(event);
     return {
