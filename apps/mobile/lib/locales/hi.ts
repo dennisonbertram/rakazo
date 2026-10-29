@@ -934,4 +934,13 @@ export const HI_MESSAGES: Record<string, string> = {
   "Paused: the page could not be checked": "रुका हुआ: पेज की जाँच नहीं हो सकी",
   "Paused: too many checks today": "रुका हुआ: आज बहुत ज़्यादा जाँचें हुईं",
   Watches: "निगरानी",
+  "Allow cross-space bot communication": "स्पेस के बीच बॉट संचार की अनुमति दें",
+  "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.":
+    "AI खाते में क्रेडिट खत्म हो गए हैं। अपने प्रदाता से क्रेडिट जोड़ें या सेटिंग्स > मॉडल्स में कोई दूसरी कुंजी इस्तेमाल करें।",
+  "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models.":
+    "AI कुंजी अपनी खर्च सीमा तक पहुँच गई है। यह {resetsOn} रीसेट होगी। अपने प्रदाता से सीमा बढ़ाएँ या सेटिंग्स > मॉडल्स में कोई दूसरी कुंजी इस्तेमाल करें।",
+  "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models.":
+    "AI कुंजी अपनी खर्च सीमा तक पहुँच गई है। अपने प्रदाता से सीमा बढ़ाएँ या सेटिंग्स > मॉडल्स में कोई दूसरी कुंजी इस्तेमाल करें।",
+  "The model provider is rate limiting requests. Try again in a few minutes.":
+    "मॉडल प्रदाता अनुरोधों की दर सीमित कर रहा है। कुछ मिनट बाद फिर कोशिश करें।",
 };

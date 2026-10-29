@@ -939,4 +939,13 @@ export const KO_MESSAGES: Record<string, string> = {
   "Paused: the page could not be checked": "일시중지됨: 페이지를 확인할 수 없음",
   "Paused: too many checks today": "일시중지됨: 오늘 확인 횟수 초과",
   Watches: "감시 중",
+  "Allow cross-space bot communication": "스페이스 간 Bot 통신 허용",
+  "The AI account is out of credits. Add credits with your provider or use another key in Settings > Models.":
+    "AI 계정의 크레딧이 소진되었습니다. 제공업체에서 크레딧을 추가하거나 설정 > AI 모델에서 다른 키를 사용하세요.",
+  "The AI key hit its spending limit. It resets {resetsOn}. Raise the limit with your provider or use another key in Settings > Models.":
+    "AI 키가 지출 한도에 도달했습니다. {resetsOn}에 초기화됩니다. 제공업체에서 한도를 올리거나 설정 > AI 모델에서 다른 키를 사용하세요.",
+  "The AI key hit its spending limit. Raise the limit with your provider or use another key in Settings > Models.":
+    "AI 키가 지출 한도에 도달했습니다. 제공업체에서 한도를 올리거나 설정 > AI 모델에서 다른 키를 사용하세요.",
+  "The model provider is rate limiting requests. Try again in a few minutes.":
+    "모델 제공업체가 요청을 제한하고 있습니다. 몇 분 후에 다시 시도하세요.",
 };
