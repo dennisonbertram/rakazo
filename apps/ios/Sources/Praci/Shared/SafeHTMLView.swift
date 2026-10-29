@@ -21,7 +21,8 @@ struct SafeHTMLView: View {
 enum SafeHTML {
   static let proxyPath = "/api/inbox/image?"
 
-  /// A plain-http server (a local or LAN install) has to be named in `img-src` too, or its proxy images would be blocked.
+  /// A plain-http server (a local or LAN install) has to be named in `img-src` too, or its proxy
+  /// images would be blocked.
   static func policy(server: URL? = nil) -> String {
     var images = "data: https:"
     if let server, server.scheme == "http", let host = server.host() {

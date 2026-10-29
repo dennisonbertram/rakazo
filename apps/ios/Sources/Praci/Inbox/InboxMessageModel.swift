@@ -87,21 +87,25 @@ final class InboxMessageModel {
     do {
       let connectionID = try await client.connection(messageID)
       let result = try await client.unsubscribe(connectionID, sender.address, confirmMailto)
-      switch result.status {
-      case "done": unsubscribe = .done
-      case "sent": unsubscribe = .sent
-      case "unknown": unsubscribe = .unknown
-      case "opened":
-        unsubscribe = result.openUrl.flatMap(URL.init(string:)).flatMap { SafeHTML.openableURL($0) }
-          .map(UnsubscribeOutcome.opened) ?? .unavailable
-      case "needs_confirmation": unsubscribe = .confirmMail(result.mailTo ?? sender.address)
-      case "disabled": unsubscribe = .failed("Changing mail is turned off.")
-      case "refused": unsubscribe = .failed("The sender didn’t accept that.")
-      case "failed": unsubscribe = .failed("Couldn’t unsubscribe.")
-      default: unsubscribe = .unavailable
-      }
+      unsubscribe = unsubscribeOutcome(result, senderAddress: sender.address)
     } catch {
       unsubscribe = .failed(text(error))
+    }
+  }
+
+  private func unsubscribeOutcome(_ result: UnsubscribeResult, senderAddress: String) -> UnsubscribeOutcome {
+    switch result.status {
+    case "done": return .done
+    case "sent": return .sent
+    case "unknown": return .unknown
+    case "opened":
+      return result.openUrl.flatMap(URL.init(string:)).flatMap { SafeHTML.openableURL($0) }
+        .map(UnsubscribeOutcome.opened) ?? .unavailable
+    case "needs_confirmation": return .confirmMail(result.mailTo ?? senderAddress)
+    case "disabled": return .failed("Changing mail is turned off.")
+    case "refused": return .failed("The sender didn’t accept that.")
+    case "failed": return .failed("Couldn’t unsubscribe.")
+    default: return .unavailable
     }
   }
 

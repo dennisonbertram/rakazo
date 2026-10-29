@@ -18,23 +18,23 @@ private final class StepClock: ComputerClock {
   func nowMs() -> Int { state.withLock { $0.now } }
 
   func sleep(_ duration: Duration) async throws {
-    let id = state.withLock { s -> Int in
-      s.nextID += 1
-      s.durations.append(duration)
-      return s.nextID
+    let id = state.withLock { box -> Int in
+      box.nextID += 1
+      box.durations.append(duration)
+      return box.nextID
     }
     try await withTaskCancellationHandler {
-      try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
-        let cancelled = state.withLock { s -> Bool in
+      try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        let cancelled = state.withLock { box -> Bool in
           if Task.isCancelled { return true }
-          s.sleepers[id] = c
+          box.sleepers[id] = continuation
           return false
         }
-        if cancelled { c.resume(throwing: CancellationError()) }
+        if cancelled { continuation.resume(throwing: CancellationError()) }
       }
     } onCancel: {
-      let c = state.withLock { $0.sleepers.removeValue(forKey: id) }
-      c?.resume(throwing: CancellationError())
+      let sleeper = state.withLock { $0.sleepers.removeValue(forKey: id) }
+      sleeper?.resume(throwing: CancellationError())
     }
   }
 
@@ -42,11 +42,11 @@ private final class StepClock: ComputerClock {
   var durations: [Duration] { state.withLock { $0.durations } }
 
   /// Moves time forward and wakes every sleeper once.
-  func advance(ms: Int) async {
-    let woken = state.withLock { s -> [CheckedContinuation<Void, Error>] in
-      s.now += ms
-      let all = Array(s.sleepers.values)
-      s.sleepers = [:]
+  func advance(ms milliseconds: Int) async {
+    let woken = state.withLock { box -> [CheckedContinuation<Void, Error>] in
+      box.now += milliseconds
+      let all = Array(box.sleepers.values)
+      box.sleepers = [:]
       return all
     }
     woken.forEach { $0.resume() }
@@ -78,133 +78,131 @@ private final class Harness {
   }
 
   /// Waits for a poll or heartbeat task to be sleeping, then advances time.
-  func tick(ms: Int, sleepers: Int = 1) async {
+  func tick(ms milliseconds: Int, sleepers: Int = 1) async {
     await settle { clock.sleeperCount >= sleepers }
-    await clock.advance(ms: ms)
+    await clock.advance(ms: milliseconds)
   }
 }
 
 @MainActor @Test func startReadsStatusAndScreenOnce() async throws {
-  let h = Harness()
-  try await h.session.start()
-  #expect(h.statusReads == 1 && h.screenReads == 1)
-  #expect(h.screens == [h.url])
-  h.session.stop()
+  let harness = Harness()
+  try await harness.session.start()
+  #expect(harness.statusReads == 1 && harness.screenReads == 1)
+  #expect(harness.screens == [harness.url])
+  harness.session.stop()
 }
 
 @MainActor @Test func pollsStatusEveryTwoSecondsWithoutRereadingTheScreen() async throws {
-  let h = Harness()
-  try await h.session.start()
-  await h.tick(ms: 2000)
-  await h.settle { h.statusReads == 2 }
-  await h.tick(ms: 2000)
-  await h.settle { h.statusReads == 3 }
-  #expect(h.statusReads == 3)
-  #expect(h.screenReads == 1)
-  #expect(h.clock.durations.allSatisfy { $0 == .seconds(2) })
-  h.session.stop()
+  let harness = Harness()
+  try await harness.session.start()
+  await harness.tick(ms: 2000)
+  await harness.settle { harness.statusReads == 2 }
+  await harness.tick(ms: 2000)
+  await harness.settle { harness.statusReads == 3 }
+  #expect(harness.statusReads == 3)
+  #expect(harness.screenReads == 1)
+  #expect(harness.clock.durations.allSatisfy { $0 == .seconds(2) || $0 == .seconds(60) })
+  harness.session.stop()
 }
 
 @MainActor @Test func rereadsTheScreenWhenTheStatusThatShapesItChanges() async throws {
-  let h = Harness()
-  try await h.session.start()
-  h.status = ComputerStatus(botId: "b", controlHolder: .user, controlBotId: "b")
-  await h.tick(ms: 2000)
-  await h.settle { h.screenReads == 2 }
-  #expect(h.screenReads == 2)
-  h.session.stop()
+  let harness = Harness()
+  try await harness.session.start()
+  harness.status = ComputerStatus(botId: "b", controlHolder: .user, controlBotId: "b")
+  await harness.tick(ms: 2000)
+  await harness.settle { harness.screenReads == 2 }
+  #expect(harness.screenReads == 2)
+  harness.session.stop()
 }
 
 @MainActor @Test func renewsTheScreenAtFiftyMinutesWithoutAStatusChange() async throws {
-  let h = Harness()
-  h.url = "https://sandbox.example/stream?authKey=one&view_only=true"
-  try await h.session.start()
-  await h.tick(ms: 49 * 60_000)
-  await h.settle { h.statusReads == 2 }
-  #expect(h.screenReads == 1)
-  await h.tick(ms: 60_000)
-  await h.settle { h.screenReads == 2 }
-  #expect(h.screenReads == 2)
-  h.session.stop()
+  let harness = Harness()
+  harness.url = "https://sandbox.example/stream?authKey=one&view_only=true"
+  try await harness.session.start()
+  await harness.tick(ms: 49 * 60_000)
+  await harness.settle { harness.statusReads == 2 }
+  #expect(harness.screenReads == 1)
+  await harness.tick(ms: 60_000)
+  await harness.settle { harness.screenReads == 2 }
+  #expect(harness.screenReads == 2)
+  harness.session.stop()
 }
 
 @MainActor @Test func aReusedSealRenewsFromItsOwnIssueTime() async throws {
-  let h = Harness()
+  let harness = Harness()
   // Issued at the clock's start (expiry minus one hour), so renewal is due 50 minutes later.
-  try await h.session.start()
-  await h.tick(ms: 51 * 60_000)
-  await h.settle { h.screenReads == 2 }
-  #expect(h.screenReads == 2)
-  h.session.stop()
+  try await harness.session.start()
+  await harness.tick(ms: 51 * 60_000)
+  await harness.settle { harness.screenReads == 2 }
+  #expect(harness.screenReads == 2)
+  harness.session.stop()
 }
 
 @MainActor @Test func aFailedScreenReadKeepsTheLastUrlAndNullClearsIt() async throws {
-  let h = Harness()
-  try await h.session.start()
-  h.session.invalidateScreen()
-  h.url = nil
-  await h.tick(ms: 2000)
-  await h.settle { h.screens.count == 2 }
-  #expect(h.screens.last == .some(nil))
-  h.session.stop()
+  let harness = Harness()
+  try await harness.session.start()
+  harness.session.invalidateScreen()
+  harness.url = nil
+  await harness.tick(ms: 2000)
+  await harness.settle { harness.screens.count == 2 }
+  #expect(harness.screens.last == .some(nil))
+  harness.session.stop()
 }
 
-@MainActor @Test func heartbeatPingsAtOnceThenEverySixtySecondsWhileControlling() async throws {
-  let h = Harness()
-  try await h.session.start()
-  #expect(h.pings == 0)
-  h.session.setControlling(true)
-  await h.settle { h.pings == 1 }
-  await h.tick(ms: 60_000, sleepers: 2)
-  await h.settle { h.pings == 2 }
-  await h.tick(ms: 60_000, sleepers: 2)
-  await h.settle { h.pings == 3 }
-  #expect(h.pings == 3)
-  #expect(h.clock.durations.contains(.seconds(60)))
-  h.session.setControlling(false)
-  let before = h.pings
-  await h.clock.advance(ms: 60_000)
+@MainActor @Test func heartbeatPingsAtOnceThenEverySixtySecondsWhileRunning() async throws {
+  let harness = Harness()
+  try await harness.session.start()
+  await harness.settle { harness.pings == 1 }
+  await harness.tick(ms: 60_000, sleepers: 2)
+  await harness.settle { harness.pings == 2 }
+  #expect(harness.pings == 2)
+  #expect(harness.clock.durations.contains(.seconds(60)))
+  harness.status = ComputerStatus(botId: "b", state: .stopped)
+  await harness.tick(ms: 2000, sleepers: 2)
+  await harness.settle { harness.statuses.last?.state == .stopped }
+  #expect(harness.statuses.last?.state == .stopped)
+  let before = harness.pings
+  await harness.clock.advance(ms: 120_000)
   for _ in 0..<20 { await Task.yield() }
-  #expect(h.pings == before)
-  h.session.stop()
+  #expect(harness.pings == before)
+  harness.session.stop()
 }
 
 @MainActor @Test func stopEndsPollingAndHeartbeats() async throws {
-  let h = Harness()
-  try await h.session.start()
-  h.session.setControlling(true)
-  await h.settle { h.pings == 1 }
-  h.session.stop()
-  await h.clock.advance(ms: 120_000)
+  let harness = Harness()
+  try await harness.session.start()
+  await harness.settle { harness.pings == 1 }
+  harness.session.stop()
+  await harness.clock.advance(ms: 120_000)
   for _ in 0..<50 { await Task.yield() }
-  #expect(h.statusReads == 1 && h.pings == 1)
-  #expect(!h.session.isActive)
+  #expect(harness.statusReads == 1 && harness.pings == 1)
+  #expect(!harness.session.isActive)
 }
 
 @MainActor @Test func performPausesPollingAndRefreshesAfterTheAction() async throws {
-  let h = Harness()
-  try await h.session.start()
+  let harness = Harness()
+  try await harness.session.start()
   var ran = false
-  let result = try await h.session.perform {
+  let result = try await harness.session.perform {
     ran = true
     return 7
   }
   #expect(result == 7 && ran)
-  #expect(h.statusReads == 2 && h.screenReads == 2)
+  #expect(harness.statusReads == 2 && harness.screenReads == 2)
   // Polling resumes afterwards.
-  await h.tick(ms: 2000)
-  await h.settle { h.statusReads == 3 }
-  #expect(h.statusReads == 3)
-  h.session.stop()
+  await harness.tick(ms: 2000)
+  await harness.settle { harness.statusReads == 3 }
+  #expect(harness.statusReads == 3)
+  harness.session.stop()
 }
 
 @MainActor @Test func performDoesNotRefreshWhenTheActionThrows() async throws {
   struct Denied: Error {}
-  let h = Harness()
-  try await h.session.start()
+  let harness = Harness()
+  try await harness.session.start()
   await #expect(throws: Denied.self) {
-    _ = try await h.session.perform { throw Denied() }
+    _ = try await harness.session.perform { throw Denied() }
   }
-  #expect(h.statusReads == 1)
-  h.session.stop()
+  #expect(harness.statusReads == 1)
+  harness.session.stop()
 }

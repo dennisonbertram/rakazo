@@ -19,9 +19,9 @@ struct NewGroupSheet: View {
           TextField("Name", text: $name).accessibilityIdentifier("groupName")
         }
         Section {
-          LoadableView(state: bots, retry: { Task { await load() } }) { list in
+          LoadableView(state: bots, retry: { Task { await load() } }, content: { list in
             MemberRows(bots: list, picked: $picked)
-          }
+          })
         } header: {
           Text("Members")
         } footer: {

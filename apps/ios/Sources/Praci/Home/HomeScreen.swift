@@ -12,9 +12,9 @@ struct HomeScreen: View {
   @State private var sheet: HomeSheet?
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { boot in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { boot in
       content(boot)
-    }
+    })
     .navigationTitle(spaceName)
     .navigationBarTitleDisplayMode(.inline)
     .toolbarTitleMenu { spaceMenu }
@@ -92,6 +92,8 @@ struct HomeScreen: View {
     }
   }
 
+  // A SwiftUI view builder lists its rows in one place.
+  // swiftlint:disable:next function_body_length
   private func content(_ boot: Bootstrap) -> some View {
     let roster = Roster(bots: boot.bots, groups: boot.groups, sections: boot.botSections)
     let visible = roster.visibleAgents(expanded: model.agentsExpanded)

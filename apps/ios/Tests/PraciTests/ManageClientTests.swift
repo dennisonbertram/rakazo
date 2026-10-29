@@ -17,7 +17,9 @@ func groupNeedsANameAndTwoToSixMembers() {
 func updateSendsNullOnlyWhenClearingTheSection() throws {
   var input = BotUpdateInput(botId: "b")
   input.pinned = true
-  #expect(!String(decoding: try JSONEncoder().encode(input), as: UTF8.self).contains("sectionId"))
+  let withoutSection = try String(bytes: JSONEncoder().encode(input), encoding: .utf8)
+  #expect(withoutSection?.contains("sectionId") == false)
   input.clearSection = true
-  #expect(String(decoding: try JSONEncoder().encode(input), as: UTF8.self).contains(#""sectionId":null"#))
+  let clearing = try String(bytes: JSONEncoder().encode(input), encoding: .utf8)
+  #expect(clearing?.contains(#""sectionId":null"#) == true)
 }

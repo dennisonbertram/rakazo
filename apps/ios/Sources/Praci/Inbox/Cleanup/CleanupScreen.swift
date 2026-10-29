@@ -23,7 +23,7 @@ private struct CleanupContent: View {
   }
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.reload() } }) { list in
+    LoadableView(state: model.state, retry: { Task { await model.reload() } }, content: { list in
       switch model.phase {
       case .selecting: selecting(list)
       case .running(let kind): RunningView(kind: kind, cancel: model.cancel)
@@ -39,7 +39,7 @@ private struct CleanupContent: View {
         }
         .accessibilityIdentifier("cleanupFailed")
       }
-    }
+    })
     .background(Color.token(.background))
     .navigationTitle("Cleanup")
     .navigationBarTitleDisplayMode(.inline)
@@ -104,7 +104,11 @@ private struct CleanupContent: View {
         .accessibilityIdentifier("cleanupEmpty")
     } else {
       List(model.senders) { sender in
-        Button { model.toggle(sender) } label: { SenderRow(sender: sender, selected: model.selected.contains(sender.id)) }
+        Button {
+          model.toggle(sender)
+        } label: {
+          SenderRow(sender: sender, selected: model.selected.contains(sender.id))
+        }
           .buttonStyle(.plain)
           .listRowBackground(Color.token(.background))
       }
@@ -215,7 +219,8 @@ private struct DoneView: View {
               .buttonStyle(.bordered).accessibilityIdentifier("cleanupUndo")
           }
           if summary.kind == .archive, !summary.undone, summary.senders.contains(where: \.canUnsubscribe) {
-            Button(LocalizedStringKey("Unsubscribe from \(senders(summary.senders.filter(\.canUnsubscribe).count))"), action: unsubscribe)
+            let count = summary.senders.filter(\.canUnsubscribe).count
+            Button(LocalizedStringKey("Unsubscribe from \(senders(count))"), action: unsubscribe)
             .accessibilityIdentifier("cleanupUnsubscribeArchived")
           }
         }

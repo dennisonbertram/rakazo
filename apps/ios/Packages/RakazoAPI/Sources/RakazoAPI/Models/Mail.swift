@@ -1,4 +1,5 @@
-// swiftlint:disable identifier_name
+// The mail models and the cleanup runner share one file.
+// swiftlint:disable file_length
 import Foundation
 
 // Mail message, compose, to-do and cleanup models. Hand-written and tolerant: missing or null fields fall
@@ -13,11 +14,11 @@ public struct MailAttachment: Decodable, Sendable, Identifiable, Hashable {
   public var size: Int
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    filename = try c.decodeIfPresent(String.self, forKey: .filename) ?? ""
-    mimeType = try c.decodeIfPresent(String.self, forKey: .mimeType) ?? ""
-    size = try c.decodeIfPresent(Int.self, forKey: .size) ?? 0
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    filename = try container.decodeIfPresent(String.self, forKey: .filename) ?? ""
+    mimeType = try container.decodeIfPresent(String.self, forKey: .mimeType) ?? ""
+    size = try container.decodeIfPresent(Int.self, forKey: .size) ?? 0
   }
 
   private enum CodingKeys: String, CodingKey { case id, filename, mimeType, size }
@@ -32,12 +33,12 @@ public struct MailThreadEntry: Decodable, Sendable, Identifiable, Hashable {
   public var fromSelf: Bool
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    from = try c.decodeIfPresent(String.self, forKey: .from) ?? ""
-    receivedAt = try c.decodeIfPresent(String.self, forKey: .receivedAt) ?? ""
-    snippet = try c.decodeIfPresent(String.self, forKey: .snippet) ?? ""
-    fromSelf = try c.decodeIfPresent(Bool.self, forKey: .fromSelf) ?? false
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    from = try container.decodeIfPresent(String.self, forKey: .from) ?? ""
+    receivedAt = try container.decodeIfPresent(String.self, forKey: .receivedAt) ?? ""
+    snippet = try container.decodeIfPresent(String.self, forKey: .snippet) ?? ""
+    fromSelf = try container.decodeIfPresent(Bool.self, forKey: .fromSelf) ?? false
   }
 
   private enum CodingKeys: String, CodingKey { case id, from, receivedAt, snippet, fromSelf }
@@ -47,7 +48,9 @@ public struct MailThreadEntry: Decodable, Sendable, Identifiable, Hashable {
 public struct MailMessage: Decodable, Sendable {
   public var from: String
   public var fromSelf: Bool
+  // swiftlint:disable:next identifier_name
   public var to: String
+  // swiftlint:disable:next identifier_name
   public var cc: String
   public var replyAllDiffers: Bool
   public var date: String
@@ -61,24 +64,25 @@ public struct MailMessage: Decodable, Sendable {
   public var later: [MailThreadEntry]
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    from = try c.decodeIfPresent(String.self, forKey: .from) ?? ""
-    fromSelf = try c.decodeIfPresent(Bool.self, forKey: .fromSelf) ?? false
-    to = try c.decodeIfPresent(String.self, forKey: .to) ?? ""
-    cc = try c.decodeIfPresent(String.self, forKey: .cc) ?? ""
-    replyAllDiffers = try c.decodeIfPresent(Bool.self, forKey: .replyAllDiffers) ?? false
-    date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-    subject = try c.decodeIfPresent(String.self, forKey: .subject) ?? ""
-    html = try? c.decodeIfPresent(String.self, forKey: .html)
-    text = try? c.decodeIfPresent(String.self, forKey: .text)
-    attachments = try c.decodeIfPresent([MailAttachment].self, forKey: .attachments) ?? []
-    unread = try c.decodeIfPresent(Bool.self, forKey: .unread) ?? false
-    inInbox = try c.decodeIfPresent(Bool.self, forKey: .inInbox) ?? true
-    thread = try c.decodeIfPresent([MailThreadEntry].self, forKey: .thread) ?? []
-    later = try c.decodeIfPresent([MailThreadEntry].self, forKey: .later) ?? []
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    from = try container.decodeIfPresent(String.self, forKey: .from) ?? ""
+    fromSelf = try container.decodeIfPresent(Bool.self, forKey: .fromSelf) ?? false
+    to = try container.decodeIfPresent(String.self, forKey: .to) ?? ""
+    cc = try container.decodeIfPresent(String.self, forKey: .cc) ?? ""
+    replyAllDiffers = try container.decodeIfPresent(Bool.self, forKey: .replyAllDiffers) ?? false
+    date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
+    subject = try container.decodeIfPresent(String.self, forKey: .subject) ?? ""
+    html = try? container.decodeIfPresent(String.self, forKey: .html)
+    text = try? container.decodeIfPresent(String.self, forKey: .text)
+    attachments = try container.decodeIfPresent([MailAttachment].self, forKey: .attachments) ?? []
+    unread = try container.decodeIfPresent(Bool.self, forKey: .unread) ?? false
+    inInbox = try container.decodeIfPresent(Bool.self, forKey: .inInbox) ?? true
+    thread = try container.decodeIfPresent([MailThreadEntry].self, forKey: .thread) ?? []
+    later = try container.decodeIfPresent([MailThreadEntry].self, forKey: .later) ?? []
   }
 
   private enum CodingKeys: String, CodingKey {
+    // swiftlint:disable:next identifier_name
     case from, fromSelf, to, cc, replyAllDiffers, date, subject, html, text, attachments
     case unread, inInbox, thread, later
   }
@@ -111,7 +115,9 @@ public struct MailLeftOutAttachment: Decodable, Sendable, Hashable {
 public struct ComposePrefill: Decodable, Sendable {
   public var connectionId: String
   public var account: MailAccount?
+  // swiftlint:disable:next identifier_name
   public var to: String
+  // swiftlint:disable:next identifier_name
   public var cc: String
   public var subject: String
   public var body: String
@@ -123,23 +129,24 @@ public struct ComposePrefill: Decodable, Sendable {
   public var quoteUnavailable: Bool
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    connectionId = try c.decodeIfPresent(String.self, forKey: .connectionId) ?? ""
-    account = try? c.decodeIfPresent(MailAccount.self, forKey: .account)
-    to = try c.decodeIfPresent(String.self, forKey: .to) ?? ""
-    cc = try c.decodeIfPresent(String.self, forKey: .cc) ?? ""
-    subject = try c.decodeIfPresent(String.self, forKey: .subject) ?? ""
-    body = try c.decodeIfPresent(String.self, forKey: .body) ?? ""
-    quotedHtml = try? c.decodeIfPresent(String.self, forKey: .quotedHtml)
-    replyToMessageId = try? c.decodeIfPresent(String.self, forKey: .replyToMessageId)
-    attachments = try c.decodeIfPresent([MailAttachment].self, forKey: .attachments) ?? []
-    attachmentsTooLarge = try c.decodeIfPresent(Bool.self, forKey: .attachmentsTooLarge) ?? false
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    connectionId = try container.decodeIfPresent(String.self, forKey: .connectionId) ?? ""
+    account = try? container.decodeIfPresent(MailAccount.self, forKey: .account)
+    to = try container.decodeIfPresent(String.self, forKey: .to) ?? ""
+    cc = try container.decodeIfPresent(String.self, forKey: .cc) ?? ""
+    subject = try container.decodeIfPresent(String.self, forKey: .subject) ?? ""
+    body = try container.decodeIfPresent(String.self, forKey: .body) ?? ""
+    quotedHtml = try? container.decodeIfPresent(String.self, forKey: .quotedHtml)
+    replyToMessageId = try? container.decodeIfPresent(String.self, forKey: .replyToMessageId)
+    attachments = try container.decodeIfPresent([MailAttachment].self, forKey: .attachments) ?? []
+    attachmentsTooLarge = try container.decodeIfPresent(Bool.self, forKey: .attachmentsTooLarge) ?? false
     attachmentsLeftOut =
-      try c.decodeIfPresent([MailLeftOutAttachment].self, forKey: .attachmentsLeftOut) ?? []
-    quoteUnavailable = try c.decodeIfPresent(Bool.self, forKey: .quoteUnavailable) ?? false
+      try container.decodeIfPresent([MailLeftOutAttachment].self, forKey: .attachmentsLeftOut) ?? []
+    quoteUnavailable = try container.decodeIfPresent(Bool.self, forKey: .quoteUnavailable) ?? false
   }
 
   private enum CodingKeys: String, CodingKey {
+    // swiftlint:disable:next identifier_name
     case connectionId, account, to, cc, subject, body, quotedHtml, replyToMessageId, attachments
     case attachmentsTooLarge, attachmentsLeftOut, quoteUnavailable
   }
@@ -157,9 +164,9 @@ public struct ComposeResult: Decodable, Sendable {
   public var outcome: ComposeOutcome
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    let status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
-    let reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+    let reason = try? container.decodeIfPresent(String.self, forKey: .reason)
     switch status {
     case "saved": outcome = .saved
     case "sent": outcome = .sent
@@ -190,18 +197,18 @@ public enum MailAddresses {
     var current = ""
     var quoted = false
     var angle = false
-    for ch in list {
-      switch ch {
+    for char in list {
+      switch char {
       case "\"": quoted.toggle()
       case "<" where !quoted: angle = true
       case ">" where !quoted: angle = false
       default: break
       }
-      if (ch == "," || ch == ";") && !quoted && !angle {
+      if (char == "," || char == ";") && !quoted && !angle {
         parts.append(current)
         current = ""
       } else {
-        current.append(ch)
+        current.append(char)
       }
     }
     parts.append(current)
@@ -255,17 +262,17 @@ public struct MailTodo: Decodable, Sendable, Identifiable, Hashable {
   public var doneAt: String?
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    connectionId = try? c.decodeIfPresent(String.self, forKey: .connectionId)
-    meetingId = try? c.decodeIfPresent(String.self, forKey: .meetingId)
-    messageId = try? c.decodeIfPresent(String.self, forKey: .messageId)
-    text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
-    detail = try? c.decodeIfPresent(String.self, forKey: .detail)
-    from = try? c.decodeIfPresent(String.self, forKey: .from)
-    priority = try? c.decodeIfPresent(String.self, forKey: .priority)
-    dueOn = try? c.decodeIfPresent(String.self, forKey: .dueOn)
-    doneAt = try? c.decodeIfPresent(String.self, forKey: .doneAt)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    connectionId = try? container.decodeIfPresent(String.self, forKey: .connectionId)
+    meetingId = try? container.decodeIfPresent(String.self, forKey: .meetingId)
+    messageId = try? container.decodeIfPresent(String.self, forKey: .messageId)
+    text = try container.decodeIfPresent(String.self, forKey: .text) ?? ""
+    detail = try? container.decodeIfPresent(String.self, forKey: .detail)
+    from = try? container.decodeIfPresent(String.self, forKey: .from)
+    priority = try? container.decodeIfPresent(String.self, forKey: .priority)
+    dueOn = try? container.decodeIfPresent(String.self, forKey: .dueOn)
+    doneAt = try? container.decodeIfPresent(String.self, forKey: .doneAt)
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -279,9 +286,9 @@ public struct MailTodoList: Decodable, Sendable {
   public var todos: [MailTodo]
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
-    todos = try c.decodeIfPresent([MailTodo].self, forKey: .todos) ?? []
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+    todos = try container.decodeIfPresent([MailTodo].self, forKey: .todos) ?? []
   }
 
   private enum CodingKeys: String, CodingKey { case enabled, todos }
@@ -290,7 +297,8 @@ public struct MailTodoList: Decodable, Sendable {
 // MARK: - Cleanup
 
 public enum CleanupKind: String, Sendable, Codable, CaseIterable {
-  case archive, skip_inbox, unsubscribe, spam
+  case archive, unsubscribe, spam
+  case skipInbox = "skip_inbox"
 }
 
 /// rpc_inbox_cleanup_list sender.
@@ -319,20 +327,20 @@ public struct CleanupSender: Decodable, Sendable, Identifiable, Hashable {
   public var canUnsubscribe: Bool { ["one_click", "link", "mailto"].contains(unsubscribe) }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    connectionId = try c.decode(String.self, forKey: .connectionId)
-    address = try c.decode(String.self, forKey: .address)
-    name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
-    messageCount = try c.decodeIfPresent(Int.self, forKey: .messageCount) ?? 0
-    readCount = try c.decodeIfPresent(Int.self, forKey: .readCount) ?? 0
-    lastReceivedAt = try? c.decodeIfPresent(String.self, forKey: .lastReceivedAt)
-    inboxThreads = try c.decodeIfPresent(Int.self, forKey: .inboxThreads) ?? 0
-    preselected = try c.decodeIfPresent(Bool.self, forKey: .preselected) ?? false
-    spamLike = try c.decodeIfPresent(Bool.self, forKey: .spamLike) ?? false
-    unsubscribe = try c.decodeIfPresent(String.self, forKey: .unsubscribe) ?? "none"
-    skipInbox = try c.decodeIfPresent(Bool.self, forKey: .skipInbox) ?? false
-    unsubscribeStatus = try? c.decodeIfPresent(String.self, forKey: .unsubscribeStatus)
-    learnedPile = try? c.decodeIfPresent(String.self, forKey: .learnedPile)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    connectionId = try container.decode(String.self, forKey: .connectionId)
+    address = try container.decode(String.self, forKey: .address)
+    name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+    messageCount = try container.decodeIfPresent(Int.self, forKey: .messageCount) ?? 0
+    readCount = try container.decodeIfPresent(Int.self, forKey: .readCount) ?? 0
+    lastReceivedAt = try? container.decodeIfPresent(String.self, forKey: .lastReceivedAt)
+    inboxThreads = try container.decodeIfPresent(Int.self, forKey: .inboxThreads) ?? 0
+    preselected = try container.decodeIfPresent(Bool.self, forKey: .preselected) ?? false
+    spamLike = try container.decodeIfPresent(Bool.self, forKey: .spamLike) ?? false
+    unsubscribe = try container.decodeIfPresent(String.self, forKey: .unsubscribe) ?? "none"
+    skipInbox = try container.decodeIfPresent(Bool.self, forKey: .skipInbox) ?? false
+    unsubscribeStatus = try? container.decodeIfPresent(String.self, forKey: .unsubscribeStatus)
+    learnedPile = try? container.decodeIfPresent(String.self, forKey: .learnedPile)
   }
 
   public init(
@@ -364,10 +372,10 @@ public struct CleanupList: Decodable, Sendable {
   public var syncedAt: String?
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    accounts = try c.decodeIfPresent([MailAccount].self, forKey: .accounts) ?? []
-    senders = try c.decodeIfPresent([CleanupSender].self, forKey: .senders) ?? []
-    syncedAt = try? c.decodeIfPresent(String.self, forKey: .syncedAt)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    accounts = try container.decodeIfPresent([MailAccount].self, forKey: .accounts) ?? []
+    senders = try container.decodeIfPresent([CleanupSender].self, forKey: .senders) ?? []
+    syncedAt = try? container.decodeIfPresent(String.self, forKey: .syncedAt)
   }
 
   private enum CodingKeys: String, CodingKey { case accounts, senders, syncedAt }
@@ -389,10 +397,10 @@ public struct UnsubscribeResult: Decodable, Sendable {
   public var mailTo: String?
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
-    openUrl = try? c.decodeIfPresent(String.self, forKey: .openUrl)
-    mailTo = try? c.decodeIfPresent(String.self, forKey: .mailTo)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+    openUrl = try? container.decodeIfPresent(String.self, forKey: .openUrl)
+    mailTo = try? container.decodeIfPresent(String.self, forKey: .mailTo)
   }
 
   public init(status: String, openUrl: String? = nil, mailTo: String? = nil) {
@@ -417,9 +425,9 @@ public enum CleanupLogic {
   /// Most unopened mail first, then the larger sender, then address.
   public static func rank(_ senders: [CleanupSender]) -> [CleanupSender] {
     senders.sorted {
-      let a = $0.messageCount - $0.readCount
-      let b = $1.messageCount - $1.readCount
-      if a != b { return a > b }
+      let unreadA = $0.messageCount - $0.readCount
+      let unreadB = $1.messageCount - $1.readCount
+      if unreadA != unreadB { return unreadA > unreadB }
       if $0.messageCount != $1.messageCount { return $0.messageCount > $1.messageCount }
       return $0.address.localizedCompare($1.address) == .orderedAscending
     }
@@ -433,7 +441,7 @@ public enum CleanupLogic {
     senders.filter {
       guard selected.contains($0.id) else { return false }
       switch kind {
-      case .skip_inbox: return !$0.spamLike
+      case .skipInbox: return !$0.spamLike
       case .unsubscribe: return $0.canUnsubscribe
       default: return true
       }
@@ -446,6 +454,7 @@ public enum CleanupLogic {
   }
 
   public struct Failure: Sendable, Equatable {
+    // swiftlint:disable:next nesting
     public enum Reason: Sendable, Equatable {
       case archive, unsubscribe, refused, disabled, unavailable, unknown, error(String)
     }
@@ -480,6 +489,30 @@ public enum CleanupLogic {
     }
   }
 
+  /// Records an unsubscribe step in `result`. Returns true when the sender's mail must not be archived.
+  private static func applyUnsubscribe(
+    _ step: UnsubscribeResult, sender: CleanupSender, to result: inout RunResult
+  ) -> Bool {
+    func fail(_ reason: Failure.Reason, openUrl: String? = nil) -> Bool {
+      result.failed.append(Failure(sender: sender, reason: reason, openUrl: openUrl))
+      return true
+    }
+    switch step.status {
+    case "needs_confirmation":
+      result.confirm.append((sender, step.mailTo ?? sender.address))
+      return true
+    case "failed": return fail(.unsubscribe, openUrl: step.openUrl)
+    case "refused": return fail(.refused)
+    case "disabled": return fail(.disabled)
+    case "unavailable": return fail(.unavailable)
+    case "unknown": return fail(.unknown)
+    case "opened":
+      if let url = step.openUrl { result.openLinks.append((sender, url)) }
+      return false
+    default: return false
+    }
+  }
+
   /// A cleanup of one sender is at most this many pages of 50 conversations.
   static let maxPages = 200
 
@@ -495,21 +528,7 @@ public enum CleanupLogic {
       do {
         if kind == .unsubscribe {
           let step = try await api.unsubscribe(sender, confirmMailto)
-          switch step.status {
-          case "needs_confirmation":
-            result.confirm.append((sender, step.mailTo ?? sender.address))
-            continue
-          case "failed":
-            result.failed.append(Failure(sender: sender, reason: .unsubscribe, openUrl: step.openUrl))
-            continue
-          case "refused": result.failed.append(Failure(sender: sender, reason: .refused)); continue
-          case "disabled": result.failed.append(Failure(sender: sender, reason: .disabled)); continue
-          case "unavailable":
-            result.failed.append(Failure(sender: sender, reason: .unavailable)); continue
-          case "unknown": result.failed.append(Failure(sender: sender, reason: .unknown)); continue
-          default: break
-          }
-          if step.status == "opened", let url = step.openUrl { result.openLinks.append((sender, url)) }
+          if applyUnsubscribe(step, sender: sender, to: &result) { continue }
         }
         var batchId: String?
         var last: CleanupArchiveResult?

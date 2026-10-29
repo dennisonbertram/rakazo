@@ -21,15 +21,15 @@ public struct NotificationPreferences: Sendable, Hashable, Decodable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    finish = try c.decodeIfPresent(Bool.self, forKey: .finish) ?? true
-    help = try c.decodeIfPresent(Bool.self, forKey: .help) ?? true
-    takeover = try c.decodeIfPresent(Bool.self, forKey: .takeover) ?? true
-    let channels = try c.decodeIfPresent(Channels.self, forKey: .channels)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    finish = try container.decodeIfPresent(Bool.self, forKey: .finish) ?? true
+    help = try container.decodeIfPresent(Bool.self, forKey: .help) ?? true
+    takeover = try container.decodeIfPresent(Bool.self, forKey: .takeover) ?? true
+    let channels = try container.decodeIfPresent(Channels.self, forKey: .channels)
     push = channels?.push ?? true
     imessage = channels?.imessage ?? true
-    hasPhone = try c.decodeIfPresent(Bool.self, forKey: .hasPhone) ?? false
-    hasImessage = try c.decodeIfPresent(Bool.self, forKey: .hasImessage) ?? false
+    hasPhone = try container.decodeIfPresent(Bool.self, forKey: .hasPhone) ?? false
+    hasImessage = try container.decodeIfPresent(Bool.self, forKey: .hasImessage) ?? false
   }
 }
 
@@ -72,23 +72,18 @@ public struct UsageSummary: Sendable, Hashable, Decodable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    inputTokens = try Self.count(c, .inputTokens)
-    outputTokens = try Self.count(c, .outputTokens)
-    totalTokens = try Self.count(c, .totalTokens)
-    modelCalls = try Self.count(c, .modelCalls)
-    runs = try Self.count(c, .runs) ?? 0
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    inputTokens = try Self.count(container, .inputTokens)
+    outputTokens = try Self.count(container, .outputTokens)
+    totalTokens = try Self.count(container, .totalTokens)
+    modelCalls = try Self.count(container, .modelCalls)
+    runs = try Self.count(container, .runs) ?? 0
   }
 
   /// The server sends JSON numbers; tolerate a fractional value by rounding.
-  private static func count(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) throws
-    -> Int?
-  {
-    try c.decodeIfPresent(Double.self, forKey: key).map { Int($0.rounded()) }
+  private static func count(
+    _ container: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys
+  ) throws -> Int? {
+    try container.decodeIfPresent(Double.self, forKey: key).map { Int($0.rounded()) }
   }
-}
-
-/// `rpc_bots_restore` and `rpc_groups_restore` return `{ ok: true }`.
-public struct OKResult: Sendable, Decodable {
-  public let ok: Bool
 }

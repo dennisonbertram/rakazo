@@ -15,14 +15,16 @@ struct GroupSettingsScreen: View {
   @State private var confirmDelete = false
 
   var body: some View {
-    LoadableView(state: state, retry: { Task { await load() } }) { group in
+    LoadableView(state: state, retry: { Task { await load() } }, content: { group in
       form(group)
-    }
+    })
     .navigationTitle("Group settings")
     .navigationBarTitleDisplayMode(.inline)
     .task { await load() }
   }
 
+  // A SwiftUI view builder lists its rows in one place.
+  // swiftlint:disable:next function_body_length
   private func form(_ group: GroupSummary) -> some View {
     let original = group.members.map(\.botId)
     let dirty = ManageClient.clean(name) != group.name || Set(picked) != Set(original)

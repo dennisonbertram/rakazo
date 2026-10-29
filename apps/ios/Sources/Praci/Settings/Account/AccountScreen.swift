@@ -4,7 +4,7 @@ import RakazoUI
 import SwiftUI
 
 struct AccountScreen: View {
-  let me: Me
+  let profile: Me
   @Environment(AppModel.self) private var app
   @State private var model = AccountModel()
   @State private var showingDelete = false
@@ -16,10 +16,10 @@ struct AccountScreen: View {
       }
       Section {
         HStack(spacing: 12) {
-          Initials(name: me.name)
-          Text(me.name)
+          Initials(name: profile.name)
+          Text(profile.name)
         }
-        LabeledContent("Email", value: me.email)
+        LabeledContent("Email", value: profile.email)
       }
       if let security = model.security.value, security.hasPassword, security.passwordChangeEnabled {
         Section {
@@ -44,7 +44,7 @@ struct AccountScreen: View {
     .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(app) }
     .sheet(isPresented: $showingDelete) {
-      DeleteAccountSheet(model: model, security: model.security.value, email: me.email)
+      DeleteAccountSheet(model: model, security: model.security.value, email: profile.email)
     }
   }
 }

@@ -159,9 +159,7 @@ final class ComputerModel {
   // MARK: Session callbacks
 
   private func apply(status next: ComputerStatus) {
-    let hadControl = hasControl
     status = next
-    if hasControl != hadControl || session?.isActive == true { session?.setControlling(hasControl) }
     recompute()
   }
 

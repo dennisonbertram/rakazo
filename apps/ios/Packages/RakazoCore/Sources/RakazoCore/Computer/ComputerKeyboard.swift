@@ -1,4 +1,3 @@
-// swiftlint:disable identifier_name
 import Foundation
 
 /// Key-bar logic for the Team Computer page. A port of `apps/mobile/lib/computer-keyboard.ts`.
@@ -23,22 +22,22 @@ public enum ComputerKeyboardCommand: Sendable, Hashable, Encodable {
   private enum CodingKeys: String, CodingKey { case type, text, count, name, control }
 
   public func encode(to encoder: Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
+    var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
     case .text(let text):
-      try c.encode("text", forKey: .type)
-      try c.encode(text, forKey: .text)
+      try container.encode("text", forKey: .type)
+      try container.encode(text, forKey: .text)
     case .backspace(let count):
-      try c.encode("backspace", forKey: .type)
-      try c.encode(count, forKey: .count)
+      try container.encode("backspace", forKey: .type)
+      try container.encode(count, forKey: .count)
     case .key(let name, let control):
-      try c.encode("key", forKey: .type)
-      try c.encode(name, forKey: .name)
-      if control { try c.encode(true, forKey: .control) }
+      try container.encode("key", forKey: .type)
+      try container.encode(name, forKey: .name)
+      if control { try container.encode(true, forKey: .control) }
     case .char(let text, let control):
-      try c.encode("char", forKey: .type)
-      try c.encode(text, forKey: .text)
-      if control { try c.encode(true, forKey: .control) }
+      try container.encode("char", forKey: .type)
+      try container.encode(text, forKey: .text)
+      if control { try container.encode(true, forKey: .control) }
     }
   }
 }
@@ -68,16 +67,17 @@ public enum ComputerKeyboard {
 
   /// Insertions and deletions between two drafts, as the in-page keyboard sends them.
   public static func changes(from old: String, to new: String) -> ComputerKeyboardChanges {
-    let o = Array(old), n = Array(new)
-    var inputCount = n.count - o.count
+    let oldChars = Array(old), newChars = Array(new)
+    var inputCount = newChars.count - oldChars.count
     var backspaces = inputCount < 0 ? -inputCount : 0
-    for index in 0..<min(o.count, n.count) where n[index] != o[index] {
-      inputCount = n.count - index
-      backspaces = o.count - index
+    for index in 0..<min(oldChars.count, newChars.count) where newChars[index] != oldChars[index] {
+      inputCount = newChars.count - index
+      backspaces = oldChars.count - index
       break
     }
     return ComputerKeyboardChanges(
-      backspaces: backspaces, text: inputCount > 0 ? String(n[(n.count - inputCount)...]) : "")
+      backspaces: backspaces,
+      text: inputCount > 0 ? String(newChars[(newChars.count - inputCount)...]) : "")
   }
 
   public static func nextDraft(_ next: String) -> String {

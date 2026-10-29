@@ -9,6 +9,8 @@ struct ThreadScreen: View {
   @State private var attempt = 0
   @State private var atBottom = true
   @State private var scrolledToDivider = false
+  /// The latest measured position; read after a programmatic scroll that may not change the geometry.
+  @State private var edgeNearBottom = true
   @State private var confirmingArchive = false
 
   init(target: ThreadTarget) {
@@ -22,9 +24,9 @@ struct ThreadScreen: View {
   }
 
   var body: some View {
-    LoadableView(state: model.state, retry: { attempt += 1 }) { snapshot in
+    LoadableView(state: model.state, retry: { attempt += 1 }, content: { snapshot in
       content(snapshot)
-    }
+    })
     .background(Color.token(.background))
     .navigationTitle(model.title)
     .navigationBarTitleDisplayMode(.inline)
@@ -48,6 +50,8 @@ struct ThreadScreen: View {
 
   // MARK: Content
 
+  // A SwiftUI view builder lists its rows in one place.
+  // swiftlint:disable:next function_body_length
   private func content(_ snapshot: ThreadSnapshot) -> some View {
     let messages = snapshot.messages
     let divider = model.dividerID
@@ -89,6 +93,7 @@ struct ThreadScreen: View {
           nearBottom: geometry.visibleRect.maxY >= geometry.contentSize.height - 48,
           height: geometry.contentSize.height)
       } action: { old, new in
+        edgeNearBottom = new.nearBottom
         if new.height != old.height && atBottom {
           // New content makes the bottom move away; keep following when the reader was there.
           proxy.scrollTo(Self.bottomID, anchor: .bottom)
@@ -112,6 +117,9 @@ struct ThreadScreen: View {
         atBottom = false
         try? await Task.sleep(for: .milliseconds(150))
         proxy.scrollTo(divider, anchor: .top)
+        // A short thread does not move, so no geometry change reports that it is still at the bottom.
+        try? await Task.sleep(for: .milliseconds(350))
+        atBottom = edgeNearBottom
       }
       .overlay(alignment: .bottomTrailing) {
         if !atBottom {
@@ -139,6 +147,8 @@ struct ThreadScreen: View {
       withAnimation { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
       try? await Task.sleep(for: .milliseconds(350))
     }
+    atBottom = true
+    await model.markRead(app)
   }
 
   @ViewBuilder private var footer: some View {

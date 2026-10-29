@@ -18,7 +18,10 @@ struct DeleteAccountSheet: View {
       Form {
         Section {
           Text(
-            "This permanently deletes your account, agents, conversations, memories, files, and saved connections. This cannot be undone."
+            """
+            This permanently deletes your account, agents, conversations, memories, files, \
+            and saved connections. This cannot be undone.
+            """
           )
         }
         if usesPassword {

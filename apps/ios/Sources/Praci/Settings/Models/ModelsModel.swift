@@ -37,10 +37,10 @@ struct DefaultModelInput: Encodable, Sendable {
 
   // The server accepts null to clear the thinking level; it must be sent explicitly.
   func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(provider, forKey: .provider)
-    try c.encode(modelId, forKey: .modelId)
-    try c.encode(thinkingLevel, forKey: .thinkingLevel)
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(provider, forKey: .provider)
+    try container.encode(modelId, forKey: .modelId)
+    try container.encode(thinkingLevel, forKey: .thinkingLevel)
   }
 }
 

@@ -1,4 +1,3 @@
-// swiftlint:disable identifier_name line_length
 import Foundation
 import RakazoAPI
 import RakazoCore
@@ -17,7 +16,10 @@ private final class FakeCompose {
       prefill: { _ in
         try JSONDecoder().decode(
           ComposePrefill.self,
-          from: Data(#"{"connectionId":"c1","account":{"connectionId":"c1","label":"Mail","address":"me@example.test"},"to":"Ana <ana@example.test>","cc":"","subject":"Re: Hi","body":"\n\n> Hi","replyToMessageId":"m1","attachments":[]}"#.utf8))
+          from: Data(
+            (#"{"connectionId":"c1","account":{"connectionId":"c1","label":"Mail","address":"me@example.test"},"#
+              + #""to":"Ana <ana@example.test>","cc":"","subject":"Re: Hi","body":"\n\n> Hi","#
+              + #""replyToMessageId":"m1","attachments":[]}"#).utf8))
       },
       accounts: { [] },
       save: { _ in .saved },
@@ -38,29 +40,29 @@ private func model(_ fake: FakeCompose) async -> ComposeModel {
 
 @Test @MainActor
 func replyPrefillsTheFieldsAndTracksChanges() async {
-  let m = await model(FakeCompose())
-  #expect(m.to == "Ana <ana@example.test>" && m.subject == "Re: Hi" && m.connectionID == "c1")
-  #expect(!m.hasChanges)
-  m.body = "Thanks" + m.body
-  #expect(m.hasChanges)
+  let compose = await model(FakeCompose())
+  #expect(compose.to == "Ana <ana@example.test>" && compose.subject == "Re: Hi" && compose.connectionID == "c1")
+  #expect(!compose.hasChanges)
+  compose.body = "Thanks" + compose.body
+  #expect(compose.hasChanges)
 }
 
 @Test @MainActor
 func sendNeedsAValidRecipient() async {
-  let m = await model(FakeCompose())
-  #expect(m.canSend)
-  m.to = ""
-  #expect(!m.canSend)
-  m.to = "ana@@example"
-  #expect(!m.canSend && m.toError)
+  let compose = await model(FakeCompose())
+  #expect(compose.canSend)
+  compose.to = ""
+  #expect(!compose.canSend)
+  compose.to = "ana@@example"
+  #expect(!compose.canSend && compose.toError)
 }
 
 @Test @MainActor
 func aSentMessageClosesAndCarriesTheReplyIdAndClientID() async {
   let fake = FakeCompose()
   fake.outcomes = [.success(.sent)]
-  let m = await model(fake)
-  #expect(await m.send())
+  let compose = await model(fake)
+  #expect(await compose.send())
   #expect(fake.sends.first?.replyToMessageId == "m1" && fake.sends.first?.clientId == "client-0001")
 }
 
@@ -68,11 +70,11 @@ func aSentMessageClosesAndCarriesTheReplyIdAndClientID() async {
 func aFailedSendShowsTheServerOutcomeAndCanBeRetriedByTheUser() async {
   let fake = FakeCompose()
   fake.outcomes = [.success(.failed(reason: "rejected")), .success(.sent)]
-  let m = await model(fake)
-  #expect(await m.send() == false)
-  if case .notSent(let text)? = m.banner { #expect(text.contains("rejected")) } else { Issue.record("no banner") }
-  #expect(m.canSend)
-  #expect(await m.send())
+  let compose = await model(fake)
+  #expect(await compose.send() == false)
+  if case .notSent(let text)? = compose.banner { #expect(text.contains("rejected")) } else { Issue.record("no banner") }
+  #expect(compose.canSend)
+  #expect(await compose.send())
   #expect(fake.sends.count == 2)
 }
 
@@ -80,10 +82,10 @@ func aFailedSendShowsTheServerOutcomeAndCanBeRetriedByTheUser() async {
 func anUnknownResultIsNeverRetried() async {
   let fake = FakeCompose()
   fake.outcomes = [.success(.unknown)]
-  let m = await model(fake)
-  #expect(await m.send() == false)
-  #expect(m.banner == .unknown && !m.canSend)
-  #expect(await m.send() == false)
+  let compose = await model(fake)
+  #expect(await compose.send() == false)
+  #expect(compose.banner == .unknown && !compose.canSend)
+  #expect(await compose.send() == false)
   #expect(fake.sends.count == 1)
 }
 
@@ -91,26 +93,26 @@ func anUnknownResultIsNeverRetried() async {
 func aDroppedConnectionCountsAsUnknownButAServerErrorDoesNot() async {
   let lost = FakeCompose()
   lost.outcomes = [.failure(URLError(.timedOut))]
-  let a = await model(lost)
-  _ = await a.send()
-  #expect(a.banner == .unknown && !a.canSend)
+  let lostModel = await model(lost)
+  _ = await lostModel.send()
+  #expect(lostModel.banner == .unknown && !lostModel.canSend)
 
   let refused = FakeCompose()
   refused.outcomes = [.failure(RPCError.server(code: "BAD_REQUEST", status: 400, message: "Bad address"))]
-  let b = await model(refused)
-  _ = await b.send()
-  #expect(b.banner == .notSent("Bad address") && b.canSend)
+  let refusedModel = await model(refused)
+  _ = await refusedModel.send()
+  #expect(refusedModel.banner == .notSent("Bad address") && refusedModel.canSend)
 }
 
 @Test @MainActor
 func savingThenDiscardingCallsTheServerOnce() async {
   let fake = FakeCompose()
-  let m = await model(fake)
-  await m.discard()
+  let compose = await model(fake)
+  await compose.discard()
   #expect(fake.discards.isEmpty)
-  #expect(await m.saveDraft())
-  await m.discard()
-  await m.discard()
+  #expect(await compose.saveDraft())
+  await compose.discard()
+  await compose.discard()
   #expect(fake.discards == ["client-0001"])
 }
 
@@ -143,7 +145,8 @@ func dueLabels() {
 @Test
 func safeHTMLAddsThePolicyFirstAndDropsBaseAndMeta() {
   let doc = SafeHTML.document(
-    for: #"<base href="https://evil.test/"><meta http-equiv="Content-Security-Policy" content="default-src *"><p>Hi</p>"#)
+    for: #"<base href="https://evil.test/"><meta http-equiv="Content-Security-Policy" "#
+      + #"content="default-src *"><p>Hi</p>"#)
   #expect(doc.contains("default-src 'none'; img-src data: https:; style-src 'unsafe-inline'"))
   #expect(!doc.contains("evil.test") && !doc.contains("default-src *"))
   let proxied = SafeHTML.document(

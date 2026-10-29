@@ -104,7 +104,8 @@ func accountSecurityReadsTheSignInOptions() async throws {
   let transport = FakeTransport([
     sessionOK,
     rpcResponse(
-      #"{"freshOidcAuth":false,"ssoLinked":false,"hasPassword":false,"passwordChangeEnabled":true,"emailDeletion":true,"sso":null}"#
+      #"{"freshOidcAuth":false,"ssoLinked":false,"hasPassword":false,"#
+        + #""passwordChangeEnabled":true,"emailDeletion":true,"sso":null}"#
     ),
     rpcResponse(#"{"success":true}"#),
   ])

@@ -1,7 +1,6 @@
 import Foundation
 import RakazoAPI
 
-private struct Done: Decodable, Sendable { let ok: Bool }
 private struct BotRef: Encodable, Sendable { let botId: String }
 private struct GroupRef: Encodable, Sendable { let groupId: String }
 
@@ -95,7 +94,7 @@ enum ManageClient {
   }
 
   static func removeGroup(_ id: String, app: AppModel) async throws {
-    let _: Done = try await app.call("groups/remove", input: GroupRef(groupId: id))
+    let _: OKResult = try await app.call("groups/remove", input: GroupRef(groupId: id))
   }
 
   static func agents(app: AppModel) async throws -> Bootstrap {
@@ -104,10 +103,10 @@ enum ManageClient {
 
   static func archived(_ target: ThreadTarget, _ flag: Bool, app: AppModel) async throws {
     switch (target, flag) {
-    case (.bot(let id), true): let _: Done = try await app.call("bots/archive", input: BotRef(botId: id))
-    case (.bot(let id), false): let _: Done = try await app.call("bots/restore", input: BotRef(botId: id))
-    case (.group(let id), true): let _: Done = try await app.call("groups/archive", input: GroupRef(groupId: id))
-    case (.group(let id), false): let _: Done = try await app.call("groups/restore", input: GroupRef(groupId: id))
+    case (.bot(let id), true): let _: OKResult = try await app.call("bots/archive", input: BotRef(botId: id))
+    case (.bot(let id), false): let _: OKResult = try await app.call("bots/restore", input: BotRef(botId: id))
+    case (.group(let id), true): let _: OKResult = try await app.call("groups/archive", input: GroupRef(groupId: id))
+    case (.group(let id), false): let _: OKResult = try await app.call("groups/restore", input: GroupRef(groupId: id))
     }
   }
 

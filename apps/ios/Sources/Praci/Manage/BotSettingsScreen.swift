@@ -18,14 +18,16 @@ struct BotSettingsScreen: View {
   @State private var confirmDiscard = false
 
   var body: some View {
-    LoadableView(state: state, retry: { Task { await load() } }) { bot in
+    LoadableView(state: state, retry: { Task { await load() } }, content: { bot in
       form(bot)
-    }
+    })
     .navigationTitle("Agent settings")
     .navigationBarTitleDisplayMode(.inline)
     .task { await load() }
   }
 
+  // A SwiftUI view builder lists its rows in one place.
+  // swiftlint:disable:next function_body_length
   private func form(_ bot: BotDetail) -> some View {
     let dirty =
       ManageClient.clean(name) != bot.name || role != bot.title

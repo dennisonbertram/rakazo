@@ -26,10 +26,10 @@ final class ArchivedModel {
     do {
       async let bots: [BotSummary] = app.call("bots/listArchived")
       async let groups: [GroupSummary] = app.call("groups/listArchived")
-      let (b, g) = try await (bots, groups)
+      let (botList, groupList) = try await (bots, groups)
       let entries =
-        b.map { ArchivedEntry(id: $0.id, kind: .bot, name: $0.name, archivedAt: $0.archivedAt) }
-        + g.map { ArchivedEntry(id: $0.id, kind: .group, name: $0.name, archivedAt: $0.archivedAt) }
+        botList.map { ArchivedEntry(id: $0.id, kind: .bot, name: $0.name, archivedAt: $0.archivedAt) }
+        + groupList.map { ArchivedEntry(id: $0.id, kind: .group, name: $0.name, archivedAt: $0.archivedAt) }
       // Newest archive first; ISO timestamps sort as text.
       state = .loaded(entries.sorted { ($0.archivedAt ?? "") > ($1.archivedAt ?? "") })
     } catch {
@@ -59,7 +59,7 @@ struct ArchivedScreen: View {
   @State private var model = ArchivedModel()
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { entries in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { entries in
       if entries.isEmpty {
         ContentUnavailableView("No archived agents", systemImage: "archivebox")
       } else {
@@ -86,7 +86,7 @@ struct ArchivedScreen: View {
           }
         }
       }
-    }
+    })
     .navigationTitle("Archived agents")
     .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(app) }

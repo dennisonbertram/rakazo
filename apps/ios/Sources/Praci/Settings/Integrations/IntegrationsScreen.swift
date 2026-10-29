@@ -10,7 +10,7 @@ struct IntegrationsScreen: View {
   private static let preview = 6
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { snapshot in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { snapshot in
       List {
         if let pending = model.pending {
           Section {
@@ -44,7 +44,7 @@ struct IntegrationsScreen: View {
         }
         available(snapshot)
       }
-    }
+    })
     .navigationTitle("Integrations")
     .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(app) }
@@ -114,8 +114,8 @@ private struct ConnectionDetailScreen: View {
           "Allow writes",
           isOn: Binding(
             get: { current.writesEnabled },
-            set: { on in
-              if on { confirmWrites = true } else { Task { await model.setWrites(app, current, enabled: false) } }
+            set: { enabled in
+              if enabled { confirmWrites = true } else { Task { await model.setWrites(app, current, enabled: false) } }
             })
         )
         .accessibilityIdentifier("allowWrites")

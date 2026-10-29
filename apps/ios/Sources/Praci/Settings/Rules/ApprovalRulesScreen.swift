@@ -75,14 +75,14 @@ struct ApprovalRulesScreen: View {
   ]
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { snapshot in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { snapshot in
       List {
         Section {
           Toggle(
             "Review actions automatically",
             isOn: Binding(
               get: { snapshot.autoReview.enabled },
-              set: { on in Task { await model.setAutoReview(app, on) } })
+              set: { enabled in Task { await model.setAutoReview(app, enabled) } })
           )
           .disabled(!snapshot.autoReview.checkerAvailable)
           .accessibilityIdentifier("autoReview")
@@ -129,7 +129,7 @@ struct ApprovalRulesScreen: View {
           ContentUnavailableView("No rules", systemImage: "checkmark.shield")
         }
       }
-    }
+    })
     .navigationTitle("Approval rules")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {

@@ -6,10 +6,12 @@ import Testing
 private let now = 1_710_000_000_000
 private let hour = 60 * 60_000
 private func view(_ token: String, _ expires: Int = now + hour) -> String {
-  "https://app.example/novnc/session/view/\(expires).\(token)/embed.html?autoconnect=true&resize=scale&view_only=true&path=websockify"
+  "https://app.example/novnc/session/view/\(expires).\(token)/embed.html?"
+    + "autoconnect=true&resize=scale&view_only=true&path=websockify"
 }
 private func control(_ token: String, _ expires: Int = now + hour) -> String {
-  "https://app.example/novnc/session/control/\(expires).\(token)/embed.html?autoconnect=true&resize=scale&view_only=false&path=websockify"
+  "https://app.example/novnc/session/control/\(expires).\(token)/embed.html?"
+    + "autoconnect=true&resize=scale&view_only=false&path=websockify"
 }
 private let api = URL(string: "http://127.0.0.1:3301")!
 

@@ -16,9 +16,9 @@ final class SettingsModel {
   func load(_ app: AppModel) async {
     if state.value == nil { state = .loading }
     do {
-      let me: Me = try await app.call("me")
-      hideAmounts = me.hideAmounts
-      state = .loaded(me)
+      let profile: Me = try await app.call("me")
+      hideAmounts = profile.hideAmounts
+      state = .loaded(profile)
     } catch {
       if state.value == nil { state = .failed(error.localizedDescription) }
     }
@@ -30,8 +30,8 @@ final class SettingsModel {
     hideAmounts = value
     errorMessage = nil
     do {
-      let me: Me = try await app.call("preferences/update", input: HideAmountsUpdate(hideAmounts: value))
-      hideAmounts = me.hideAmounts
+      let profile: Me = try await app.call("preferences/update", input: HideAmountsUpdate(hideAmounts: value))
+      hideAmounts = profile.hideAmounts
     } catch {
       hideAmounts = previous
       errorMessage = error.localizedDescription

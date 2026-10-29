@@ -14,6 +14,8 @@ enum MarkdownBlock: Equatable {
 }
 
 // ponytail: line-based parser; nested lists and lazy continuation lines are flattened.
+// A line-based parser reads best as one loop.
+// swiftlint:disable:next function_body_length cyclomatic_complexity
 func parseMarkdown(_ source: String) -> [MarkdownBlock] {
   var blocks: [MarkdownBlock] = []
   var paragraph: [String] = []

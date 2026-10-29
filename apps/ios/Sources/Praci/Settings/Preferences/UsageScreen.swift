@@ -22,7 +22,7 @@ struct UsageScreen: View {
   @State private var model = UsageModel()
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { usage in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { usage in
       List {
         row("Runs", usage.runs)
         row("Model calls", usage.modelCalls)
@@ -30,7 +30,7 @@ struct UsageScreen: View {
         row("Output tokens", usage.outputTokens)
         row("Total tokens", usage.totalTokens)
       }
-    }
+    })
     .navigationTitle("Usage")
     .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(app) }

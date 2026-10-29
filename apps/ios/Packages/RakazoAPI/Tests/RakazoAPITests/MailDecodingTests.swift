@@ -36,7 +36,8 @@ func mapsEverySendOutcome() throws {
   #expect(try decode(ComposeResult.self, "mail-send-sent").outcome == .sent)
   #expect(try decode(ComposeResult.self, "mail-send-unknown").outcome == .unknown)
   #expect(try decode(ComposeResult.self, "mail-send-failed").outcome == .failed(reason: "rejected"))
-  let other = try JSONDecoder().decode(RPCEnvelope<ComposeResult>.self, from: Data(#"{"json":{"status":"later"}}"#.utf8))
+  let other = try JSONDecoder().decode(
+    RPCEnvelope<ComposeResult>.self, from: Data(#"{"json":{"status":"later"}}"#.utf8))
   #expect(other.json.outcome == .unrecognized("later"))
 }
 
@@ -53,12 +54,15 @@ func decodesCleanupAndTodos() throws {
   #expect(todos.todos[0].messageId == "msg-1" && todos.todos[1].messageId == nil)
   #expect(try decode(MailTodoList.self, "mail-todos-disabled").enabled == false)
   #expect(try decode(CleanupArchiveResult.self, "mail-cleanup-archive").remaining == 8)
-  #expect(try decode(UnsubscribeResult.self, "mail-unsubscribe-opened").openUrl == "https://example.test/unsubscribe")
+  let opened = try decode(UnsubscribeResult.self, "mail-unsubscribe-opened")
+  #expect(opened.openUrl == "https://example.test/unsubscribe")
 }
 
 @Test
 func parsesAndValidatesAddresses() {
-  #expect(MailAddresses.parse("Ana Ruiz <ana@example.test>") == MailAddress(name: "Ana Ruiz", address: "ana@example.test"))
+  #expect(
+    MailAddresses.parse("Ana Ruiz <ana@example.test>")
+      == MailAddress(name: "Ana Ruiz", address: "ana@example.test"))
   #expect(MailAddresses.parse("\"Ruiz, Ana\" <ana@example.test>")?.name == "Ruiz, Ana")
   #expect(MailAddresses.parse("ana@example.test")?.name == nil)
   #expect(MailAddresses.parse("ana@@example") == nil)
@@ -68,27 +72,34 @@ func parsesAndValidatesAddresses() {
   #expect(MailAddresses.invalid(in: "  ").isEmpty)
 }
 
-private func sender(_ address: String, count: Int = 10, read: Int = 0, spam: Bool = false, unsub: String = "link") -> CleanupSender {
-  CleanupSender(connectionId: "c", address: address, messageCount: count, readCount: read, inboxThreads: count, spamLike: spam, unsubscribe: unsub)
+private func sender(
+  _ address: String, count: Int = 10, read: Int = 0, spam: Bool = false, unsub: String = "link"
+) -> CleanupSender {
+  CleanupSender(
+    connectionId: "c", address: address, messageCount: count, readCount: read, inboxThreads: count,
+    spamLike: spam, unsubscribe: unsub)
 }
 
 @Test
 func cleanupTargetsAndRanking() {
-  let a = sender("a@x.test", count: 5, read: 4)
-  let b = sender("b@x.test", count: 10, spam: true, unsub: "none")
-  let c = sender("c@x.test", count: 7)
-  #expect(CleanupLogic.rank([a, b, c]).map(\.address) == ["b@x.test", "c@x.test", "a@x.test"])
-  let all = Set([a, b, c].map(\.id))
-  #expect(CleanupLogic.targets(.archive, senders: [a, b, c], selected: all).count == 3)
-  #expect(CleanupLogic.targets(.skip_inbox, senders: [a, b, c], selected: all).map(\.address) == ["a@x.test", "c@x.test"])
-  #expect(CleanupLogic.targets(.unsubscribe, senders: [a, b, c], selected: all).map(\.address) == ["a@x.test", "c@x.test"])
-  #expect(CleanupLogic.threadCount([a, c]) == 12)
+  let first = sender("a@x.test", count: 5, read: 4)
+  let second = sender("b@x.test", count: 10, spam: true, unsub: "none")
+  let third = sender("c@x.test", count: 7)
+  let senders = [first, second, third]
+  #expect(CleanupLogic.rank(senders).map(\.address) == ["b@x.test", "c@x.test", "a@x.test"])
+  let all = Set(senders.map(\.id))
+  #expect(CleanupLogic.targets(.archive, senders: senders, selected: all).count == 3)
+  let skipInbox = CleanupLogic.targets(.skipInbox, senders: senders, selected: all)
+  #expect(skipInbox.map(\.address) == ["a@x.test", "c@x.test"])
+  let unsubscribe = CleanupLogic.targets(.unsubscribe, senders: senders, selected: all)
+  #expect(unsubscribe.map(\.address) == ["a@x.test", "c@x.test"])
+  #expect(CleanupLogic.threadCount([first, third]) == 12)
 }
 
 private actor Calls {
   var archive: [String] = []
   var unsub = 0
-  func recordArchive(_ s: String) { archive.append(s) }
+  func recordArchive(_ address: String) { archive.append(address) }
   func recordUnsub() { unsub += 1 }
 }
 
@@ -120,10 +131,13 @@ func cleanupPagesUntilEmptyAndNeverArchivesAfterUnknownUnsubscribe() async {
 func cleanupKeepsFailuresAndAsksBeforeMail() async {
   let api = CleanupLogic.Api(
     archive: { _, _, _ in throw URLError(.notConnectedToInternet) },
-    unsubscribe: { _, confirm in UnsubscribeResult(status: confirm ? "sent" : "needs_confirmation", mailTo: "unsub@x.test") })
+    unsubscribe: { _, confirm in
+      UnsubscribeResult(status: confirm ? "sent" : "needs_confirmation", mailTo: "unsub@x.test")
+    })
   let ask = await CleanupLogic.run(.unsubscribe, senders: [sender("m@x.test", unsub: "mailto")], api: api)
   #expect(ask.confirm.first?.mailTo == "unsub@x.test" && ask.failed.isEmpty)
-  let sent = await CleanupLogic.run(.unsubscribe, senders: [sender("m@x.test", unsub: "mailto")], api: api, confirmMailto: true)
+  let sent = await CleanupLogic.run(
+    .unsubscribe, senders: [sender("m@x.test", unsub: "mailto")], api: api, confirmMailto: true)
   #expect(sent.failed.count == 1)  // the archive step failed after the email was sent
 }
 

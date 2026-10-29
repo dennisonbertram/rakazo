@@ -49,7 +49,8 @@ private func makeApp(_ responses: [HTTPResponse]) async throws -> (AppModel, Scr
 private let archivedBot =
   #"{"id":"b1","name":"Old bot","archivedAt":"2026-10-03T03:26:53.690Z","updatedAt":"2026-10-03T03:26:53.690Z"}"#
 private let archivedGroup =
-  #"{"id":"g1","name":"Old group","archivedAt":"2026-10-05T03:26:53.690Z","members":[],"updatedAt":"2026-10-05T03:26:53.690Z","preview":"","unread":false,"pinned":false}"#
+  #"{"id":"g1","name":"Old group","archivedAt":"2026-10-05T03:26:53.690Z","members":[],"#
+    + #""updatedAt":"2026-10-05T03:26:53.690Z","preview":"","unread":false,"pinned":false}"#
 
 @Test
 @MainActor
@@ -71,7 +72,9 @@ func archivedListMergesBotsAndGroupsNewestFirstAndRestoreRemovesTheRow() async t
 @MainActor
 func failedRestoreKeepsTheRowAndShowsTheError() async throws {
   let (app, transport) = try await makeApp([
-    HTTPResponse(statusCode: 400, body: Data(#"{"json":{"defined":false,"code":"BAD_REQUEST","status":400,"message":"Nope"}}"#.utf8))
+    HTTPResponse(
+      statusCode: 400,
+      body: Data(#"{"json":{"defined":false,"code":"BAD_REQUEST","status":400,"message":"Nope"}}"#.utf8))
   ])
   await transport.route("/rpc/bots/listArchived", ok("{\"json\":[\(archivedBot)]}"))
   await transport.route("/rpc/groups/listArchived", ok(#"{"json":[]}"#))

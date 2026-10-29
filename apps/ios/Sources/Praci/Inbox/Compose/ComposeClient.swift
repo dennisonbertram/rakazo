@@ -12,7 +12,9 @@ struct ComposeDraft: Encodable, Sendable, Equatable {
   let connectionId: String
   var replyToMessageId: String?
   var forwardOf: Forward?
+  // swiftlint:disable:next identifier_name
   var to: String
+  // swiftlint:disable:next identifier_name
   var cc: String
   var bcc: String
   var subject: String
@@ -43,7 +45,6 @@ struct ComposeClient {
 }
 
 private struct DiscardInput: Encodable, Sendable { let clientId: String }
-private struct Ok: Decodable, Sendable { let ok: Bool }
 
 extension ComposeClient {
   @MainActor
@@ -74,7 +75,7 @@ extension ComposeClient {
         return result.outcome
       },
       discard: { id in
-        let _: Ok = try await app.call("inbox/compose/discard", input: DiscardInput(clientId: id))
+        let _: OKResult = try await app.call("inbox/compose/discard", input: DiscardInput(clientId: id))
       })
   }
 }

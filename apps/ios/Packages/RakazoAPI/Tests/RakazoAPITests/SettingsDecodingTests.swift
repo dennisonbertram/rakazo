@@ -9,25 +9,25 @@ private func decode<T: Decodable>(_ type: T.Type, _ name: String) throws -> T {
 
 @Test
 func decodesNotificationPreferencesAndTreatsMissingChannelsAsOn() throws {
-  let p = try decode(NotificationPreferences.self, "settings-notification-preferences")
-  #expect(p.finish && !p.help && p.takeover)
-  #expect(!p.push)
-  #expect(p.imessage)
-  #expect(p.hasPhone && !p.hasImessage)
+  let prefs = try decode(NotificationPreferences.self, "settings-notification-preferences")
+  #expect(prefs.finish && !prefs.help && prefs.takeover)
+  #expect(!prefs.push)
+  #expect(prefs.imessage)
+  #expect(prefs.hasPhone && !prefs.hasImessage)
 }
 
 @Test
 func encodesOnlyTheChangedNotificationFields() throws {
   let data = try JSONEncoder().encode(
     RPCRequest(json: NotificationPreferencesUpdate(channels: .init(push: false))))
-  #expect(String(decoding: data, as: UTF8.self) == #"{"json":{"channels":{"push":false}}}"#)
+  #expect(String(bytes: data, encoding: .utf8) == #"{"json":{"channels":{"push":false}}}"#)
 }
 
 @Test
 func decodesUsageIncludingNullCounts() throws {
-  let u = try decode(UsageSummary.self, "settings-usage-summary")
-  #expect(u.inputTokens == 39 && u.outputTokens == 3038 && u.totalTokens == 129_449)
-  #expect(u.runs == 9)
+  let usage = try decode(UsageSummary.self, "settings-usage-summary")
+  #expect(usage.inputTokens == 39 && usage.outputTokens == 3038 && usage.totalTokens == 129_449)
+  #expect(usage.runs == 9)
   let empty = try decode(UsageSummary.self, "settings-usage-empty")
   #expect(empty.inputTokens == nil && empty.runs == 0)
 }

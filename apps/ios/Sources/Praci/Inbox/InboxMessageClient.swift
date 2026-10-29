@@ -9,7 +9,9 @@ struct InboxMessageClient {
   var askAgent: @MainActor (_ messageID: String) async throws -> AskAgentResult
   /// The account a message arrived on. rpc_inbox_get does not say, but the reply prefill does.
   var connection: @MainActor (_ messageID: String) async throws -> String
-  var unsubscribe: @MainActor (_ connectionID: String, _ address: String, _ confirmMailto: Bool) async throws -> UnsubscribeResult
+  var unsubscribe:
+    @MainActor (_ connectionID: String, _ address: String, _ confirmMailto: Bool) async throws
+      -> UnsubscribeResult
   var attachment: @MainActor (_ messageID: String, _ attachment: MailAttachment) async throws -> URL
 }
 
@@ -23,7 +25,6 @@ struct PrefillInput: Encodable, Sendable {
   var timeZone = TimeZone.current.identifier
   var locale = Locale.current.identifier(.bcp47)
 }
-private struct Ok: Decodable, Sendable { let ok: Bool }
 
 extension InboxMessageClient {
   @MainActor
@@ -31,10 +32,10 @@ extension InboxMessageClient {
     InboxMessageClient(
       get: { id in try await app.call("inbox/get", input: MessageInput(messageId: id)) },
       archive: { id in
-        let _: Ok = try await app.call("inbox/archive", input: MessageInput(messageId: id))
+        let _: OKResult = try await app.call("inbox/archive", input: MessageInput(messageId: id))
       },
       unarchive: { id in
-        let _: Ok = try await app.call("inbox/unarchive", input: MessageInput(messageId: id))
+        let _: OKResult = try await app.call("inbox/unarchive", input: MessageInput(messageId: id))
       },
       askAgent: { id in try await app.call("inbox/askAgent", input: MessageInput(messageId: id), timeout: 30) },
       connection: { id in
@@ -53,7 +54,8 @@ extension InboxMessageClient {
         let path = "/api/inbox/messages/\(id.urlPathSafe)/attachments/\(attachment.id.urlPathSafe)"
         guard let url = URL(string: path, relativeTo: base)?.absoluteURL else { throw URLError(.badURL) }
         let data = try await app.data(url: url)
-        let directory = FileManager.default.temporaryDirectory.appending(path: "mail-attachments", directoryHint: .isDirectory)
+        let directory = FileManager.default.temporaryDirectory
+          .appending(path: "mail-attachments", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let name = attachment.filename.replacing("/", with: "-")
         let file = directory.appending(path: "\(attachment.id)-\(name.isEmpty ? "attachment" : name)")

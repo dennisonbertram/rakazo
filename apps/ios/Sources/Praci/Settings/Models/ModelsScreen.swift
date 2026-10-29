@@ -7,7 +7,7 @@ struct ModelsScreen: View {
   @State private var connecting = false
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { snapshot in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { snapshot in
       List {
         if let current = snapshot.defaultCredential, let modelID = current.modelId {
           defaultSection(snapshot, current: current, modelID: modelID)
@@ -29,7 +29,7 @@ struct ModelsScreen: View {
           .accessibilityIdentifier("connectModel")
         }
       }
-    }
+    })
     .navigationTitle("Models")
     .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(app) }

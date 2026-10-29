@@ -1,3 +1,5 @@
+// The auth client keeps every endpoint call in this one file.
+// swiftlint:disable file_length
 import Foundation
 import CoreFoundation
 
@@ -180,6 +182,8 @@ public struct AuthorizedRequest: Sendable {
   public let hadSpace: Bool
 }
 
+// The client keeps every auth call behind one actor so the session state stays serialized.
+// swiftlint:disable:next type_body_length
 public actor AuthClient {
   private static let authResponseLimit = 64 * 1024
   private static let originHeader = "rakazo://"
@@ -246,6 +250,7 @@ public actor AuthClient {
     return .unauthorized
   }
 
+  // swiftlint:disable:next function_body_length
   public func restore() async throws {
     let currentEndpoint = try validatedEndpoint()
     let operationGeneration = generation
@@ -341,6 +346,7 @@ public actor AuthClient {
     return capabilities
   }
 
+  // swiftlint:disable:next cyclomatic_complexity
   public func authenticate(
     _ action: EmailAuthAction,
     email: String,
@@ -593,6 +599,7 @@ public actor AuthClient {
     return AccountRequestError(status: response.statusCode, message: message)
   }
 
+  // swiftlint:disable:next function_body_length
   public func beginSSO() async throws -> SSOChallenge {
     let currentEndpoint = try validatedEndpoint()
     let operationGeneration = generation

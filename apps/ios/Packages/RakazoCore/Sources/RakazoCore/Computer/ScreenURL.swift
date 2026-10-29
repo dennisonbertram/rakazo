@@ -1,4 +1,3 @@
-// swiftlint:disable identifier_name
 import Foundation
 
 /// Screen-URL rules for the Team Computer page. A port of `apps/mobile/lib/computer.ts`.
@@ -31,34 +30,40 @@ public enum ComputerScreenURL {
     return parts.url
   }
 
-  private static func segments(_ url: String) -> (origin: String, path: String, query: [String: String])? {
+  private struct Segments {
+    var origin: String
+    var path: String
+    var query: [String: String]
+  }
+
+  private static func segments(_ url: String) -> Segments? {
     guard let parts = URLComponents(string: url), let scheme = parts.scheme, let host = parts.host
     else { return nil }
     let port = parts.port.map { ":\($0)" } ?? ""
     var query: [String: String] = [:]
     for item in parts.queryItems ?? [] { query[item.name] = item.value ?? "" }
-    return ("\(scheme)://\(host)\(port)", parts.path, query)
+    return Segments(origin: "\(scheme)://\(host)\(port)", path: parts.path, query: query)
   }
 
   /// Identity of a live stream, ignoring rotating capability tokens. View versus control stays
   /// in the key so takeover and release reconnect.
   public static func streamKey(_ url: String) -> String {
-    guard let s = segments(url) else { return url }
-    let pieces = s.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+    guard let parts = segments(url) else { return url }
+    let pieces = parts.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
     // ["", "novnc", "session", "view|control", "<expiry>.<token>", rest...]
     if pieces.count >= 5, pieces[0] == "", pieces[1] == "novnc", pieces[2] == "session",
       pieces[3] == "view" || pieces[3] == "control"
     {
       let rest = pieces.dropFirst(5).map { "/" + $0 }.joined()
-      return "\(s.origin)/novnc/session/\(pieces[3])\(rest)"
+      return "\(parts.origin)/novnc/session/\(pieces[3])\(rest)"
     }
-    let policy = s.query["view_only"].map { "?view_only=\($0)" } ?? ""
-    return "\(s.origin)\(s.path)\(policy)"
+    let policy = parts.query["view_only"].map { "?view_only=\($0)" } ?? ""
+    return "\(parts.origin)\(parts.path)\(policy)"
   }
 
   static func capabilityExpiresAt(_ url: String) -> Int? {
-    guard let s = segments(url) else { return nil }
-    let pieces = s.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+    guard let parts = segments(url) else { return nil }
+    let pieces = parts.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
     guard pieces.count >= 5, pieces[1] == "novnc", pieces[2] == "session",
       pieces[3] == "view" || pieces[3] == "control",
       let dot = pieces[4].firstIndex(of: "."), let expiry = Int(pieces[4][..<dot])

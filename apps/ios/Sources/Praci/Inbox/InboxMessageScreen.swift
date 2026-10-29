@@ -249,7 +249,9 @@ private struct MessageBody: View {
         .font(.subheadline)
         .foregroundStyle(Color.token(.mutedForeground))
       if !message.cc.isEmpty {
-        Text("Cc \(MailAddresses.split(message.cc).map { MailAddresses.parse($0)?.display ?? $0 }.joined(separator: ", "))")
+        let ccList = MailAddresses.split(message.cc).map { MailAddresses.parse($0)?.display ?? $0 }
+          .joined(separator: ", ")
+        Text("Cc \(ccList)")
           .font(.subheadline)
           .foregroundStyle(Color.token(.mutedForeground))
       }

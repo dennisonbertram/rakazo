@@ -9,8 +9,8 @@ struct ConsentRevokeInput: Encodable, Sendable {
 
   // The server requires the key field; null revokes every recipient.
   func encode(to encoder: any Encoder) throws {
-    var c = encoder.container(keyedBy: CodingKeys.self)
-    try c.encode(key, forKey: .key)
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(key, forKey: .key)
   }
 }
 
@@ -58,7 +58,7 @@ struct AIDataSharingScreen: View {
   @State private var asking: AIRecipient?
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { status in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { status in
       List {
         ForEach([AIDataUse.model, .voice, .memory], id: \.self) { use in
           let recipients = status.recipients.filter { $0.use == use }
@@ -68,8 +68,8 @@ struct AIDataSharingScreen: View {
                 Toggle(
                   isOn: Binding(
                     get: { recipient.allowed },
-                    set: { on in
-                      if on { asking = recipient } else { Task { await model.revoke(app, recipient) } }
+                    set: { granted in
+                      if granted { asking = recipient } else { Task { await model.revoke(app, recipient) } }
                     })
                 ) {
                   VStack(alignment: .leading) {
@@ -98,7 +98,7 @@ struct AIDataSharingScreen: View {
           }
         }
       }
-    }
+    })
     .navigationTitle("AI data sharing")
     .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(app) }

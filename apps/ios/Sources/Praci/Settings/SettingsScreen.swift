@@ -8,9 +8,9 @@ struct SettingsScreen: View {
   @State private var model = SettingsModel()
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { profile in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { profile in
       list(profile)
-    }
+    })
     .navigationTitle("Settings")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
@@ -46,7 +46,7 @@ struct SettingsScreen: View {
   private func topSections(_ profile: Me) -> some View {
     Section {
       NavigationLink {
-        AccountScreen(me: profile)
+        AccountScreen(profile: profile)
       } label: {
         HStack(spacing: 12) {
           Initials(name: profile.name)

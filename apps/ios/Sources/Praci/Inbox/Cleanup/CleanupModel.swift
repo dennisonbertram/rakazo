@@ -30,13 +30,17 @@ extension CleanupClient {
         archive: { kind, sender, batch in
           try await app.call(
             "inbox/cleanup/archive",
-            input: ArchiveInput(kind: kind.rawValue, connectionId: sender.connectionId, address: sender.address, batchId: batch),
+            input: ArchiveInput(
+              kind: kind.rawValue, connectionId: sender.connectionId, address: sender.address,
+              batchId: batch),
             timeout: 60)
         },
         unsubscribe: { sender, confirm in
           try await app.call(
             "inbox/unsubscribe",
-            input: UnsubscribeInput(connectionId: sender.connectionId, address: sender.address, confirmMailto: confirm ? true : nil),
+            input: UnsubscribeInput(
+              connectionId: sender.connectionId, address: sender.address,
+              confirmMailto: confirm ? true : nil),
             timeout: 60)
         }),
       undo: { id in
@@ -186,10 +190,14 @@ final class CleanupModel {
         if case .error(let message) = failure.reason { return message }
         return nil
       }
-      phase = .failed(kind, kind == .archive ? "Couldn’t archive. Nothing was moved." : (detail ?? "Couldn’t finish that."))
+      phase = .failed(
+        kind, kind == .archive ? "Couldn’t archive. Nothing was moved." : (detail ?? "Couldn’t finish that."))
       return
     }
-    phase = .done(Summary(kind: kind, senders: senders, done: result.done, batchIDs: result.batchIds, failures: failures, links: links))
+    phase = .done(
+      Summary(
+        kind: kind, senders: senders, done: result.done, batchIDs: result.batchIds, failures: failures,
+        links: links))
     Task { await reload() }
   }
 

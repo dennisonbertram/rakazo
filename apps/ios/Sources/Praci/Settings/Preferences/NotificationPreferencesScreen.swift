@@ -42,7 +42,7 @@ struct NotificationPreferencesScreen: View {
   @State private var model = NotificationPreferencesModel()
 
   var body: some View {
-    LoadableView(state: model.state, retry: { Task { await model.load(app) } }) { prefs in
+    LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { prefs in
       List {
         Section("Tell me when an agent") {
           toggle("Finishes", prefs.finish, id: "notifyFinish") {
@@ -73,7 +73,7 @@ struct NotificationPreferencesScreen: View {
           Section { Text(message).foregroundStyle(Color.token(.destructive)) }
         }
       }
-    }
+    })
     .navigationTitle("Notifications")
     .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(app) }

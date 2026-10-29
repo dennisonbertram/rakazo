@@ -35,6 +35,7 @@ private struct ComposeContent: View {
   @Environment(\.dismiss) private var dismiss
   @FocusState private var focus: Field?
 
+  // swiftlint:disable:next identifier_name
   private enum Field { case to, cc, bcc, subject, body }
 
   init(app: AppModel, mode: ComposeMode, onSent: (() -> Void)?) {
@@ -44,9 +45,9 @@ private struct ComposeContent: View {
 
   var body: some View {
     NavigationStack {
-      LoadableView(state: model.state, retry: { Task { await model.load() } }) { _ in
+      LoadableView(state: model.state, retry: { Task { await model.load() } }, content: { _ in
         form
-      }
+      })
       .background(Color.token(.background))
       .navigationTitle(model.title)
       .navigationBarTitleDisplayMode(.inline)

@@ -25,7 +25,9 @@ final class ComposeModel {
   private(set) var sent = false
   private(set) var savedDraft = false
   var connectionID = ""
+  // swiftlint:disable:next identifier_name
   var to = ""
+  // swiftlint:disable:next identifier_name
   var cc = ""
   var bcc = ""
   var subject = ""
@@ -41,6 +43,7 @@ final class ComposeModel {
   @ObservationIgnored private var initial: Snapshot?
 
   private struct Snapshot: Equatable {
+    // swiftlint:disable:next identifier_name
     var to, cc, bcc, subject, body: String
     var connectionID: String
     var attachmentIDs: [String]
@@ -78,7 +81,8 @@ final class ComposeModel {
         showsCcBcc = !prefill.cc.isEmpty
         replyToMessageID = mode.isForward ? nil : (prefill.replyToMessageId ?? id)
         if prefill.attachmentsTooLarge {
-          banner = .error("Some files were left out: \(prefill.attachmentsLeftOut.map(\.filename).joined(separator: ", ")).")
+          let names = prefill.attachmentsLeftOut.map(\.filename).joined(separator: ", ")
+          banner = .error("Some files were left out: \(names).")
         }
       } else {
         accounts = try await client.accounts()
@@ -93,7 +97,9 @@ final class ComposeModel {
   }
 
   private var snapshot: Snapshot {
-    Snapshot(to: to, cc: cc, bcc: bcc, subject: subject, body: body, connectionID: connectionID, attachmentIDs: attachments.map(\.id))
+    Snapshot(
+      to: to, cc: cc, bcc: bcc, subject: subject, body: body, connectionID: connectionID,
+      attachmentIDs: attachments.map(\.id))
   }
 
   /// True once anything changed from what the sheet opened with.

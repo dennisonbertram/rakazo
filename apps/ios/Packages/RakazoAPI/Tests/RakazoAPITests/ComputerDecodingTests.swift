@@ -9,28 +9,28 @@ private func decode<T: Decodable>(_ type: T.Type, _ name: String) throws -> T {
 
 @Test
 func decodesComputerStatusWhileTheAgentDrives() throws {
-  let s = try decode(ComputerStatus.self, "computer-status-running-bot")
-  #expect(s.state == .running)
-  #expect(s.mode == .team)
-  #expect(s.controlHolder == .bot)
-  #expect(s.busyBotName == "Finance agent")
-  #expect(s.userHasControl(of: "bot-placeholder") == false)
+  let status = try decode(ComputerStatus.self, "computer-status-running-bot")
+  #expect(status.state == .running)
+  #expect(status.mode == .team)
+  #expect(status.controlHolder == .bot)
+  #expect(status.busyBotName == "Finance agent")
+  #expect(status.userHasControl(of: "bot-placeholder") == false)
 }
 
 @Test
 func decodesComputerStatusWhileTheUserDrives() throws {
-  let s = try decode(ComputerStatus.self, "computer-status-user-control")
-  #expect(s.userHasControl(of: "bot-placeholder"))
-  #expect(s.userHasControl(of: "other") == false)
+  let status = try decode(ComputerStatus.self, "computer-status-user-control")
+  #expect(status.userHasControl(of: "bot-placeholder"))
+  #expect(status.userHasControl(of: "other") == false)
 }
 
 @Test
 func computerStatusToleratesUnknownValuesAndMissingFields() throws {
   let json = #"{"json":{"botId":"b","state":"hibernating","controlHolder":"robot"}}"#
-  let s = try JSONDecoder().decode(RPCEnvelope<ComputerStatus>.self, from: Data(json.utf8)).json
-  #expect(s.state == .unknown("hibernating"))
-  #expect(s.controlHolder == .unknown("robot"))
-  #expect(s.screenWidth == nil)
+  let status = try JSONDecoder().decode(RPCEnvelope<ComputerStatus>.self, from: Data(json.utf8)).json
+  #expect(status.state == .unknown("hibernating"))
+  #expect(status.controlHolder == .unknown("robot"))
+  #expect(status.screenWidth == nil)
 }
 
 @Test
@@ -45,5 +45,5 @@ func decodesScreenTakeoverAndAck() throws {
 @Test
 func encodesReleaseInput() throws {
   let data = try JSONEncoder().encode(ComputerReleaseInput(botId: "b", reason: .skipped))
-  #expect(String(decoding: data, as: UTF8.self).contains(#""reason":"skipped""#))
+  #expect(String(bytes: data, encoding: .utf8)?.contains(#""reason":"skipped""#) == true)
 }

@@ -18,6 +18,9 @@ struct InboxListView: View {
           .listRowSeparator(.hidden)
           .listRowBackground(Color.token(.background))
       }
+      TodosCard()
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.token(.background))
       section("Needs reply", groups.needsReply, count: true)
       section("Today", groups.today)
       section("Earlier", groups.earlier)

@@ -21,16 +21,16 @@ public struct ModelOption: Sendable, Hashable, Decodable, Identifiable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    provider = try c.decode(String.self, forKey: .provider)
-    providerName = try c.decodeIfPresent(String.self, forKey: .providerName) ?? provider
-    id = try c.decode(String.self, forKey: .id)
-    label = try c.decodeIfPresent(String.self, forKey: .label) ?? id
-    auth = try c.decodeIfPresent(String.self, forKey: .auth) ?? "api-key"
-    oauthLabel = try c.decodeIfPresent(String.self, forKey: .oauthLabel)
-    signIn = try c.decodeIfPresent(String.self, forKey: .signIn)
-    thinkingLevels = try c.decodeIfPresent([String].self, forKey: .thinkingLevels) ?? []
-    placeholder = try c.decodeIfPresent(Bool.self, forKey: .placeholder) ?? false
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    provider = try container.decode(String.self, forKey: .provider)
+    providerName = try container.decodeIfPresent(String.self, forKey: .providerName) ?? provider
+    id = try container.decode(String.self, forKey: .id)
+    label = try container.decodeIfPresent(String.self, forKey: .label) ?? id
+    auth = try container.decodeIfPresent(String.self, forKey: .auth) ?? "api-key"
+    oauthLabel = try container.decodeIfPresent(String.self, forKey: .oauthLabel)
+    signIn = try container.decodeIfPresent(String.self, forKey: .signIn)
+    thinkingLevels = try container.decodeIfPresent([String].self, forKey: .thinkingLevels) ?? []
+    placeholder = try container.decodeIfPresent(Bool.self, forKey: .placeholder) ?? false
   }
 }
 
@@ -50,15 +50,15 @@ public struct ModelCredential: Sendable, Hashable, Decodable, Identifiable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    provider = try c.decode(String.self, forKey: .provider)
-    label = try c.decodeIfPresent(String.self, forKey: .label) ?? provider
-    hasKey = try c.decodeIfPresent(Bool.self, forKey: .hasKey) ?? false
-    isDefault = try c.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
-    modelId = try c.decodeIfPresent(String.self, forKey: .modelId)
-    thinkingLevel = try c.decodeIfPresent(String.self, forKey: .thinkingLevel)
-    baseUrl = try c.decodeIfPresent(String.self, forKey: .baseUrl)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    provider = try container.decode(String.self, forKey: .provider)
+    label = try container.decodeIfPresent(String.self, forKey: .label) ?? provider
+    hasKey = try container.decodeIfPresent(Bool.self, forKey: .hasKey) ?? false
+    isDefault = try container.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
+    modelId = try container.decodeIfPresent(String.self, forKey: .modelId)
+    thinkingLevel = try container.decodeIfPresent(String.self, forKey: .thinkingLevel)
+    baseUrl = try container.decodeIfPresent(String.self, forKey: .baseUrl)
   }
 }
 
@@ -81,6 +81,8 @@ public struct ModelOAuthStatus: Sendable, Decodable {
 
 /// `{ ok: true }` outputs of the disconnect, revoke and remove procedures.
 public struct OKResult: Sendable, Decodable {
+  // The server names this key "ok".
+  // swiftlint:disable:next identifier_name
   public let ok: Bool
 }
 
@@ -105,13 +107,13 @@ public struct ConnectorEntry: Sendable, Hashable, Decodable, Identifiable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    connectorId = try c.decode(String.self, forKey: .connectorId)
-    slug = try c.decode(String.self, forKey: .slug)
-    name = try c.decodeIfPresent(String.self, forKey: .name) ?? slug
-    connected = try c.decodeIfPresent(Bool.self, forKey: .connected) ?? false
-    description = try c.decodeIfPresent(String.self, forKey: .description)
-    category = try c.decodeIfPresent(String.self, forKey: .category) ?? "other"
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    connectorId = try container.decode(String.self, forKey: .connectorId)
+    slug = try container.decode(String.self, forKey: .slug)
+    name = try container.decodeIfPresent(String.self, forKey: .name) ?? slug
+    connected = try container.decodeIfPresent(Bool.self, forKey: .connected) ?? false
+    description = try container.decodeIfPresent(String.self, forKey: .description)
+    category = try container.decodeIfPresent(String.self, forKey: .category) ?? "other"
   }
 }
 
@@ -134,15 +136,15 @@ public struct Connection: Sendable, Hashable, Decodable, Identifiable {
   }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    connectorId = try c.decodeIfPresent(String.self, forKey: .connectorId) ?? ""
-    provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? ""
-    displayName = try c.decodeIfPresent(String.self, forKey: .displayName) ?? provider
-    status = try c.decodeIfPresent(String.self, forKey: .status) ?? "error"
-    error = try c.decodeIfPresent(String.self, forKey: .error)
-    needsReconnect = try c.decodeIfPresent(Bool.self, forKey: .needsReconnect) ?? false
-    writesEnabled = try c.decodeIfPresent(Bool.self, forKey: .writesEnabled) ?? false
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    connectorId = try container.decodeIfPresent(String.self, forKey: .connectorId) ?? ""
+    provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? ""
+    displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? provider
+    status = try container.decodeIfPresent(String.self, forKey: .status) ?? "error"
+    error = try container.decodeIfPresent(String.self, forKey: .error)
+    needsReconnect = try container.decodeIfPresent(Bool.self, forKey: .needsReconnect) ?? false
+    writesEnabled = try container.decodeIfPresent(Bool.self, forKey: .writesEnabled) ?? false
   }
 }
 
@@ -163,12 +165,12 @@ public struct ApprovalRule: Sendable, Hashable, Decodable, Identifiable {
   private enum CodingKeys: String, CodingKey { case id, effect, matchKind, matchValue, botId }
 
   public init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    effect = try c.decodeIfPresent(String.self, forKey: .effect) ?? "require_approval"
-    matchKind = try c.decodeIfPresent(String.self, forKey: .matchKind) ?? "tool"
-    matchValue = try c.decodeIfPresent(String.self, forKey: .matchValue) ?? ""
-    botId = try c.decodeIfPresent(String.self, forKey: .botId)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    effect = try container.decodeIfPresent(String.self, forKey: .effect) ?? "require_approval"
+    matchKind = try container.decodeIfPresent(String.self, forKey: .matchKind) ?? "tool"
+    matchValue = try container.decodeIfPresent(String.self, forKey: .matchValue) ?? ""
+    botId = try container.decodeIfPresent(String.self, forKey: .botId)
   }
 }
 

@@ -46,6 +46,8 @@ struct ThreadMessageView: View {
     .accessibilityIdentifier("threadMessage")
   }
 
+  // One case per block kind.
+  // swiftlint:disable:next cyclomatic_complexity
   @ViewBuilder private func blockView(_ block: MessageBlock) -> some View {
     switch block.kind {
     case .text:

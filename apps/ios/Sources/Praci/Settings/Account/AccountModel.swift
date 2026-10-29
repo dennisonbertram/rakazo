@@ -78,6 +78,7 @@ final class AccountModel {
       try await app.authentication.client.deleteAccount(proof)
       app.reset()
       await app.authentication.sync()
+      app.authentication.showNotice(String(localized: "Your account was deleted"))
       return true
     } catch {
       errorMessage = Self.message(error)

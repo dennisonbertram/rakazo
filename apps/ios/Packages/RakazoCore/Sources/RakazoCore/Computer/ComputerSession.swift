@@ -15,8 +15,8 @@ public struct SystemComputerClock: ComputerClock {
 
 /// One polling lifecycle for an open Team Computer page. A port of `computer-refresh.ts`.
 /// It polls the status about every 2 seconds, re-reads the screen URL only when the status that
-/// shapes it changed or the held URL nears expiry, and pings the heartbeat while the user
-/// controls the computer. `stop()` ends every task; call it when the page disappears or the app
+/// shapes it changed or the held URL nears expiry, and pings the heartbeat while the computer
+/// is running. `stop()` ends every task; call it when the page disappears or the app
 /// goes to the background.
 @MainActor
 public final class ComputerSession {
@@ -45,7 +45,6 @@ public final class ComputerSession {
   private let hooks: Hooks
   private let clock: any ComputerClock
   private var active = false
-  private var controlling = false
   private var paused = false
   /// Bumped by `stop` and `perform` so a read that finished late is dropped.
   private var generation = 0
@@ -91,12 +90,15 @@ public final class ComputerSession {
   /// The viewer could not use the current URL: read a fresh one on the next poll.
   public func invalidateScreen() { screenLoaded = false }
 
-  /// Starts or stops the 60-second heartbeat. The first ping is immediate.
-  public func setControlling(_ value: Bool) {
-    controlling = value
-    heartbeatTask?.cancel()
-    heartbeatTask = nil
-    guard value, active else { return }
+  /// Pings every 60 seconds while the computer is running (the server keeps it awake while
+  /// someone watches). The first ping is immediate. Starts or stops from each status read.
+  private func setHeartbeat(_ running: Bool) {
+    if !running {
+      heartbeatTask?.cancel()
+      heartbeatTask = nil
+      return
+    }
+    guard active, heartbeatTask == nil else { return }
     let clock = clock, ping = hooks.heartbeat
     heartbeatTask = Task { @MainActor in
       while !Task.isCancelled {
@@ -131,6 +133,7 @@ public final class ComputerSession {
     let status = try await hooks.readStatus()
     guard active, token == generation else { return nil }
     hooks.onStatus(status)
+    setHeartbeat(status.state == .running)
     if screenIsStale(status, force: force) {
       do {
         let url = try await hooks.readScreen(attempts)
