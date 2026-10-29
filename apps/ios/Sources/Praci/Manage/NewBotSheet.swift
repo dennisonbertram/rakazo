@@ -82,7 +82,7 @@ struct ColorSwatches: View {
       HStack(spacing: 12) {
         ForEach(BotPalette.colors, id: \.self) { hex in
           Button { selection = hex } label: {
-            BotAvatarView(name: "", avatar: hex, size: 32)
+            Circle().fill(Color(hex: hex)).frame(width: 32, height: 32)
               .overlay {
                 if selection.caseInsensitiveCompare(hex) == .orderedSame {
                   Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(.white)
