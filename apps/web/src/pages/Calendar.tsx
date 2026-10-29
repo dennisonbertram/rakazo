@@ -457,15 +457,25 @@ export function CalendarPage({
     const bot = bots.find((candidate) => candidate.id === item.botId);
     const parsed = bot ? parseBotAvatar(bot.color) : null;
     const accent = parsed && !parsed.isImage && /^#[0-9a-f]{3,8}$/i.test(parsed.color);
+    // All-day bars and timed blocks an hour or longer have room for a second title line.
+    const tall = !style || (typeof style.height === "number" && style.height >= 40);
     const full = [timeText(item), item.title, item.botName].filter(Boolean).join(" · ");
     return wrap(
       item,
-      `${style ? "absolute" : "pointer-coarse:min-h-11"} flex items-center gap-1 overflow-hidden rounded-md border px-1 py-0.5 text-start text-xs hover:bg-accent ${
+      `${
+        style
+          ? // A timed block keeps its time slot's height; on touch an invisible band above and below makes it 44 px to tap.
+            "absolute pointer-coarse:min-h-0! pointer-coarse:overflow-visible pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2.5"
+          : "pointer-coarse:min-h-11"
+      } flex ${tall ? "items-start" : "items-center"} gap-1 overflow-hidden rounded-md border px-1 py-0.5 text-start text-xs hover:bg-accent ${
         item.kind === "event" ? "bg-muted" : "bg-card"
       } ${item.botId ? "border-s-2" : ""}`,
       <>
         {crowded ? null : kindIcon(item)}
-        <span className="min-w-0 flex-1 truncate" title={full}>
+        <span
+          className={`min-w-0 flex-1 ${tall ? "line-clamp-2 break-words" : "truncate"}`}
+          title={full}
+        >
           {item.title}
         </span>
         {crowded ? null : avatar(item, 14)}
@@ -901,7 +911,8 @@ export function CalendarPage({
           <Trans>Couldn't load {account}</Trans>
         </p>
       ))}
-      {phone ? null : <div className={PAGE_GUTTER_X}>{todos}</div>}
+      {/* A grid scrolls to the current hour, so on a phone the block stays above it instead of scrolling away. */}
+      {phone && !isGrid ? null : <div className={PAGE_GUTTER_X}>{todos}</div>}
       {phone && view === "day" && !loading && itemsOn(start).length === 0 ? (
         <p className={`${PAGE_GUTTER_X} mb-2 text-sm text-muted-foreground`}>
           <Trans>Nothing scheduled</Trans>
@@ -911,7 +922,7 @@ export function CalendarPage({
         ref={scroller}
         className={`rk-scroll min-h-0 flex-1 overflow-auto ${PAGE_GUTTER_X} pb-6`}
       >
-        {phone ? todos : null}
+        {phone && !isGrid ? todos : null}
         {content}
         {googleConnected === false ? (
           <p className="mt-4 text-sm">

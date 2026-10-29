@@ -1339,10 +1339,10 @@ export function ShellPage() {
     [markBotRead],
   );
   const markBotUnread = useCallback(
-    async (id: string) => {
+    async (id: string, messageId?: string) => {
       manuallyUnread.current.add(id);
       try {
-        await rpc.threads.markUnread({ botId: id });
+        await rpc.threads.markUnread({ botId: id, ...(messageId ? { messageId } : {}) });
       } catch (err) {
         manuallyUnread.current.delete(id);
         throw err;
@@ -1351,6 +1351,28 @@ export function ShellPage() {
     },
     [updateBotUnread],
   );
+
+  // "Mark as unread" on a message: the chat stays unread until reopened, and the next open puts
+  // the New divider at the first reply from that message. The server holds the boundary.
+  const markMessageUnread = (message: ThreadMessage) => {
+    if (groupId) {
+      manuallyUnread.current.add(groupId);
+      rpc.threads
+        .markUnread({ groupId, messageId: message.id })
+        .then(() => {
+          setGroups((current) =>
+            current.map((group) => (group.id === groupId ? { ...group, unread: true } : group)),
+          );
+          // The cached thread carries the old boundary; refresh it so the next open reads the new one.
+          return refreshActiveThread();
+        })
+        .catch(() => manuallyUnread.current.delete(groupId));
+    } else if (active) {
+      void markBotUnread(active.id, message.id)
+        .then(() => refreshActiveThread())
+        .catch(() => undefined);
+    }
+  };
 
   const refreshBots = useCallback(
     async (includeArchived = false, replaceBotOrder = false) => {
@@ -4462,6 +4484,7 @@ export function ShellPage() {
                   setReplyTarget(message);
                   setReplyQuote(null);
                 }}
+                onMarkUnread={markMessageUnread}
                 onQuote={(message, quote) => {
                   setReplyTarget(message);
                   setReplyQuote(quote);

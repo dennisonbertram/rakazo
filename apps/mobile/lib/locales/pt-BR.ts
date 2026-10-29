@@ -166,6 +166,7 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   "Could not speak": "Não foi possível falar",
   "Could not update reaction": "Não foi possível atualizar a reação",
   "Could not remember": "Não foi possível lembrar",
+  "Mark as unread": "Marcar como não lida",
   Created: "Criado",
   "Delete…": "Excluir…",
   Denied: "Negado",

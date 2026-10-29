@@ -164,6 +164,7 @@ export const TR_MESSAGES: Record<string, string> = {
   "Could not speak": "Sesli okunamadı",
   "Could not update reaction": "Tepki güncellenemedi",
   "Could not remember": "Hatırlanamadı",
+  "Mark as unread": "Okunmadı olarak işaretle",
   Created: "Oluşturuldu",
   "Delete…": "Sil…",
   Denied: "Reddedildi",

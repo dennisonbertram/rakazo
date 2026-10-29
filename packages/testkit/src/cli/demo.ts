@@ -243,6 +243,7 @@ function printInfo(email: string) {
   console.log(`
 Mock demo stack is running (slot ${SLOT}). Every record in it is invented and labeled MOCK.
   Web:          ${WEB_ORIGIN}
+                http://localhost:${WEB_PORT} (same app; use this one for passkeys, which browsers refuse on an IP address)
   API:          ${API_URL}
   Postgres:     127.0.0.1:${PG_PORT} (${CONTAINER})
   Sign in as:   ${email}
