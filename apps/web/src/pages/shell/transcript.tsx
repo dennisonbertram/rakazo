@@ -829,6 +829,14 @@ export const Transcript = memo(function Transcript({
                   {t`From routine: ${message.routineName}`}
                 </p>
               ) : null}
+              {message.via ? (
+                <p
+                  className="mb-1 shrink-0 truncate text-end text-xs text-muted-foreground"
+                  data-testid="via-label"
+                >
+                  {t`via ${message.via}`}
+                </p>
+              ) : null}
               <div
                 data-message-id={message.id}
                 data-stored-message={isStoredMessage(message) ? "" : undefined}

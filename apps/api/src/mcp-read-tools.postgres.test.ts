@@ -21,6 +21,7 @@ describePostgres("MCP read tools (PostgreSQL, runtime login)", () => {
   const alice = `mcpr-alice-${suffix}`;
   const client = "mcpr-client";
   const botIds: Record<string, string> = {};
+  const threadIds: Record<string, string> = {};
   let prisma: PrismaClient;
   let close: () => Promise<void>;
 
@@ -131,6 +132,9 @@ describePostgres("MCP read tools (PostgreSQL, runtime login)", () => {
           data: { spaceId, userId: alice, name: `Bot ${name}`, color: "blue" },
         });
         botIds[spaceId] = bot.id;
+        threadIds[spaceId] = (
+          await prisma.thread.create({ data: { spaceId, userId: alice, botId: bot.id } })
+        ).id;
         await prisma.scratchpadItem.create({
           data: { spaceId, userId: alice, botId: bot.id, title: `Todo for ${name}`, notes: "n" },
         });
@@ -222,6 +226,7 @@ describePostgres("MCP read tools (PostgreSQL, runtime login)", () => {
     const args: Record<string, object> = {
       finance_breakdown: { by: "category" },
       scratchpad_list: { botId: botIds[spaceA] },
+      thread_read: { threadId: threadIds[spaceA] },
     };
     for (const name of listed.filter((tool) => tool !== "action_status")) {
       const { isError, data } = await callTool(spaceA, name, args[name] ?? {});

@@ -915,6 +915,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     auth,
     baseUrl: mcpBaseUrl,
     notificationEvents,
+    agents: { events, jobs },
     jwksUrl: `${env.apiUrl.replace(/\/+$/, "")}${"/api/auth"}/jwks`,
   });
   mountLocalSettings(app, { token: env.desktopStackToken, prisma, rpc });
