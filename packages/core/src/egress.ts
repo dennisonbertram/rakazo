@@ -29,6 +29,13 @@ function siteOf(hostname: string, allowPrivateDomains: boolean): string | undefi
   return parsed.domain ?? host;
 }
 
+/** Tools that reach a site: each is checked against the site rules (web_fetch names a URL; browser_act uses the current page's site). */
+export const SITE_GATED_TOOLS: ReadonlySet<string> = new Set([
+  "web_fetch",
+  "browser_navigate",
+  "browser_act",
+]);
+
 /** The site an http(s) URL is sent to, or undefined for anything else. */
 export function urlSite(input: string): string | undefined {
   const url = httpUrl(input);
