@@ -7,6 +7,7 @@ import { getLogger } from "@rakazo/logging";
 import type { PoolClient } from "pg";
 import { returnBotMessageOutcome } from "./bot-messages.js";
 import { scheduleComputerControlExpiry } from "./computer-control.js";
+import { expireExternalActions, pruneMcpCallLog } from "./external-actions.js";
 import { reconcileMailApprovals } from "./mail-approval-recovery.js";
 import { notifyPastDueItems } from "./past-due.js";
 import { reconcileStuckWork } from "./stuck-work.js";
@@ -179,6 +180,16 @@ export function createJobReconciler(
         });
       } catch (error) {
         getLogger().error("past-due reconciliation", error);
+      }
+      try {
+        await expireExternalActions(deps.prisma, now);
+      } catch (error) {
+        getLogger().error("external action expiry", error);
+      }
+      try {
+        await pruneMcpCallLog(deps.prisma, now);
+      } catch (error) {
+        getLogger().error("mcp call log retention", error);
       }
       if (deps.events) {
         try {

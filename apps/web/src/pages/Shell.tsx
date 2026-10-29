@@ -1718,7 +1718,7 @@ export function ShellPage() {
           groupId ?? botId ?? "",
         );
         if (otherSpaceId && selectSpace(otherSpaceId)) {
-          window.location.assign(window.location.pathname);
+          window.location.assign(window.location.pathname + window.location.search);
           return;
         }
         if (groupId) {
@@ -6606,6 +6606,7 @@ const SETTINGS_SECTIONS = [
   "voice",
   "computer",
   "billing",
+  "connections",
 ] as const satisfies readonly SettingsSection[];
 
 export function settingsSectionFromParam(value: string | null): SettingsSection | null {

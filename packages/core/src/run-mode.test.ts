@@ -22,7 +22,9 @@ describe("newRunUnattended", () => {
 
 describe("newRunExternalTaint", () => {
   it.each(RUN_TRIGGERS)("%s without a source run", (trigger) => {
-    expect(newRunExternalTaint({ trigger })).toBe(trigger === "webhook" || trigger === "messaging");
+    expect(newRunExternalTaint({ trigger })).toBe(
+      ["webhook", "messaging", "mcp"].includes(trigger),
+    );
   });
 
   it("inherits from the source run and never clears it", () => {

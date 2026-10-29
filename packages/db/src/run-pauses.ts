@@ -16,7 +16,7 @@ import {
   isSecretAskBlock,
   resolveAskChoice,
 } from "@rakazo/core";
-import { urlSite } from "@rakazo/core/egress";
+import { SITE_GATED_TOOLS, urlSite } from "@rakazo/core/egress";
 import { setApprovalRule } from "./approval-rules.js";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import type { Prisma, PrismaClient } from "./client.js";
@@ -600,7 +600,7 @@ async function commitAnswerRunInput(
     }
     // "Always" on a fetch card allows that site, never every site the tool can reach.
     const site = alwaysAllowedSite(approvalEffect!);
-    if (input.answer === "always" && (site || approvalEffect!.kind !== "web_fetch")) {
+    if (input.answer === "always" && (site || !SITE_GATED_TOOLS.has(approvalEffect!.kind))) {
       // A card's "Always allow" is a space-wide rule; it replaces any rule for that target.
       await setApprovalRule(tx, {
         spaceId: input.spaceId,
@@ -915,7 +915,7 @@ export async function pauseRunForTakeover(
 }
 
 function alwaysAllowedSite(effect: { kind: string; request?: unknown }): string | undefined {
-  if (effect.kind !== "web_fetch") return undefined;
+  if (!SITE_GATED_TOOLS.has(effect.kind)) return undefined;
   const request = effect.request as { url?: unknown } | null;
   return typeof request?.url === "string" ? urlSite(request.url) : undefined;
 }
