@@ -11,7 +11,7 @@ struct VoiceStatusTests {
       {"configured":false,"ready":false,"transcribe":false,"provider":null,"voiceId":"",\
       "transcriptionProvider":null,"transcriptionReady":false}
       """
-    let status = try JSONDecoder().decode(VoiceStatus.self, from: Data(json.utf8))
+    let status = try JSONDecoder().decode(CallVoiceStatus.self, from: Data(json.utf8))
     #expect(!status.canSpeak)
     #expect(!status.canTranscribe)
     #expect(status.provider == nil)
@@ -20,7 +20,7 @@ struct VoiceStatusTests {
   @Test("tolerates missing fields and reads a ready provider")
   func ready() throws {
     let status = try JSONDecoder().decode(
-      VoiceStatus.self, from: Data(#"{"ready":true,"transcribe":true,"extra":1}"#.utf8))
+      CallVoiceStatus.self, from: Data(#"{"ready":true,"transcribe":true,"extra":1}"#.utf8))
     #expect(status.canSpeak)
     #expect(status.canTranscribe)
   }

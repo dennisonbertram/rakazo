@@ -31,7 +31,7 @@ struct VoiceServer {
   private struct TranscribeResult: Decodable { var text: String? }
   private struct ErrorBody: Decodable { var error: String? }
 
-  func status() async throws -> VoiceStatus { try await app.call("voice/status") }
+  func status() async throws -> CallVoiceStatus { try await app.call("voice/status") }
 
   func prepare(text: String, botID: String) async throws -> VoicePrepared {
     try await app.consent.ensure(procedure: "voice/prepare", app: app)

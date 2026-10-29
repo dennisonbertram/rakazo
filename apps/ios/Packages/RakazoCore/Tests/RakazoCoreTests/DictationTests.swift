@@ -9,6 +9,7 @@ import Testing
 struct DictationTests {
   private final class Box { var finals: [String] = []; var interims: [String] = [] }
 
+  // swiftlint:disable:next large_tuple
   private func make() -> (DictationSession, FakeRecognizer, VoiceClock, Box) {
     let clock = VoiceClock()
     let recognizer = FakeRecognizer()

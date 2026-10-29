@@ -494,3 +494,4 @@ public final class CallSession {
     return text.flatMap { $0.isEmpty ? nil : $0 } ?? fallback
   }
 }
+// swiftlint:enable file_length type_body_length function_body_length cyclomatic_complexity

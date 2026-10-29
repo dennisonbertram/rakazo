@@ -2,7 +2,7 @@ import Foundation
 import RakazoAPI
 
 /// `rpc_voice_status`. Every field is optional so a server that drops one still decodes.
-public struct VoiceStatus: Decodable, Sendable, Equatable {
+public struct CallVoiceStatus: Decodable, Sendable, Equatable {
   public var configured: Bool?
   public var ready: Bool?
   public var transcribe: Bool?

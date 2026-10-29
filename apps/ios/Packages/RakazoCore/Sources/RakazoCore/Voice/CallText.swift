@@ -38,9 +38,9 @@ public func isEchoOfSpeech(_ heard: String, spoken: String, threshold: Double = 
   var cursor = 0
   var matched = 0
   for word in heardWords {
-    guard let at = spokenWords[cursor...].firstIndex(of: word) else { continue }
+    guard let found = spokenWords[cursor...].firstIndex(of: word) else { continue }
     matched += 1
-    cursor = at + 1
+    cursor = found + 1
   }
   if matched < minEchoWords { return false }
   return Double(matched) / Double(heardWords.count) >= threshold

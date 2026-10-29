@@ -12,6 +12,7 @@ private final class Harness {
   var session: CallSession!
   var handlers: DictationHandlers?
   var onDevice = true
+  // swiftlint:disable:next large_tuple
   var sent: [(bot: String, text: String, nonce: String)] = []
   var spoken: [String] = []
   var closed: [(bot: String, call: String)] = []
@@ -91,6 +92,7 @@ private final class Harness {
   }
 }
 
+// swiftlint:disable identifier_name type_body_length
 @MainActor
 @Suite("mobile call session")
 struct CallSessionTests {
@@ -386,3 +388,4 @@ struct CallSessionTests {
     #expect(h.recordCount == 0)
   }
 }
+// swiftlint:enable identifier_name type_body_length

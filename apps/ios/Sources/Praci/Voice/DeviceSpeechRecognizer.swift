@@ -68,8 +68,8 @@ final class DeviceSpeechRecognizer: SpeechRecognizing {
     if !tapInstalled {
       let input = engine.inputNode
       let sink = sink
-      input.installTap(onBus: 0, bufferSize: 1_024, format: input.outputFormat(forBus: 0)) {
-        buffer, _ in sink.append(buffer)
+      input.installTap(onBus: 0, bufferSize: 1_024, format: input.outputFormat(forBus: 0)) { buffer, _ in
+        sink.append(buffer)
       }
       tapInstalled = true
     }
@@ -86,7 +86,7 @@ final class DeviceSpeechRecognizer: SpeechRecognizing {
   }
 }
 
-/// Hands microphone buffers from the audio thread to the current recognition request.
+// Hands microphone buffers from the audio thread to the current recognition request.
 // @unchecked: the request is only touched under the lock, and `append` is documented as thread-safe.
 private final class RequestSink: @unchecked Sendable {
   private let lock = NSLock()

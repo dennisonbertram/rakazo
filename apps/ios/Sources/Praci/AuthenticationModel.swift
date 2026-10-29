@@ -134,12 +134,17 @@ final class AuthenticationModel {
     await sync()
   }
 
+  /// Runs before the session ends (sign-out, server change, account deletion), while the server
+  /// still accepts the session. The notification router uses it to unregister push.
+  var beforeSessionEnds: (() async -> Void)?
+
   func changeServer(to endpoint: URL) async -> Bool {
     guard !busy else { return false }
     busy = true
     errorMessage = nil
     notice = nil
     defer { busy = false }
+    if isSignedIn { await beforeSessionEnds?() }
     do {
       try await client.changeServer(to: endpoint)
       await sync()
@@ -164,6 +169,7 @@ final class AuthenticationModel {
     errorMessage = nil
     notice = nil
     defer { busy = false }
+    await beforeSessionEnds?()
     do {
       try await client.signOut()
     } catch {

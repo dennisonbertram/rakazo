@@ -19,8 +19,9 @@ struct CallButton: View {
       Label("Call", systemImage: "phone")
     }
     .accessibilityIdentifier("call")
+    // swiftlint:disable:next multiple_closures_with_trailing_closure
     .fullScreenCover(isPresented: $presenting, onDismiss: { coordinator.end() }) {
-      CallView(coordinator: coordinator, name: name, avatar: avatar) { presenting = false }
+      CallView(coordinator: coordinator, name: name, avatar: avatar, close: { presenting = false })
     }
     // The agent hung up, or the caller did: the call screen goes away with the call.
     .onChange(of: coordinator.isActive) { wasActive, active in

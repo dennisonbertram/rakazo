@@ -41,6 +41,8 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
   init(app: AppModel, defaults: UserDefaults = .standard) {
     self.app = app
     self.defaults = defaults
+    super.init()
+    app.authentication.beforeSessionEnds = { [weak self] in await self?.unregisterIfNeeded() }
   }
 
   /// The app has no push registration yet: it needs the APNs entitlement and signing, which stay

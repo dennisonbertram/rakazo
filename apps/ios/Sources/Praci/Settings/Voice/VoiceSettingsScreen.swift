@@ -101,6 +101,7 @@ struct HostedVoiceScreen: View {
   }
 
   @ViewBuilder
+  // swiftlint:disable:next function_body_length
   private func content(_ snapshot: VoiceSnapshot) -> some View {
     let selected = snapshot.providers.first { $0.id == providerID }
     let credential = providerID.flatMap(snapshot.credential(for:))

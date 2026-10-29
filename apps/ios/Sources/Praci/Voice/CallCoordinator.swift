@@ -24,7 +24,7 @@ final class CallCoordinator {
     failure = nil
     defer { starting = false }
     let server = VoiceServer(app: app)
-    let status = (try? await server.status()) ?? VoiceStatus()
+    let status = (try? await server.status()) ?? CallVoiceStatus()
     let hosted = status.canSpeak && !VoiceServer.useDeviceVoice
     do {
       try await app.consent.ensure(procedure: "threads/send", app: app)
