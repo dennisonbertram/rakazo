@@ -1,7 +1,14 @@
 import { createPublicKey, generateKeyPairSync, verify } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import type { ApnsConfig, ApnsRequest } from "./apns-push.js";
-import { ApnsPushProvider, apnsConfigFromEnv, apnsJwt, PushChannel } from "./apns-push.js";
+import {
+  ApnsPushProvider,
+  apnsConfigFromEnv,
+  apnsJwt,
+  createHttp2Transport,
+  PushChannel,
+} from "./apns-push.js";
 import { ExpoPushProvider } from "./expo-push.js";
 
 const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -178,5 +185,130 @@ describe("push channel", () => {
     expect(expo.send).not.toHaveBeenCalled();
     await new PushChannel(store("expo"), expo, apns).send(envelope, endpoint, context);
     expect(expo.send).toHaveBeenCalledOnce();
+  });
+});
+
+class FakeStream extends EventEmitter {
+  destroyed = false;
+  end = vi.fn();
+  destroy() {
+    this.destroyed = true;
+    this.emit("close");
+  }
+}
+class FakeSession extends EventEmitter {
+  destroyed = false;
+  closed = false;
+  streams: FakeStream[] = [];
+  unref() {}
+  request() {
+    const stream = new FakeStream();
+    this.streams.push(stream);
+    return stream;
+  }
+  destroy() {
+    this.destroyed = true;
+    this.emit("close");
+  }
+}
+const fakeConnect = () => {
+  const sessions: FakeSession[] = [];
+  const connectFn = (() => {
+    const session = new FakeSession();
+    sessions.push(session);
+    return session;
+  }) as never;
+  return { sessions, connectFn };
+};
+const req = (signal: AbortSignal) => ({
+  host: "h",
+  path: "/p",
+  headers: {},
+  body: "{}",
+  signal,
+});
+
+describe("apns http2 transport", () => {
+  it("rejects a pre-aborted request without opening a stream or crashing on later errors", async () => {
+    const { sessions, connectFn } = fakeConnect();
+    const transport = createHttp2Transport(connectFn);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(transport(req(controller.signal))).rejects.toThrow("aborted");
+    for (const session of sessions) {
+      expect(session.streams).toHaveLength(0);
+      expect(() => session.emit("error", new Error("late"))).not.toThrow();
+    }
+  });
+
+  it("survives errors on a cancelled stream, destroys it, and reconnects afterwards", async () => {
+    const { sessions, connectFn } = fakeConnect();
+    const transport = createHttp2Transport(connectFn);
+    const controller = new AbortController();
+    const pending = transport(req(controller.signal));
+    controller.abort();
+    await expect(pending).rejects.toThrow("aborted");
+    const [session] = sessions;
+    expect(session?.streams[0]?.destroyed).toBe(true);
+    expect(session?.destroyed).toBe(true);
+    expect(() => session?.streams[0]?.emit("error", new Error("late"))).not.toThrow();
+    expect(() => session?.emit("error", new Error("late"))).not.toThrow();
+    void transport(req(new AbortController().signal));
+    expect(sessions).toHaveLength(2);
+  });
+
+  it("leaves no per-request listeners on the session", async () => {
+    const { sessions, connectFn } = fakeConnect();
+    const transport = createHttp2Transport(connectFn);
+    const first = transport(req(new AbortController().signal));
+    const [session] = sessions;
+    const before = session?.eventNames().map((n) => session.listenerCount(n));
+    session?.streams[0]?.emit("response", { ":status": 200 });
+    session?.streams[0]?.emit("end");
+    await first;
+    void transport(req(new AbortController().signal));
+    expect(sessions).toHaveLength(1);
+    expect(session?.eventNames().map((n) => session.listenerCount(n))).toEqual(before);
+  });
+
+  it("drops the cached session on GOAWAY and on a connect timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const { sessions, connectFn } = fakeConnect();
+      const transport = createHttp2Transport(connectFn, 50);
+      void transport(req(new AbortController().signal));
+      sessions[0]?.emit("goaway");
+      void transport(req(new AbortController().signal));
+      expect(sessions).toHaveLength(2);
+      vi.advanceTimersByTime(60);
+      expect(sessions[1]?.destroyed).toBe(true);
+      void transport(req(new AbortController().signal));
+      expect(sessions).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("apns send ownership", () => {
+  it("does not send when another account claims the token during the session lookup", async () => {
+    let owner = true;
+    const store = {
+      notificationEndpoint: {
+        findMany: async () => (owner ? [{ ...endpoint, sessionId: "s1" }] : []),
+      },
+    } as never;
+    const transport = vi.fn(async () => ({ status: 200, body: "" }));
+    const apns = new ApnsPushProvider(store, config, {
+      transport,
+      sessionExpiresAt: async () => {
+        owner = false;
+        return new Date(Date.now() + 60_000);
+      },
+    });
+    expect(await apns.send(envelope, { ...endpoint, sessionId: "s1" }, context)).toBe(
+      "endpointGone",
+    );
+    expect(transport).not.toHaveBeenCalled();
   });
 });

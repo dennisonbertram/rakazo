@@ -69,46 +69,67 @@ export function apnsJwt(config: ApnsConfig, issuedAtSeconds: number): string {
   return `${input}.${b64url(signature)}`;
 }
 
-/** One HTTP/2 session per host, reused until it closes. */
-export function createHttp2Transport(): ApnsTransport {
+const CONNECT_TIMEOUT_MS = 10_000;
+
+/**
+ * One HTTP/2 session per host, reused until it closes, errors, receives GOAWAY, or a request on it
+ * times out or is cancelled (the next request then reconnects). `connectFn` is for tests.
+ */
+export function createHttp2Transport(
+  connectFn: typeof connect = connect,
+  connectTimeoutMs = CONNECT_TIMEOUT_MS,
+): ApnsTransport {
   const sessions = new Map<string, ClientHttp2Session>();
   const sessionFor = (host: string) => {
     const existing = sessions.get(host);
     if (existing && !existing.closed && !existing.destroyed) return existing;
-    const session = connect(`https://${host}`);
+    const session = connectFn(`https://${host}`);
     const drop = () => {
+      clearTimeout(timer);
       if (sessions.get(host) === session) sessions.delete(host);
+      if (!session.destroyed) session.destroy();
     };
+    const timer = setTimeout(drop, connectTimeoutMs);
+    session.once("connect", () => clearTimeout(timer));
+    // One handler for the session's life: request listeners never attach to the session.
     session.on("close", drop);
     session.on("error", drop);
+    session.on("goaway", drop);
     session.unref();
     sessions.set(host, session);
     return session;
   };
   return (request) =>
     new Promise<ApnsResponse>((resolve, reject) => {
+      if (request.signal.aborted) return reject(new Error("APNs request aborted."));
       let settled = false;
-      const done = (fn: () => void) => {
-        if (settled) return;
-        settled = true;
-        fn();
-      };
+      let status = 0;
+      const chunks: Buffer[] = [];
+      let size = 0;
       const session = sessionFor(request.host);
-      session.once("error", (error) => done(() => reject(error)));
       const stream = session.request({
         ":method": "POST",
         ":path": request.path,
         ...request.headers,
       });
-      let status = 0;
-      const chunks: Buffer[] = [];
-      let size = 0;
-      const abort = () => {
-        stream.close();
+      const onAbort = () => {
         done(() => reject(new Error("APNs request aborted.")));
+        stream.destroy();
+        // A stalled connection must not serve the retry.
+        session.destroy();
       };
-      if (request.signal.aborted) return abort();
-      request.signal.addEventListener("abort", abort, { once: true });
+      const done = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        request.signal.removeEventListener("abort", onAbort);
+        fn();
+      };
+      // Before anything that can return early or fail.
+      stream.on("error", (error) => done(() => reject(error)));
+      stream.on("close", () =>
+        done(() => reject(new Error("APNs stream closed before a response."))),
+      );
+      request.signal.addEventListener("abort", onAbort, { once: true });
       stream.on("response", (headers) => {
         status = Number(headers[":status"] ?? 0);
       });
@@ -116,7 +137,6 @@ export function createHttp2Transport(): ApnsTransport {
         size += chunk.length;
         if (size <= MAX_RESPONSE_BYTES) chunks.push(chunk);
       });
-      stream.on("error", (error) => done(() => reject(error)));
       stream.on("end", () =>
         done(() => resolve({ status, body: Buffer.concat(chunks).toString("utf8") })),
       );
@@ -190,6 +210,11 @@ export class ApnsPushProvider implements NotificationChannel {
       if (!expiresAt || expiresAt.getTime() <= Date.now()) return "endpointGone";
     }
     const signal = combineSignals(context.signal, AbortSignal.timeout(APNS_TIMEOUT_MS));
+    // Another account may have claimed the token, or the session ended, during the lookup.
+    const latest = (await listPushEndpoints(this.prisma, context.userId)).find(
+      (e) => e.id === endpoint.id && e.address === endpoint.address,
+    );
+    if (!latest || latest.sessionId !== current.sessionId) return "endpointGone";
     const data = expoNotificationData(envelope, context.spaceId);
     const response = await this.transport({
       host: this.config.sandbox ? "api.sandbox.push.apple.com" : "api.push.apple.com",
