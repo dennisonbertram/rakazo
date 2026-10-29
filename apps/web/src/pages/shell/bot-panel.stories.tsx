@@ -105,6 +105,20 @@ export const PinnedConnection: Story = {
   },
 };
 
+/** The pinned connection was signed out and removed: the pin stays and says so. */
+export const PinnedConnectionRemoved: Story = {
+  beforeEach: PinnedConnection.beforeEach,
+  args: {
+    bot: {
+      ...scoutBot,
+      modelProvider: "example-sub",
+      modelId: "example-pro",
+      modelCredentialId: "cred_gone",
+    },
+  },
+  play: PinnedConnection.play,
+};
+
 const openAdvanced: Story["play"] = async ({ canvasElement }) => {
   await userEvent.click(await within(canvasElement).findByText("Advanced"));
 };

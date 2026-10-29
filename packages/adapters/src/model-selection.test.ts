@@ -218,6 +218,30 @@ describe("routine model pin", () => {
     });
   });
 
+  it("carries the routine's own connection pin, and the bot's pin only when it follows the bot", () => {
+    expect(routineRunModelPin({ ...routine, modelCredentialId: "cred-routine" })).toMatchObject({
+      modelCredentialId: "cred-routine",
+      modelPinned: true,
+    });
+    const own = runModelChoice(
+      { modelPinned: true, ...routine, modelCredentialId: "cred-routine" },
+      { ...bot, modelCredentialId: "cred-bot" },
+    );
+    expect(own.modelCredentialId).toBe("cred-routine");
+    // A routine with its own model but no pin uses the lookup, not the bot's connection.
+    expect(
+      runModelChoice({ modelPinned: true, ...routine }, { ...bot, modelCredentialId: "cred-bot" })
+        .modelCredentialId,
+    ).toBeUndefined();
+    // A routine that follows the bot runs on the bot's pin.
+    expect(
+      runModelChoice(
+        { modelPinned: false, modelProvider: null, modelId: null, thinkingLevel: null },
+        { ...bot, modelCredentialId: "cred-bot" },
+      ).modelCredentialId,
+    ).toBe("cred-bot");
+  });
+
   it("pins nothing when the routine follows the bot", () => {
     expect(routineRunModelPin({ modelProvider: null, modelId: null, thinkingLevel: null })).toEqual(
       {},

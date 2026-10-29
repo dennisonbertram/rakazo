@@ -19,6 +19,7 @@ import {
   deleteMeeting,
   findDefaultModelCredential,
   findBotModelCredential,
+  ignorePinnedConnectionLost,
   getMeetingSyncState,
   IsolationError,
 } from "@rakazo/db";
@@ -89,7 +90,7 @@ async function primaryRecipient(deps: MeetingsDeps, actor: Actor, botId?: string
           modelProvider: bot.modelProvider,
           modelId: bot.modelId,
           modelCredentialId: bot.modelCredentialId,
-        })
+        }).catch(ignorePinnedConnectionLost)
       : null;
   const model = selectConfiguredModel({
     override: bot ?? null,

@@ -104,6 +104,8 @@ export type RoutineDraftState = {
   runAtLocal: string;
   /** Empty runs this routine on the bot's model. */
   modelKey: string;
+  /** The connection the model runs on; empty uses the bot's connection or the default. */
+  credentialId: string;
   thinkingLevel: string;
   /** Empty keeps the routine's zone, or the account zone for a new routine. */
   timezone: string;
@@ -125,6 +127,7 @@ export function emptyRoutineDraft(): RoutineDraftState {
     active: true,
     runAtLocal: "",
     modelKey: "",
+    credentialId: "",
     thinkingLevel: "",
     timezone: "",
     quiet: false,
@@ -147,6 +150,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
       routine.modelProvider && routine.modelId
         ? modelOptionKey(routine.modelProvider, routine.modelId)
         : "",
+    credentialId: routine.modelCredentialId ?? "",
     thinkingLevel: routine.thinkingLevel ?? "",
     timezone: routine.timezone,
     quiet: routine.quiet,
@@ -401,7 +405,11 @@ export function RoutineEditor({
       })
       .catch(() => undefined);
   }, []);
-  const modelOptions = connectedModelOptions(credentials, catalog);
+  const pinnedCredential = credentials.find((entry) => entry.id === draft.credentialId);
+  const modelOptions = connectedModelOptions(
+    pinnedCredential ? [pinnedCredential] : credentials,
+    catalog,
+  );
   const selectedModel = draft.modelKey ? parseModelOptionKey(draft.modelKey) : null;
   const selectedEntry = selectedModel
     ? catalog.find(
@@ -703,6 +711,47 @@ export function RoutineEditor({
                   ))}
                 </NativeSelect>
               </label>
+
+              {credentials.length > 1 || draft.credentialId ? (
+                <label
+                  htmlFor={`${fieldId}-connection`}
+                  className="mt-5 block text-sm text-muted-foreground"
+                >
+                  <Trans>Connection</Trans>
+                  <NativeSelect
+                    id={`${fieldId}-connection`}
+                    className="mt-2 w-full"
+                    value={draft.credentialId}
+                    onChange={(event) => {
+                      const next = credentials.find((entry) => entry.id === event.target.value);
+                      const choices = connectedModelOptions(next ? [next] : credentials, catalog);
+                      onChange({
+                        ...draft,
+                        credentialId: next?.id ?? "",
+                        thinkingLevel: "",
+                        modelKey:
+                          next && draft.modelKey && !choices.some((c) => c.key === draft.modelKey)
+                            ? (choices[0]?.key ?? "")
+                            : draft.modelKey,
+                      });
+                    }}
+                  >
+                    <NativeSelectOption value="">{t`Bot's connection`}</NativeSelectOption>
+                    {draft.credentialId && !pinnedCredential ? (
+                      <NativeSelectOption value={draft.credentialId}>
+                        {t`Signed out or removed`}
+                      </NativeSelectOption>
+                    ) : null}
+                    {credentials.map((entry) => (
+                      <NativeSelectOption key={entry.id} value={entry.id}>
+                        {entry.authKind === "oauth"
+                          ? t`${entry.label} (Subscription)`
+                          : entry.label}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </label>
+              ) : null}
 
               <label
                 htmlFor={`${fieldId}-model`}

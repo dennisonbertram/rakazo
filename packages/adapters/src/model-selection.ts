@@ -351,6 +351,8 @@ export async function validateConnectedModelChoice(
 export type ModelChoice = {
   modelProvider: string | null;
   modelId: string | null;
+  /** The owner's connection this model runs on; null uses the default lookup. */
+  modelCredentialId?: string | null;
   thinkingLevel: string | null;
 };
 
@@ -367,12 +369,14 @@ export function runModelChoice(
     return {
       modelProvider: run.modelProvider,
       modelId: run.modelId,
+      ...(run.modelCredentialId ? { modelCredentialId: run.modelCredentialId } : {}),
       thinkingLevel: run.thinkingLevel,
     };
   }
   return {
     modelProvider: bot.modelProvider,
     modelId: bot.modelId,
+    ...(bot.modelCredentialId ? { modelCredentialId: bot.modelCredentialId } : {}),
     thinkingLevel: bot.thinkingLevel,
   };
 }
@@ -381,6 +385,7 @@ export function runModelChoice(
 export function routineRunModelPin(routine: ModelChoice): {
   modelProvider?: string;
   modelId?: string;
+  modelCredentialId?: string | null;
   thinkingLevel?: string | null;
   modelPinned?: true;
 } {
@@ -388,6 +393,7 @@ export function routineRunModelPin(routine: ModelChoice): {
   return {
     modelProvider: routine.modelProvider,
     modelId: routine.modelId,
+    ...(routine.modelCredentialId ? { modelCredentialId: routine.modelCredentialId } : {}),
     thinkingLevel: routine.thinkingLevel,
     modelPinned: true,
   };
@@ -406,6 +412,7 @@ export function inboundRoutineModelPin(routines: readonly ModelChoice[]) {
       pin.modelPinned === first.modelPinned &&
       pin.modelProvider === first.modelProvider &&
       pin.modelId === first.modelId &&
+      (pin.modelCredentialId ?? null) === (first.modelCredentialId ?? null) &&
       (pin.thinkingLevel ?? null) === (first.thinkingLevel ?? null),
   );
   return agreed ? first : {};

@@ -234,6 +234,7 @@ export interface SendUserMessageInput {
   modelPin?: {
     modelProvider: string;
     modelId: string;
+    modelCredentialId?: string | null;
     thinkingLevel: string | null;
   };
 }
@@ -476,6 +477,7 @@ export async function sendUserMessage(
               ? {
                   modelProvider: input.modelPin.modelProvider,
                   modelId: input.modelPin.modelId,
+                  modelCredentialId: input.modelPin.modelCredentialId ?? null,
                   thinkingLevel: input.modelPin.thinkingLevel,
                   modelPinned: true,
                 }
@@ -504,6 +506,7 @@ export async function sendUserMessage(
               ? {
                   modelProvider: input.modelPin.modelProvider,
                   modelId: input.modelPin.modelId,
+                  modelCredentialId: input.modelPin.modelCredentialId ?? null,
                   thinkingLevel: input.modelPin.thinkingLevel,
                 }
               : {}),

@@ -7,6 +7,7 @@ import {
   findBotModelCredential,
   findModelCredential,
   newestModelCredentialOrder,
+  PinnedConnectionLostError,
   selectSpaceModelPreference,
 } from "./model-credentials.js";
 
@@ -433,9 +434,11 @@ describe("findBotModelCredential", () => {
     });
   });
 
-  it("falls back to the provider lookup when the pin is deleted or foreign", async () => {
+  it("fails instead of using another connection when the pin is deleted or foreign", async () => {
     const { prisma } = build(null);
-    expect((await findBotModelCredential(prisma, scope, bot))?.id).toBe("default");
+    await expect(findBotModelCredential(prisma, scope, bot)).rejects.toBeInstanceOf(
+      PinnedConnectionLostError,
+    );
   });
 
   it("uses the provider lookup when nothing is pinned", async () => {

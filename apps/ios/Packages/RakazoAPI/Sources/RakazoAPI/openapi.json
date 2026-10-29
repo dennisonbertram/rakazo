@@ -10033,6 +10033,16 @@
                                   "null"
                                 ]
                               },
+                              "modelCredentialId": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "thinkingLevel": {
                                 "anyOf": [
                                   {
@@ -99788,14 +99798,17 @@
                       "modelId": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema12"
                       },
-                      "thinkingLevel": {
+                      "modelCredentialId": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema13"
                       },
-                      "quiet": {
+                      "thinkingLevel": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema14"
                       },
-                      "watch": {
+                      "quiet": {
                         "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema15"
+                      },
+                      "watch": {
+                        "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema16"
                       }
                     },
                     "required": [
@@ -99884,6 +99897,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcRoutinesCreateOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -100631,6 +100654,16 @@
                               "null"
                             ]
                           },
+                          "modelCredentialId": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcRoutinesListOutputSchema0"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "thinkingLevel": {
                             "anyOf": [
                               {
@@ -101349,17 +101382,20 @@
                       "modelId": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema12"
                       },
-                      "thinkingLevel": {
+                      "modelCredentialId": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema13"
                       },
-                      "runAt": {
+                      "thinkingLevel": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema14"
                       },
-                      "quiet": {
+                      "runAt": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema15"
                       },
-                      "watch": {
+                      "quiet": {
                         "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema16"
+                      },
+                      "watch": {
+                        "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema17"
                       }
                     },
                     "required": [
@@ -101447,6 +101483,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcRoutinesUpdateOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -132310,6 +132356,17 @@
         "default": null,
         "anyOf": [
           {
+            "$ref": "#/components/schemas/RpcRoutinesCreateInputSchema0"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "RpcRoutinesCreateInputSchema14": {
+        "default": null,
+        "anyOf": [
+          {
             "type": "string",
             "enum": [
               "off",
@@ -132326,10 +132383,10 @@
           }
         ]
       },
-      "RpcRoutinesCreateInputSchema14": {
+      "RpcRoutinesCreateInputSchema15": {
         "type": "boolean"
       },
-      "RpcRoutinesCreateInputSchema15": {
+      "RpcRoutinesCreateInputSchema16": {
         "default": null,
         "anyOf": [
           {
@@ -132576,6 +132633,16 @@
       "RpcRoutinesUpdateInputSchema13": {
         "anyOf": [
           {
+            "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema0"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "RpcRoutinesUpdateInputSchema14": {
+        "anyOf": [
+          {
             "type": "string",
             "enum": [
               "off",
@@ -132592,15 +132659,15 @@
           }
         ]
       },
-      "RpcRoutinesUpdateInputSchema14": {
+      "RpcRoutinesUpdateInputSchema15": {
         "type": "string",
         "format": "date-time",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
       },
-      "RpcRoutinesUpdateInputSchema15": {
+      "RpcRoutinesUpdateInputSchema16": {
         "type": "boolean"
       },
-      "RpcRoutinesUpdateInputSchema16": {
+      "RpcRoutinesUpdateInputSchema17": {
         "anyOf": [
           {
             "oneOf": [
@@ -132616,7 +132683,7 @@
                     "maxLength": 2048
                   },
                   "intervalMinutes": {
-                    "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema17"
+                    "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema18"
                   }
                 },
                 "required": [
@@ -132654,10 +132721,10 @@
                   "arguments": {
                     "type": "object",
                     "propertyNames": {
-                      "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema18"
+                      "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema19"
                     },
                     "additionalProperties": {
-                      "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema19"
+                      "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema20"
                     }
                   },
                   "appName": {
@@ -132665,7 +132732,7 @@
                     "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
                   },
                   "intervalMinutes": {
-                    "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema17"
+                    "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema18"
                   }
                 },
                 "required": [
@@ -132684,7 +132751,7 @@
           }
         ]
       },
-      "RpcRoutinesUpdateInputSchema17": {
+      "RpcRoutinesUpdateInputSchema18": {
         "anyOf": [
           {
             "type": "number",
@@ -132700,10 +132767,10 @@
           }
         ]
       },
-      "RpcRoutinesUpdateInputSchema18": {
+      "RpcRoutinesUpdateInputSchema19": {
         "type": "string"
       },
-      "RpcRoutinesUpdateInputSchema19": {
+      "RpcRoutinesUpdateInputSchema20": {
         "anyOf": [
           {
             "type": "string"
@@ -132720,7 +132787,7 @@
           {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema19"
+              "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema20"
             }
           },
           {
@@ -132729,7 +132796,7 @@
               "type": "string"
             },
             "additionalProperties": {
-              "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema19"
+              "$ref": "#/components/schemas/RpcRoutinesUpdateInputSchema20"
             }
           }
         ]

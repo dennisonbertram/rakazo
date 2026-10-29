@@ -1,4 +1,4 @@
-import { usableModelId } from "@rakazo/contracts";
+import { PINNED_CONNECTION_LOST_MESSAGE, usableModelId } from "@rakazo/contracts";
 import type { PrismaClient } from "./client.js";
 
 export const newestCredentialOrder = [
@@ -251,7 +251,7 @@ function credentialFromChoice<
 /**
  * The connection a bot is pinned to, shaped like findModelCredential's result.
  * Null when there is no pin, the connection is gone, belongs to someone else, or
- * is for a different provider than the bot's model; callers then use the space default.
+ * is for a different provider than the bot's model.
  */
 export async function findPinnedModelCredential(
   prisma: PrismaClient,
@@ -273,7 +273,26 @@ export async function findPinnedModelCredential(
     : { ...credential, isDefault: false, defaultModel: null, thinkingLevel: null };
 }
 
-/** A bot's pinned connection when it has a usable one, else the usual per-provider lookup. */
+/** A pinned connection that is gone, foreign or for another provider: the run must not use a different one. */
+export class PinnedConnectionLostError extends Error {
+  constructor() {
+    super(PINNED_CONNECTION_LOST_MESSAGE);
+    this.name = "PinnedConnectionLostError";
+  }
+}
+
+/** For callers that only ask who would receive data: the run itself fails by name. */
+export function ignorePinnedConnectionLost(error: unknown): null {
+  if (error instanceof PinnedConnectionLostError) return null;
+  throw error;
+}
+
+/**
+ * The connection a bot or routine model runs on. A pinned choice returns exactly that connection
+ * or throws PinnedConnectionLostError; there is no fallback, because an automatic sign-out deletes
+ * the credential and the owner chose this connection on purpose. Unpinned choices use the usual
+ * per-provider lookup.
+ */
 export async function findBotModelCredential(
   prisma: PrismaClient,
   scope: ModelCredentialScope,
@@ -283,10 +302,11 @@ export async function findBotModelCredential(
     modelCredentialId?: string | null;
   },
 ) {
-  return (
-    (await findPinnedModelCredential(prisma, scope, bot)) ??
-    findModelCredential(prisma, scope, bot.modelProvider, bot.modelId)
-  );
+  if (!bot.modelCredentialId)
+    return findModelCredential(prisma, scope, bot.modelProvider, bot.modelId);
+  const pinned = await findPinnedModelCredential(prisma, scope, bot);
+  if (!pinned) throw new PinnedConnectionLostError();
+  return pinned;
 }
 
 export async function findModelCredential(

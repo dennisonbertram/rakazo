@@ -446,7 +446,8 @@ export function BotSettings({
         voiceId: voiceId || null,
         modelProvider: selected?.provider ?? null,
         modelId: selected?.modelId ?? null,
-        modelCredentialId: selected && pinnedCredential ? pinnedCredential.id : null,
+        // Sent as saved even when the connection is gone, so saving other fields keeps the pin.
+        modelCredentialId: selected && credentialId ? credentialId : null,
         ...(modelMetaReady
           ? {
               thinkingLevel: thinkingOptions.length
@@ -790,13 +791,13 @@ export function BotSettings({
                   </Suspense>
                 </ErrorBoundary>
               ) : null}
-              {credentials.length > 1 ? (
+              {credentials.length > 1 || credentialId ? (
                 <label htmlFor={`${ids}-connection`} className={advancedLabelClass}>
                   <Trans>Connection</Trans>
                   <NativeSelect
                     id={`${ids}-connection`}
                     className="mt-2 w-full"
-                    value={pinnedCredential?.id ?? ""}
+                    value={credentialId}
                     onChange={(event) => {
                       const next = credentials.find((entry) => entry.id === event.target.value);
                       const choices = connectedModelChoices(next ? [next] : credentials, catalog);
@@ -810,6 +811,11 @@ export function BotSettings({
                     }}
                   >
                     <NativeSelectOption value="">{t`Space default`}</NativeSelectOption>
+                    {credentialId && !pinnedCredential ? (
+                      <NativeSelectOption value={credentialId}>
+                        {t`Signed out or removed`}
+                      </NativeSelectOption>
+                    ) : null}
                     {credentials.map((entry) => (
                       <NativeSelectOption key={entry.id} value={entry.id}>
                         {entry.authKind === "oauth"

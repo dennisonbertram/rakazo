@@ -215,6 +215,7 @@ function continuationModelPin(
   batch: ReadonlyArray<{
     modelProvider?: string | null;
     modelId?: string | null;
+    modelCredentialId?: string | null;
     thinkingLevel?: string | null;
   }>,
 ) {
@@ -224,12 +225,14 @@ function continuationModelPin(
     (item) =>
       item.modelProvider === first.modelProvider &&
       item.modelId === first.modelId &&
+      (item.modelCredentialId ?? null) === (first.modelCredentialId ?? null) &&
       (item.thinkingLevel ?? null) === (first.thinkingLevel ?? null),
   );
   if (!agreed) return null;
   return {
     modelProvider: first.modelProvider,
     modelId: first.modelId,
+    modelCredentialId: first.modelCredentialId ?? null,
     thinkingLevel: first.thinkingLevel ?? null,
     modelPinned: true,
   };

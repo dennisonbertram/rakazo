@@ -27,6 +27,7 @@ export type WebhookEvents = {
     modelPin?: {
       modelProvider: string;
       modelId: string;
+      modelCredentialId?: string | null;
       thinkingLevel: string | null;
     };
   }): Promise<{ messageId: string; runId: string | null; seq: number }>;
@@ -336,6 +337,7 @@ export async function deliverWebhookEvent(
           modelPin: {
             modelProvider: pin.modelProvider,
             modelId: pin.modelId,
+            modelCredentialId: pin.modelCredentialId ?? null,
             thinkingLevel: pin.thinkingLevel ?? null,
           },
         }

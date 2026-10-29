@@ -88,6 +88,7 @@ import {
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  PINNED_CONNECTION_LOST_MESSAGE,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   RunPhaseSchema,
   VOICE_AGENT_BUILTIN_TOOLS,
@@ -187,6 +188,7 @@ import {
   effectiveMemoryScope,
   findBotModelCredential,
   findDefaultModelCredential,
+  PinnedConnectionLostError,
   findModelCredential,
   InvalidSpaceNameError,
   isDatabaseInterruption,
@@ -1443,7 +1445,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // The claim locks the row, so this is the model that was committed when it fired.
           const currentModel = await tx.routine.findUnique({
             where: { id: routine.id },
-            select: { modelProvider: true, modelId: true, thinkingLevel: true },
+            select: {
+              modelProvider: true,
+              modelId: true,
+              modelCredentialId: true,
+              thinkingLevel: true,
+            },
           });
           if (!currentModel) return null;
           const task = await tx.task.create({
@@ -1690,6 +1697,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? {
                     modelProvider: failed.modelProvider,
                     modelId: failed.modelId,
+                    modelCredentialId: failed.modelCredentialId,
                     thinkingLevel: failed.thinkingLevel,
                     modelPinned: true,
                   }
@@ -2161,15 +2169,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // modelPinned distinguishes the captured choice from an attempt's recorded model.
         const modelChoice = runModelChoice(run, bot);
         const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
+        // A pinned connection that is gone fails the run by name; it never moves to another one.
+        let pinnedConnectionLost = false;
         const overrideCredential =
           hasModelOverride && modelChoice.modelProvider
             ? await findBotModelCredential(deps.prisma, run, {
                 modelProvider: modelChoice.modelProvider,
                 modelId: modelChoice.modelId,
-                // A routine's own model is not on the bot's pinned connection.
-                modelCredentialId: run.modelPinned ? null : bot.modelCredentialId,
+                modelCredentialId: modelChoice.modelCredentialId,
+              }).catch((error: unknown) => {
+                if (!(error instanceof PinnedConnectionLostError)) throw error;
+                pinnedConnectionLost = true;
+                return null;
               })
             : null;
+        // Backups stand in for a refused or exhausted account; a pinned connection never swaps.
+        const runPinnedToConnection = Boolean(hasModelOverride && modelChoice.modelCredentialId);
         runAbortController = new AbortController();
         if (!leaseValid) runAbortController.abort();
         if (deps.shutdownSignal?.aborted) runAbortController.abort(deps.shutdownSignal.reason);
@@ -2613,6 +2628,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           return true;
         };
+        if (pinnedConnectionLost) {
+          await failRunBeforeModel(PINNED_CONNECTION_LOST_MESSAGE, true);
+          return;
+        }
         if (pinError) {
           await failRunBeforeModel(pinError, pinError === PINNED_PROVIDER_NOT_CONNECTED);
           return;
@@ -8192,6 +8211,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // recipient, so the Legal agent has none. A meeting-source agent has none for the same reason.
         if (
           !scripted &&
+          !runPinnedToConnection &&
           !legalOnly &&
           !meetingAgent &&
           !meetingTaint &&

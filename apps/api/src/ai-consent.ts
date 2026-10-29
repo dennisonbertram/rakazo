@@ -19,6 +19,7 @@ import {
   findDefaultModelCredential,
   findDefaultVoiceCredential,
   findBotModelCredential,
+  ignorePinnedConnectionLost,
   findModelCredential,
 } from "@rakazo/db";
 import type { RouterDeps } from "./router.js";
@@ -157,7 +158,7 @@ export async function aiConsentStatus(
                   "modelCredentialId" in override
                     ? (override.modelCredentialId as string | null)
                     : null,
-              })
+              }).catch(ignorePinnedConnectionLost)
             : null;
         return selectConfiguredModel({
           override,

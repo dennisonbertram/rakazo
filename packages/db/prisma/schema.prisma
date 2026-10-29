@@ -713,7 +713,6 @@ model UserModelCredential {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   preferences    SpaceModelPreference[]
-  bots           Bot[]
 
   @@unique([id, userId])
   @@index([userId, provider, updatedAt])
@@ -842,9 +841,10 @@ model Bot {
   autoSpeak              Boolean               @default(false)
   modelProvider          String?
   modelId                String?
-  // The connection this bot's model runs on; null follows the space default.
+  // The connection this bot's model runs on; null follows the space default. A plain column, not
+  // a foreign key: an automatic sign-out deletes the credential and the pin must survive it, so
+  // the run fails by name instead of quietly using another connection.
   modelCredentialId      String?
-  modelCredential        UserModelCredential?  @relation(fields: [modelCredentialId], references: [id], onDelete: SetNull)
   thinkingLevel          String?
   disabledBuiltinTools   String[]              @default([])
   // "internal" (default) or "external": talks to people outside the company. Server-owned; no bot tool reads or sets it.
@@ -890,6 +890,7 @@ model Bot {
   @@index([sectionId])
   @@index([computerId])
   @@index([parentBotId])
+  @@index([modelCredentialId])
   @@map("bots")
 }
 
@@ -1079,6 +1080,8 @@ model Run {
   externalTaint        Boolean           @default(false)
   modelProvider        String?
   modelId              String?
+  // The routine's connection pin, captured with the model.
+  modelCredentialId    String?
   thinkingLevel        String?
   // True when these columns are the model the run must keep. A later attempt
   // may record the model it used in the same columns without setting this.
@@ -1140,6 +1143,7 @@ model SteeringMessage {
   /// Model agreed for an inbound delivery that had to wait. Empty follows the bot.
   modelProvider String?
   modelId       String?
+  modelCredentialId String?
   thinkingLevel String?
   claimedAt     DateTime?
   createdAt     DateTime  @default(now())
@@ -1243,6 +1247,8 @@ model Routine {
   messageProvider String?
   modelProvider   String?
   modelId         String?
+  // Pins the routine's own model to one of the owner's connections.
+  modelCredentialId String?
   thinkingLevel   String?
   lastRunAt       DateTime?
   nextRunAt       DateTime?
@@ -1265,6 +1271,7 @@ model Routine {
   @@index([active, nextRunAt])
   @@index([spaceId, botId])
   @@index([taughtSkillId])
+  @@index([modelCredentialId])
   @@map("routines")
 }
 
