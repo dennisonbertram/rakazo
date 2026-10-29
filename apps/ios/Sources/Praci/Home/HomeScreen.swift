@@ -40,6 +40,8 @@ struct HomeScreen: View {
       }
     }
     .task(id: app.spaceID) { await model.load(app) }
+    // Pushed screens change agents (rename, settings, archive); reload quietly when Home returns.
+    .onAppear { if model.state.value != nil { Task { await model.load(app) } } }
     .sheet(item: $sheet) { sheet in
       switch sheet {
       case .newAgent:
