@@ -80,6 +80,7 @@ struct ThreadScreen: View {
             )
             .id(message.id)
           }
+          PendingSendsView(model: model)
           footer
           Color.clear.frame(height: 1).id(Self.bottomID)
         }

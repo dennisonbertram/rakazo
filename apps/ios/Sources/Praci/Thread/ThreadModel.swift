@@ -45,7 +45,12 @@ final class ThreadModel {
   private var readHeld = false
   private var markingRead = false
 
-  init(target: ThreadTarget) { self.target = target }
+  let composer: ComposerModel
+
+  init(target: ThreadTarget) {
+    self.target = target
+    composer = ComposerModel(target: target)
+  }
 
   var snapshot: ThreadSnapshot? { state.value }
 
