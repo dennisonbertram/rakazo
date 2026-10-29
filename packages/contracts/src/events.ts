@@ -556,6 +556,8 @@ export const ThreadMessageSchema = z.object({
   routineName: z.string().optional(),
   /** Set when the message was sent from a live voice call; groups one call's transcript. */
   callId: z.string().optional(),
+  /** Label of the outside MCP connection that sent this message. */
+  via: z.string().optional(),
   createdAt: z.string(),
 });
 export type ThreadMessage = z.infer<typeof ThreadMessageSchema>;

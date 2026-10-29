@@ -12,8 +12,10 @@ import {
   runAsSystem,
   setApprovalRule,
 } from "@rakazo/db";
+import type { McpAgentDeps } from "./mcp-agent-tools.js";
+import { agentRunState } from "./mcp-agent-tools.js";
 import type { McpWriteToolName } from "./mcp-read-tools.js";
-import { callMcpWriteTool } from "./mcp-read-tools.js";
+import { callMcpWriteTool, wrapUntrustedText } from "./mcp-read-tools.js";
 
 /** A waiting action that nobody answered in this time is closed. */
 export const EXTERNAL_ACTION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -36,13 +38,22 @@ export type McpWriteResult = {
 /** Runs the handler for an action and records how it ended. Callers claim the row first. */
 async function execute(
   prisma: PrismaClient,
-  action: Owner & { id: string; tool: string; args: unknown },
+  action: Owner & { id: string; tool: string; args: unknown; connectionId: string },
+  agents?: McpAgentDeps,
 ) {
   let result: unknown;
   try {
     result = await callMcpWriteTool(
       action.tool as McpWriteToolName,
-      { prisma, scope: scopeOf(action) },
+      // An approved agent_send starts the run and returns; action_status reports the reply later.
+      {
+        prisma,
+        scope: scopeOf(action),
+        agents,
+        connectionId: action.connectionId,
+        key: action.id,
+        wait: false,
+      },
       (action.args ?? {}) as Record<string, unknown>,
     );
   } catch {
@@ -68,6 +79,7 @@ export async function submitMcpWrite(
   name: McpWriteToolName,
   args: Record<string, unknown>,
   events?: NotificationEvents,
+  agents?: McpAgentDeps,
 ): Promise<McpWriteResult> {
   const rules = (await listApprovalRules(prisma, scopeOf(caller))) as ActionApprovalRule[];
   const resolved = resolveActionApprovalDetail({ toolName: name, rules });
@@ -75,7 +87,11 @@ export async function submitMcpWrite(
     return { outcome: "blocked", result: { error: BLOCKED_ACTION_MESSAGE } };
   }
   if (resolved.source === "always_allow" && resolved.decision === "allow") {
-    const result = await callMcpWriteTool(name, { prisma, scope: scopeOf(caller) }, args);
+    const result = await callMcpWriteTool(
+      name,
+      { prisma, scope: scopeOf(caller), agents, connectionId: caller.connectionId },
+      args,
+    );
     return { outcome: failed(result) ? "error" : "ok", result };
   }
   const waiting = await prisma.externalAction.count({
@@ -130,14 +146,19 @@ export async function actionStatus(
   if (typeof actionId !== "string" || !actionId) return { error: "actionId is required" };
   const row = await prisma.externalAction.findFirst({
     where: { id: actionId, connectionId: caller.connectionId, spaceId: caller.spaceId },
-    select: { status: true, result: true },
+    select: { status: true, result: true, tool: true },
   });
   if (!row) return { error: "Action not found" };
+  let result = row.result;
+  // A sent message finishes later than the action: report the run's current state and reply.
+  const runId = (result as { runId?: unknown } | null)?.runId;
+  if (row.tool === "agent_send" && row.status === "done" && typeof runId === "string") {
+    const state = await agentRunState(prisma, caller, runId);
+    if (state) result = wrapUntrustedText(state, ["reply"]) as typeof result;
+  }
   return {
     status: row.status,
-    ...(row.result !== null && (row.status === "done" || row.status === "failed")
-      ? { result: row.result }
-      : {}),
+    ...(result !== null && (row.status === "done" || row.status === "failed") ? { result } : {}),
   };
 }
 
@@ -187,7 +208,7 @@ export async function decideExternalAction(
   owner: Owner,
   id: string,
   decision: "approve" | "deny",
-  options: { alwaysAllow?: boolean; now?: Date } = {},
+  options: { alwaysAllow?: boolean; now?: Date; agents?: McpAgentDeps } = {},
 ) {
   const now = options.now ?? new Date();
   const claimed = await prisma.externalAction.updateMany({
@@ -212,7 +233,7 @@ export async function decideExternalAction(
       effect: "always_allow",
     });
   }
-  return execute(prisma, action);
+  return execute(prisma, action, options.agents);
 }
 
 /** Closes unanswered actions after a day, and approved ones that never finished. Runs in the job reconciler. */

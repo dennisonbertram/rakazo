@@ -5,6 +5,13 @@ import type { DataRoomToolDeps } from "./data-room-tools.js";
 import { dataRoomToolFromTool } from "./data-room-tools.js";
 import { financeToolFromTool } from "./finance-tools.js";
 import { fundraisingToolFromTool } from "./fundraising-tools.js";
+import type { McpAgentDeps } from "./mcp-agent-tools.js";
+import {
+  AGENT_SEND_DESCRIPTOR,
+  agentSend,
+  THREAD_READ_DESCRIPTOR,
+  threadRead,
+} from "./mcp-agent-tools.js";
 import { meetingToolFromTool } from "./meeting-tools.js";
 import {
   addScratchpadItemFromTool,
@@ -36,6 +43,8 @@ export const MCP_READ_TOOLS = {
   // One string holding the title, attendees and summary (already inside <meeting_notes>).
   meetings_list: ["meeting"],
   scratchpad_list: ["title", "notes", "target", "waitingOn", "proof", "resolvedReason"],
+  // Not a bot tool: reads the messages of one of the member's agent threads.
+  thread_read: ["text"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Read tools that `builtinAgentTools` does not mark `readOnly`, each with the reason it is safe. */
@@ -51,6 +60,8 @@ export const MCP_WRITE_TOOLS = {
   scratchpad_add: ["title", "notes", "waitingOn"],
   scratchpad_update: ["title", "notes", "waitingOn"],
   scratchpad_complete: ["title", "notes", "waitingOn"],
+  // Not a bot tool: starts a run of one of the member's agents (trigger `mcp`, unattended and tainted).
+  agent_send: ["reply"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Arguments of the bot schema that an outside client may not set (gated categories, proofs, hand-offs). */
@@ -98,10 +109,16 @@ const describeTools = (isListed: (name: string) => boolean) =>
     }));
 
 /** Name, description and JSON Schema of every read tool, taken from the bot definitions. */
-export const mcpReadToolDescriptors = () => describeTools(isMcpReadTool);
+export const mcpReadToolDescriptors = () => [
+  ...describeTools(isMcpReadTool),
+  THREAD_READ_DESCRIPTOR,
+];
 
 /** The same for the write tools. */
-export const mcpWriteToolDescriptors = () => describeTools(isMcpWriteTool);
+export const mcpWriteToolDescriptors = () => [
+  ...describeTools(isMcpWriteTool),
+  AGENT_SEND_DESCRIPTOR,
+];
 
 /** Moves the listed text fields of every object in `value` under an `untrusted_text` key. */
 export function wrapUntrustedText(value: unknown, fields: readonly string[]): unknown {
@@ -161,6 +178,8 @@ export async function callMcpReadTool(
       { prisma, scope, consentAllowed: CONNECTION_IS_CONSENT },
       args,
     );
+  } else if (name === "thread_read") {
+    result = await threadRead(prisma, scope, args);
   } else if (name === "scratchpad_list") {
     const bot = await ownBot(prisma, scope, args.botId);
     if (!bot) return { error: "Agent not found" };
@@ -188,12 +207,26 @@ export async function callMcpReadTool(
  */
 export async function callMcpWriteTool(
   name: McpWriteToolName,
-  deps: { prisma: PrismaClient; scope: Scope },
+  deps: {
+    prisma: PrismaClient;
+    scope: Scope;
+    /** Needed by agent_send. `key` makes a repeated send of the same action idempotent. */
+    agents?: McpAgentDeps;
+    connectionId?: string;
+    key?: string;
+    /** Wait for the agent's reply (a direct call), or return as soon as the run has started. */
+    wait?: boolean;
+  },
   args: Record<string, unknown>,
 ): Promise<unknown> {
   const { prisma, scope } = deps;
   let result: Record<string, unknown>;
-  if (name === "contacts_add" || name === "contacts_save") {
+  if (name === "agent_send") {
+    result = await agentSend(prisma, deps.agents, scope, deps.connectionId ?? "", args, {
+      wait: deps.wait !== false,
+      key: deps.key,
+    });
+  } else if (name === "contacts_add" || name === "contacts_save") {
     result = await contactToolFromTool(name, { prisma, scope }, args);
   } else {
     const bot = await ownBot(prisma, scope, args.botId);
