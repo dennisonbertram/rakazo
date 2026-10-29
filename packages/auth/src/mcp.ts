@@ -1,6 +1,7 @@
 import { mcp, requireMcpAuth } from "@better-auth/mcp";
 import { getOAuthProviderState } from "@better-auth/oauth-provider";
 import type { PrismaClient } from "@rakazo/db";
+import { notifyNewMcpConnection } from "@rakazo/db";
 import type { BetterAuthPlugin } from "better-auth";
 import {
   APIError,
@@ -129,7 +130,7 @@ function mcpSpace(prisma: PrismaClient): BetterAuthPlugin {
               where: { clientId },
               select: { name: true },
             });
-            await prisma.mcpConnection.create({
+            const created = await prisma.mcpConnection.create({
               data: {
                 userId: session.user.id,
                 spaceId,
@@ -139,6 +140,8 @@ function mcpSpace(prisma: PrismaClient): BetterAuthPlugin {
                 label: client?.name ?? "MCP client",
               },
             });
+            // A failed notice must not block the approval.
+            await notifyNewMcpConnection(prisma, created).catch(() => undefined);
           }),
         },
       ],

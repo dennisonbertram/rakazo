@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { NotificationKind } from "@rakazo/contracts";
 import { NOTIFICATION_KINDS, notificationKindOf } from "@rakazo/contracts";
 import type { Notification, PrismaClient } from "./client.js";
+import { runAsSystem } from "./row-security.js";
 
 type Scope = { spaceId: string; userId: string };
 /** Only space and user: callers may pass a whole actor, which must not reach a Prisma query. */
@@ -416,4 +417,37 @@ export async function deleteExpiredNotifications(
     where: { createdAt: { lt: new Date(now.getTime() - NOTIFICATION_RETENTION_MS) } },
   });
   return { notifications: notifications.count, deliveries: deliveries.count };
+}
+
+/**
+ * Tells a member that an outside client was connected to a Space, so a connection they did not
+ * make shows up. Runs in the system scope: the auth hook and the token route have no tenant yet.
+ */
+export async function notifyNewMcpConnection(
+  prisma: PrismaClient,
+  connection: { id: string; spaceId: string; userId: string; label: string },
+  notify?: (notification: { id: string; importance: "info" | "attention" }) => Promise<void>,
+) {
+  const result = await runAsSystem("new mcp connection notice", async () => {
+    const space = await prisma.space.findFirst({
+      where: { id: connection.spaceId },
+      select: { name: true },
+    });
+    const title = `New connection: ${connection.label} in ${space?.name ?? "your space"}`;
+    return createNotification(prisma, {
+      spaceId: connection.spaceId,
+      userId: connection.userId,
+      surface: "mcp",
+      title:
+        title.length > NOTIFICATION_TITLE_MAX
+          ? `${title.slice(0, NOTIFICATION_TITLE_MAX - 1)}…`
+          : title,
+      link: "/app?settings=connections",
+      importance: "attention",
+      kind: "new",
+      dedupeKey: `mcp-connection:${connection.id}`,
+      skipRateLimits: true,
+    });
+  });
+  if (result.status === "created") await notify?.(result.notification);
 }

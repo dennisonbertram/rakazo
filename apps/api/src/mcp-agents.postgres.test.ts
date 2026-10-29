@@ -250,6 +250,18 @@ describePostgres("MCP agent_send and thread_read (PostgreSQL, runtime login)", (
       loadMessagePage(prisma, bots.alice!.threadId, undefined, 50),
     );
     expect(page.messages.findLast((m) => m.role === "user" && m.via)?.via).toBe("Cursor");
+    // The live event carries it too, so the label shows without a reload.
+    const live = await runAsSystem("mcp test", () =>
+      prisma.event.findMany({
+        where: { threadId: bots.alice!.threadId, type: "thread.message.created" },
+        orderBy: { seq: "desc" },
+      }),
+    );
+    expect(
+      live.find((e) => (e.payload as { role?: string }).role === "user")?.payload,
+    ).toMatchObject({
+      via: "Cursor",
+    });
     script = () => undefined;
   });
 

@@ -32,7 +32,7 @@ export function createMcpConnectionsRoutes({ deps, authed }: RouteContext) {
       listConnections(deps.prisma, context.actor, deps.env.mcpUrl ?? ""),
     ),
     createToken: authed.mcpConnections.createToken.handler(({ context, input }) =>
-      owned(() => createToken(deps.prisma, context.actor, input)),
+      owned(() => createToken(deps.prisma, context.actor, input, deps.notificationEvents)),
     ),
     update: authed.mcpConnections.update.handler(({ context, input }) =>
       owned(() => updateConnection(deps.prisma, context.actor, input)),

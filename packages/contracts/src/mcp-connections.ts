@@ -58,6 +58,8 @@ export const McpPendingActionSchema = z.object({
   /** What the client sent; shown so the member knows what they approve. */
   args: z.record(z.string(), z.unknown()),
   connectionLabel: z.string(),
+  /** Name of the agent the action targets, when the args name one. */
+  botName: z.string().optional(),
   createdAt: z.string(),
 });
 export type McpPendingAction = z.infer<typeof McpPendingActionSchema>;

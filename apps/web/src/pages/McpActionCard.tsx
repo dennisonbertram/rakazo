@@ -12,7 +12,12 @@ export function McpActionCard({
   busy: boolean;
   onDecide: (decision: "approve" | "deny", alwaysAllow?: boolean) => void;
 }) {
-  const fields = Object.entries(action.args).filter(([, value]) => value !== undefined);
+  const fields = Object.entries(action.args)
+    .filter(([, value]) => value !== undefined)
+    // The agent's name reads better than its id.
+    .map(([key, value]): [string, unknown] =>
+      key === "botId" && action.botName ? ["agent", action.botName] : [key, value],
+    );
   return (
     // biome-ignore lint/a11y/useSemanticElements: a fieldset brings its own border and sizing to a card
     <div

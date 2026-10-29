@@ -10,6 +10,7 @@ import {
   callIdFromClientNonce,
   isApprovalAskBlock,
   isConversationalRun,
+  mcpConnectionIdFromNonce,
   newRunExternalTaint,
   newRunUnattended,
   sanitizeJsonValue,
@@ -510,6 +511,16 @@ export async function sendUserMessage(
         });
         await tx.message.update({ where: { id: message.id }, data: { runId: busy.id } });
       }
+      // An outside MCP client's label rides on the live event, as it does on a loaded thread.
+      const connectionId = mcpConnectionIdFromNonce(message.clientNonce);
+      const via = connectionId
+        ? (
+            await tx.mcpConnection.findFirst({
+              where: { id: connectionId, spaceId: input.spaceId },
+              select: { label: true },
+            })
+          )?.label
+        : undefined;
       const event = await appendEventInTransaction(tx, {
         spaceId: input.spaceId,
         threadId: input.threadId,
@@ -520,6 +531,7 @@ export async function sendUserMessage(
           messageId: message.id,
           role: "user",
           blocks: input.blocks,
+          ...(via ? { via } : {}),
           // Carries the call id on the live event so a spoken turn groups into the
           // call card immediately, instead of after a refetch reads the nonce.
           callId: callIdFromClientNonce(message.clientNonce),

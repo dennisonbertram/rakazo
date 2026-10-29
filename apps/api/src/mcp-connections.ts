@@ -6,8 +6,8 @@ import type {
   McpConnectionList,
   UpdateMcpConnectionInput,
 } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { IsolationError, requireMembership, runAsSystem } from "@rakazo/db";
+import type { NotificationEvents, PrismaClient } from "@rakazo/db";
+import { IsolationError, notifyNewMcpConnection, requireMembership, runAsSystem } from "@rakazo/db";
 
 export const PAT_PREFIX = "praci_pat_";
 /** Random bytes in a token: 256 bits. */
@@ -92,6 +92,7 @@ export async function createToken(
   prisma: PrismaClient,
   actor: { userId: string },
   input: CreateMcpTokenInput,
+  events?: NotificationEvents,
 ) {
   try {
     await requireMembership(prisma, actor.userId, input.spaceId);
@@ -114,6 +115,14 @@ export async function createToken(
       include: withSpace,
     }),
   );
+  await notifyNewMcpConnection(prisma, row, (n) =>
+    events
+      ? events.notify(
+          { spaceId: row.spaceId, userId: row.userId },
+          { id: n.id, surface: "mcp", importance: n.importance },
+        )
+      : Promise.resolve(),
+  ).catch(() => undefined);
   return { connection: dto(row), token };
 }
 

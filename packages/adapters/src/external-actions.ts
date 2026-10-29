@@ -167,6 +167,7 @@ export type PendingExternalAction = {
   tool: string;
   args: Record<string, unknown>;
   connectionLabel: string;
+  botName?: string;
   createdAt: string;
 };
 
@@ -186,13 +187,36 @@ export async function listPendingActions(
     orderBy: { createdAt: "asc" },
     include: { connection: { select: { label: true } } },
   });
-  return rows.map((row) => ({
-    id: row.id,
-    tool: row.tool,
-    args: (row.args ?? {}) as Record<string, unknown>,
-    connectionLabel: row.connection.label,
-    createdAt: row.createdAt.toISOString(),
-  }));
+  const botIds = [
+    ...new Set(
+      rows.flatMap((row) => {
+        const id = (row.args as { botId?: unknown } | null)?.botId;
+        return typeof id === "string" ? [id] : [];
+      }),
+    ),
+  ];
+  const names = new Map(
+    botIds.length
+      ? (
+          await prisma.bot.findMany({
+            where: { id: { in: botIds }, ...scopeOf(owner) },
+            select: { id: true, name: true },
+          })
+        ).map((bot) => [bot.id, bot.name])
+      : [],
+  );
+  return rows.map((row) => {
+    const botId = (row.args as { botId?: unknown } | null)?.botId;
+    const botName = typeof botId === "string" ? names.get(botId) : undefined;
+    return {
+      id: row.id,
+      tool: row.tool,
+      args: (row.args ?? {}) as Record<string, unknown>,
+      connectionLabel: row.connection.label,
+      ...(botName ? { botName } : {}),
+      createdAt: row.createdAt.toISOString(),
+    };
+  });
 }
 
 /** The action is not waiting: answered already (maybe by a second click), expired, or not the member's. */
@@ -254,4 +278,16 @@ export function expireExternalActions(prisma: PrismaClient, now = new Date()) {
       data: { status: "failed", result: { error: "Interrupted" } },
     });
   });
+}
+
+/** Call log rows older than this are deleted. */
+export const MCP_CALL_LOG_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Deletes call log rows past retention. Runs in the job reconciler. */
+export function pruneMcpCallLog(prisma: PrismaClient, now = new Date()) {
+  return runAsSystem("prune mcp call log", () =>
+    prisma.mcpCallLog.deleteMany({
+      where: { createdAt: { lt: new Date(now.getTime() - MCP_CALL_LOG_RETENTION_MS) } },
+    }),
+  );
 }

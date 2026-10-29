@@ -1106,13 +1106,36 @@ Plain `http://` is accepted only for a private IP, `localhost`, or a `.local` na
 
 ## Connect outside AI clients (MCP)
 
-The API serves a Model Context Protocol endpoint at `/mcp` for AI clients such as Claude Code,
-claude.ai, ChatGPT and MCP Inspector. A client signs in through OAuth: the member approves it on
-a page of the web app and chooses one Space, and the client then sees only that Space. The
-connection is checked again on every call, so a member who leaves the Space, or a connection that
-is revoked, stops working on the next call. This first version has one tool, `agents_list`.
+The API serves a Model Context Protocol endpoint at `/mcp`. AI clients such as Claude Code,
+claude.ai, ChatGPT and MCP Inspector can connect to it, read the data of one Space, make changes
+that follow your approval rules, and send messages to your agents. Each connection is bound to
+one Space and one member. It is checked again on every call, so a member who leaves the Space, or
+a connection that is revoked, stops working on the next call.
 
-A client that cannot sign in through OAuth can use a personal access token instead. In **Settings > Connections**, choose **Create token**, name it, pick one Space and leave **Read-only** on unless the client needs to write. The token is shown once. Send it as `Authorization: Bearer <token>`; the same dialog shows the full `claude mcp add` command. The Connections list also shows each OAuth client, with its Space and last use, and **Revoke** ends either kind on the next call.
+There are two ways to connect:
+
+- **A personal access token**, for clients that can send a header (Claude Code). It works on
+  localhost and needs no public address.
+- **OAuth**, for clients that sign in through a browser (claude.ai, ChatGPT). It needs a public
+  address, so see the Funnel section below. On localhost, MCP Inspector and Claude Code can also
+  use OAuth.
+
+### Claude Code with a token
+
+1. Open **Settings > Connections** and choose **Create token**. Name it, pick one Space, and leave
+   **Read-only** on unless the client needs to make changes. The token is shown once.
+2. Run this in a terminal. Use the API address, `http://127.0.0.1:<API port>/mcp` on a local
+   stack (`3200` on a dev stack), or your public address followed by `/mcp`:
+
+   ```bash
+   claude mcp add --transport http praci http://127.0.0.1:<API port>/mcp --header "Authorization: Bearer <token>"
+   ```
+
+3. In Claude Code, run `/mcp` to check that `praci` is connected, then ask a question such as
+   "list my agents".
+
+The token is stored hashed, so a lost token cannot be shown again. Create a new one and revoke
+the old one.
 
 ### On localhost
 
@@ -1157,3 +1180,81 @@ reach `WEB_ORIGIN`, and the client's own browser redirect brings them there.
    `registration_endpoint` at the public address.
 5. Add the connector in the client with `https://<machine>.<tailnet>.ts.net/mcp`.
 6. To stop exposing it: `tailscale funnel reset`, and unset `PUBLIC_MCP_URL`.
+
+### What the client can do
+
+Read tools never change anything:
+
+| Tool | What it returns |
+| --- | --- |
+| `agents_list` | The agents in the Space: id, name and description. |
+| `contacts_list` | Contacts. |
+| `finance_overview`, `finance_breakdown`, `finance_transactions`, `finance_recurring`, `finance_crypto` | Finance summaries, spending by category, transactions, recurring payments and crypto balances. |
+| `cap_table_read` | The cap table. |
+| `fundraising_read` | Investors and the fundraising round. |
+| `meetings_list` | Meeting notes. |
+| `search_data_room` | Titles and snippets from the data room, not whole files. |
+| `scratchpad_list` | An agent's scratchpad items. |
+| `thread_read` | The latest messages of one agent's thread. |
+| `action_status` | The state of a change that is waiting for your approval. |
+
+Write tools change data in the Space:
+
+| Tool | What it does |
+| --- | --- |
+| `contacts_add`, `contacts_save` | Add a contact, or change one. |
+| `scratchpad_add`, `scratchpad_update`, `scratchpad_complete` | Add, change or finish a scratchpad item of one agent. |
+| `agent_send` | Send a message to one of your agents. The agent runs without you watching, so its risky actions ask for your approval in Praci, even if your rules would allow them in a live chat. The message appears in the agent's thread with "via <connection name>". |
+
+Mail, calendar, Drive and anything that moves money are not available. Text written by people or
+third parties, such as notes and contact names, comes back in fields named `untrusted_text`, and
+the client is told to treat it as data.
+
+### Read-only and write
+
+A **Read-only** connection sees only the read tools and is refused if it calls a write tool. You can
+switch a connection between read-only and read-write in **Settings > Connections** at any time.
+Use read-only unless the client has to make changes.
+
+### Approvals and Always allow
+
+A write from an outside client follows your approval rules for the Space (**Allow**, **Ask**,
+**Block**). Unlike your own agents, an outside client has no default Allow:
+
+- **Block**: the call is refused.
+- **Allow**: the change is made at once.
+- **Ask**, or no rule: the change waits. The client gets `pending_approval` and an action id, and
+  can check it with `action_status`. Praci sends you a notification and shows a card in
+  **Settings > Connections** with what the client sent. **Approve** makes the change once.
+  **Deny** drops it. A card nobody answers expires after 24 hours.
+- **Always allow this** on a card approves it and saves an Allow rule for that tool in the Space,
+  so the next call from any connection runs without asking. Remove the rule in the approval
+  rules if you change your mind. A few tools can never be allowed permanently.
+
+A connection can have at most 20 changes waiting at once.
+
+### Notifications
+
+When a connection is created, by you from **Create token** or by approving a client through
+OAuth, you get a notification, "New connection: <name> in <Space>". It opens **Settings >
+Connections**, so a connection you did not make is easy to notice. You also get one when a change
+needs your approval.
+
+### Rate limits
+
+- Each connection can make 120 calls per minute. Calls over the limit return "Rate limit reached"
+  and a number of seconds to wait.
+- Each internet address can register up to 10 new OAuth clients per hour (the `register`
+  endpoint is open so that clients can set themselves up). The 11th request gets HTTP 429. The
+  count is kept in Postgres, so it is shared by all API processes. The address is the socket
+  address; behind a proxy on the same machine, such as Tailscale Funnel, it is the last
+  `X-Forwarded-For` entry, which the proxy adds. A proxy on another machine is not trusted: its
+  address is used instead.
+- Call history (tool name, outcome and time, never arguments or results) is shown per
+  connection and deleted after 30 days.
+
+### Revoking a connection
+
+In **Settings > Connections**, choose **Revoke** on the connection. It stops on its next call. For
+an OAuth client the refresh tokens and your approval are deleted too, so the client has to ask
+you again. Revoke a token you no longer use, and any connection you do not recognise.
