@@ -85593,6 +85593,9 @@
                           "approve",
                           "deny"
                         ]
+                      },
+                      "alwaysAllow": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -114388,7 +114391,10 @@
                         "$ref": "#/components/schemas/RpcThreadsMarkUnreadInputSchema0"
                       },
                       "groupId": {
-                        "$ref": "#/components/schemas/RpcThreadsMarkUnreadInputSchema2"
+                        "$ref": "#/components/schemas/RpcThreadsMarkUnreadInputSchema0"
+                      },
+                      "messageId": {
+                        "$ref": "#/components/schemas/RpcThreadsMarkUnreadInputSchema0"
                       }
                     },
                     "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
@@ -133741,14 +133747,8 @@
         "minLength": 1
       },
       "RpcThreadsMarkUnreadInputSchema0": {
-        "$ref": "#/components/schemas/RpcThreadsMarkUnreadInputSchema1"
-      },
-      "RpcThreadsMarkUnreadInputSchema1": {
         "type": "string",
         "minLength": 1
-      },
-      "RpcThreadsMarkUnreadInputSchema2": {
-        "$ref": "#/components/schemas/RpcThreadsMarkUnreadInputSchema1"
       },
       "RpcThreadsMessagesOutputSchema0": {
         "type": "string",

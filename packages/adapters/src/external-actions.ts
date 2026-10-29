@@ -2,7 +2,7 @@ import type { ActionApprovalRule } from "@rakazo/core";
 import {
   BLOCKED_ACTION_MESSAGE,
   resolveActionApprovalDetail,
-  toolRequiresApproval,
+  toolRuleAllowsAllow,
 } from "@rakazo/core";
 import type { NotificationEvents, Prisma, PrismaClient } from "@rakazo/db";
 import {
@@ -10,6 +10,7 @@ import {
   listApprovalRules,
   NOTIFICATION_BODY_MAX,
   runAsSystem,
+  setApprovalRule,
 } from "@rakazo/db";
 import type { McpWriteToolName } from "./mcp-read-tools.js";
 import { callMcpWriteTool } from "./mcp-read-tools.js";
@@ -57,8 +58,9 @@ async function execute(
 
 /**
  * One write from an outside client, under the member's space-wide approval rules (no bot
- * overrides). Allow runs it now, Block refuses it, Ask stores it for the member to approve.
- * A tool the bots ask about unless the member chose Always allow (contacts_save) also asks.
+ * overrides). Block refuses it. Only an explicit Allow rule (for the tool, or for its action
+ * type) runs it now; with no rule, or with Ask, it is stored for the member to approve. Unlike a
+ * bot, an outside client gets no default Allow.
  */
 export async function submitMcpWrite(
   prisma: PrismaClient,
@@ -72,10 +74,7 @@ export async function submitMcpWrite(
   if (resolved.decision === "block") {
     return { outcome: "blocked", result: { error: BLOCKED_ACTION_MESSAGE } };
   }
-  const asks =
-    resolved.decision === "ask" ||
-    (resolved.source !== "always_allow" && toolRequiresApproval(name, false));
-  if (!asks) {
+  if (resolved.source === "always_allow" && resolved.decision === "allow") {
     const result = await callMcpWriteTool(name, { prisma, scope: scopeOf(caller) }, args);
     return { outcome: failed(result) ? "error" : "ok", result };
   }
@@ -188,8 +187,9 @@ export async function decideExternalAction(
   owner: Owner,
   id: string,
   decision: "approve" | "deny",
-  now = new Date(),
+  options: { alwaysAllow?: boolean; now?: Date } = {},
 ) {
+  const now = options.now ?? new Date();
   const claimed = await prisma.externalAction.updateMany({
     where: {
       id,
@@ -203,6 +203,15 @@ export async function decideExternalAction(
   if (claimed.count !== 1) throw new ExternalActionNotPending();
   if (decision === "deny") return { status: "denied" as const };
   const action = await prisma.externalAction.findFirstOrThrow({ where: { id } });
+  // "Always allow": a space-wide rule for this tool, as a bot's approval card saves.
+  if (options.alwaysAllow && toolRuleAllowsAllow(action.tool)) {
+    await setApprovalRule(prisma, {
+      ...scopeOf(owner),
+      matchKind: "tool",
+      matchValue: action.tool,
+      effect: "always_allow",
+    });
+  }
   return execute(prisma, action);
 }
 

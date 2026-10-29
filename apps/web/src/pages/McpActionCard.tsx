@@ -10,7 +10,7 @@ export function McpActionCard({
 }: {
   action: McpPendingAction;
   busy: boolean;
-  onDecide: (decision: "approve" | "deny") => void;
+  onDecide: (decision: "approve" | "deny", alwaysAllow?: boolean) => void;
 }) {
   const fields = Object.entries(action.args).filter(([, value]) => value !== undefined);
   return (
@@ -42,6 +42,14 @@ export function McpActionCard({
         </Button>
         <Button variant="outline" disabled={busy} onClick={() => onDecide("deny")}>
           <Trans>Deny</Trans>
+        </Button>
+        <Button
+          variant="ghost"
+          className="ms-auto"
+          disabled={busy}
+          onClick={() => onDecide("approve", true)}
+        >
+          <Trans>Always allow this</Trans>
         </Button>
       </div>
     </div>

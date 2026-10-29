@@ -797,7 +797,10 @@ export const appContract = {
         threadTarget.safeExtend({ upToMessageId: Id.optional(), toEnd: z.boolean().optional() }),
       )
       .output(z.object({ ok: z.literal(true) })),
-    markUnread: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
+    /** With `messageId`, the chat reads as unread from that message: the next open puts New above it. */
+    markUnread: oc
+      .input(threadTarget.safeExtend({ messageId: Id.optional() }))
+      .output(z.object({ ok: z.literal(true) })),
   },
   computer: {
     status: oc.input(botId).output(ComputerStatusSchema),

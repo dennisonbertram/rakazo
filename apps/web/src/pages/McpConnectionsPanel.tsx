@@ -73,10 +73,10 @@ export function McpConnectionsPanel() {
               key={action.id}
               action={action}
               busy={deciding === action.id}
-              onDecide={(decision) => {
+              onDecide={(decision, alwaysAllow) => {
                 setDeciding(action.id);
                 void change(() =>
-                  rpc.mcpConnections.decideAction({ id: action.id, decision }),
+                  rpc.mcpConnections.decideAction({ id: action.id, decision, alwaysAllow }),
                 ).finally(() => setDeciding(null));
               }}
             />

@@ -14,8 +14,9 @@ import {
   TableRow,
 } from "@rakazo/ui-web";
 import { cn } from "@rakazo/ui-web/lib/utils";
-import { CircleCheck, Info, OctagonAlert, TriangleAlert } from "lucide-react";
+import { ChevronRight, CircleCheck, Info, OctagonAlert, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHideAmounts } from "../lib/hide-amounts-preference";
 
 type Props = {
@@ -35,6 +36,27 @@ const TONES = {
   },
 } as const;
 
+/** Scrolls sideways; the right edge fades while more is hidden, so a cut-off column reads as "scroll". */
+function SideScroll({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  const measure = () => {
+    const el = box.current;
+    if (el) setMore(el.scrollWidth - el.clientWidth - Math.abs(el.scrollLeft) > 1);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measure only reads the box; it runs once the table has rendered.
+  useEffect(measure, []);
+  return (
+    <div
+      ref={box}
+      onScroll={measure}
+      className={cn("overflow-x-auto px-4", more && "mask-r-from-[calc(100%-2rem)]")}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** A typed block from the render_ui tool. All text is plain or Markdown; nothing here runs model code. */
 export function UiBlockView({ block, onNavigate }: Props) {
   const hidden = useHideAmounts();
@@ -52,7 +74,7 @@ export function UiBlockView({ block, onNavigate }: Props) {
       content = (
         <Card size="sm" className="gap-2">
           {title(block.title)}
-          <div className="overflow-x-auto px-4">
+          <SideScroll>
             <Table compact>
               <TableHeader>
                 <TableHeadRow>
@@ -86,7 +108,7 @@ export function UiBlockView({ block, onNavigate }: Props) {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </SideScroll>
         </Card>
       );
       break;
@@ -147,13 +169,17 @@ export function UiBlockView({ block, onNavigate }: Props) {
             const external = card.href?.startsWith("https://");
             return (
               <li key={i} className="min-w-0">
-                <Card size="sm" className="h-full gap-1 px-4">
+                <Card
+                  size="sm"
+                  className={cn("relative h-full gap-1 px-4", card.href && "hover:bg-accent/50")}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="min-w-0 text-sm font-medium break-words">
                       {card.href ? (
                         <a
                           href={card.href}
-                          className="underline-offset-4 hover:underline"
+                          // The link's hit area covers the whole card.
+                          className="underline-offset-4 after:absolute after:inset-0 hover:underline"
                           {...(external
                             ? { target: "_blank", rel: "noopener noreferrer" }
                             : {
@@ -171,11 +197,20 @@ export function UiBlockView({ block, onNavigate }: Props) {
                       )}
                     </h3>
                     {card.badge ? <Badge variant="secondary">{card.badge}</Badge> : null}
+                    {card.href ? (
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      />
+                    ) : null}
                   </div>
                   {card.subtitle ? (
                     <p className="text-xs text-muted-foreground">{text(card.subtitle)}</p>
                   ) : null}
-                  {card.body ? markdown(card.body) : null}
+                  {card.body ? (
+                    // Links in the body sit above the card-wide link.
+                    <div className="[&_a]:relative [&_a]:z-10">{markdown(card.body)}</div>
+                  ) : null}
                 </Card>
               </li>
             );

@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 313 of 313
-- Web and shared components: 806
+- Web and shared components: 807
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 3 in 2 files, native story pending
 
@@ -129,7 +129,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SubscriptionGate | [apps/web/src/components/SubscriptionGate.tsx](../../apps/web/src/components/SubscriptionGate.tsx) | [SubscriptionGate.stories.tsx](../../apps/web/src/components/SubscriptionGate.stories.tsx) | web |
 | ToolSteps, ToolActivityDisclosure, StandaloneToolActivity, ToolOnlyNarration | [apps/web/src/components/ToolActivityDisclosure.tsx](../../apps/web/src/components/ToolActivityDisclosure.tsx) | [ToolActivityDisclosure.stories.tsx](../../apps/web/src/components/ToolActivityDisclosure.stories.tsx) | web |
 | UiArtifactView, Unsupported, BlockView, ChartView | [apps/web/src/components/UiArtifactView.tsx](../../apps/web/src/components/UiArtifactView.tsx) | [UiArtifactView.stories.tsx](../../apps/web/src/components/UiArtifactView.stories.tsx) | web |
-| UiBlockView | [apps/web/src/components/UiBlockView.tsx](../../apps/web/src/components/UiBlockView.tsx) | [UiBlockView.stories.tsx](../../apps/web/src/components/UiBlockView.stories.tsx) | web |
+| SideScroll, UiBlockView | [apps/web/src/components/UiBlockView.tsx](../../apps/web/src/components/UiBlockView.tsx) | [UiBlockView.stories.tsx](../../apps/web/src/components/UiBlockView.stories.tsx) | web |
 | UserTextBubble | [apps/web/src/components/UserTextBubble.tsx](../../apps/web/src/components/UserTextBubble.tsx) | [UserTextBubble.stories.tsx](../../apps/web/src/components/UserTextBubble.stories.tsx) | web |
 
 ## Web components/ai

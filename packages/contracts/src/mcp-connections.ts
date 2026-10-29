@@ -65,5 +65,7 @@ export type McpPendingAction = z.infer<typeof McpPendingActionSchema>;
 export const McpActionDecisionInput = z.object({
   id: Id,
   decision: z.enum(["approve", "deny"]),
+  /** With approve: also save an Always allow rule for this tool in the Space. */
+  alwaysAllow: z.boolean().optional(),
 });
 export type McpActionDecisionInput = z.infer<typeof McpActionDecisionInput>;

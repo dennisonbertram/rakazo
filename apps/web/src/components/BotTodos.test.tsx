@@ -101,3 +101,16 @@ it("marks an item done and removes it", async () => {
   expect(api.update).toHaveBeenCalledWith({ itemId: "1", status: "done" });
   expect(container.innerHTML).toBe("");
 });
+
+it("shows three items and reveals the rest on request", async () => {
+  api.waiting.mockResolvedValue([item("1"), item("2"), item("3"), item("4"), item("5")]);
+  await mount();
+  expect(container.querySelectorAll("li")).toHaveLength(3);
+  const more = [...container.querySelectorAll("button")].find(
+    (b) => b.textContent === "Show 2 more",
+  );
+  expect(more).toBeDefined();
+  await act(async () => more?.click());
+  expect(container.querySelectorAll("li")).toHaveLength(5);
+  expect(container.textContent).not.toContain("Show 2 more");
+});

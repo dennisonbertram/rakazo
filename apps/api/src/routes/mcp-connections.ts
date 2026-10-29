@@ -45,7 +45,9 @@ export function createMcpConnectionsRoutes({ deps, authed }: RouteContext) {
     ),
     decideAction: authed.mcpConnections.decideAction.handler(async ({ context, input }) => {
       try {
-        return await decideExternalAction(deps.prisma, context.actor, input.id, input.decision);
+        return await decideExternalAction(deps.prisma, context.actor, input.id, input.decision, {
+          alwaysAllow: input.alwaysAllow,
+        });
       } catch (error) {
         if (error instanceof ExternalActionNotPending) {
           throw new ORPCError("CONFLICT", { message: "This action is no longer waiting." });

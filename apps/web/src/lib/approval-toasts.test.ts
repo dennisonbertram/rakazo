@@ -166,4 +166,12 @@ describe("approval toasts", () => {
     toasts.enqueueApprovalToast({ id: "n2", title: "two", href: "/app/b" });
     expect(titles()).toEqual([]);
   });
+
+  it("closes every approval toast when the session ends", () => {
+    toasts.enqueueApprovalToast({ id: "n1", title: "one", href: "/app/a" });
+    expect(titles()).toEqual(["one"]);
+    toasts.clearApprovalToasts();
+    expect(titles()).toEqual([]);
+    expect(toasts.hasApprovalToasts()).toBe(false);
+  });
 });

@@ -166,10 +166,15 @@ describePostgres("MCP writes and approvals (PostgreSQL, runtime login)", () => {
     );
   });
 
-  it("allow runs the change now; ask stores it; block refuses it", async () => {
+  it("asks with no rule; an explicit Allow runs it; Block refuses it", async () => {
     await clearRules();
     const writer = await connect(spaceA);
-    // No rule: contacts_add is allowed by default.
+    // No rule: an outside client's write asks, even though a bot's would be allowed.
+    const unruled = await callTool(writer, "contacts_add", { name: "Wendy Unruled" });
+    expect(unruled.data.status).toBe("pending_approval");
+    expect(await contacts()).toHaveLength(0);
+
+    await rule("contacts_add", "always_allow");
     const allowed = await callTool(writer, "contacts_add", { name: "Wendy Allowed" });
     expect(allowed.isError).toBe(false);
     expect(allowed.data.contact.untrusted_text.name).toBe("Wendy Allowed");
@@ -189,10 +194,23 @@ describePostgres("MCP writes and approvals (PostgreSQL, runtime login)", () => {
     expect((await contacts()).map((c) => c.name)).toEqual(["Wendy Allowed"]);
 
     expect(await outcomes(writer.id)).toEqual([
+      ["contacts_add", "pending"],
       ["contacts_add", "ok"],
       ["contacts_add", "pending"],
       ["contacts_add", "blocked"],
     ]);
+    await clearRules();
+  });
+
+  it("Always allow on an approval saves a tool rule, so the next call runs", async () => {
+    await clearRules();
+    const writer = await connect(spaceA);
+    const { data } = await callTool(writer, "contacts_add", { name: "Wendy Always" });
+    await runAsTenant(actor, () =>
+      decideExternalAction(prisma, actor, data.actionId, "approve", { alwaysAllow: true }),
+    );
+    const next = await callTool(writer, "contacts_add", { name: "Wendy Always Two" });
+    expect(next.data.contact).toBeDefined();
     await clearRules();
   });
 
@@ -277,7 +295,9 @@ describePostgres("MCP writes and approvals (PostgreSQL, runtime login)", () => {
   });
 
   it("scratchpad writes take the member's own agent and refuse another Space's", async () => {
-    await clearRules();
+    await rule("scratchpad_add", "always_allow");
+    await rule("scratchpad_complete", "always_allow");
+
     const writer = await connect(spaceA);
     const added = await callTool(writer, "scratchpad_add", {
       botId: botIds[spaceA],

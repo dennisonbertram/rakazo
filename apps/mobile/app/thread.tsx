@@ -42,6 +42,7 @@ import {
   reportedToolStep,
   resolveComposerSendPlan,
   resolvePersonaColorDef,
+  runErrorAction,
   selectableMessageText,
   selectedAskActionLabel,
   splitDataRoomReferences,
@@ -1395,10 +1396,12 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   const showingSavedRef = useRef(showingSaved);
   showingSavedRef.current = showingSaved;
   const readTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const heldUnread = useRef<string | null>(null);
   useEffect(() => () => clearTimeout(readTimer.current), []);
   const markReadIfVisible = useCallback(() => {
     if (readOnly || AppState.currentState !== "active" || !navigation.isFocused()) return;
     const target = groupId ?? botId;
+    if (target && heldUnread.current === target) return;
     const current = snapRef.current;
     if (!target || !current || showingSavedRef.current || pinnedAroundRef.current) return;
     if (scrollBehavior.current.state().detached) return;
@@ -2170,6 +2173,24 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     }
   }
 
+  // The chat stays unread for as long as this screen shows it; the next open puts New at the
+  // first reply from the message. ponytail: the hold lives in a ref, so it ends when the screen unmounts.
+  async function markUnreadFrom(message: MobileMessage) {
+    const target = groupId ?? botId;
+    if (!target) return;
+    heldUnread.current = target;
+    clearTimeout(readTimer.current);
+    try {
+      await rpc("threads/markUnread", {
+        ...(groupId ? { groupId } : { botId: botId! }),
+        messageId: message.id,
+      });
+    } catch (err) {
+      if (heldUnread.current === target) heldUnread.current = null;
+      Alert.alert(t("Could not update chat"), errorText(err, t("Try again.")));
+    }
+  }
+
   // Event actions read the latest committed screen state without invalidating settled rows.
   const currentRowActions: MessageRowActions = {
     reply: (message) => {
@@ -2181,6 +2202,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     speak,
     react: (message, reaction) => void reactToMessage(message, reaction),
     remember: (message) => void rememberMessage(message),
+    markUnread: (message) => void markUnreadFrom(message),
     answer: answerMessage,
     openBot,
     openComputer,
@@ -2229,6 +2251,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
       speak: (message) => rowActionsRef.current.speak(message),
       react: (message, reaction) => rowActionsRef.current.react(message, reaction),
       remember: (message) => rowActionsRef.current.remember(message),
+      markUnread: (message) => rowActionsRef.current.markUnread(message),
       answer: (message, answer, username) =>
         rowActionsRef.current.answer(message, answer, username),
       openBot: (id, name) => rowActionsRef.current.openBot(id, name),
@@ -2673,14 +2696,24 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
           {/* Fades messages out above the composer, like the header fade. */}
           <View pointerEvents="none" style={styles.composerFade} />
           {runError ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("Dismiss")}
-              onPress={dismissRunError}
-              style={{ marginTop: 12 }}
-            >
-              <Text style={{ color: tokens.destructive, fontSize: 13 }}>{runError}</Text>
-            </Pressable>
+            <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("Dismiss")}
+                onPress={dismissRunError}
+                style={{ flex: 1 }}
+              >
+                <Text style={{ color: tokens.destructive, fontSize: 13 }}>{runError}</Text>
+              </Pressable>
+              {/* A key or billing failure is fixed in Models; there is no native retry yet. */}
+              {runErrorAction(snap?.run?.error) === "models" ? (
+                <Pressable accessibilityRole="button" onPress={() => router.push("/models")}>
+                  <Text style={{ color: tokens.foreground, fontSize: 13, fontWeight: "600" }}>
+                    {t("Models")}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
           {replyTarget ? (
             <GlassSurface
@@ -3033,6 +3066,7 @@ type MessageRowActions = {
   speak: (message: MobileMessage) => void;
   react: (message: MobileMessage, reaction: MessageReaction) => void;
   remember: (message: MobileMessage) => void;
+  markUnread: (message: MobileMessage) => void;
   answer: (message: MobileMessage, answer: string, username?: string) => Promise<void>;
   openBot: (id: string, name: string) => void;
   openComputer: (id: string, name: string) => void;
@@ -3134,6 +3168,7 @@ const MessageRow = memo(function MessageRow({
       message.role === "bot" &&
       canReactToThreadMessage(message) &&
       messageText.trim().length > 0;
+    const includeUnread = !readOnly && isStoredMessage(message);
     const reply = () => actions.reply(message);
     const quote = () => actions.quote(message);
     const speakMessage = () => actions.speak(message);
@@ -3147,8 +3182,12 @@ const MessageRow = memo(function MessageRow({
     };
     const react = (reaction: MessageReaction) => actions.react(message, reaction);
     const remember = () => actions.remember(message);
+    const markUnread = () => actions.markUnread(message);
     const menuActions = [
       ...(!readOnly ? [{ name: "reply", text: t("Reply"), onPress: reply }] : []),
+      ...(includeUnread
+        ? [{ name: "unread", text: t("Mark as unread"), onPress: markUnread }]
+        : []),
       ...(includeQuote ? [{ name: "quote", text: t("Quote"), onPress: quote }] : []),
       ...(includeReact
         ? [
@@ -3182,6 +3221,7 @@ const MessageRow = memo(function MessageRow({
         speak: t("Speak message"),
         select: t("Select text"),
         remember: t("Remember"),
+        unread: t("Mark as unread"),
       },
       reactions: MESSAGE_REACTIONS,
       include: {
@@ -3191,6 +3231,7 @@ const MessageRow = memo(function MessageRow({
         speak: includeSpeak,
         select: includeSelect,
         remember: includeRemember,
+        unread: includeUnread,
       },
     });
     const openSheet = () =>
@@ -3217,6 +3258,7 @@ const MessageRow = memo(function MessageRow({
         if (id === "speak") speakMessage();
         if (id === "select") select();
         if (id === "remember") remember();
+        if (id === "unread") markUnread();
       },
       actionProps: {
         onLongPress: Platform.OS === "ios" ? undefined : openSheet,

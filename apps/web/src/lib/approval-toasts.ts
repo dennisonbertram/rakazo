@@ -132,3 +132,11 @@ export function retainApprovalToasts(unansweredIds: ReadonlySet<string>) {
 
 export const hasApprovalToast = (id: string) => pending.has(id) || dismissed.has(id);
 export const hasApprovalToasts = () => pending.size > 0;
+
+/** The session ended: close every approval toast and forget what was dismissed, so the next sign-in starts clean. */
+export function clearApprovalToasts() {
+  pending.clear();
+  dismissed.clear();
+  openedId = undefined;
+  sync();
+}

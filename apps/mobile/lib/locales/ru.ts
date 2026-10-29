@@ -316,6 +316,7 @@ export const RU_MESSAGES: Record<string, string> = {
   "Could not update notifications": "Не удалось обновить уведомления.",
   "Could not update reaction": "Не удалось обновить реакцию",
   "Could not remember": "Не удалось запомнить",
+  "Mark as unread": "Отметить как непрочитанное",
   "Couldn't update avatars": "Не удалось обновить аватары",
   Create: "Создать",
   "Create group": "Создать группу",

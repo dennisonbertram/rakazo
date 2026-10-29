@@ -47,3 +47,24 @@ it("opens https card links in a new tab with no opener, and renders a callout", 
   show({ type: "callout", tone: "warning", title: "Careful", body: "Check **this**" });
   expect(host.querySelector("strong")?.textContent).toBe("this");
 });
+
+it("keeps links in a card's body above the card-wide link", () => {
+  show({
+    type: "cards",
+    cards: [
+      {
+        title: "Notes",
+        href: "https://example.com/n",
+        body: "See [the doc](https://example.com/d)",
+      },
+    ],
+  });
+  const links = [...host.querySelectorAll("a")];
+  expect(links.map((a) => a.getAttribute("href"))).toEqual([
+    "https://example.com/n",
+    "https://example.com/d",
+  ]);
+  // The title link stretches over the card; the body link must sit above it.
+  expect(links[0]?.className).toContain("after:absolute");
+  expect(links[1]?.closest("[class*=\"[&_a]:z-10\"]")).not.toBeNull();
+});
