@@ -191,20 +191,56 @@ function runErrorResetDate(error: string): string | null {
     : null;
 }
 
-/** A stored run error as a person reads it; one mapping for the panel, the toast and the push. */
-export function plainRunError(error: string, copy: RunErrorCopy): string {
-  if (KEY_REJECTED_PATTERN.test(error)) return copy.keyRejected;
+type RunErrorKind = "keyRejected" | "spendLimit" | "outOfCredits" | "rateLimited" | "other";
+
+function classifyRunError(error: string): RunErrorKind {
+  if (KEY_REJECTED_PATTERN.test(error)) return "keyRejected";
   const status = runErrorStatus(error);
   const quotaStatus = status === 402 || status === 403 || status === 429;
   if (
     /"(?:scope|limit_source)":\s*"[^"]*limit/.test(error) ||
     (quotaStatus && LIMIT_WORDING.test(error) && !RATE_WORDING.test(error))
   )
-    return copy.spendLimit(runErrorResetDate(error));
-  if (status === 429 && RATE_WORDING.test(error)) return copy.rateLimited;
-  if (status === 402 || (quotaStatus && CREDIT_WORDING.test(error))) return copy.outOfCredits;
-  if (status === 429) return copy.rateLimited;
-  return isInternalRunError(error) ? copy.generic : error;
+    return "spendLimit";
+  if (status === 429 && RATE_WORDING.test(error)) return "rateLimited";
+  if (status === 402 || (quotaStatus && CREDIT_WORDING.test(error))) return "outOfCredits";
+  if (status === 429) return "rateLimited";
+  return "other";
+}
+
+/** A stored run error as a person reads it; one mapping for the panel, the toast and the push. */
+export function plainRunError(error: string, copy: RunErrorCopy): string {
+  switch (classifyRunError(error)) {
+    case "keyRejected":
+      return copy.keyRejected;
+    case "spendLimit":
+      return copy.spendLimit(runErrorResetDate(error));
+    case "outOfCredits":
+      return copy.outOfCredits;
+    case "rateLimited":
+      return copy.rateLimited;
+    default:
+      return isInternalRunError(error) ? copy.generic : error;
+  }
+}
+
+/**
+ * The one action that fixes a failed run: "models" opens Settings > Models (a rejected key, a
+ * spending limit, no credits), "retry" sends the message again (a rate limit or an unexplained
+ * failure, whose copy says to try again). Any other error names its own cause and has none.
+ */
+export function runErrorAction(error: string | null | undefined): "models" | "retry" | undefined {
+  if (!error) return undefined;
+  switch (classifyRunError(error)) {
+    case "keyRejected":
+    case "spendLimit":
+    case "outOfCredits":
+      return "models";
+    case "rateLimited":
+      return "retry";
+    default:
+      return isInternalRunError(error) ? "retry" : undefined;
+  }
 }
 
 /** True when a delegate agent's reply reached this thread after the run began: the answer is on screen. */
