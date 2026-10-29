@@ -185,6 +185,7 @@ import {
   createThreadMessageInTransaction,
   dropRunTurnCheckpoint,
   effectiveMemoryScope,
+  findBotModelCredential,
   findDefaultModelCredential,
   findModelCredential,
   InvalidSpaceNameError,
@@ -1151,13 +1152,22 @@ async function resolveRunModel(
           userId: scope.userId,
           spaceId: scope.spaceId,
         },
-        select: { modelProvider: true, modelId: true, thinkingLevel: true },
+        select: {
+          modelProvider: true,
+          modelId: true,
+          modelCredentialId: true,
+          thinkingLevel: true,
+        },
       })
     : null;
   const hasOverride = Boolean(override?.modelProvider && override.modelId);
   const [overrideCredential, defaultCredential, settings] = await Promise.all([
     hasOverride
-      ? findModelCredential(deps.prisma, scope, override!.modelProvider!, override!.modelId)
+      ? findBotModelCredential(deps.prisma, scope, {
+          modelProvider: override!.modelProvider!,
+          modelId: override!.modelId,
+          modelCredentialId: override!.modelCredentialId,
+        })
       : Promise.resolve(null),
     findDefaultModelCredential(deps.prisma, scope),
     deps.prisma.deploymentSettings.findUnique({
@@ -2153,12 +2163,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
         const overrideCredential =
           hasModelOverride && modelChoice.modelProvider
-            ? await findModelCredential(
-                deps.prisma,
-                run,
-                modelChoice.modelProvider,
-                modelChoice.modelId,
-              )
+            ? await findBotModelCredential(deps.prisma, run, {
+                modelProvider: modelChoice.modelProvider,
+                modelId: modelChoice.modelId,
+                // A routine's own model is not on the bot's pinned connection.
+                modelCredentialId: run.modelPinned ? null : bot.modelCredentialId,
+              })
             : null;
         runAbortController = new AbortController();
         if (!leaseValid) runAbortController.abort();
@@ -3918,7 +3928,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trustedSitesPromise ??= (async () => {
             const sites = sitesInText(await loadOwnerWords());
             const rows = await deps.prisma.externalEffect.findMany({
-              where: { runId, kind: { in: [...SITE_GATED_TOOLS] }, status: { in: PASSED_EFFECT_STATUSES } },
+              where: {
+                runId,
+                kind: { in: [...SITE_GATED_TOOLS] },
+                status: { in: PASSED_EFFECT_STATUSES },
+              },
               select: { request: true },
             });
             for (const row of rows) {

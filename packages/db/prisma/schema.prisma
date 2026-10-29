@@ -713,6 +713,7 @@ model UserModelCredential {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   preferences    SpaceModelPreference[]
+  bots           Bot[]
 
   @@unique([id, userId])
   @@index([userId, provider, updatedAt])
@@ -841,6 +842,9 @@ model Bot {
   autoSpeak              Boolean               @default(false)
   modelProvider          String?
   modelId                String?
+  // The connection this bot's model runs on; null follows the space default.
+  modelCredentialId      String?
+  modelCredential        UserModelCredential?  @relation(fields: [modelCredentialId], references: [id], onDelete: SetNull)
   thinkingLevel          String?
   disabledBuiltinTools   String[]              @default([])
   // "internal" (default) or "external": talks to people outside the company. Server-owned; no bot tool reads or sets it.

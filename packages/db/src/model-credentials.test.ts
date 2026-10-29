@@ -4,6 +4,7 @@ import {
   chooseModelCredential,
   defaultModelCredentialCandidates,
   findDefaultModelCredential,
+  findBotModelCredential,
   findModelCredential,
   newestModelCredentialOrder,
   selectSpaceModelPreference,
@@ -394,4 +395,53 @@ describe("selectSpaceModelPreference", () => {
       );
     },
   );
+});
+
+describe("findBotModelCredential", () => {
+  const scope = { userId: "user", spaceId: "space" };
+  const row = (id: string) => ({
+    id,
+    userId: "user",
+    provider: "anthropic",
+    label: "Claude subscription",
+    secretId: `secret-${id}`,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  });
+  const build = (pinned: ReturnType<typeof row> | null) => {
+    const credentialFindFirst = vi.fn().mockResolvedValue(pinned);
+    const prisma = {
+      userModelCredential: {
+        findFirst: credentialFindFirst,
+        findMany: vi.fn().mockResolvedValue([row("default")]),
+      },
+      spaceModelPreference: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+    } as unknown as PrismaClient;
+    return { prisma, credentialFindFirst };
+  };
+  const bot = { modelProvider: "anthropic", modelId: "m", modelCredentialId: "pinned" };
+
+  it("prefers the pinned connection over the space default", async () => {
+    const { prisma, credentialFindFirst } = build(row("pinned"));
+    const found = await findBotModelCredential(prisma, scope, bot);
+    expect(found?.id).toBe("pinned");
+    expect(credentialFindFirst).toHaveBeenCalledWith({
+      where: { id: "pinned", userId: "user", provider: "anthropic" },
+    });
+  });
+
+  it("falls back to the provider lookup when the pin is deleted or foreign", async () => {
+    const { prisma } = build(null);
+    expect((await findBotModelCredential(prisma, scope, bot))?.id).toBe("default");
+  });
+
+  it("uses the provider lookup when nothing is pinned", async () => {
+    const { prisma, credentialFindFirst } = build(row("pinned"));
+    const found = await findBotModelCredential(prisma, scope, { ...bot, modelCredentialId: null });
+    expect(found?.id).toBe("default");
+    expect(credentialFindFirst).not.toHaveBeenCalled();
+  });
 });

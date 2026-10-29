@@ -81,6 +81,30 @@ export const ConnectedModelPicker: Story = {
   },
 };
 
+/** With several connections, a bot can be pinned to one; subscription sign-ins say so. */
+export const PinnedConnection: Story = {
+  beforeEach: () => {
+    setup();
+    mockRpc({
+      "models.credentials": mockModelCredentials,
+      "models.list": mockModelCatalog,
+      me: mockMe,
+    });
+  },
+  args: {
+    bot: {
+      ...scoutBot,
+      modelProvider: "example-sub",
+      modelId: "example-pro",
+      modelCredentialId: "cred_2",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText("Advanced"));
+    await screen.findByRole("combobox", { name: "Model" });
+  },
+};
+
 const openAdvanced: Story["play"] = async ({ canvasElement }) => {
   await userEvent.click(await within(canvasElement).findByText("Advanced"));
 };

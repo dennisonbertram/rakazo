@@ -18,7 +18,7 @@ import {
 import {
   deleteMeeting,
   findDefaultModelCredential,
-  findModelCredential,
+  findBotModelCredential,
   getMeetingSyncState,
   IsolationError,
 } from "@rakazo/db";
@@ -72,7 +72,12 @@ async function primaryRecipient(deps: MeetingsDeps, actor: Actor, botId?: string
     botId
       ? prisma.bot.findFirst({
           where: { id: botId, ...owner(actor), archivedAt: null },
-          select: { modelProvider: true, modelId: true, thinkingLevel: true },
+          select: {
+            modelProvider: true,
+            modelId: true,
+            modelCredentialId: true,
+            thinkingLevel: true,
+          },
         })
       : null,
     findDefaultModelCredential(prisma, actor),
@@ -80,7 +85,11 @@ async function primaryRecipient(deps: MeetingsDeps, actor: Actor, botId?: string
   ]);
   const overrideCredential =
     bot?.modelProvider && bot.modelId
-      ? await findModelCredential(prisma, actor, bot.modelProvider, bot.modelId)
+      ? await findBotModelCredential(prisma, actor, {
+          modelProvider: bot.modelProvider,
+          modelId: bot.modelId,
+          modelCredentialId: bot.modelCredentialId,
+        })
       : null;
   const model = selectConfiguredModel({
     override: bot ?? null,

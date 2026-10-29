@@ -264,6 +264,7 @@ import {
   FundraiseRoundOpenError,
   findDefaultModelCredential,
   findDefaultVoiceCredential,
+  findBotModelCredential,
   findModelCredential,
   findSpaceMemoryConfig,
   findTicket,
@@ -2588,17 +2589,41 @@ export function createRouter(deps: RouterDeps) {
         // Web settings resend the saved model on every save. Reject an
         // incompatible override only when this request is changing it; a run
         // still rejects a Spark model the subscription sign-in cannot call.
+        // The pin is the caller's own connection for the bot's provider. Changing the
+        // provider (or clearing the model) drops it unless the request names a new one.
+        const providerChanged =
+          input.modelProvider !== undefined && input.modelProvider !== existing.modelProvider;
+        const pinWrite: string | null | undefined =
+          input.modelCredentialId !== undefined
+            ? input.modelProvider === null
+              ? null
+              : input.modelCredentialId
+            : providerChanged || input.modelProvider === null
+              ? null
+              : undefined;
+        if (pinWrite) {
+          const nextProvider =
+            input.modelProvider !== undefined ? input.modelProvider : existing.modelProvider;
+          const owned = await deps.prisma.userModelCredential.findFirst({
+            where: { id: pinWrite, userId: context.actor.userId, provider: nextProvider ?? "" },
+            select: { id: true },
+          });
+          if (!owned) throw new IsolationError();
+        }
+        const effectivePin =
+          pinWrite === undefined ? (existing.modelCredentialId ?? null) : pinWrite;
         const settingModel =
           input.modelProvider !== undefined &&
           input.modelId !== undefined &&
-          (input.modelProvider !== existing.modelProvider || input.modelId !== existing.modelId);
+          (providerChanged ||
+            input.modelId !== existing.modelId ||
+            effectivePin !== (existing.modelCredentialId ?? null));
         if (settingModel && input.modelProvider && input.modelId) {
-          const credential = await findModelCredential(
-            deps.prisma,
-            context.actor,
-            input.modelProvider,
-            input.modelId,
-          );
+          const credential = await findBotModelCredential(deps.prisma, context.actor, {
+            modelProvider: input.modelProvider,
+            modelId: input.modelId,
+            modelCredentialId: effectivePin,
+          });
           if (!credential) {
             throw new ORPCError("BAD_REQUEST", { message: "Connect that model provider first" });
           }
@@ -2737,6 +2762,7 @@ export function createRouter(deps: RouterDeps) {
             ...(input.modelProvider !== undefined
               ? { modelProvider: input.modelProvider, modelId: input.modelId ?? null }
               : {}),
+            ...(pinWrite !== undefined ? { modelCredentialId: pinWrite } : {}),
             ...(input.thinkingLevel !== undefined ? { thinkingLevel } : {}),
             ...(input.teamChatAmbientEnabled !== undefined
               ? { teamChatAmbientEnabled: input.teamChatAmbientEnabled }

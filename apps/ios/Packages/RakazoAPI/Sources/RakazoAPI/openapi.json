@@ -12939,6 +12939,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsCreateOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -13388,6 +13398,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsDuplicateOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -13841,6 +13861,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsGetOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -14279,6 +14309,16 @@
                             "type": [
                               "string",
                               "null"
+                            ]
+                          },
+                          "modelCredentialId": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcBotsListOutputSchema0"
+                              },
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
                           "thinkingLevel": {
@@ -14720,6 +14760,16 @@
                             "type": [
                               "string",
                               "null"
+                            ]
+                          },
+                          "modelCredentialId": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcBotsListArchivedOutputSchema0"
+                              },
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
                           "thinkingLevel": {
@@ -15835,6 +15885,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsSetComputerOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -16100,32 +16160,35 @@
                       "modelId": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema14"
                       },
-                      "thinkingLevel": {
+                      "modelCredentialId": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema15"
                       },
-                      "teamChatAmbientEnabled": {
+                      "thinkingLevel": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema16"
                       },
-                      "teamChatRules": {
+                      "teamChatAmbientEnabled": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema17"
                       },
-                      "crossSpaceCommunication": {
+                      "teamChatRules": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema18"
                       },
-                      "disabledBuiltinTools": {
+                      "crossSpaceCommunication": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
                       },
-                      "audience": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema21"
+                      "disabledBuiltinTools": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema20"
                       },
-                      "externalMessageTargets": {
+                      "audience": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema22"
                       },
-                      "externalComputerTools": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
                       },
-                      "runsOn": {
+                      "externalComputerTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema24"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema25"
                       }
                     },
                     "required": [
@@ -16354,6 +16417,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsUpdateOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -17928,6 +18001,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCartaAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -18699,6 +18782,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCompanyAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -23315,6 +23408,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCompanyImportAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -34951,6 +35054,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcDataRoomAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -41947,6 +42060,16 @@
                                     "null"
                                   ]
                                 },
+                                "modelCredentialId": {
+                                  "anyOf": [
+                                    {
+                                      "$ref": "#/components/schemas/RpcDevinAgentOutputSchema0"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "thinkingLevel": {
                                   "anyOf": [
                                     {
@@ -46152,6 +46275,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcFinanceAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -63217,6 +63350,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcGtmAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -64847,6 +64990,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcInboxAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -65649,6 +65802,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcInboxAskAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -72425,6 +72588,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -79364,6 +79537,16 @@
                           "type": [
                             "string",
                             "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcLegalAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "thinkingLevel": {
@@ -109305,6 +109488,16 @@
                                       "null"
                                     ]
                                   },
+                                  "modelCredentialId": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
                                   "thinkingLevel": {
                                     "anyOf": [
                                       {
@@ -120960,6 +121153,16 @@
                             "null"
                           ]
                         },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcVoiceAgentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "thinkingLevel": {
                           "anyOf": [
                             {
@@ -123324,6 +123527,16 @@
               "null"
             ]
           },
+          "modelCredentialId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "thinkingLevel": {
             "anyOf": [
               {
@@ -124573,6 +124786,16 @@
       "RpcBotsUpdateInputSchema15": {
         "anyOf": [
           {
+            "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "RpcBotsUpdateInputSchema16": {
+        "anyOf": [
+          {
             "type": "string",
             "enum": [
               "off",
@@ -124589,46 +124812,46 @@
           }
         ]
       },
-      "RpcBotsUpdateInputSchema16": {
+      "RpcBotsUpdateInputSchema17": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema17": {
+      "RpcBotsUpdateInputSchema18": {
         "type": "string",
         "maxLength": 4000
       },
-      "RpcBotsUpdateInputSchema18": {
+      "RpcBotsUpdateInputSchema19": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema19": {
+      "RpcBotsUpdateInputSchema20": {
         "maxItems": 129,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema20"
+          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema21"
         }
       },
-      "RpcBotsUpdateInputSchema20": {
+      "RpcBotsUpdateInputSchema21": {
         "type": "string",
         "minLength": 1,
         "maxLength": 64
       },
-      "RpcBotsUpdateInputSchema21": {
+      "RpcBotsUpdateInputSchema22": {
         "type": "string",
         "enum": [
           "internal",
           "external"
         ]
       },
-      "RpcBotsUpdateInputSchema22": {
+      "RpcBotsUpdateInputSchema23": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema23": {
+      "RpcBotsUpdateInputSchema24": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema24": {
+      "RpcBotsUpdateInputSchema25": {
         "anyOf": [
           {
             "type": "string",

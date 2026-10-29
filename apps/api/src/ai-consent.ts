@@ -18,6 +18,7 @@ import type { PrismaClient } from "@rakazo/db";
 import {
   findDefaultModelCredential,
   findDefaultVoiceCredential,
+  findBotModelCredential,
   findModelCredential,
 } from "@rakazo/db";
 import type { RouterDeps } from "./router.js";
@@ -89,7 +90,12 @@ export async function aiConsentStatus(
             archivedAt: null,
             ...(botIds ? { id: { in: botIds } } : {}),
           },
-          select: { modelProvider: true, modelId: true, thinkingLevel: true },
+          select: {
+            modelProvider: true,
+            modelId: true,
+            modelCredentialId: true,
+            thinkingLevel: true,
+          },
         })
       : [],
     // An active routine with its own model is another recipient for this bot.
@@ -144,12 +150,14 @@ export async function aiConsentStatus(
       (target ? [...bots, ...routines] : [null, ...bots, ...routines]).map(async (override) => {
         const overrideCredential =
           override?.modelProvider && override.modelId
-            ? await findModelCredential(
-                deps.prisma,
-                actor,
-                override.modelProvider,
-                override.modelId,
-              )
+            ? await findBotModelCredential(deps.prisma, actor, {
+                modelProvider: override.modelProvider,
+                modelId: override.modelId,
+                modelCredentialId:
+                  "modelCredentialId" in override
+                    ? (override.modelCredentialId as string | null)
+                    : null,
+              })
             : null;
         return selectConfiguredModel({
           override,

@@ -248,6 +248,47 @@ function credentialFromChoice<
   return { ...choice.credential, isDefault: false, defaultModel: null, thinkingLevel: null };
 }
 
+/**
+ * The connection a bot is pinned to, shaped like findModelCredential's result.
+ * Null when there is no pin, the connection is gone, belongs to someone else, or
+ * is for a different provider than the bot's model; callers then use the space default.
+ */
+export async function findPinnedModelCredential(
+  prisma: PrismaClient,
+  scope: ModelCredentialScope,
+  bot: { modelCredentialId?: string | null; modelProvider?: string | null },
+) {
+  if (!bot.modelCredentialId || !bot.modelProvider) return null;
+  const credential = await prisma.userModelCredential.findFirst({
+    where: { id: bot.modelCredentialId, userId: scope.userId, provider: bot.modelProvider },
+  });
+  if (!credential) return null;
+  const preference = await prisma.spaceModelPreference.findFirst({
+    where: { spaceId: scope.spaceId, userId: scope.userId, credentialId: credential.id },
+    include: { credential: true },
+    orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }, { id: "desc" }],
+  });
+  return preference
+    ? withModelPreference(preference)
+    : { ...credential, isDefault: false, defaultModel: null, thinkingLevel: null };
+}
+
+/** A bot's pinned connection when it has a usable one, else the usual per-provider lookup. */
+export async function findBotModelCredential(
+  prisma: PrismaClient,
+  scope: ModelCredentialScope,
+  bot: {
+    modelProvider: string;
+    modelId?: string | null;
+    modelCredentialId?: string | null;
+  },
+) {
+  return (
+    (await findPinnedModelCredential(prisma, scope, bot)) ??
+    findModelCredential(prisma, scope, bot.modelProvider, bot.modelId)
+  );
+}
+
 export async function findModelCredential(
   prisma: PrismaClient,
   scope: ModelCredentialScope,
