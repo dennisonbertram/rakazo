@@ -160,6 +160,7 @@ import {
 } from "./investor-portal.js";
 import { mountLocalSettings } from "./local-settings.js";
 import { mountMailPushRoute } from "./mail-push.js";
+import { mountRegisterLimit } from "./mcp-register-limit.js";
 import { mountMcpDiscovery, mountMcpServer } from "./mcp-server.js";
 import {
   createMessagingInboundHandler,
@@ -901,6 +902,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     );
   }
   mountApiRequestBodyLimits(app);
+  mountRegisterLimit(app, prisma);
   mountScreenTarget(app, prisma, env.screenProxySecret);
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
     const path = new URL(c.req.url).pathname.replace("/api/auth", "");
@@ -914,6 +916,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     prisma,
     auth,
     baseUrl: mcpBaseUrl,
+    notificationEvents,
+    agents: { events, jobs },
     jwksUrl: `${env.apiUrl.replace(/\/+$/, "")}${"/api/auth"}/jwks`,
   });
   mountLocalSettings(app, { token: env.desktopStackToken, prisma, rpc });

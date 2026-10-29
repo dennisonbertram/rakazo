@@ -34,7 +34,9 @@ struct DeleteAccountSheet: View {
           Section {
             TextField("Code from email", text: $secret)
               .textContentType(.oneTimeCode)
-              .keyboardType(.numberPad)
+              .keyboardType(.asciiCapable)
+              .textInputAutocapitalization(.never)
+              .autocorrectionDisabled()
               .accessibilityIdentifier("deleteCode")
           } footer: {
             if model.codeSent { Text("We emailed a code to \(email).") }
@@ -61,7 +63,7 @@ struct DeleteAccountSheet: View {
         Button(role: .destructive) {
           Task {
             let proof: AccountDeletionProof =
-              usesPassword ? .password(secret) : .emailedCode(secret)
+              usesPassword ? .password(secret) : .emailedCode(AccountModel.cleanCode(secret))
             if await model.delete(proof, app) { dismiss() }
           }
         } label: {
@@ -73,7 +75,8 @@ struct DeleteAccountSheet: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
-        .disabled(secret.isEmpty || model.busy)
+        .disabled(
+          (usesPassword ? secret.isEmpty : AccountModel.cleanCode(secret).isEmpty) || model.busy)
         .padding()
         .accessibilityIdentifier("confirmDelete")
       }

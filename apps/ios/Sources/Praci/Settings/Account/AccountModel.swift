@@ -34,6 +34,7 @@ final class AccountModel {
     do {
       security = .loaded(try await app.authentication.client.accountSecurity())
     } catch {
+      await app.authentication.sync()
       if security.value == nil { security = .failed(Self.message(error)) }
     }
   }
@@ -50,6 +51,8 @@ final class AccountModel {
       notice = String(localized: "Password changed")
       return true
     } catch {
+      // The client may have ended the session (rejected, or no replacement could be kept).
+      await app.authentication.sync()
       errorMessage = Self.message(error)
       return false
     }
@@ -64,6 +67,7 @@ final class AccountModel {
       try await app.authentication.client.requestAccountDeletionCode()
       codeSent = true
     } catch {
+      await app.authentication.sync()
       errorMessage = Self.message(error)
     }
   }
@@ -75,15 +79,22 @@ final class AccountModel {
     errorMessage = nil
     defer { busy = false }
     do {
-      try await app.authentication.client.deleteAccount(proof)
+      // The account is gone once the server says so, even if this device could not clear itself.
+      _ = try await app.authentication.client.deleteAccount(proof)
       app.reset()
       await app.authentication.sync()
       app.authentication.showNotice(String(localized: "Your account was deleted"))
       return true
     } catch {
+      await app.authentication.sync()
       errorMessage = Self.message(error)
       return false
     }
+  }
+
+  /// Emailed codes are hexadecimal; pasting can add spaces or line breaks.
+  static func cleanCode(_ pasted: String) -> String {
+    String(pasted.filter { !$0.isWhitespace })
   }
 
   private static func message(_ error: any Error) -> String {

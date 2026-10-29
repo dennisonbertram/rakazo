@@ -8,6 +8,8 @@ export const calls: McpActivityCall[] = [
   { tool: "contacts_list", outcome: "ok", createdAt: "2026-10-27T09:30:40.000Z" },
   { tool: "finance_breakdown", outcome: "error", createdAt: "2026-10-27T09:30:12.000Z" },
   { tool: "search_data_room", outcome: "rate_limited", createdAt: "2026-10-27T09:30:01.000Z" },
+  { tool: "contacts_add", outcome: "pending", createdAt: "2026-10-27T09:29:40.000Z" },
+  { tool: "contacts_add", outcome: "blocked", createdAt: "2026-10-27T09:29:10.000Z" },
 ];
 
 const meta = {
