@@ -165,7 +165,7 @@ public enum OutboxError: Error, Equatable {
 }
 
 /// Disk storage for unsent messages. The directory is injected; the app passes a caches
-/// subdirectory, which iOS excludes from backups and may evict.
+/// subdirectory of Application Support (see `standardRoot`), which iOS does not evict.
 public struct OutboxDisk: Sendable {
   public let root: URL
   private var metadata: URL {
@@ -218,11 +218,11 @@ public struct OutboxDisk: Sendable {
     if diskBytes(root) + bytes + entry > OutboxLimits.maxBytes { return false }
     do {
       try FileManager.default.createDirectory(
-        at: folder(attempt.clientNonce), withIntermediateDirectories: true
+        at: folder(attempt.clientNonce), withIntermediateDirectories: true, attributes: Self.protection
       )
       for index in attempt.payload.attachments.indices {
         let target = attachmentFile(attempt.clientNonce, index)
-        try attempt.payload.attachments[index].data.write(to: target, options: .atomic)
+        try attempt.payload.attachments[index].data.write(to: target, options: Self.writeOptions)
         let isImage = attempt.payload.attachments[index].mimeType.hasPrefix("image/")
         attempt.payload.attachments[index].previewURL = isImage ? target : nil
         attempt.payload.attachments[index].data = Data()
@@ -234,15 +234,64 @@ public struct OutboxDisk: Sendable {
     }
   }
 
-  /// Rewrites the metadata file atomically. Persistence is optional, so failures are ignored.
-  public func save(_ attempts: [SendAttempt]) {
+  /// Rewrites the metadata file atomically. Throws when it cannot be written, so a caller never
+  /// treats a message as kept when a restart would lose it. Holds at most `maxEntries` entries.
+  public func save(_ attempts: [SendAttempt]) throws {
+    guard attempts.count <= OutboxLimits.maxEntries else { throw OutboxError.storageUnavailable }
     do {
-      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(
+        at: root, withIntermediateDirectories: true, attributes: Self.protection)
       let data = try encoded(attempts)
       let existing = exists(metadata) ? diskBytes(metadata) : 0
-      if diskBytes(root) - existing + data.count > OutboxLimits.maxBytes { return }
-      try data.write(to: metadata, options: .atomic)
-    } catch {}
+      if diskBytes(root) - existing + data.count > OutboxLimits.maxBytes {
+        throw OutboxError.storageUnavailable
+      }
+      try data.write(to: metadata, options: Self.writeOptions)
+    } catch {
+      throw OutboxError.storageUnavailable
+    }
+  }
+
+  // Readable after the first unlock so a background drain can still send.
+  private static var protection: [FileAttributeKey: Any] {
+    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+  }
+
+  private static var writeOptions: Data.WritingOptions {
+    [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+  }
+
+  /// The outbox folder in Application Support (iOS never evicts it, unlike Caches): created,
+  /// kept out of backups, and filled once from the old Caches location.
+  public static func standardRoot(
+    support: URL? = nil, legacy: URL? = nil
+  ) -> URL {
+    let fileManager = FileManager.default
+    let root = (support ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
+      .appendingPathComponent("outbox", isDirectory: true)
+    let old = legacy ?? fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("outbox", isDirectory: true)
+    try? fileManager.createDirectory(
+      at: root, withIntermediateDirectories: true, attributes: protection)
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    var mutable = root
+    try? mutable.setResourceValues(values)
+    migrate(from: old, to: root)
+    return root
+  }
+
+  /// Moves each scope folder out of the old location, keeping any that already exist in `root`.
+  public static func migrate(from old: URL, to root: URL) {
+    let fileManager = FileManager.default
+    guard let items = try? fileManager.contentsOfDirectory(at: old, includingPropertiesForKeys: nil)
+    else { return }
+    for item in items {
+      let target = root.appendingPathComponent(item.lastPathComponent)
+      if fileManager.fileExists(atPath: target.path) { continue }
+      try? fileManager.moveItem(at: item, to: target)
+    }
+    try? fileManager.removeItem(at: old)
   }
 
   /// Returns stored sends for `scope` as queued/failed/refused attempts in `session`, and deletes
