@@ -21,7 +21,7 @@ import {
   redactSecrets,
   sanitizeMessagingLabel,
 } from "@rakazo/core";
-import { urlSite } from "@rakazo/core/egress";
+import { SITE_GATED_TOOLS, urlSite } from "@rakazo/core/egress";
 import { buildRawMessage, displayAddress, parseRecipients } from "./mail-compose.js";
 
 const MAX_APPROVAL_SUMMARY_LENGTH = 500;
@@ -195,7 +195,9 @@ export function buildApprovalAskBlock(
 }
 
 function webFetchSite(toolName: string, args: Record<string, unknown>): string | undefined {
-  return toolName === "web_fetch" && typeof args.url === "string" ? urlSite(args.url) : undefined;
+  return SITE_GATED_TOOLS.has(toolName) && typeof args.url === "string"
+    ? urlSite(args.url)
+    : undefined;
 }
 
 /**
@@ -454,7 +456,7 @@ function formatApprovalDetail(
   const keys =
     toolName === "contacts_save"
       ? ["name", "email", "organization", "kind", "notes"]
-      : toolName === "web_fetch"
+      : SITE_GATED_TOOLS.has(toolName)
         ? ["url"]
         : ["collection", "title", "to", "subject", "amount", "body"];
   for (const key of keys) {

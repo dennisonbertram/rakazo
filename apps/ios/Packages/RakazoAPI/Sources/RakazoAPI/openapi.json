@@ -96580,6 +96580,13 @@
                         "minLength": 8,
                         "maxLength": 512,
                         "pattern": "^\\S+$"
+                      },
+                      "platform": {
+                        "type": "string",
+                        "enum": [
+                          "expo",
+                          "apns"
+                        ]
                       }
                     },
                     "required": [
