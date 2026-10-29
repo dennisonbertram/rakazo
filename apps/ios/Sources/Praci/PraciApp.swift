@@ -11,7 +11,10 @@ struct PraciApp: App {
       RootView()
         .environment(app)
         .tint(Color.token(.primary))
-        .task { await app.authentication.start() }
+        .task {
+          AppearanceChoice.applyStored()
+          await app.authentication.start()
+        }
         .onChange(of: scenePhase) { _, phase in
           if phase == .active {
             Task { await app.authentication.revalidate() }
