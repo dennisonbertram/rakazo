@@ -18,10 +18,12 @@ export function serveJsonTools(
   server: McpServer,
   tools: McpJsonTool[],
   call: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>,
+  /** The tools `tools/list` shows, when fewer than the tools that can be called (they then refuse themselves). */
+  listed: McpJsonTool[] = tools,
 ) {
   server.server.registerCapabilities({ tools: {} });
   server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: tools.map(({ readOnly, ...tool }) => ({
+    tools: listed.map(({ readOnly, ...tool }) => ({
       ...tool,
       annotations: { readOnlyHint: readOnly },
     })),

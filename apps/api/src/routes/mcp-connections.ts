@@ -1,5 +1,10 @@
 import { ORPCError } from "@orpc/server";
 import {
+  decideExternalAction,
+  ExternalActionNotPending,
+  listPendingActions,
+} from "@rakazo/adapters";
+import {
   createToken,
   listActivity,
   listConnections,
@@ -35,6 +40,21 @@ export function createMcpConnectionsRoutes({ deps, authed }: RouteContext) {
     activity: authed.mcpConnections.activity.handler(({ context, input }) =>
       owned(() => listActivity(deps.prisma, context.actor, input.id)),
     ),
+    pendingActions: authed.mcpConnections.pendingActions.handler(({ context }) =>
+      listPendingActions(deps.prisma, context.actor),
+    ),
+    decideAction: authed.mcpConnections.decideAction.handler(async ({ context, input }) => {
+      try {
+        return await decideExternalAction(deps.prisma, context.actor, input.id, input.decision, {
+          alwaysAllow: input.alwaysAllow,
+        });
+      } catch (error) {
+        if (error instanceof ExternalActionNotPending) {
+          throw new ORPCError("CONFLICT", { message: "This action is no longer waiting." });
+        }
+        throw error;
+      }
+    }),
     revoke: authed.mcpConnections.revoke.handler(({ context, input }) =>
       owned(async () => {
         await revokeConnection(deps.prisma, context.actor, input.id);

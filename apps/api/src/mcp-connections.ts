@@ -137,7 +137,9 @@ export function listActivity(
     });
     return rows.map((row) => ({
       tool: row.tool,
-      outcome: row.outcome === "ok" || row.outcome === "rate_limited" ? row.outcome : "error",
+      outcome: ["ok", "rate_limited", "pending", "blocked"].includes(row.outcome)
+        ? (row.outcome as McpActivityCall["outcome"])
+        : "error",
       createdAt: row.createdAt.toISOString(),
     }));
   });

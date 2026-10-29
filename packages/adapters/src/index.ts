@@ -105,6 +105,7 @@ export * from "./exchange-clients.js";
 export * from "./exchange-sync.js";
 export * from "./executor.js";
 export * from "./expo-push.js";
+export * from "./external-actions.js";
 export * from "./fake-browser.js";
 export * from "./fake-sandbox.js";
 export * from "./fake-web.js";
