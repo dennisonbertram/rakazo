@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     close: () => ipcRenderer.invoke("desktop.window.close"),
     minimize: () => ipcRenderer.invoke("desktop.window.minimize"),
     toggleMaximize: () => ipcRenderer.invoke("desktop.window.toggleMaximize"),
+    focus: () => ipcRenderer.invoke("desktop.window.focus"),
     state: () => ipcRenderer.invoke("desktop.window.state"),
   },
   update: {

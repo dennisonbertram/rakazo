@@ -60,16 +60,20 @@ async function followUnansweredApprovals(
   });
 }
 
-/** The sending bot's avatar; a failed lookup just means a toast without one. */
-async function avatarFor(n: NotificationDto, userId: string | undefined) {
-  if (!n.botId || !userId) return undefined;
+/** The sending bot's avatar, name and app logo; a failed lookup just means a plain toast and OS alert. */
+async function senderFor(n: NotificationDto, userId: string | undefined) {
+  if (!n.botId || !userId) return {};
   try {
     const found = await lookupBotApp(userId, n.botId);
-    if (!found) return undefined;
+    if (!found) return {};
     const { bot, app } = found;
-    return <AgentAvatar app={app} color={bot.color} identity={bot.id} size={32} />;
+    return {
+      avatar: <AgentAvatar app={app} color={bot.color} identity={bot.id} size={32} />,
+      osTitle: n.kind === "done" ? bot.name : undefined,
+      icon: app?.logo ?? undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -126,7 +130,7 @@ export function AppToaster() {
             : deliverNotification(
                 {
                   ...attentionFromDto(n),
-                  avatar: await avatarFor(n, userIdRef.current),
+                  ...(await senderFor(n, userIdRef.current)),
                   onSeen: () => void markOpened(n),
                   onDismiss: dismissApproval(n),
                 },

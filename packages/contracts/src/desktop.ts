@@ -46,6 +46,8 @@ export interface RakazoDesktop {
     close: () => Promise<void>;
     minimize: () => Promise<void>;
     toggleMaximize: () => Promise<void>;
+    /** Raises and focuses the window (a clicked notification). Optional for older desktops. */
+    focus?: () => Promise<void>;
     state: () => Promise<{ minimized: boolean; maximized: boolean; fullScreen: boolean }>;
   };
   update: RakazoDesktopUpdate;
