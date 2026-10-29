@@ -66,6 +66,7 @@ export const Composer = memo(function Composer({
   onDismissAttachmentNotice,
   sendError,
   runError,
+  runErrorFix,
   onRetryRun,
   onRetrySend,
   runErrorId,
@@ -107,6 +108,8 @@ export const Composer = memo(function Composer({
   onDismissAttachmentNotice?: () => void;
   sendError: string | null;
   runError: string | null;
+  /** The one action that fixes the failed run (runErrorAction of its stored error). */
+  runErrorFix?: "models" | "retry";
   onRetryRun?: () => void;
   /** Sends a failed message again when the composer holds no draft to resend (such as a chip); offered with a send error. */
   onRetrySend?: () => void;
@@ -643,6 +646,7 @@ export const Composer = memo(function Composer({
         <ComposerError
           ref={runErrorRef}
           message={(sendError ?? runError) as string}
+          fix={!sendError ? runErrorFix : undefined}
           onRetry={!sendError ? onRetryRun : undefined}
           onRetrySend={
             // A restored draft goes out again through the composer, so a success clears it.

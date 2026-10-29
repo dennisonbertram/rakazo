@@ -356,6 +356,61 @@ export function isValidTimezone(timezone: string): boolean {
   }
 }
 
+const OFFSET_SUFFIX = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i;
+const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?$/;
+
+/**
+ * An ISO date or datetime as an instant. One with an offset (or Z) is taken as written; a date
+ * or wall-clock time without one is read in `timezone`, so "2026-11-02T10:00" is 10:00 there.
+ * A time skipped by a daylight-saving change moves forward by the gap. Null when invalid.
+ */
+export function zonedDateTime(value: string, timezone = "UTC"): Date | null {
+  const text = value.trim();
+  let wall = WALL_CLOCK.exec(text);
+  const offset = wall ? undefined : OFFSET_SUFFIX.exec(text)?.[0];
+  if (offset) wall = WALL_CLOCK.exec(text.slice(0, -offset.length));
+  // Date.parse rolls an impossible date over (February 30 becomes March 2), so check the parts.
+  if (!wall || (offset && !wall[4])) return null;
+  const [year, month, day, hour, minute, second] = wall
+    .slice(1, 7)
+    .map((part) => (part === undefined ? 0 : Number(part)));
+  const ms = wall[7] ? Math.floor(Number(`0.${wall[7]}`) * 1000) : 0;
+  const check = new Date(
+    Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, hour ?? 0, minute ?? 0, second ?? 0),
+  );
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== (month ?? 1) - 1 ||
+    check.getUTCDate() !== day ||
+    check.getUTCHours() !== hour ||
+    check.getUTCMinutes() !== minute ||
+    check.getUTCSeconds() !== second
+  ) {
+    return null;
+  }
+  if (offset) {
+    const instant = new Date(text);
+    return Number.isFinite(instant.getTime()) ? instant : null;
+  }
+  const local = new CronDate(new Date(), validTimezoneOrUtc(timezone));
+  local.year = check.getUTCFullYear();
+  local.month = check.getUTCMonth();
+  local.day = check.getUTCDate();
+  local.hour = check.getUTCHours();
+  local.minute = check.getUTCMinutes();
+  local.second = check.getUTCSeconds();
+  local.ms = 0;
+  // Keep any fraction so a time just after an occurrence does not include it.
+  return new Date(local.getDate().getTime() + ms);
+}
+
+/** The local date and time of `instant` in `timezone`, as zonedDateTime reads it back. */
+export function wallClock(instant: Date, timezone = "UTC"): string {
+  const local = new CronDate(instant, validTimezoneOrUtc(timezone));
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${local.year}-${pad(local.month + 1)}-${pad(local.day)}T${pad(local.hour)}:${pad(local.minute)}:${pad(local.second)}`;
+}
+
 function validTimezoneOrUtc(timezone: string): string {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();

@@ -703,6 +703,22 @@ it("offers the OpenRouter key field when the last scan's key was rejected", asyn
   expect(container.querySelector('[data-testid="scan-failed"]')).toBeNull();
 });
 
+it("offers Models settings for a spending limit and Retry for a rate limit", async () => {
+  const failed = (error: string) =>
+    rpcMock.overview.mockResolvedValue({
+      ...overview,
+      agent: { ...overview.agent, lastScanRun: { id: id(8), status: "failed", error } },
+    });
+  failed('402: {"message":"Insufficient credits","code":402}');
+  const openSettings = vi.fn();
+  await render(<LegalPage onOpenSettings={openSettings} />);
+  await click(button("Open Models settings"));
+  expect(openSettings).toHaveBeenCalledTimes(1);
+  expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Retry")).toBe(
+    false,
+  );
+});
+
 it("has one Scan now button on an empty page", async () => {
   rpcMock.overview.mockResolvedValue(emptyWithFiles);
   await render(<LegalPage />);

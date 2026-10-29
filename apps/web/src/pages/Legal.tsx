@@ -2,6 +2,7 @@ import { plural, t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { LegalDeadline } from "@rakazo/contracts";
 import { groupLegalContracts, LEGAL_CONSENT_REQUIRED_MESSAGE } from "@rakazo/contracts";
+import { runErrorAction } from "@rakazo/core";
 import { Button, Skeleton, Tabs, TabsList, TabsTrigger } from "@rakazo/ui-web";
 import { Scale, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -328,6 +329,8 @@ function Legal({
     lastRun?.status === "failed" &&
     !running &&
     Boolean(lastRun.error && KEY_REJECTED_PATTERN.test(lastRun.error));
+  const scanFix =
+    lastRun?.status === "failed" && !running ? runErrorAction(lastRun.error) : undefined;
   const lastScan = data.agent.lastScanAt ? formatRelativeTime(data.agent.lastScanAt) : "";
   // Below the tabs, so the result appearing never moves them.
   const readCount = Math.min(scanTotal, Math.max(0, scanTotal - counts.unreviewedDocuments));
@@ -450,10 +453,15 @@ function Legal({
               <Trans>Last scan failed</Trans>
             )}
           </p>
-          {/* A rejected key is fixed in one place; go straight to its field. */}
-          {keyRejected && onOpenSettings ? (
+          {/* A key or billing failure is fixed in Models; a transient one by scanning again. */}
+          {scanFix === "models" && onOpenSettings ? (
             <Button size="sm" variant="outline" onClick={onOpenSettings}>
-              <Trans>Replace key</Trans>
+              {keyRejected ? <Trans>Replace key</Trans> : <Trans>Open Models settings</Trans>}
+            </Button>
+          ) : null}
+          {scanFix === "retry" ? (
+            <Button size="sm" variant="outline" onClick={() => void scan()}>
+              <Trans>Retry</Trans>
             </Button>
           ) : null}
           <button

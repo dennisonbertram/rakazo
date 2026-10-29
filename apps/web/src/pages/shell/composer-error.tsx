@@ -3,18 +3,10 @@ import {
   LEGAL_CONSENT_REQUIRED_MESSAGE,
   MISSING_TOOL_FINAL_RESPONSE_ERROR,
 } from "@rakazo/contracts";
+import type { runErrorAction } from "@rakazo/core";
 import { Button } from "@rakazo/ui-web";
 import { X } from "lucide-react";
 import type { Ref } from "react";
-import { runErrorText } from "../../lib/user-error";
-
-/**
- * The Models settings that fix a run error, when they do. `provider` opens that provider's key
- * field; `""` opens the space's default provider's key field (a rejected key).
- */
-function modelSettingsFor(message: string): { provider: string } | null {
-  return message === runErrorText("401") ? { provider: "" } : null;
-}
 
 /** The API's refusal of a send while an agent's question is still open. */
 const PENDING_ASK_ERROR = "Answer the pending ask first.";
@@ -41,6 +33,7 @@ export function isStalePendingAskError(
 export function ComposerError({
   ref,
   message,
+  fix,
   onDismiss,
   onRetry,
   onRetrySend,
@@ -49,6 +42,8 @@ export function ComposerError({
 }: {
   ref?: Ref<HTMLDivElement>;
   message: string;
+  /** The one action that fixes this run's failure, from its stored error. */
+  fix?: ReturnType<typeof runErrorAction>;
   onDismiss: () => void;
   /** Sends the last message again; offered only for a run that ended without a reply. */
   onRetry?: () => void;
@@ -58,7 +53,6 @@ export function ComposerError({
   onNavigate?: (path: string) => void;
 }) {
   const { t } = useLingui();
-  const settings = modelSettingsFor(message);
   const needsConsent = message === LEGAL_CONSENT_REQUIRED_MESSAGE;
   return (
     <div
@@ -69,16 +63,13 @@ export function ComposerError({
     >
       <span className="min-w-0 flex-1 basis-48">{message}</span>
       <div className="ms-auto flex shrink-0 items-center gap-2">
-        {settings && onOpenModelSettings ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onOpenModelSettings(settings.provider)}
-          >
+        {fix === "models" && onOpenModelSettings ? (
+          <Button size="sm" variant="outline" onClick={() => onOpenModelSettings("")}>
             <Trans>Open Models settings</Trans>
           </Button>
         ) : null}
-        {(message.startsWith(MISSING_TOOL_FINAL_RESPONSE_ERROR) && onRetry) || onRetrySend ? (
+        {((message.startsWith(MISSING_TOOL_FINAL_RESPONSE_ERROR) || fix === "retry") && onRetry) ||
+        onRetrySend ? (
           <Button size="sm" variant="outline" onClick={onRetrySend ?? onRetry}>
             <Trans>Retry</Trans>
           </Button>

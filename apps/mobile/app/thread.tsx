@@ -42,6 +42,7 @@ import {
   reportedToolStep,
   resolveComposerSendPlan,
   resolvePersonaColorDef,
+  runErrorAction,
   selectableMessageText,
   selectedAskActionLabel,
   splitDataRoomReferences,
@@ -2695,14 +2696,24 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
           {/* Fades messages out above the composer, like the header fade. */}
           <View pointerEvents="none" style={styles.composerFade} />
           {runError ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("Dismiss")}
-              onPress={dismissRunError}
-              style={{ marginTop: 12 }}
-            >
-              <Text style={{ color: tokens.destructive, fontSize: 13 }}>{runError}</Text>
-            </Pressable>
+            <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("Dismiss")}
+                onPress={dismissRunError}
+                style={{ flex: 1 }}
+              >
+                <Text style={{ color: tokens.destructive, fontSize: 13 }}>{runError}</Text>
+              </Pressable>
+              {/* A key or billing failure is fixed in Models; there is no native retry yet. */}
+              {runErrorAction(snap?.run?.error) === "models" ? (
+                <Pressable accessibilityRole="button" onPress={() => router.push("/models")}>
+                  <Text style={{ color: tokens.foreground, fontSize: 13, fontWeight: "600" }}>
+                    {t("Models")}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
           {replyTarget ? (
             <GlassSurface

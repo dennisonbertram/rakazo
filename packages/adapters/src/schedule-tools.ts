@@ -18,9 +18,12 @@ import {
   nextCronDateAcross,
   ONCE_ROUTINE_CRON,
   unevenInterval,
+  wallClock,
+  zonedDateTime,
 } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { resumeWatch, syncWatchState, watchLimitError } from "@rakazo/db";
+import { localDateTime } from "./current-time.js";
 import { OWNER_INITIATED_TRIGGERS } from "./mail-tools.js";
 import { connectorAppLabel, resolveWatchTool } from "./watch-connector.js";
 
@@ -89,37 +92,6 @@ export function compactScheduleInput(input: Record<string, unknown>): Record<str
   );
 }
 
-const ISO_DATE_TIME =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/i;
-
-/**
- * Date.parse rolls an impossible calendar date over (February 30 becomes March 2), so a
- * mistyped run time would be scheduled for the wrong day. Check the written parts first.
- */
-function parseIsoInstant(text: string): Date {
-  const value = text.trim();
-  const parts = ISO_DATE_TIME.exec(value);
-  if (parts) {
-    const [year, month, day, hour, minute, second] = parts
-      .slice(1, 7)
-      .map((part) => (part === undefined ? 0 : Number(part)));
-    const check = new Date(0);
-    check.setUTCFullYear(year ?? 0, (month ?? 1) - 1, day ?? 1);
-    check.setUTCHours(hour ?? 0, minute ?? 0, second ?? 0);
-    if (
-      check.getUTCFullYear() !== year ||
-      check.getUTCMonth() !== (month ?? 1) - 1 ||
-      check.getUTCDate() !== day ||
-      check.getUTCHours() !== hour ||
-      check.getUTCMinutes() !== minute ||
-      check.getUTCSeconds() !== second
-    ) {
-      return new Date(Number.NaN);
-    }
-  }
-  return new Date(value);
-}
-
 export function resolveScheduleTiming(
   input: {
     cron?: unknown;
@@ -128,6 +100,7 @@ export function resolveScheduleTiming(
     runAt?: unknown;
     delayMinutes?: unknown;
     delaySeconds?: unknown;
+    startAt?: unknown;
   },
   timezone = "UTC",
 ): ResolvedSchedule {
@@ -161,6 +134,10 @@ export function resolveScheduleTiming(
     };
   }
 
+  if (hasOneShot && isScheduleValueProvided(input.startAt)) {
+    return { ok: false, error: "startAt is only for repeating schedules." };
+  }
+
   if (hasOneShot) {
     const oneShotFields = [input.runAt, input.delayMinutes, input.delaySeconds].filter(
       isScheduleValueProvided,
@@ -186,16 +163,29 @@ export function resolveScheduleTiming(
       }
       nextRunAt = new Date(Date.now() + delayMinutes * 60_000);
     } else {
-      const parsed = parseIsoInstant(String(input.runAt ?? ""));
-      if (!Number.isFinite(parsed.getTime())) {
-        return { ok: false, error: "runAt must be a valid ISO datetime." };
-      }
+      // Without an offset, runAt is the routine's local time.
+      const parsed = zonedDateTime(String(input.runAt ?? ""), timezone);
+      if (!parsed) return { ok: false, error: "runAt must be a valid ISO datetime." };
       nextRunAt = parsed;
     }
     if (nextRunAt.getTime() <= Date.now()) {
-      return { ok: false, error: "One-shot schedules must run in the future." };
+      return { ok: false, error: `One-shot schedules must run in the future. ${nowIn(timezone)}` };
     }
     return { ok: true, cron: ONCE_ROUTINE_CRON, nextRunAt, oneShot: true };
+  }
+
+  // The first run is the first occurrence at or after startAt.
+  let from = new Date();
+  if (isScheduleValueProvided(input.startAt)) {
+    const startAt = zonedDateTime(String(input.startAt), timezone);
+    if (!startAt) return { ok: false, error: "startAt must be an ISO date or datetime." };
+    if (startAt.getTime() < Date.now()) {
+      return {
+        ok: false,
+        error: `startAt is in the past; omit it to start now. ${nowIn(timezone)}`,
+      };
+    }
+    from = new Date(startAt.getTime() - 1);
   }
 
   if (hasCron) {
@@ -210,7 +200,7 @@ export function resolveScheduleTiming(
     const intervalError = validateRepeatingCron(cron);
     if (intervalError) return { ok: false, error: intervalError };
     try {
-      const nextRunAt = nextCronDate(cron, new Date(), timezone);
+      const nextRunAt = nextCronDate(cron, from, timezone);
       return { ok: true, cron, nextRunAt, oneShot: false };
     } catch {
       return { ok: false, error: "cron must be a valid 5-field cron expression." };
@@ -235,11 +225,21 @@ export function resolveScheduleTiming(
   const intervalError = validateRepeatingCron(cron);
   if (intervalError) return { ok: false, error: intervalError };
   try {
-    const nextRunAt = nextCronDate(cron, new Date(), timezone);
+    const nextRunAt = nextCronDate(cron, from, timezone);
     return { ok: true, cron, nextRunAt, oneShot: false };
   } catch {
     return { ok: false, error: "every/unit produced an invalid cron expression." };
   }
+}
+
+function nowIn(timezone: string): string {
+  const now = new Date();
+  return `It is now ${localDateTime(now, timezone) ?? now.toISOString()} in ${timezone}.`;
+}
+
+/** The next run as the owner reads it: in the routine's timezone. */
+function nextRunLocal(nextRunAt: Date | null, timezone: string) {
+  return nextRunAt ? (localDateTime(nextRunAt, timezone) ?? nextRunAt.toISOString()) : null;
 }
 
 function validateRepeatingCron(cron: string): string | null {
@@ -362,6 +362,7 @@ export async function createScheduleFromTool(
     timezone: row.timezone,
     schedule: describeSchedule(row.crons, row.timezone, row.nextRunAt),
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
+    nextRun: nextRunLocal(row.nextRunAt, row.timezone),
     oneShot: resolved.oneShot,
   };
 }
@@ -606,6 +607,7 @@ export async function listSchedulesFromTool(
       timezone: row.timezone,
       schedule: describeRoutine(row),
       nextRunAt: row.nextRunAt?.toISOString() ?? null,
+      nextRun: nextRunLocal(row.nextRunAt, row.timezone),
       oneShot: isOneShotRoutineCrons(row.crons),
     })),
   };
@@ -723,7 +725,15 @@ function routineRepeats(routine: {
   );
 }
 
-const TIMING_FIELDS = ["cron", "every", "unit", "runAt", "delayMinutes", "delaySeconds"] as const;
+const TIMING_FIELDS = [
+  "cron",
+  "every",
+  "unit",
+  "runAt",
+  "delayMinutes",
+  "delaySeconds",
+  "startAt",
+] as const;
 
 function timingOf(input: unknown): Record<string, unknown> {
   const source = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
@@ -775,28 +785,42 @@ export async function updateScheduleFromTool(
     : existing.timezone;
   if (!isValidTimezone(timezone)) return { error: `Unknown time zone: ${timezone}.` };
   const timing = timingOf(input.schedule);
-  const hasTiming = Object.keys(timing).length > 0;
+  const { startAt, ...method } = timing;
+  const hasTiming = Object.keys(method).length > 0;
   const enabled = typeof input.enabled === "boolean" ? input.enabled : existing.active;
 
   let crons = existing.crons;
   let nextRunAt = existing.nextRunAt;
+  const repeats = !isOneShotRoutineCrons(crons);
   if (hasTiming) {
     const resolved = resolveScheduleTiming(timing, timezone);
     if (!resolved.ok) return { error: resolved.error };
     crons = [resolved.cron];
     nextRunAt = resolved.nextRunAt;
-  } else if (
-    !isOneShotRoutineCrons(crons) &&
-    (timezone !== existing.timezone || (enabled && !nextRunAt))
-  ) {
-    // An uneven step (every 7 hours) recurs by a fixed gap that no timezone moves, so a new
-    // zone alone keeps the next run where it was instead of restarting the count from now.
+  } else if (startAt !== undefined) {
+    // startAt alone moves the next run of the current repeat.
+    if (existing.watch) return { error: "A watch checks on its own interval." };
+    if (!repeats || crons.length !== 1) {
+      return { error: "Give cron or every/unit along with startAt." };
+    }
+    const resolved = resolveScheduleTiming({ cron: crons[0], startAt }, timezone);
+    if (!resolved.ok) return { error: resolved.error };
+    nextRunAt = resolved.nextRunAt;
+  } else if (repeats && (timezone !== existing.timezone || (enabled && !nextRunAt))) {
     const due = existing.nextRunAt;
-    const step = crons.length === 1 ? unevenInterval(crons[0] ?? "") : undefined;
-    nextRunAt =
-      due && due.getTime() > Date.now() && step && step.unit !== "days"
-        ? due
-        : nextCronDateAcross(crons, new Date(), timezone);
+    if (timezone !== existing.timezone && enabled && due && due.getTime() > Date.now()) {
+      // A new timezone alone keeps the next run's local time, so a start set for later holds.
+      // In a timezone behind, the first run is the first one from when it was due, so none is
+      // skipped. An uneven step (every 7 hours) recurs by a fixed gap that no timezone moves,
+      // so it keeps its moment.
+      const step = crons.length === 1 ? unevenInterval(crons[0] ?? "") : undefined;
+      const local = zonedDateTime(wallClock(due, existing.timezone), timezone);
+      if (step && step.unit !== "days") nextRunAt = due;
+      else if (local && (step || local <= due) && local.getTime() > Date.now()) nextRunAt = local;
+      else if (local && !step && local > due) {
+        nextRunAt = nextCronDateAcross(crons, new Date(due.getTime() - 1), timezone);
+      } else nextRunAt = nextCronDateAcross(crons, new Date(), timezone);
+    } else nextRunAt = nextCronDateAcross(crons, new Date(), timezone);
   }
   if (
     enabled &&
@@ -807,14 +831,20 @@ export async function updateScheduleFromTool(
   }
   if (enabled && crons.length > 0 && !nextRunAt) return { error: "That schedule has no next run." };
 
+  const timingChanged =
+    timezone !== existing.timezone ||
+    enabled !== existing.active ||
+    nextRunAt?.getTime() !== existing.nextRunAt?.getTime() ||
+    crons.join("|") !== existing.crons.join("|");
   const row = await deps.prisma.routine.update({
     where: { id: existing.id },
     data: {
       prompt,
-      timezone,
-      crons,
-      active: enabled,
-      nextRunAt: enabled ? nextRunAt : null,
+      // A prompt-only edit leaves the timing alone, so a run that advanced the routine meanwhile
+      // keeps its advance.
+      ...(timingChanged
+        ? { timezone, crons, active: enabled, nextRunAt: enabled ? nextRunAt : null }
+        : {}),
       ...(watch ? { watch } : {}),
     },
     include: { watchState: true },
@@ -861,6 +891,7 @@ export async function updateScheduleFromTool(
     timezone: row.timezone,
     enabled: row.active,
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
+    nextRun: nextRunLocal(row.nextRunAt, row.timezone),
     oneShot: isOneShotRoutineCrons(row.crons),
   };
 }

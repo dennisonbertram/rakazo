@@ -6679,6 +6679,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 runAt: args.runAt,
                 delayMinutes: args.delayMinutes,
                 delaySeconds: args.delaySeconds,
+                startAt: args.startAt,
               }),
             });
             return finish(created);

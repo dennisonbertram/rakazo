@@ -10,6 +10,7 @@ import {
   KEY_REJECTED_PATTERN,
   plainRunError,
   providerErrorMessage,
+  runErrorAction,
   threadRunError,
   userErrorMessage,
 } from "./user-error.js";
@@ -288,6 +289,20 @@ describe("plainRunError", () => {
   it("hides stack-trace text and keeps human messages", () => {
     expect(plainRunError("x".repeat(400), copy)).toBe("GENERIC");
     expect(plainRunError("Allow it on the Legal page.", copy)).toBe("Allow it on the Legal page.");
+  });
+});
+
+describe("runErrorAction", () => {
+  it.each([
+    ['401: {"message":"User not found.","code":401}', "models"],
+    ['403: {"message":"Monthly usage limit exceeded","code":403}', "models"],
+    ['402: {"message":"Insufficient credits","code":402}', "models"],
+    ['429: {"message":"Rate limit exceeded","code":429}', "retry"],
+    ["upstream connect error or disconnect/reset before headers. reset reason: timeout", "retry"],
+    ["Allow it on the Legal page.", undefined],
+    ["", undefined],
+  ])("%s -> %s", (error, action) => {
+    expect(runErrorAction(error)).toBe(action);
   });
 });
 
