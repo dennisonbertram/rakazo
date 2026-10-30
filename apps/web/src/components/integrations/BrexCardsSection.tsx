@@ -35,6 +35,9 @@ export function useBrexCards(enabled: boolean) {
   const [cards, setCards] = useState<BrexCardsList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  // The last failure ran past the server's owner checks (the Brex call itself failed), so the caller
+  // is the owner. A network failure has no server code and proves nothing.
+  const [ownerProven, setOwnerProven] = useState(false);
   const reload = useCallback(() => {
     // A failed read stays on screen while it is retried, so the page does not flicker.
     rpc.brexCards
@@ -42,18 +45,24 @@ export function useBrexCards(enabled: boolean) {
       .then((answer) => {
         setCards(answer);
         setError(null);
+        setOwnerProven(false);
       })
       .catch((cause) => {
-        if ((cause as { code?: unknown } | null)?.code === "FORBIDDEN") {
+        const code = (cause as { code?: unknown } | null)?.code;
+        if (code === "FORBIDDEN") {
           setForbidden(true);
           setCards(null);
-        } else setError(errorText(cause));
+          setOwnerProven(false);
+          return;
+        }
+        setError(errorText(cause));
+        setOwnerProven(typeof code === "string" && code !== "PRECONDITION_FAILED");
       });
   }, []);
   useEffect(() => {
     if (enabled) reload();
   }, [enabled, reload]);
-  return { cards, error, forbidden, reload };
+  return { cards, error, forbidden, ownerProven, reload };
 }
 
 // Brex ids are plain tokens. The id is Brex-controlled text, so anything else is never sent.

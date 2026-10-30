@@ -67,8 +67,9 @@ export function McpDetail({
   const [replacingToken, setReplacingToken] = useState(false);
   const brexCards = isBrexCardsEndpoint(server?.endpoint);
   const brex = useBrexCards(brexCards);
-  // Only a successful read proves the viewer owns the space: a member is refused (FORBIDDEN) and any
-  // other failure proves nothing, so Controls and Replace token wait for a read that worked.
+  // Controls need a cards read that worked. Replace token also shows when the read failed past the
+  // server's owner checks (Brex down, token revoked), which is when it is needed. A member is refused
+  // (FORBIDDEN) and a failure with no server code proves nothing, so neither shows it.
   const brexOwner = brexCards && !brex.forbidden && Boolean(brex.cards);
   const brexCardsShown = brexCards && !brex.forbidden && Boolean(brex.cards || brex.error);
 
@@ -326,7 +327,7 @@ export function McpDetail({
               <Trans>Configure API key</Trans>
             </Button>
           ) : null}
-          {brexOwner ? (
+          {brexOwner || (brexCards && brex.ownerProven) ? (
             <Button variant="outline" disabled={busy} onClick={() => setReplacingToken(true)}>
               <Trans>Replace token</Trans>
             </Button>
