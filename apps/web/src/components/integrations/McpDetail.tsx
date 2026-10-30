@@ -67,9 +67,10 @@ export function McpDetail({
   const [replacingToken, setReplacingToken] = useState(false);
   const brexCards = isBrexCardsEndpoint(server?.endpoint);
   const brex = useBrexCards(brexCards);
-  // Only the space owner can read the cards; for anyone else the server refuses and nothing shows.
-  // Nothing shows until the read has answered, so a member never sees the owner's sections flash.
-  const brexOwner = brexCards && !brex.forbidden && Boolean(brex.cards || brex.error);
+  // Only a successful read proves the viewer owns the space: a member is refused (FORBIDDEN) and any
+  // other failure proves nothing, so Controls and Replace token wait for a read that worked.
+  const brexOwner = brexCards && !brex.forbidden && Boolean(brex.cards);
+  const brexCardsShown = brexCards && !brex.forbidden && Boolean(brex.cards || brex.error);
 
   const back = (
     <Link
@@ -364,7 +365,7 @@ export function McpDetail({
           />
         ) : null}
 
-        {brexOwner ? (
+        {brexCardsShown ? (
           <>
             <BrexCardsSection
               cards={brex.cards}
@@ -372,7 +373,7 @@ export function McpDetail({
               writesEnabled={server.writesEnabled}
               onRetry={brex.reload}
             />
-            <BrexControlsForm />
+            {brexOwner ? <BrexControlsForm /> : null}
           </>
         ) : null}
 

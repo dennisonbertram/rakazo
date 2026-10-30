@@ -469,6 +469,19 @@ export function IntegrationsHome({
     (category === "all" || category === "finance") &&
     financeMatches &&
     connectedKeys.size < FINANCE_TILE_COUNT;
+  // Connecting Brex cards is for the space owner. The role comes from the space list's own flag for
+  // the owner's rights; until it answers, or if it fails, the tile stays hidden.
+  const [spaceOwner, setSpaceOwner] = useState(false);
+  useEffect(() => {
+    void Promise.resolve()
+      .then(() => rpc.spaces.list())
+      .then((navigation) =>
+        setSpaceOwner(
+          navigation.spaces.find((space) => space.id === navigation.current.id)?.canRename === true,
+        ),
+      )
+      .catch(() => setSpaceOwner(false));
+  }, []);
   const [omiConnected, setOmiConnected] = useState(false);
   useEffect(() => {
     void Promise.resolve(rpc.omi?.status?.())
@@ -496,6 +509,7 @@ export function IntegrationsHome({
   );
   // Brex cards has no https endpoint to match a connected server by, so its tile is hidden by its own check.
   const showBrexTile =
+    spaceOwner &&
     !data.servers.some((server) => isBrexCardsEndpoint(server.endpoint)) &&
     (category === "all" || category === "tools" || category === "finance") &&
     "brex cards".includes(query.trim().toLowerCase());

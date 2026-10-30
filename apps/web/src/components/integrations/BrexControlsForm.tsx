@@ -8,12 +8,16 @@ import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { Heading } from "./AppDetail";
 
+// The largest amount `BrexCardsControlsSchema` and the write-tool schemas accept (`MAX_CENTS` in
+// packages/contracts/src/brex-cards.ts, not exported): $10,000,000.
+const MAX_CENTS = 1_000_000_000;
+
 /** Whole dollars or dollars and cents ("250", "250.5"), above zero, as cents. Anything else is null. */
 export function dollarsToCents(text: string): number | null {
   const value = text.trim();
   if (!/^\d{1,9}(\.\d{1,2})?$/.test(value)) return null;
   const cents = Math.round(Number(value) * 100);
-  return cents > 0 ? cents : null;
+  return cents > 0 && cents <= MAX_CENTS ? cents : null;
 }
 
 /** Cents as the dollar text a person types: "250", "250.50". */

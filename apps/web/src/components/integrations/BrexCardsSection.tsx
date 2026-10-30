@@ -36,13 +36,18 @@ export function useBrexCards(enabled: boolean) {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const reload = useCallback(() => {
-    setError(null);
+    // A failed read stays on screen while it is retried, so the page does not flicker.
     rpc.brexCards
       .cards()
-      .then(setCards)
+      .then((answer) => {
+        setCards(answer);
+        setError(null);
+      })
       .catch((cause) => {
-        if ((cause as { code?: unknown } | null)?.code === "FORBIDDEN") setForbidden(true);
-        else setError(errorText(cause));
+        if ((cause as { code?: unknown } | null)?.code === "FORBIDDEN") {
+          setForbidden(true);
+          setCards(null);
+        } else setError(errorText(cause));
       });
   }, []);
   useEffect(() => {
@@ -108,8 +113,13 @@ export function BrexCardsSection({
   const botId = cards?.agentBotId ?? null;
   const enabled = Boolean((writesEnabled ?? cards?.writesEnabled) && botId);
 
+  // A dialog left open must not send once changes are off or the agent is gone.
+  useEffect(() => {
+    if (!enabled) setPending(null);
+  }, [enabled]);
+
   async function send(text: string) {
-    if (!botId || busy) return;
+    if (!botId || !enabled || busy) return;
     setBusy(true);
     setSendError("");
     try {
