@@ -1,6 +1,8 @@
 import { withSandboxedArtifactCsp } from "@rakazo/core";
+import { useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
+import { htmlPageDataScript } from "../lib/agent-page";
 
 /**
  * Renders bot-authored HTML in a WebView that cannot reach the app's session:
@@ -23,21 +25,37 @@ function isWebUrl(url: string): boolean {
  * says. `scripts={false}` alone is for other untrusted documents. `onOpenLink` receives an http(s) URL
  * only for a positively identified tap (`navigationType: "click"`, reported on iOS only); the
  * navigation itself is always blocked, and every other navigation (meta refresh, Android) opens nothing.
+ * `data` is an HTML page's live data by source name. It is injected as a "praci-data" message event after
+ * each load and whenever it changes; the page cannot send anything back (WebView messages are not handled).
  */
 export function SandboxedHtmlPreview({
   html,
   scripts = true,
   email = false,
   onOpenLink,
+  data,
 }: {
   html: string;
   scripts?: boolean;
   email?: boolean;
   onOpenLink?: (url: string) => void;
+  data?: Record<string, unknown>;
 }) {
+  const webview = useRef<WebView>(null);
+  const loaded = useRef(false);
+  const inject = (sources: Record<string, unknown> | undefined) => {
+    if (sources !== undefined && loaded.current)
+      webview.current?.injectJavaScript(htmlPageDataScript(sources));
+  };
+  useEffect(() => inject(data), [data]);
   return (
     <View style={styles.container}>
       <WebView
+        ref={webview}
+        onLoadEnd={() => {
+          loaded.current = true;
+          inject(data);
+        }}
         source={{ html: withSandboxedArtifactCsp(html, { email }), baseUrl: "about:blank" }}
         style={styles.webview}
         javaScriptEnabled={scripts && !email}

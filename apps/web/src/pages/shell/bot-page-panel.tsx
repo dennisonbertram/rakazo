@@ -34,6 +34,7 @@ import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor } from
 import { ArrowDown, ArrowUp, GripVertical, MoreHorizontal, Plus, X } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { GtmBlock, GtmBlockContext } from "../../components/gtm/GtmBlock";
+import { HtmlPageView } from "../../components/pages/HtmlPageView";
 import {
   PageChartFrame,
   PageMetricBlock,
@@ -290,7 +291,14 @@ function PageEditor({
   const applyData = useCallback(
     (data: PageData | null) => {
       setLiveLoaded(true);
-      if (!data || !editor || editor.isDestroyed || data.revision !== revision.current) return;
+      if (
+        !data ||
+        !("blocks" in data) ||
+        !editor ||
+        editor.isDestroyed ||
+        data.revision !== revision.current
+      )
+        return;
       const doc = editor.markdown?.parse(baseline.current);
       if (doc) setLiveBlocks(mapLiveBlocks(doc, data.blocks));
     },
@@ -713,7 +721,18 @@ export function BotPagePanel({
           {error}
         </p>
       ) : null}
-      {pages.length === 0 || activeId ? (
+      {active?.kind === "html" ? (
+        <HtmlPageView
+          key={active.id}
+          botId={botId}
+          pageId={active.id}
+          title={active.title}
+          changeTick={editorRemote?.seq ?? 0}
+          dataTick={dataTick}
+          refreshTick={refreshTick}
+          onSources={setHasSources}
+        />
+      ) : pages.length === 0 || activeId ? (
         <PageEditor
           key={activeId ?? "first"}
           botId={botId}

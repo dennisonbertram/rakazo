@@ -62,6 +62,7 @@ const content = [fence("chart", staticChart), fence("metric", metric), fence("ta
 );
 const page = (revision = 1): BotPage => ({
   id: "p1",
+  kind: "blocks",
   botId: "bot_demo",
   title: "Cash",
   content,

@@ -120,12 +120,17 @@ it("renders only well-formed messages from the embedding app", () => {
   const script = shell.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   if (!script) throw new Error("shell script missing");
   const run = (embedded: boolean) => {
-    const frameWindow = {};
+    const forwarded: unknown[] = [];
+    const frameWindow = { postMessage: (data: unknown) => forwarded.push(data) };
     const attributes = new Map<string, string>();
+    let onLoad: (() => void) | undefined;
     const preview = {
       srcdoc: "",
       contentWindow: frameWindow,
       setAttribute: (name: string, value: string) => attributes.set(name, value),
+      addEventListener: (_type: string, handler: () => void) => {
+        onLoad = handler;
+      },
     };
     const self = {};
     const reports: unknown[] = [];
@@ -145,6 +150,8 @@ it("renders only well-formed messages from the embedding app", () => {
       parent,
       frameWindow,
       reports,
+      forwarded,
+      load: () => onLoad?.(),
       send: (source: unknown, data: unknown) => listener?.({ source, data }),
     };
   };
@@ -171,6 +178,80 @@ it("renders only well-formed messages from the embedding app", () => {
   const topLevel = run(false);
   topLevel.send(topLevel.parent, message);
   expect(topLevel.preview.srcdoc).toBe("");
+
+  // Data for an HTML page goes into the frame only from the app, as exactly {type, sources}.
+  const bridge = run(true);
+  const data = { type: "praci-data", sources: { Cash: { status: "ok" } }, extra: "x" };
+  bridge.send({}, data);
+  bridge.send(bridge.frameWindow, data);
+  bridge.send(bridge.parent, { ...data, type: "praci-data2" });
+  bridge.send(bridge.parent, { sources: {} });
+  expect(bridge.forwarded).toEqual([]);
+  expect(bridge.reports).toEqual([]);
+  bridge.send(bridge.parent, data);
+  expect(bridge.forwarded).toEqual([{ type: "praci-data", sources: { Cash: { status: "ok" } } }]);
+  expect(bridge.reports).toEqual([]);
+
+  // Nothing from the frame reaches the app but height reports; the shell's own load ping carries no data.
+  bridge.send(bridge.frameWindow, { type: "praci-viewer-ready", leak: "secret" });
+  bridge.send(bridge.frameWindow, { type: "praci-data", sources: {} });
+  bridge.send(bridge.frameWindow, { srcdoc: "<p>x</p>", sandbox: "allow-same-origin", csp: "" });
+  expect(bridge.reports).toEqual([]);
+  expect(bridge.preview.srcdoc).toBe("");
+  bridge.load();
+  expect(bridge.reports).toEqual([{ type: "praci-viewer-ready" }]);
+});
+
+it("pushes data to the shell after the frame is ready and whenever it changes", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const show = async (data?: Record<string, unknown>) =>
+    act(async () => {
+      root.render(<SandboxedHtmlViewer title="Page" html="<p>x</p>" data={data} />);
+    });
+  await show({ Cash: { status: "ok", value: 1 } });
+  const iframe = container.querySelector("iframe");
+  if (!iframe?.contentWindow) throw new Error("viewer frame missing");
+  const postMessage = vi.spyOn(iframe.contentWindow, "postMessage").mockImplementation(() => {});
+  const dataPosts = () =>
+    postMessage.mock.calls.map(([message]) => message).filter((m) => m?.type === "praci-data");
+  const fromFrame = async (source: unknown, data: unknown) =>
+    act(async () => {
+      window.dispatchEvent(new MessageEvent("message", { source: source as Window, data }));
+    });
+
+  await act(async () => {
+    iframe.dispatchEvent(new Event("load"));
+  });
+  // Not before the shell reports a loaded document, and never for a message from anywhere else.
+  expect(dataPosts()).toEqual([]);
+  await fromFrame(window, { type: "praci-viewer-ready" });
+  await fromFrame(iframe.contentWindow, { type: "something-else" });
+  expect(dataPosts()).toEqual([]);
+
+  await fromFrame(iframe.contentWindow, { type: "praci-viewer-ready" });
+  expect(dataPosts()).toEqual([
+    { type: "praci-data", sources: { Cash: { status: "ok", value: 1 } } },
+  ]);
+  expect(postMessage.mock.lastCall?.[1]).toBe("*");
+
+  await show({ Cash: { status: "ok", value: 2 } });
+  expect(dataPosts()).toHaveLength(2);
+  expect(dataPosts()[1]).toEqual({
+    type: "praci-data",
+    sources: { Cash: { status: "ok", value: 2 } },
+  });
+
+  // A new document in the frame needs the data again.
+  await fromFrame(iframe.contentWindow, { type: "praci-viewer-ready" });
+  expect(dataPosts()).toHaveLength(3);
+
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 it("lets the shell load the nested srcdoc preview and rejects http(s) navigations", () => {

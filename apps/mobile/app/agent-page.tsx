@@ -14,6 +14,7 @@ import {
 import { SvgXml } from "react-native-svg";
 import { MenuPicker } from "../components/menu-picker";
 import { NativeSymbol } from "../components/native-symbol";
+import { SandboxedHtmlPreview } from "../components/sandboxed-html-preview";
 import type { LiveCell } from "../lib/agent-page";
 import { pageBlocks } from "../lib/agent-page";
 import { rpc } from "../lib/api";
@@ -122,7 +123,9 @@ export default function AgentPageScreen() {
 
   const page = state.status === "ready" ? state.page : null;
   // Data for another revision would pair with the wrong blocks, so it is ignored until refetched.
-  const liveBlocks = page && live?.revision === page.revision ? live.blocks : undefined;
+  const liveBlocks =
+    page && live && "blocks" in live && live.revision === page.revision ? live.blocks : undefined;
+  const htmlSources = live && "sources" in live ? live.sources : undefined;
   const blocks = useMemo(
     () => (page ? pageBlocks(page.content, page.chartSvgs, liveBlocks) : []),
     [page, liveBlocks],
@@ -157,6 +160,24 @@ export default function AgentPageScreen() {
             {state.status === "error" ? state.message : t("No page yet.")}
           </Text>
         )}
+      </View>
+    );
+  }
+
+  if (page.kind === "html") {
+    return (
+      <View style={styles.screen}>
+        {pages.length > 1 ? (
+          <View style={styles.content}>
+            <MenuPicker
+              label={t("Page")}
+              choices={pages.map((entry) => ({ key: entry.id, label: entry.title }))}
+              value={pageId ?? page.id}
+              onChange={setPageId}
+            />
+          </View>
+        ) : null}
+        <SandboxedHtmlPreview html={page.content} data={htmlSources ?? {}} />
       </View>
     );
   }
