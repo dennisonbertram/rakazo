@@ -148,17 +148,3 @@ public struct ArtifactFamilyInput: Encodable, Sendable {
   public let familyId: String
   public init(familyId: String) { self.familyId = familyId }
 }
-
-/// `rpc_pages_get`: the agent's page, or null when it has none.
-public struct AgentPage: Sendable, Decodable {
-  public let botId: String
-  public let content: String
-  public let revision: Int?
-  public let updatedBy: String?
-  public let updatedAt: String?
-}
-
-public struct PageGetInput: Encodable, Sendable {
-  public let botId: String
-  public init(botId: String) { self.botId = botId }
-}
