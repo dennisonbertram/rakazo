@@ -193,7 +193,7 @@ it("brex-receipts-close finds missing receipts and memos, leaves uploads and sta
   for (const used of [
     "list_expenses",
     "update_expense_memo",
-    "missingReceipt",
+    "no receipt",
     "upload the receipt in Brex",
     "list_cash_accounts",
     "list_statements",
