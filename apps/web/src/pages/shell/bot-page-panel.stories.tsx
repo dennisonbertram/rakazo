@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { userEvent, within } from "storybook/test";
 import { mockRpc } from "../../lib/__mocks__/rpc";
 import { BotPagePanel } from "./bot-page-panel";
 
@@ -27,10 +28,19 @@ ${JSON.stringify(chart)}
 After the chart.`;
 
 const page = (revision: number, text = content) => ({
+  id: "page_cash",
   botId: "bot_demo",
+  title: "Cash",
   content: text,
   revision,
   updatedBy: "bot" as const,
+  updatedAt: "2026-01-01T00:00:00.000Z",
+});
+
+const summary = (id: string, title: string) => ({
+  id,
+  title,
+  revision: 1,
   updatedAt: "2026-01-01T00:00:00.000Z",
 });
 
@@ -54,26 +64,67 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const WithChart: Story = {
-  beforeEach: () => mockRpc({ "pages.get": page(1) }),
+  beforeEach: () => mockRpc({ "pages.list": [summary("page_cash", "Cash")], "pages.get": page(1) }),
 };
 
 export const TextOnly: Story = {
-  beforeEach: () => mockRpc({ "pages.get": page(1, "# Notes\n\nJust a short page.") }),
+  beforeEach: () =>
+    mockRpc({
+      "pages.list": [summary("page_cash", "Cash")],
+      "pages.get": page(1, "# Notes\n\nJust a short page."),
+    }),
 };
 
 export const Empty: Story = {
-  beforeEach: () => mockRpc({ "pages.get": page(1, "") }),
+  beforeEach: () =>
+    mockRpc({ "pages.list": [summary("page_cash", "Cash")], "pages.get": page(1, "") }),
 };
 
 export const NeverWritten: Story = {
-  beforeEach: () => mockRpc({ "pages.get": null }),
+  beforeEach: () => mockRpc({ "pages.list": [], "pages.get": null }),
 };
 
 export const LoadError: Story = {
   beforeEach: () =>
     mockRpc({
+      "pages.list": [],
       "pages.get": () => {
         throw new Error("Could not load the page.");
       },
     }),
+};
+
+export const OnePage: Story = {
+  beforeEach: () => mockRpc({ "pages.list": [summary("page_cash", "Cash")], "pages.get": page(1) }),
+};
+
+export const SeveralPages: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "pages.list": [
+        summary("page_cash", "Cash"),
+        summary("page_burn", "Burn"),
+        summary("page_pipeline", "Pipeline"),
+      ],
+      "pages.get": (input: unknown) => {
+        const { pageId } = input as { pageId?: string };
+        return pageId === "page_burn"
+          ? { ...page(1, "# Burn\n\nMonthly burn."), id: "page_burn", title: "Burn" }
+          : page(1);
+      },
+    }),
+};
+
+/** Opens the title field the way "New page" and the Rename menu item do. */
+export const RenameOpen: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "pages.list": [summary("page_cash", "Cash"), summary("page_burn", "Burn")],
+      "pages.get": page(1),
+    }),
+  play: async ({ canvasElement }) => {
+    const menu = await within(canvasElement).findByRole("button", { name: "Page options" });
+    await userEvent.click(menu);
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Rename" }));
+  },
 };
