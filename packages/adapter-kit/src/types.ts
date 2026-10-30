@@ -824,6 +824,8 @@ export interface BackgroundJobPayloads {
   /** Extracts commitments from a stored meeting; the handler is filled in by the digest slice. */
   "meetings.digest": { spaceId: string; userId: string; meetingId: string; continue?: boolean };
   "finance.sync": { userId: string; spaceId: string };
+  /** Turns a pendant connection's uploaded records into audio recordings in the Data room. Ids only. */
+  "omi.assemble": { spaceId: string; userId: string; connectionId: string };
   /** Removes a deleted Data room item's blob. Idempotent: a missing blob is success. */
   "dataroom.blob.delete": { spaceId: string; storageKey: string };
   /** Pipeline steps for one Data room item, in order; each queues the next. */
@@ -847,7 +849,7 @@ export interface BackgroundJobPayloads {
     /** The import that reports progress. */
     importId: string;
     name: string;
-    source: "upload" | "gmail" | "drive" | "box" | "chat";
+    source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi";
     folderId: string | null;
     sourceConnectionId?: string;
     externalId?: string;
