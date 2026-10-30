@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   sources: vi.fn(),
   removeSource: vi.fn(),
+  setSourceSchedule: vi.fn(),
+  pauseSource: vi.fn(),
+  resumeSource: vi.fn(),
 }));
 vi.mock("../../lib/rpc", () => ({ rpc: { pages: mocks } }));
 vi.mock("@lingui/core/macro", () => ({
@@ -215,6 +218,34 @@ it("Sources lists the page's sources and removes one after confirming", async ()
   await click(byText("Remove", "button"));
   expect(mocks.removeSource).toHaveBeenCalledWith({ botId: "bot_demo", sourceId: "s1" });
   expect(document.body.textContent).toContain("No sources");
+});
+
+it("changes a source's schedule, pauses it and resumes it", async () => {
+  mocks.setSourceSchedule.mockResolvedValue({ ...source, schedule: "1d" });
+  mocks.pauseSource.mockResolvedValue({ ...source, schedule: "1d", status: "paused" });
+  mocks.resumeSource.mockResolvedValue({ ...source, schedule: "1d" });
+  await render();
+  await openMenu();
+  await click(byText("Sources", '[role="menuitem"]'));
+  expect(document.body.textContent).toContain("finance_overview · Hourly");
+  await click(document.querySelector('[aria-label="cash options"]'));
+  await click(byText("Change schedule", '[role="menuitem"]'));
+  await click(byText("Daily", '[role="menuitemradio"]'));
+  expect(mocks.setSourceSchedule).toHaveBeenCalledWith({
+    botId: "bot_demo",
+    sourceId: "s1",
+    schedule: "1d",
+  });
+  expect(document.body.textContent).toContain("finance_overview · Daily");
+  await click(document.querySelector('[aria-label="cash options"]'));
+  expect(byText("Resume", '[role="menuitem"]')).toBeUndefined();
+  await click(byText("Pause", '[role="menuitem"]'));
+  expect(mocks.pauseSource).toHaveBeenCalledWith({ botId: "bot_demo", sourceId: "s1" });
+  expect(document.body.textContent).toContain("paused");
+  await click(document.querySelector('[aria-label="cash options"]'));
+  expect(byText("Pause", '[role="menuitem"]')).toBeUndefined();
+  await click(byText("Resume", '[role="menuitem"]'));
+  expect(mocks.resumeSource).toHaveBeenCalledWith({ botId: "bot_demo", sourceId: "s1" });
 });
 
 it("shows the error and Retry on the warning dot, and Retry reruns the sources", async () => {
