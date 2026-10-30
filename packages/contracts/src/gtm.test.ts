@@ -105,6 +105,8 @@ describe("GTM contracts", () => {
       "scratchpad_update",
       "scratchpad_complete",
       "scratchpad_remove",
+      "page_list",
+      "page_create",
       "page_read",
       "page_write",
       "page_edit",
