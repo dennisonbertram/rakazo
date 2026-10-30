@@ -1,9 +1,6 @@
 /** Height of the "+N more" bar that covers the foot of the list while rows remain below. */
 export const MORE_BAR_HEIGHT = 28;
 
-/** Share of a cut row that must show above the bar for the bar not to cover the whole row. */
-const MOSTLY_VISIBLE = 0.6;
-
 /** Coarse pointers (phones) grow every button to 44px in styles.css, the bar included. */
 export const moreBarHeight = () =>
   typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches
@@ -57,9 +54,8 @@ export function moreBarCover(
   const edge = scroller.getBoundingClientRect().bottom - moreBarHeight();
   for (const row of scroller.querySelectorAll<HTMLElement>(rowSelector)) {
     const box = row.getBoundingClientRect();
-    // A row that is mostly in view stays; its foot fades under the bar instead of leaving a gap.
-    if (box.top < edge - 0.5 && box.bottom > edge + 0.5)
-      return edge - box.top >= box.height * MOSTLY_VISIBLE ? 0 : Math.ceil(edge - box.top);
+    // The bar covers a cut row whole, so no half row shows.
+    if (box.top < edge - 0.5 && box.bottom > edge + 0.5) return Math.ceil(edge - box.top);
   }
   return 0;
 }

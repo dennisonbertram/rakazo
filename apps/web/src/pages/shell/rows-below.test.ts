@@ -57,3 +57,9 @@ it("grows the bar over a row it would cut in half", () => {
   expect(moreBarCover([list(0, [edge - 20, edge + 20, 450])])).toBe(20);
   expect(moreBarCover([list(0, [edge - 40, 450])])).toBe(0);
 });
+
+it("covers a row that is mostly in view above the bar, never leaving a partial row", () => {
+  const edge = BOTTOM - MORE_BAR_HEIGHT;
+  // The row spans edge-36..edge+4: 90% in view, still covered whole.
+  expect(moreBarCover([list(0, [edge + 4, 450])])).toBe(36);
+});
