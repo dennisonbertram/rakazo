@@ -2,7 +2,15 @@ import { randomUUID } from "node:crypto";
 import type { ArtifactStore } from "@rakazo/adapter-kit";
 import type { BotPage, PageData, PageLiveBlock } from "@rakazo/contracts";
 import { isShareableArtifactMimeType } from "@rakazo/contracts";
-import { cellValue, formatCell, markdownToSafeHtml, splitPage, tableColumns } from "@rakazo/core";
+import {
+  cellValue,
+  DNS_PREFETCH_OFF_META,
+  formatCell,
+  htmlPageDataScript,
+  markdownToSafeHtml,
+  splitPage,
+  tableColumns,
+} from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { createArtifactShare } from "@rakazo/db";
 import { renderPageChartSvg } from "./pages.js";
@@ -36,21 +44,24 @@ function placeholder(block: PageLiveBlock | undefined): string {
 const noValue = (block: PageLiveBlock | undefined) =>
   block?.status === "missing" || block?.status === "pending" || block?.status === "denied";
 
-async function renderBlocks(page: Pick<BotPage, "content">, data: PageData): Promise<string> {
+async function renderBlocks(
+  page: Pick<BotPage, "content">,
+  blocks: PageLiveBlock[],
+): Promise<string> {
   let next = 0;
   const parts: string[] = [];
   for (const segment of splitPage(page.content)) {
     if (segment.kind === "markdown") {
       parts.push(markdownToSafeHtml(segment.text));
     } else if (segment.kind === "metric") {
-      const live = data.blocks[next++];
+      const live = blocks[next++];
       const body =
         live?.text !== undefined
           ? `<p class="v">${esc(live.text)}</p>`
           : `<p class="m">${placeholder(live)}</p>`;
       parts.push(`<section><div class="l">${esc(segment.block.label)}</div>${body}</section>`);
     } else if (segment.kind === "table") {
-      const live = data.blocks[next++];
+      const live = blocks[next++];
       const rows = live?.rows ?? [];
       let body = `<p class="m">${placeholder(live)}</p>`;
       if (rows.length) {
@@ -66,7 +77,7 @@ async function renderBlocks(page: Pick<BotPage, "content">, data: PageData): Pro
       }
       parts.push(`<section><div class="l">${esc(segment.block.name)}</div>${body}</section>`);
     } else if (segment.kind === "chart") {
-      const live = segment.chart.source !== undefined ? data.blocks[next++] : undefined;
+      const live = segment.chart.source !== undefined ? blocks[next++] : undefined;
       const body = noValue(live)
         ? `<p class="m">${placeholder(live)}</p>`
         : (await renderPageChartSvg(segment.chart, live?.rows?.length ? live.rows : undefined))
@@ -79,24 +90,39 @@ async function renderBlocks(page: Pick<BotPage, "content">, data: PageData): Pro
 }
 
 /**
- * One self-contained, static HTML document for a page: no script, no external resource, and only
- * rendered values (never a source definition, call, URL or secret name).
+ * One self-contained, static HTML document for a page: no script of ours beyond the data hand-off,
+ * no external resource, and only rendered values (never a source definition, call, URL or secret
+ * name). A blocks page becomes static HTML; an html page keeps its own markup and gets its current
+ * data delivered as the same "praci-data" message the live viewer sends, once the page has loaded.
  */
 export async function renderPageSnapshotHtml(
   page: Pick<BotPage, "title" | "content"> & { kind?: string },
   data: PageData,
   now = new Date(),
 ): Promise<string> {
-  let body: string;
   switch (page.kind ?? "blocks") {
-    case "blocks":
-      body = await renderBlocks(page, data);
-      break;
+    case "blocks": {
+      const body = await renderBlocks(page, "blocks" in data ? data.blocks : []);
+      const taken = now.toISOString().slice(0, 16).replace("T", " ");
+      return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(page.title)}</title><style>${CSS}</style></head><body><main><h1>${esc(page.title)}</h1>\n${body}\n<footer>Snapshot ${taken} UTC</footer></main></body></html>`;
+    }
+    case "html": {
+      // Error text can name a call or URL, so only values and times are shared.
+      const sources = Object.fromEntries(
+        Object.entries("sources" in data ? data.sources : {}).map(
+          ([name, { error: _, ...rest }]) => [name, rest],
+        ),
+      );
+      const head = `${DNS_PREFETCH_OFF_META}<script>window.addEventListener("load",function(){${htmlPageDataScript(sources)}});</script>`;
+      // Insert at the start of <head>; a page without one gets the tags after its doctype.
+      const withHead = page.content.replace(/<head(\s[^>]*)?>/i, (open) => `${open}${head}`);
+      if (withHead !== page.content) return withHead;
+      const doctype = /^\s*<!doctype[^>]*>/i.exec(page.content)?.[0] ?? "";
+      return `${doctype || "<!doctype html>"}${head}${page.content.slice(doctype.length)}`;
+    }
     default:
       throw new Error(`Cannot snapshot a "${page.kind}" page.`);
   }
-  const taken = now.toISOString().slice(0, 16).replace("T", " ");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(page.title)}</title><style>${CSS}</style></head><body><main><h1>${esc(page.title)}</h1>\n${body}\n<footer>Snapshot ${taken} UTC</footer></main></body></html>`;
 }
 
 /**

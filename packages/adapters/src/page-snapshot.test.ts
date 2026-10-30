@@ -92,4 +92,57 @@ describe("renderPageSnapshotHtml", () => {
       renderPageSnapshotHtml({ title: "T", content: "hi", kind: "other" }, data),
     ).rejects.toThrow();
   });
+
+  it("keeps an html page's markup and delivers its data as the praci-data event", async () => {
+    const markup =
+      '<!doctype html><html><head><title>Cash</title></head><body><div id="app">hi</div><script>window.addEventListener("message",function(e){})</script></body></html>';
+    const html = await renderPageSnapshotHtml({ title: "Cash", content: markup, kind: "html" }, {
+      kind: "html",
+      pageId: "p1",
+      revision: 1,
+      sources: {
+        cash: {
+          status: "ok",
+          fetchedAt: "2026-10-30T10:00:00Z",
+          value: { note: "</script><b>x\u2028" },
+        },
+      },
+    } as never);
+    expect(html).toContain('<div id="app">hi</div>');
+    expect(html).toContain(
+      '<head><meta http-equiv="x-dns-prefetch-control" content="off"><script>',
+    );
+    expect(html).toContain("praci-data");
+    // A value cannot close the script element or add markup.
+    expect(html.match(/<\/script>/gi)).toHaveLength(2);
+    expect(html).not.toContain("<b>x");
+    expect(html).not.toContain("\u2028");
+    // The script text, evaluated, delivers the original value.
+    const script =
+      /<script>window\.addEventListener\("load",function\(\)\{(.*?)\}\);<\/script>/s.exec(
+        html,
+      )![1]!;
+    const events: unknown[] = [];
+    new Function("window", "MessageEvent", script)(
+      { dispatchEvent: (e: unknown) => events.push(e) },
+      class {
+        constructor(
+          public type: string,
+          public init: { data: unknown },
+        ) {}
+      },
+    );
+    expect((events[0] as { init: { data: unknown } }).init.data).toEqual({
+      type: "praci-data",
+      sources: {
+        cash: {
+          status: "ok",
+          fetchedAt: "2026-10-30T10:00:00Z",
+          value: { note: "</script><b>x\u2028" },
+        },
+      },
+    });
+    for (const leak of ["list_invoices", "api.internal.test", "http://", "https://"])
+      expect(html).not.toContain(leak);
+  });
 });
