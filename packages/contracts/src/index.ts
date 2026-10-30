@@ -62,6 +62,7 @@ export * from "./runs.js";
 export * from "./search.js";
 export * from "./sidebar-folders.js";
 export * from "./sidebar-pages.js";
+export * from "./space-owner.js";
 export * from "./terminal.js";
 export * from "./ui-block.js";
 export * from "./voice-agent.js";

@@ -683,6 +683,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     messaging,
     cloudAgent,
     devinCallTool: createDevinCallTool(prisma, mcp),
+    ...(brexApi ? { brexApi } : {}),
     notificationEvents,
     financeCallToolFor: financeCallToolOverride ?? createFinanceCallToolFor(prisma, mcp),
     artifacts,
@@ -732,6 +733,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
 
   const router = createRouter({
     email,
+    ...(brexApi ? { brexApi } : {}),
     describeTeachSteps: (input) =>
       describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
     reviewAttachment: (input, signal) =>

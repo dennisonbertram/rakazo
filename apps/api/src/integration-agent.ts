@@ -3,12 +3,14 @@ import type { Actor, Bot } from "@rakazo/contracts";
 import {
   appAgentColor,
   cartaAgentSpawnKey,
+  financeProviderForEndpoint,
   GRANOLA_API_CONNECTOR_ID,
   granolaAgentSpawnKey,
   INTEGRATION_PRESETS,
   inboxAgentSpawnKey,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
+  isBrexCardsEndpoint,
   isCartaEndpoint,
   isDevinEndpoint,
   isGranolaEndpoint,
@@ -21,6 +23,7 @@ import { getLogger } from "@rakazo/logging";
 import { ensureCartaAgent } from "./carta-agent.js";
 import { ensureGtmBot } from "./gtm-agent.js";
 import { ensureInboxAgent } from "./inbox-agent.js";
+import { isSpaceOwnerRole } from "./space-owner.js";
 
 /**
  * How every integration agent words a reply. The asker is often another bot that will present the
@@ -44,6 +47,21 @@ async function loadServer(prisma: Pick<PrismaClient, "mcpServer">, actor: Actor,
   const server = await prisma.mcpServer.findFirst({ where: scope(actor, id) });
   if (!server) throw new ORPCError("NOT_FOUND", { message: "Integration not found" });
   return server;
+}
+
+/**
+ * The Brex cards server is the space owner's to change, whoever's user id is on the row: a former
+ * owner who still owns the row is refused. Other servers keep their own-row rule.
+ */
+async function requireCurrentSpaceOwner(
+  prisma: Pick<PrismaClient, "spaceMember">,
+  actor: Actor,
+): Promise<void> {
+  const member = await prisma.spaceMember.findUnique({
+    where: { spaceId_userId: { spaceId: actor.spaceId, userId: actor.userId } },
+    select: { role: true },
+  });
+  if (!isSpaceOwnerRole(member?.role)) throw new ORPCError("FORBIDDEN");
 }
 
 async function loadConnectedApp(
@@ -148,6 +166,29 @@ export async function findGranolaAgent(
     if (moved.count) return { id: found.id, spawnKey: key };
   }
   return found;
+}
+
+/**
+ * The owner's agent for the Brex finance server, which the Brex cards server shares. Only a live
+ * agent that is linked to that finance server and carries its own spawn key counts.
+ */
+export async function findBrexAgent(
+  prisma: Pick<PrismaClient, "mcpServer" | "bot">,
+  actor: Actor,
+): Promise<AgentRef | null> {
+  const servers = await prisma.mcpServer.findMany({
+    where: { spaceId: actor.spaceId, userId: actor.userId, agentBotId: { not: null } },
+    select: { id: true, spaceId: true, userId: true, endpoint: true, agentBotId: true },
+  });
+  for (const server of servers.filter(
+    (row) => financeProviderForEndpoint(row.endpoint) === "brex",
+  )) {
+    const bot = await prisma.bot.findFirst({
+      where: { id: server.agentBotId as string, spaceId: actor.spaceId, userId: actor.userId },
+    });
+    if (bot && isIntegrationAgentForServer(server, bot)) return bot;
+  }
+  return null;
 }
 
 export async function ensureConnectedAppAgent(
@@ -514,11 +555,17 @@ export async function ensureIntegrationAgent(
     });
   // A user has one Granola agent: the sign-in reuses the one the API key made, and the reverse.
   const granola = isGranolaEndpoint(server.endpoint);
+  // The Brex cards server shares the owner's Brex finance agent when there is one.
+  const brexCards = isBrexCardsEndpoint(server.endpoint);
   const spawnKey = granola
     ? granolaAgentSpawnKey(actor.userId)
     : integrationAgentSpawnKey(server.id);
   for (let attempt = 0; attempt < 2; attempt++) {
-    const reused = granola ? await findGranolaAgent(deps.prisma, actor) : null;
+    const reused = granola
+      ? await findGranolaAgent(deps.prisma, actor)
+      : brexCards
+        ? await findBrexAgent(deps.prisma, actor)
+        : null;
     const existed =
       Boolean(reused) ||
       Boolean(
@@ -541,20 +588,51 @@ export async function ensureIntegrationAgent(
       if (!existed) await deps.archiveBot(bot.id).catch(() => undefined);
       throw error;
     });
-    if (linked) return { server: linked, bot };
+    if (linked) {
+      // createBot returns a reused agent as it is, with the finance instructions only. The cards
+      // guidance is appended once (compare-and-swap on the text we read), so it reaches the agent.
+      if (brexCards && reused && preset && !bot.instructions.includes(preset.instructions)) {
+        const to = `${bot.instructions} ${preset.instructions}`;
+        await deps.repos.replaceBotInstructions(actor, bot.id, { from: bot.instructions, to });
+        return { server: linked, bot: { ...bot, instructions: to } };
+      }
+      return { server: linked, bot };
+    }
   }
   throw new ORPCError("CONFLICT", {
     message: "The agent was archived while it was created; retry",
   });
 }
 
+/**
+ * The scope a Brex cards server is read and changed in. The current space owner reaches the row
+ * whoever connected it, and the row, its agent and its secret stay in the connecting user's scope;
+ * anyone else is refused. Any other server keeps the acting user's own scope.
+ */
+async function brexOwnerScope(
+  prisma: Pick<PrismaClient, "mcpServer" | "spaceMember">,
+  actor: Actor,
+  serverId: string,
+): Promise<Actor> {
+  const row = await prisma.mcpServer.findFirst({
+    where: { id: serverId, spaceId: actor.spaceId },
+    select: { endpoint: true, userId: true },
+  });
+  if (!row || !isBrexCardsEndpoint(row.endpoint)) return actor;
+  await requireCurrentSpaceOwner(prisma, actor);
+  return { ...actor, userId: row.userId };
+}
+
 export async function setIntegrationExclusive(
-  prisma: Pick<PrismaClient, "mcpServer">,
+  prisma: Pick<PrismaClient, "mcpServer" | "spaceMember">,
   actor: Actor,
   serverId: string,
   exclusive: boolean,
 ) {
-  const server = await loadServer(prisma, actor, serverId);
+  const target = await brexOwnerScope(prisma, actor, serverId);
+  const server = await loadServer(prisma, target, serverId);
+  if (isBrexCardsEndpoint(server.endpoint) && !exclusive)
+    throw new ORPCError("BAD_REQUEST", { message: "Brex cards are always exclusive" });
   if (isZernioEndpoint(server.endpoint) && !exclusive)
     throw new ORPCError("BAD_REQUEST", { message: "Zernio is always exclusive" });
   if (!server.agentBotId)
@@ -562,24 +640,27 @@ export async function setIntegrationExclusive(
   // Archiving the agent can release the server after the check above: only the checked agent counts.
   const { count } = await prisma.mcpServer.updateMany({
     where: {
-      ...scope(actor, server.id),
+      ...scope(target, server.id),
       endpoint: server.endpoint,
       agentBotId: server.agentBotId,
     },
     data: { agentExclusive: exclusive },
   });
   if (!count) throw new ORPCError("CONFLICT", { message: "The integration changed; retry" });
-  return loadServer(prisma, actor, server.id);
+  return loadServer(prisma, target, server.id);
 }
 
 export async function setIntegrationAgentWrites(
-  prisma: Pick<PrismaClient, "mcpServer" | "bot" | "$transaction">,
+  prisma: Pick<PrismaClient, "mcpServer" | "bot" | "spaceMember" | "$transaction">,
   actor: Actor,
   serverId: string,
   enabled: boolean,
 ) {
   return prisma.$transaction(async (tx) => {
-    const current = await loadServer(tx, actor, serverId);
+    const target = await brexOwnerScope(tx, actor, serverId);
+    // Any current owner may switch changes off; only the owner who connected may switch them on.
+    if (enabled && target.userId !== actor.userId) throw new ORPCError("FORBIDDEN");
+    const current = await loadServer(tx, target, serverId);
     if (isDevinEndpoint(current.endpoint))
       throw new ORPCError("BAD_REQUEST", { message: "Devin is read-only" });
     if (isZernioEndpoint(current.endpoint) && enabled)
@@ -589,8 +670,8 @@ export async function setIntegrationAgentWrites(
     const agent = await tx.bot.findFirst({
       where: {
         id: current.agentBotId,
-        spaceId: actor.spaceId,
-        userId: actor.userId,
+        spaceId: target.spaceId,
+        userId: target.userId,
         archivedAt: null,
       },
       select: { id: true, spaceId: true, userId: true, spawnKey: true, archivedAt: true },
@@ -600,8 +681,8 @@ export async function setIntegrationAgentWrites(
     const lockedAgent = await tx.bot.updateMany({
       where: {
         id: agent.id,
-        spaceId: actor.spaceId,
-        userId: actor.userId,
+        spaceId: target.spaceId,
+        userId: target.userId,
         spawnKey: agent.spawnKey,
         archivedAt: null,
       },
@@ -611,7 +692,7 @@ export async function setIntegrationAgentWrites(
       throw new ORPCError("CONFLICT", { message: "The integration agent is no longer active" });
     const updated = await tx.mcpServer.updateMany({
       where: {
-        ...scope(actor, serverId),
+        ...scope(target, serverId),
         endpoint: current.endpoint,
         agentBotId: current.agentBotId,
       },
@@ -619,6 +700,6 @@ export async function setIntegrationAgentWrites(
     });
     if (!updated.count)
       throw new ORPCError("CONFLICT", { message: "The integration changed; retry" });
-    return tx.mcpServer.findFirstOrThrow({ where: scope(actor, serverId) });
+    return tx.mcpServer.findFirstOrThrow({ where: scope(target, serverId) });
   });
 }

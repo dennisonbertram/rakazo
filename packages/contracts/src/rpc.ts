@@ -27,6 +27,12 @@ import {
   BotSecretPutInput,
   StoredBotSecretName,
 } from "./bot-secrets.js";
+import {
+  BrexCardsConnectInputSchema,
+  BrexCardsConnectOutputSchema,
+  BrexCardsControlsSchema,
+  BrexCardsListSchema,
+} from "./brex-cards.js";
 import { CalendarAgendaInputSchema, CalendarAgendaSchema } from "./calendar.js";
 import {
   CapTableChangeSourceInputSchema,
@@ -1820,6 +1826,17 @@ export const appContract = {
     /** Space owners only. The old rows and key go; the acting owner becomes the connector. */
     replaceKey: oc.input(DevinKeyInputSchema).output(z.object({ ok: z.literal(true) })),
     disconnect: oc.output(z.object({ ok: z.literal(true) })),
+  },
+  /** Every procedure here needs the current space owner. */
+  brexCards: {
+    /** Checks the token with Brex first; nothing is stored for a refused token. Writes stay off. */
+    connect: oc.input(BrexCardsConnectInputSchema).output(BrexCardsConnectOutputSchema),
+    /** Checks the new token first; a refused token keeps the old one. Controls and model are kept. */
+    replaceToken: oc.input(BrexCardsConnectInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** The cards from Brex's `list_cards`, the only tool this page calls. */
+    cards: oc.output(BrexCardsListSchema),
+    getControls: oc.output(BrexCardsControlsSchema),
+    setControls: oc.input(BrexCardsControlsSchema).output(BrexCardsControlsSchema),
   },
   gtm: {
     /** Idempotent: creates the GTM agent and hourly work routine. */

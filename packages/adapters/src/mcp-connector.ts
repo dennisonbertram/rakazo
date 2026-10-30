@@ -21,6 +21,7 @@ import {
   isIntegrationAgentSpawnKey,
   isLocalMcpHost,
   isReadTool,
+  isSpaceOwnerRole,
 } from "@rakazo/contracts";
 import type { McpServer, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -819,6 +820,18 @@ export class McpConnector implements ConnectorProvider {
 
   private async sessionFor(server: McpServer, context: AdapterContext): Promise<McpSession> {
     const sessionKey = this.sessionKey(server, context);
+    if (isBrexCardsEndpoint(server.endpoint)) {
+      // The token belongs to the space owner who connected it. Once that person stops being an
+      // owner, neither a warm session nor a new one may use it, whatever the bot assignments say.
+      const member = await this.prisma.spaceMember.findUnique({
+        where: { spaceId_userId: { spaceId: server.spaceId, userId: server.userId } },
+        select: { role: true },
+      });
+      if (!isSpaceOwnerRole(member?.role)) {
+        await this.evict(sessionKey);
+        throw new Error("The person who connected Brex cards is no longer an owner of this space.");
+      }
+    }
     const existing = this.sessions.get(sessionKey);
     if (existing && existing.revision === server.revision) {
       // Every credential write stores a new record without bumping the revision, so a
