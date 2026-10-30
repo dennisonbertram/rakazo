@@ -2,7 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AgentSkillCatalogEntry, ThreadMessage } from "@rakazo/contracts";
 import { ATTACHMENT_ALLOWED_MIME_TYPES } from "@rakazo/contracts";
-import type { ComposerMention, SlashActionId } from "@rakazo/core";
+import type { ComposerMention, runErrorAction, SlashActionId } from "@rakazo/core";
 import {
   mentionChipKey,
   newClientId,
@@ -73,6 +73,7 @@ export const Composer = memo(function Composer({
   onRunErrorPresented,
   onDismissError,
   onOpenModelSettings,
+  onOpenBotSettings,
   onNavigate,
   sending,
   fileInputRef,
@@ -109,7 +110,7 @@ export const Composer = memo(function Composer({
   sendError: string | null;
   runError: string | null;
   /** The one action that fixes the failed run (runErrorAction of its stored error). */
-  runErrorFix?: "models" | "retry";
+  runErrorFix?: ReturnType<typeof runErrorAction>;
   onRetryRun?: () => void;
   /** Sends a failed message again when the composer holds no draft to resend (such as a chip); offered with a send error. */
   onRetrySend?: () => void;
@@ -118,6 +119,8 @@ export const Composer = memo(function Composer({
   onDismissError: () => void;
   /** Opens the Models settings a model-setup run error points to. */
   onOpenModelSettings?: (provider?: string) => void;
+  /** Opens the active bot's settings, where its connection is chosen. */
+  onOpenBotSettings?: () => void;
   onNavigate?: (path: string) => void;
   sending: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -655,6 +658,7 @@ export const Composer = memo(function Composer({
               : undefined
           }
           onOpenModelSettings={!sendError ? onOpenModelSettings : undefined}
+          onOpenBotSettings={!sendError ? onOpenBotSettings : undefined}
           onNavigate={!sendError ? onNavigate : undefined}
           onDismiss={() => {
             onDismissError();
