@@ -864,7 +864,7 @@ model Bot {
   scratchpadItems        ScratchpadItem[]
   taughtSkills           TaughtSkill[]
   memoryDocuments        MemoryDocument[]
-  page                   BotPage?
+  pages                  BotPage[]
   pins                   BotPins?
   agentHome              AgentHome?
   browserProfile         BrowserProfile?
@@ -1648,14 +1648,15 @@ model MemoryRevision {
   @@map("memory_revisions")
 }
 
-/// One Markdown page per bot, written by the bot's tools and edited by its owner.
+/// A bot's named Markdown pages (up to 20), written by the bot's tools and edited by its owner.
 model BotPage {
   id        String            @id @default(cuid())
   spaceId   String
   space     Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  botId     String            @unique
+  botId     String
   bot       Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   userId    String
+  title     String
   content   String
   revision  Int               @default(1)
   /// "bot" or "user"
@@ -1664,6 +1665,9 @@ model BotPage {
   updatedAt DateTime          @updatedAt
   revisions BotPageRevision[]
 
+  // Titles are unique per bot ignoring case: unique index bot_pages_botId_title_key (raw SQL in
+  // migration 20261231000026) on (botId, lower(title)).
+  @@index([botId])
   @@index([spaceId])
   @@map("bot_pages")
 }

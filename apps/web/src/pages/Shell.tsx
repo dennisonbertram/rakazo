@@ -1916,9 +1916,9 @@ export function ShellPage() {
         applyThreadEvent(event, commitSnapshot, commitComputer, snapshotRef, computerRef),
       onEvent: (event, _initial) => {
         if (event.type === "page.updated") {
-          const { revision, updatedBy } = event.payload as PageRemoteUpdate;
+          const { pageId, revision, updatedBy } = event.payload as PageRemoteUpdate;
           setPageBotId(active.id);
-          setPageRemote({ revision, updatedBy, seq: event.seq });
+          setPageRemote({ pageId, revision, updatedBy, seq: event.seq });
         }
         if (event.type === "pins.updated") setPinsSeq(event.seq);
         if (event.type === "thread.cleared") {

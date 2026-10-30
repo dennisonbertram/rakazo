@@ -103,7 +103,7 @@ Protect the file: `chmod 600 .env`. It is excluded from Git and from the Docker 
 
 `Caddyfile.prod` serves `{$RAKAZO_HOST}` and asks Let's Encrypt for a certificate. A tailnet-only machine cannot complete that challenge, and the phone needs HTTPS ([Connect mobile clients](self-host.md#connect-mobile-clients)). So terminate TLS with `tailscale serve` and run Caddy as a plain-HTTP router on a loopback port.
 
-This also fixes a gap: `Caddyfile.prod` routes only `/health`, `/api/*`, `/rpc/*` and the web app. `/mcp` and `/.well-known/*` would reach the web preview server, not the API. Add them in your own copy.
+`Caddyfile.prod` already routes `/mcp` and `/.well-known/oauth-*` to the API, so the copy needs only the first-line change.
 
 1. Copy the Caddyfile outside the checkout so a `git checkout` never overwrites it:
 
@@ -112,19 +112,7 @@ This also fixes a gap: `Caddyfile.prod` routes only `/health`, `/api/*`, `/rpc/*
    cp infra/compose/Caddyfile.prod ~/praci-config/Caddyfile.mini
    ```
 
-2. Edit the copy. Change the first site line to `http://:80 {` (plain HTTP inside the container, no certificate request). Add these two blocks next to `handle /health`:
-
-   ```caddy
-   	handle /mcp* {
-   		reverse_proxy api:3100
-   	}
-
-   	handle /.well-known/* {
-   		reverse_proxy api:3100
-   	}
-   ```
-
-   A copy with only the first-line change passed `caddy validate`. The two added blocks were not validated, and `/mcp` through Caddy and Serve is **Unverified**.
+2. Edit the copy. Change the first site line to `http://:80 {` (plain HTTP inside the container, no certificate request). A copy with only this change passed `caddy validate`. `/mcp` through Caddy and Serve is **Unverified**.
 3. Point Compose at it and publish Caddy only on loopback. Create `~/praci-config/mini.override.yml`:
 
    ```yaml

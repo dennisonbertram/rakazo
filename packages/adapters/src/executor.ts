@@ -89,8 +89,8 @@ import {
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
   OMI_CONNECTOR_ID,
-  PINNED_CONNECTION_LOST_MESSAGE,
   OPENAI_COMPATIBLE_PROVIDER_ID,
+  PINNED_CONNECTION_LOST_MESSAGE,
   RunPhaseSchema,
   VOICE_AGENT_BUILTIN_TOOLS,
   ZERNIO_READ_TOOLS,
@@ -189,7 +189,6 @@ import {
   effectiveMemoryScope,
   findBotModelCredential,
   findDefaultModelCredential,
-  PinnedConnectionLostError,
   findModelCredential,
   InvalidSpaceNameError,
   isDatabaseInterruption,
@@ -198,6 +197,7 @@ import {
   listApprovalRules,
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
+  PinnedConnectionLostError,
   parseComputerMode,
   RUN_TURN_CHECKPOINT_KIND,
   readHistory,
@@ -5823,7 +5823,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
             }
           }
-          if (name === "page_read" || name === "page_write" || name === "page_edit") {
+          if (
+            name === "page_list" ||
+            name === "page_create" ||
+            name === "page_read" ||
+            name === "page_write" ||
+            name === "page_edit"
+          ) {
             return finish(
               await pageToolFromTool(
                 name,
@@ -10515,7 +10521,7 @@ export function userTurnInstructions(parts: {
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "page_write",
-      'You have one persistent page. Put durable output the user will revisit there (a summary, tracker, or dashboard); keep ordinary replies in chat. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order.',
+      'You have named pages, up to 20. Put durable output the user will revisit on a page (a summary, tracker, or dashboard); keep ordinary replies in chat. Call page_list to see them and page_create to add one; page_read, page_write and page_edit take an optional page (a title from page_list) and use the first page without it. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order.',
     ),
     offeredBuiltinClause(
       parts.disabledBuiltinTools,

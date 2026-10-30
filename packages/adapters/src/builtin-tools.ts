@@ -84,6 +84,11 @@ export const DELEGATION_TOOL_NAMES = new Set([
   "message_bot",
 ]);
 
+const PAGE_TITLE_PROPERTY = {
+  type: "string",
+  description: "Title of the page, from page_list (any letter case). Omit for the first page.",
+} as const;
+
 const scheduleCreateProperties = {
   name: { type: "string", description: "Short label shown in Routines." },
   prompt: {
@@ -523,9 +528,25 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
-    name: "page_read",
-    description: "Read this bot's page (Markdown with chart blocks): its content and revision.",
+    name: "page_list",
+    description: "List this bot's pages: title, revision and last update of each.",
     inputSchema: { type: "object", properties: {} },
+    readOnly: true,
+  },
+  {
+    name: "page_create",
+    description: "Add an empty page with a title (up to 60 characters). A bot can have 20 pages.",
+    inputSchema: {
+      type: "object",
+      properties: { title: { type: "string" } },
+      required: ["title"],
+    },
+  },
+  {
+    name: "page_read",
+    description:
+      "Read one of this bot's pages (Markdown with chart blocks): its content and revision. Without page, the first page.",
+    inputSchema: { type: "object", properties: { page: PAGE_TITLE_PROPERTY } },
     readOnly: true,
   },
   {
@@ -537,6 +558,7 @@ export const builtinAgentTools: ConnectorTool[] = [
       properties: {
         content: { type: "string", description: "The whole page as Markdown." },
         baseRevision: { type: "number" },
+        page: PAGE_TITLE_PROPERTY,
       },
       required: ["content", "baseRevision"],
     },
@@ -551,6 +573,7 @@ export const builtinAgentTools: ConnectorTool[] = [
         old_string: { type: "string" },
         new_string: { type: "string" },
         baseRevision: { type: "number" },
+        page: PAGE_TITLE_PROPERTY,
       },
       required: ["old_string", "new_string", "baseRevision"],
     },

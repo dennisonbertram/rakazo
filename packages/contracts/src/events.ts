@@ -37,7 +37,7 @@ export const ProductEventType = z.enum([
   "computer.takeover.released",
   "computer.command",
   "memory.revised",
-  /** payload: { revision, updatedBy } */
+  /** payload: { pageId, revision, updatedBy } (older events have no pageId) */
   "page.updated",
   /** payload: { revision, updatedBy } */
   "pins.updated",
