@@ -50,7 +50,7 @@ export async function runOmiAssemble(
   if (!connection) return;
   const uploads = await prisma.omiUpload.findMany({
     where: { connectionId: connection.id, assembledAt: null },
-    orderBy: { firstSeq: "asc" },
+    orderBy: [{ receivedAt: "asc" }, { firstSeq: "asc" }],
   });
   if (uploads.length === 0) return;
 
@@ -59,12 +59,21 @@ export async function runOmiAssemble(
   const ctx = dataRoomBlobContext(actor, "omi.assemble");
   const folderId = await filing.folderAt(actor, null, ["Omi", "Audio"], [], "agent");
 
-  // Uploads with the same codec and clock state make one stream; a change starts a new one.
+  // Uploads with the same codec and clock state make one stream; a change starts a new one, and
+  // so does a sequence number that does not move forward (the pendant's counter restarted).
   const runs: (typeof uploads)[] = [];
   for (const upload of uploads) {
     const run = runs[runs.length - 1];
     const first = run?.[0];
-    if (run && first && first.codec === upload.codec && first.rtcValid === upload.rtcValid) {
+    const prev = run?.[run.length - 1];
+    if (
+      run &&
+      first &&
+      prev &&
+      first.codec === upload.codec &&
+      first.rtcValid === upload.rtcValid &&
+      upload.firstSeq >= prev.firstSeq + BigInt(prev.recordCount)
+    ) {
       run.push(upload);
     } else runs.push([upload]);
   }
@@ -83,7 +92,14 @@ export async function runOmiAssemble(
       const recordings = splitRecordings(records, { gapSeconds: 120, frameMs });
       const runEnd = Math.max(...recordings.map((r) => r.timestamp + r.durationMs / 1000));
       for (const recording of recordings) {
-        const externalId = `omi:${recording.firstSeq}`;
+        // The upload holding the recording's first record names it, so a restarted counter
+        // never collides with an older recording of the same sequence number.
+        const holder = run.find(
+          (u) =>
+            Number(u.firstSeq) <= recording.firstSeq &&
+            recording.firstSeq < Number(u.firstSeq) + u.recordCount,
+        ) as (typeof run)[number];
+        const externalId = `omi:${recording.firstSeq}:${holder.sha256.slice(0, 12)}`;
         const exists = await prisma.dataRoomItem.findFirst({
           where: {
             spaceId: actor.spaceId,

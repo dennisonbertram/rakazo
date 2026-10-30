@@ -7,6 +7,7 @@ CREATE TABLE "omi_uploads" (
     "userId" TEXT NOT NULL,
     "connectionId" TEXT NOT NULL,
     "firstSeq" BIGINT NOT NULL,
+    "sha256" TEXT NOT NULL,
     "recordCount" INTEGER NOT NULL,
     "codec" INTEGER NOT NULL,
     "rtcValid" BOOLEAN NOT NULL,
@@ -18,7 +19,7 @@ CREATE TABLE "omi_uploads" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "omi_uploads_connectionId_firstSeq_key" ON "omi_uploads"("connectionId", "firstSeq");
+CREATE UNIQUE INDEX "omi_uploads_connectionId_firstSeq_sha256_key" ON "omi_uploads"("connectionId", "firstSeq", "sha256");
 
 -- CreateIndex
 CREATE INDEX "omi_uploads_connectionId_assembledAt_idx" ON "omi_uploads"("connectionId", "assembledAt");

@@ -1552,8 +1552,10 @@ model OmiUpload {
   userId       String
   connectionId String
   connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  /// Sequence number of the first 444-byte record; a retried upload repeats it.
+  /// Sequence number of the first 444-byte record.
   firstSeq     BigInt
+  /// SHA-256 (hex) of the body. A retry repeats both; a restarted counter repeats only firstSeq.
+  sha256       String
   recordCount  Int
   /// Omi codec byte: 20 (10 ms frames) or 21 (20 ms frames).
   codec        Int
@@ -1563,7 +1565,7 @@ model OmiUpload {
   storageKey   String
   assembledAt  DateTime?
 
-  @@unique([connectionId, firstSeq])
+  @@unique([connectionId, firstSeq, sha256])
   @@index([connectionId, assembledAt])
   @@map("omi_uploads")
 }

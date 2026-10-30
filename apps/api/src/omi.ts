@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { ArtifactStore, JobPublisher } from "@rakazo/adapter-kit";
 import { dataRoomBlobDeleteJob, omiAssembleJob } from "@rakazo/adapter-kit";
 import { dataRoomBlobContext } from "@rakazo/adapters";
@@ -185,10 +186,12 @@ export function mountOmiRoutes(
       return c.json({ error: "Body must be whole 444-byte records" }, 400);
     const stored = body.byteLength / RECORD_BYTES;
 
-    // A retry of an upload we already hold answers the same and stores nothing.
+    // A retry (same position and same bytes) answers the same and stores nothing. The same
+    // position with other bytes is new audio from a restarted counter.
+    const sha256 = createHash("sha256").update(body).digest("hex");
     const known = () =>
       prisma.omiUpload.findFirst({
-        where: { connectionId: connection.id, firstSeq: BigInt(firstSeq) },
+        where: { connectionId: connection.id, firstSeq: BigInt(firstSeq), sha256 },
         select: { id: true },
       });
     if (await known()) return c.json({ stored }, 200);
@@ -204,6 +207,7 @@ export function mountOmiRoutes(
           ...owner(actor),
           connectionId: connection.id,
           firstSeq: BigInt(firstSeq),
+          sha256,
           recordCount: stored,
           codec,
           rtcValid: rtcValid === "true",

@@ -235,7 +235,10 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
       orderBy: { externalId: "asc" },
       include: { folder: { include: { parent: true } } },
     });
-    expect(items.map((i) => i.externalId)).toEqual(["omi:0", "omi:4"]);
+    expect(items.map((i) => i.externalId)).toEqual([
+      expect.stringMatching(/^omi:0:[0-9a-f]{12}$/),
+      expect.stringMatching(/^omi:4:[0-9a-f]{12}$/),
+    ]);
     expect(items[0]).toMatchObject({
       source: "omi",
       mimeType: "audio/ogg",
@@ -262,6 +265,32 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
     });
     // A retried upload after assembly is still a no-op.
     expect((await upload("a", connections.a as string, 0, records([1000, 1000]))).status).toBe(200);
+  });
+
+  it("keeps new audio that reuses an old sequence number, and still ignores an identical retry", async () => {
+    const id = connections.b as string;
+    const wait = async () => {
+      const job = enqueued.filter((j) => j.name === "omi.assemble").at(-1);
+      await runOmiAssemble(
+        { prisma, artifacts, jobs: { enqueue: async (j) => void enqueued.push(j) } },
+        job?.payload as never,
+      );
+    };
+    const first = records([2000, 2000]);
+    // The pendant's counter restarted: same firstSeq, different audio.
+    const second = records([9000, 9000], 4);
+    expect((await upload("b", id, 0, first)).status).toBe(201);
+    await post("b", `/api/omi/sync-complete?connectionId=${id}`);
+    await wait();
+    expect((await upload("b", id, 0, second)).status).toBe(201);
+    expect((await upload("b", id, 0, second)).status).toBe(200);
+    await post("b", `/api/omi/sync-complete?connectionId=${id}`);
+    await wait();
+    const items = await prisma.dataRoomItem.findMany({ where: { sourceConnectionId: id } });
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => /^omi:0:[0-9a-f]{12}$/.test(i.externalId ?? ""))).toBe(true);
+    expect(new Set(items.map((i) => i.externalId)).size).toBe(2);
+    expect(await prisma.omiUpload.count({ where: { connectionId: id } })).toBe(2);
   });
 
   it("disconnect keeps recordings unless asked to delete them", async () => {
