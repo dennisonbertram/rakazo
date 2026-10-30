@@ -53,6 +53,14 @@ it("keeps the numbers from one minute up", () => {
   expect(status({ kind: "paused", done: 14, total: 38 })).toBe("Paused · 14 of 38 min saved");
 });
 
+it("counts hours from two hours up", () => {
+  expect(status({ kind: "downloading", done: 119, total: 119.4 })).toBe(
+    "Downloading 119 of 119 min",
+  );
+  expect(status({ kind: "downloading", done: 190, total: 1620 })).toBe("Downloading 3.2 of 27 h");
+  expect(status({ kind: "paused", done: 600, total: 1620 })).toBe("Paused · 10 of 27 h saved");
+});
+
 it("says an upload failed without blaming the pendant", () => {
   expect(status({ kind: "upload_failed" })).toBe("Could not upload · saved on this computer");
 });

@@ -11,6 +11,7 @@ import {
   Reassembler,
   readCommand,
 } from "./protocol";
+import { downloadSession } from "./session";
 import type { RingTransport } from "./sync";
 import { runSync } from "./sync";
 
@@ -40,8 +41,11 @@ const u64 = (n: number) => {
   new DataView(b.buffer).setBigUint64(0, BigInt(n));
   return b;
 };
-const info = (read: number, write: number) =>
-  join([Uint8Array.of(0x02), u64(read), u64(write), new Uint8Array(14)]);
+const info = (read: number, write: number, packetBytes = 444) => {
+  const tail = new Uint8Array(14);
+  new DataView(tail.buffer).setUint16(12, packetBytes);
+  return join([Uint8Array.of(0x02), u64(read), u64(write), tail]);
+};
 const begin = (start: number, count: number) => {
   const c = new Uint8Array(4);
   new DataView(c.buffer).setUint32(0, count);
@@ -81,6 +85,8 @@ describe("protocol", () => {
       kind: "info",
       readSeq: 7,
       writeSeq: 45,
+      packetBytes: 444,
+      droppedPackets: 0,
     });
     expect(parseNotification(begin(7, 38))).toEqual({
       kind: "begin",
@@ -187,31 +193,228 @@ describe("runSync", () => {
     expect(writes).toHaveLength(0);
   });
 
-  it("pauses and keeps what arrived when the pendant goes quiet", async () => {
+  it("pauses after repeated reads that bring nothing, keeping what arrived", async () => {
     const seen: number[] = [];
+    let reads = 0;
     const listeners: ((b: Uint8Array) => void)[] = [];
     const custom: RingTransport = {
-      readStatus: async () => ({
-        usedBytes: 0,
-        unreadPackets: 2,
-        freeBytes: 0,
-        rtcValid: true,
-      }),
+      readStatus: async () => ({ usedBytes: 0, unreadPackets: 2000, freeBytes: 0, rtcValid: true }),
       subscribe: (l) => {
         listeners.push(l);
         return () => undefined;
       },
       write: async (bytes) => {
-        if (bytes[0] === 0x10) for (const l of listeners) l(info(5, 7));
-        if (bytes[0] === 0x11) for (const l of listeners) l(data(record(1)));
+        if (bytes[0] === 0x10) for (const l of listeners) l(info(5, 2005));
+        if (bytes[0] === 0x11) {
+          reads += 1;
+          // Only the first read delivers anything.
+          if (reads === 1) for (const l of listeners) l(data(record(1)));
+        }
       },
     };
-    const result = await runSync(custom, {
-      idleMs: 20,
-      onRecords: (seq) => void seen.push(seq),
-    });
+    const result = await runSync(custom, { idleMs: 20, onRecords: (seq) => void seen.push(seq) });
     expect(result).toEqual({ outcome: "paused", records: 1 });
     expect(seen).toEqual([5]);
+    expect(reads).toBe(4);
+  });
+
+  it("re-issues the read until a long backlog is drained", async () => {
+    const pendant = livePendant({ backlog: 2500, maxPerRead: 1000, trickle: 0 });
+    const got: number[] = [];
+    const result = await runSync(pendant.transport, { onRecords: collect(got) });
+    expect(result).toEqual({ outcome: "complete", records: 2500 });
+    expect(got).toEqual(Array.from({ length: 2500 }, (_, i) => 100 + i));
+    expect(pendant.reads).toBe(3);
+  });
+
+  it("ends as complete when only live recording keeps arriving", async () => {
+    const pendant = livePendant({ backlog: 3000, maxPerRead: 1500, trickle: 40 });
+    const got: number[] = [];
+    const result = await runSync(pendant.transport, { onRecords: collect(got) });
+    expect(result.outcome).toBe("complete");
+    expect(got.length).toBeGreaterThanOrEqual(3000);
+    expect(got).toEqual(got.map((_, i) => 100 + i));
+    expect(pendant.reads).toBeLessThan(6);
+  });
+
+  it("restarts from where it stopped when a read ends with an error status", async () => {
+    const pendant = livePendant({ backlog: 1500, maxPerRead: 700, trickle: 0, failFirst: true });
+    const got: number[] = [];
+    const result = await runSync(pendant.transport, { onRecords: collect(got) });
+    expect(result).toEqual({ outcome: "complete", records: 1500 });
+    expect(got).toEqual(Array.from({ length: 1500 }, (_, i) => 100 + i));
+  });
+});
+
+function collect(into: number[]) {
+  return (seq: number, bytes: Uint8Array) => {
+    for (let i = 0; i < bytes.length / RECORD_SIZE; i++) into.push(seq + i);
+  };
+}
+
+/**
+ * A pendant that keeps recording: each read ends after at most `maxPerRead` records, as the
+ * firmware's read may, and `trickle` new records arrive after each read.
+ */
+function livePendant(o: {
+  backlog: number;
+  maxPerRead: number;
+  trickle: number;
+  failFirst?: boolean;
+}) {
+  const listeners = new Set<(bytes: Uint8Array) => void>();
+  const emit = (bytes: Uint8Array) => {
+    for (const listener of listeners) listener(bytes);
+  };
+  let readSeq = 100;
+  let writeSeq = 100 + o.backlog;
+  let reads = 0;
+  let finished = false;
+  const transport: RingTransport = {
+    readStatus: async () => ({
+      usedBytes: 0,
+      unreadPackets: writeSeq - readSeq,
+      freeBytes: 0,
+      rtcValid: true,
+    }),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    write: async (bytes) => {
+      if (bytes[0] === 0x10) queueMicrotask(() => emit(info(readSeq, writeSeq)));
+      if (bytes[0] === 0x11) {
+        const start = Number(new DataView(bytes.buffer).getBigUint64(1));
+        const asked = new DataView(bytes.buffer).getUint32(9);
+        reads += 1;
+        const count = Math.min(asked, o.maxPerRead, writeSeq - start);
+        void (async () => {
+          emit(begin(start, count));
+          const chunks = join(Array.from({ length: count }, (_, i) => record((start + i) % 250)));
+          for (let at = 0, n = 0; at < chunks.length; at += 197, n += 1) {
+            emit(data(chunks.subarray(at, at + 197)));
+            // Notifications arrive over time, so the page's own work runs in between.
+            if (n % 200 === 199) await new Promise((r) => setTimeout(r, 0));
+          }
+          if (o.failFirst && reads === 1) {
+            // The read stops early with a "not ready" status.
+            emit(join([Uint8Array.of(0x04, 9), u64(start + count)]));
+          } else emit(done(start + count));
+          finished = true;
+          readSeq = start + count;
+          writeSeq += o.trickle;
+        })();
+      }
+    },
+  };
+  return {
+    transport,
+    get reads() {
+      return reads;
+    },
+    get finished() {
+      return finished;
+    },
+  };
+}
+
+describe("downloadSession", () => {
+  const setup = (pendant: ReturnType<typeof livePendant>, pending = false) => {
+    const store = memoryStore();
+    const events: string[] = [];
+    const uploaded: number[] = [];
+    const upload = () =>
+      flushRecords(store, async (batch) => {
+        uploaded.push(batch.firstSeq);
+        events.push(pendant.finished ? "upload-after" : "upload-during");
+      });
+    const run = (extra: { idleMs?: number } = {}) =>
+      downloadSession({
+        transport: pendant.transport,
+        store,
+        codec: 21,
+        rtcValid: true,
+        frameMs: 20,
+        upload,
+        assemble: async () => void events.push("assemble"),
+        hadPending: pending,
+        ...extra,
+      });
+    return { store, events, uploaded, run };
+  };
+
+  it("uploads while the download is still running and assembles when it ends", async () => {
+    const pendant = livePendant({ backlog: 3000, maxPerRead: 3000, trickle: 0 });
+    const { store, events, uploaded, run } = setup(pendant);
+    const result = await run();
+    expect(result.outcome).toBe("complete");
+    // 3000 records are about 1.3 MB: several uploads, not one at the end.
+    expect(uploaded.length).toBeGreaterThan(3);
+    expect(await store.all()).toEqual([]);
+    expect(events.at(-1)).toBe("assemble");
+    expect(events.filter((e) => e === "assemble")).toHaveLength(1);
+    expect(events.filter((e) => e === "upload-during").length).toBeGreaterThan(2);
+  });
+
+  it("assembles after a pause as well", async () => {
+    const listeners: ((b: Uint8Array) => void)[] = [];
+    const transport: RingTransport = {
+      readStatus: async () => ({ usedBytes: 0, unreadPackets: 5000, freeBytes: 0, rtcValid: true }),
+      subscribe: (l) => {
+        listeners.push(l);
+        return () => undefined;
+      },
+      write: async (bytes) => {
+        if (bytes[0] === 0x10) for (const l of listeners) l(info(0, 5000));
+        if (bytes[0] === 0x11 && !listeners.length) return;
+      },
+    };
+    const store = memoryStore();
+    await store.put([{ seq: 1, bytes: record(1), codec: 21, rtcValid: true }]);
+    let assembled = 0;
+    const result = await downloadSession({
+      transport,
+      store,
+      codec: 21,
+      rtcValid: true,
+      frameMs: 20,
+      idleMs: 10,
+      upload: () => flushRecords(store, async () => undefined),
+      assemble: async () => {
+        assembled += 1;
+      },
+      hadPending: false,
+    });
+    expect(result.outcome).toBe("paused");
+    expect(assembled).toBe(1);
+  });
+
+  it("assembles uploads an earlier sync left on the server even when nothing new arrives", async () => {
+    const pendant = livePendant({ backlog: 0, maxPerRead: 10, trickle: 0 });
+    let assembled = 0;
+    const store = memoryStore();
+    await downloadSession({
+      transport: pendant.transport,
+      store,
+      codec: 21,
+      rtcValid: true,
+      frameMs: 20,
+      upload: async () => 0,
+      assemble: async () => {
+        assembled += 1;
+      },
+      hadPending: true,
+    });
+    expect(assembled).toBe(1);
+  });
+
+  it("assembles about every ten minutes of audio during a long download", async () => {
+    // 20 ms frames, 3 per record: 3000 records are 3 minutes, so use many records.
+    const pendant = livePendant({ backlog: 30000, maxPerRead: 30000, trickle: 0 });
+    const { events, run } = setup(pendant);
+    await run();
+    // 30000 records x 3 frames x 20 ms = 30 min: about three mid-run runs plus the final one.
+    expect(events.filter((e) => e === "assemble").length).toBeGreaterThanOrEqual(3);
   });
 });
 
