@@ -151,7 +151,7 @@ export function SidebarPages({
     <>
       {rows.map((row) =>
         hidden.includes(row.key) || (collapsed && !isCurrent(row)) ? null : (
-          <div key={row.key} className="group relative">
+          <div key={row.key} className="group relative flex flex-col">
             <SidebarPageLink
               testId={`sidebar-page-${row.key}`}
               current={isCurrent(row)}
