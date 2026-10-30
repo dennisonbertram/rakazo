@@ -57,14 +57,12 @@ export async function runOmiTranscribe(
   });
   if (!item?.storageKey || item.text?.text) return;
 
-  // The revision bump makes a pipeline step that read the item earlier discard its write.
   const save = (error: string | null, text?: string) =>
     prisma.$transaction(async (tx) => {
       const { count } = await tx.dataRoomItem.updateMany({
         where: owned,
         data: {
           error,
-          revision: { increment: 1 },
           ...(text === undefined ? {} : { previewText: dataRoomPreviewText(text), failures: 0 }),
         },
       });

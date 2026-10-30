@@ -126,6 +126,7 @@ export async function runOmiAssemble(
           externalId,
           sourceUpdatedAt: start,
           notIndexed: true,
+          ready: true,
         });
         if (created && item) {
           await deps.jobs.enqueue(
