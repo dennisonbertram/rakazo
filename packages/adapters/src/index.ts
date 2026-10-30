@@ -1,3 +1,4 @@
+export { BrexApiEmulator } from "@rakazo/brex-mcp";
 export * from "./account-export.js";
 export * from "./agent-connections.js";
 export * from "./agent-environment.js";
@@ -35,6 +36,7 @@ export * from "./box-api-emulator.js";
 export * from "./box-emulator.js";
 export * from "./box-files.js";
 export * from "./box-sandbox.js";
+export * from "./brex-cards-binding.js";
 export * from "./brex-finance-source.js";
 export * from "./browser-emulator.js";
 export * from "./browser-provider-factory.js";

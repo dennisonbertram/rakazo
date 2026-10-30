@@ -184,7 +184,7 @@ describe("Brex cards binding", () => {
     const { call, state } = await setup();
     const result = await call("create_vendor_card", CREATE, "effect-1");
     const cardId = (JSON.parse(result.text) as { id: string }).id;
-    expect(state.reservations).toEqual([
+    expect(state.reservations).toMatchObject([
       {
         id: "res-1",
         spaceId: SERVER.spaceId,

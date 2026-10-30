@@ -3032,7 +3032,14 @@ describe("MCP connector Brex cards (in-process server)", () => {
         annotations: { readOnlyHint: true },
       })),
     };
-    vi.stubGlobal("fetch", mcpFetch(extraState));
+    // The lazy-catalog case needs a second, large server over HTTP; Brex itself goes to its emulator.
+    const realFetch = globalThis.fetch;
+    const extraFetch = mcpFetch(extraState);
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) =>
+      logicalHref(input, init).startsWith(baseUrl)
+        ? realFetch(input, init)
+        : extraFetch(input, init),
+    );
     const extra = {
       ...ASSIGNMENT,
       botId: bot.id,

@@ -360,7 +360,16 @@ export class McpSession {
   async connectStdio(options: McpStdioOptions): Promise<void> {
     if (this.connected || this.connecting)
       throw new Error("MCP session is already connected or connecting");
-    const transport = new StdioClientTransport(stdioParams(options));
+    await this.connectTransport(new StdioClientTransport(stdioParams(options)), options);
+  }
+
+  /** Connects over a transport the caller built, such as one side of an in-process linked pair. */
+  async connectTransport(
+    transport: Transport,
+    options: { signal?: AbortSignal; timeoutMs?: number } = {},
+  ): Promise<void> {
+    if (this.connected || this.connecting)
+      throw new Error("MCP session is already connected or connecting");
     this.transport = transport;
     const signal = combineSignals(options.signal, AbortSignal.timeout(options.timeoutMs ?? 15_000));
     this.connecting = this.client
@@ -382,12 +391,14 @@ export class McpSession {
   async callTool(
     name: string,
     args: Record<string, unknown> = {},
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal; meta?: Record<string, unknown> },
   ): Promise<CallToolResult> {
     this.assertConnected();
-    return (await this.client.callTool({ name, arguments: args }, undefined, {
-      signal: options?.signal,
-    })) as CallToolResult;
+    return (await this.client.callTool(
+      { name, arguments: args, ...(options?.meta ? { _meta: options.meta } : {}) },
+      undefined,
+      { signal: options?.signal },
+    )) as CallToolResult;
   }
 
   async close(): Promise<void> {

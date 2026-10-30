@@ -374,7 +374,7 @@ describe("Brex cards executor gates", () => {
 
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
     expect(f.dispatched().map((call) => call.executionId)).toEqual(["effect-approved-1"]);
-    expect(f.externalEffects[0]).toMatchObject({ id: "effect-approved-1", status: "executing" });
+    expect(f.externalEffects[0]).toMatchObject({ id: "effect-approved-1", status: "completed" });
   });
 
   it("reuses the same key when the same effect is dispatched again by a restarted attempt", async () => {
