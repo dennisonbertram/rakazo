@@ -131,9 +131,9 @@ function renderComposer(
     disconnect() {}
   };
   // Reduced motion skips the chip-row resize animation, which jsdom cannot run.
-  window.matchMedia ??= () =>
+  window.matchMedia ??= (query: string) =>
     ({
-      matches: true,
+      matches: !query.includes("pointer"),
       addEventListener() {},
       removeEventListener() {},
     }) as unknown as MediaQueryList;
@@ -749,9 +749,9 @@ describe("Transcript jump to a search result", () => {
 
   it("does not snap to the end when older messages mount for the jump", () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    window.matchMedia ??= () =>
+    window.matchMedia ??= (query: string) =>
       ({
-        matches: true,
+        matches: !query.includes("pointer"),
         addEventListener() {},
         removeEventListener() {},
       }) as unknown as MediaQueryList;
@@ -804,9 +804,9 @@ describe("Transcript jump to a search result", () => {
   });
   it("keeps the newest message in view when the layout grows while following", () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    window.matchMedia ??= () =>
+    window.matchMedia ??= (query: string) =>
       ({
-        matches: true,
+        matches: !query.includes("pointer"),
         addEventListener() {},
         removeEventListener() {},
       }) as unknown as MediaQueryList;
@@ -954,9 +954,9 @@ describe("Transcript unread divider and new-message pill", () => {
 
   function mount() {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    window.matchMedia ??= () =>
+    window.matchMedia ??= (query: string) =>
       ({
-        matches: true,
+        matches: !query.includes("pointer"),
         addEventListener() {},
         removeEventListener() {},
       }) as unknown as MediaQueryList;

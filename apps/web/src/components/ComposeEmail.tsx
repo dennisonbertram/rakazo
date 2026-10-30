@@ -41,6 +41,7 @@ import {
 } from "../lib/recipients";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
+import { useMediaQuery, useVisualViewport } from "../lib/visual-viewport";
 import { focusRestored } from "./compose/caret";
 import { forgetClosed, recallClosed, rememberClosed } from "./compose/draft-memory";
 import { invalidAddressText, RecipientField } from "./compose/RecipientField";
@@ -228,6 +229,8 @@ export function ComposeEmail({
   // The recipient rows are open while focus is inside them; otherwise many recipients fold up.
   const [expanded, setExpanded] = useState(false);
   const [panelOpen, setPanelOpen] = useContextPanelOpen();
+  // iOS Safari keeps the layout viewport full height under the keyboard: follow the visible area.
+  const viewport = useVisualViewport(useMediaQuery("(max-width: 767px)"));
   const people = useMemo(() => recipientPeople(fields.to), [fields.to]);
   const recipientsRef = useRef<HTMLDivElement>(null);
   const [showFormat, setShowFormat] = useState(false);
@@ -592,6 +595,13 @@ export function ComposeEmail({
       <DialogContent
         initialFocus={seed.kind === "new" ? toRef : undefined}
         showCloseButton={false}
+        style={viewport ? { top: viewport.top, height: viewport.height } : undefined}
+        onBlur={() => {
+          // Safari pans the page to a focused field and leaves it panned once the keyboard closes.
+          window.setTimeout(() => {
+            if (document.activeElement === document.body) window.scrollTo(0, 0);
+          }, 100);
+        }}
         onKeyDown={(event) => {
           if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
             event.preventDefault();
@@ -613,7 +623,7 @@ export function ComposeEmail({
           if (!locked) addFiles([...event.dataTransfer.files]);
         }}
         className={cn(
-          "flex h-[min(680px,88vh)] w-[min(680px,94vw)] max-w-none flex-row gap-0 overflow-hidden p-0 sm:max-w-none max-md:inset-0 max-md:top-0 max-md:left-0 max-md:h-dvh max-md:max-h-none max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]",
+          "flex h-[min(680px,88vh)] w-[min(680px,94vw)] max-w-none flex-row gap-0 overflow-hidden p-0 sm:max-w-none max-md:inset-0 max-md:top-0 max-md:left-0 max-md:h-dvh max-md:max-h-none max-md:w-full max-md:overflow-x-hidden max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]",
           panelOpen && "md:w-[min(1040px,94vw)]",
         )}
       >
@@ -646,7 +656,7 @@ export function ComposeEmail({
               <Row label={t`From`}>
                 <NativeSelect
                   size="sm"
-                  className="min-w-0 flex-1"
+                  className="min-w-0 flex-1 overflow-hidden"
                   value={fields.connectionId}
                   disabled={locked}
                   aria-label={t`From`}
