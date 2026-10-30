@@ -158,11 +158,39 @@ export type PageLiveBlock = z.infer<typeof PageLiveBlockSchema>;
  * Live data for one page revision. `blocks` follows document order of live segments: every
  * metric and table fence and every chart that has a `source`. Static charts are not included.
  */
-export const PageDataSchema = z.object({
+export const PageBlocksDataSchema = z.object({
   pageId: Id,
   revision: z.number().int().positive(),
   blocks: z.array(PageLiveBlockSchema),
 });
+export type PageBlocksData = z.infer<typeof PageBlocksDataSchema>;
+
+/** Largest `pages.data` payload for an HTML page; the oldest history goes first. */
+export const PAGE_HTML_DATA_MAX_BYTES = 1_000_000;
+export const PAGE_HTML_HISTORY_MAX = 500;
+
+/** One source as an HTML page receives it. `value` is the newest snapshot (already redacted when stored). */
+export const PageHtmlSourceDataSchema = z.object({
+  status: PageLiveStatus,
+  fetchedAt: z.string().nullable(),
+  error: z.string().optional(),
+  value: z.unknown().optional(),
+  /** Newest first; only for sources the page lists in praci-history. */
+  history: z.array(z.object({ at: z.string(), value: z.unknown() })).optional(),
+});
+export type PageHtmlSourceData = z.infer<typeof PageHtmlSourceDataSchema>;
+
+/** An HTML page gets only the sources it declares in `<meta name="praci-sources">`, keyed by the declared name. */
+export const PageHtmlDataSchema = z.object({
+  kind: z.literal("html"),
+  pageId: Id,
+  revision: z.number().int().positive(),
+  sources: z.record(z.string(), PageHtmlSourceDataSchema),
+});
+export type PageHtmlData = z.infer<typeof PageHtmlDataSchema>;
+
+/** Blocks pages keep their original shape (no `kind`); HTML pages carry `kind: "html"`. */
+export const PageDataSchema = z.union([PageHtmlDataSchema, PageBlocksDataSchema]);
 export type PageData = z.infer<typeof PageDataSchema>;
 
 export const PageDataInputSchema = z.object({ botId: Id, pageId: Id.optional() });

@@ -6,7 +6,7 @@ import {
   pageSourceToolFromTool,
   refreshPageSource,
   refreshPageSources,
-  resolvePageData,
+  resolveBlocksPageData,
   runPraciSourceTool,
 } from "./page-sources.js";
 import { createBotPage, saveBotPage } from "./pages.js";
@@ -301,7 +301,7 @@ describePostgres("page sources (PostgreSQL)", () => {
           fence("metric", { label: "Off", source: "fresh", path: "/nothing" }),
         ].join("\n"),
       );
-      const data = await resolvePageData({ prisma }, { spaceId }, await page());
+      const data = await resolveBlocksPageData({ prisma }, { spaceId }, await page());
       expect(data.pageId).toBe(pageId);
       expect(data.blocks).toEqual([
         { status: "ok", fetchedAt: t0.toISOString(), text: "$1,235" },
@@ -341,7 +341,7 @@ describePostgres("page sources (PostgreSQL)", () => {
           fence("table", { name: "Bad", source: "fresh", path: "/n" }),
         ].join("\n"),
       );
-      const data = await resolvePageData({ prisma }, { spaceId }, await page());
+      const data = await resolveBlocksPageData({ prisma }, { spaceId }, await page());
       expect(data.blocks.map((block) => block.status)).toEqual(["ok", "ok", "empty"]);
       expect(data.blocks[0]?.rows).toEqual([{ b: 2 }, { b: 4 }]);
       expect(data.blocks[1]?.rows).toEqual([
@@ -385,7 +385,7 @@ describePostgres("page sources (PostgreSQL)", () => {
         ].join("\n"),
       );
       const current = await page();
-      const data = await resolvePageData({ prisma }, { spaceId }, current);
+      const data = await resolveBlocksPageData({ prisma }, { spaceId }, current);
       expect(data.blocks).toHaveLength(2);
       expect(data.blocks[0]?.rows).toEqual([{ k: "2026-10-04", v: 3 }]);
       expect(data.blocks[1]?.rows).toEqual([
