@@ -48,6 +48,13 @@ export const Synced: Story = {
     </OmiView>
   ),
 };
+export const DownloadingShortAudio: Story = {
+  args: { status: connected, sync: { kind: "downloading", done: 0, total: 0 } },
+};
+export const PausedShortAudio: Story = {
+  args: { status: connected, sync: { kind: "paused", done: 0, total: 0 } },
+};
+export const UploadFailed: Story = { args: { status: connected, sync: { kind: "upload_failed" } } };
 export const Reconnect: Story = { args: { status: connected, sync: { kind: "reconnect" } } };
 export const Paused: Story = {
   args: { status: connected, sync: { kind: "paused", done: 14, total: 38 } },

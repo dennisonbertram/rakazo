@@ -6,7 +6,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 - Web and shared component files with stories: 315 of 315
 - Web and shared components: 814
 - Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 120 in 65 files, native story pending
+- SwiftUI views: 125 in 67 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -593,7 +593,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | UsageScreen | [apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift) | native story pending | iOS |
 | ApprovalRulesScreen, AddRuleSheet | [apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift](../../apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift) | native story pending | iOS |
 | SettingsScreen | [apps/ios/Sources/Praci/Settings/SettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/SettingsScreen.swift) | native story pending | iOS |
-| VoiceSettingsScreen | [apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift) | native story pending | iOS |
+| VoiceSettingsScreen, HostedVoiceScreen | [apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift) | native story pending | iOS |
 | BotAvatarView | [apps/ios/Sources/Praci/Shared/BotAvatarView.swift](../../apps/ios/Sources/Praci/Shared/BotAvatarView.swift) | native story pending | iOS |
 | ConsentSheet | [apps/ios/Sources/Praci/Shared/ConsentSheet.swift](../../apps/ios/Sources/Praci/Shared/ConsentSheet.swift) | native story pending | iOS |
 | LoadableView | [apps/ios/Sources/Praci/Shared/Loadable.swift](../../apps/ios/Sources/Praci/Shared/Loadable.swift) | native story pending | iOS |
@@ -613,3 +613,5 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView, UnsupportedBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
 | ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |
 | ThreadScreen, UnreadDivider | [apps/ios/Sources/Praci/Thread/ThreadScreen.swift](../../apps/ios/Sources/Praci/Thread/ThreadScreen.swift) | native story pending | iOS |
+| CallButton, CallView | [apps/ios/Sources/Praci/Voice/CallView.swift](../../apps/ios/Sources/Praci/Voice/CallView.swift) | native story pending | iOS |
+| DictationButton, DictationNotice | [apps/ios/Sources/Praci/Voice/DictationControl.swift](../../apps/ios/Sources/Praci/Voice/DictationControl.swift) | native story pending | iOS |

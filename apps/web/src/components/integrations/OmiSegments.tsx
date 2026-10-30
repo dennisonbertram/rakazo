@@ -101,7 +101,9 @@ export function OmiSegments() {
   const { t } = useLingui();
   const { rows: all, error, move } = useSegments();
   const trashed = (all ?? []).filter((row) => row.kind === "trash").length;
-  const rows = (all ?? []).filter((row) => row.startedAt.slice(0, 10) === today());
+  const rows = (all ?? []).filter(
+    (row) => row.kind !== "trash" && row.startedAt.slice(0, 10) === today(),
+  );
   if (rows.length === 0 && trashed === 0 && !error) return null;
   return (
     <section aria-label={t`Today`} className="mt-6">

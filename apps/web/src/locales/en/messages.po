@@ -4345,6 +4345,10 @@ msgstr "Could not update the default memory scope"
 msgid "Could not update the request"
 msgstr "Could not update the request"
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Could not upload · saved on this computer"
+msgstr "Could not upload · saved on this computer"
+
 #: src/components/computer/FilesApp.tsx
 msgid "Could not upload file"
 msgstr "Could not upload file"
@@ -8721,6 +8725,10 @@ msgstr "Off in Settings"
 msgid "OK"
 msgstr "OK"
 
+#: src/components/data-room/FilterBar.tsx
+msgid "Omi"
+msgstr "Omi"
+
 #: src/components/integrations/OmiPage.tsx
 msgid "Omi agent"
 msgstr "Omi agent"
@@ -9211,14 +9219,11 @@ msgstr "Path"
 msgid "Pause"
 msgstr "Pause"
 
+#: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Paused"
-
-#: src/components/integrations/OmiPage.tsx
-msgid "Paused · {done} min saved"
-msgstr "Paused · {done} min saved"
 
 #: src/components/integrations/OmiPage.tsx
 msgid "Paused · {done} of {total} min saved"

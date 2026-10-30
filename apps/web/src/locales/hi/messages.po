@@ -4345,6 +4345,10 @@ msgstr "डिफ़ॉल्ट मेमोरी स्कोप अपडे
 msgid "Could not update the request"
 msgstr ""
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Could not upload · saved on this computer"
+msgstr ""
+
 #: src/components/computer/FilesApp.tsx
 msgid "Could not upload file"
 msgstr ""
@@ -8721,6 +8725,10 @@ msgstr ""
 msgid "OK"
 msgstr ""
 
+#: src/components/data-room/FilterBar.tsx
+msgid "Omi"
+msgstr ""
+
 #: src/components/integrations/OmiPage.tsx
 msgid "Omi agent"
 msgstr ""
@@ -9211,13 +9219,10 @@ msgstr ""
 msgid "Pause"
 msgstr ""
 
+#: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
-msgstr ""
-
-#: src/components/integrations/OmiPage.tsx
-msgid "Paused · {done} min saved"
 msgstr ""
 
 #: src/components/integrations/OmiPage.tsx

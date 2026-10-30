@@ -30,6 +30,8 @@ function StatusLine({ state }: { state: OmiSyncState }) {
   if (state.kind === "unsupported") return <Trans>Use Chrome, Edge or the desktop app</Trans>;
   if (state.kind === "old_firmware") return <Trans>Update the pendant in the Omi app</Trans>;
   if (state.kind === "failed") return <Trans>Could not reach the pendant</Trans>;
+  if (state.kind === "upload_failed")
+    return <Trans>Could not upload · saved on this computer</Trans>;
   if (state.kind === "connecting") {
     return (
       <Shimmer>
@@ -41,7 +43,7 @@ function StatusLine({ state }: { state: OmiSyncState }) {
     const { done, total } = state;
     return (
       <Shimmer>
-        {done === null ? (
+        {done === null || (total ?? done) < 1 ? (
           <Trans>Downloading</Trans>
         ) : (
           <Trans>
@@ -53,8 +55,8 @@ function StatusLine({ state }: { state: OmiSyncState }) {
   }
   if (state.kind === "paused") {
     const { done, total } = state;
-    return total === null ? (
-      <Trans>Paused · {done} min saved</Trans>
+    return total === null || total < 1 ? (
+      <Trans>Paused</Trans>
     ) : (
       <Trans>
         Paused · {done} of {total} min saved
@@ -98,6 +100,7 @@ export function OmiView({
     reconnect: t`Reconnect`,
     paused: t`Sync now`,
     failed: t`Sync now`,
+    upload_failed: t`Sync now`,
     synced: t`Sync now`,
   }[sync.kind as "idle"];
   const primary = sync.kind === "idle" || sync.kind === "reconnect";
@@ -295,6 +298,15 @@ export function OmiPage({
   }, [reload]);
   const { state, sync } = useOmiSync(status, reload);
 
+  async function deleteAll() {
+    setError(null);
+    try {
+      await rpc.omi.deleteRecordings();
+      await reload();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
   async function disconnect(deleteRecordings: boolean) {
     setError(null);
     try {
@@ -312,7 +324,7 @@ export function OmiPage({
       error={error}
       onSync={sync}
       onDisconnect={() => void disconnect(false)}
-      onDeleteAll={() => void disconnect(true)}
+      onDeleteAll={() => void deleteAll()}
       onOpenVoiceSettings={onOpenVoiceSettings}
     >
       {status ? (

@@ -311,4 +311,17 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
       0,
     );
   });
+
+  it("deleteRecordings empties the connection but keeps it connected", async () => {
+    const b = client(actors.b as Actor);
+    const id = connections.b as string;
+    expect(await prisma.dataRoomItem.count({ where: { sourceConnectionId: id } })).toBeGreaterThan(
+      0,
+    );
+    await b.omi.deleteRecordings();
+    expect(await b.omi.status()).toMatchObject({ connectionId: id, recordings: 0 });
+    expect(await prisma.dataRoomItem.count({ where: { sourceConnectionId: id } })).toBe(0);
+    expect(await prisma.omiSegment.count({ where: { connectionId: id } })).toBe(0);
+    expect(await prisma.omiUpload.count({ where: { connectionId: id } })).toBe(0);
+  });
 });

@@ -24,6 +24,7 @@ export type OmiSyncState =
   | { kind: "paused"; done: number; total: number | null }
   | { kind: "synced"; at: number }
   | { kind: "old_firmware" }
+  | { kind: "upload_failed" }
   | { kind: "failed" };
 
 function recordStore(ref: { current: RecordStore | null }): RecordStore {
@@ -32,6 +33,9 @@ function recordStore(ref: { current: RecordStore | null }): RecordStore {
 }
 
 const AUTO_SYNC_MS = 15 * 60 * 1000;
+
+/** A failed upload; the records are still in the buffer. */
+class UploadError extends Error {}
 
 async function post(
   path: string,
@@ -45,8 +49,8 @@ async function post(
     credentials: "include",
     headers: withSpaceHeaders({ "content-type": "application/octet-stream" }),
     ...(body ? { body: body as BodyInit } : {}),
-  });
-  if (!response.ok) throw new Error(`Upload failed (${response.status})`);
+  }).catch(() => null);
+  if (!response?.ok) throw new UploadError(`Upload failed (${response?.status})`);
 }
 
 /** Pulls the pendant's recordings into the browser's buffer and on to the server. */
@@ -145,7 +149,9 @@ export function useOmiSync(status: OmiStatus | undefined, reload: () => Promise<
         void reload();
       } catch (error) {
         // Closing the chooser is not a failure.
-        if (error instanceof DOMException && error.name === "NotFoundError") {
+        if (error instanceof UploadError) {
+          setState({ kind: "upload_failed" });
+        } else if (error instanceof DOMException && error.name === "NotFoundError") {
           setState(connectionId ? { kind: "reconnect" } : { kind: "idle" });
         } else {
           setState(

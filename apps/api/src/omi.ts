@@ -88,26 +88,20 @@ export async function omiStatus(deps: OmiDeps, actor: Actor): Promise<OmiStatus>
   };
 }
 
-export async function disconnectOmi(
+/** Deletes the connection's recordings, uploads, segments, meetings with to-dos, and notes. The connection stays. */
+async function deleteOmiRecordings(
   deps: OmiDeps,
   actor: Actor,
-  input: { deleteRecordings: boolean },
-): Promise<{ ok: true }> {
+  connectionId: string,
+): Promise<void> {
   const { prisma, jobs } = deps;
-  const connection = await findConnection(prisma, actor);
-  if (!connection) return { ok: true };
-  await prisma.connection.update({
-    where: { id: connection.id },
-    data: { status: "disconnected" },
-  });
-  if (!input.deleteRecordings) return { ok: true };
   // Blob cleanup is queued first: if a row delete fails, the job finds the row and keeps the blob.
   const repo = createDataRoomRepos(prisma);
-  for (const key of await deleteOmiOutputs(prisma, actor, { connectionId: connection.id })) {
+  for (const key of await deleteOmiOutputs(prisma, actor, { connectionId })) {
     await jobs.enqueue(dataRoomBlobDeleteJob(actor.spaceId, key));
   }
   const items = await prisma.dataRoomItem.findMany({
-    where: { ...owner(actor), source: "omi", sourceConnectionId: connection.id },
+    where: { ...owner(actor), source: "omi", sourceConnectionId: connectionId },
     select: { id: true, storageKey: true, thumbnailKey: true },
   });
   for (const item of items) {
@@ -117,12 +111,32 @@ export async function disconnectOmi(
     await repo.deleteItem(actor, item.id);
   }
   const uploads = await prisma.omiUpload.findMany({
-    where: { connectionId: connection.id, assembledAt: null },
+    where: { connectionId, assembledAt: null },
     select: { storageKey: true },
   });
-  await prisma.omiUpload.deleteMany({ where: { connectionId: connection.id, ...owner(actor) } });
+  await prisma.omiUpload.deleteMany({ where: { connectionId, ...owner(actor) } });
   for (const upload of uploads)
     await jobs.enqueue(dataRoomBlobDeleteJob(actor.spaceId, upload.storageKey));
+}
+
+export async function deleteOmiRecordingsFor(deps: OmiDeps, actor: Actor): Promise<{ ok: true }> {
+  const connection = await findConnection(deps.prisma, actor);
+  if (connection) await deleteOmiRecordings(deps, actor, connection.id);
+  return { ok: true };
+}
+
+export async function disconnectOmi(
+  deps: OmiDeps,
+  actor: Actor,
+  input: { deleteRecordings: boolean },
+): Promise<{ ok: true }> {
+  const connection = await findConnection(deps.prisma, actor);
+  if (!connection) return { ok: true };
+  await deps.prisma.connection.update({
+    where: { id: connection.id },
+    data: { status: "disconnected" },
+  });
+  if (input.deleteRecordings) await deleteOmiRecordings(deps, actor, connection.id);
   return { ok: true };
 }
 

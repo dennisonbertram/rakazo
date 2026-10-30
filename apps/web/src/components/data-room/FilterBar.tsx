@@ -40,6 +40,7 @@ export const sourceLabels = () => ({
   drive: t`Google Drive`,
   box: t`Box`,
   gmail: t`Gmail`,
+  omi: t`Omi`,
   chat: t`Chat`,
   finance: t`Finance`,
 });
