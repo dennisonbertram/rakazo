@@ -177,6 +177,8 @@ export * from "./object-home.js";
 export * from "./omi-assemble.js";
 export * from "./omi-records.js";
 export * from "./omi-segments.js";
+export * from "./omi-sort.js";
+export * from "./omi-sort-split.js";
 export * from "./omi-transcribe.js";
 export * from "./openai-compatible-embedder.js";
 export * from "./openai-compatible-url.js";

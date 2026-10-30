@@ -64,6 +64,7 @@ import {
   createDataRoomImport,
   createDataRoomRepos,
   DataRoomConflictError,
+  deleteOmiOutputs,
   IsolationError,
   listDataRoomImports,
   recordImportSkips,
@@ -399,9 +400,12 @@ export function createDataRoomService(deps: DataRoomDeps) {
       }),
     deleteItem: (actor: Actor, id: string) =>
       dataRoomCall(async () => {
-        const { storageKey, thumbnailKey } = await repo.getItem(actor, id);
+        const { storageKey, thumbnailKey, source } = await repo.getItem(actor, id);
+        // A deleted recording takes its meetings and notes with it.
+        const noteKeys =
+          source === "omi" ? await deleteOmiOutputs(deps.prisma, actor, { audioItemId: id }) : [];
         // Queue the cleanup first: if the row delete fails, the job finds the row and keeps the blob.
-        for (const key of [storageKey, thumbnailKey]) {
+        for (const key of [storageKey, thumbnailKey, ...noteKeys]) {
           if (!key) continue;
           const at = new Date(Date.now() + (deps.blobDeleteDelayMs ?? 60_000));
           await deps.jobs.enqueue(dataRoomBlobDeleteJob(actor.spaceId, key, at));

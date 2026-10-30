@@ -348,12 +348,24 @@ import {
   NotificationSchema,
   NotificationSignalSchema,
 } from "./notification.js";
-import { OmiConnectInputSchema, OmiDisconnectInputSchema, OmiStatusSchema } from "./omi.js";
 import {
+  OmiConnectInputSchema,
+  OmiDisconnectInputSchema,
+  OmiSegmentMoveInputSchema,
+  OmiSegmentSchema,
+  OmiSegmentsListInputSchema,
+  OmiStatusSchema,
+} from "./omi.js";
+import {
+  BotPageCreateInputSchema,
   BotPageGetInputSchema,
+  BotPageListInputSchema,
+  BotPageRemoveInputSchema,
+  BotPageRenameInputSchema,
   BotPageSaveInputSchema,
   BotPageSaveOutputSchema,
   BotPageSchema,
+  BotPageSummarySchema,
 } from "./pages.js";
 import {
   BotPinsGetInputSchema,
@@ -887,6 +899,10 @@ export const appContract = {
   pages: {
     get: oc.input(BotPageGetInputSchema).output(BotPageSchema.nullable()),
     save: oc.input(BotPageSaveInputSchema).output(BotPageSaveOutputSchema),
+    list: oc.input(BotPageListInputSchema).output(z.array(BotPageSummarySchema)),
+    create: oc.input(BotPageCreateInputSchema).output(BotPageSchema),
+    rename: oc.input(BotPageRenameInputSchema).output(BotPageSummarySchema),
+    remove: oc.input(BotPageRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
   },
   pins: {
     get: oc.input(BotPinsGetInputSchema).output(BotPinsSchema.nullable()),
@@ -1769,6 +1785,12 @@ export const appContract = {
     status: oc.output(OmiStatusSchema),
     /** Revokes the connection; recordings stay unless `deleteRecordings` is true. */
     disconnect: oc.input(OmiDisconnectInputSchema).output(z.object({ ok: z.literal(true) })),
+    segments: {
+      /** The caller's sorted stretches, newest first. */
+      list: oc.input(OmiSegmentsListInputSchema).output(z.array(OmiSegmentSchema)),
+      /** Moves one stretch to Meeting, Note or Trash; a re-sort keeps the choice. */
+      move: oc.input(OmiSegmentMoveInputSchema).output(OmiSegmentSchema),
+    },
   },
   devin: {
     /** Any member reads the space's cached sessions; a read older than a minute refreshes them first. */

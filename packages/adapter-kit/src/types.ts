@@ -828,6 +828,8 @@ export interface BackgroundJobPayloads {
   "omi.assemble": { spaceId: string; userId: string; connectionId: string };
   /** Transcribes one Omi recording in the Data room. Ids only. */
   "omi.transcribe": { spaceId: string; userId: string; itemId: string };
+  /** Sorts one transcribed Omi recording into meetings, notes and trash. Ids only. */
+  "omi.sort": { spaceId: string; userId: string; itemId: string };
   /** Removes a deleted Data room item's blob. Idempotent: a missing blob is success. */
   "dataroom.blob.delete": { spaceId: string; storageKey: string };
   /** Pipeline steps for one Data room item, in order; each queues the next. */
