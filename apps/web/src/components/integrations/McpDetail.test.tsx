@@ -528,6 +528,33 @@ it("Brex cards: row buttons enable once changes are on", async () => {
   expect(lock?.disabled).toBe(false);
 });
 
+it("Brex cards: row buttons follow the Allow changes switch without a reload, on and off", async () => {
+  // The cards read happens once, while changes are off, and is never repeated.
+  brex.cards.mockResolvedValue({ ...brexList, writesEnabled: false });
+  brex.getControls.mockResolvedValue(brexControls);
+  const lock = () =>
+    [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+      (b) => b.textContent === "Lock",
+    );
+  await showBrex(false);
+  expect(lock()?.disabled).toBe(true);
+  await showBrex(true);
+  expect(lock()?.disabled).toBe(false);
+  await showBrex(false);
+  expect(lock()?.disabled).toBe(true);
+  expect(brex.cards).toHaveBeenCalledTimes(1);
+});
+
+it("Brex cards: a stale cards answer that says changes are on does not enable buttons while the switch is off", async () => {
+  brex.cards.mockResolvedValue({ ...brexList, writesEnabled: true });
+  brex.getControls.mockResolvedValue(brexControls);
+  await showBrex(false);
+  const lock = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+    (b) => b.textContent === "Lock",
+  );
+  expect(lock?.disabled).toBe(true);
+});
+
 it("Brex cards: a member (or former owner) is refused and sees none of the owner's sections", async () => {
   brex.cards.mockRejectedValue(
     Object.assign(new Error("Only the space owner can do this."), { code: "FORBIDDEN" }),

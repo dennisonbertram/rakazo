@@ -61,14 +61,23 @@ const onRetry = vi.fn();
 function Where() {
   return <output data-testid="where">{useLocation().pathname}</output>;
 }
-async function mount(props: { cards: BrexCardsList | null; error?: string | null }) {
+async function mount(props: {
+  cards: BrexCardsList | null;
+  error?: string | null;
+  writesEnabled?: boolean;
+}) {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   await act(async () =>
     root.render(
       <MemoryRouter initialEntries={["/app/integrations/mcp/s1"]}>
-        <BrexCardsSection cards={props.cards} error={props.error ?? null} onRetry={onRetry} />
+        <BrexCardsSection
+          cards={props.cards}
+          error={props.error ?? null}
+          writesEnabled={props.writesEnabled}
+          onRetry={onRetry}
+        />
         <Where />
       </MemoryRouter>,
     ),
@@ -213,6 +222,37 @@ it.each([
   }
   expect(send).not.toHaveBeenCalled();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it("a locked card cannot be locked again but can still have its limit edited or be cancelled", async () => {
+  await mount({ cards: list([{ ...figma, status: "LOCKED" }]) });
+  expect(buttonIn(rowOf("Figma"), "Lock").disabled).toBe(true);
+  expect(buttonIn(rowOf("Figma"), "Edit limit").disabled).toBe(false);
+  expect(buttonIn(rowOf("Figma"), "Cancel").disabled).toBe(false);
+  await click(buttonIn(rowOf("Figma"), "Lock"));
+  expect(send).not.toHaveBeenCalled();
+});
+
+it("a terminated card has all three buttons disabled and sends nothing", async () => {
+  await mount({ cards: list([{ ...figma, status: "TERMINATED" }, hostile]) });
+  for (const label of ["Lock", "Edit limit", "Cancel"]) {
+    const button = buttonIn(rowOf("Figma"), label);
+    expect(button.disabled).toBe(true);
+    await click(button);
+  }
+  expect(send).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  // The other card is untouched by it.
+  expect(buttonIn(rowOf(HOSTILE), "Lock").disabled).toBe(false);
+});
+
+it("an explicit writesEnabled prop overrides the one in the cards answer", async () => {
+  await mount({ cards: list([figma], { writesEnabled: false }), writesEnabled: true });
+  expect(buttonIn(rowOf("Figma"), "Lock").disabled).toBe(false);
+  act(() => root.unmount());
+  container.remove();
+  await mount({ cards: list([figma], { writesEnabled: true }), writesEnabled: false });
+  expect(buttonIn(rowOf("Figma"), "Lock").disabled).toBe(true);
 });
 
 it("has no Unlock button, on any card", async () => {
