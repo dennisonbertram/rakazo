@@ -3102,7 +3102,14 @@ describe("MCP connector Brex cards (in-process server)", () => {
       server: { ...SERVER, id: "extra-server", slug: "extra" },
     };
     const secretLookups: Array<{ spaceId: string }> = [];
+    /** Space roles by user id; anyone not listed owns the space, as the server rows' users do. */
+    const roles = new Map<string, string>();
     const prisma = {
+      spaceMember: {
+        findUnique: vi.fn(async ({ where }: { where: { spaceId_userId: { userId: string } } }) => ({
+          role: roles.get(where.spaceId_userId.userId) ?? "owner",
+        })),
+      },
       botMcpServer: {
         findMany: vi.fn(async ({ where }: { where: { spaceId: string } }) => [
           assignments.get(where.spaceId),
@@ -3190,6 +3197,7 @@ describe("MCP connector Brex cards (in-process server)", () => {
       emulator.requests.filter((r) => r.method === "POST" && r.path === "/v2/cards");
     return {
       assignments,
+      roles,
       connector,
       contextFor,
       emulator,
@@ -3242,6 +3250,27 @@ describe("MCP connector Brex cards (in-process server)", () => {
       { type: "error" },
     ]);
     expect(s.posts()).toHaveLength(1);
+  });
+
+  it("refuses the session once the server row's user is no longer an owner of the space, even on a warm session", async () => {
+    const s = await setup({ writesEnabled: true });
+    expect(await s.callTool("list_cards", {}, "read-1")).toMatchObject([{ type: "result" }]);
+    const reached = s.emulator.requests.length;
+
+    // The user who connected Brex cards is demoted; the bot they own keeps its assignment.
+    s.roles.set("u-w1", "member");
+    expect(await s.callTool("list_cards", {}, "read-2")).toMatchObject([
+      { type: "error", message: expect.stringContaining("no longer an owner") },
+    ]);
+    expect(await s.callTool("create_vendor_card", CREATE, "effect-1")).toMatchObject([
+      { type: "error" },
+    ]);
+    expect(s.emulator.requests).toHaveLength(reached);
+
+    // A fresh connector refuses too, and another space's owner is unaffected.
+    expect(await s.callTool("list_cards", {}, "read-3", "w2")).toMatchObject([{ type: "result" }]);
+    s.roles.set("u-w2", "owner,admin");
+    expect(await s.callTool("list_cards", {}, "read-4", "w2")).toMatchObject([{ type: "result" }]);
   });
 
   it("gives a bot that is not the server's agent nothing, and its calls never reach Brex", async () => {

@@ -100,6 +100,10 @@ function fakeDb(seed: { bot?: Row; server?: Row; connection?: Row } = {}) {
   };
   const secret = {
     findFirst: vi.fn(async () => null),
+    count: vi.fn(
+      async ({ where }: { where: { ciphertext: string } }) =>
+        state.secrets.filter((row) => row.ciphertext === where.ciphertext).length,
+    ),
     create: vi.fn(async ({ data }: { data: Row }) => {
       state.secrets.push(data);
       return data;
@@ -132,6 +136,8 @@ function fakeDb(seed: { bot?: Row; server?: Row; connection?: Row } = {}) {
     brexCardsConnection,
     mcpServer,
     secret,
+    botSecret: { count: vi.fn(async () => 0) },
+    integrationProviderConfig: { count: vi.fn(async () => 0) },
     bot,
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     $queryRaw: vi.fn(async () => []),
@@ -168,6 +174,7 @@ function deps(
   overrides: Partial<BrexCardsDeps> = {},
 ) {
   const secrets = {
+    delete: vi.fn(async () => undefined),
     put: vi.fn(async (plaintext: string) => ({
       id: `sec-${db.state.secrets.length + 1}`,
       ciphertext: plaintext,
@@ -200,12 +207,12 @@ function deps(
   };
 }
 
-const connectedDb = (botExtra: Row = {}) =>
+const connectedDb = (botExtra: Row = {}, rowOwner = "owner") =>
   fakeDb({
     server: {
       id: "srv-existing",
       spaceId: "space",
-      userId: "owner",
+      userId: rowOwner,
       endpoint: BREX_CARDS_MCP_ENDPOINT,
       secretId: "sec-old",
       revision: 3,
@@ -227,7 +234,7 @@ const connectedDb = (botExtra: Row = {}) =>
     connection: {
       serverId: "srv-existing",
       spaceId: "space",
-      brexAccountId: "cmp_old",
+      brexAccountId: "cmp_77",
       ...BREX_CARDS_CONTROLS_DEFAULTS,
     },
     bot: {
@@ -509,6 +516,76 @@ describe("brexCards controls", () => {
   });
 });
 
+describe("token ownership and the Brex account", () => {
+  it("refuses a replacement token from another Brex company and changes nothing", async () => {
+    const db = connectedDb();
+    db.state.connections[0] = { ...db.state.connections[0], brexAccountId: "cmp_other" };
+    const t = deps(db);
+    await expect(brexCardsReplaceToken(t.deps, owner, NEW_TOKEN)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message:
+        "This token is for a different Brex account. Disconnect Brex cards and connect again.",
+    });
+    expect(t.secrets.put).not.toHaveBeenCalled();
+    expect(db.prisma.$transaction).not.toHaveBeenCalled();
+    expect(db.state.servers[0]).toMatchObject({ secretId: "sec-old", revision: 3 });
+    expect(db.state.connections[0]).toMatchObject({ brexAccountId: "cmp_other" });
+  });
+
+  const SOMEONE_ELSE = "Brex cards were connected by someone else. Disconnect and connect again.";
+  it.each([
+    [
+      "replaceToken",
+      (t: ReturnType<typeof deps>) => brexCardsReplaceToken(t.deps, owner, NEW_TOKEN),
+    ],
+    ["cards", (t: ReturnType<typeof deps>) => brexCardsCards(t.deps, owner)],
+    ["getControls", (t: ReturnType<typeof deps>) => brexCardsGetControls(t.deps, owner)],
+    [
+      "setControls",
+      (t: ReturnType<typeof deps>) =>
+        brexCardsSetControls(t.deps, owner, BREX_CARDS_CONTROLS_DEFAULTS as never),
+    ],
+  ])("%s refuses the current owner when someone else connected the server", async (_name, call) => {
+    const db = connectedDb({}, "former");
+    const t = deps(db);
+    t.callServerTool.mockResolvedValue({ content: [{ type: "text", text: '{"cards":[]}' }] });
+    await expect(call(t)).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: SOMEONE_ELSE,
+    });
+    expect(t.callServerTool).not.toHaveBeenCalled();
+    expect(t.brex.calls).toEqual([]);
+    expect(t.secrets.put).not.toHaveBeenCalled();
+    expect(db.prisma.brexCardsConnection.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("the stored secret when the transaction fails", () => {
+  it("connect deletes the secret it stored, and keeps it on success", async () => {
+    const failing = fakeDb();
+    failing.prisma.$transaction.mockRejectedValueOnce(new Error("tx failed"));
+    const t = deps(failing);
+    await expect(brexCardsConnect(t.deps, owner, TOKEN)).rejects.toThrow("tx failed");
+    expect(t.secrets.delete).toHaveBeenCalledTimes(1);
+    expect(String(t.secrets.delete.mock.calls[0]?.[0])).toContain(TOKEN);
+
+    const ok = deps(fakeDb());
+    await brexCardsConnect(ok.deps, owner, TOKEN);
+    expect(ok.secrets.delete).not.toHaveBeenCalled();
+  });
+
+  it("replace token deletes the new secret and keeps the old one", async () => {
+    const db = connectedDb();
+    db.state.secrets.push({ id: "sec-old", ciphertext: "old" });
+    db.prisma.$transaction.mockRejectedValueOnce(new Error("tx failed"));
+    const t = deps(db);
+    await expect(brexCardsReplaceToken(t.deps, owner, NEW_TOKEN)).rejects.toThrow("tx failed");
+    expect(t.secrets.delete).toHaveBeenCalledTimes(1);
+    expect(String(t.secrets.delete.mock.calls[0]?.[0])).toContain(NEW_TOKEN);
+    expect(db.state.servers[0]).toMatchObject({ secretId: "sec-old", revision: 3 });
+  });
+});
+
 describe("the Brex agent", () => {
   const financeServer = {
     id: "fin",
@@ -693,6 +770,22 @@ describe("generic MCP routes on the Brex cards server", () => {
     await expect(
       client.integrationAgents.setExclusive({ serverId: "srv-existing", exclusive: true }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.state.servers[0]).toMatchObject({ writesEnabled: false });
+  });
+  it("after an ownership transfer, the new owner may turn writes off but not on, and the former owner may do neither", async () => {
+    const former = { ...owner, userId: "former" } as Actor;
+    const db = connectedDb({}, "former");
+    db.state.servers[0] = { ...db.state.servers[0], writesEnabled: true };
+    db.state.bots[0] = { ...db.state.bots[0], userId: "former" };
+    const current = routed(owner, db).client;
+    await expect(
+      current.mcp.servers.setWrites({ id: "srv-existing", enabled: true }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      routed(former, db).client.mcp.servers.setWrites({ id: "srv-existing", enabled: false }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.state.servers[0]).toMatchObject({ writesEnabled: true });
+    await current.mcp.servers.setWrites({ id: "srv-existing", enabled: false });
     expect(db.state.servers[0]).toMatchObject({ writesEnabled: false });
   });
 });

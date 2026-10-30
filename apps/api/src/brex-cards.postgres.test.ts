@@ -66,6 +66,7 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
     isDeploymentOwner: false,
   });
   const owner1 = actor("owner1");
+  const owner2 = actor("owner2");
   const member = actor("member");
   const outsider = actor("outsider", spaceB);
   const spaces = [spaceA, spaceB];
@@ -104,6 +105,10 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
       where: { spaceId: spaceA, userId: owner1.userId },
       data: { role: "owner" },
     });
+    await prisma.spaceMember.updateMany({
+      where: { spaceId: spaceA, userId: owner2.userId },
+      data: { role: "member" },
+    });
     callServerTool.mockClear();
     brexFetch.mockClear();
   };
@@ -115,7 +120,7 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
       await prisma.$disconnect();
       await db.pool.end();
     };
-    const users = [owner1, member, outsider];
+    const users = [owner1, owner2, member, outsider];
     for (const who of users) {
       await prisma.user.create({
         data: { id: who.userId, name: who.userId, email: who.email, emailVerified: false },
@@ -149,6 +154,7 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
     await prisma.spaceMember.deleteMany({ where: { spaceId: { in: spaces } } });
     for (const [who, role] of [
       [owner1, "owner"],
+      [owner2, "member"],
       [member, "member"],
       [outsider, "owner"],
     ] as Array<[Actor, string]>) {
@@ -171,7 +177,7 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
     await reset();
     await prisma.organization.deleteMany({ where: { id: orgId } });
     await prisma.user.deleteMany({
-      where: { id: { in: [owner1, member, outsider].map((who) => who.userId) } },
+      where: { id: { in: [owner1, owner2, member, outsider].map((who) => who.userId) } },
     });
     await close();
   });
@@ -506,9 +512,9 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
     expect(JSON.stringify(await connection())).not.toContain(TOKEN);
   });
 
-  it("regression: a replacement token from another Brex company moves the daily-cap account id with it", async () => {
-    await client(owner1).brexCards.connect({ token: TOKEN });
-    expect((await connection())?.brexAccountId).toBe("cmp_pg_1");
+  it("regression: a replacement token from another Brex company is refused and changes nothing", async () => {
+    const { serverId } = await client(owner1).brexCards.connect({ token: TOKEN });
+    const before = await prisma.mcpServer.findUniqueOrThrow({ where: { id: serverId } });
     brexFetch.mockImplementation(async (url: URL | string) =>
       new URL(String(url)).pathname === "/v2/company"
         ? json({ id: "cmp_pg_2", legal_name: "Other Co" })
@@ -519,11 +525,93 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
           ),
     );
     try {
-      await client(owner1).brexCards.replaceToken({ token: NEW_TOKEN });
+      await expect(
+        client(owner1).brexCards.replaceToken({ token: NEW_TOKEN }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message:
+          "This token is for a different Brex account. Disconnect Brex cards and connect again.",
+      });
     } finally {
       brexFetch.mockReset();
       brexFetch.mockImplementation(defaultBrex);
     }
-    expect((await connection())?.brexAccountId).toBe("cmp_pg_2");
+    expect((await connection())?.brexAccountId).toBe("cmp_pg_1");
+    expect(await prisma.mcpServer.findUniqueOrThrow({ where: { id: serverId } })).toMatchObject({
+      secretId: before.secretId,
+      revision: before.revision,
+    });
+    expect(await prisma.secret.count({ where: { spaceId: spaceA } })).toBe(1);
+  });
+
+  /** Owner1 connects and turns writes on, then is demoted while owner2 becomes the owner. */
+  const transferOwnership = async () => {
+    const connected = await client(owner1).brexCards.connect({ token: TOKEN });
+    await client(owner1).mcp.servers.setWrites({ id: connected.serverId, enabled: true });
+    await prisma.spaceMember.updateMany({
+      where: { spaceId: spaceA, userId: owner1.userId },
+      data: { role: "member" },
+    });
+    await prisma.spaceMember.updateMany({
+      where: { spaceId: spaceA, userId: owner2.userId },
+      data: { role: "owner" },
+    });
+    return connected;
+  };
+
+  it("after an ownership transfer, the new owner turns writes off and removes the connection, and the former owner may do neither", async () => {
+    const { serverId, agentBotId } = await transferOwnership();
+
+    // The new owner is not the row owner, so token, controls and cards ask to reconnect.
+    for (const call of [
+      (c: ReturnType<typeof client>) => c.brexCards.cards(),
+      (c: ReturnType<typeof client>) => c.brexCards.getControls(),
+      (c: ReturnType<typeof client>) => c.brexCards.setControls(BREX_CARDS_CONTROLS_DEFAULTS),
+      (c: ReturnType<typeof client>) => c.brexCards.replaceToken({ token: NEW_TOKEN }),
+    ])
+      await expect(call(client(owner2))).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: "Brex cards were connected by someone else. Disconnect and connect again.",
+      });
+
+    await expect(
+      client(owner2).mcp.servers.setWrites({ id: serverId, enabled: true }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      client(owner1).mcp.servers.setWrites({ id: serverId, enabled: false }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(client(owner1).mcp.servers.remove({ id: serverId })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(await prisma.mcpServer.findUniqueOrThrow({ where: { id: serverId } })).toMatchObject({
+      writesEnabled: true,
+    });
+
+    await client(owner2).mcp.servers.setWrites({ id: serverId, enabled: false });
+    expect(
+      (await prisma.mcpServer.findUniqueOrThrow({ where: { id: serverId } })).writesEnabled,
+    ).toBe(false);
+
+    await client(owner2).mcp.servers.remove({ id: serverId });
+    expect(await servers()).toEqual([]);
+    expect(await connection()).toBeNull();
+    expect(await prisma.secret.count({ where: { spaceId: spaceA } })).toBe(0);
+    expect(
+      (await prisma.bot.findUniqueOrThrow({ where: { id: agentBotId } })).archivedAt,
+    ).not.toBeNull();
+  });
+
+  it("removing the Brex finance server keeps the agent the cards server still uses", async () => {
+    const finance = await financeAgent("my-own-model");
+    const { serverId } = await client(owner1).brexCards.connect({ token: TOKEN });
+
+    await client(owner1).mcp.servers.remove({ id: finance.server.id });
+
+    expect(
+      (await prisma.bot.findUniqueOrThrow({ where: { id: finance.bot.id } })).archivedAt,
+    ).toBeNull();
+    expect((await prisma.mcpServer.findUniqueOrThrow({ where: { id: serverId } })).agentBotId).toBe(
+      finance.bot.id,
+    );
   });
 });
