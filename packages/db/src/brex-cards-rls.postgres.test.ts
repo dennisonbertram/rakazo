@@ -228,9 +228,7 @@ describePostgres("Brex cards row-level security (PostgreSQL)", () => {
     for (const table of ["brex_cards_connections", "brex_card_reservations"]) {
       const own = policies.filter((policy) => policy.tablename === table);
       expect(own.find((p) => p.policyname === `${table}_tenant`)?.qual).toContain("app.space_id");
-      expect(own.find((p) => p.policyname === `${table}_system`)?.qual).toContain(
-        "app.rls_bypass",
-      );
+      expect(own.find((p) => p.policyname === `${table}_system`)?.qual).toContain("app.rls_bypass");
       expect(own).toHaveLength(2);
     }
   });

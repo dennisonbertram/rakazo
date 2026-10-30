@@ -56,6 +56,7 @@ describe("Brex cards endpoint", () => {
       writesEnabled: false,
       revision: 1,
       createdAt: "2026-10-30T00:00:00.000Z",
+      updatedAt: "2026-10-30T00:00:00.000Z",
     });
     expect(stored.success).toBe(true);
     const remote = McpServerConfigInput.safeParse({

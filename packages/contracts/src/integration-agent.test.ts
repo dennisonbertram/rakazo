@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { BOX_MCP_ENDPOINT, BOX_READ_TOOLS, BOX_WRITE_TOOLS } from "./box.js";
 import {
   BREX_CARDS_MCP_ENDPOINT,
   BREX_CARDS_READ_TOOLS,
   BREX_CARDS_WRITE_TOOLS,
 } from "./brex-cards.js";
-import { BOX_MCP_ENDPOINT, BOX_READ_TOOLS, BOX_WRITE_TOOLS } from "./box.js";
 import {
   CARTA_MCP_ENDPOINT,
   CARTA_READ_TOOLS,
@@ -13,7 +13,11 @@ import {
   cartaAgentSpawnKey,
 } from "./carta.js";
 import { DEVIN_MCP_ENDPOINT, DEVIN_READ_TOOLS, DEVIN_WRITE_TOOLS } from "./devin.js";
-import { FINANCE_MCP_ENDPOINTS, FINANCE_READ_TOOLS, financeProviderForEndpoint } from "./finance.js";
+import {
+  FINANCE_MCP_ENDPOINTS,
+  FINANCE_READ_TOOLS,
+  financeProviderForEndpoint,
+} from "./finance.js";
 import {
   GRANOLA_BLOCKED_TOOLS,
   GRANOLA_MCP_ENDPOINT,

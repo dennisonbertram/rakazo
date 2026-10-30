@@ -188,6 +188,8 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "MeetingTombstone",
   "DevinConnectionState",
   "DevinSession",
+  "BrexCardsConnection",
+  "BrexCardReservation",
   "CompanyEntity",
   "CompanyIdentity",
   "CompanyEdge",
