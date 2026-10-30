@@ -232,6 +232,21 @@ it("says why an untagged file has no type when no model is set up", async () => 
   expect(container.textContent).toContain("Not tagged. No model is set up to read documents.");
 });
 
+it("shows an Omi recording without the not-searchable note, and names the source Omi", async () => {
+  await act(async () => {
+    root.render(
+      <Preview
+        item={{ ...receipt, mimeType: "audio/ogg", source: "omi", notIndexed: true }}
+        folderPath=""
+        onAction={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+  });
+  expect(container.textContent).not.toContain("Too large to search inside");
+  expect(container.textContent).toContain("Omi");
+});
+
 it("says a file too large to read is not searchable inside, instead of not tagged yet", async () => {
   await act(async () => {
     root.render(

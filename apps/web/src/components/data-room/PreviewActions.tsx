@@ -28,8 +28,11 @@ import { SheetPreview } from "../SheetPreview";
 
 export type FileUrl = { url: string; failed: boolean };
 
-/** True for an image or PDF, which is shown from an object URL of its bytes. */
-export const isShowable = (item: DataRoomApiItem) => canPreviewImage(item) || canPreviewPdf(item);
+export const isAudio = (item: DataRoomApiItem) => item.mimeType?.startsWith("audio/") ?? false;
+
+/** True for an image, PDF or audio file, which is shown from an object URL of its bytes. */
+export const isShowable = (item: DataRoomApiItem) =>
+  canPreviewImage(item) || canPreviewPdf(item) || isAudio(item);
 
 /**
  * The object URL of an image or PDF item, read once through the authenticated content route. The
@@ -109,6 +112,10 @@ export function FileViewer({
         />
       </>
     );
+  if (isAudio(item)) {
+    // biome-ignore lint/a11y/useMediaCaption: a recording has no captions; its transcript is the note beside it
+    return <audio controls src={file.url} className="w-full" />;
+  }
   return item.mimeType === "application/pdf" ? (
     <>
       <PdfPhoneFallback item={item} url={file.url} fill={fill} />

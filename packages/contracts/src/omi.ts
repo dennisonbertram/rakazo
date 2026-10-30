@@ -24,6 +24,8 @@ export const OmiStatusSchema = z
     /** Uploads received and not yet turned into recordings. */
     pendingUploads: z.number().int(),
     recordings: z.number().int(),
+    /** The Omi agent, once provisioned. */
+    agentBotId: Id.nullable(),
   })
   .nullable();
 export type OmiStatus = z.infer<typeof OmiStatusSchema>;

@@ -72,6 +72,7 @@ const PHONE_POPULAR = 3;
 const CHIPS = ["all", "finance", "social", "equity", "tools"] as const;
 type Chip = (typeof CHIPS)[number];
 const GRANOLA_PATH = "/app/integrations/granola";
+const OMI_PATH = "/app/integrations/omi";
 
 function hostOf(value: string | null) {
   if (!value) return "";
@@ -451,6 +452,7 @@ export function IntegrationsHome({
     box: t`Search and read files and folders`,
     granola: t`Meeting notes and transcripts`,
     wisprflow: t`Notetaker meetings, notes and tasks`,
+    omi: t`Pendant recordings, meetings and notes`,
   };
   const financeStatus = useFinanceStatus();
   const connectedKeys = connectedFinanceKeys(data.financeSources, financeStatus);
@@ -460,6 +462,12 @@ export function IntegrationsHome({
     (category === "all" || category === "finance") &&
     financeMatches &&
     connectedKeys.size < FINANCE_TILE_COUNT;
+  const [omiConnected, setOmiConnected] = useState(false);
+  useEffect(() => {
+    void Promise.resolve(rpc.omi?.status?.())
+      .then((status) => setOmiConnected(Boolean(status)))
+      .catch(() => undefined);
+  }, []);
   const granolaKey =
     data.meetings && data.meetings.status !== "disconnected" ? data.meetings : null;
   const hasGranolaServer = data.servers.some((server) => isGranolaEndpoint(server.endpoint));
@@ -471,7 +479,8 @@ export function IntegrationsHome({
       ) &&
       !data.sources.some((source) => isSameMcpEndpoint(source.source, entry.endpoint)) &&
       // A connected API key is already Granola's tile under Connected.
-      !(entry.id === "granola" && keyOnlyGranola),
+      !(entry.id === "granola" && keyOnlyGranola) &&
+      !(entry.id === "omi" && omiConnected),
   );
   const firstPartyMcp = unconnectedFirstParty.filter(
     (entry) =>
@@ -525,7 +534,9 @@ export function IntegrationsHome({
     (searching && connectedApps.length > 0);
   const wholeList = category === "all";
   const anyConnected =
-    apps.length + servers.length + data.sources.length + connectedKeys.size > 0 || keyOnlyGranola;
+    apps.length + servers.length + data.sources.length + connectedKeys.size > 0 ||
+    keyOnlyGranola ||
+    omiConnected;
   const hasConnected = chipOnly
     ? connectedApps.length > 0 || (category === "finance" && connectedKeys.size > 0)
     : anyConnected;
@@ -568,6 +579,10 @@ export function IntegrationsHome({
     // Granola has its own page: sign-in and the API key are both connected there.
     if (entry.id === "granola") {
       void navigate(GRANOLA_PATH);
+      return;
+    }
+    if (entry.id === "omi") {
+      void navigate(OMI_PATH);
       return;
     }
     setCustom({
@@ -743,6 +758,11 @@ export function IntegrationsHome({
                         status={granolaKey}
                         description={firstPartyDescription.granola}
                       />
+                    ) : null}
+                    {omiConnected && wholeList && !searching ? (
+                      <Card>
+                        <CardHead name="Omi" sub={firstPartyDescription.omi} to={OMI_PATH} />
+                      </Card>
                     ) : null}
                     {(wholeList && !searching ? data.sources : []).map((source) => (
                       <SourceCard key={source.id} source={source} onRemove={setRemoving} />

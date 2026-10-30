@@ -179,6 +179,15 @@ export const FIRST_PARTY_MCP = [
     category: "docs_files",
   },
   {
+    // Omi has no MCP server: the endpoint is a placeholder that matches no connected server.
+    id: "omi",
+    name: "Omi",
+    logo: null,
+    endpoint: "omi:pendant",
+    section: "tools",
+    category: "docs_files",
+  },
+  {
     // Id has no hyphen so a catalog toolkit "wispr_flow" or "wispr-flow" matches it.
     id: "wisprflow",
     name: "Wispr Flow",
