@@ -168,6 +168,7 @@ import {
   wakeMessageRoutines,
 } from "./messaging-inbound.js";
 import { mountMessagingWebhookRoutes } from "./messaging-webhook.js";
+import { mountOmiRoutes } from "./omi.js";
 import { mountApiRequestBodyLimits } from "./request-body-limit.js";
 import { mountSystemRoutes, mountTenantRoutes } from "./route-scope.js";
 import { createRouter } from "./router.js";
@@ -977,6 +978,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   mountInboxAttachment(app, { prisma, mail }, loggedActor);
   mountContactPhoto(app, { prisma, artifacts }, loggedActor);
   mountDataRoomRoutes(app, { prisma, artifacts, jobs }, loggedActor);
+  mountOmiRoutes(app, { prisma, artifacts, jobs }, loggedActor);
   mountInvestorPortal(app, {
     store: prismaPortalStore(prisma),
     artifacts,

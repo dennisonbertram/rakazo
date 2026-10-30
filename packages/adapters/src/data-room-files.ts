@@ -40,11 +40,13 @@ export interface FileDataRoomInput {
   mimeType: string;
   folderId: string | null;
   importId?: string;
-  source: "upload" | "gmail" | "drive" | "box" | "chat";
+  source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi";
   sourceConnectionId?: string;
   externalId?: string;
   sourceUrl?: string;
   sourceUpdatedAt?: Date;
+  /** Stored and listed but never read for search (pendant audio). */
+  notIndexed?: boolean;
 }
 
 /** A filed item, or (`item: null`) a zip stored for unpacking in the background. */
@@ -176,6 +178,7 @@ export function createFileDataRoomItem(
     rootId: string | null,
     path: string[],
     made: string[] = [],
+    createdBy?: "user" | "agent",
   ) => {
     let parentId = rootId;
     for (const raw of path) {
@@ -186,7 +189,7 @@ export function createFileDataRoomItem(
       });
       if (existing) parentId = existing.id;
       else {
-        parentId = (await repo.createFolder(actor, { name, parentId })).id;
+        parentId = (await repo.createFolder(actor, { name, parentId, createdBy })).id;
         made.push(parentId);
       }
     }

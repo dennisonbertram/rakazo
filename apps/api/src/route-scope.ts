@@ -24,6 +24,7 @@ export const TENANT_ROUTES: readonly string[] = [
   "/api/inbox/*",
   "/api/contacts/*",
   "/api/data-room/*",
+  "/api/omi/*",
   "/api/account/*",
   "/api/voice/*",
 ];

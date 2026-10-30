@@ -65,6 +65,7 @@ import { runMeetingSyncJob } from "./meeting-sync-job.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-delivery.js";
 import { deliverDueNotifications } from "./notification-outbox.js";
+import { runOmiAssemble } from "./omi-assemble.js";
 import { renderPdfPages } from "./pdf-render.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
 import { describeTeachSteps } from "./teach-steps.js";
@@ -381,6 +382,13 @@ export function createBackgroundJobHandlers(deps: {
           resolveModel: deps.executor.resolveModel,
           classifier: createInboxClassifierProvider(),
         },
+        payload,
+      );
+    }),
+    "omi.assemble": asPayloadTenant(async (payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      await runOmiAssemble(
+        { prisma: deps.prisma, jobs: deps.jobs, artifacts: deps.artifacts },
         payload,
       );
     }),

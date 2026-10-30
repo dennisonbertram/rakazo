@@ -93,6 +93,11 @@ const payloadSchemas = {
   "company.refresh.tick": z.object({}),
   "watch.probe": z.object({}),
   "finance.sync": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
+  "omi.assemble": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    connectionId: z.string().min(1),
+  }),
   "dataroom.blob.delete": z.object({ spaceId: z.string().min(1), storageKey: z.string().min(1) }),
   "dataroom.ingest": dataRoomStepPayload,
   "dataroom.classify": dataRoomStepPayload,
@@ -106,7 +111,7 @@ const payloadSchemas = {
     entries: z.number().int().positive(),
     importId: z.string().min(1),
     name: z.string().min(1),
-    source: z.enum(["upload", "gmail", "drive", "box", "chat"]),
+    source: z.enum(["upload", "gmail", "drive", "box", "chat", "omi"]),
     folderId: z.string().min(1).nullable(),
     sourceConnectionId: z.string().min(1).optional(),
     externalId: z.string().min(1).optional(),
@@ -442,6 +447,16 @@ export function meetingsDigestJob(
     replaceKey: `meetings.digest:${payload.meetingId}`,
     maxAttempts: 3,
     ...(availableAt ? { availableAt } : {}),
+  };
+}
+
+/** One queued assembly per pendant connection; a repeat replaces it. */
+export function omiAssembleJob(payload: BackgroundJobPayloads["omi.assemble"]): BackgroundJob {
+  return {
+    name: "omi.assemble",
+    payload,
+    replaceKey: `omi.assemble:${payload.connectionId}`,
+    maxAttempts: 3,
   };
 }
 

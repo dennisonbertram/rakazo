@@ -525,6 +525,7 @@ model Space {
   aiDataConsents              AiDataConsent[]
   mcpCallLogs                 McpCallLog[]
   externalActions             ExternalAction[]
+  omiUploads                  OmiUpload[]
   mcpConnections              McpConnection[]
   id                          String                       @id
   organizationId              String
@@ -1535,11 +1536,38 @@ model Connection {
   privateByDefault    Boolean               @default(false)
   companyEvidence     CompanyEvidence[]
   companyCandidates   CompanyCandidate[]    @relation("CompanyCandidateConnection")
+  omiUploads          OmiUpload[]
 
   @@index([spaceId, userId, connectorId])
   @@unique([id, spaceId, userId])
   @@index([agentBotId])
   @@map("connections")
+}
+
+/// One piece of records a pendant uploaded, kept raw until the assemble job turns it into recordings.
+model OmiUpload {
+  id           String     @id @default(cuid())
+  spaceId      String
+  space        Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  /// Sequence number of the first 444-byte record.
+  firstSeq     BigInt
+  /// SHA-256 (hex) of the body. A retry repeats both; a restarted counter repeats only firstSeq.
+  sha256       String
+  recordCount  Int
+  /// Omi codec byte: 20 (10 ms frames) or 21 (20 ms frames).
+  codec        Int
+  rtcValid     Boolean
+  receivedAt   DateTime   @default(now())
+  /// The raw bytes in the artifact store; removed once assembled.
+  storageKey   String
+  assembledAt  DateTime?
+
+  @@unique([connectionId, firstSeq, sha256])
+  @@index([connectionId, assembledAt])
+  @@map("omi_uploads")
 }
 
 model BotConnectionAccess {
@@ -3350,7 +3378,7 @@ model DataRoomItem {
   /// The import that filed this item, when one did.
   importId           String?
   import             DataRoomImport?   @relation(fields: [importId], references: [id], onDelete: SetNull)
-  /// "upload", "drive", "box", "gmail", "chat" or "finance".
+  /// "upload", "drive", "box", "gmail", "chat", "finance" or "omi".
   source             String
   sourceConnectionId String?
   sourceConnection   Connection?       @relation(fields: [sourceConnectionId], references: [id], onDelete: SetNull)

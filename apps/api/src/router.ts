@@ -191,6 +191,7 @@ import {
   isZernioEndpoint,
   NOTIFICATION_HEARTBEAT_ID,
   notificationKindOf,
+  OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   parseTicketRef,
   usableModelId,
@@ -563,6 +564,7 @@ import {
   serializeSpaceMemoryConfig,
   updateMemoryProviderDefaultScope,
 } from "./memory-provider-config.js";
+import { connectOmi, disconnectOmi, omiStatus } from "./omi.js";
 import {
   chooseFocus,
   dismissFocus,
@@ -6237,7 +6239,8 @@ export function createRouter(deps: RouterDeps) {
             userId: context.actor.userId,
             status: { in: ["connected", "pending", "error"] },
             // The Granola key shows through meetings.status, never as a generic app.
-            connectorId: { not: GRANOLA_API_CONNECTOR_ID },
+            // Omi shows through omi.status.
+            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID] },
           },
           // Without an order Postgres returns rows in storage order, which changes when a row is
           // updated, so the accounts of one app swapped places between loads.
@@ -8070,6 +8073,28 @@ export function createRouter(deps: RouterDeps) {
       ),
       delete: authed.meetings.delete.handler(({ context, input }) =>
         deleteStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
+      ),
+    },
+    omi: {
+      connect: authed.omi.connect.handler(({ context, input }) =>
+        connectOmi(
+          {
+            prisma: deps.prisma,
+            jobs: deps.jobs,
+            artifacts: deps.artifacts,
+            agent: {
+              prisma: deps.prisma,
+              repos,
+              archiveBot: (botId) => archiveActorBot(context.actor, botId),
+            },
+          },
+          context.actor,
+          input,
+        ),
+      ),
+      status: authed.omi.status.handler(({ context }) => omiStatus(deps, context.actor)),
+      disconnect: authed.omi.disconnect.handler(({ context, input }) =>
+        disconnectOmi(deps, context.actor, input),
       ),
     },
     devin: {

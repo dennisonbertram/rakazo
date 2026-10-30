@@ -154,6 +154,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "McpConnection",
   "McpCallLog",
   "ExternalAction",
+  "OmiUpload",
   "FinanceCryptoSnapshot",
   "FinanceExchangeConnection",
   "FinanceExchangeBalance",
