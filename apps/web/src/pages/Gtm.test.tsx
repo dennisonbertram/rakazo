@@ -42,7 +42,9 @@ vi.mock("./shell/bot-page-panel", () => ({
     useEffect(() => {
       if (mocks.pageContent === undefined || mocks.pageContent === "load-error") return;
       onPageChange({
+        id: "page_gtm",
         botId: "bot_gtm",
+        title: "GTM",
         content: mocks.pageContent,
         revision: 1,
         updatedBy: "bot",
