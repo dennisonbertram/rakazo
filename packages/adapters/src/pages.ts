@@ -1,4 +1,4 @@
-import type { BotPage, BotPageSummary, PageAuthor, PageChart } from "@rakazo/contracts";
+import type { BotPage, BotPageSummary, PageAuthor, PageChart, PageKind } from "@rakazo/contracts";
 import {
   BOT_PAGE_MAX_CHARS,
   BOT_PAGE_MAX_CHARTS,
@@ -8,7 +8,12 @@ import {
   PAGE_LIVE_BLOCKS_MAX,
   PageChartInputSchema,
 } from "@rakazo/contracts";
-import { gtmPageContentError, isLiveSegment, splitPage } from "@rakazo/core";
+import {
+  gtmPageContentError,
+  htmlPageDeclaration,
+  isLiveSegment,
+  splitPage,
+} from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -78,11 +83,21 @@ export async function renderPageChartSvg(chart: PageChart, rows?: unknown[]): Pr
 }
 
 /** Throws PageValidationError unless every chart fence parses and renders with the PlotSpec rules. */
-async function validatePageContent(content: string, gtmPage = false): Promise<void> {
+async function validatePageContent(
+  content: string,
+  gtmPage = false,
+  kind: PageKind = "blocks",
+): Promise<void> {
   if (content.length > BOT_PAGE_MAX_CHARS) {
     throw new PageValidationError(
       `The page is ${content.length} characters; the limit is ${BOT_PAGE_MAX_CHARS}.`,
     );
+  }
+  if (kind === "html") {
+    // No Markdown, chart or live-fence rules apply to an HTML document.
+    const { error } = htmlPageDeclaration(content);
+    if (error) throw new PageValidationError(error);
+    return;
   }
   const gtmError = gtmPageContentError(content, gtmPage);
   if (gtmError) throw new PageValidationError(gtmError);
@@ -137,6 +152,7 @@ type PageRow = {
   botId: string;
   title: string;
   content: string;
+  kind: string;
   revision: number;
   updatedBy: string;
   updatedAt: Date;
@@ -148,6 +164,7 @@ function toBotPage(row: PageRow): BotPage {
     botId: row.botId,
     title: row.title,
     content: row.content,
+    kind: row.kind === "html" ? "html" : "blocks",
     revision: row.revision,
     updatedBy: row.updatedBy === "user" ? "user" : "bot",
     updatedAt: row.updatedAt.toISOString(),
@@ -180,6 +197,7 @@ export async function listBotPages(
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
+    kind: row.kind === "html" ? ("html" as const) : ("blocks" as const),
     revision: row.revision,
     updatedAt: row.updatedAt.toISOString(),
   }));
@@ -211,7 +229,14 @@ const duplicateTitle = (title: string) =>
 /** Create an empty page. Throws PageValidationError at the page cap, PageConflictError on a duplicate title. */
 export async function createBotPage(
   deps: PageDeps,
-  input: { spaceId: string; botId: string; userId: string; title: string; sourceRunId?: string },
+  input: {
+    spaceId: string;
+    botId: string;
+    userId: string;
+    title: string;
+    kind?: PageKind;
+    sourceRunId?: string;
+  },
 ): Promise<BotPage> {
   const title = cleanTitle(input.title);
   const { prisma } = deps;
@@ -233,6 +258,7 @@ export async function createBotPage(
           userId: input.userId,
           title,
           content: "",
+          kind: input.kind ?? "blocks",
           revision: 1,
           updatedBy: "user",
         },
@@ -269,7 +295,13 @@ export async function renameBotPage(
   }
   const page = await getBotPage(prisma, { ...input });
   return page
-    ? { id: page.id, title: page.title, revision: page.revision, updatedAt: page.updatedAt }
+    ? {
+        id: page.id,
+        title: page.title,
+        kind: page.kind,
+        revision: page.revision,
+        updatedAt: page.updatedAt,
+      }
     : null;
 }
 
@@ -345,9 +377,19 @@ async function announce(
  * writes nothing and returns the current page. Shared by the pages RPC and the page tools.
  */
 export async function saveBotPage(deps: PageDeps, input: PageSaveInput): Promise<PageSaveResult> {
-  await validatePageContent(input.content, input.gtmPage ?? false);
   const { prisma } = deps;
   const scope = { spaceId: input.spaceId, botId: input.botId };
+  // The kind is fixed when a page is created; a save to a page that does not exist yet is a blocks page.
+  const existing = await prisma.botPage.findFirst({
+    where: { ...scope, ...(input.pageId ? { id: input.pageId } : {}) },
+    orderBy: [...FIRST_PAGE_ORDER],
+    select: { kind: true },
+  });
+  await validatePageContent(
+    input.content,
+    input.gtmPage ?? false,
+    existing?.kind === "html" ? "html" : "blocks",
+  );
   let saved: PageRow | null;
   try {
     saved = await prisma.$transaction(async (tx) => {
@@ -442,9 +484,10 @@ export async function pageToolFromTool(
         botId: scope.botId,
         userId: scope.userId,
         title: String(args.title ?? ""),
+        kind: args.kind === "html" ? "html" : "blocks",
         sourceRunId: scope.runId,
       });
-      return { ok: true, title: page.title, revision: page.revision };
+      return { ok: true, title: page.title, kind: page.kind, revision: page.revision };
     } catch (error) {
       if (error instanceof PageValidationError || error instanceof PageConflictError) {
         return { error: error.message };

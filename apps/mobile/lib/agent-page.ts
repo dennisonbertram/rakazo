@@ -5,7 +5,7 @@ import type {
   SidebarPagesState,
 } from "@rakazo/contracts";
 import type { PageSegment } from "@rakazo/core";
-import { splitPage } from "@rakazo/core";
+import { htmlPageDataScript, splitPage } from "@rakazo/core";
 
 /** A table cell or metric value; `usd` values are masked while amounts are hidden. */
 export type LiveCell = { text: string; usd: boolean };
@@ -132,3 +132,5 @@ export function pageBlocks(
 export function sidebarBotPages(state: SidebarPagesState) {
   return state.pages.flatMap((page) => ("pageId" in page ? [page] : []));
 }
+
+export { htmlPageDataScript };

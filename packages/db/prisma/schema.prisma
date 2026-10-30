@@ -1694,6 +1694,8 @@ model BotPage {
   userId    String
   title     String
   content   String
+  /// "blocks" (Markdown with live blocks) or "html" (one sandboxed HTML document). Fixed at creation.
+  kind      String            @default("blocks")
   revision  Int               @default(1)
   /// "bot" or "user"
   updatedBy String

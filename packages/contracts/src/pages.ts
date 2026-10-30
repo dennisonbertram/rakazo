@@ -37,6 +37,10 @@ export type PageChart = z.infer<typeof PageChartSchema>;
 export const PageAuthor = z.enum(["bot", "user"]);
 export type PageAuthor = z.infer<typeof PageAuthor>;
 
+/** blocks: Markdown with live blocks. html: one sandboxed HTML document. Fixed when the page is created. */
+export const PageKind = z.enum(["blocks", "html"]);
+export type PageKind = z.infer<typeof PageKind>;
+
 export const BotPageTitleSchema = z.string().trim().min(1).max(BOT_PAGE_TITLE_MAX);
 
 export const BotPageSchema = z.object({
@@ -44,6 +48,7 @@ export const BotPageSchema = z.object({
   botId: Id,
   title: BotPageTitleSchema,
   content: z.string().max(BOT_PAGE_MAX_CHARS),
+  kind: PageKind.default("blocks"),
   /** Increments on every save; writes must name the revision they were based on. */
   revision: z.number().int().positive(),
   updatedBy: PageAuthor,
@@ -78,13 +83,18 @@ export type BotPageSaveOutput = z.infer<typeof BotPageSaveOutputSchema>;
 export const BotPageSummarySchema = z.object({
   id: Id,
   title: BotPageTitleSchema,
+  kind: PageKind.default("blocks"),
   revision: z.number().int().positive(),
   updatedAt: z.string(),
 });
 export type BotPageSummary = z.infer<typeof BotPageSummarySchema>;
 
 export const BotPageListInputSchema = z.object({ botId: Id });
-export const BotPageCreateInputSchema = z.object({ botId: Id, title: BotPageTitleSchema });
+export const BotPageCreateInputSchema = z.object({
+  botId: Id,
+  title: BotPageTitleSchema,
+  kind: PageKind.optional(),
+});
 export const BotPageRenameInputSchema = z.object({
   botId: Id,
   pageId: Id,

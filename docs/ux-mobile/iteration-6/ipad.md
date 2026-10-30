@@ -130,3 +130,12 @@ A retry on the 13-inch (iPad Pro 13-inch, iOS 26.3, Mobile Safari, demo on main 
 - The chat column is capped, and the last message ("The pilot converted…") sits fully clear of the "Investors agent needs approval" toast. A "6 new messages" pill shows because this was a fresh sign-in with unread messages.
 - The first-run tour card (step 1 of 10) and Safari's own prompts (Save Password, Highlights) covered part of the sidebar's agent list. Dismissing them by tap in landscape did not work reliably, so the agent rows under the tour card, the Activity view, Data room and Finance were not seen in landscape.
 - The 11-inch was not checked in landscape.
+
+### 11-inch landscape after #984
+
+Retried on the iPad Pro 11-inch in landscape (Mobile Safari, demo on main). This time the first-run tour was marked seen through the API and Safari's password prompt was dismissed first.
+
+- Home/chat: PASS (`l11-land-home.png`). The sidebar shows Chief, Investor Relations and Finance helper, then "+1 more" with no half-visible row, then Integrations and the account row directly below, with no empty band. The chat column is capped. The thread opened at the "NEW" divider with a "6 new messages" pill, as expected for unread messages.
+- Activity view: PASS (`l11-land-activity.png`). It loaded with Needs your answer, Working and "Show 2 finished runs", and the sidebar stayed compact underneath.
+- Finance: PASS (`l11-land-finance.png`). KPI cards, period tabs and the burn chart fit, and the Pages list and footer are in place. No approval toast was showing, so toast clearance was not judged here.
+- Data room: partly seen (`l11-land-dataroom2.png`). The folder tree, filters and the "1 failed" chip render. The file list and the sidebar's agent list were still on skeletons, with the simulator's clock frozen while the host load average was about 545. Treated as environment slowness, not a layout finding.

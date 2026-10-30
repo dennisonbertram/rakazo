@@ -43,6 +43,7 @@ vi.mock("./shell/bot-page-panel", () => ({
       if (mocks.pageContent === undefined || mocks.pageContent === "load-error") return;
       onPageChange({
         id: "page_gtm",
+        kind: "blocks",
         botId: "bot_gtm",
         title: "GTM",
         content: mocks.pageContent,

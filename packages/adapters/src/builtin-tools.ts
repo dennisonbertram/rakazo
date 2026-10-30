@@ -536,10 +536,11 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "page_create",
-    description: "Add an empty page with a title (up to 60 characters). A bot can have 20 pages.",
+    description:
+      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design.',
     inputSchema: {
       type: "object",
-      properties: { title: { type: "string" } },
+      properties: { title: { type: "string" }, kind: { type: "string", enum: ["blocks", "html"] } },
       required: ["title"],
     },
   },

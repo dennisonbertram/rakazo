@@ -50,6 +50,7 @@ it("reports a never-written page and renders its first remote save without a rel
 
   const page: BotPage = {
     id: "page_1",
+    kind: "blocks",
     botId: "bot_demo",
     title: "Demo",
     content: "# Created by agent",
@@ -89,6 +90,7 @@ it("keeps a failed initial load visible instead of reporting a missing page", as
 const summary = (id: string, title: string, revision = 1) => ({
   id,
   title,
+  kind: "blocks" as const,
   revision,
   updatedAt: "2026-01-01T00:00:00.000Z",
 });

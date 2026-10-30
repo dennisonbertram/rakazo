@@ -1,4 +1,5 @@
 import { HTML_VIEWER_PATH } from "@rakazo/contracts/content-security-policy";
+import { DNS_PREFETCH_OFF_META } from "@rakazo/core";
 import { useEffect, useRef, useState } from "react";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 
@@ -26,6 +27,9 @@ document.addEventListener("submit", (event) => event.preventDefault(), true);
 export const EMAIL_HEIGHT_SCRIPT = `(()=>{let last=0;const send=()=>{const h=Math.ceil(document.documentElement.getBoundingClientRect().height);if(h!==last){last=h;parent.postMessage({type:"rakazo-email-height",height:h},"*")}};new ResizeObserver(send).observe(document.documentElement);addEventListener("load",send);send()})();`;
 export const EMAIL_HEIGHT_SCRIPT_HASH = "sha256-6RpnQvW9DYV8jCtQSnZW5rlzGspOpUNiizQnBvHvo0I=";
 const EMAIL_HEIGHT_MESSAGE = "rakazo-email-height";
+// The shell says a document finished loading in its frame; the app answers with the page's data.
+export const VIEWER_READY_MESSAGE = "praci-viewer-ready";
+export const PAGE_DATA_MESSAGE = "praci-data";
 // ponytail: a cap so a hostile height cannot make a page millions of pixels tall; longer mail scrolls inside.
 const MAX_EMAIL_HEIGHT = 20_000;
 
@@ -140,7 +144,7 @@ function withPreviewDocument(html: string, scripts: boolean, email: boolean): st
   const body = email
     ? `${EMAIL_FIT}<script>${EMAIL_HEIGHT_SCRIPT}</script>${openLinksInNewTab(html)}`
     : html;
-  return `${meta}${referrer}${scripts ? PREVIEW_GUARD : ""}${body}`;
+  return `${DNS_PREFETCH_OFF_META}${meta}${referrer}${scripts ? PREVIEW_GUARD : ""}${body}`;
 }
 
 /**
@@ -153,11 +157,17 @@ export function SandboxedHtmlViewer({
   title,
   scripts = true,
   email = false,
+  data,
 }: {
   html: string;
   title: string;
   scripts?: boolean;
   email?: boolean;
+  /**
+   * An HTML page's live data, by source name. Pushed to the page as a "praci-data" message event
+   * after each load and whenever it changes. The page can send nothing back through this.
+   */
+  data?: Record<string, unknown>;
 }) {
   const runScripts = scripts && !email;
   useHideAmounts(); // re-render, and so re-mask, when the switch flips
@@ -176,6 +186,26 @@ export function SandboxedHtmlViewer({
         "*",
       );
   }, [loads, preview, previewSandbox, csp]);
+  // Count of documents the shell has finished loading in its frame; each one needs the data again.
+  const [documents, setDocuments] = useState(0);
+  // A new document needs its own ready ping before it gets any data.
+  useEffect(() => setDocuments(0), [preview]);
+  useEffect(() => {
+    if (data === undefined) return;
+    const onReady = (event: MessageEvent) => {
+      const message = event.data as { type?: unknown } | null;
+      if (event.source === frame.current?.contentWindow && message?.type === VIEWER_READY_MESSAGE)
+        setDocuments((count) => count + 1);
+    };
+    window.addEventListener("message", onReady);
+    return () => window.removeEventListener("message", onReady);
+  }, [data === undefined]);
+  useEffect(() => {
+    if (data === undefined || documents === 0) return;
+    // Plain JSON only, so nothing but data crosses into the frame.
+    const sources: unknown = JSON.parse(JSON.stringify(data));
+    frame.current?.contentWindow?.postMessage({ type: PAGE_DATA_MESSAGE, sources }, "*");
+  }, [data, documents]);
   // Key presses inside the sandboxed frame never reach this page, so Escape and j/k stop working
   // after a click in it (such as on a link, which opens in a new tab). When the person comes back,
   // focus moves from the frame to the dialog around it.

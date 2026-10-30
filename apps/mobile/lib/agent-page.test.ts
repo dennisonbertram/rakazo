@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageBlocks, sidebarBotPages } from "./agent-page";
+import { htmlPageDataScript, pageBlocks, sidebarBotPages } from "./agent-page";
 
 const chart = (name: string) =>
   `\`\`\`chart\n${JSON.stringify({ name, spec: {}, data: [] })}\n\`\`\``;
@@ -112,5 +112,46 @@ describe("sidebarBotPages", () => {
     expect(
       sidebarBotPages({ pages: [{ templateKey: "team-health" }, row], addable: [], botPages: [] }),
     ).toEqual([row]);
+  });
+});
+
+describe("htmlPageDataScript", () => {
+  const run = (sources: unknown) => {
+    const events: unknown[] = [];
+    // Evaluate the script the way the WebView would, with a stub window.
+    new Function("window", "MessageEvent", htmlPageDataScript(sources))(
+      { dispatchEvent: (event: unknown) => events.push(event) },
+      class {
+        constructor(
+          public type: string,
+          public init: { data: unknown },
+        ) {}
+      },
+    );
+    return events as { type: string; init: { data: unknown } }[];
+  };
+
+  it("delivers the sources as a message event, round-tripping hostile strings", () => {
+    const sources = {
+      "a</script><script>alert(1)": {
+        status: "ok",
+        value: "x\"'`\\ ${1+1} \u2028 \u2029 </script>",
+        __proto__: { polluted: true },
+      },
+    };
+    const [event] = run(sources);
+    expect(event?.type).toBe("message");
+    expect(event?.init.data).toEqual({
+      type: "praci-data",
+      sources: JSON.parse(JSON.stringify(sources)),
+    });
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
+  });
+
+  it("contains no raw line separators and cannot close a script element", () => {
+    const script = htmlPageDataScript({ A: { value: "\u2028\u2029</script>" } });
+    expect(script).not.toMatch(/[\u2028\u2029]/);
+    expect(script.split("\n")).toHaveLength(1);
+    expect(script.endsWith("true;")).toBe(true);
   });
 });
