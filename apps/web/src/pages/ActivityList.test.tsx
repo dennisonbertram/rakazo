@@ -75,6 +75,37 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+it("turns a request that never answers into the error with Try again, which refetches in place", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.useFakeTimers();
+  try {
+    api.runs.list.mockImplementation(() => new Promise(() => {}));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(view()));
+    expect(container.querySelector('[role="status"]')).not.toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(13_000);
+    });
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Could not load activity",
+    );
+
+    api.runs.list.mockResolvedValue({ runs: [run("a", "running")] });
+    const calls = api.runs.list.mock.calls.length;
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[role="alert"] button')?.click();
+    });
+    expect(api.runs.list.mock.calls.length).toBeGreaterThan(calls);
+    expect(container.querySelector('[data-testid="activity-list"]')).not.toBeNull();
+    await act(async () => root.unmount());
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it("lists items waiting on the person after Needs you, opens the bot, and hides when none", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   api.runs.list.mockResolvedValue({ runs: [] });

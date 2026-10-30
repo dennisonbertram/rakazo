@@ -817,7 +817,7 @@ export function SpaceSidebar({
       ) : null}
       <div
         ref={sidebarPaneRef}
-        className="flex min-h-0 flex-1 flex-col max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col pointer-coarse:md:max-lg:flex-initial max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto"
       >
         {bootstrapMe === undefined ? null : (
           // Waiting for the account (undefined) keeps pages the user hid from flashing in.
@@ -1084,7 +1084,7 @@ export function SpaceSidebar({
         <div
           ref={sidebarScrollRef}
           tabIndex={-1}
-          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 lg:snap-y lg:snap-proximity lg:scroll-pt-10 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
+          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 pointer-coarse:lg:flex-initial lg:snap-y lg:snap-proximity lg:scroll-pt-10 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
         >
           {activityMode && !rail ? (
             <button

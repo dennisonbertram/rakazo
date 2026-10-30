@@ -40,6 +40,25 @@ type ActivityListProps = {
   onOpenWaitingItem?: (item: WaitingOnYouItem) => void;
 };
 
+/** A request that has not answered by now becomes the error with Try again, not an endless skeleton. */
+const ACTIVITY_REQUEST_MS = 12_000;
+
+function within<T>(request: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(t`Could not load activity`)), ACTIVITY_REQUEST_MS);
+    request.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        window.clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: ActivityListProps) {
   const { t } = useLingui();
   const [activeRuns, setActiveRuns] = useState<RunActivityRow[]>([]);
@@ -77,15 +96,15 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
           // Each list renders as soon as it arrives; the second need not hold up the first.
           const fresh = () => !cancelled && requestId === generation;
           await Promise.all([
-            rpc.runs.list({ filter: "active" }).then((result) => {
+            within(rpc.runs.list({ filter: "active" })).then((result) => {
               if (!fresh()) return;
               setActiveRuns(result.runs);
               setLoading(false);
             }),
-            rpc.runs.list({ filter: "recent" }).then((result) => {
+            within(rpc.runs.list({ filter: "recent" })).then((result) => {
               if (fresh()) setRecentRuns(result.runs);
             }),
-            rpc.scratchpad.waitingOnYou({}).then((result) => {
+            within(rpc.scratchpad.waitingOnYou({})).then((result) => {
               if (fresh()) setWaitingItems(result);
             }),
           ]);
@@ -197,7 +216,7 @@ export function ActivityList({ onOpenRun, onListedBots, onOpenWaitingItem }: Act
   }, [layoutKey, showFinished, error]);
 
   if (loading && !hasAnyRuns && !filtersOn) {
-    return <RowsSkeleton rows={3} className="px-2.5 py-2" />;
+    return <RowsSkeleton rows={3} className="px-2.5 py-2" onRetry={() => reloadRef.current?.()} />;
   }
 
   if (!hasAnyRuns && !filtersOn) {
