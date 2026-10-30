@@ -312,7 +312,7 @@ import {
   routineNeedsOneShotArm,
 } from "./RoutineEditor";
 import type { SettingsSection } from "./SettingsOverlay";
-import type { PageRemoteUpdate } from "./shell/bot-page-panel";
+import type { PageDataUpdate, PageRemoteUpdate } from "./shell/bot-page-panel";
 import { BotPagePanel } from "./shell/bot-page-panel";
 import { BotSettings } from "./shell/bot-panel";
 import { PinsList, PinsStrip, useBotPins } from "./shell/bot-pins";
@@ -743,6 +743,7 @@ export function ShellPage() {
   // The bot whose page exists (the Page control shows only then), and its latest page.updated event.
   const [pageBotId, setPageBotId] = useState<string | null>(null);
   const [pageRemote, setPageRemote] = useState<PageRemoteUpdate | null>(null);
+  const [pageDataRemote, setPageDataRemote] = useState<PageDataUpdate | null>(null);
   const [pinsSeq, setPinsSeq] = useState(0);
   const [restoredPanelKey, setRestoredPanelKey] = useState<string | null>(null);
   const panelStorageKeyRef = useRef<string | null>(null);
@@ -1919,6 +1920,11 @@ export function ShellPage() {
           const { pageId, revision, updatedBy } = event.payload as PageRemoteUpdate;
           setPageBotId(active.id);
           setPageRemote({ pageId, revision, updatedBy, seq: event.seq });
+        }
+        if (event.type === "page.data") {
+          const { pageId } = event.payload as { pageId?: string };
+          setPageBotId(active.id);
+          setPageDataRemote({ pageId, seq: event.seq });
         }
         if (event.type === "pins.updated") setPinsSeq(event.seq);
         if (event.type === "thread.cleared") {
@@ -5414,7 +5420,12 @@ export function ShellPage() {
               </div>
             ) : null}
             {panel === "page" && active ? (
-              <BotPagePanel key={active.id} botId={active.id} remote={pageRemote} />
+              <BotPagePanel
+                key={active.id}
+                botId={active.id}
+                remote={pageRemote}
+                dataRemote={pageDataRemote}
+              />
             ) : null}
             {panel === "list" && botPins?.list ? (
               <PinsList pins={botPins} onPins={setBotPins} />
