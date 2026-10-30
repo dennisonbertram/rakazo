@@ -137,7 +137,9 @@ describePostgres("sidebar pages (PostgreSQL)", () => {
       code: "owner_only",
     });
     await addSidebarPage(prisma, owner, "owned", templates);
-    expect((await pages(owner)).map((p) => p.templateKey)).toContain("owned");
+    expect((await pages(owner)).map((p) => ("templateKey" in p ? p.templateKey : ""))).toContain(
+      "owned",
+    );
   });
 
   it("offers owner-only templates in addable only to the space owner", async () => {
@@ -156,12 +158,16 @@ describePostgres("sidebar pages (PostgreSQL)", () => {
       where: { spaceId_userId: owner },
       data: { role: "member" },
     });
-    expect((await pages(owner)).map((p) => p.templateKey)).not.toContain("owned");
+    expect(
+      (await pages(owner)).map((p) => ("templateKey" in p ? p.templateKey : "")),
+    ).not.toContain("owned");
     await prisma.spaceMember.update({
       where: { spaceId_userId: owner },
       data: { role: "owner" },
     });
-    expect((await pages(owner)).map((p) => p.templateKey)).toContain("owned");
+    expect((await pages(owner)).map((p) => ("templateKey" in p ? p.templateKey : ""))).toContain(
+      "owned",
+    );
   });
 
   describe("bot pages", () => {
