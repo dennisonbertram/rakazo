@@ -47,7 +47,8 @@ struct ComposerView: View {
     .padding(.horizontal, 16).padding(.vertical, 8)
     .task { SendQueue.shared.bind(app) }
     .onChange(of: scenePhase) { _, phase in
-      if phase != .active { dictation.stop() }
+      // Not on .inactive: the microphone permission prompt itself makes the scene inactive.
+      if phase == .background { dictation.stop() }
     }
     .photosPicker(
       isPresented: $picking, selection: $photos, maxSelectionCount: max(composer.slotsLeft, 1),

@@ -24,9 +24,10 @@ struct CallButton: View {
     .fullScreenCover(isPresented: $presenting, onDismiss: { coordinator.end() }) {
       CallView(coordinator: coordinator, name: name, avatar: avatar, close: { presenting = false })
     }
-    // The app does not keep the microphone in the background, so leaving the foreground hangs up.
+    // The app does not keep the microphone in the background, so going to the background hangs up.
+    // Not on .inactive: permission prompts, Control Center and incoming alerts pass through it.
     .onChange(of: scenePhase) { _, phase in
-      guard phase != .active else { return }
+      guard phase == .background else { return }
       coordinator.end()
       presenting = false
     }
