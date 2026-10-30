@@ -298,6 +298,7 @@ async function main() {
     }),
   });
   const jobHandlers = createBackgroundJobHandlers({
+    ticketBoardEnabled,
     executor,
     prisma,
     sandbox,

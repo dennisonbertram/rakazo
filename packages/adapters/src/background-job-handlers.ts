@@ -68,6 +68,7 @@ import { deliverDueNotifications } from "./notification-outbox.js";
 import { runOmiAssemble } from "./omi-assemble.js";
 import { runOmiSort } from "./omi-sort.js";
 import { runOmiTranscribe } from "./omi-transcribe.js";
+import { runPageRefreshTick, runPageSnapshotRetention } from "./page-source-tick.js";
 import { renderPdfPages } from "./pdf-render.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
 import { describeTeachSteps } from "./teach-steps.js";
@@ -145,6 +146,8 @@ export function createBackgroundJobHandlers(deps: {
   /** Gmail push settings; absent means polling only, and the watch renewal job does nothing. */
   gmailPush?: GmailPushConfig;
   companyImport?: CompanyImportEngine;
+  /** From the deployment; board_tickets is only a page source where the ticket board is on. */
+  ticketBoardEnabled?: boolean;
 }): BackgroundJobHandlers {
   const messagingDeps = deps.messaging
     ? { prisma: deps.prisma, messaging: deps.messaging, events: deps.events, jobs: deps.jobs }
@@ -531,6 +534,17 @@ export function createBackgroundJobHandlers(deps: {
         events: deps.events,
         notificationEvents: deps.notificationEvents,
       });
+    },
+    "pages.refresh.tick": async () => {
+      await runPageRefreshTick({
+        prisma: deps.prisma,
+        events: deps.events,
+        jobs: deps.jobs,
+        ticketBoardEnabled: deps.ticketBoardEnabled,
+      });
+    },
+    "pages.snapshots.retention": async () => {
+      await runPageSnapshotRetention(deps.prisma);
     },
     "history.compact": asOwner(thread, async (payload) => {
       // Retrieval policies use stored context without paid message-count compaction.

@@ -41,10 +41,11 @@ export const Sources: Story = {
           id: "src_2",
           name: "Vendors",
           call: { tool: "finance_transactions", args: {} },
+          schedule: "1d",
           lastError: "Request timed out",
         }),
         source({ id: "src_3", name: "Revenue", status: "pending", lastRefreshAt: null }),
-        source({ id: "src_4", name: "Pipeline", status: "paused" }),
+        source({ id: "src_4", name: "Pipeline", status: "paused", schedule: "1w" }),
       ],
     }),
 };

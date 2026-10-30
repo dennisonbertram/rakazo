@@ -2513,6 +2513,10 @@ msgstr ""
 msgid "Change password"
 msgstr "पासवर्ड बदलें"
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Change schedule"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Change source"
 msgstr ""
@@ -4631,6 +4635,7 @@ msgstr "बॉट अवतार अनुकूलित करें"
 msgid "Cut costs"
 msgstr ""
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Daily"
 msgstr ""
@@ -5592,12 +5597,20 @@ msgstr "हर"
 msgid "every {intervalAmountSelect} {intervalUnitSelect}"
 msgstr "हर {intervalAmountSelect} {intervalUnitSelect}"
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Every 15 min"
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "Every 15 minutes"
 msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Every 4 hours"
+msgstr ""
+
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Every 6 hours"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
@@ -6362,6 +6375,10 @@ msgstr ""
 #: src/pages/RoutineSchedule.tsx
 msgid "hour"
 msgstr "घंटा"
+
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Hourly"
+msgstr ""
 
 #: src/pages/ExternalConversationSettings.tsx
 #: src/pages/RoutineSchedule.tsx
@@ -9260,6 +9277,7 @@ msgstr "अपनी API कुंजी पेस्ट करें, फिर
 msgid "Path"
 msgstr ""
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Pause"
 msgstr ""
@@ -10546,6 +10564,7 @@ msgstr ""
 msgid "Restoring your workspace"
 msgstr ""
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Resume"
 msgstr ""
@@ -13781,6 +13800,7 @@ msgstr ""
 msgid "Weekdays"
 msgstr "कार्यदिवस"
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Weekly"
 msgstr ""

@@ -812,6 +812,8 @@ export interface BackgroundJobPayloads {
   "company.refresh.tick": Record<string, never>;
   /** Checks the page watches that are due (no model); run every minute by the worker's cron. */
   "watch.probe": Record<string, never>;
+  "pages.refresh.tick": Record<string, never>;
+  "pages.snapshots.retention": Record<string, never>;
   /** Syncs a user's finance accounts and transactions from their Mercury and Brex servers; one queued job per user and space. */
   /** Names exactly one source: a Connection or an MCP server. */
   "meetings.sync": {
