@@ -649,7 +649,8 @@ container logs, default no-new-privileges, and the kernel NAT path instead of Do
    from Cloudflare's [published IP ranges](https://www.cloudflare.com/ips/); reconcile those ranges
    whenever Cloudflare publishes a change. A Cloudflare Tunnel can replace the public web listeners.
 2. Clone the repository on the VM and create a root `.env` with production-only values. At minimum set
-   `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, `SCREEN_PROXY_SECRET`,
+   `POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD` (the password of the `rakazo_app` runtime login; the
+   stack refuses to start without it), `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, `SCREEN_PROXY_SECRET`,
    `OPENROUTER_API_KEY`, the API key for your selected sandbox provider,
    `RAKAZO_HOST`, and the three public origins. Set `RAKAZO_DEPLOY_DIR` when the checkout is not at
    the supported Linux default, `/srv/rakazo`. Use URL-safe random values for database credentials.
@@ -797,6 +798,8 @@ docker compose --env-file .env \
 
 ## Restore
 
+### Development stack
+
 For backups created by `scripts/backup.sh`, use an empty `rakazo` database in the development
 Compose stack, with application services stopped. The SQL import runs in one transaction and
 stops on the first error, including conflicts with existing tables. Files are restored and
@@ -806,6 +809,55 @@ production snapshot's custom-format `rakazo.dump` or `appdata.tgz`.
 ```bash
 ./scripts/restore.sh backups/<stamp>
 ```
+
+### Production stack
+
+For a snapshot written by `infra/compose/backup-prod.sh` (`rakazo.dump`, `appdata.tgz`, and
+`objects/` with `objects.manifest.json` when object storage is on). Keep the same `.env` as the
+backup: without its `ENCRYPTION_KEY` and `BETTER_AUTH_SECRET` the data cannot be read. On macOS,
+follow [mac-mini.md](mac-mini.md) (sections 3.2, 3.3 and 5.5). Set
+`dc='docker compose --env-file .env -f infra/compose/docker-compose.prod.yml'`.
+
+1. Stop the services that write, and start Postgres alone:
+
+   ```bash
+   $dc stop caddy web worker api
+   $dc up -d --wait postgres
+   ```
+
+2. Replace the database with the dump. This deletes the current contents:
+
+   ```bash
+   $dc exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" --force "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+   $dc exec -T postgres sh -c 'pg_restore --exit-on-error --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+     < <snapshot>/rakazo.dump
+   ```
+
+3. Start everything. `migrate` applies migrations the dump lacks and recreates the `rakazo_app` login:
+
+   ```bash
+   $dc up -d --wait --pull never
+   ```
+
+4. If the snapshot has `objects.manifest.json`, restore the objects with the API container's
+   settings (`restore` never deletes). Run it from the API container's network, as `backup-prod.sh` does:
+
+   ```bash
+   api=$($dc ps -q api)
+   docker run --rm --network "container:$api" --user "$(id -u):$(id -g)" \
+     --cap-drop ALL --security-opt no-new-privileges --entrypoint node \
+     -v "$PWD/scripts/s3-objects.mjs:/s3-objects.mjs:ro" -v <snapshot>:/in:ro \
+     --env-file <(docker inspect "$api" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^RAKAZO_S3_') \
+     "$(docker inspect "$api" --format '{{.Image}}')" /s3-objects.mjs restore /in
+   ```
+
+5. Check `curl --fail https://$RAKAZO_HOST/health`, sign in, and open a file or an agent home.
+
+`appdata.tgz` holds the API's `/data` volume (bot state under `DATA_DIR`). To restore it, extract it
+as root into the `appdata` volume while `api` and `worker` are stopped, and `chown -R 1000:1000` the
+result. With object storage on, most state is in the bucket instead. The database steps above were
+exercised only through [mac-mini.md](mac-mini.md); the `dropdb`/`createdb` and object steps were not
+run on a Linux host.
 
 ## Upgrade
 
@@ -842,18 +894,27 @@ docker compose --env-file .env -f infra/compose/docker-compose.prod.yml \
 ```
 
 A deployment on the default `local` tag has no registry to pull from, so it upgrades by rebuilding
-the checkout instead:
+the checkout instead. Tag each build with its commit so the previous image survives for rollback:
+a build on plain `local` overwrites the `local` image. `api`, `worker`, `web`, and `migrate` share
+one image, and `RAKAZO_IMAGE_TAG` names it (from the shell or `.env`):
 
 ```bash
 git pull
-GIT_SHA=$(git rev-parse HEAD) docker compose --env-file .env -f infra/compose/docker-compose.prod.yml \
+OLD_TAG=$(sed -n 's/^RAKAZO_IMAGE_TAG=//p' .env)   # note it for rollback
+export RAKAZO_IMAGE_TAG=local-$(git rev-parse HEAD) GIT_SHA=$(git rev-parse HEAD)
+docker compose --env-file .env -f infra/compose/docker-compose.prod.yml \
   up -d --wait --pull never --build api worker web
 ```
+
+Also set `RAKAZO_IMAGE_TAG=local-<commit>` in `.env` afterwards, so a later `up` or restart does not
+look for a different tag. The shell value overrides `.env` only for that session.
 
 `up --wait` does not report success until the new API is healthy and the worker and web containers
 are running. The API starts only after the `migrate` service finishes, so a migration
 failure keeps health red. A failed CLI recreate does not auto-roll back; recover with the previous
-`RAKAZO_IMAGE_TAG` (or rebuild `local`) and `up -d --wait --pull never`.
+`RAKAZO_IMAGE_TAG` (`$OLD_TAG`; check `docker images | grep rakazo/app`) and
+`up -d --wait --pull never api worker web`, with no `--build`. Migrations are not reversed. Keep the
+old image until the new version has run for a while, and do not run `docker image prune -a` meanwhile.
 
 The updater sidecar has its own image and tag so an update never recreates the process performing
 it. Move it deliberately by setting `RAKAZO_UPDATER_IMAGE_TAG` to the full `sha-<commit>` tag, then
@@ -1098,6 +1159,8 @@ service's trust boundary. `SIGNUPS_ENABLED` applies on the API's first start. A 
 `SIGNUP_ALLOWLIST` applies on every API start.
 The optional marketing site in `apps/www` can be hosted separately.
 
+To run the production stack on a Mac that stays on your tailnet, see [Moving Praci to a Mac mini](mac-mini.md).
+
 ## Connect mobile clients
 
 The iOS and Android app can also point at a self-hosted origin at runtime. On the sign-in screen, tap **Use a custom server** and enter the same HTTPS origin as `WEB_ORIGIN` (for example `https://app.example.com`). Store builds still default to `EXPO_PUBLIC_API_URL`; the in-app setting is an override for people running their own API. Changing the server signs the device out of any previous session.
@@ -1161,12 +1224,15 @@ reach `WEB_ORIGIN`, and the client's own browser redirect brings them there.
    It becomes the OAuth issuer and the base of the token and registration endpoints. Leave
    `BETTER_AUTH_URL` and `WEB_ORIGIN` unchanged: the session cookie belongs to the web origin.
 2. Restart the API so it reads the setting.
-3. Expose three path prefixes of the API port. `<API port>` is where the API listens: `3200` on a dev stack, or the port of `API_URL`:
+3. Expose three path prefixes. `<port>` is where the endpoint listens: the API port on a dev stack
+   (`3200`, or the port of `API_URL`). On the production Compose stack the API is not published, so use
+   the Caddy listener (for example `127.0.0.1:8080` when Caddy is published on loopback behind
+   `tailscale serve`). `Caddyfile.prod` already sends `/mcp`, `/.well-known/oauth-*`, and `/api/*` to the API:
 
    ```bash
-   tailscale funnel --bg --set-path /mcp http://127.0.0.1:<API port>/mcp
-   tailscale funnel --bg --set-path /.well-known http://127.0.0.1:<API port>/.well-known
-   tailscale funnel --bg --set-path /api/auth/oauth2 http://127.0.0.1:<API port>/api/auth/oauth2
+   tailscale funnel --bg --set-path /mcp http://127.0.0.1:<port>/mcp
+   tailscale funnel --bg --set-path /.well-known http://127.0.0.1:<port>/.well-known
+   tailscale funnel --bg --set-path /api/auth/oauth2 http://127.0.0.1:<port>/api/auth/oauth2
    ```
 
 4. Check the public address from another network. Both must return JSON:

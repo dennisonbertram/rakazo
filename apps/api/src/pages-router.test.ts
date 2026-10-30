@@ -21,9 +21,21 @@ const match = (row: Row, where: Row = {}) =>
 
 function setup() {
   const bots: Row[] = [
-    { id: "bot-1", userId: "user-1", spaceId: "space-1", archivedAt: null },
-    { id: "bot-other-user", userId: "user-2", spaceId: "space-1", archivedAt: null },
-    { id: "bot-other-space", userId: "user-1", spaceId: "space-2", archivedAt: null },
+    { id: "bot-1", userId: "user-1", spaceId: "space-1", archivedAt: null, name: "Writer" },
+    {
+      id: "bot-other-user",
+      userId: "user-2",
+      spaceId: "space-1",
+      archivedAt: null,
+      name: "Writer",
+    },
+    {
+      id: "bot-other-space",
+      userId: "user-1",
+      spaceId: "space-2",
+      archivedAt: null,
+      name: "Writer",
+    },
   ];
   const pages: Row[] = [];
   const prisma = {
@@ -37,12 +49,26 @@ function setup() {
       findFirst: vi.fn(
         async ({ where }: { where: Row }) => pages.find((p) => match(p, where)) ?? null,
       ),
+      findMany: vi.fn(async ({ where }: { where: Row }) => pages.filter((p) => match(p, where))),
       create: vi.fn(async ({ data }: { data: Row }) => {
-        const row = { id: "page-1", updatedAt: new Date("2026-10-17T00:00:00Z"), ...data };
+        const row = {
+          id: `page-${pages.length + 1}`,
+          updatedAt: new Date("2026-10-17T00:00:00Z"),
+          ...data,
+        };
         pages.push(row);
         return row;
       }),
-      updateMany: vi.fn(),
+      updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
+        const row = pages.find((p) => match(p, where));
+        if (row) Object.assign(row, data);
+        return { count: row ? 1 : 0 };
+      }),
+      deleteMany: vi.fn(async ({ where }: { where: Row }) => {
+        const i = pages.findIndex((p) => match(p, where));
+        if (i >= 0) pages.splice(i, 1);
+        return { count: i >= 0 ? 1 : 0 };
+      }),
     },
     botPageRevision: { create: vi.fn() },
     thread: { findFirst: vi.fn(async () => ({ id: "thread-1" })) },
@@ -56,7 +82,10 @@ function setup() {
     env: { mailWritesDisabled: false },
   } as unknown as RouterDeps;
   const handler = new RPCHandler(createRouter(deps));
-  async function call(path: "get" | "save", input: unknown) {
+  async function call(
+    path: "get" | "save" | "list" | "create" | "rename" | "remove",
+    input: unknown,
+  ) {
     const { response } = await handler.handle(
       new Request(`http://127.0.0.1/rpc/pages/${path}`, {
         method: "POST",
@@ -80,7 +109,7 @@ describe("pages router", () => {
     expect(events.append).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "page.updated",
-        payload: { revision: 1, updatedBy: "user" },
+        payload: { pageId: "page-1", revision: 1, updatedBy: "user" },
       }),
     );
     expect((await call("get", { botId: "bot-1" })).body.json).toMatchObject({ content: "# Plan" });
@@ -108,5 +137,62 @@ describe("pages router", () => {
       ).toBeGreaterThanOrEqual(400);
     }
     expect(pages).toHaveLength(0);
+  });
+
+  it("lists, creates, renames and removes named pages, and addresses each by pageId", async () => {
+    const { call } = setup();
+    await call("save", { botId: "bot-1", content: "first", baseRevision: 0 });
+    const created = await call("create", { botId: "bot-1", title: " Cash " });
+    expect(created.body.json).toMatchObject({ title: "Cash", revision: 1, content: "" });
+    const pageId = created.body.json?.id as string;
+    expect((await call("create", { botId: "bot-1", title: "Cash" })).status).toBe(409);
+    expect((await call("list", { botId: "bot-1" })).body.json).toMatchObject([
+      { title: "Writer", revision: 1 },
+      { title: "Cash", revision: 1 },
+    ]);
+    // No pageId still means the first page.
+    expect((await call("get", { botId: "bot-1" })).body.json).toMatchObject({ content: "first" });
+    const saved = await call("save", { botId: "bot-1", pageId, content: "c", baseRevision: 1 });
+    expect(saved.body.json).toMatchObject({ ok: true, page: { title: "Cash", revision: 2 } });
+    expect((await call("get", { botId: "bot-1", pageId })).body.json).toMatchObject({
+      content: "c",
+    });
+    expect(
+      (await call("rename", { botId: "bot-1", pageId, title: "Money" })).body.json,
+    ).toMatchObject({
+      title: "Money",
+    });
+    expect((await call("remove", { botId: "bot-1", pageId })).body.json).toEqual({ ok: true });
+    expect((await call("get", { botId: "bot-1", pageId })).body.json).toBeNull();
+  });
+
+  it("treats a pageId of another bot as not found", async () => {
+    const { call, pages } = setup();
+    pages.push({
+      id: "foreign",
+      botId: "bot-other-user",
+      spaceId: "space-1",
+      title: "Theirs",
+      content: "secret",
+      revision: 1,
+      updatedBy: "user",
+      updatedAt: new Date(),
+    });
+    expect((await call("get", { botId: "bot-1", pageId: "foreign" })).body.json).toBeNull();
+    expect(
+      (await call("save", { botId: "bot-1", pageId: "foreign", content: "x", baseRevision: 1 }))
+        .status,
+    ).toBe(404);
+    expect(
+      (await call("rename", { botId: "bot-1", pageId: "foreign", title: "Mine" })).status,
+    ).toBe(404);
+    expect((await call("remove", { botId: "bot-1", pageId: "foreign" })).status).toBe(404);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toMatchObject({ title: "Theirs", content: "secret" });
+    for (const path of ["list", "create"] as const) {
+      expect(
+        (await call(path, { botId: "bot-other-user", title: "x" })).status,
+      ).toBeGreaterThanOrEqual(400);
+    }
   });
 });

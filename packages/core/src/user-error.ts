@@ -1,5 +1,8 @@
 import type { ThreadSnapshot } from "@rakazo/contracts";
-import { MISSING_TOOL_FINAL_RESPONSE_ERROR } from "@rakazo/contracts";
+import {
+  MISSING_TOOL_FINAL_RESPONSE_ERROR,
+  PINNED_CONNECTION_LOST_MESSAGE,
+} from "@rakazo/contracts";
 
 /** Copy each client supplies in its own language. */
 export type UserErrorCopy = { fallback: string; offline: string };
@@ -227,10 +230,15 @@ export function plainRunError(error: string, copy: RunErrorCopy): string {
 /**
  * The one action that fixes a failed run: "models" opens Settings > Models (a rejected key, a
  * spending limit, no credits), "retry" sends the message again (a rate limit or an unexplained
- * failure, whose copy says to try again). Any other error names its own cause and has none.
+ * failure, whose copy says to try again), "connection" offers both Models and the bot's settings
+ * for a pinned connection that is signed out or removed. Any other error names its own cause and has none.
  */
-export function runErrorAction(error: string | null | undefined): "models" | "retry" | undefined {
+export function runErrorAction(
+  error: string | null | undefined,
+): "models" | "retry" | "connection" | undefined {
   if (!error) return undefined;
+  // "connection": the bot's pinned connection is gone; sign in again or choose another.
+  if (error === PINNED_CONNECTION_LOST_MESSAGE) return "connection";
   switch (classifyRunError(error)) {
     case "keyRejected":
     case "spendLimit":

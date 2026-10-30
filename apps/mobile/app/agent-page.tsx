@@ -1,9 +1,10 @@
 import { ChatMarkdown } from "@rakazo/chat-ui/native";
-import type { BotPage } from "@rakazo/contracts";
+import type { BotPage, BotPageSummary } from "@rakazo/contracts";
 import { useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
+import { MenuPicker } from "../components/menu-picker";
 import { NativeSymbol } from "../components/native-symbol";
 import { pageBlocks } from "../lib/agent-page";
 import { rpc } from "../lib/api";
@@ -26,6 +27,9 @@ export default function AgentPageScreen() {
   const tokens = mobileTokens();
   const colorScheme = useResolvedAppearance();
   const [state, setState] = useState<State>({ status: "loading" });
+  // A bot with several pages shows a menu to switch; without a choice, the first page opens.
+  const [pages, setPages] = useState<BotPageSummary[]>([]);
+  const [pageId, setPageId] = useState<string>();
   const navigation = useNavigation();
   const hidden = useHideAmounts();
 
@@ -65,7 +69,10 @@ export default function AgentPageScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      rpc<BotPage | null>("pages/get", { botId, chartSvgs: true })
+      rpc<BotPageSummary[]>("pages/list", { botId })
+        .then((list) => !cancelled && setPages(list))
+        .catch(() => undefined);
+      rpc<BotPage | null>("pages/get", { botId, pageId, chartSvgs: true })
         .then((page) => !cancelled && setState({ status: "ready", page }))
         .catch((error: unknown) => {
           // Keep an already-loaded page on screen when a refresh fails.
@@ -79,7 +86,7 @@ export default function AgentPageScreen() {
       return () => {
         cancelled = true;
       };
-    }, [botId, t]),
+    }, [botId, pageId, t]),
   );
 
   const page = state.status === "ready" ? state.page : null;
@@ -105,6 +112,14 @@ export default function AgentPageScreen() {
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
     >
+      {pages.length > 1 ? (
+        <MenuPicker
+          label={t("Page")}
+          choices={pages.map((entry) => ({ key: entry.id, label: entry.title }))}
+          value={pageId ?? page.id}
+          onChange={setPageId}
+        />
+      ) : null}
       {blocks.map((block, index) =>
         block.kind === "markdown" ? (
           <ChatMarkdown key={index} palette={tokens} colorScheme={colorScheme}>

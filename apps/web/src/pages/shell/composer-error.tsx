@@ -38,6 +38,7 @@ export function ComposerError({
   onRetry,
   onRetrySend,
   onOpenModelSettings,
+  onOpenBotSettings,
   onNavigate,
 }: {
   ref?: Ref<HTMLDivElement>;
@@ -50,6 +51,7 @@ export function ComposerError({
   /** Sends the message that failed to leave again. */
   onRetrySend?: () => void;
   onOpenModelSettings?: (provider?: string) => void;
+  onOpenBotSettings?: () => void;
   onNavigate?: (path: string) => void;
 }) {
   const { t } = useLingui();
@@ -66,6 +68,16 @@ export function ComposerError({
         {fix === "models" && onOpenModelSettings ? (
           <Button size="sm" variant="outline" onClick={() => onOpenModelSettings("")}>
             <Trans>Open Models settings</Trans>
+          </Button>
+        ) : null}
+        {fix === "connection" && onOpenModelSettings ? (
+          <Button size="sm" variant="outline" onClick={() => onOpenModelSettings("")}>
+            <Trans>Sign in again</Trans>
+          </Button>
+        ) : null}
+        {fix === "connection" && onOpenBotSettings ? (
+          <Button size="sm" variant="outline" onClick={onOpenBotSettings}>
+            <Trans>Choose another connection</Trans>
           </Button>
         ) : null}
         {((message.startsWith(MISSING_TOOL_FINAL_RESPONSE_ERROR) || fix === "retry") && onRetry) ||

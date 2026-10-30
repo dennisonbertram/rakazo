@@ -2594,6 +2594,7 @@ describe("sendUserMessage", () => {
 
   it("keeps an agreed inbound model on steering while a routine run is busy", async () => {
     const tx = {
+      bot: { findUnique: vi.fn().mockResolvedValue({ modelCredentialId: null }) },
       thread: {
         update: vi
           .fn()
@@ -2650,6 +2651,84 @@ describe("sendUserMessage", () => {
         modelId: "private-model",
         thinkingLevel: "low",
       },
+    });
+  });
+
+  describe("steering and connection pins", () => {
+    async function steer(
+      busyRun: Record<string, unknown>,
+      modelCredentialId: string | null,
+      botPin: string | null = null,
+    ) {
+      const tx = {
+        thread: {
+          update: vi
+            .fn()
+            .mockResolvedValueOnce({ nextMessageSeq: 5 })
+            .mockResolvedValueOnce({ nextEventSeq: 9 }),
+        },
+        message: {
+          create: vi.fn().mockResolvedValue({ id: "message-1", seq: 4 }),
+          update: vi.fn().mockResolvedValue({ id: "message-1" }),
+        },
+        steeringMessage: { create: vi.fn() },
+        bot: { findUnique: vi.fn().mockResolvedValue({ modelCredentialId: botPin }) },
+        task: { create: vi.fn() },
+        run: {
+          findMany: vi.fn().mockResolvedValue([{ id: "run-0", taskId: "task-0", ...busyRun }]),
+          findUnique: vi.fn().mockResolvedValue({ status: "running" }),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
+        event: {
+          create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+            ...event(data.seq),
+            type: data.type,
+          })),
+        },
+      };
+      const prisma = {
+        $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+      } as unknown as PrismaClient;
+      await sendUserMessage(prisma, {
+        spaceId: "workspace-1",
+        threadId: "thread-1",
+        botId: "bot-1",
+        userId: "user-1",
+        blocks: [{ kind: "text", text: "ping" }],
+        prompt: "ping",
+        trigger: "webhook",
+        modelPin: {
+          modelProvider: "openai-compatible",
+          modelId: "m",
+          modelCredentialId,
+          thinkingLevel: null,
+        },
+      });
+      return tx.steeringMessage.create.mock.calls[0]![0].data as Record<string, unknown>;
+    }
+
+    it("holds a message pinned to another connection instead of folding it into the live run", async () => {
+      const data = await steer({ trigger: "user", modelPinned: false }, "cred-routine", null);
+      expect(data.runId).toBeNull();
+      expect(data.modelCredentialId).toBe("cred-routine");
+    });
+
+    it("holds a message with no pin while the live run is on a pinned connection", async () => {
+      const data = await steer(
+        { trigger: "user", modelPinned: true, modelCredentialId: "cred-a" },
+        null,
+        null,
+      );
+      expect(data.runId).toBeNull();
+    });
+
+    it("folds a message into the live run when both use the same connection", async () => {
+      const data = await steer(
+        { trigger: "user", modelPinned: true, modelCredentialId: "cred-a" },
+        "cred-a",
+      );
+      expect(data.runId).toBe("run-0");
     });
   });
 

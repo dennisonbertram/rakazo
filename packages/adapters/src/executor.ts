@@ -90,6 +90,7 @@ import {
   LEGAL_CONSENT_REQUIRED_MESSAGE,
   OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
+  PINNED_CONNECTION_LOST_MESSAGE,
   RunPhaseSchema,
   VOICE_AGENT_BUILTIN_TOOLS,
   ZERNIO_READ_TOOLS,
@@ -186,6 +187,7 @@ import {
   createThreadMessageInTransaction,
   dropRunTurnCheckpoint,
   effectiveMemoryScope,
+  findBotModelCredential,
   findDefaultModelCredential,
   findModelCredential,
   InvalidSpaceNameError,
@@ -195,6 +197,7 @@ import {
   listApprovalRules,
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
+  PinnedConnectionLostError,
   parseComputerMode,
   RUN_TURN_CHECKPOINT_KIND,
   readHistory,
@@ -1138,6 +1141,7 @@ export function isTerminalModelSetupError(error: unknown): boolean {
   return (
     error instanceof UnavailableModelForAuthError ||
     isRetiredModelCredentialError(error) ||
+    error instanceof PinnedConnectionLostError ||
     (error instanceof Error && error.message === CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE)
   );
 }
@@ -1154,13 +1158,22 @@ async function resolveRunModel(
           userId: scope.userId,
           spaceId: scope.spaceId,
         },
-        select: { modelProvider: true, modelId: true, thinkingLevel: true },
+        select: {
+          modelProvider: true,
+          modelId: true,
+          modelCredentialId: true,
+          thinkingLevel: true,
+        },
       })
     : null;
   const hasOverride = Boolean(override?.modelProvider && override.modelId);
   const [overrideCredential, defaultCredential, settings] = await Promise.all([
     hasOverride
-      ? findModelCredential(deps.prisma, scope, override!.modelProvider!, override!.modelId)
+      ? findBotModelCredential(deps.prisma, scope, {
+          modelProvider: override!.modelProvider!,
+          modelId: override!.modelId,
+          modelCredentialId: override!.modelCredentialId,
+        })
       : Promise.resolve(null),
     findDefaultModelCredential(deps.prisma, scope),
     deps.prisma.deploymentSettings.findUnique({
@@ -1436,7 +1449,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // The claim locks the row, so this is the model that was committed when it fired.
           const currentModel = await tx.routine.findUnique({
             where: { id: routine.id },
-            select: { modelProvider: true, modelId: true, thinkingLevel: true },
+            select: {
+              modelProvider: true,
+              modelId: true,
+              modelCredentialId: true,
+              thinkingLevel: true,
+            },
           });
           if (!currentModel) return null;
           const task = await tx.task.create({
@@ -1683,6 +1701,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? {
                     modelProvider: failed.modelProvider,
                     modelId: failed.modelId,
+                    modelCredentialId: failed.modelCredentialId,
                     thinkingLevel: failed.thinkingLevel,
                     modelPinned: true,
                   }
@@ -2158,15 +2177,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // modelPinned distinguishes the captured choice from an attempt's recorded model.
         const modelChoice = runModelChoice(run, bot);
         const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
+        // A pinned connection that is gone fails the run by name; it never moves to another one.
+        let pinnedConnectionLost = false;
         const overrideCredential =
           hasModelOverride && modelChoice.modelProvider
-            ? await findModelCredential(
-                deps.prisma,
-                run,
-                modelChoice.modelProvider,
-                modelChoice.modelId,
-              )
+            ? await findBotModelCredential(deps.prisma, run, {
+                modelProvider: modelChoice.modelProvider,
+                modelId: modelChoice.modelId,
+                modelCredentialId: modelChoice.modelCredentialId,
+              }).catch((error: unknown) => {
+                if (!(error instanceof PinnedConnectionLostError)) throw error;
+                pinnedConnectionLost = true;
+                return null;
+              })
             : null;
+        // Backups stand in for a refused or exhausted account; a pinned connection never swaps.
+        const runPinnedToConnection = Boolean(hasModelOverride && modelChoice.modelCredentialId);
         runAbortController = new AbortController();
         if (!leaseValid) runAbortController.abort();
         if (deps.shutdownSignal?.aborted) runAbortController.abort(deps.shutdownSignal.reason);
@@ -2617,6 +2643,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           return true;
         };
+        if (pinnedConnectionLost) {
+          await failRunBeforeModel(PINNED_CONNECTION_LOST_MESSAGE, true);
+          return;
+        }
         if (pinError) {
           await failRunBeforeModel(pinError, pinError === PINNED_PROVIDER_NOT_CONNECTED);
           return;
@@ -2644,6 +2674,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             runModelProvider,
             runModelId,
             (values) => runSecrets.push(...values),
+            false,
+            runPinnedToConnection,
           );
         } catch (error) {
           // A dead or account-switched credential is already deleted. Retrying
@@ -2651,7 +2683,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (!isTerminalModelSetupError(error)) throw error;
           await failRunBeforeModel(
             error instanceof Error ? error.message : "Connect the provider again.",
-            isRetiredModelCredentialError(error),
+            isRetiredModelCredentialError(error) || error instanceof PinnedConnectionLostError,
           );
           return;
         }
@@ -5791,7 +5823,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
             }
           }
-          if (name === "page_read" || name === "page_write" || name === "page_edit") {
+          if (
+            name === "page_list" ||
+            name === "page_create" ||
+            name === "page_read" ||
+            name === "page_write" ||
+            name === "page_edit"
+          ) {
             return finish(
               await pageToolFromTool(
                 name,
@@ -8213,6 +8251,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // recipient, so the Legal agent has none. A meeting-source agent has none for the same reason.
         if (
           !scripted &&
+          !runPinnedToConnection &&
           !legalOnly &&
           !meetingAgent &&
           !meetingTaint &&
@@ -10482,7 +10521,7 @@ export function userTurnInstructions(parts: {
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "page_write",
-      'You have one persistent page. Put durable output the user will revisit there (a summary, tracker, or dashboard); keep ordinary replies in chat. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order.',
+      'You have named pages, up to 20. Put durable output the user will revisit on a page (a summary, tracker, or dashboard); keep ordinary replies in chat. Call page_list to see them and page_create to add one; page_read, page_write and page_edit take an optional page (a title from page_list) and use the first page without it. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order.',
     ),
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
@@ -11468,6 +11507,7 @@ async function resolveModelKey(
   modelId: string,
   registerSecrets?: (values: string[]) => void,
   requireStoredSecret = false,
+  pinnedConnection = false,
 ): Promise<{
   apiKey?: string;
   accountId?: string;
@@ -11495,6 +11535,8 @@ async function resolveModelKey(
         where: { id: credential.secretId, userId, spaceId: null },
       });
       if (!row) {
+        // A pinned run never takes the deployment key when its connection's secret vanishes.
+        if (pinnedConnection) throw new PinnedConnectionLostError();
         if (requireStoredSecret) throw new Error("Backup model credential is no longer available");
         cloudflareGatewayProviderEnv({ provider });
         return { apiKey: deploymentKeyFor(deps, provider), redact: [] };
