@@ -18,6 +18,7 @@ import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
+import { PRACI_SOURCE_TOOLS } from "./praci-source-tools.js";
 import { SCRATCHPAD_HANDOFF_AGENTS } from "./scratchpad-tools.js";
 import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { voiceAgentTools } from "./voice-agent-tools.js";
@@ -576,6 +577,46 @@ export const builtinAgentTools: ConnectorTool[] = [
         page: PAGE_TITLE_PROPERTY,
       },
       required: ["old_string", "new_string", "baseRevision"],
+    },
+  },
+  {
+    name: "page_source_list",
+    description:
+      "List the data sources saved on one of this bot's pages: name, tool, schedule, status, last refresh and last error.",
+    inputSchema: { type: "object", properties: { page: PAGE_TITLE_PROPERTY } },
+    readOnly: true,
+  },
+  {
+    name: "page_source_set",
+    description:
+      "Save or replace a named data source on a page: a read-only Praci data tool that the server reruns on a schedule without you. Page metric, table and chart blocks show its stored result by source name. Runs the tool once now and returns the saved source and a preview of the result (up to 4,000 characters) so you can choose the path to show. A page can have 20 sources.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        page: PAGE_TITLE_PROPERTY,
+        name: { type: "string", description: "1 to 40 characters, unique on the page." },
+        kind: { type: "string", enum: ["praci"] },
+        tool: {
+          type: "string",
+          description: `One of: ${PRACI_SOURCE_TOOLS.join(", ")}. It must be a tool you have.`,
+        },
+        args: { type: "object", description: "Arguments for the tool." },
+        schedule: {
+          type: "string",
+          enum: ["15m", "1h", "6h", "1d", "1w"],
+          description: "Default 1h.",
+        },
+      },
+      required: ["name", "tool"],
+    },
+  },
+  {
+    name: "page_source_remove",
+    description: "Remove a data source (and its stored results) from a page by name.",
+    inputSchema: {
+      type: "object",
+      properties: { page: PAGE_TITLE_PROPERTY, name: { type: "string" } },
+      required: ["name"],
     },
   },
   {

@@ -38,6 +38,8 @@ function setup() {
     },
   ];
   const pages: Row[] = [];
+  const sources: Row[] = [];
+  const snapshots: Row[] = [];
   const prisma = {
     bot: {
       findFirst: vi.fn(async ({ where }: { where: Row }) => {
@@ -70,6 +72,34 @@ function setup() {
         return { count: i >= 0 ? 1 : 0 };
       }),
     },
+    pageSource: {
+      findMany: vi.fn(async ({ where }: { where: Row }) => sources.filter((r) => match(r, where))),
+      findFirst: vi.fn(
+        async ({ where }: { where: Row }) => sources.find((r) => match(r, where)) ?? null,
+      ),
+      updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
+        const row = sources.find((r) => match(r, where));
+        if (row) {
+          Object.assign(row, data, {
+            failures: (row.failures as number) + 1,
+          });
+        }
+        return { count: row ? 1 : 0 };
+      }),
+      deleteMany: vi.fn(async ({ where }: { where: Row }) => {
+        const i = sources.findIndex((r) => match(r, where));
+        if (i >= 0) sources.splice(i, 1);
+        return { count: i >= 0 ? 1 : 0 };
+      }),
+    },
+    pageSourceSnapshot: {
+      findMany: vi.fn(async ({ where, take }: { where: Row; take: number }) =>
+        snapshots
+          .filter((r) => match(r, where))
+          .slice(-take)
+          .reverse(),
+      ),
+    },
     botPageRevision: { create: vi.fn() },
     thread: { findFirst: vi.fn(async () => ({ id: "thread-1" })) },
     $transaction: vi.fn(),
@@ -83,7 +113,17 @@ function setup() {
   } as unknown as RouterDeps;
   const handler = new RPCHandler(createRouter(deps));
   async function call(
-    path: "get" | "save" | "list" | "create" | "rename" | "remove",
+    path:
+      | "get"
+      | "save"
+      | "list"
+      | "create"
+      | "rename"
+      | "remove"
+      | "data"
+      | "refresh"
+      | "sources"
+      | "removeSource",
     input: unknown,
   ) {
     const { response } = await handler.handle(
@@ -97,7 +137,7 @@ function setup() {
     if (!response) throw new Error("Procedure did not match");
     return { status: response.status, body: (await response.json()) as { json: Row | null } };
   }
-  return { prisma, events, pages, call };
+  return { prisma, events, pages, sources, snapshots, call };
 }
 
 describe("pages router", () => {
@@ -194,5 +234,98 @@ describe("pages router", () => {
         (await call(path, { botId: "bot-other-user", title: "x" })).status,
       ).toBeGreaterThanOrEqual(400);
     }
+  });
+
+  describe("live data", () => {
+    const metric =
+      '```metric\n{"label":"People","source":"people","path":"/n","format":"number"}\n```';
+    const source = (over: Row = {}): Row => ({
+      id: "src-1",
+      spaceId: "space-1",
+      userId: "user-1",
+      botId: "bot-1",
+      pageId: "page-1",
+      name: "people",
+      kind: "praci",
+      call: { tool: "finance_overview", args: {} },
+      schedule: "1h",
+      status: "active",
+      failures: 0,
+      lastError: null,
+      lastRefreshAt: null,
+      ...over,
+    });
+
+    async function withPage() {
+      const ctx = setup();
+      await ctx.call("save", { botId: "bot-1", content: metric, baseRevision: 0 });
+      return ctx;
+    }
+
+    it("resolves a page's live blocks from stored snapshots, and is null without a page", async () => {
+      const { call, sources, snapshots } = setup();
+      expect((await call("data", { botId: "bot-1" })).body.json).toBeNull();
+      await call("save", { botId: "bot-1", content: metric, baseRevision: 0 });
+      expect((await call("data", { botId: "bot-1" })).body.json).toMatchObject({
+        blocks: [{ status: "missing" }],
+      });
+      sources.push(source());
+      snapshots.push({
+        sourceId: "src-1",
+        spaceId: "space-1",
+        value: { n: 1200 },
+        fetchedAt: new Date("2026-10-01T00:00:00Z"),
+      });
+      expect((await call("data", { botId: "bot-1" })).body.json).toEqual({
+        pageId: "page-1",
+        revision: 1,
+        blocks: [{ status: "ok", fetchedAt: "2026-10-01T00:00:00.000Z", text: "1,200" }],
+      });
+      for (const botId of ["bot-other-user", "bot-other-space"]) {
+        for (const path of ["data", "refresh", "sources"] as const) {
+          expect((await call(path, { botId })).status).toBeGreaterThanOrEqual(400);
+        }
+      }
+    });
+
+    it("lists sources and removes only this bot's source, announcing page.data", async () => {
+      const { call, sources, events } = await withPage();
+      sources.push(source(), source({ id: "foreign", botId: "bot-other-user", name: "theirs" }));
+      expect((await call("sources", { botId: "bot-1" })).body.json).toMatchObject([
+        { id: "src-1", name: "people", status: "active", lastError: null },
+      ]);
+      expect((await call("removeSource", { botId: "bot-1", sourceId: "foreign" })).status).toBe(
+        404,
+      );
+      expect(sources).toHaveLength(2);
+      expect((await call("removeSource", { botId: "bot-1", sourceId: "src-1" })).body.json).toEqual(
+        { ok: true },
+      );
+      expect(sources.map((row) => row.id)).toEqual(["foreign"]);
+      expect(events.append).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "page.data", payload: { pageId: "page-1" } }),
+      );
+    });
+
+    it("refresh skips a source refreshed in the last minute and records a failure for the rest", async () => {
+      const { call, sources, events } = await withPage();
+      sources.push(source({ lastRefreshAt: new Date() }));
+      await call("refresh", { botId: "bot-1" });
+      expect(sources[0]?.failures).toBe(0);
+      expect(events.append).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "page.data" }),
+      );
+      sources[0] = source({ lastRefreshAt: new Date(Date.now() - 120_000) });
+      const result = await call("refresh", { botId: "bot-1" });
+      // Chief is not a Finance agent, so the same gate a run applies refuses the call.
+      expect(sources[0]).toMatchObject({
+        failures: 1,
+        lastError: "This bot does not have finance_overview.",
+      });
+      expect(result.body.json).toMatchObject({
+        blocks: [{ status: "failed", error: "This bot does not have finance_overview." }],
+      });
+      expect(events.append).toHaveBeenCalledWith(expect.objectContaining({ type: "page.data" }));
+    });
   });
 });

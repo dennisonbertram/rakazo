@@ -9,6 +9,7 @@ import {
   renderPlotSpecToSvg,
   searchChartCatalog,
   supportedPlotNames,
+  unknownPlotSpecKey,
 } from "./plot-tool.js";
 
 const dom = () => new JSDOM("").window.document;
@@ -22,6 +23,17 @@ const penguinish = [
 ];
 
 describe("render_plot", () => {
+  it("drops top-level keys that are not PlotSpec keys, and reports them for saving", () => {
+    const spec = {
+      figure: true,
+      marks: [{ type: "dot", options: { x: "length", y: "depth" } }],
+    } as unknown as PlotSpec;
+    // Plot.plot would wrap the chart in a <figure> if the option reached it.
+    expect(buildPlotParts(spec, penguinish, dom()).plotted.tagName.toLowerCase()).toBe("svg");
+    expect(unknownPlotSpecKey(spec)).toBe("figure");
+    expect(unknownPlotSpecKey({ title: "t", marks: [] })).toBeNull();
+  });
+
   it("renders a titled scatterplot with a categorical legend into standalone SVG", () => {
     const svg = renderPlotSpecToSvg(
       {

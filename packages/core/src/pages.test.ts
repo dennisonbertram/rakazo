@@ -4,6 +4,8 @@ import {
   gtmPageContentError,
   pageChartFence,
   pageGtmFence,
+  pageMetricFence,
+  pageTableFence,
   parsePageGtm,
   splitPage,
 } from "./pages.js";
@@ -82,6 +84,59 @@ describe("splitPage", () => {
     const unclosed = splitPage('Intro\n```gtm-plan\n{"group":"done"}');
     expect(unclosed[0]).toEqual({ kind: "markdown", text: "Intro" });
     expect(unclosed[1]?.kind).toBe("invalid_gtm");
+  });
+});
+
+describe("live blocks", () => {
+  const metric = { label: "Cash", source: "cash", path: "/balance", format: "usd" as const };
+  const table = {
+    name: "Vendors",
+    source: "spend",
+    path: "/vendors",
+    columns: [{ key: "name", label: "Vendor" }],
+    limit: 10,
+  };
+
+  it("splits metric and table fences in order and round-trips them", () => {
+    const page = `Intro\n${pageMetricFence(metric)}\n${pageTableFence(table)}\nEnd`;
+    expect(splitPage(page).map((segment) => segment.kind)).toEqual([
+      "markdown",
+      "metric",
+      "table",
+      "markdown",
+    ]);
+    expect(splitPage(pageMetricFence(metric))).toEqual([{ kind: "metric", block: metric }]);
+    expect(splitPage(pageTableFence(table))).toEqual([{ kind: "table", block: table }]);
+  });
+
+  it("applies defaults and reports invalid, unknown-key and unclosed fences", () => {
+    expect(splitPage('```metric\n{"label":"A","source":"cash"}\n```')).toEqual([
+      { kind: "metric", block: { label: "A", source: "cash", path: "", format: "number" } },
+    ]);
+    expect(splitPage('```metric\n{"label":"A","source":"cash","extra":1}\n```')[0]?.kind).toBe(
+      "invalid_live",
+    );
+    expect(splitPage("```table\n{nope\n```")).toEqual([
+      { kind: "invalid_live", raw: "{nope", error: "The table block is not valid JSON." },
+    ]);
+    expect(splitPage('```metric\n{"label":"A"')[0]).toMatchObject({
+      kind: "invalid_live",
+      error: expect.stringContaining("missing its closing"),
+    });
+  });
+
+  it("keeps a metric example inside a longer fence as markdown", () => {
+    const page = `\`\`\`\`md\n${pageMetricFence(metric)}\n\`\`\`\``;
+    expect(splitPage(page).map((segment) => segment.kind)).toEqual(["markdown"]);
+  });
+
+  it("checks the source name and path of a sourced chart", () => {
+    const ok = splitPage(pageChartFence({ ...chart, source: "cash flow", path: "/rows" }));
+    expect(ok[0]?.kind).toBe("chart");
+    const badName = splitPage(pageChartFence({ ...chart, source: "bad/name" }));
+    expect(badName[0]).toMatchObject({ kind: "invalid_chart" });
+    const badPath = splitPage(pageChartFence({ ...chart, source: "cash", path: "rows" }));
+    expect(badPath[0]).toMatchObject({ kind: "invalid_chart" });
   });
 });
 
