@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageBlocks } from "./agent-page";
+import { pageBlocks, sidebarBotPages } from "./agent-page";
 
 const chart = (name: string) =>
   `\`\`\`chart\n${JSON.stringify({ name, spec: {}, data: [] })}\n\`\`\``;
@@ -103,5 +103,14 @@ describe("pageBlocks", () => {
     );
     expect(blocks.map((b) => b.kind)).toEqual(["chart_error", "metric"]);
     expect(blocks[1]).toMatchObject({ value: { text: "5" } });
+  });
+});
+
+describe("sidebarBotPages", () => {
+  it("keeps only bot page rows", () => {
+    const row = { pageId: "p1", botId: "b1", title: "Cash" };
+    expect(
+      sidebarBotPages({ pages: [{ templateKey: "team-health" }, row], addable: [], botPages: [] }),
+    ).toEqual([row]);
   });
 });

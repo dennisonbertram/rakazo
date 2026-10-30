@@ -238,6 +238,7 @@ import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
 import {
   AnswerTooLongError,
   addSidebarFolder,
+  addSidebarBotPage,
   addSidebarPage,
   appendEventInTransaction,
   approvalTable,
@@ -335,6 +336,7 @@ import {
   releaseAuditDraft,
   releaseSpaceDeletionClaim,
   removeSidebarFolder,
+  removeSidebarBotPage,
   removeSidebarPage,
   renameSpaceForMember,
   renewSpaceDeletionClaim,
@@ -8745,12 +8747,15 @@ export function createRouter(deps: RouterDeps) {
         listSidebarPages(deps.prisma, actorScope(context.actor)),
       ),
       add: authed.sidebarPages.add.handler(({ context, input }) =>
-        addSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey).catch(
-          sidebarPageError,
-        ),
+        ("pageId" in input
+          ? addSidebarBotPage(deps.prisma, actorScope(context.actor), input.pageId)
+          : addSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey)
+        ).catch(sidebarPageError),
       ),
       remove: authed.sidebarPages.remove.handler(({ context, input }) =>
-        removeSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey),
+        "pageId" in input
+          ? removeSidebarBotPage(deps.prisma, actorScope(context.actor), input.pageId)
+          : removeSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey),
       ),
     },
     calendar: {

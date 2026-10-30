@@ -35,7 +35,7 @@ type State =
   | { status: "ready"; page: BotPage | null };
 
 export default function AgentPageScreen() {
-  const { botId } = useLocalSearchParams<{ botId: string }>();
+  const { botId, pageId: openPageId } = useLocalSearchParams<{ botId: string; pageId?: string }>();
   const { t } = useI18n();
   const styles = useThemedStyles(createStyles);
   const tokens = mobileTokens();
@@ -43,7 +43,7 @@ export default function AgentPageScreen() {
   const [state, setState] = useState<State>({ status: "loading" });
   // A bot with several pages shows a menu to switch; without a choice, the first page opens.
   const [pages, setPages] = useState<BotPageSummary[]>([]);
-  const [pageId, setPageId] = useState<string>();
+  const [pageId, setPageId] = useState<string | undefined>(openPageId);
   const [live, setLive] = useState<PageData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();

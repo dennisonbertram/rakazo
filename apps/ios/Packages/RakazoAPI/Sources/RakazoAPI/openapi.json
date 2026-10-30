@@ -108064,16 +108064,32 @@
                 "properties": {
                   "json": {
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "type": "object",
-                    "properties": {
-                      "templateKey": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "templateKey": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "templateKey"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "pageId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "pageId"
+                        ]
                       }
-                    },
-                    "required": [
-                      "templateKey"
                     ]
                   }
                 },
@@ -108102,16 +108118,40 @@
                         "pages": {
                           "type": "array",
                           "items": {
-                            "type": "object",
-                            "properties": {
-                              "templateKey": {
-                                "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema0"
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "templateKey": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema0"
+                                  }
+                                },
+                                "required": [
+                                  "templateKey"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "pageId": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema1"
+                                  },
+                                  "botId": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema1"
+                                  },
+                                  "title": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema2"
+                                  }
+                                },
+                                "required": [
+                                  "pageId",
+                                  "botId",
+                                  "title"
+                                ],
+                                "additionalProperties": false
                               }
-                            },
-                            "required": [
-                              "templateKey"
-                            ],
-                            "additionalProperties": false
+                            ]
                           }
                         },
                         "addable": {
@@ -108119,11 +108159,47 @@
                           "items": {
                             "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema0"
                           }
+                        },
+                        "botPages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "botId": {
+                                "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema1"
+                              },
+                              "pages": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema1"
+                                    },
+                                    "title": {
+                                      "$ref": "#/components/schemas/RpcSidebarPagesAddOutputSchema2"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "title"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "botId",
+                              "pages"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
                         "pages",
-                        "addable"
+                        "addable",
+                        "botPages"
                       ],
                       "additionalProperties": false
                     }
@@ -108266,16 +108342,40 @@
                         "pages": {
                           "type": "array",
                           "items": {
-                            "type": "object",
-                            "properties": {
-                              "templateKey": {
-                                "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema0"
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "templateKey": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema0"
+                                  }
+                                },
+                                "required": [
+                                  "templateKey"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "pageId": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema1"
+                                  },
+                                  "botId": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema1"
+                                  },
+                                  "title": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema2"
+                                  }
+                                },
+                                "required": [
+                                  "pageId",
+                                  "botId",
+                                  "title"
+                                ],
+                                "additionalProperties": false
                               }
-                            },
-                            "required": [
-                              "templateKey"
-                            ],
-                            "additionalProperties": false
+                            ]
                           }
                         },
                         "addable": {
@@ -108283,11 +108383,47 @@
                           "items": {
                             "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema0"
                           }
+                        },
+                        "botPages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "botId": {
+                                "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema1"
+                              },
+                              "pages": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema1"
+                                    },
+                                    "title": {
+                                      "$ref": "#/components/schemas/RpcSidebarPagesListOutputSchema2"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "title"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "botId",
+                              "pages"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
                         "pages",
-                        "addable"
+                        "addable",
+                        "botPages"
                       ],
                       "additionalProperties": false
                     }
@@ -108406,16 +108542,32 @@
                 "properties": {
                   "json": {
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "type": "object",
-                    "properties": {
-                      "templateKey": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "templateKey": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "templateKey"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "pageId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "pageId"
+                        ]
                       }
-                    },
-                    "required": [
-                      "templateKey"
                     ]
                   }
                 },
@@ -108444,16 +108596,40 @@
                         "pages": {
                           "type": "array",
                           "items": {
-                            "type": "object",
-                            "properties": {
-                              "templateKey": {
-                                "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema0"
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "templateKey": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema0"
+                                  }
+                                },
+                                "required": [
+                                  "templateKey"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "pageId": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema1"
+                                  },
+                                  "botId": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema1"
+                                  },
+                                  "title": {
+                                    "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema2"
+                                  }
+                                },
+                                "required": [
+                                  "pageId",
+                                  "botId",
+                                  "title"
+                                ],
+                                "additionalProperties": false
                               }
-                            },
-                            "required": [
-                              "templateKey"
-                            ],
-                            "additionalProperties": false
+                            ]
                           }
                         },
                         "addable": {
@@ -108461,11 +108637,47 @@
                           "items": {
                             "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema0"
                           }
+                        },
+                        "botPages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "botId": {
+                                "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema1"
+                              },
+                              "pages": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema1"
+                                    },
+                                    "title": {
+                                      "$ref": "#/components/schemas/RpcSidebarPagesRemoveOutputSchema2"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "title"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "botId",
+                              "pages"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
                         "pages",
-                        "addable"
+                        "addable",
+                        "botPages"
                       ],
                       "additionalProperties": false
                     }
@@ -136686,15 +136898,42 @@
         "minLength": 1,
         "maxLength": 64
       },
+      "RpcSidebarPagesAddOutputSchema1": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcSidebarPagesAddOutputSchema2": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      },
       "RpcSidebarPagesListOutputSchema0": {
         "type": "string",
         "minLength": 1,
         "maxLength": 64
       },
+      "RpcSidebarPagesListOutputSchema1": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcSidebarPagesListOutputSchema2": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      },
       "RpcSidebarPagesRemoveOutputSchema0": {
         "type": "string",
         "minLength": 1,
         "maxLength": 64
+      },
+      "RpcSidebarPagesRemoveOutputSchema1": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcSidebarPagesRemoveOutputSchema2": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
       },
       "RpcSkillsAppendEventOutputSchema0": {
         "type": "string",
