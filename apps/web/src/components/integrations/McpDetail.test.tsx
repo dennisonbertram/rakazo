@@ -593,6 +593,63 @@ it("Brex cards: any answer but a successful read keeps Replace token and Control
   ).toBe(true);
 });
 
+const replaceToken = () =>
+  [...container.querySelectorAll("button")].some((b) => b.textContent === "Replace token");
+
+it("Brex cards: a server error that ran past the owner checks shows Replace token but not Controls", async () => {
+  // The server runs the Brex call only for the space owner who connected, so BAD_GATEWAY (Brex down
+  // or its token revoked) proves the caller is that owner and the token can be replaced.
+  for (const code of ["BAD_GATEWAY", "UNAUTHORIZED", "INTERNAL_SERVER_ERROR"]) {
+    brex.cards
+      .mockReset()
+      .mockRejectedValue(Object.assign(new Error("Could not reach Brex"), { code }));
+    await showBrex();
+    expect(container.textContent).toContain("Could not reach Brex");
+    expect(replaceToken(), code).toBe(true);
+    expect(headings(), code).toContain("Cards");
+    expect(headings(), code).not.toContain("Controls");
+    expect(brex.getControls).not.toHaveBeenCalled();
+    act(() => root.render(null));
+  }
+});
+
+it("Brex cards: errors with no server code, FORBIDDEN and PRECONDITION_FAILED do not show Replace token", async () => {
+  const failures: [string, unknown][] = [
+    ["network", new TypeError("Failed to fetch")],
+    ["aborted", new DOMException("The operation was aborted.", "AbortError")],
+    ["forbidden", Object.assign(new Error("nope"), { code: "FORBIDDEN" })],
+    [
+      "someone else",
+      Object.assign(
+        new Error("Brex cards were connected by someone else. Disconnect and connect again."),
+        { code: "PRECONDITION_FAILED" },
+      ),
+    ],
+  ];
+  for (const [name, failure] of failures) {
+    brex.cards.mockReset().mockRejectedValue(failure);
+    await showBrex();
+    expect(replaceToken(), name).toBe(false);
+    expect(headings(), name).not.toContain("Controls");
+    act(() => root.render(null));
+  }
+});
+
+it("Brex cards: PRECONDITION_FAILED shows the server's message as the Cards error", async () => {
+  brex.cards.mockRejectedValue(
+    Object.assign(
+      new Error("Brex cards were connected by someone else. Disconnect and connect again."),
+      { code: "PRECONDITION_FAILED" },
+    ),
+  );
+  await showBrex();
+  expect(headings()).toContain("Cards");
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    "Brex cards were connected by someone else. Disconnect and connect again.",
+  );
+  expect(replaceToken()).toBe(false);
+});
+
 it("other servers never call the Brex RPCs", async () => {
   brex.cards.mockClear();
   await show(false, "https://mcp.example.com/sse");
