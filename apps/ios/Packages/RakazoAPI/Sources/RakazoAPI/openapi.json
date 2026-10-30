@@ -101339,7 +101339,8 @@
                           "type": "string",
                           "enum": [
                             "praci",
-                            "mcp"
+                            "mcp",
+                            "http"
                           ]
                         },
                         "call": {
@@ -101391,6 +101392,32 @@
                                 "args"
                               ],
                               "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "maxLength": 1000
+                                },
+                                "secret": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                },
+                                "accept": {
+                                  "default": "json",
+                                  "type": "string",
+                                  "enum": [
+                                    "json",
+                                    "csv"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "url",
+                                "accept"
+                              ],
+                              "additionalProperties": false
                             }
                           ]
                         },
@@ -101440,7 +101467,9 @@
                         "lastRefreshAt",
                         "lastError"
                       ],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                      "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
                     }
                   }
                 }
@@ -102334,7 +102363,8 @@
                           "type": "string",
                           "enum": [
                             "praci",
-                            "mcp"
+                            "mcp",
+                            "http"
                           ]
                         },
                         "call": {
@@ -102386,6 +102416,32 @@
                                 "args"
                               ],
                               "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "maxLength": 1000
+                                },
+                                "secret": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                },
+                                "accept": {
+                                  "default": "json",
+                                  "type": "string",
+                                  "enum": [
+                                    "json",
+                                    "csv"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "url",
+                                "accept"
+                              ],
+                              "additionalProperties": false
                             }
                           ]
                         },
@@ -102435,7 +102491,9 @@
                         "lastRefreshAt",
                         "lastError"
                       ],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                      "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
                     }
                   }
                 }
@@ -102818,7 +102876,8 @@
                           "type": "string",
                           "enum": [
                             "praci",
-                            "mcp"
+                            "mcp",
+                            "http"
                           ]
                         },
                         "call": {
@@ -102870,6 +102929,32 @@
                                 "args"
                               ],
                               "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "maxLength": 1000
+                                },
+                                "secret": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                },
+                                "accept": {
+                                  "default": "json",
+                                  "type": "string",
+                                  "enum": [
+                                    "json",
+                                    "csv"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "url",
+                                "accept"
+                              ],
+                              "additionalProperties": false
                             }
                           ]
                         },
@@ -102919,7 +103004,9 @@
                         "lastRefreshAt",
                         "lastError"
                       ],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                      "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
                     }
                   }
                 }
@@ -103090,7 +103177,8 @@
                             "type": "string",
                             "enum": [
                               "praci",
-                              "mcp"
+                              "mcp",
+                              "http"
                             ]
                           },
                           "call": {
@@ -103140,6 +103228,32 @@
                                   "serverId",
                                   "tool",
                                   "args"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": "string",
+                                    "maxLength": 1000
+                                  },
+                                  "secret": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                  },
+                                  "accept": {
+                                    "default": "json",
+                                    "type": "string",
+                                    "enum": [
+                                      "json",
+                                      "csv"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "accept"
                                 ],
                                 "additionalProperties": false
                               }
@@ -103192,7 +103306,9 @@
                           "lastError"
                         ],
                         "additionalProperties": false
-                      }
+                      },
+                      "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                      "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
                     }
                   }
                 }
