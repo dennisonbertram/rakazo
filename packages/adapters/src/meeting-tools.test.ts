@@ -6,6 +6,7 @@ import {
   MEETING_AGENT_BUILTIN_TOOLS,
   MEETING_CONSENT_OFF,
   meetingToolFromTool,
+  OMI_AGENT_BUILTIN_TOOLS,
   wrapMeetingNotes,
 } from "./meeting-tools.js";
 
@@ -213,6 +214,38 @@ describe("meeting tools", () => {
       "meetings_list",
       "meetings_search",
       "recall_memory",
+    ]);
+  });
+
+  it("registers the Omi agent, with exactly the meeting reads, Data room reads and recall", async () => {
+    const bot = {
+      id: "bot-omi",
+      ...scope,
+      spawnKey: "integration-agent:conn-omi",
+      archivedAt: null,
+    };
+    const prismaWith = (connectorId: string | null) =>
+      ({
+        mcpServer: { findMany: async () => [] },
+        connection: {
+          findFirst: async ({ where }: { where: { connectorId: string; agentBotId: string } }) =>
+            where.connectorId === connectorId && where.agentBotId === "bot-omi"
+              ? { id: "conn-omi" }
+              : null,
+        },
+      }) as never;
+    expect(await isMeetingSourceAgent(bot, { prisma: prismaWith("omi") })).toBe(true);
+    expect(await isMeetingSourceAgent(bot, { prisma: prismaWith(null) })).toBe(false);
+    expect(
+      await isMeetingSourceAgent({ ...bot, spawnKey: null }, { prisma: prismaWith("omi") }),
+    ).toBe(false);
+    expect([...OMI_AGENT_BUILTIN_TOOLS].sort()).toEqual([
+      "meetings_get",
+      "meetings_list",
+      "meetings_search",
+      "read_data_room_item",
+      "recall_memory",
+      "search_data_room",
     ]);
   });
 });

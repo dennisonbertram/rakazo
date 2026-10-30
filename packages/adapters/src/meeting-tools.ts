@@ -5,6 +5,7 @@ import {
   isIntegrationAgentSpawnKey,
   MEETING_TRANSCRIPT_TOOL_MAX_BYTES,
   MEETING_TRUNCATION_MARKER,
+  OMI_CONNECTOR_ID,
 } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { getMeeting, listMeetings } from "@rakazo/db";
@@ -26,6 +27,16 @@ export const MEETING_AGENT_BUILTIN_TOOLS = [
   "meetings_search",
   "meetings_get",
   "recall_memory",
+] as const;
+
+/**
+ * The Omi agent's built-ins: the meeting reads plus Data room reads (limited to its own Omi
+ * connection by the tool, see data-room-tools). Nothing else, and no exceptions.
+ */
+export const OMI_AGENT_BUILTIN_TOOLS = [
+  ...MEETING_AGENT_BUILTIN_TOOLS,
+  "search_data_room",
+  "read_data_room_item",
 ] as const;
 
 export const MEETING_CONSENT_OFF = "AI data sharing off";
@@ -236,12 +247,34 @@ const granolaApiAgent: MeetingAgentCheck = async (bot, deps) => {
   return Boolean(row) && bot.archivedAt === null;
 };
 
+/** The agent of an Omi pendant connection, found by the connection that names it. */
+export const omiAgent: MeetingAgentCheck = async (bot, deps) => {
+  if (!isIntegrationAgentSpawnKey(bot.spawnKey)) return false;
+  return Boolean(await omiConnectionOf(bot, deps)) && bot.archivedAt === null;
+};
+
+/** The live Omi connection this exact bot is the agent of, if any. */
+export const omiConnectionOf = async (
+  bot: AgentBot,
+  deps: { prisma: Pick<PrismaClient, "connection"> },
+): Promise<{ id: string } | null> =>
+  deps.prisma.connection.findFirst({
+    where: {
+      spaceId: bot.spaceId,
+      userId: bot.userId,
+      connectorId: OMI_CONNECTOR_ID,
+      agentBotId: bot.id,
+      status: { not: "revoked" },
+    },
+    select: { id: true },
+  });
+
 /**
  * The provider registry: each source that stores meetings declares which agent reads them. Wispr
  * Flow is absent until its MeetingSource is registered; the Granola API-key connection adds its
  * check here.
  */
-const meetingAgentChecks: MeetingAgentCheck[] = [granolaMcpAgent, granolaApiAgent];
+const meetingAgentChecks: MeetingAgentCheck[] = [granolaMcpAgent, granolaApiAgent, omiAgent];
 export function registerMeetingSourceAgentCheck(check: MeetingAgentCheck) {
   meetingAgentChecks.push(check);
 }

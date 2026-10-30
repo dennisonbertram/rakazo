@@ -88,6 +88,7 @@ import {
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   RunPhaseSchema,
   VOICE_AGENT_BUILTIN_TOOLS,
@@ -485,6 +486,8 @@ import {
   MEETING_CONSENT_REQUIRED_MESSAGE,
   MEETING_TOOL_NAMES,
   meetingToolFromTool,
+  OMI_AGENT_BUILTIN_TOOLS,
+  omiConnectionOf,
   wrapMeetingNotes,
 } from "./meeting-tools.js";
 import { loadAgentMemoryContext } from "./memory-context.js";
@@ -1979,6 +1982,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // may have started the chain, so the message must also carry the owner's own origin.
         // A meeting-source agent reads untrusted meeting text, so it gets a fixed list of built-ins.
         const meetingAgent = await isMeetingSourceAgent(bot, { prisma: deps.prisma });
+        // The Omi agent also reads the Data room, but only its own Omi connection's recordings.
+        const omiConnection = meetingAgent
+          ? await omiConnectionOf({ ...bot, archivedAt: null }, { prisma: deps.prisma })
+          : null;
         // Its own thread holds meeting text from now on (compaction, notifications), so it is marked.
         if (
           meetingAgent &&
@@ -2210,6 +2217,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const deniedIds = deniedConnectionIds(
           connectionRowsForAudience(storedConnections, bot.audience),
         );
+        // Omi recordings are anyone's speech: an agent reads them only with a grant on the Omi
+        // connection, whatever its status (a disconnected connection keeps its recordings).
+        for (const connection of storedConnections) {
+          if (connection.connectorId === OMI_CONNECTOR_ID && !botMayUseConnection(connection)) {
+            deniedIds.add(connection.id);
+          }
+        }
         const ordinaryAllowedConnections = storedConnections.filter(
           (connection) => !deniedIds.has(connection.id),
         );
@@ -3267,7 +3281,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botUserId: bot.userId,
             trigger: run.trigger,
             messagingChannelRun,
-          });
+            ownerAgentPeer:
+              Boolean(omiConnection) && senderInScope && peerMessage?.ownerOrigin === true,
+          }) &&
+          // The Omi agent's Data room reads need the same AI data consent as meetings_*.
+          (!omiConnection || (await meetingConsentOk()));
         // Owner-initiated runs only (the owner's message, or a bot_message from the owner's own
         // agent), and only with the AI data sharing consent mail needs. Without it the agent has no
         // meetings_* tool and no live MCP tool either, so MCP cannot read meetings around the gate.
@@ -3310,7 +3328,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           run.trigger !== "routine" &&
           !isBackgroundRunTrigger(run.trigger) &&
           OWNER_INITIATED_TRIGGERS.has(run.trigger);
-        const meetingAgentToolSet: ReadonlySet<string> = new Set(MEETING_AGENT_BUILTIN_TOOLS);
+        const meetingAgentToolSet: ReadonlySet<string> = new Set(
+          omiConnection ? OMI_AGENT_BUILTIN_TOOLS : MEETING_AGENT_BUILTIN_TOOLS,
+        );
         const financeEnabled =
           financeToolsAllowed({
             ownerAgentPeer: financeAgentPeer,
@@ -3410,6 +3430,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             cartaAgent,
             gtmAgent,
             integrationAgent: integrationAgent || appAgentIdentity,
+            omiAgent: Boolean(omiConnection),
             googleAgentProvider:
               appAgentConnection?.connectorId === "google"
                 ? appAgentConnection.provider
@@ -3506,6 +3527,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const exposedConnectorTools =
           !voiceAgent &&
           (!meetingAgent || meetingsEnabled) &&
+          !omiConnection &&
           (run.trigger !== "bot_message" || integrationPeerRun || connectedAppPeerRun)
             ? (peerDiscovered ?? discovered).filter(
                 (tool) =>
@@ -3918,7 +3940,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trustedSitesPromise ??= (async () => {
             const sites = sitesInText(await loadOwnerWords());
             const rows = await deps.prisma.externalEffect.findMany({
-              where: { runId, kind: { in: [...SITE_GATED_TOOLS] }, status: { in: PASSED_EFFECT_STATUSES } },
+              where: {
+                runId,
+                kind: { in: [...SITE_GATED_TOOLS] },
+                status: { in: PASSED_EFFECT_STATUSES },
+              },
               select: { request: true },
             });
             for (const row of rows) {
@@ -6376,6 +6402,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   connectors: deps.connectors,
                   driveAccounts,
                   deniedConnectionIds: [...deniedIds],
+                  ...(omiConnection ? { onlyConnectionId: omiConnection.id } : {}),
+                  // Omi recording text is untrusted: the thread is marked before it is returned,
+                  // so every later write or send asks (the same mark meeting text sets).
+                  onUntrustedContent: async () => {
+                    await deps.prisma.thread.updateMany({
+                      where: { id: thread.id, meetingTaintedAt: null },
+                      data: { meetingTaintedAt: new Date() },
+                    });
+                  },
                 },
                 context,
                 args,
@@ -9683,6 +9718,8 @@ export function selectBuiltinToolsForRun(options: {
   fundraisingEnabled?: boolean;
   /** A meeting-source agent on an owner-initiated run with AI data sharing allowed. */
   meetingsEnabled?: boolean;
+  /** The Omi agent: an integration agent that still reads the Data room (its own recordings). */
+  omiAgent?: boolean;
   messagingChannelRun: boolean;
   /** The Carta agent: no delegation to other bots, whose runs would skip its mail approval. */
   cartaAgent?: boolean;
@@ -9710,7 +9747,7 @@ export function selectBuiltinToolsForRun(options: {
       imessageEnabled: false,
       calendarEnabled: options.calendarEnabled && options.googleAgentProvider === "googlecalendar",
       driveEnabled: options.driveEnabled && options.googleAgentProvider === "googledrive",
-      dataRoomEnabled: false,
+      dataRoomEnabled: options.omiAgent === true && options.dataRoomEnabled === true,
       financeEnabled: false,
       contactsEnabled: false,
       capTableEnabled: false,

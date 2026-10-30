@@ -38,6 +38,8 @@ export interface DataRoomFilters {
   legalUnchecked?: boolean;
   /** Hides items imported through these connections. Items with no connection stay visible. */
   excludeConnectionIds?: string[];
+  /** Only items imported through this connection (the Omi agent's own recordings). */
+  onlyConnectionId?: string;
 }
 
 const MAX_LIMIT = 50;
@@ -199,6 +201,7 @@ export function eligibleWhere(
     ...(filters.tag ? { tags: { has: filters.tag } } : {}),
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.source ? { source: filters.source } : {}),
+    ...(filters.onlyConnectionId ? { sourceConnectionId: filters.onlyConnectionId } : {}),
     ...(filters.excludeConnectionIds?.length
       ? {
           OR: [
@@ -231,6 +234,9 @@ function eligibleSql(actor: Actor, filters: DataRoomFilters = {}): Prisma.Sql {
   if (filters.tag) parts.push(Prisma.sql`${filters.tag} = ANY(i."tags")`);
   if (filters.status) parts.push(Prisma.sql`i."status" = ${filters.status}`);
   if (filters.source) parts.push(Prisma.sql`i."source" = ${filters.source}`);
+  if (filters.onlyConnectionId) {
+    parts.push(Prisma.sql`i."sourceConnectionId" = ${filters.onlyConnectionId}`);
+  }
   if (filters.legalUnchecked) {
     parts.push(
       Prisma.sql`i."status" = 'ready' AND NOT EXISTS (

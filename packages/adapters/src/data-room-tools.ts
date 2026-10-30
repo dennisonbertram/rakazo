@@ -23,6 +23,7 @@ import type { DriveFilesDeps } from "./drive-files.js";
 import { DriveFileError, streamDriveFile } from "./drive-files.js";
 import type { DriveAccount } from "./drive-tools.js";
 import { mailToolsAllowed } from "./mail-tools.js";
+import { wrapMeetingNotes } from "./meeting-tools.js";
 import { streamChunks } from "./stream-chunks.js";
 
 export const DATA_ROOM_TOOL_NAMES = new Set([
@@ -79,9 +80,20 @@ export type DataRoomToolDeps = {
   driveAccounts: () => Promise<DriveAccount[]>;
   /** Connections the user denied this agent; items imported through them stay hidden. */
   deniedConnectionIds?: readonly string[];
+  /** The Omi agent sees only items of this connection (its own recordings). */
+  onlyConnectionId?: string;
+  /**
+   * Called before a result that holds Omi recording text (untrusted audio) is returned, so the
+   * caller can mark the run's thread as holding untrusted content.
+   */
+  onUntrustedContent?: () => Promise<void>;
   /** The cap on one mail attachment; injectable so tests can use a small one. */
   maxBytes?: number;
 };
+
+/** Omi recording text is anyone's speech near the pendant: wrapped as untrusted data. */
+const untrustedIf = <T extends string | null>(omi: boolean, value: T): T =>
+  omi && value ? (wrapMeetingNotes(value) as T) : value;
 
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
@@ -132,11 +144,12 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
   const filters = {
     ...rest,
     excludeConnectionIds: [...(deps.deniedConnectionIds ?? [])],
+    ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
     ...(docDateFrom ? { docDateFrom: new Date(docDateFrom) } : {}),
     ...(docDateTo ? { docDateTo: new Date(docDateTo) } : {}),
   };
   const repo = createDataRoomRepos(deps.prisma);
-  if (!query) return await listRoom(repo, actor, filters, args);
+  if (!query) return await listRoom(deps, repo, actor, filters, args);
   const page = await repo.searchPage(actor, {
     query,
     filters,
@@ -147,11 +160,15 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
   // hits (search has no relevance cutoff). A file quiet for minutes shows as failed, not pending.
   const indexing = await deps.prisma.dataRoomItem.count({
     where: {
-      ...eligibleWhere(actor, { excludeConnectionIds: filters.excludeConnectionIds }),
+      ...eligibleWhere(actor, {
+        excludeConnectionIds: filters.excludeConnectionIds,
+        ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
+      }),
       status: { in: ["pending", "extracting", "classifying", "indexing"] },
       updatedAt: { gte: new Date(Date.now() - DATA_ROOM_STUCK_MS) },
     },
   });
+  if (page.results.some(({ item }) => item.source === "omi")) await deps.onUntrustedContent?.();
   return {
     ...(indexing
       ? {
@@ -164,7 +181,10 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
       link: dataRoomItemLink(item.id),
       docType: item.docType,
       docDate: item.docDate?.toISOString().slice(0, 10) ?? null,
-      snippet: snippet.replace(HIGHLIGHT_MARKS, "").slice(0, SNIPPET_CHARS),
+      snippet: untrustedIf(
+        item.source === "omi",
+        snippet.replace(HIGHLIGHT_MARKS, "").slice(0, SNIPPET_CHARS),
+      ),
     })),
   };
 }
@@ -174,6 +194,7 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
  * must be judged from this list, since a keyword search misses files whose text lacks the words.
  */
 async function listRoom(
+  deps: DataRoomToolDeps,
   repo: ReturnType<typeof createDataRoomRepos>,
   actor: Actor,
   filters: Parameters<ReturnType<typeof createDataRoomRepos>["listItemsPage"]>[1],
@@ -186,6 +207,7 @@ async function listRoom(
     }),
     repo.listFolders(actor),
   ]);
+  if (page.items.some((item) => item.source === "omi")) await deps.onUntrustedContent?.();
   const folders = new Map(folderRows.map((folder) => [folder.id, folder]));
   const pathOf = (folderId: string | null) => {
     const path: string[] = [];
@@ -221,7 +243,10 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
   if (!id) return { error: "item_id is required" };
   const repo = createDataRoomRepos(deps.prisma);
   const item = await repo
-    .getItem(actor, id, { excludeConnectionIds: [...(deps.deniedConnectionIds ?? [])] })
+    .getItem(actor, id, {
+      excludeConnectionIds: [...(deps.deniedConnectionIds ?? [])],
+      ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
+    })
     .catch((error: unknown) => {
       if (error instanceof IsolationError) return null;
       throw error;
@@ -238,6 +263,8 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
   }
   const full = (await repo.getItemText(actor, id)) ?? "";
   const truncated = full.length > MAX_TEXT_CHARS;
+  const omi = item.source === "omi";
+  if (omi) await deps.onUntrustedContent?.();
   return {
     id: item.id,
     name: item.name,
@@ -249,8 +276,8 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
     docDate: item.docDate?.toISOString().slice(0, 10) ?? null,
     parties: item.parties,
     tags: item.tags,
-    summary: item.summary,
-    text: truncated ? full.slice(0, MAX_TEXT_CHARS) : full,
+    summary: untrustedIf(omi, item.summary),
+    text: untrustedIf(omi, truncated ? full.slice(0, MAX_TEXT_CHARS) : full),
     truncated,
     ...(truncated ? { note: `Text truncated to ${MAX_TEXT_CHARS} characters.` } : {}),
     ...(!full && item.status !== "failed" ? { note: "No text has been extracted yet." } : {}),
