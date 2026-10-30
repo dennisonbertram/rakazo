@@ -61,3 +61,16 @@ export function splitOggOpus(bytes: Uint8Array, maxSeconds = 600): OmiSegment[] 
     return { bytes: file, startSeconds: Math.round(base / SAMPLES_PER_SECOND) };
   });
 }
+
+/** Length in whole seconds, from the last page's granule position (our own files, one stream). */
+export function oggSeconds(bytes: Uint8Array): number {
+  let last = 0;
+  for (let at = 0; at + 27 <= bytes.byteLength; ) {
+    const lacing = bytes[at + 26] ?? 0;
+    let size = 27 + lacing;
+    for (let i = 0; i < lacing; i += 1) size += bytes[at + 27 + i] ?? 0;
+    last = Number(new DataView(bytes.buffer, bytes.byteOffset).getBigUint64(at + 6, true));
+    at += size;
+  }
+  return Math.round(last / SAMPLES_PER_SECOND);
+}

@@ -29,6 +29,7 @@ export * from "./investor-portal.js";
 export * from "./investor-updates.js";
 export * from "./legal.js";
 export * from "./meetings.js";
+export * from "./omi-outputs.js";
 export * from "./memory-config.js";
 export * from "./messages.js";
 export * from "./messaging.js";
