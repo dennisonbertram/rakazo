@@ -16,6 +16,7 @@ import { LocalArtifactStore } from "./artifacts.js";
 import { createFileDataRoomItem } from "./data-room-files.js";
 import type { DataRoomAi } from "./data-room-models.js";
 import { muxOggOpus } from "./omi-records.js";
+import { runDataRoomClassify, runDataRoomIndex, runDataRoomIngest } from "./data-room-jobs.js";
 import { listOmiSegments, moveOmiSegment, runOmiSort } from "./omi-sort.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -198,7 +199,6 @@ describePostgres("Omi sorting (PostgreSQL)", () => {
       externalId: `${id}:0`,
       title: "Ship date",
       transcript: "we agreed to ship on friday",
-      attendees: [],
     });
     expect(row.startedAt).toEqual(RECORDED_AT);
     expect(row.endedAt).toEqual(new Date(RECORDED_AT.getTime() + 600_000));
@@ -224,6 +224,50 @@ describePostgres("Omi sorting (PostgreSQL)", () => {
       { spaceId: who.spaceId, userId: who.userId, meetingId: row.id },
     ]);
     expect(queued.some((j) => j.name === "dataroom.ingest")).toBe(true);
+  });
+
+  it("reads and indexes a note made by a move, and puts the user on the meeting", async () => {
+    const who = actors[0] as Actor;
+    const id = await makeRecording(who);
+    replies = [split];
+    await runOmiSort(deps(), payload(who, id));
+    const [meeting, , trash] = await segments(id);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: who.userId } });
+    const row = await prisma.meeting.findUniqueOrThrow({
+      where: { id: meeting?.meetingId as string },
+    });
+    expect(row.attendees).toEqual([{ name: user.name, email: user.email }]);
+    const moved = await moveOmiSegment(deps(), who, {
+      segmentId: trash?.id as string,
+      kind: "meeting",
+    });
+    const again = await prisma.meeting.findUniqueOrThrow({
+      where: { id: moved.meetingId as string },
+    });
+    expect(again.attendees).toEqual([{ name: user.name, email: user.email }]);
+
+    const note = await moveOmiSegment(deps(), who, {
+      segmentId: meeting?.id as string,
+      kind: "note",
+    });
+    const itemId = note.noteItemId as string;
+    const jobDeps = {
+      prisma,
+      jobs,
+      artifacts,
+      runtime,
+      resolveAi: async () => ({ ...ai(), allowed: false }),
+    };
+    await runDataRoomIngest(jobDeps, { ...payload(who, itemId) });
+    await runDataRoomClassify(jobDeps, { ...payload(who, itemId) });
+    await runDataRoomIndex(jobDeps, { ...payload(who, itemId) });
+    const item = await prisma.dataRoomItem.findUniqueOrThrow({
+      where: { id: itemId },
+      include: { text: true },
+    });
+    expect(item.notIndexed).toBe(false);
+    expect(item.text?.text).toContain("ship on friday");
+    expect(await prisma.dataRoomChunk.count({ where: { itemId } })).toBeGreaterThan(0);
   });
 
   it("makes one note of the whole recording without consent, and calls no model", async () => {
