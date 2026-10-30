@@ -28,6 +28,7 @@ function handlers(): BackgroundJobHandlers {
     "mail.watch.renew": vi.fn(async () => undefined),
     "devin.refresh": vi.fn(async () => undefined),
     "finance.sync": vi.fn(async () => undefined),
+    "omi.assemble": vi.fn(async () => undefined),
     "meetings.sync": vi.fn(async () => undefined),
     "meetings.digest": vi.fn(async () => undefined),
     "dataroom.blob.delete": vi.fn(async () => undefined),

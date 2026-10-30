@@ -34,7 +34,7 @@ struct ThreadScreen: View {
     .task(id: RunKey(spaceID: app.spaceID, attempt: attempt)) { await model.run(app) }
     .confirmationDialog("Archive \(model.title)?", isPresented: $confirmingArchive) {
       Button("Archive agent", role: .destructive) {
-        Task { if await model.archive(app) { app.path = [] } }
+        Task { _ = await model.archive(app) }
       }
     }
     .alert("Couldn’t archive", isPresented: archiveFailed) {
@@ -53,7 +53,7 @@ struct ThreadScreen: View {
   // A SwiftUI view builder lists its rows in one place.
   // swiftlint:disable:next function_body_length
   private func content(_ snapshot: ThreadSnapshot) -> some View {
-    let messages = snapshot.messages
+    let (messages, reactions) = ThreadReactions.project(snapshot.messages)
     let divider = model.dividerID
     return ScrollViewReader { proxy in
       ScrollView {
@@ -71,7 +71,7 @@ struct ThreadScreen: View {
           ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
             if message.id == divider { UnreadDivider() }
             ThreadMessageView(
-              message: message, model: model,
+              message: message, model: model, reactions: reactions[message.id] ?? [],
               showsSender: index == 0 || messages[index - 1].botId != message.botId
                 || messages[index - 1].role == "user",
               showsTime: index == messages.count - 1
@@ -80,6 +80,7 @@ struct ThreadScreen: View {
             )
             .id(message.id)
           }
+          PendingSendsView(model: model)
           footer
           Color.clear.frame(height: 1).id(Self.bottomID)
         }
@@ -195,6 +196,11 @@ struct ThreadScreen: View {
   // MARK: Toolbar
 
   @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+    if case .bot(let id) = target {
+      ToolbarItem(placement: .topBarTrailing) {
+        CallButton(botID: id, name: model.title, avatar: model.botColor)
+      }
+    }
     ToolbarItem(placement: .topBarTrailing) {
       Menu {
         switch target {
