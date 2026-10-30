@@ -141,7 +141,7 @@ export function framesInRecord(record: Uint8Array): number {
 }
 
 /**
- * Minutes downloaded and the estimated total, from the frames seen so far. The total is null until a
+ * Minutes downloaded and the estimated total (unrounded, so callers can tell under a minute), from the frames seen so far. The total is null until a
  * record has arrived, because a record's length in time depends on how the audio compressed.
  */
 export function progressMinutes(
@@ -150,8 +150,8 @@ export function progressMinutes(
   framesDone: number,
   frameMs: number,
 ): { done: number; total: number | null } {
-  const done = Math.round((framesDone * frameMs) / 60000);
+  const done = (framesDone * frameMs) / 60000;
   if (recordsDone === 0 || recordsTotal === 0) return { done, total: null };
-  const total = Math.round(((framesDone * frameMs) / 60000) * (recordsTotal / recordsDone));
+  const total = done * (recordsTotal / recordsDone);
   return { done, total: Math.max(total, done) };
 }

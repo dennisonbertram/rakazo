@@ -43,11 +43,11 @@ function StatusLine({ state }: { state: OmiSyncState }) {
     const { done, total } = state;
     return (
       <Shimmer>
-        {done === null || (total ?? done) < 1 ? (
+        {done === null || (total ?? 0) < 1 ? (
           <Trans>Downloading</Trans>
         ) : (
           <Trans>
-            Downloading {done} of {total ?? done} min
+            Downloading {Math.round(done)} of {Math.round(total ?? done)} min
           </Trans>
         )}
       </Shimmer>
@@ -59,7 +59,7 @@ function StatusLine({ state }: { state: OmiSyncState }) {
       <Trans>Paused</Trans>
     ) : (
       <Trans>
-        Paused · {done} of {total} min saved
+        Paused · {Math.round(done)} of {Math.round(total)} min saved
       </Trans>
     );
   }
@@ -276,16 +276,15 @@ export function OmiPage({
 }) {
   const [status, setStatus] = useState<OmiStatus | undefined>(undefined);
   const [noKey, setNoKey] = useState(false);
+  const [segmentsKey, setSegmentsKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     try {
       setStatus((await rpc.omi.status()) ?? null);
-      const failed = await rpc.dataRoom.items.list({
-        status: "failed",
-        limit: 50,
-      });
+      // A recording without a key stays "ready" with the error, so the status is not filtered.
+      const items = await rpc.dataRoom.items.list({ source: "omi", limit: 100 });
       setNoKey(
-        (failed?.items ?? []).some(
+        (items?.items ?? []).some(
           (item) => item.source === "omi" && item.error === "no_transcription_provider",
         ),
       );
@@ -302,6 +301,7 @@ export function OmiPage({
     setError(null);
     try {
       await rpc.omi.deleteRecordings();
+      setSegmentsKey((key) => key + 1);
       await reload();
     } catch (err) {
       setError(errorText(err));
@@ -329,7 +329,7 @@ export function OmiPage({
     >
       {status ? (
         <>
-          <OmiSegments />
+          <OmiSegments reloadKey={segmentsKey} />
           {status.agentBotId ? (
             <OmiAgent
               connectionId={status.connectionId}

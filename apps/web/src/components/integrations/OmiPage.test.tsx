@@ -42,6 +42,12 @@ it("drops the numbers for audio under a minute", () => {
   expect(status({ kind: "paused", done: 0, total: 0 })).toBe("Paused");
 });
 
+it("drops the numbers when the unrounded total is under a minute", () => {
+  // 30 s rounds to 1 min, but is still under a minute.
+  expect(status({ kind: "downloading", done: 0.2, total: 0.5 })).toBe("Downloading");
+  expect(status({ kind: "paused", done: 0.2, total: 0.5 })).toBe("Paused");
+});
+
 it("keeps the numbers from one minute up", () => {
   expect(status({ kind: "downloading", done: 14, total: 38 })).toBe("Downloading 14 of 38 min");
   expect(status({ kind: "paused", done: 14, total: 38 })).toBe("Paused · 14 of 38 min saved");

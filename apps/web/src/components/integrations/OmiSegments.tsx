@@ -16,7 +16,7 @@ import { errorText } from "../../lib/user-error";
 export const OMI_PATH = "/app/integrations/omi";
 type Kind = OmiSegmentDto["kind"];
 
-function useSegments() {
+function useSegments(reloadKey = 0) {
   const [rows, setRows] = useState<OmiSegmentDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
@@ -26,9 +26,10 @@ function useSegments() {
       setError(errorText(err));
     }
   }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey asks for a fresh list
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, reloadKey]);
   async function move(segment: OmiSegmentDto, kind: Kind) {
     setError(null);
     try {
@@ -97,9 +98,9 @@ function SegmentRow({ segment, onMove }: { segment: OmiSegmentDto; onMove: (kind
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Today's sorted stretches, with a link to the trashed ones. Renders nothing before there is any. */
-export function OmiSegments() {
+export function OmiSegments({ reloadKey = 0 }: { reloadKey?: number }) {
   const { t } = useLingui();
-  const { rows: all, error, move } = useSegments();
+  const { rows: all, error, move } = useSegments(reloadKey);
   const trashed = (all ?? []).filter((row) => row.kind === "trash").length;
   const rows = (all ?? []).filter(
     (row) => row.kind !== "trash" && row.startedAt.slice(0, 10) === today(),
