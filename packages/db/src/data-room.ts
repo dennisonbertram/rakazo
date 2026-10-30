@@ -584,7 +584,7 @@ export function createDataRoomRepos(prisma: PrismaClient) {
     async createItem(
       actor: Actor,
       input: {
-        source: "upload" | "drive" | "box" | "gmail" | "chat" | "finance";
+        source: "upload" | "drive" | "box" | "gmail" | "chat" | "finance" | "omi";
         sha256: string;
         name: string;
         mimeType: string;
@@ -596,6 +596,7 @@ export function createDataRoomRepos(prisma: PrismaClient) {
         externalId?: string | null;
         sourceUrl?: string | null;
         sourceUpdatedAt?: Date | null;
+        notIndexed?: boolean;
         docType?: string | null;
         docDate?: Date | null;
         parties?: string[];

@@ -425,8 +425,9 @@ export async function runDataRoomIngest(deps: DataRoomJobDeps, payload: Payload)
     const ctx = context(payload, "ingest");
     let text = "";
     let extractKey = "local";
-    let notIndexed = false;
-    if (item.storageKey) {
+    // Pendant audio is stored and listed, never read for search.
+    let notIndexed = item.source === "omi";
+    if (item.storageKey && item.source !== "omi") {
       const type = effectiveType(item.mimeType, item.name);
       const size = Number(item.size);
       // Only the file types that have a reader are fetched. Text is read from its head, whatever
