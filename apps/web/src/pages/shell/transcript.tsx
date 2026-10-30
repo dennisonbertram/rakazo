@@ -464,6 +464,23 @@ export const Transcript = memo(function Transcript({
     return () => observer.disconnect();
   }, [scrollRef, messages]);
 
+  // The toaster pads the thread through --toast-reserve on <html>. That changes the scroll height
+  // without resizing the element or its children, so follow it here and keep the newest message
+  // clear above the toast.
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const observer = new MutationObserver(() => {
+      if (!following.current || jumpScrolling.current) return;
+      if (element.scrollHeight - element.scrollTop - element.clientHeight > 1) {
+        element.scrollTop = element.scrollHeight;
+        setAtEnd(true);
+      }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    return () => observer.disconnect();
+  }, [scrollRef]);
+
   const jumpToLatest = useCallback(() => {
     const element = scrollRef.current;
     if (!element) return;
