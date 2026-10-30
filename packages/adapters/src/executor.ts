@@ -72,6 +72,7 @@ import {
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
   isAttachmentImageMimeType,
+  isBrexCardsEndpoint,
   isCartaAgentSpawnKey,
   isCompanyAgentSpawnKey,
   isCompanyImporterSpawnKey,
@@ -7969,7 +7970,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     : connectorCall.route,
                 tool: name,
                 args,
-                executionId: effectKey,
+                // The Brex cards server sends this id to Brex as the request's idempotency key.
+                // It is the approved effect's own id: a retry of the effect reuses it and a second
+                // approval of the same request has another. Every other server keeps the effect key.
+                executionId:
+                  isBrexCardsEndpoint(dispatchRoute?.endpoint) && applied
+                    ? applied.effect.id
+                    : effectKey,
                 beforeDispatch: connectionDenial,
               },
               context,

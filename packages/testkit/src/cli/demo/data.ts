@@ -2585,6 +2585,17 @@ export const DEMO_SKILLS = [
   },
 ] as const;
 
+/** The one token the demo's Brex emulator accepts. It is fake and works nowhere else. */
+export const DEMO_BREX_TOKEN = "bxt_demo_fake_token_0000";
+
+/**
+ * The demo's Brex emulator: it accepts only the demo token and serves its own invented company,
+ * users, cards and spend limits, so the Brex cards server runs end to end with no Brex account.
+ */
+export function demoBrexCards() {
+  return { token: DEMO_BREX_TOKEN };
+}
+
 /** The one key the demo's Granola emulator accepts. It is fake and works nowhere else. */
 export const DEMO_GRANOLA_KEY = "grn_demo_fake_key_0000";
 

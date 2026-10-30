@@ -669,6 +669,9 @@ importers:
       '@rakazo/adapter-kit':
         specifier: workspace:*
         version: link:../adapter-kit
+      '@rakazo/brex-mcp':
+        specifier: workspace:*
+        version: link:../brex-mcp
       '@rakazo/contracts':
         specifier: workspace:*
         version: link:../contracts

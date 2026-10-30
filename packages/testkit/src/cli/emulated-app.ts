@@ -18,6 +18,8 @@ export async function createEmulatedApp(
     cryptoFetch?: typeof fetch;
     /** Meeting providers; the demo points Granola at its emulator. */
     meetingSources?: MeetingSourceRegistry;
+    /** Where the Brex cards server reaches Brex; the demo points it at its emulator. */
+    brexApi?: { baseUrl: string };
     /** Called with each transactional email (reset links, verification) the app sends. */
     onEmail?: (message: TransactionalEmail) => void;
   } = {},
@@ -44,6 +46,7 @@ export async function createEmulatedApp(
     ...(options.financeCallToolFor ? { financeCallToolFor: options.financeCallToolFor } : {}),
     ...(options.cryptoFetch ? { cryptoFetch: options.cryptoFetch } : {}),
     ...(options.meetingSources ? { meetingSources: options.meetingSources } : {}),
+    ...(options.brexApi ? { brexApi: options.brexApi } : {}),
     remoteConnectors: {
       fetch: thirdParties.fetch,
       resolveHostname: thirdParties.resolveHostname,

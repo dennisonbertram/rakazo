@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import type { ConnectorCall, ConnectorEvent } from "@rakazo/adapter-kit";
+import { BrexApiEmulator } from "@rakazo/brex-mcp";
 import {
+  BREX_CARDS_MCP_ENDPOINT,
+  BREX_CARDS_READ_TOOLS,
+  BREX_CARDS_WRITE_TOOLS,
   CARTA_MCP_ENDPOINT,
   CARTA_READ_TOOLS,
   CARTA_WRITE_TOOLS,
@@ -2929,5 +2933,393 @@ describe("MCP connector Devin agent", () => {
           true,
         ),
       ).toBe(false);
+  });
+});
+
+describe("MCP connector Brex cards (in-process server)", () => {
+  const TOKEN = "bxt_connector_token_1234567890";
+  const agentBot = {
+    id: "agent-1",
+    spawnKey: "integration-agent:server-1",
+    spaceId: "w1",
+    userId: "u1",
+    archivedAt: null,
+  };
+  const CREATE = {
+    cardName: "Notion",
+    ownerUserId: "u_ada",
+    ownerName: "Ada Example",
+    amountCents: 25_000,
+    duration: "MONTHLY",
+  };
+  const emulators: BrexApiEmulator[] = [];
+  const connectors: McpConnector[] = [];
+  afterEach(async () => {
+    await Promise.all(connectors.splice(0).map((connector) => connector.close()));
+    await Promise.all(emulators.splice(0).map((emulator) => emulator.stop()));
+  });
+
+  /** One Brex cards server per space; `asBot` is who calls (the server's agent or another bot). */
+  async function setup({
+    writesEnabled = true,
+    asAgent = true,
+    lazy = false,
+    secret = { secret: TOKEN } as Record<string, unknown>,
+  }: {
+    writesEnabled?: boolean;
+    asAgent?: boolean;
+    lazy?: boolean;
+    /** What the row's decrypted secret holds. */
+    secret?: Record<string, unknown>;
+  } = {}) {
+    const emulator = new BrexApiEmulator({ token: TOKEN });
+    emulators.push(emulator);
+    const baseUrl = await emulator.start();
+    const bot = asAgent ? agentBot : { ...agentBot, id: "other", spawnKey: null };
+    const assignments = new Map<string, Record<string, unknown> & { server: any }>();
+    const connections = new Map<string, Record<string, unknown>>();
+    const reservations: Array<{ spaceId: string; status: string }> = [];
+    for (const space of ["w1", "w2"]) {
+      const serverId = `server-${space}`;
+      assignments.set(space, {
+        ...ASSIGNMENT,
+        botId: bot.id,
+        serverId,
+        spaceId: space,
+        userId: `u-${space}`,
+        bot: {
+          ...bot,
+          spaceId: space,
+          userId: `u-${space}`,
+          spawnKey: bot.spawnKey && `integration-agent:${serverId}`,
+        },
+        server: {
+          ...SERVER,
+          id: serverId,
+          slug: "brex-cards",
+          name: "Brex cards",
+          endpoint: BREX_CARDS_MCP_ENDPOINT,
+          secretId: "secret-1",
+          spaceId: space,
+          userId: `u-${space}`,
+          writesEnabled,
+          agentExclusive: true,
+          agentBotId: `${bot.id}`,
+          agentBot: {
+            ...agentBot,
+            spaceId: space,
+            userId: `u-${space}`,
+            spawnKey: `integration-agent:${serverId}`,
+          },
+        },
+      });
+      connections.set(serverId, {
+        serverId,
+        spaceId: space,
+        brexAccountId: "cmp_example",
+        maxNewCardLimitCents: 100_000,
+        maxCardLimitCents: 500_000,
+        maxSpendLimitBaseCents: 1_000_000,
+        maxCardsPerDay: 5,
+        allowedDurations: ["MONTHLY", "ONE_TIME"],
+        oneTimeMaxDays: 90,
+      });
+    }
+    const extraState = {
+      failNext: false,
+      initializations: 0,
+      calls: [] as string[],
+      tools: Array.from({ length: DIRECT_TOOL_LIMIT + 1 }, (_, i) => ({
+        name: `read_${i}`,
+        inputSchema: { type: "object" },
+        annotations: { readOnlyHint: true },
+      })),
+    };
+    // The lazy-catalog case needs a second, large server over HTTP; Brex itself goes to its emulator.
+    const realFetch = globalThis.fetch;
+    const extraFetch = mcpFetch(extraState);
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) =>
+      logicalHref(input, init).startsWith(baseUrl)
+        ? realFetch(input, init)
+        : extraFetch(input, init),
+    );
+    const extra = {
+      ...ASSIGNMENT,
+      botId: bot.id,
+      serverId: "extra-server",
+      server: { ...SERVER, id: "extra-server", slug: "extra" },
+    };
+    const secretLookups: Array<{ spaceId: string }> = [];
+    const prisma = {
+      botMcpServer: {
+        findMany: vi.fn(async ({ where }: { where: { spaceId: string } }) => [
+          assignments.get(where.spaceId),
+          ...(lazy ? [{ ...extra, spaceId: where.spaceId }] : []),
+        ]),
+        findFirst: vi.fn(async ({ where }: { where: { spaceId: string; serverId: string } }) =>
+          where.serverId === "extra-server" ? extra : assignments.get(where.spaceId),
+        ),
+      },
+      secret: {
+        findFirst: vi.fn(async ({ where }: { where: { spaceId: string } }) => {
+          secretLookups.push({ spaceId: where.spaceId });
+          return { id: "secret-1", ciphertext: "encrypted" };
+        }),
+      },
+      brexCardsConnection: {
+        findFirst: vi.fn(
+          async ({ where }: { where: { serverId: string } }) =>
+            connections.get(where.serverId) ?? null,
+        ),
+      },
+      brexCardReservation: {
+        updateMany: vi.fn(
+          async ({ where, data }: { where: { id: string }; data: { status: string } }) => {
+            const row = reservations[Number(where.id)];
+            if (row) row.status = data.status;
+            return { count: row ? 1 : 0 };
+          },
+        ),
+      },
+      $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
+        callback({
+          $executeRaw: vi.fn(async () => 1),
+          brexCardReservation: {
+            count: vi.fn(async () => reservations.filter((r) => r.status !== "failed").length),
+            create: vi.fn(async ({ data }: { data: { spaceId: string; status: string } }) => {
+              reservations.push({ spaceId: data.spaceId, status: data.status });
+              return { id: String(reservations.length - 1) };
+            }),
+          },
+        }),
+      ),
+    };
+    const connector = new McpConnector(
+      prisma as never,
+      { load: vi.fn(async () => JSON.stringify(secret)) } as never,
+      { network: TEST_NETWORK, brexApi: { baseUrl } } as never,
+    );
+    connectors.push(connector);
+    const contextFor = (space: string) => ({
+      operationId: "test",
+      traceId: "test",
+      spaceId: space,
+      userId: `u-${space}`,
+      botId: bot.id,
+      signal: new AbortController().signal,
+    });
+    const execute = async (call: ConnectorCall, space = "w1") => {
+      const events: ConnectorEvent[] = [];
+      for await (const event of connector.execute(call, contextFor(space))) events.push(event);
+      return events;
+    };
+    const callTool = (
+      name: string,
+      args: Record<string, unknown>,
+      effectId: string,
+      space = "w1",
+    ) =>
+      execute(
+        {
+          tool: `mcp__brex-cards__${name}`,
+          args,
+          executionId: effectId,
+          route: {
+            connectorId: "mcp",
+            resourceId: `server-${space}`,
+            toolName: name,
+            endpoint: BREX_CARDS_MCP_ENDPOINT,
+            discoveredReadOnly: (BREX_CARDS_READ_TOOLS as readonly string[]).includes(name),
+          },
+        },
+        space,
+      );
+    const posts = () =>
+      emulator.requests.filter((r) => r.method === "POST" && r.path === "/v2/cards");
+    return {
+      assignments,
+      connector,
+      contextFor,
+      emulator,
+      execute,
+      callTool,
+      posts,
+      reservations,
+      secretLookups,
+      extraState,
+    };
+  }
+
+  const toolNames = async (s: Awaited<ReturnType<typeof setup>>, space = "w1") =>
+    (await s.connector.discoverTools(s.contextFor(space))).map((t) => t.route?.toolName);
+
+  it("offers the agent the closed allowlist, reads only until changes are on, with no unlock tool", async () => {
+    const off = await setup({ writesEnabled: false });
+    expect(await toolNames(off)).toEqual(expect.arrayContaining([...BREX_CARDS_READ_TOOLS]));
+    const offNames = await toolNames(off);
+    for (const name of BREX_CARDS_WRITE_TOOLS) expect(offNames).not.toContain(name);
+
+    const on = await setup({ writesEnabled: true });
+    const onNames = await toolNames(on);
+    expect([...onNames].sort()).toEqual(
+      [...BREX_CARDS_READ_TOOLS, ...BREX_CARDS_WRITE_TOOLS].sort(),
+    );
+    expect(onNames.filter((name) => /unlock/i.test(String(name)))).toEqual([]);
+  });
+
+  it("serves reads from the in-process server with the secret's token", async () => {
+    const s = await setup({ writesEnabled: false });
+    const [event] = await s.callTool("list_cards", {}, "read-1");
+    expect(event).toMatchObject({ type: "result" });
+    expect(s.emulator.requests[0]?.authorization).toBe(`Bearer ${TOKEN}`);
+  });
+
+  it("denies a write until changes are on, and again if they are switched off after discovery", async () => {
+    const s = await setup({ writesEnabled: false });
+    expect(await s.callTool("create_vendor_card", CREATE, "effect-1")).toMatchObject([
+      { type: "error", message: expect.stringContaining("Changes are off") },
+    ]);
+    expect(s.posts()).toEqual([]);
+
+    s.assignments.get("w1")!.server.writesEnabled = true;
+    expect(await s.callTool("create_vendor_card", CREATE, "effect-1")).toMatchObject([
+      { type: "result" },
+    ]);
+    s.assignments.get("w1")!.server.writesEnabled = false;
+    expect(await s.callTool("create_vendor_card", CREATE, "effect-2")).toMatchObject([
+      { type: "error" },
+    ]);
+    expect(s.posts()).toHaveLength(1);
+  });
+
+  it("gives a bot that is not the server's agent nothing, and its calls never reach Brex", async () => {
+    const s = await setup({ asAgent: false });
+    expect(await toolNames(s)).toEqual([]);
+    expect(await s.callTool("list_cards", {}, "read-1")).toMatchObject([{ type: "error" }]);
+    expect(await s.callTool("create_vendor_card", CREATE, "effect-1")).toMatchObject([
+      { type: "error" },
+    ]);
+    expect(s.emulator.requests).toEqual([]);
+  });
+
+  it("uses the executor's effect id as Brex's idempotency key: a retry reuses it, another approval does not", async () => {
+    const s = await setup();
+    const before = s.emulator.cards.length;
+    const first = await s.callTool("create_vendor_card", CREATE, "effect-1");
+    const retry = await s.callTool("create_vendor_card", CREATE, "effect-1");
+    expect(first).toEqual(retry);
+    expect(s.emulator.cards.length).toBe(before + 1);
+    await s.callTool("create_vendor_card", CREATE, "effect-2");
+    expect(s.emulator.cards.length).toBe(before + 2);
+    expect(s.posts().map((post) => post.idempotencyKey)).toEqual([
+      "effect-1",
+      "effect-1",
+      "effect-2",
+    ]);
+  });
+
+  it("never reuses a session across spaces: each space connects, reads its own row and reserves under its own id", async () => {
+    const s = await setup();
+    await s.callTool("create_vendor_card", CREATE, "effect-w1", "w1");
+    await s.callTool("list_cards", {}, "read-w1", "w1");
+    expect(s.secretLookups).toEqual([{ spaceId: "w1" }]);
+
+    await s.callTool("create_vendor_card", { ...CREATE, cardName: "Linear" }, "effect-w2", "w2");
+    expect(s.secretLookups).toEqual([{ spaceId: "w1" }, { spaceId: "w2" }]);
+    expect(s.reservations.map((r) => r.spaceId)).toEqual(["w1", "w2"]);
+  });
+
+  it("runs the same gates in lazy-catalog mode: the catalog call executes the write, and writes-off still denies it", async () => {
+    const s = await setup({ lazy: true, writesEnabled: false });
+    const wrappers = await s.connector.discoverTools(s.contextFor("w1"));
+    expect(wrappers.map((entry) => entry.route?.toolName)).toEqual([
+      "__catalog_search",
+      "__catalog_load",
+      "__catalog_execute",
+    ]);
+    const catalogCall = (effectId: string): ConnectorCall => ({
+      tool: "catalog_mcp_execute_tool",
+      args: { id: "server-w1:create_vendor_card", arguments: CREATE },
+      executionId: effectId,
+      route: { connectorId: "mcp", toolName: "__catalog_execute" },
+    });
+    // Off: the write is not even in the catalog.
+    await expect(
+      s.connector.resolveCall(catalogCall("effect-1"), s.contextFor("w1")),
+    ).rejects.toThrow("not authorized");
+    expect(s.posts()).toEqual([]);
+
+    s.assignments.get("w1")!.server.writesEnabled = true;
+    const resolved = await s.connector.resolveCall(catalogCall("effect-1"), s.contextFor("w1"));
+    expect(resolved?.tool.route?.toolName).toBe("create_vendor_card");
+    expect(await s.execute(resolved!.call)).toMatchObject([{ type: "result" }]);
+    expect(s.posts().map((post) => post.idempotencyKey)).toEqual(["effect-1"]);
+  });
+
+  it("keeps the token out of what the model sees when Brex rejects it", async () => {
+    const wrong = "bxt_wrong_token_abcdefghijklmnop";
+    const s = await setup({ secret: { secret: wrong } });
+    const events = await s.callTool("list_cards", {}, "read-1");
+    const seen = JSON.stringify(events);
+    expect(seen).toContain("Brex rejected the token");
+    expect(seen).not.toContain(wrong);
+    expect(seen).not.toContain(TOKEN);
+  });
+
+  it("refuses to connect without a token in the row's secret, and never reaches Brex", async () => {
+    const s = await setup({ secret: {} });
+    expect(await s.callTool("list_cards", {}, "read-1")).toMatchObject([
+      { type: "error", message: expect.stringContaining("token is missing") },
+    ]);
+    expect(s.emulator.requests).toEqual([]);
+  });
+
+  it("sends the idempotency key to Brex cards only: other servers' calls carry no request metadata", async () => {
+    const bodies: Array<{ method?: string; params?: { _meta?: unknown } }> = [];
+    const state = { failNext: false, initializations: 0 };
+    const inner = mcpFetch(state);
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input.clone() : new Request(input, init);
+      if (request.method === "POST")
+        void request
+          .text()
+          .then((text) => bodies.push(JSON.parse(text)))
+          .catch(() => undefined);
+      return inner(input, init);
+    });
+    const assignment = { ...ASSIGNMENT, bot: null, server: { ...SERVER, slug: "demo" } };
+    const connector = new McpConnector(
+      {
+        botMcpServer: {
+          findMany: vi.fn(async () => [assignment]),
+          findFirst: vi.fn(async () => assignment),
+        },
+      } as never,
+      {} as never,
+      { network: TEST_NETWORK },
+    );
+    connectors.push(connector);
+    const context = {
+      operationId: "test",
+      traceId: "test",
+      spaceId: "w1",
+      userId: "u1",
+      botId: "bot-1",
+      signal: new AbortController().signal,
+    };
+    for await (const event of connector.execute(
+      {
+        tool: "mcp__demo__echo",
+        args: {},
+        executionId: "effect-1",
+        route: { connectorId: "mcp", resourceId: "server-1", toolName: "echo" },
+      },
+      context,
+    ))
+      expect(event.type).toBe("result");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const calls = bodies.filter((body) => body.method === "tools/call");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.params?._meta).toBeUndefined();
   });
 });

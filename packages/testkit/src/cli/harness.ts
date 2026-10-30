@@ -22,8 +22,14 @@ const agentRuntime = runtimeArg?.slice("--runtime=".length) ?? "scripted";
 
 const ROW_SECURITY_SUITE = "packages/db/src/row-security.postgres.test.ts";
 const BREX_CARDS_RLS_SUITE = "packages/db/src/brex-cards-rls.postgres.test.ts";
-// Suites that check the runtime login rather than the owner login.
-const RUNTIME_LOGIN_SUITES = new Set([ROW_SECURITY_SUITE, BREX_CARDS_RLS_SUITE]);
+const BREX_CARDS_BINDING_SUITE = "packages/adapters/src/brex-cards-binding.postgres.test.ts";
+// Suites that check the runtime login rather than the owner login. The Brex cards binding runs
+// as the runtime role so its cap count crosses spaces under row-level security, as it does live.
+const RUNTIME_LOGIN_SUITES = new Set([
+  ROW_SECURITY_SUITE,
+  BREX_CARDS_RLS_SUITE,
+  BREX_CARDS_BINDING_SUITE,
+]);
 
 if (Number(integration) + Number(e2e) !== 1) {
   throw new Error("Pass exactly one of --integration or --e2e");
@@ -130,6 +136,7 @@ async function main() {
         "packages/db/src/space-membership.postgres.test.ts",
         ROW_SECURITY_SUITE,
         BREX_CARDS_RLS_SUITE,
+        BREX_CARDS_BINDING_SUITE,
         "packages/db/src/messaging.postgres.test.ts",
         "packages/db/src/billing.postgres.test.ts",
         "apps/api/src/billing.postgres.test.ts",

@@ -18,10 +18,12 @@ import { CARTA_MCP_ENDPOINT } from "@rakazo/contracts";
 import { loadOrCreateCredentials } from "./demo/credentials.js";
 import {
   DEMO_BOUNCE_DOMAIN,
+  DEMO_BREX_TOKEN,
   DEMO_GRANOLA_KEY,
   DEMO_NEW_MAIL_DELAY_MS,
   DEMO_RATE_LIMIT_SPACE,
   DEMO_RECONNECT_SPACE,
+  demoBrexCards,
   demoCarta,
   demoCrypto,
   demoFinance,
@@ -258,6 +260,8 @@ Mail states to try:
   Between accounts: mail from Sales mail to Founder mail arrives in Founder mail
 Granola:
   API key:      ${DEMO_GRANOLA_KEY} (fake demo key; paste it on the Granola page)
+Brex cards:
+  API token:    ${DEMO_BREX_TOKEN} (fake demo token; the demo's Brex emulator accepts only this one)
 ${USE_DOCKER_SANDBOX ? `Computers:     real Docker computers via the sandbox supervisor on ${SUPERVISOR_URL}` : "Computers:     fake (DEMO_SANDBOX_PROVIDER=docker gives bots a real Docker computer; build the image first with pnpm sandbox:build)"}
 Stop and delete it with: ${SLOT ? `DEMO_SLOT=${SLOT} ` : ""}pnpm demo:down`);
 }
@@ -405,15 +409,21 @@ async function serve() {
     DEMO_NEW_MAIL_DELAY_MS,
   ).unref();
   // Granola's API runs as an emulator with three invented meetings, so Connect works offline.
-  const { GranolaApiEmulator, createMeetingSourceRegistry } = await import("@rakazo/adapters");
+  const { BrexApiEmulator, GranolaApiEmulator, createMeetingSourceRegistry } = await import(
+    "@rakazo/adapters"
+  );
   const granola = new GranolaApiEmulator({
     meetings: demoGranolaMeetings(),
     apiKey: DEMO_GRANOLA_KEY,
   });
   const granolaBaseUrl = await granola.start();
+  // The Brex cards server runs inside the API and talks to this emulator instead of api.brex.com.
+  const brex = new BrexApiEmulator(demoBrexCards());
+  const brexBaseUrl = await brex.start();
   const { handles } = await createEmulatedApp(process.env.DATABASE_URL as string, {
     composio,
     meetingSources: createMeetingSourceRegistry({ granolaBaseUrl }),
+    brexApi: { baseUrl: brexBaseUrl },
     financeCallToolFor: demoFinance().callToolFor,
     mcpServers: {
       [new URL(CARTA_MCP_ENDPOINT).hostname]: demoCarta(WEB_ORIGIN),
@@ -432,6 +442,7 @@ async function serve() {
     void handles
       .stop()
       .then(() => granola.stop())
+      .then(() => brex.stop())
       .finally(() => server.close(() => process.exit(0)));
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);

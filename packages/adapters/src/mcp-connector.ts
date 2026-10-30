@@ -14,6 +14,7 @@ import {
   FINANCE_READ_TOOLS,
   financeProviderForEndpoint,
   integrationPresetForEndpoint,
+  isBrexCardsEndpoint,
   isCartaAgentSpawnKey,
   isFinanceAgentSpawnKey,
   isIntegrationAgentForServer,
@@ -24,6 +25,7 @@ import {
 import type { McpServer, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { catalogToolPrefix } from "./approval-effect.js";
+import { connectBrexCardsSession } from "./brex-cards-binding.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
 import { credentialDigest } from "./credential-digest.js";
 import { appendToolCompletionAudit } from "./executor.js";
@@ -273,6 +275,8 @@ export class McpConnector implements ConnectorProvider {
       /** Audit sink for failed discovery. Without it the log line stays the only trace. */
       events?: Pick<ThreadEvents, "append">;
       allowPrivateEndpoint?: boolean;
+      /** Where the in-process Brex cards server reaches Brex. Replaced by the demo and tests. */
+      brexApi?: { baseUrl?: string; fetch?: typeof fetch };
     } = {},
     private readonly oauth?: McpOAuthBroker,
   ) {
@@ -626,7 +630,14 @@ export class McpConnector implements ConnectorProvider {
         context,
         (current) => {
           material = this.sessions.get(sessionKey)?.material ?? material;
-          return current.callTool(route.toolName, call.args, { signal: context.signal });
+          return current.callTool(route.toolName, call.args, {
+            signal: context.signal,
+            // The executor hands this server the approved effect's id, which Brex gets as the
+            // request's idempotency key. A retry of the same effect carries the same id.
+            ...(isBrexCardsEndpoint(opened.endpoint)
+              ? { meta: { idempotencyKey: call.executionId } }
+              : {}),
+          });
         },
         session,
       );
@@ -910,7 +921,29 @@ export class McpConnector implements ConnectorProvider {
       const loaded = { material, ...(secret ? { secretId: secret.id } : {}) };
       const args = Array.isArray(server.args) ? server.args.map(String) : [];
       const env = { ...(material.env ?? {}) };
-      if (server.transport === "stdio") {
+      if (isBrexCardsEndpoint(server.endpoint)) {
+        // Runs in this process, so the session belongs to one space: never connect it to a row of
+        // another one, and take the token from this row's own secret.
+        if (server.spaceId !== context.spaceId) throw new Error("MCP server is not in this space");
+        const token = material.secret?.replace(/^Bearer /, "");
+        if (!token)
+          throw Object.assign(
+            new Error("The Brex token is missing. Ask the owner to replace it."),
+            {
+              expected: "reconnect",
+            },
+          );
+        await connectBrexCardsSession(
+          session,
+          {
+            server: { id: server.id, spaceId: server.spaceId, userId: server.userId },
+            prisma: this.prisma,
+            token,
+            ...this.options.brexApi,
+          },
+          { signal: context.signal },
+        );
+      } else if (server.transport === "stdio") {
         // Only a deployment change or an edit to the server fixes a refusal, so wait for one.
         const refusal = mcpStdioRefusal(String(server.command ?? ""), this.options);
         if (refusal) throw Object.assign(new Error(refusal), { expected: "reconnect" });

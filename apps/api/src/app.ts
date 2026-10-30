@@ -241,6 +241,8 @@ type CreateAppOverrides = Partial<AppEnv> & {
   cryptoFetch?: typeof fetch;
   /** Replaces the real meeting providers, so the demo and tests run Granola against its emulator. */
   meetingSources?: MeetingSourceRegistry;
+  /** Points the in-process Brex cards server at an emulator instead of api.brex.com. */
+  brexApi?: { baseUrl?: string; fetch?: typeof fetch };
   /** Offline acceptance seams limited to GTM account and queue reads. */
   gtmQueueReader?: GtmQueueReader;
   gtmMcp?: Pick<McpConnector, "callServerTool">;
@@ -263,6 +265,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     financeCallToolFor: financeCallToolOverride,
     cryptoFetch,
     meetingSources,
+    brexApi,
     gtmQueueReader,
     gtmMcp,
     ...envOverrides
@@ -399,6 +402,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       network: remoteConnectors,
       events,
       allowPrivateEndpoint: env.mcpAllowPrivateEndpoint,
+      ...(brexApi ? { brexApi } : {}),
     },
     mcpOAuth,
   );
