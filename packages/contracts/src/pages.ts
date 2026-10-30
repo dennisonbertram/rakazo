@@ -8,6 +8,8 @@ import { Id } from "./ids.js";
  */
 export const BOT_PAGE_MAX_CHARS = 200_000;
 export const BOT_PAGE_MAX_CHARTS = 20;
+export const BOT_PAGE_MAX_PAGES = 20;
+export const BOT_PAGE_TITLE_MAX = 60;
 export const PAGE_CHART_FENCE = "chart";
 
 /** Snapshot charts carry their rows. Live charts (a later `source` field) will resolve them on view. */
@@ -27,8 +29,12 @@ export type PageChart = z.infer<typeof PageChartSchema>;
 export const PageAuthor = z.enum(["bot", "user"]);
 export type PageAuthor = z.infer<typeof PageAuthor>;
 
+export const BotPageTitleSchema = z.string().trim().min(1).max(BOT_PAGE_TITLE_MAX);
+
 export const BotPageSchema = z.object({
+  id: Id,
   botId: Id,
+  title: BotPageTitleSchema,
   content: z.string().max(BOT_PAGE_MAX_CHARS),
   /** Increments on every save; writes must name the revision they were based on. */
   revision: z.number().int().positive(),
@@ -39,10 +45,16 @@ export const BotPageSchema = z.object({
 });
 export type BotPage = z.infer<typeof BotPageSchema>;
 
-export const BotPageGetInputSchema = z.object({ botId: Id, chartSvgs: z.boolean().optional() });
+/** Without pageId, the bot's first page (oldest) is meant. */
+export const BotPageGetInputSchema = z.object({
+  botId: Id,
+  pageId: Id.optional(),
+  chartSvgs: z.boolean().optional(),
+});
 
 export const BotPageSaveInputSchema = z.object({
   botId: Id,
+  pageId: Id.optional(),
   content: z.string().max(BOT_PAGE_MAX_CHARS),
   /** 0 creates the page. */
   baseRevision: z.number().int().nonnegative(),
@@ -54,3 +66,20 @@ export const BotPageSaveOutputSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(false), reason: z.literal("conflict"), page: BotPageSchema }),
 ]);
 export type BotPageSaveOutput = z.infer<typeof BotPageSaveOutputSchema>;
+
+export const BotPageSummarySchema = z.object({
+  id: Id,
+  title: BotPageTitleSchema,
+  revision: z.number().int().positive(),
+  updatedAt: z.string(),
+});
+export type BotPageSummary = z.infer<typeof BotPageSummarySchema>;
+
+export const BotPageListInputSchema = z.object({ botId: Id });
+export const BotPageCreateInputSchema = z.object({ botId: Id, title: BotPageTitleSchema });
+export const BotPageRenameInputSchema = z.object({
+  botId: Id,
+  pageId: Id,
+  title: BotPageTitleSchema,
+});
+export const BotPageRemoveInputSchema = z.object({ botId: Id, pageId: Id });
