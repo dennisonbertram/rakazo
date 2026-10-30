@@ -769,7 +769,7 @@ export function ComposeEmail({
                 maxLength={998}
                 dir="auto"
                 autoComplete="off"
-                className="h-7 min-w-0 flex-1 bg-transparent text-sm outline-none disabled:opacity-50"
+                className="h-7 min-w-0 flex-1 bg-transparent text-base outline-none disabled:opacity-50 md:text-sm"
                 onChange={(event) => update({ subject: event.target.value })}
               />
             </Row>
