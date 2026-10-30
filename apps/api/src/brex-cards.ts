@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
+import type { SecretStore } from "@rakazo/adapter-kit";
 import type { McpConnector } from "@rakazo/adapters";
-import { buildMcpCredentialBlob } from "@rakazo/adapters";
+import { buildMcpCredentialBlob, persistPreparedSecret } from "@rakazo/adapters";
 import type { Actor, Bot, BrexCardsControls, BrexCardsList } from "@rakazo/contracts";
 import {
   actorScope,
@@ -16,7 +17,7 @@ import { requireSpaceOwner } from "./space-owner.js";
 
 export interface BrexCardsDeps {
   prisma: PrismaClient;
-  secrets: { put(plaintext: string, context: never): Promise<{ id: string; ciphertext: string }> };
+  secrets: SecretStore;
   mcp: Pick<McpConnector, "callServerTool">;
   /** Where Brex is reached; the demo and tests point it at an emulator. */
   brexApi?: { baseUrl?: string; fetch?: typeof fetch };
@@ -29,6 +30,10 @@ const REJECTED = "Brex rejected this token";
 const UNREACHABLE = "Could not reach Brex";
 const CONFLICT_MESSAGE = "Brex cards are already connected in this space";
 const NOT_CONNECTED_MESSAGE = "Brex cards are not connected in this space";
+const CONNECTED_BY_OTHER_MESSAGE =
+  "Brex cards were connected by someone else. Disconnect and connect again.";
+const OTHER_ACCOUNT_MESSAGE =
+  "This token is for a different Brex account. Disconnect Brex cards and connect again.";
 
 /**
  * Checks the token with the three reads the server itself relies on, before anything is stored,
@@ -84,6 +89,10 @@ const connectionOf = async (deps: BrexCardsDeps, actor: Actor) => {
     include: { server: true },
   });
   if (!connection) throw new ORPCError("NOT_FOUND", { message: NOT_CONNECTED_MESSAGE });
+  // After a change of space owner the token and its secret still belong to the person who
+  // connected them: the new owner disconnects and connects again instead of using them.
+  if (connection.server.userId !== actor.userId)
+    throw new ORPCError("PRECONDITION_FAILED", { message: CONNECTED_BY_OTHER_MESSAGE });
   return connection;
 };
 
@@ -131,39 +140,43 @@ export async function brexCardsConnect(
     buildMcpCredentialBlob({ secret: token }) as string,
     secretContext("brex-cards.connect", scope),
   );
-  const server = await deps.prisma
-    .$transaction(async (tx) => {
-      await tx.secret.create({
-        data: { id: stored.id, ...scope, kind: "mcp", ciphertext: stored.ciphertext },
-      });
-      const row = await tx.mcpServer.create({
-        data: {
-          ...scope,
-          slug: "brex-cards",
-          name: "Brex cards",
-          description: "",
-          transport: "streamable_http",
-          endpoint: BREX_CARDS_MCP_ENDPOINT,
-          secretId: stored.id,
-          enabled: true,
-          agentExclusive: true,
-          writesEnabled: false,
-        },
-      });
-      await tx.brexCardsConnection.create({
-        data: {
-          serverId: row.id,
-          spaceId: actor.spaceId,
-          createdByUserId: actor.userId,
-          brexAccountId,
-        },
-      });
-      return row;
-    })
-    .catch((error: unknown) => {
-      if (isUniqueViolation(error)) throw new ORPCError("CONFLICT", { message: CONFLICT_MESSAGE });
-      throw error;
-    });
+  // The stored secret may live in a remote vault: a failed transaction must not leave it there.
+  const server = await persistPreparedSecret(deps.prisma, deps.secrets, stored, () =>
+    deps.prisma
+      .$transaction(async (tx) => {
+        await tx.secret.create({
+          data: { id: stored.id, ...scope, kind: "mcp", ciphertext: stored.ciphertext },
+        });
+        const row = await tx.mcpServer.create({
+          data: {
+            ...scope,
+            slug: "brex-cards",
+            name: "Brex cards",
+            description: "",
+            transport: "streamable_http",
+            endpoint: BREX_CARDS_MCP_ENDPOINT,
+            secretId: stored.id,
+            enabled: true,
+            agentExclusive: true,
+            writesEnabled: false,
+          },
+        });
+        await tx.brexCardsConnection.create({
+          data: {
+            serverId: row.id,
+            spaceId: actor.spaceId,
+            createdByUserId: actor.userId,
+            brexAccountId,
+          },
+        });
+        return row;
+      })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error))
+          throw new ORPCError("CONFLICT", { message: CONFLICT_MESSAGE });
+        throw error;
+      }),
+  );
 
   try {
     const bot = await deps.provisionAgent(actor, server.id);
@@ -196,34 +209,35 @@ export async function brexCardsReplaceToken(
   await requireSpaceOwner(deps.prisma, actor);
   const connection = await connectionOf(deps, actor);
   const brexAccountId = await checkToken(deps, token);
-  // The secret stays in the scope of the server's own user, who may not be the acting owner.
-  const owner = { spaceId: connection.server.spaceId, userId: connection.server.userId };
+  // The daily card cap counts per Brex company and an in-flight create holds the old token, so a
+  // token may not move the connection to another company.
+  if (brexAccountId !== connection.brexAccountId)
+    throw new ORPCError("BAD_REQUEST", { message: OTHER_ACCOUNT_MESSAGE });
+  const scope = actorScope(actor);
   const stored = await deps.secrets.put(
     buildMcpCredentialBlob({ secret: token }) as string,
-    secretContext("brex-cards.replace", owner),
+    secretContext("brex-cards.replace", scope),
   );
-  await deps.prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM mcp_servers WHERE id = ${connection.serverId} FOR UPDATE`;
-    const current = await tx.mcpServer.findFirst({
-      where: { id: connection.serverId, spaceId: actor.spaceId },
-      select: { secretId: true },
-    });
-    if (!current) throw new ORPCError("NOT_FOUND", { message: NOT_CONNECTED_MESSAGE });
-    const oldSecretId = current.secretId;
-    await tx.secret.create({
-      data: { id: stored.id, ...owner, kind: "mcp", ciphertext: stored.ciphertext },
-    });
-    await tx.mcpServer.update({
-      where: { id: connection.serverId },
-      data: { secretId: stored.id, revision: { increment: 1 } },
-    });
-    if (oldSecretId) await tx.secret.deleteMany({ where: { id: oldSecretId, ...owner } });
-    // The daily card cap counts per Brex company, so the id follows the token.
-    await tx.brexCardsConnection.update({
-      where: { serverId: connection.serverId },
-      data: { brexAccountId },
-    });
-  });
+  // The stored secret may live in a remote vault: a failed transaction must not leave it there.
+  await persistPreparedSecret(deps.prisma, deps.secrets, stored, () =>
+    deps.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM mcp_servers WHERE id = ${connection.serverId} FOR UPDATE`;
+      const current = await tx.mcpServer.findFirst({
+        where: { id: connection.serverId, ...scope },
+        select: { secretId: true },
+      });
+      if (!current) throw new ORPCError("NOT_FOUND", { message: NOT_CONNECTED_MESSAGE });
+      const oldSecretId = current.secretId;
+      await tx.secret.create({
+        data: { id: stored.id, ...scope, kind: "mcp", ciphertext: stored.ciphertext },
+      });
+      await tx.mcpServer.update({
+        where: { id: connection.serverId },
+        data: { secretId: stored.id, revision: { increment: 1 } },
+      });
+      if (oldSecretId) await tx.secret.deleteMany({ where: { id: oldSecretId, ...scope } });
+    }),
+  );
 }
 
 const ListedCards = z.object({

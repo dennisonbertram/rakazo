@@ -6026,11 +6026,22 @@ export function createRouter(deps: RouterDeps) {
             await devinDisconnect(devinDeps, context.actor, input.id);
             return { ok: true as const };
           }
+          // The current space owner removes a Brex cards server whoever connected it; its rows are
+          // in the connecting user's scope. A former owner who still owns the row is refused.
+          const brexRow = await deps.prisma.mcpServer.findFirst({
+            where: { id: input.id, spaceId: context.actor.spaceId },
+            select: { endpoint: true, userId: true },
+          });
+          let actor: Actor = context.actor;
+          if (isBrexCardsEndpoint(brexRow?.endpoint)) {
+            await requireSpaceOwner(deps.prisma, context.actor);
+            actor = { ...context.actor, userId: brexRow?.userId as string };
+          }
           const server = await deps.prisma.mcpServer.findFirst({
             where: {
               id: input.id,
-              spaceId: context.actor.spaceId,
-              userId: context.actor.userId,
+              spaceId: actor.spaceId,
+              userId: actor.userId,
             },
             select: { id: true, secretId: true },
           });
@@ -6039,13 +6050,8 @@ export function createRouter(deps: RouterDeps) {
           // Cards are closed first, including ones that were never assigned.
           let agentToArchive: string | null = null;
           const seqs = await deps.prisma.$transaction(async (tx) => {
-            const painted = await dismissMcpServerApprovals(
-              onboardingDeps,
-              context.actor,
-              server.id,
-              tx,
-            );
-            await companyWriter(tx, context.actor).disconnectMcpServer(server.id);
+            const painted = await dismissMcpServerApprovals(onboardingDeps, actor, server.id, tx);
+            await companyWriter(tx, actor).disconnectMcpServer(server.id);
             // The deleted row says which agent it had at that moment, so a concurrent relink is seen.
             const deleted = await tx.mcpServer.delete({ where: { id: server.id } });
             // Carta's agent is shared with the Cap table, and the Granola agent with the API key.
@@ -6056,31 +6062,27 @@ export function createRouter(deps: RouterDeps) {
               !isZernioEndpoint(deleted.endpoint)
                 ? deleted.agentBotId
                 : null;
-            // The Brex cards server may share the owner's Brex finance agent, which keeps its
-            // other server: only an agent made for this server goes with it.
-            if (agentToArchive && isBrexCardsEndpoint(deleted.endpoint)) {
-              const own = await tx.bot.findFirst({
-                where: {
-                  id: agentToArchive,
-                  ...actorScope(context.actor),
-                  spawnKey: integrationAgentSpawnKey(deleted.id),
-                },
-                select: { id: true },
-              });
-              if (!own) agentToArchive = null;
-            }
+            // An agent that another server of the space still uses (the Brex finance and cards
+            // servers share one) stays with that server.
+            if (
+              agentToArchive &&
+              (await tx.mcpServer.count({
+                where: { spaceId: actor.spaceId, agentBotId: agentToArchive },
+              }))
+            )
+              agentToArchive = null;
             // Archived with the server, so the agent is never left active without it.
             if (agentToArchive)
               await tx.bot.updateMany({
-                where: { id: agentToArchive, ...actorScope(context.actor), archivedAt: null },
+                where: { id: agentToArchive, ...actorScope(actor), archivedAt: null },
                 data: { archivedAt: new Date(), pinned: false },
               });
             if (server.secretId) {
               await tx.secret.deleteMany({
                 where: {
                   id: server.secretId,
-                  spaceId: context.actor.spaceId,
-                  userId: context.actor.userId,
+                  spaceId: actor.spaceId,
+                  userId: actor.userId,
                 },
               });
             }
@@ -6088,7 +6090,7 @@ export function createRouter(deps: RouterDeps) {
           });
           // Runs and the computer of the archived agent are cleaned up now; the archive itself is done.
           if (agentToArchive)
-            await archiveActorBot(context.actor, agentToArchive).catch((error) =>
+            await archiveActorBot(actor, agentToArchive).catch((error) =>
               getLogger().error("mcp.servers.remove: agent not archived", error),
             );
           for (const event of seqs) await deps.events.notify(event.threadId, event.seq);
