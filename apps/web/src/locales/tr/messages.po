@@ -2362,6 +2362,7 @@ msgstr "Sunucuya ulaşılamıyor."
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/shell/bot-credentials.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Cancel"
@@ -4709,6 +4710,7 @@ msgstr "Varsayılan ({0})"
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
 #: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
 #: src/pages/shell/space-sidebar.tsx
@@ -4741,6 +4743,10 @@ msgstr "{0} sil"
 #: src/pages/shell/dialogs.tsx
 msgid "Delete {0}?"
 msgstr "{0} silinsin mi?"
+
+#: src/pages/shell/bot-page-panel.tsx
+msgid "Delete {activeTitle}?"
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Delete {title}"
@@ -7935,8 +7941,13 @@ msgid "New open-work item"
 msgstr "Yeni açık iş öğesi"
 
 #: src/pages/Shell.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "New page"
+msgstr ""
+
+#: src/pages/shell/bot-page-panel.tsx
+msgid "New page {n}"
 msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
@@ -9026,9 +9037,15 @@ msgstr ""
 
 #: src/components/SidebarPages.tsx
 #: src/components/SidebarPagesGroup.tsx
+#: src/pages/shell/bot-page-panel.tsx
 msgid "Page options"
 msgstr ""
 
+#: src/pages/shell/bot-page-panel.tsx
+msgid "Page title"
+msgstr ""
+
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/command-palette.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Pages"
@@ -10202,6 +10219,7 @@ msgstr ""
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Rename"
 msgstr ""

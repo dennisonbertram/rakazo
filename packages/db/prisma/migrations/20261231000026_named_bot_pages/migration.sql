@@ -12,6 +12,7 @@ UPDATE "bot_pages" SET "title" = 'Page' WHERE "title" IS NULL;
 
 ALTER TABLE "bot_pages" ALTER COLUMN "title" SET NOT NULL;
 
-CREATE UNIQUE INDEX "bot_pages_botId_title_key" ON "bot_pages"("botId", "title");
+-- Case-insensitive, because bots address pages by title in any case.
+CREATE UNIQUE INDEX "bot_pages_botId_title_key" ON "bot_pages"("botId", lower("title"));
 
 CREATE INDEX "bot_pages_botId_idx" ON "bot_pages"("botId");

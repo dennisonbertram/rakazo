@@ -2362,6 +2362,7 @@ msgstr "Can't reach the server."
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/shell/bot-credentials.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Cancel"
@@ -4709,6 +4710,7 @@ msgstr "Default ({0})"
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
 #: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
 #: src/pages/shell/space-sidebar.tsx
@@ -4741,6 +4743,10 @@ msgstr "Delete {0}"
 #: src/pages/shell/dialogs.tsx
 msgid "Delete {0}?"
 msgstr "Delete {0}?"
+
+#: src/pages/shell/bot-page-panel.tsx
+msgid "Delete {activeTitle}?"
+msgstr "Delete {activeTitle}?"
 
 #: src/pages/Artifacts.tsx
 msgid "Delete {title}"
@@ -7935,9 +7941,14 @@ msgid "New open-work item"
 msgstr "New open-work item"
 
 #: src/pages/Shell.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "New page"
 msgstr "New page"
+
+#: src/pages/shell/bot-page-panel.tsx
+msgid "New page {n}"
+msgstr "New page {n}"
 
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Auth.tsx
@@ -9026,9 +9037,15 @@ msgstr "Page not found"
 
 #: src/components/SidebarPages.tsx
 #: src/components/SidebarPagesGroup.tsx
+#: src/pages/shell/bot-page-panel.tsx
 msgid "Page options"
 msgstr "Page options"
 
+#: src/pages/shell/bot-page-panel.tsx
+msgid "Page title"
+msgstr "Page title"
+
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/command-palette.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Pages"
@@ -10202,6 +10219,7 @@ msgstr "Removes this meeting and its to-dos from Praci. Your note in Granola is 
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/finance/FinanceAccounts.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Rename"
 msgstr "Rename"

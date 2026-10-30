@@ -1665,7 +1665,8 @@ model BotPage {
   updatedAt DateTime          @updatedAt
   revisions BotPageRevision[]
 
-  @@unique([botId, title])
+  // Titles are unique per bot ignoring case: unique index bot_pages_botId_title_key (raw SQL in
+  // migration 20261231000026) on (botId, lower(title)).
   @@index([botId])
   @@index([spaceId])
   @@map("bot_pages")
