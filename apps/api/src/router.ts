@@ -268,7 +268,9 @@ import {
   FundraiseRoundOpenError,
   findDefaultModelCredential,
   findDefaultVoiceCredential,
+  findBotModelCredential,
   findModelCredential,
+  PinnedConnectionLostError,
   findSpaceMemoryConfig,
   findTicket,
   formatMessagingLinkCode,
@@ -2445,6 +2447,11 @@ export function createRouter(deps: RouterDeps) {
               await tx.userModelCredential.deleteMany({
                 where: { userId: context.actor.userId, id: { in: ids } },
               });
+              // The owner chose to disconnect, so what was pinned goes back to the default.
+              // An automatic sign-out never runs this and leaves the pin to fail by name.
+              const pinned = { userId: context.actor.userId, modelCredentialId: { in: ids } };
+              await tx.bot.updateMany({ where: pinned, data: { modelCredentialId: null } });
+              await tx.routine.updateMany({ where: pinned, data: { modelCredentialId: null } });
               for (const row of existing) {
                 await deleteUnreferencedCredentialSecret(tx, {
                   credentialKind: "model",
@@ -2593,17 +2600,40 @@ export function createRouter(deps: RouterDeps) {
         // Web settings resend the saved model on every save. Reject an
         // incompatible override only when this request is changing it; a run
         // still rejects a Spark model the subscription sign-in cannot call.
+        // The pin is the caller's own connection for the bot's provider. Changing the
+        // provider (or clearing the model) drops it unless the request names a new one.
+        const providerChanged =
+          input.modelProvider !== undefined && input.modelProvider !== existing.modelProvider;
+        const pinWrite = connectionPinWrite(input, existing.modelProvider);
+        // An unchanged pin is kept as stored, even if its connection has since gone, so a
+        // rename or voice change still saves; only a new pin or a new provider is checked.
+        if (pinWrite && (pinWrite !== existing.modelCredentialId || providerChanged)) {
+          await assertOwnedConnection(
+            deps,
+            context.actor,
+            pinWrite,
+            input.modelProvider !== undefined ? input.modelProvider : existing.modelProvider,
+          );
+        }
+        const effectivePin =
+          pinWrite === undefined ? (existing.modelCredentialId ?? null) : pinWrite;
         const settingModel =
           input.modelProvider !== undefined &&
           input.modelId !== undefined &&
-          (input.modelProvider !== existing.modelProvider || input.modelId !== existing.modelId);
+          (providerChanged ||
+            input.modelId !== existing.modelId ||
+            effectivePin !== (existing.modelCredentialId ?? null));
         if (settingModel && input.modelProvider && input.modelId) {
-          const credential = await findModelCredential(
-            deps.prisma,
-            context.actor,
-            input.modelProvider,
-            input.modelId,
-          );
+          const credential = await findBotModelCredential(deps.prisma, context.actor, {
+            modelProvider: input.modelProvider,
+            modelId: input.modelId,
+            modelCredentialId: effectivePin,
+          }).catch((error: unknown) => {
+            if (error instanceof PinnedConnectionLostError) {
+              throw new ORPCError("BAD_REQUEST", { message: error.message });
+            }
+            throw error;
+          });
           if (!credential) {
             throw new ORPCError("BAD_REQUEST", { message: "Connect that model provider first" });
           }
@@ -2742,6 +2772,7 @@ export function createRouter(deps: RouterDeps) {
             ...(input.modelProvider !== undefined
               ? { modelProvider: input.modelProvider, modelId: input.modelId ?? null }
               : {}),
+            ...(pinWrite !== undefined ? { modelCredentialId: pinWrite } : {}),
             ...(input.thinkingLevel !== undefined ? { thinkingLevel } : {}),
             ...(input.teamChatAmbientEnabled !== undefined
               ? { teamChatAmbientEnabled: input.teamChatAmbientEnabled }
@@ -4405,6 +4436,14 @@ export function createRouter(deps: RouterDeps) {
         }
         const bot = await repos.getBot(context.actor, input.botId);
         await assertRoutineModel(deps, context.actor, input);
+        if (input.modelCredentialId && input.modelProvider) {
+          await assertOwnedConnection(
+            deps,
+            context.actor,
+            input.modelCredentialId,
+            input.modelProvider,
+          );
+        }
         if (input.taughtSkillId) {
           await assertRoutineTaughtSkill(deps, context.actor, input.botId, input.taughtSkillId);
         }
@@ -4443,6 +4482,7 @@ export function createRouter(deps: RouterDeps) {
             messageProvider: input.messageProvider,
             modelProvider: input.modelProvider,
             modelId: input.modelId,
+            modelCredentialId: input.modelProvider ? input.modelCredentialId : null,
             thinkingLevel: input.thinkingLevel,
             // A watch is quiet by default; everything else keeps today's behavior.
             quiet: input.quiet ?? Boolean(input.watch),
@@ -4499,9 +4539,16 @@ export function createRouter(deps: RouterDeps) {
         const hasModel = Boolean(modelProvider && modelId);
         const modelChanged =
           modelProvider !== existing.modelProvider || modelId !== existing.modelId;
+        const pinWrite = connectionPinWrite(input, existing.modelProvider);
+        const modelCredentialId = !hasModel
+          ? null
+          : pinWrite === undefined
+            ? existing.modelCredentialId
+            : pinWrite;
         const touchesModel =
           input.modelProvider !== undefined ||
           input.modelId !== undefined ||
+          input.modelCredentialId !== undefined ||
           input.thinkingLevel !== undefined;
         if (Boolean(modelProvider) !== Boolean(modelId)) {
           throw new ORPCError("BAD_REQUEST", {
@@ -4521,6 +4568,9 @@ export function createRouter(deps: RouterDeps) {
             : input.thinkingLevel;
         if (modelChanged) {
           await assertRoutineModel(deps, context.actor, { modelProvider, modelId });
+        }
+        if (modelCredentialId && modelCredentialId !== existing.modelCredentialId) {
+          await assertOwnedConnection(deps, context.actor, modelCredentialId, modelProvider);
         }
         if (existing.managedKind) {
           const edited = Object.entries(input).filter(
@@ -4627,6 +4677,7 @@ export function createRouter(deps: RouterDeps) {
                 ? {
                     modelProvider: existing.modelProvider,
                     modelId: existing.modelId,
+                    modelCredentialId: existing.modelCredentialId,
                     thinkingLevel: existing.thinkingLevel,
                   }
                 : {}),
@@ -4644,7 +4695,7 @@ export function createRouter(deps: RouterDeps) {
               messageProvider: input.messageProvider,
               quiet: input.quiet,
               ...(input.watch === undefined ? {} : { watch: input.watch ?? Prisma.DbNull }),
-              ...(touchesModel ? { modelProvider, modelId, thinkingLevel } : {}),
+              ...(touchesModel ? { modelProvider, modelId, modelCredentialId, thinkingLevel } : {}),
               nextRunAt,
             },
             include: routineInclude,
@@ -4767,7 +4818,12 @@ export function createRouter(deps: RouterDeps) {
             });
             const currentModel = await tx.routine.findUnique({
               where: { id: routine.id },
-              select: { modelProvider: true, modelId: true, thinkingLevel: true },
+              select: {
+                modelProvider: true,
+                modelId: true,
+                modelCredentialId: true,
+                thinkingLevel: true,
+              },
             });
             if (!currentModel) throw new IsolationError();
             const created = await tx.run.create({
@@ -10102,6 +10158,32 @@ async function assertWatchLimits(prisma: PrismaClient, spaceId: string, botId: s
 }
 
 /** A routine may only name a model the space has connected. */
+/** What a save writes to a pin: a new id, null to clear, or undefined to leave it alone. */
+function connectionPinWrite(
+  input: { modelProvider?: string | null; modelCredentialId?: string | null },
+  existingProvider: string | null,
+): string | null | undefined {
+  if (input.modelProvider === null) return null;
+  if (input.modelCredentialId !== undefined) return input.modelCredentialId;
+  return input.modelProvider !== undefined && input.modelProvider !== existingProvider
+    ? null
+    : undefined;
+}
+
+/** Only the caller's own connection, for the model's provider, can be pinned. */
+async function assertOwnedConnection(
+  deps: RouterDeps,
+  actor: Actor,
+  credentialId: string,
+  provider: string | null,
+) {
+  const owned = await deps.prisma.userModelCredential.findFirst({
+    where: { id: credentialId, userId: actor.userId, provider: provider ?? "" },
+    select: { id: true },
+  });
+  if (!owned) throw new IsolationError();
+}
+
 async function assertRoutineModel(
   deps: RouterDeps,
   actor: Actor,
@@ -10153,6 +10235,7 @@ function mapRoutine(row: {
   messageProvider: string | null;
   modelProvider: string | null;
   modelId: string | null;
+  modelCredentialId?: string | null;
   thinkingLevel: string | null;
   lastRunAt: Date | null;
   nextRunAt: Date | null;
@@ -10182,6 +10265,7 @@ function mapRoutine(row: {
     messageProvider: row.messageProvider,
     modelProvider: row.modelProvider ?? null,
     modelId: row.modelId ?? null,
+    modelCredentialId: row.modelCredentialId ?? null,
     thinkingLevel: (row.thinkingLevel as Routine["thinkingLevel"]) ?? null,
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     nextRunAt: row.nextRunAt?.toISOString() ?? null,

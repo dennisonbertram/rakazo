@@ -4632,6 +4632,7 @@ export function ShellPage() {
                 // "" is a rejected key: open the provider the failed run used.
                 openSettings("models", provider || (activeSnapshot?.run?.modelProvider ?? ""))
               }
+              onOpenBotSettings={() => setPanel("settings")}
               onNavigate={navigate}
               sending={sending}
               fileInputRef={fileInputRef}
@@ -5719,6 +5720,8 @@ export function ShellPage() {
                     const routineModel = {
                       modelProvider: model?.provider ?? null,
                       modelId: model?.modelId ?? null,
+                      modelCredentialId:
+                        model && routineDraft.credentialId ? routineDraft.credentialId : null,
                       thinkingLevel: (model && routineDraft.thinkingLevel
                         ? routineDraft.thinkingLevel
                         : null) as ThinkingLevel | null,
@@ -5758,6 +5761,8 @@ export function ShellPage() {
                           : {}),
                         ...(routineModel.modelProvider !== targetRoutine.modelProvider ||
                         routineModel.modelId !== targetRoutine.modelId ||
+                        routineModel.modelCredentialId !==
+                          (targetRoutine.modelCredentialId ?? null) ||
                         routineModel.thinkingLevel !== targetRoutine.thinkingLevel
                           ? routineModel
                           : {}),

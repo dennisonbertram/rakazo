@@ -75,6 +75,7 @@ export function mountWebhookHttpRoutes(app: Hono, deps: WebhookDeps) {
         prompt: true,
         modelProvider: true,
         modelId: true,
+        modelCredentialId: true,
         thinkingLevel: true,
         taughtSkillId: true,
       },

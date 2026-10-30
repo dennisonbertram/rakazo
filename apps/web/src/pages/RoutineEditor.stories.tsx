@@ -1,7 +1,9 @@
 import type { AgentSkillCatalogEntry, Routine } from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { screen, userEvent, within } from "storybook/test";
 import { mockRpc, resetRpcMocks } from "../lib/__mocks__/rpc";
+import { mockModelCatalog, mockModelCredentials } from "../stories/fixtures/models";
 import {
   draftFromRoutine,
   emptyRoutineDraft,
@@ -359,6 +361,31 @@ export const RunsTaughtSkill: Story = {
 
 export const NewRoutine: Story = {
   render: () => <Editor editing={null} initial={emptyRoutineDraft()} />,
+};
+
+/** With several connections the routine can run on one; a subscription sign-in says so. */
+export const EditingPinnedConnection: Story = {
+  beforeEach: () => {
+    resetRpcMocks();
+    mockRpc({
+      "models.credentials": mockModelCredentials,
+      "models.list": mockModelCatalog,
+      "routines.history": { runs: [], nextCursor: null },
+    });
+  },
+  render: () => {
+    const pinned = {
+      ...routine,
+      modelProvider: "example-sub",
+      modelId: "example-pro",
+      modelCredentialId: "cred_2",
+    };
+    return <Editor editing={pinned} initial={draftFromRoutine(pinned)} />;
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Advanced" }));
+    await screen.findByLabelText("Connection");
+  },
 };
 
 export const EditingScheduled: Story = {

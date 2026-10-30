@@ -214,6 +214,12 @@ msgstr ""
 msgid "{0} (overdue)"
 msgstr ""
 
+#. placeholder {0}: entry.label
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "{0} (Subscription)"
+msgstr ""
+
 #. placeholder {0}: owner(investorName)
 #. placeholder {1}: usd(amountCents)
 #: src/pages/Fundraising.tsx
@@ -2165,6 +2171,10 @@ msgid "Bot to link"
 msgstr "Bot a vincular"
 
 #: src/pages/RoutineEditor.tsx
+msgid "Bot's connection"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
 msgid "Bot's model"
 msgstr "Modelo del bot"
 
@@ -2701,6 +2711,10 @@ msgstr ""
 
 #: src/components/MailApprovalCard.tsx
 msgid "Choose an account to send from."
+msgstr ""
+
+#: src/pages/shell/composer-error.tsx
+msgid "Choose another connection"
 msgstr ""
 
 #: src/pages/shell/avatar-studio-popover.tsx
@@ -3413,6 +3427,11 @@ msgstr ""
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Connecting…"
 msgstr "Conectando…"
+
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "Connection"
+msgstr ""
 
 #: src/lib/model-connection-preflight.ts
 msgid "Connection test failed."
@@ -11542,6 +11561,7 @@ msgstr "Iniciar sesión"
 #: src/components/AccountAccess.tsx
 #: src/lib/user-error.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/composer-error.tsx
 msgid "Sign in again"
 msgstr ""
 
@@ -11626,6 +11646,11 @@ msgstr ""
 
 #: src/pages/Onboarding.tsx
 msgid "Signed in with {signedInLabel}"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "Signed out or removed"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
@@ -11831,6 +11856,10 @@ msgstr "El espacio cambió. Vuelve a abrir Modelos para cargar la lista de respa
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Space changed. Reopen Models to save its backup list."
 msgstr "El espacio cambió. Vuelve a abrir Modelos para guardar la lista de respaldo."
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Space default"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Spaces"
