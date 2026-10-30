@@ -571,11 +571,23 @@ it("Brex cards: a member (or former owner) is refused and sees none of the owner
   expect(brex.getControls).not.toHaveBeenCalled();
 });
 
-it("Brex cards: when Brex cannot be reached the owner still gets Replace token", async () => {
-  brex.cards.mockRejectedValue(new Error("Could not reach Brex"));
+it("Brex cards: any answer but a successful read keeps Replace token and Controls hidden, and offers Retry", async () => {
+  // A network error does not prove the viewer owns the space: ownership shows only after a read.
+  brex.cards.mockRejectedValueOnce(new Error("Could not reach Brex"));
   brex.getControls.mockResolvedValue(brexControls);
   await showBrex();
   expect(container.textContent).toContain("Could not reach Brex");
+  expect(headings()).toContain("Cards");
+  expect(headings()).not.toContain("Controls");
+  expect(
+    [...container.querySelectorAll("button")].some((b) => b.textContent === "Replace token"),
+  ).toBe(false);
+  expect(brex.getControls).not.toHaveBeenCalled();
+  // Retry reads again; a good answer then shows the owner's sections.
+  brex.cards.mockResolvedValue(brexList);
+  await press("Retry");
+  expect(brex.cards).toHaveBeenCalledTimes(2);
+  expect(headings()).toContain("Controls");
   expect(
     [...container.querySelectorAll("button")].some((b) => b.textContent === "Replace token"),
   ).toBe(true);

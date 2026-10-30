@@ -22,8 +22,15 @@ const financeRpc = vi.hoisted(() => ({
 const messagingRpc = vi.hoisted(() => ({ get: vi.fn() }));
 const devinRpc = vi.hoisted(() => ({ sessions: vi.fn(), connect: vi.fn(), replaceKey: vi.fn() }));
 const brexRpc = vi.hoisted(() => ({ connect: vi.fn() }));
+const spacesRpc = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("../../lib/rpc", () => ({
-  rpc: { finance: financeRpc, messagingSetup: messagingRpc, devin: devinRpc, brexCards: brexRpc },
+  rpc: {
+    finance: financeRpc,
+    messagingSetup: messagingRpc,
+    devin: devinRpc,
+    brexCards: brexRpc,
+    spaces: spacesRpc,
+  },
 }));
 
 import { IntegrationsHome } from "./IntegrationsHome";
@@ -68,6 +75,13 @@ const data = (canConfigure: boolean, managed: boolean): IntegrationsData => ({
   refresh: async () => {},
 });
 
+function spaceRole(owner: boolean) {
+  spacesRpc.list.mockResolvedValue({
+    current: { id: "space_1", name: "Demo" },
+    spaces: [{ id: "space_1", name: "Demo", canRename: owner }],
+  });
+}
+
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 function Where() {
@@ -104,6 +118,8 @@ beforeEach(() => {
   });
   financeRpc.exchanges.mockResolvedValue([]);
   messagingRpc.get.mockRejectedValue(new Error("not owner"));
+  // The current space, with the caller as its owner unless a test says otherwise.
+  spaceRole(true);
   devinRpc.sessions.mockReset();
   devinRpc.sessions.mockRejectedValue(new Error("not mocked"));
   devinRpc.connect.mockReset();
@@ -233,6 +249,24 @@ it("offers Brex cards and opens its connect dialog, then lands on the server pag
   expect(container.querySelector('[data-testid="where"]')?.textContent).toBe(
     "/app/integrations/mcp/srv_brex",
   );
+});
+
+it("shows the Brex cards tile only to the space owner, and not while the role is unknown", async () => {
+  spaceRole(false);
+  await show(data(true, false));
+  expect(container.querySelector('[aria-label="Connect Brex cards"]')).toBeNull();
+  act(() => root.unmount());
+  container.remove();
+
+  spacesRpc.list.mockRejectedValue(new Error("offline"));
+  await show(data(true, false));
+  expect(container.querySelector('[aria-label="Connect Brex cards"]')).toBeNull();
+  act(() => root.unmount());
+  container.remove();
+
+  spaceRole(true);
+  await show(data(true, false));
+  expect(container.querySelector('[aria-label="Connect Brex cards"]')).not.toBeNull();
 });
 
 it("hides the Brex cards tile once its server is connected, and its card has no host line", async () => {

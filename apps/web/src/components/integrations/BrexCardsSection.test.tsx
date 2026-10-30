@@ -61,15 +61,15 @@ const onRetry = vi.fn();
 function Where() {
   return <output data-testid="where">{useLocation().pathname}</output>;
 }
-async function mount(props: {
-  cards: BrexCardsList | null;
-  error?: string | null;
-  writesEnabled?: boolean;
-}) {
+type Props = { cards: BrexCardsList | null; error?: string | null; writesEnabled?: boolean };
+async function mount(props: Props) {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  await act(async () =>
+  await render(props);
+}
+const render = (props: Props) =>
+  act(async () =>
     root.render(
       <MemoryRouter initialEntries={["/app/integrations/mcp/s1"]}>
         <BrexCardsSection
@@ -82,7 +82,6 @@ async function mount(props: {
       </MemoryRouter>,
     ),
   );
-}
 const rowOf = (name: string) =>
   [...container.querySelectorAll("tbody tr")].find((row) => row.textContent?.includes(name))!;
 const buttonIn = (scope: ParentNode, label: string) =>
@@ -305,4 +304,44 @@ it("shows the limit with its currency and the owner id, and a loading, empty and
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("Could not reach Brex");
   await click(buttonIn(container, "Retry"));
   expect(onRetry).toHaveBeenCalledOnce();
+});
+
+it.each([
+  ["Edit limit", "limit"],
+  ["Cancel", "cancel"],
+])(
+  "%s: a dialog left open is closed when changes are turned off, so it cannot send",
+  async (label) => {
+    await mount({ cards: list([figma]), writesEnabled: true });
+    await click(buttonIn(rowOf("Figma"), label));
+    expect(dialog()).not.toBeNull();
+    await render({ cards: list([figma]), writesEnabled: false });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+    // Turning them on again does not bring the old dialog back.
+    await render({ cards: list([figma]), writesEnabled: true });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  },
+);
+
+it("a dialog left open is closed when the agent goes away", async () => {
+  await mount({ cards: list([figma]) });
+  await click(buttonIn(rowOf("Figma"), "Edit limit"));
+  await render({ cards: list([figma], { agentBotId: null }) });
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(send).not.toHaveBeenCalled();
+});
+
+it("Edit limit accepts the largest amount the contract allows and rejects one cent more", async () => {
+  await mount({ cards: list([figma]) });
+  await click(buttonIn(rowOf("Figma"), "Edit limit"));
+  await typeInto(amountField(), "10000000.01");
+  await click(buttonIn(dialog(), "Send"));
+  expect(send).not.toHaveBeenCalled();
+  expect(dialog().querySelector('[role="alert"]')).not.toBeNull();
+  await typeInto(amountField(), "10000000");
+  await click(buttonIn(dialog(), "Send"));
+  expect(send.mock.calls[0]?.[0]).toMatchObject({
+    text: "Set the limit of card card_aaa to $10000000 per month.",
+  });
 });
