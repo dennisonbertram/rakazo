@@ -151,3 +151,33 @@ it("has no tab row for one page and creates a new page from the New page button"
   expect(document.activeElement).toBe(title);
   expect([title.selectionStart, title.selectionEnd]).toEqual([0, "New page".length]);
 });
+
+it("pins one page: no tabs or new button, reports its title, and reports a missing page", async () => {
+  mocks.list.mockResolvedValue([summary("p1", "Cash"), summary("p2", "Burn")]);
+  mocks.get.mockResolvedValue(pageOf("p2", "Burn", "Burn text"));
+  const onTitle = vi.fn();
+  const onMissing = vi.fn();
+  await act(async () => {
+    root.render(
+      <BotPagePanel
+        botId="bot_demo"
+        remote={null}
+        fixedPageId="p2"
+        onTitle={onTitle}
+        onMissing={onMissing}
+      />,
+    );
+  });
+  expect(container.querySelector('[role="tab"]')).toBeNull();
+  expect(container.querySelector('[aria-label="New page"]')).toBeNull();
+  expect(mocks.get).toHaveBeenLastCalledWith({ botId: "bot_demo", pageId: "p2" });
+  expect(onTitle).toHaveBeenCalledWith("Burn");
+  expect(onMissing).not.toHaveBeenCalled();
+
+  await act(async () => {
+    root.render(
+      <BotPagePanel botId="bot_demo" remote={null} fixedPageId="gone" onMissing={onMissing} />,
+    );
+  });
+  expect(onMissing).toHaveBeenCalled();
+});
