@@ -959,4 +959,9 @@ export const FR_MESSAGES: Record<string, string> = {
     "La clé IA a atteint sa limite de dépenses. Augmentez la limite auprès de votre fournisseur ou utilisez une autre clé dans Paramètres > Modèles.",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "Le fournisseur du modèle limite les requêtes. Réessayez dans quelques minutes.",
+  "Waiting for approval": "En attente d'approbation",
+  "Not approved": "Non approuvé",
+  "Source not found": "Source introuvable",
+  "No data yet": "Pas encore de données",
+  "Source failed": "Échec de la source",
 };

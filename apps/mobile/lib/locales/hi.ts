@@ -943,4 +943,9 @@ export const HI_MESSAGES: Record<string, string> = {
     "AI कुंजी अपनी खर्च सीमा तक पहुँच गई है। अपने प्रदाता से सीमा बढ़ाएँ या सेटिंग्स > मॉडल्स में कोई दूसरी कुंजी इस्तेमाल करें।",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "मॉडल प्रदाता अनुरोधों की दर सीमित कर रहा है। कुछ मिनट बाद फिर कोशिश करें।",
+  "Waiting for approval": "अनुमोदन की प्रतीक्षा में",
+  "Not approved": "स्वीकृत नहीं",
+  "Source not found": "स्रोत नहीं मिला",
+  "No data yet": "अभी कोई डेटा नहीं",
+  "Source failed": "स्रोत विफल रहा",
 };

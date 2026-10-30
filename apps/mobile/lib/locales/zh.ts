@@ -978,4 +978,9 @@ export const ZH_MESSAGES: Record<string, string> = {
     "AI 密钥已达到支出上限。请向服务商提高上限，或在设置 > 模型中使用其他密钥。",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "模型服务商正在限制请求频率。请几分钟后重试。",
+  "Waiting for approval": "等待批准",
+  "Not approved": "未获批准",
+  "Source not found": "未找到数据源",
+  "No data yet": "暂无数据",
+  "Source failed": "数据源失败",
 };

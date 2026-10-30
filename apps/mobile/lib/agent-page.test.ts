@@ -33,4 +33,75 @@ describe("pageBlocks", () => {
       { kind: "chart", name: "b", svg: "<svg b/>" },
     ]);
   });
+
+  const metric = (label: string, format = "usd") =>
+    `\`\`\`metric\n${JSON.stringify({ label, source: "cash", path: "/x", format })}\n\`\`\``;
+  const table = `\`\`\`table\n${JSON.stringify({
+    name: "Vendors",
+    source: "spend",
+    path: "/v",
+    columns: [
+      { key: "name", label: "Vendor" },
+      { key: "total", label: "Total", format: "usd" },
+    ],
+  })}\n\`\`\``;
+  const sourced = `\`\`\`chart\n${JSON.stringify({ name: "Live", spec: {}, data: [], source: "cash", path: "/c" })}\n\`\`\``;
+  const ok = (extra: object) => ({ status: "ok" as const, fetchedAt: null, ...extra });
+
+  it("pairs live data with metric, table and sourced chart segments in order, skipping static charts", () => {
+    const content = [chart("static"), metric("Burn"), sourced, table].join("\n");
+    const blocks = pageBlocks(
+      content,
+      ["<svg s/>", "<svg l/>"],
+      [
+        ok({ text: "$86K" }),
+        ok({ rows: [{ chart: 1 }] }),
+        ok({ rows: [{ name: "Acme", total: 1234.5 }] }),
+      ],
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["chart", "metric", "chart", "table"]);
+    expect(blocks[1]).toMatchObject({
+      label: "Burn",
+      status: "ok",
+      value: { text: "$86K", usd: true },
+    });
+    expect(blocks[3]).toMatchObject({
+      name: "Vendors",
+      hasRows: true,
+      rows: [
+        {
+          title: { text: "Acme", usd: false },
+          details: [{ text: "Total: $1,235", usd: true }],
+        },
+      ],
+    });
+  });
+
+  it("keeps the failed status with the last value, and placeholders when there is no data", () => {
+    const blocks = pageBlocks(
+      [metric("A"), metric("B"), table].join("\n"),
+      [],
+      [
+        { status: "failed", fetchedAt: null, error: "timed out", text: "$1" },
+        { status: "pending", fetchedAt: null },
+      ],
+    );
+    expect(blocks[0]).toMatchObject({
+      status: "failed",
+      error: "timed out",
+      value: { text: "$1" },
+    });
+    expect(blocks[1]).toMatchObject({ status: "pending", value: undefined });
+    expect(blocks[2]).toMatchObject({ kind: "table", status: "empty", hasRows: false, rows: [] });
+  });
+
+  it("shows an invalid live fence as an error line without shifting live data", () => {
+    const blocks = pageBlocks(
+      ["```metric\nnot json\n```", metric("A")].join("\n"),
+      [],
+      [ok({ text: "5" })],
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["chart_error", "metric"]);
+    expect(blocks[1]).toMatchObject({ value: { text: "5" } });
+  });
 });

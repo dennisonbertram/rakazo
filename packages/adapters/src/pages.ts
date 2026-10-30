@@ -5,14 +5,15 @@ import {
   BOT_PAGE_MAX_PAGES,
   BOT_PAGE_TITLE_MAX,
   BotPageTitleSchema,
+  PAGE_LIVE_BLOCKS_MAX,
   PageChartInputSchema,
 } from "@rakazo/contracts";
-import { gtmPageContentError, splitPage } from "@rakazo/core";
+import { gtmPageContentError, isLiveSegment, splitPage } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import type { PlotSpec } from "./plot-tool.js";
-import { renderPlotSpecToSvg } from "./plot-tool.js";
+import { renderPlotSpecToSvg, unknownPlotSpecKey } from "./plot-tool.js";
 
 export interface PageDeps {
   prisma: PrismaClient;
@@ -62,15 +63,15 @@ async function newDocument(): Promise<Document> {
   return new JSDOM("").window.document;
 }
 
-/** The one place chart rows and spec become an SVG; live chart sources will hook in here. */
-function renderChart(chart: PageChart, document: Document): string {
-  return renderPlotSpecToSvg(chart.spec as PlotSpec, chart.data, document);
+/** The one place chart rows and spec become an SVG. A sourced chart passes its resolved rows. */
+function renderChart(chart: PageChart, document: Document, rows?: unknown[]): string {
+  return renderPlotSpecToSvg(chart.spec as PlotSpec, rows ?? chart.data, document);
 }
 
 /** Render one chart for display. A chart that fails to render yields a small error SVG. */
-export async function renderPageChartSvg(chart: PageChart): Promise<string> {
+export async function renderPageChartSvg(chart: PageChart, rows?: unknown[]): Promise<string> {
   try {
-    return renderChart(chart, await newDocument());
+    return renderChart(chart, await newDocument(), rows);
   } catch {
     return '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="40"><text x="8" y="24" font-family="system-ui, sans-serif" font-size="13" fill="currentColor">Chart could not be rendered</text></svg>';
   }
@@ -86,17 +87,33 @@ async function validatePageContent(content: string, gtmPage = false): Promise<vo
   const gtmError = gtmPageContentError(content, gtmPage);
   if (gtmError) throw new PageValidationError(gtmError);
   const charts: PageChart[] = [];
-  for (const segment of splitPage(content)) {
+  const segments = splitPage(content);
+  for (const segment of segments) {
     if (segment.kind === "invalid_chart") {
       throw new PageValidationError(`Invalid chart block: ${segment.error}`);
+    }
+    if (segment.kind === "invalid_live") {
+      throw new PageValidationError(`Invalid block: ${segment.error}`);
     }
     if (segment.kind === "chart") {
       const checked = PageChartInputSchema.safeParse(segment.chart);
       if (!checked.success) {
         throw new PageValidationError(`Invalid chart block: ${checked.error.issues[0]?.message}`);
       }
+      const unknownKey = unknownPlotSpecKey(segment.chart.spec);
+      if (unknownKey) {
+        throw new PageValidationError(
+          `Chart "${segment.chart.name}" has an unknown spec option "${unknownKey}". Use only title, data, width, height, margins, grid, inset, aspectRatio, x, y, fx, fy, facet, color, r, opacity, symbol, length, projection, style and marks.`,
+        );
+      }
       charts.push(segment.chart);
     }
+  }
+  const liveBlocks = segments.filter(isLiveSegment).length;
+  if (liveBlocks > PAGE_LIVE_BLOCKS_MAX) {
+    throw new PageValidationError(
+      `The page has ${liveBlocks} live blocks (metric, table and sourced charts); the limit is ${PAGE_LIVE_BLOCKS_MAX}.`,
+    );
   }
   if (charts.length > BOT_PAGE_MAX_CHARTS) {
     throw new PageValidationError(
@@ -169,7 +186,7 @@ export async function listBotPages(
 }
 
 /** The bot's page with this title (case-insensitive), or null. */
-async function findPageByTitle(
+export async function findPageByTitle(
   prisma: PrismaClient,
   scope: { spaceId: string; botId: string },
   title: string,
@@ -265,6 +282,32 @@ export async function removeBotPage(
     where: { id: input.pageId, botId: input.botId, spaceId: input.spaceId },
   });
   return removed.count > 0;
+}
+
+/** Tell the bot's thread a page's live data changed, so open pages reload it. */
+export async function announcePageData(
+  deps: PageDeps,
+  input: { spaceId: string; botId: string; pageId: string },
+): Promise<void> {
+  const thread = await deps.prisma.thread.findFirst({
+    where: { botId: input.botId, spaceId: input.spaceId },
+    select: { id: true },
+  });
+  if (!thread) return;
+  await deps.events
+    .append({
+      spaceId: input.spaceId,
+      threadId: thread.id,
+      botId: input.botId,
+      type: "page.data",
+      payload: { pageId: input.pageId },
+    })
+    .catch((error) => {
+      getLogger().warn("page.data append failed", {
+        error: error instanceof Error ? error.message : String(error),
+        botId: input.botId,
+      });
+    });
 }
 
 /** Tell the bot's thread a page changed. The saved page is the source of truth; a missed event only delays a refresh. */

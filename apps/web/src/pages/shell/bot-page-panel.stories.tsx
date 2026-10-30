@@ -128,3 +128,114 @@ export const RenameOpen: Story = {
     await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Rename" }));
   },
 };
+
+const fence = (kind: string, value: unknown) => `\`\`\`${kind}\n${JSON.stringify(value)}\n\`\`\``;
+const liveContent = [
+  "# Cash",
+  fence("metric", { label: "Cash", source: "cash", path: "/cash", format: "usd" }),
+  fence("metric", { label: "Burn / mo", source: "cash", path: "/burn", format: "usd" }),
+  fence("chart", {
+    name: "Cash over time",
+    spec: { marks: [{ type: "line", options: { x: "at", y: "value" } }] },
+    data: [],
+    source: "cash",
+    path: "/cash",
+    over: "history",
+  }),
+  fence("table", {
+    name: "Largest vendors",
+    source: "spend",
+    path: "/vendors",
+    limit: 50,
+    columns: [
+      { key: "name", label: "Vendor" },
+      { key: "total", label: "Total", format: "usd" },
+    ],
+  }),
+].join("\n\n");
+
+const at = "2026-01-01T09:00:00.000Z";
+const history = [
+  { at: "Dec 1", value: 410000 },
+  { at: "Dec 15", value: 392000 },
+  { at: "Jan 1", value: 371000 },
+];
+const vendors = [
+  { name: "Northwind Cloud", total: 18200 },
+  { name: "Example Payroll", total: 12400.5 },
+  { name: "Sample Legal", total: 3100 },
+];
+const liveData = (blocks: unknown[]) => ({ pageId: "page_cash", revision: 1, blocks });
+const liveBlocks = [
+  { status: "ok", fetchedAt: at, text: "$371K" },
+  { status: "ok", fetchedAt: at, text: "$86K" },
+  { status: "ok", fetchedAt: at, rows: history },
+  { status: "ok", fetchedAt: at, rows: vendors },
+];
+const sources = [
+  {
+    id: "src_1",
+    pageId: "page_cash",
+    name: "cash",
+    kind: "praci",
+    call: { tool: "finance_overview", args: {} },
+    schedule: "1h",
+    status: "active",
+    lastRefreshAt: at,
+    lastError: null,
+  },
+];
+const liveMocks = (blocks: unknown[]) => ({
+  "pages.list": [summary("page_cash", "Cash")],
+  "pages.get": page(1, liveContent),
+  "pages.data": liveData(blocks),
+  "pages.sources": sources,
+  "pages.refresh": liveData(liveBlocks),
+});
+
+/** Two numbers, a chart over stored snapshots and a table, all read from saved sources. */
+export const LivePage: Story = { beforeEach: () => mockRpc(liveMocks(liveBlocks)) };
+
+/** The first number's source failed: it keeps its last value and shows a warning dot. */
+export const LivePageSourceFailed: Story = {
+  beforeEach: () =>
+    mockRpc(
+      liveMocks([
+        { ...liveBlocks[0], status: "failed", error: "Request timed out" },
+        ...liveBlocks.slice(1),
+      ]),
+    ),
+};
+
+/** Blocks wait for the owner's approval of their source. */
+export const LivePagePending: Story = {
+  beforeEach: () =>
+    mockRpc(
+      liveMocks([
+        { status: "pending", fetchedAt: null },
+        { status: "pending", fetchedAt: null },
+        { status: "pending", fetchedAt: null },
+        { status: "pending", fetchedAt: null },
+      ]),
+    ),
+};
+
+/** The Refresh item reruns the sources and shows the returned data. */
+export const LivePageRefresh: Story = {
+  beforeEach: () => mockRpc(liveMocks(liveBlocks)),
+  play: async ({ canvasElement }) => {
+    const menu = await within(canvasElement).findByRole("button", { name: "Page options" });
+    await userEvent.click(menu);
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Refresh" }));
+  },
+};
+
+/** The Sources item opens the list of the page's sources. */
+export const LivePageSources: Story = {
+  beforeEach: () => mockRpc(liveMocks(liveBlocks)),
+  play: async ({ canvasElement }) => {
+    const menu = await within(canvasElement).findByRole("button", { name: "Page options" });
+    await userEvent.click(menu);
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Sources" }));
+  },
+};
