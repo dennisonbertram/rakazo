@@ -82,7 +82,7 @@ const CRC_TABLE = (() => {
 })();
 
 /** Ogg's CRC: polynomial 0x04c11db7, not reflected, zero start and no final xor. */
-function oggCrc(bytes: Uint8Array): number {
+export function oggCrc(bytes: Uint8Array): number {
   let crc = 0;
   for (const byte of bytes)
     crc = ((crc << 8) ^ (CRC_TABLE[((crc >>> 24) ^ byte) & 0xff] as number)) >>> 0;

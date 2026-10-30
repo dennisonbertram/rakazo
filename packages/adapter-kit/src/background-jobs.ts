@@ -98,6 +98,11 @@ const payloadSchemas = {
     userId: z.string().min(1),
     connectionId: z.string().min(1),
   }),
+  "omi.transcribe": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    itemId: z.string().min(1),
+  }),
   "dataroom.blob.delete": z.object({ spaceId: z.string().min(1), storageKey: z.string().min(1) }),
   "dataroom.ingest": dataRoomStepPayload,
   "dataroom.classify": dataRoomStepPayload,
@@ -456,6 +461,16 @@ export function omiAssembleJob(payload: BackgroundJobPayloads["omi.assemble"]): 
     name: "omi.assemble",
     payload,
     replaceKey: `omi.assemble:${payload.connectionId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** One queued transcription per recording; a repeat replaces it. */
+export function omiTranscribeJob(payload: BackgroundJobPayloads["omi.transcribe"]): BackgroundJob {
+  return {
+    name: "omi.transcribe",
+    payload,
+    replaceKey: `omi.transcribe:${payload.itemId}`,
     maxAttempts: 3,
   };
 }

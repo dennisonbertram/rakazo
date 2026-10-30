@@ -427,7 +427,11 @@ export async function runDataRoomIngest(deps: DataRoomJobDeps, payload: Payload)
     let extractKey = "local";
     // Pendant audio is stored and listed, never read for search.
     let notIndexed = item.source === "omi";
-    if (item.storageKey && item.source !== "omi") {
+    if (item.source === "omi") {
+      // Its text is the transcript, written by `omi.transcribe`; keep what is there.
+      text =
+        (await deps.prisma.dataRoomItemText.findUnique({ where: { itemId: item.id } }))?.text ?? "";
+    } else if (item.storageKey) {
       const type = effectiveType(item.mimeType, item.name);
       const size = Number(item.size);
       // Only the file types that have a reader are fetched. Text is read from its head, whatever
