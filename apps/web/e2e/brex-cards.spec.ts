@@ -22,17 +22,18 @@ const server = {
   oauthStatus: "none",
   oauthAttempted: false,
   enabled: true,
-  writesEnabled: true,
+  writesEnabled: false,
   agentBotId: AGENT_ID,
   agentExclusive: true,
   revision: 1,
   createdAt: "2026-10-30T00:00:00.000Z",
   updatedAt: "2026-10-30T00:00:00.000Z",
 };
+// Changes are off when the cards are read; the page must follow the switch, not this answer.
 const cards = {
   serverId: SERVER_ID,
   agentBotId: AGENT_ID,
-  writesEnabled: true,
+  writesEnabled: false,
   cards: [
     {
       cardId: "card_figma",
@@ -54,6 +55,26 @@ const cards = {
       currency: "USD",
       duration: "YEARLY",
     },
+    {
+      cardId: "card_gone",
+      name: "Old trial",
+      lastFour: "1881",
+      ownerUserId: "user_demo",
+      status: "TERMINATED",
+      limitCents: 1_000,
+      currency: "USD",
+      duration: "ONE_TIME",
+    },
+    {
+      cardId: "card_locked",
+      name: "Paused",
+      lastFour: "2002",
+      ownerUserId: "user_demo",
+      status: "LOCKED",
+      limitCents: 1_000,
+      currency: "USD",
+      duration: "MONTHLY",
+    },
   ],
 };
 const controls = {
@@ -72,7 +93,7 @@ const json = (value: unknown) => ({
 
 /** Answers the Brex RPCs and the server list with synthetic data; the rest is the real stack. */
 async function mockBrex(page: Page) {
-  const state = { connected: false, sent: [] as string[], saved: [] as unknown[] };
+  const state = { connected: false, writes: false, sent: [] as string[], saved: [] as unknown[] };
   await page.route("**/rpc/brexCards/**", async (route) => {
     const name = new URL(route.request().url()).pathname.split("/rpc/brexCards/")[1] ?? "";
     const input = (route.request().postDataJSON() as { json?: unknown } | null)?.json;
@@ -89,8 +110,14 @@ async function mockBrex(page: Page) {
     return route.fulfill({ status: 404, body: "not mocked" });
   });
   await page.route("**/rpc/mcp/servers/list", (route) =>
-    state.connected ? route.fulfill(json([server])) : route.fallback(),
+    state.connected
+      ? route.fulfill(json([{ ...server, writesEnabled: state.writes }]))
+      : route.fallback(),
   );
+  await page.route("**/rpc/mcp/servers/setWrites", (route) => {
+    state.writes = (route.request().postDataJSON() as { json: { enabled: boolean } }).json.enabled;
+    return route.fulfill(json({ ...server, writesEnabled: state.writes }));
+  });
   await page.route("**/rpc/threads/send", (route) => {
     const body = route.request().postDataJSON() as { json: { text: string; botId: string } };
     state.sent.push(`${body.json.botId}: ${body.json.text}`);
@@ -122,6 +149,21 @@ test("Brex cards connects from its tile, shows cards and controls, and sends but
   await expect(main.getByRole("button", { name: /unlock/i })).toHaveCount(0);
   await expect(main.getByText("Let other agents use")).toHaveCount(0);
   await expect(main.getByText(HOSTILE)).toBeVisible();
+
+  // Changes start off, so no card button works. Turning them on enables the buttons without a
+  // reload, except where Brex has already acted: no Lock on a locked card, nothing on a terminated one.
+  const rowOf = (name: string) => main.locator("tbody tr").filter({ hasText: name });
+  const lockOf = (name: string) => rowOf(name).getByRole("button", { name: "Lock", exact: true });
+  await expect(lockOf("Figma")).toBeDisabled();
+  await main.getByRole("switch", { name: "Allow changes in Brex cards" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Allow changes" }).click();
+  await expect(lockOf("Figma")).toBeEnabled();
+  await expect(lockOf("Paused")).toBeDisabled();
+  await expect(rowOf("Paused").getByRole("button", { name: "Cancel" })).toBeEnabled();
+  for (const label of ["Lock", "Edit limit", "Cancel"])
+    await expect(
+      rowOf("Old trial").getByRole("button", { name: label, exact: true }),
+    ).toBeDisabled();
   await captureScreenshot(page, testInfo, "brex-cards");
 
   // Controls: edit one cap in dollars and save it as cents.

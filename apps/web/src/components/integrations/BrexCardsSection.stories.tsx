@@ -29,6 +29,17 @@ const cards: BrexCardsList = {
       currency: "USD",
       duration: "ONE_TIME",
     },
+    {
+      // Brex has terminated this card: no action applies.
+      cardId: "card_demo_3",
+      name: "Old trial",
+      lastFour: "1881",
+      ownerUserId: "user_demo_1",
+      status: "TERMINATED",
+      limitCents: 1_000,
+      currency: "USD",
+      duration: "ONE_TIME",
+    },
   ],
 };
 

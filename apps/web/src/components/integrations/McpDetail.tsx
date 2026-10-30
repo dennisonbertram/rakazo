@@ -366,7 +366,12 @@ export function McpDetail({
 
         {brexOwner ? (
           <>
-            <BrexCardsSection cards={brex.cards} error={brex.error} onRetry={brex.reload} />
+            <BrexCardsSection
+              cards={brex.cards}
+              error={brex.error}
+              writesEnabled={server.writesEnabled}
+              onRetry={brex.reload}
+            />
             <BrexControlsForm />
           </>
         ) : null}

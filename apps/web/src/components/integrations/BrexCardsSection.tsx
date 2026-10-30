@@ -89,11 +89,14 @@ type Pending = { kind: "limit" | "cancel"; card: BrexCardRow };
 export function BrexCardsSection({
   cards,
   error,
+  writesEnabled,
   onRetry,
 }: {
   /** Null while loading, or when it could not be read (`error`). */
   cards: BrexCardsList | null;
   error: string | null;
+  /** The Allow changes switch as it is now; the cards answer is read once and goes stale. */
+  writesEnabled?: boolean;
   onRetry: () => void;
 }) {
   const { t } = useLingui();
@@ -103,7 +106,7 @@ export function BrexCardsSection({
   const [sendError, setSendError] = useState("");
 
   const botId = cards?.agentBotId ?? null;
-  const enabled = Boolean(cards?.writesEnabled && botId);
+  const enabled = Boolean((writesEnabled ?? cards?.writesEnabled) && botId);
 
   async function send(text: string) {
     if (!botId || busy) return;
@@ -173,6 +176,10 @@ export function BrexCardsSection({
         <TableBody>
           {cards.cards.map((card, index) => {
             const usable = enabled && SAFE_ID.test(card.cardId);
+            // Brex has already done these: a locked card cannot be locked again, and a terminated
+            // card cannot be changed at all.
+            const terminated = card.status.toUpperCase() === "TERMINATED";
+            const locked = card.status.toUpperCase() === "LOCKED";
             return (
               // The id is Brex's and unique; the index only guards a malformed duplicate.
               <TableRow key={`${card.cardId}-${index}`}>
@@ -188,7 +195,7 @@ export function BrexCardsSection({
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={!usable || busy}
+                      disabled={!usable || terminated || locked || busy}
                       onClick={() => void send(lockMessage(card))}
                     >
                       <Trans>Lock</Trans>
@@ -196,7 +203,7 @@ export function BrexCardsSection({
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={!usable || busy}
+                      disabled={!usable || terminated || busy}
                       onClick={() => open({ kind: "limit", card })}
                     >
                       <Trans>Edit limit</Trans>
@@ -204,7 +211,7 @@ export function BrexCardsSection({
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={!usable || busy}
+                      disabled={!usable || terminated || busy}
                       onClick={() => open({ kind: "cancel", card })}
                     >
                       <Trans>Cancel</Trans>
