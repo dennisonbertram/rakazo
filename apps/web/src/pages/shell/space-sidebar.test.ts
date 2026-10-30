@@ -1054,8 +1054,9 @@ it("shows the +N more bar slim, at the bottom of the list", async () => {
     });
     const bar = container.querySelector<HTMLElement>('[data-testid="sidebar-more-rows"]');
     expect(bar?.textContent).toBe("+3 more");
-    expect(bar?.style.height).toBe("28px");
-    expect(bar?.className).toContain("bottom-0");
+    // 28px bar plus the 12px that reaches under the list's foot.
+    expect(bar?.style.height).toBe("40px");
+    expect(bar?.style.bottom).toBe("-12px");
   } finally {
     await act(async () => root.unmount());
     container.remove();
