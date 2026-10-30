@@ -36,7 +36,7 @@ async function runChat(
   trigger = "user",
   sourceBlocks: unknown[] | null = null,
   delegate = false,
-  pinned: "ok" | "gone" | null = null,
+  pinned: "ok" | "gone" | "no-secret" | null = null,
 ) {
   const switchModel = { provider: "openrouter", modelId: "openai/gpt-4o" };
   const backupReadFails = false;
@@ -134,7 +134,12 @@ async function runChat(
         async () => null,
       ),
     },
-    secret: { findFirst: vi.fn(async () => null) },
+    // A pinned connection's key is on file unless the run is meant to lose it.
+    secret: {
+      findFirst: vi.fn(async () =>
+        pinned === "ok" ? { id: "secret-1", ciphertext: "cipher-1", userId: "user-1" } : null,
+      ),
+    },
     userModelCredential: {
       findFirst: vi.fn(async (args?: { where?: { id?: string } }) =>
         args?.where?.id && pinned === "gone"
@@ -224,6 +229,7 @@ async function runChat(
     events: { append: vi.fn(async () => undefined), finalizeRun, pauseRunForInput },
     jobs: { enqueue: vi.fn(async () => undefined) },
     secrets: [],
+    secretStore: { load: vi.fn(async () => "sk-test-key-12345678") },
   } as unknown as Parameters<typeof createRunExecutor>[0]);
 
   await executor.continueRun(run.id, "worker-1");
@@ -271,7 +277,7 @@ describe("Chat runs need AI consent for the model they use", () => {
   });
 
   it("never offers a backup model to a run pinned to a connection", async () => {
-    const { request } = await runChat(
+    const { request, runtimeRun } = await runChat(
       ["openai/gpt-6-luna", "openai/gpt-4o"],
       null,
       "user",
@@ -279,6 +285,7 @@ describe("Chat runs need AI consent for the model they use", () => {
       false,
       "ok",
     );
+    expect(runtimeRun).toHaveBeenCalled();
     expect(request?.fallbackModels ?? []).toEqual([]);
   });
 
@@ -290,6 +297,14 @@ describe("Chat runs need AI consent for the model they use", () => {
         outcome: "failed",
         error: PINNED_CONNECTION_LOST_MESSAGE,
       }),
+    );
+  });
+
+  it("fails a pinned run whose secret vanished instead of using the deployment key", async () => {
+    const { runtimeRun, finalizeRun } = await runChat(true, null, "user", null, false, "no-secret");
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(finalizeRun).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "failed", error: PINNED_CONNECTION_LOST_MESSAGE }),
     );
   });
 

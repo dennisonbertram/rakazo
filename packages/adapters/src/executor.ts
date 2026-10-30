@@ -1138,6 +1138,7 @@ export function isTerminalModelSetupError(error: unknown): boolean {
   return (
     error instanceof UnavailableModelForAuthError ||
     isRetiredModelCredentialError(error) ||
+    error instanceof PinnedConnectionLostError ||
     (error instanceof Error && error.message === CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE)
   );
 }
@@ -2659,6 +2660,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             runModelProvider,
             runModelId,
             (values) => runSecrets.push(...values),
+            false,
+            runPinnedToConnection,
           );
         } catch (error) {
           // A dead or account-switched credential is already deleted. Retrying
@@ -2666,7 +2669,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (!isTerminalModelSetupError(error)) throw error;
           await failRunBeforeModel(
             error instanceof Error ? error.message : "Connect the provider again.",
-            isRetiredModelCredentialError(error),
+            isRetiredModelCredentialError(error) || error instanceof PinnedConnectionLostError,
           );
           return;
         }
@@ -11465,6 +11468,7 @@ async function resolveModelKey(
   modelId: string,
   registerSecrets?: (values: string[]) => void,
   requireStoredSecret = false,
+  pinnedConnection = false,
 ): Promise<{
   apiKey?: string;
   accountId?: string;
@@ -11492,6 +11496,8 @@ async function resolveModelKey(
         where: { id: credential.secretId, userId, spaceId: null },
       });
       if (!row) {
+        // A pinned run never takes the deployment key when its connection's secret vanishes.
+        if (pinnedConnection) throw new PinnedConnectionLostError();
         if (requireStoredSecret) throw new Error("Backup model credential is no longer available");
         cloudflareGatewayProviderEnv({ provider });
         return { apiKey: deploymentKeyFor(deps, provider), redact: [] };

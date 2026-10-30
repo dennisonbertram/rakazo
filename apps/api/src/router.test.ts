@@ -3663,6 +3663,29 @@ describe("bot model auth on save", () => {
     );
   });
 
+  it("saves a rename while an unchanged pin points at a connection that is gone", async () => {
+    const { botUpdate, credentialFindFirst, handler } = saveDeps({
+      modelId: luna,
+      preferences: () => null,
+      bot: { modelCredentialId: "cred-gone" },
+      ownedCredentialIds: [],
+    });
+
+    const response = await call(handler, "bots/update", {
+      botId: "bot-1",
+      name: "Ada renamed",
+      modelProvider: "openai-codex",
+      modelId: luna,
+      modelCredentialId: "cred-gone",
+    });
+
+    expect(response.status).toBe(200);
+    expect(credentialFindFirst).not.toHaveBeenCalled();
+    expect(botUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name: "Ada renamed" }) }),
+    );
+  });
+
   it("rejects pinning a bot to someone else's connection", async () => {
     const { botUpdate, credentialFindFirst, handler } = saveDeps({
       modelId: spark,

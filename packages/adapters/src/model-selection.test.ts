@@ -8,6 +8,7 @@ import {
   pinnedModelCredentialError,
   readStoredModelAuth,
   routineRunModelPin,
+  splitRoutinesByConnectionPin,
   runModelChoice,
   selectConfiguredModel,
   selectDefaultCredentialId,
@@ -1075,5 +1076,24 @@ describe("connected model validation", () => {
     await expect(
       validateConnectedModelChoice(catalogPrisma, actor, "xai", "undefined"),
     ).resolves.toBe("Unknown model for that provider");
+  });
+});
+
+describe("routines of one inbound delivery on different connections", () => {
+  const base = { modelProvider: "p", modelId: "m", thinkingLevel: null };
+
+  it("splits routines whose connection pins differ so none falls back to the bot's", () => {
+    const a = { ...base, modelCredentialId: "cred-a" };
+    const b = { ...base, modelCredentialId: "cred-b" };
+    const plain = { ...base };
+    expect(splitRoutinesByConnectionPin([a, b, a, plain])).toEqual([[a, a], [b], [plain]]);
+  });
+
+  it("keeps one group when pins agree or nobody pins a connection", () => {
+    const a = { ...base, modelCredentialId: "cred-a" };
+    expect(splitRoutinesByConnectionPin([a, a])).toEqual([[a, a]]);
+    const x = { ...base, modelId: "x" };
+    expect(splitRoutinesByConnectionPin([base, x])).toEqual([[base, x]]);
+    expect(splitRoutinesByConnectionPin([])).toEqual([[]]);
   });
 });

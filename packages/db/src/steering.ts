@@ -174,7 +174,15 @@ export async function createPendingSteeringRun(
   if (pending.length === 0) return null;
   // One origin per continuation so a group channel and a direct chat are not answered together.
   const origin = steeringOrigin(pending[0]!);
-  const batch = pending.filter((item) => steeringOrigin(item) === origin);
+  // Rows pinned to different connections never share a run; the rest wait for the next one.
+  const pinKey = (item: (typeof pending)[number]) =>
+    [item.modelProvider, item.modelId, item.modelCredentialId, item.thinkingLevel].join("|");
+  const first = pending[0]!;
+  const batch = pending.filter(
+    (item) =>
+      steeringOrigin(item) === origin &&
+      (!pending.some((row) => row.modelCredentialId) || pinKey(item) === pinKey(first)),
+  );
   const source = batch.at(-1)!;
   const modelPin = continuationModelPin(batch);
   const task = await tx.task.create({

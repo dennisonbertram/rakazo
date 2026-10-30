@@ -266,6 +266,7 @@ import {
   findDefaultVoiceCredential,
   findBotModelCredential,
   findModelCredential,
+  PinnedConnectionLostError,
   findSpaceMemoryConfig,
   findTicket,
   formatMessagingLinkCode,
@@ -2599,7 +2600,9 @@ export function createRouter(deps: RouterDeps) {
         const providerChanged =
           input.modelProvider !== undefined && input.modelProvider !== existing.modelProvider;
         const pinWrite = connectionPinWrite(input, existing.modelProvider);
-        if (pinWrite) {
+        // An unchanged pin is kept as stored, even if its connection has since gone, so a
+        // rename or voice change still saves; only a new pin or a new provider is checked.
+        if (pinWrite && (pinWrite !== existing.modelCredentialId || providerChanged)) {
           await assertOwnedConnection(
             deps,
             context.actor,
@@ -2620,6 +2623,11 @@ export function createRouter(deps: RouterDeps) {
             modelProvider: input.modelProvider,
             modelId: input.modelId,
             modelCredentialId: effectivePin,
+          }).catch((error: unknown) => {
+            if (error instanceof PinnedConnectionLostError) {
+              throw new ORPCError("BAD_REQUEST", { message: error.message });
+            }
+            throw error;
           });
           if (!credential) {
             throw new ORPCError("BAD_REQUEST", { message: "Connect that model provider first" });

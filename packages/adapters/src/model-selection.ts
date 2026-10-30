@@ -418,6 +418,27 @@ export function inboundRoutineModelPin(routines: readonly ModelChoice[]) {
   return agreed ? first : {};
 }
 
+/**
+ * Routines of one inbound delivery whose connection pins differ cannot share a turn: one turn runs
+ * on one connection, and falling back to the bot's would ignore a pin the owner chose. This splits
+ * them into groups that agree. Without any connection pin there is one group, as before.
+ */
+export function splitRoutinesByConnectionPin<T extends ModelChoice>(routines: readonly T[]): T[][] {
+  if (!routines.some((routine) => routine.modelCredentialId)) return [[...routines]];
+  const groups = new Map<string, T[]>();
+  for (const routine of routines) {
+    const pin = routineRunModelPin(routine);
+    const key = JSON.stringify([
+      pin.modelProvider ?? null,
+      pin.modelId ?? null,
+      pin.modelCredentialId ?? null,
+      pin.thinkingLevel ?? null,
+    ]);
+    groups.set(key, [...(groups.get(key) ?? []), routine]);
+  }
+  return [...groups.values()];
+}
+
 /** Why a pinned model cannot run on the credential that was found for it. */
 export function pinnedModelCredentialError(
   choice: ModelChoice,

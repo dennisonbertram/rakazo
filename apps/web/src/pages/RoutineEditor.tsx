@@ -730,7 +730,7 @@ export function RoutineEditor({
                         credentialId: next?.id ?? "",
                         thinkingLevel: "",
                         modelKey:
-                          next && draft.modelKey && !choices.some((c) => c.key === draft.modelKey)
+                          next && !choices.some((c) => c.key === draft.modelKey)
                             ? (choices[0]?.key ?? "")
                             : draft.modelKey,
                       });

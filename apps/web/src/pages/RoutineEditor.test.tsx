@@ -10,8 +10,11 @@ vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ i18n: { locale: "en" }, t: (parts: TemplateStringsArray) => parts.join("") }),
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
+const models = vi.hoisted(() => ({ credentials: [] as unknown[], catalog: [] as unknown[] }));
 vi.mock("../lib/rpc", () => ({
-  rpc: { models: { credentials: async () => [], list: async () => [] } },
+  rpc: {
+    models: { credentials: async () => models.credentials, list: async () => models.catalog },
+  },
 }));
 
 import {
@@ -364,4 +367,59 @@ it("describes a connected-app watch by its app, not a page", () => {
   } as Routine;
   expect(routineTriggerSummary(appWatch)).toBe("Watches Bank");
   expect(routineStatusLine(appWatch)).toBe("Paused: the app could not be checked");
+});
+
+it("picks the connection's first model when a connection is chosen with no model yet", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  models.credentials = [
+    { id: "c1", provider: "p1", label: "Key one", hasKey: true, isDefault: true },
+    { id: "c2", provider: "p2", label: "Key two", hasKey: true, isDefault: false },
+  ];
+  models.catalog = [
+    { provider: "p1", providerName: "P1", id: "m1", label: "M1", billing: "" },
+    { provider: "p2", providerName: "P2", id: "m2", label: "M2", billing: "" },
+  ];
+  const el = document.body.appendChild(document.createElement("div"));
+  const root = createRoot(el);
+  const noop = () => undefined;
+  const onChange = vi.fn();
+  await act(async () =>
+    root.render(
+      <RoutineEditor
+        draft={emptyRoutineDraft()}
+        onChange={onChange}
+        editing={null}
+        timezone="UTC"
+        webhook={{ path: "/hook", secret: null, configured: false }}
+        githubPath="/gh"
+        messageProviders={[]}
+        saving={false}
+        running={false}
+        error={null}
+        onBack={noop}
+        onClose={noop}
+        onSave={noop}
+        onTestRun={noop}
+        onDelete={noop}
+        onEnsureWebhook={async () => undefined}
+      />,
+    ),
+  );
+  await act(async () => {
+    (el.querySelector('button[aria-label="Advanced"]') as HTMLButtonElement).click();
+  });
+  const select = document.querySelector('select[id$="-connection"]') as HTMLSelectElement;
+  await act(async () => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
+    setValue.call(select, "c2");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({ credentialId: "c2", modelKey: expect.stringContaining("m2") }),
+  );
+  await act(async () => root.unmount());
+  el.remove();
+  vi.unstubAllGlobals();
+  models.credentials = [];
+  models.catalog = [];
 });
