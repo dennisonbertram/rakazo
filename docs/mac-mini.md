@@ -237,7 +237,7 @@ dc exec -T postgres sh -c \
 
 Wait until Postgres accepts connections twice: the first start of the official image runs a temporary server and then restarts. A `pg_isready` that succeeds immediately can be the temporary server. `dc up --wait postgres` waits for the healthcheck, which avoids this.
 
-Rehearsed on the laptop: a 172 MB database (about 67 MB dump) restored into a fresh `pgvector/pgvector:pg16-trixie` container with exit code 0. The extension, the job-queue schema and all tables came across. A following `pnpm db:migrate` against it reported "No pending migrations to apply" and created the runtime login.
+Rehearsed on the laptop: a real database restored into a fresh `pgvector/pgvector:pg16-trixie` container with exit code 0. The extension, the job-queue schema and all tables came across. A following `pnpm db:migrate` against it reported "No pending migrations to apply" and created the runtime login.
 
 ### 3.3 Copy object storage (MinIO to the mini's store)
 
@@ -249,7 +249,7 @@ On the laptop, in the checkout, with the laptop `.env` (MinIO on `http://127.0.0
 node scripts/s3-objects.mjs backup <objects-dir> --dotenv .env
 ```
 
-Rehearsed: 1330 objects (about 570 MB) in about 40 seconds. Copy `<objects-dir>` to the mini (`rsync -a <objects-dir>/ <mini-user>@<mini-hostname>:objects/`).
+Rehearsed: a full bucket export took under a minute. Copy `<objects-dir>` to the mini (`rsync -a <objects-dir>/ <mini-user>@<mini-hostname>:objects/`).
 
 On the mini, restore into the running stack. The bundled store is not published on the host, so run the script in a throwaway container that shares the API container's network, like `backup-prod.sh` does for backups:
 
@@ -264,7 +264,7 @@ docker run --rm --network "container:$api" --user "$(id -u):$(id -g)" \
   "$img" /s3-objects.mjs restore /in
 ```
 
-The restore and its verification ran against a throwaway MinIO container on the laptop and reported all 1330 objects restored. Restoring into the mini's SeaweedFS through the container network is **Unverified**; the container pattern is copied from `backup-prod.sh`. If `--env-file <(...)` is rejected on your Docker, write the `RAKAZO_S3_*` lines to a mode-600 temporary file, pass that, and delete it.
+The restore and its verification ran against a throwaway MinIO container on the laptop and reported every object restored. Restoring into the mini's SeaweedFS through the container network is **Unverified**; the container pattern is copied from `backup-prod.sh`. If `--env-file <(...)` is rejected on your Docker, write the `RAKAZO_S3_*` lines to a mode-600 temporary file, pass that, and delete it.
 
 Do not point the mini at the laptop's MinIO instead. It is a container on a laptop that sleeps.
 
