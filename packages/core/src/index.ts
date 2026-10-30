@@ -55,6 +55,7 @@ export * from "./mail-cleanup-run.js";
 export * from "./mail-piles.js";
 export * from "./mail-results.js";
 export * from "./mail-unsubscribe.js";
+export * from "./markdown-html.js";
 export * from "./markdown-plain.js";
 export * from "./mcp.js";
 export * from "./html-page.js";

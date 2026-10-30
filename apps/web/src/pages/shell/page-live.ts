@@ -1,4 +1,4 @@
-import type { PageChart, PageLiveBlock, PinFormat } from "@rakazo/contracts";
+import type { PageChart, PageLiveBlock } from "@rakazo/contracts";
 import { createContext, useContext } from "react";
 
 /** Lets every live block on the open page read its data without prop drilling through the editor. */
@@ -51,37 +51,4 @@ export function mapLiveBlocks(doc: JsonNode, blocks: PageLiveBlock[]): Map<strin
   return result;
 }
 
-/** Same rules as the server's pin formatter, for table cells (metric text arrives formatted). */
-export function formatCell(value: unknown, format?: PinFormat): string {
-  if (value === null || value === undefined) return "";
-  const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
-  if (format && format !== "text" && typeof n === "number" && Number.isFinite(n)) {
-    if (format === "percent") return `${n.toFixed(1)}%`;
-    if (format === "number") return new Intl.NumberFormat("en-US").format(n);
-    const digits = Math.abs(n) >= 1000 ? 0 : 2;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-    }).format(n);
-  }
-  return typeof value === "object" ? JSON.stringify(value) : String(value);
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** Columns to show: the block's, or the keys of the first row. */
-export function tableColumns(
-  columns: { key: string; label: string; format?: PinFormat }[] | undefined,
-  rows: unknown[],
-) {
-  if (columns) return columns;
-  const first = rows[0];
-  const keys = isRecord(first) ? Object.keys(first) : ["value"];
-  return keys.map((key) => ({ key, label: key, format: undefined as PinFormat | undefined }));
-}
-
-export const cellValue = (row: unknown, key: string): unknown =>
-  isRecord(row) ? row[key] : key === "value" ? row : undefined;
+export { cellValue, formatCell, tableColumns } from "@rakazo/core";
