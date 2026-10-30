@@ -574,6 +574,8 @@ model Space {
   capabilities                CapabilityInstall[]
   memoryDocuments             MemoryDocument[]
   botPages                    BotPage[]
+  pageSources                 PageSource[]
+  pageSourceSnapshots         PageSourceSnapshot[]
   botPins                     BotPins[]
   contacts                    Contact[]
   contactPhotos               ContactPhoto[]
@@ -867,6 +869,7 @@ model Bot {
   taughtSkills           TaughtSkill[]
   memoryDocuments        MemoryDocument[]
   pages                  BotPage[]
+  pageSources            PageSource[]
   pins                   BotPins?
   agentHome              AgentHome?
   browserProfile         BrowserProfile?
@@ -1697,12 +1700,63 @@ model BotPage {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   revisions BotPageRevision[]
+  sources   PageSource[]
 
   // Titles are unique per bot ignoring case: unique index bot_pages_botId_title_key (raw SQL in
   // migration 20261231000026) on (botId, lower(title)).
   @@index([botId])
   @@index([spaceId])
   @@map("bot_pages")
+}
+
+/// A saved read-only data call on a bot page. Page blocks name it; the server reruns it without a model and stores each result as a snapshot.
+model PageSource {
+  id               String               @id @default(cuid())
+  spaceId          String
+  space            Space                @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  /// The bot's owner.
+  userId           String
+  botId            String
+  bot              Bot                  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  pageId           String
+  page             BotPage              @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  name             String
+  /// "praci" for now.
+  kind             String
+  call             Json
+  schedule         String
+  /// "pending" | "active" | "paused" | "denied"
+  status           String
+  nextRefreshAt    DateTime?
+  leaseUntil       DateTime?
+  failures         Int                  @default(0)
+  lastError        String?
+  lastRefreshAt    DateTime?
+  approvedCallHash String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  snapshots        PageSourceSnapshot[]
+
+  // Names are unique per page ignoring case: unique index page_sources_pageId_name_key (raw SQL in
+  // migration 20261231000027) on (pageId, lower(name)).
+  @@index([spaceId])
+  @@index([status, nextRefreshAt])
+  @@map("page_sources")
+}
+
+/// One successful result of a page source.
+model PageSourceSnapshot {
+  id        String     @id @default(cuid())
+  spaceId   String
+  space     Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  sourceId  String
+  source    PageSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  fetchedAt DateTime   @default(now())
+  value     Json
+  bytes     Int
+
+  @@index([sourceId, fetchedAt(sort: Desc)])
+  @@map("page_source_snapshots")
 }
 
 /// A bot's numbers strip (stats) and one sidebar list; separate from the page so refreshes never conflict with page edits.
