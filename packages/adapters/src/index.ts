@@ -186,6 +186,7 @@ export * from "./openai-compatible-embedder.js";
 export * from "./openai-compatible-url.js";
 export * from "./openai-voice.js";
 export * from "./page-browser-session.js";
+export * from "./page-source-approval.js";
 export * from "./page-source-tick.js";
 export * from "./page-sources.js";
 export * from "./pages.js";

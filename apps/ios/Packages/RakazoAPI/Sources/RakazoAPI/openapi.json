@@ -8480,6 +8480,24 @@
                                                   ],
                                                   "additionalProperties": false
                                                 },
+                                                "pageSource": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "sourceId": {
+                                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+                                                    },
+                                                    "callHash": {
+                                                      "type": "string",
+                                                      "minLength": 64,
+                                                      "maxLength": 64
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "sourceId",
+                                                    "callHash"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
                                                 "input": {
                                                   "type": "string",
                                                   "enum": [
@@ -43520,6 +43538,24 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "pageSource": {
+                                          "type": "object",
+                                          "properties": {
+                                            "sourceId": {
+                                              "$ref": "#/components/schemas/RpcExportBotOutputSchema0"
+                                            },
+                                            "callHash": {
+                                              "type": "string",
+                                              "minLength": 64,
+                                              "maxLength": 64
+                                            }
+                                          },
+                                          "required": [
+                                            "sourceId",
+                                            "callHash"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "input": {
                                           "type": "string",
                                           "enum": [
@@ -60641,6 +60677,24 @@
                                           },
                                           "required": [
                                             "version"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "pageSource": {
+                                          "type": "object",
+                                          "properties": {
+                                            "sourceId": {
+                                              "$ref": "#/components/schemas/RpcGroupsGetOutputSchema0"
+                                            },
+                                            "callHash": {
+                                              "type": "string",
+                                              "minLength": 64,
+                                              "maxLength": 64
+                                            }
+                                          },
+                                          "required": [
+                                            "sourceId",
+                                            "callHash"
                                           ],
                                           "additionalProperties": false
                                         },
@@ -100327,30 +100381,64 @@
                         "kind": {
                           "type": "string",
                           "enum": [
-                            "praci"
+                            "praci",
+                            "mcp"
                           ]
                         },
                         "call": {
-                          "type": "object",
-                          "properties": {
-                            "tool": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 100
-                            },
-                            "args": {
+                          "anyOf": [
+                            {
                               "type": "object",
-                              "propertyNames": {
-                                "type": "string"
+                              "properties": {
+                                "tool": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "args": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                }
                               },
-                              "additionalProperties": {}
+                              "required": [
+                                "tool",
+                                "args"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "serverId": {
+                                  "$ref": "#/components/schemas/RpcPagesPauseSourceOutputSchema0"
+                                },
+                                "tool": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "args": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "required": [
+                                "serverId",
+                                "tool",
+                                "args"
+                              ],
+                              "additionalProperties": false
                             }
-                          },
-                          "required": [
-                            "tool",
-                            "args"
-                          ],
-                          "additionalProperties": false
+                          ]
+                        },
+                        "serverName": {
+                          "type": "string"
                         },
                         "schedule": {
                           "type": "string",
@@ -101288,30 +101376,64 @@
                         "kind": {
                           "type": "string",
                           "enum": [
-                            "praci"
+                            "praci",
+                            "mcp"
                           ]
                         },
                         "call": {
-                          "type": "object",
-                          "properties": {
-                            "tool": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 100
-                            },
-                            "args": {
+                          "anyOf": [
+                            {
                               "type": "object",
-                              "propertyNames": {
-                                "type": "string"
+                              "properties": {
+                                "tool": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "args": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                }
                               },
-                              "additionalProperties": {}
+                              "required": [
+                                "tool",
+                                "args"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "serverId": {
+                                  "$ref": "#/components/schemas/RpcPagesResumeSourceOutputSchema0"
+                                },
+                                "tool": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "args": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "required": [
+                                "serverId",
+                                "tool",
+                                "args"
+                              ],
+                              "additionalProperties": false
                             }
-                          },
-                          "required": [
-                            "tool",
-                            "args"
-                          ],
-                          "additionalProperties": false
+                          ]
+                        },
+                        "serverName": {
+                          "type": "string"
                         },
                         "schedule": {
                           "type": "string",
@@ -101738,30 +101860,64 @@
                         "kind": {
                           "type": "string",
                           "enum": [
-                            "praci"
+                            "praci",
+                            "mcp"
                           ]
                         },
                         "call": {
-                          "type": "object",
-                          "properties": {
-                            "tool": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 100
-                            },
-                            "args": {
+                          "anyOf": [
+                            {
                               "type": "object",
-                              "propertyNames": {
-                                "type": "string"
+                              "properties": {
+                                "tool": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "args": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                }
                               },
-                              "additionalProperties": {}
+                              "required": [
+                                "tool",
+                                "args"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "serverId": {
+                                  "$ref": "#/components/schemas/RpcPagesSetSourceScheduleOutputSchema0"
+                                },
+                                "tool": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "args": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "required": [
+                                "serverId",
+                                "tool",
+                                "args"
+                              ],
+                              "additionalProperties": false
                             }
-                          },
-                          "required": [
-                            "tool",
-                            "args"
-                          ],
-                          "additionalProperties": false
+                          ]
+                        },
+                        "serverName": {
+                          "type": "string"
                         },
                         "schedule": {
                           "type": "string",
@@ -101976,30 +102132,64 @@
                           "kind": {
                             "type": "string",
                             "enum": [
-                              "praci"
+                              "praci",
+                              "mcp"
                             ]
                           },
                           "call": {
-                            "type": "object",
-                            "properties": {
-                              "tool": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 100
-                              },
-                              "args": {
+                            "anyOf": [
+                              {
                                 "type": "object",
-                                "propertyNames": {
-                                  "type": "string"
+                                "properties": {
+                                  "tool": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100
+                                  },
+                                  "args": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
                                 },
-                                "additionalProperties": {}
+                                "required": [
+                                  "tool",
+                                  "args"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "serverId": {
+                                    "$ref": "#/components/schemas/RpcPagesSourcesOutputSchema0"
+                                  },
+                                  "tool": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "args": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "serverId",
+                                  "tool",
+                                  "args"
+                                ],
+                                "additionalProperties": false
                               }
-                            },
-                            "required": [
-                              "tool",
-                              "args"
-                            ],
-                            "additionalProperties": false
+                            ]
+                          },
+                          "serverName": {
+                            "type": "string"
                           },
                           "schedule": {
                             "type": "string",
@@ -116068,6 +116258,24 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "pageSource": {
+                                          "type": "object",
+                                          "properties": {
+                                            "sourceId": {
+                                              "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
+                                            },
+                                            "callHash": {
+                                              "type": "string",
+                                              "minLength": 64,
+                                              "maxLength": 64
+                                            }
+                                          },
+                                          "required": [
+                                            "sourceId",
+                                            "callHash"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "input": {
                                           "type": "string",
                                           "enum": [
@@ -118443,6 +118651,24 @@
                                           },
                                           "required": [
                                             "version"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "pageSource": {
+                                          "type": "object",
+                                          "properties": {
+                                            "sourceId": {
+                                              "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema0"
+                                            },
+                                            "callHash": {
+                                              "type": "string",
+                                              "minLength": 64,
+                                              "maxLength": 64
+                                            }
+                                          },
+                                          "required": [
+                                            "sourceId",
+                                            "callHash"
                                           ],
                                           "additionalProperties": false
                                         },

@@ -27,6 +27,7 @@ import {
   acquireComputerExecutionLease,
   addScratchpadItemFromTool,
   answerBotShare,
+  answerPageSourceApproval,
   applyCodexLiveCatalog,
   applyPendingSenderRules,
   applyTeachingDesktopInput,
@@ -66,6 +67,7 @@ import {
   expireComputerControl,
   findBotShareEffect,
   findInvestorsAgent,
+  findPageSourceApproval,
   forgetBotSecret,
   getBotPage,
   getBotPins,
@@ -111,6 +113,7 @@ import {
   provisionComputer,
   queueComputerUpdate,
   refreshBotPins,
+  refreshPageSource,
   refreshPageSources,
   releaseComputerExecutionLease,
   removeBotPage,
@@ -3510,6 +3513,27 @@ export function createRouter(deps: RouterDeps) {
           userId: context.actor.userId,
           threadId: target.threadId,
         };
+        // A page source card is answered the same way, by server code that checks it still matches
+        // the source's call.
+        if (await findPageSourceApproval(deps.prisma, scope, input)) {
+          const approvalDeps = {
+            prisma: deps.prisma,
+            events: deps.events,
+            ticketBoardEnabled: deps.env?.ticketBoardEnabled,
+            mcp: deps.mcp,
+            notificationEvents: deps.notificationEvents,
+          };
+          const answered = await answerPageSourceApproval(approvalDeps, scope, input);
+          if (!answered) {
+            throw new ORPCError("CONFLICT", {
+              message: "This prompt is no longer awaiting an answer",
+            });
+          }
+          // Allow runs the approved source once now; a failure is recorded on the source.
+          if (answered !== "denied") await refreshPageSource(approvalDeps, answered);
+          await clearAsked();
+          return { ok: true as const };
+        }
         if (await findBotShareEffect(deps.prisma, scope, input)) {
           const shared = await answerBotShare(deps, scope, input);
           if (!shared) {
@@ -4393,6 +4417,7 @@ export function createRouter(deps: RouterDeps) {
             prisma: deps.prisma,
             events: deps.events,
             ticketBoardEnabled: deps.env?.ticketBoardEnabled,
+            mcp: deps.mcp,
           },
           { spaceId: bot.spaceId, botId: bot.id, pageId: page.id },
         );

@@ -18,14 +18,14 @@ export const PAGE_METRIC_FENCE = "metric";
 export const PAGE_TABLE_FENCE = "table";
 export const PAGE_LIVE_FENCES = [PAGE_METRIC_FENCE, PAGE_TABLE_FENCE] as const;
 
-/** S2 ships Praci's own data; "mcp" and "http" arrive with their approval flow (S4, S5). */
-export const PageSourceKind = z.enum(["praci"]);
+/** "http" arrives with S5. An "mcp" source needs the owner's approval before it runs. */
+export const PageSourceKind = z.enum(["praci", "mcp"]);
 export type PageSourceKind = z.infer<typeof PageSourceKind>;
 
 export const PageSourceSchedule = z.enum(["15m", "1h", "6h", "1d", "1w"]);
 export type PageSourceSchedule = z.infer<typeof PageSourceSchedule>;
 
-/** pending and denied are used by outside sources once approval exists; Praci sources start active. */
+/** pending and denied apply to outside (mcp) sources, which wait for the owner's approval; Praci sources start active. */
 export const PageSourceStatus = z.enum(["pending", "active", "paused", "denied"]);
 export type PageSourceStatus = z.infer<typeof PageSourceStatus>;
 
@@ -50,12 +50,22 @@ export const PraciSourceCallSchema = z.strictObject({
 });
 export type PraciSourceCall = z.infer<typeof PraciSourceCallSchema>;
 
+/** One read-only tool on one of the bot's MCP servers, rerun with these exact arguments. */
+export const McpSourceCallSchema = z.strictObject({
+  serverId: Id,
+  tool: z.string().min(1).max(200),
+  args: z.record(z.string(), z.unknown()),
+});
+export type McpSourceCall = z.infer<typeof McpSourceCallSchema>;
+
 export const PageSourceSchema = z.object({
   id: Id,
   pageId: Id,
   name: PageSourceNameSchema,
   kind: PageSourceKind,
-  call: PraciSourceCallSchema,
+  call: z.union([PraciSourceCallSchema, McpSourceCallSchema]),
+  /** An mcp source: the server's name, for display. */
+  serverName: z.string().optional(),
   schedule: PageSourceSchedule,
   status: PageSourceStatus,
   lastRefreshAt: z.string().nullable(),

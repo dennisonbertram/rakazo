@@ -58,6 +58,7 @@ import { runInboxTriage, triageReadiness } from "./inbox-triage.js";
 import { runMailAttachmentFiling } from "./mail-attachment-filing.js";
 import { runMailSyncJob } from "./mail-sync-job.js";
 import { expireMailSearch } from "./mail-tools.js";
+import type { McpConnector } from "./mcp-connector.js";
 import { runMeetingDigest } from "./meeting-digest.js";
 import { createMeetingSourceRegistry } from "./meeting-source-registry.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
@@ -148,6 +149,8 @@ export function createBackgroundJobHandlers(deps: {
   companyImport?: CompanyImportEngine;
   /** From the deployment; board_tickets is only a page source where the ticket board is on. */
   ticketBoardEnabled?: boolean;
+  /** Needed for mcp page sources; without it they record an error. */
+  mcp?: Pick<McpConnector, "callServerTool" | "listServerTools">;
 }): BackgroundJobHandlers {
   const messagingDeps = deps.messaging
     ? { prisma: deps.prisma, messaging: deps.messaging, events: deps.events, jobs: deps.jobs }
@@ -541,6 +544,7 @@ export function createBackgroundJobHandlers(deps: {
         events: deps.events,
         jobs: deps.jobs,
         ticketBoardEnabled: deps.ticketBoardEnabled,
+        mcp: deps.mcp,
       });
     },
     "pages.snapshots.retention": async () => {

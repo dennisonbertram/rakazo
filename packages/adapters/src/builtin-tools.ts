@@ -589,16 +589,25 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "page_source_set",
     description:
-      "Save or replace a named data source on a page: a read-only Praci data tool that the server reruns on a schedule without you. Page metric, table and chart blocks show its stored result by source name. Runs the tool once now and returns the saved source and a preview of the result (up to 4,000 characters) so you can choose the path to show. A page can have 20 sources and a space 100. A source that fails five times in a row is paused (you get a message); call this again with the same name to fix it and resume it.",
+      'Save or replace a named data source on a page: a read-only Praci data tool that the server reruns on a schedule without you. Page metric, table and chart blocks show its stored result by source name. A praci source runs once now and returns the saved source and a preview of the result (up to 4,000 characters) so you can choose the path to show. An mcp source returns status pending: the owner is asked, nothing is called until they allow it, and blocks show "Waiting for approval"; changing its server, tool or args asks again. A page can have 20 sources and a space 100. A source that fails five times in a row is paused (you get a message); call this again with the same name to fix it and resume it.',
     inputSchema: {
       type: "object",
       properties: {
         page: PAGE_TITLE_PROPERTY,
         name: { type: "string", description: "1 to 40 characters, unique on the page." },
-        kind: { type: "string", enum: ["praci"] },
+        kind: {
+          type: "string",
+          enum: ["praci", "mcp"],
+          description:
+            'Default "praci". "mcp" reads one read-only tool of an MCP server assigned to you; it waits for the owner\'s approval and does not run until they allow it.',
+        },
+        server: {
+          type: "string",
+          description: "With kind mcp: the name of an MCP server assigned to you.",
+        },
         tool: {
           type: "string",
-          description: `One of: ${PRACI_SOURCE_TOOLS.join(", ")}. It must be a tool you have.`,
+          description: `With kind praci, one of: ${PRACI_SOURCE_TOOLS.join(", ")}. With kind mcp, the server's tool name. It must be a tool you have.`,
         },
         args: { type: "object", description: "Arguments for the tool." },
         schedule: {

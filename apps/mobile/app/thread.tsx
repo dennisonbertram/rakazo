@@ -3815,13 +3815,13 @@ const MessageBubble = memo(function MessageBubble({
                 askBlock.answer,
                 askBlock.actions,
                 isApprovalAskBlock(askBlock),
-                Boolean(askBlock.consent),
+                Boolean(askBlock.consent || askBlock.pageSource),
               )}
             </Text>
-          ) : canAnswer && onAnswer ? (
+          ) : (canAnswer || askBlock.pageSource) && onAnswer ? (
             <AskActions
               actions={askBlock.actions}
-              consent={Boolean(askBlock.consent)}
+              consent={Boolean(askBlock.consent || askBlock.pageSource)}
               accessibilityActions={actionProps.accessibilityActions}
               onAccessibilityAction={actionProps.onAccessibilityAction}
               onAnswer={(answer) => onAnswer(message, answer)}

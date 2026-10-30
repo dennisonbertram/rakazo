@@ -160,6 +160,7 @@ export function PageSourcesDialog({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{source.name}</p>
                         <p className="truncate text-xs text-muted-foreground">
+                          {source.serverName ? `${source.serverName} · ` : ""}
                           {source.call.tool} · {scheduleLabel(source.schedule)}
                         </p>
                       </div>

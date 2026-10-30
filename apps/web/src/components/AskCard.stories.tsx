@@ -43,6 +43,19 @@ const shareAsk = (overrides: Partial<AskBlock> = {}): AskBlock =>
     ...overrides,
   });
 
+const pageSourceAsk = (overrides: Partial<AskBlock> = {}): AskBlock =>
+  ask({
+    text: "Read Mercury every hour?",
+    detail: 'Request: getAccounts {"limit":5}\nPage: Finance',
+    pageSource: { sourceId: "src_demo", callHash: "0".repeat(64) },
+    actions: [
+      { id: "allow", label: "Allow" },
+      { id: "deny", label: "Not now" },
+    ],
+    status: "pending",
+    ...overrides,
+  });
+
 const meta = {
   title: "Chat/AskCard",
   component: AskCard,
@@ -377,4 +390,15 @@ export const HeldShareShared: Story = {
 
 export const HeldShareDeclined: Story = {
   args: { block: shareAsk({ status: "answered", answer: "deny" }) },
+};
+
+/** The owner's approval of a page's data source: answered without a waiting run. */
+export const PageSourcePending: Story = { args: { block: pageSourceAsk() } };
+
+export const PageSourceAllowed: Story = {
+  args: { block: pageSourceAsk({ status: "answered", answer: "allow" }) },
+};
+
+export const PageSourceDenied: Story = {
+  args: { block: pageSourceAsk({ status: "answered", answer: "deny" }) },
 };

@@ -3,25 +3,17 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { AdapterContext, JobPublisher } from "@rakazo/adapter-kit";
 import { runContinueJob } from "@rakazo/adapter-kit";
 import type { BotPins, PageAuthor, PinList, PinSource, PinStat } from "@rakazo/contracts";
-import {
-  BotPinsSchema,
-  integrationPresetForEndpoint,
-  isIntegrationAgentSpawnKey,
-  isReadTool,
-  PinListSchema,
-} from "@rakazo/contracts";
-import { connectorToolRequiresApproval } from "@rakazo/core";
+import { BotPinsSchema, PinListSchema } from "@rakazo/contracts";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { isUniqueViolation, Prisma } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { unwrapToolResult } from "./finance-call-tool.js";
 import type { McpConnector } from "./mcp-connector.js";
-import { assignmentAllowsTool } from "./mcp-connector.js";
+import { checkMcpReadSource, mcpSourceContext } from "./mcp-read-source.js";
 import { formatPinValue, jsonPointerGet } from "./pin-values.js";
 
 export { formatPinValue, jsonPointerGet };
 
-const PIN_SOURCE_TIMEOUT_MS = 15_000;
 const REFRESH_PROMPT = "Update your pinned numbers.";
 
 interface PinsDeps {
@@ -99,86 +91,12 @@ export async function getBotPins(
   return row ? toBotPins(row) : null;
 }
 
-/** MCP tools often use camelCase (getAccounts); the approval name check expects snake_case. */
-function toolNameIsReadOnly(tool: string): boolean {
-  return !connectorToolRequiresApproval(tool.replace(/([a-z0-9])([A-Z])/g, "$1_$2"));
-}
-
 function pinContext(scope: PinsScope): AdapterContext {
-  return {
-    operationId: `pins:${scope.botId}`,
-    traceId: `pins:${scope.botId}`,
-    spaceId: scope.spaceId,
-    userId: scope.userId,
-    botId: scope.botId,
-    signal: AbortSignal.timeout(PIN_SOURCE_TIMEOUT_MS),
-  };
+  return mcpSourceContext(scope, "pins");
 }
 
-/**
- * Looks up the source's server and checks the call is safe to rerun without a model. The server
- * must be enabled and belong to the bot's space and owner, the bot must still be assigned to it,
- * and the assignment must allow the tool (the rule a bot run uses). The server must list the tool.
- * A tool is read-only only when no annotation declares a write (readOnlyHint false, destructiveHint
- * true) and its name reads as a get/list/search/read, the same rule that exempts a run from approval.
- */
-async function checkSource(deps: PinsDeps, scope: PinsScope, source: PinSource) {
-  const { prisma } = deps;
-  const loadAssignment = () =>
-    prisma.botMcpServer.findFirst({
-      where: {
-        botId: scope.botId,
-        serverId: source.serverId,
-        spaceId: scope.spaceId,
-        userId: scope.userId,
-        server: { enabled: true, spaceId: scope.spaceId, userId: scope.userId },
-      },
-      include: {
-        server: {
-          include: {
-            agentBot: {
-              select: { id: true, spawnKey: true, spaceId: true, userId: true, archivedAt: true },
-            },
-          },
-        },
-        bot: {
-          select: { id: true, spawnKey: true, spaceId: true, userId: true, archivedAt: true },
-        },
-      },
-    });
-  let assignment = await loadAssignment();
-  if (!assignment) throw new Error(`MCP tool ${source.tool} is not assigned to this bot`);
-  if (!deps.mcp) throw new Error("MCP is not available");
-  // Fresh, not cached: refresh calls the tool outside the approval flow, so a tool that has turned
-  // into a write since the last listing must not pass on old annotations.
-  const tools = await deps.mcp.listServerTools(assignment.server, pinContext(scope), {
-    fresh: true,
-  });
-  // The listing took time: authorize on the row as it is now.
-  const current = await loadAssignment();
-  if (!current) throw new Error(`MCP tool ${source.tool} is not assigned to this bot`);
-  assignment = current;
-  const meta = tools.find((tool) => tool.name === source.tool);
-  // The gate needs the tool's annotations (an integration agent's reads) and the bot's owner.
-  if (!assignmentAllowsTool(assignment, source.tool, meta?.annotations)) {
-    throw new Error(`MCP tool ${source.tool} is not assigned to this bot`);
-  }
-  if (!meta) throw new Error(`Tool ${source.tool} is not offered by the server`);
-  const hints = meta.annotations;
-  // Never rerun what a bot run would need approval for: the name rule applies whatever the server claims.
-  // With an integration agent involved, only the agent's own read classification counts: refresh runs
-  // outside the approval flow, so an unannotated get_* tool (a write there) must not pass by its name.
-  const readOnly =
-    assignment.server.agentBotId || isIntegrationAgentSpawnKey(assignment.bot?.spawnKey)
-      ? isReadTool(meta, integrationPresetForEndpoint(assignment.server.endpoint))
-      : hints?.readOnlyHint !== false &&
-        hints?.destructiveHint !== true &&
-        toolNameIsReadOnly(source.tool);
-  if (!readOnly) {
-    throw new Error(`Tool ${source.tool} is not read-only, so it cannot be a pin source`);
-  }
-  return assignment.server;
-}
+const checkSource = (deps: PinsDeps, scope: PinsScope, source: PinSource) =>
+  checkMcpReadSource(deps, scope, source, "pins");
 
 async function validateInput(
   deps: PinsDeps,

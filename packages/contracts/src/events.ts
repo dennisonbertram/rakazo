@@ -235,6 +235,11 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     share: z.boolean().optional(),
     /** An AI data sharing request: the card's Allow records consent for the disclosure `version`. */
     consent: z.object({ version: z.string() }).optional(),
+    /**
+     * The owner's approval of a page source's exact call. It is answered without a waiting run and
+     * only if `callHash` still matches the source's current call.
+     */
+    pageSource: z.object({ sourceId: Id, callHash: z.string().length(64) }).optional(),
     input: z.enum(["text", "secret"]).optional(),
     /** Why the secret is needed; drives field label on the masked card. */
     purpose: SecretAskPurpose.optional(),

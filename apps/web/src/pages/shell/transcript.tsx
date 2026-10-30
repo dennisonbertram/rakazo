@@ -2011,8 +2011,8 @@ const MessageView = memo(function MessageView({
               <AskCard
                 block={block}
                 requestedAt={message.createdAt}
-                // A held message is answered without a waiting run, so it stays answerable.
-                canAnswer={canAnswer || block.share === true}
+                // A held message or a page source request is answered without a waiting run, so it stays answerable.
+                canAnswer={canAnswer || block.share === true || Boolean(block.pageSource)}
                 ownerOnly={ownerOnly}
                 onAnswer={(text, username) => onAnswer(message, text, username)}
               />
