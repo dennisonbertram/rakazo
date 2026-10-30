@@ -1,5 +1,6 @@
 import { ChatMarkdown } from "@rakazo/chat-ui/native";
 import type { BotPage, BotPageSummary, PageData } from "@rakazo/contracts";
+import { htmlPageSourcesFor } from "@rakazo/core";
 import { useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import {
@@ -48,6 +49,10 @@ export default function AgentPageScreen() {
   const [live, setLive] = useState<PageData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
+  const switchPage = (next: string) => {
+    setLive(null);
+    setPageId(next);
+  };
   const hidden = useHideAmounts();
 
   useLayoutEffect(() => {
@@ -125,7 +130,8 @@ export default function AgentPageScreen() {
   // Data for another revision would pair with the wrong blocks, so it is ignored until refetched.
   const liveBlocks =
     page && live && "blocks" in live && live.revision === page.revision ? live.blocks : undefined;
-  const htmlSources = live && "sources" in live ? live.sources : undefined;
+  // Only data for this page and revision reaches the preview; it starts empty after a page switch.
+  const htmlSources = htmlPageSourcesFor(page, live);
   const blocks = useMemo(
     () => (page ? pageBlocks(page.content, page.chartSvgs, liveBlocks) : []),
     [page, liveBlocks],
@@ -173,11 +179,15 @@ export default function AgentPageScreen() {
               label={t("Page")}
               choices={pages.map((entry) => ({ key: entry.id, label: entry.title }))}
               value={pageId ?? page.id}
-              onChange={setPageId}
+              onChange={switchPage}
             />
           </View>
         ) : null}
-        <SandboxedHtmlPreview html={page.content} data={htmlSources ?? {}} />
+        <SandboxedHtmlPreview
+          key={`${page.id}:${page.revision}`}
+          html={page.content}
+          data={htmlSources}
+        />
       </View>
     );
   }
@@ -194,7 +204,7 @@ export default function AgentPageScreen() {
           label={t("Page")}
           choices={pages.map((entry) => ({ key: entry.id, label: entry.title }))}
           value={pageId ?? page.id}
-          onChange={setPageId}
+          onChange={switchPage}
         />
       ) : null}
       {blocks.map((block, index) =>

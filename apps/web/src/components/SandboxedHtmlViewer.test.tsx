@@ -167,7 +167,11 @@ it("renders only well-formed messages from the embedding app", () => {
   expect(shellFrame.attributes.get("sandbox")).toBe("allow-scripts");
   expect(shellFrame.attributes.get("csp")).toBe("default-src 'none'");
 
-  // Only the message frame's well-formed height reports go on to the app.
+  // A frame that was not configured as an email never reports a height to the app.
+  shellFrame.send(shellFrame.frameWindow, { type: "rakazo-email-height", height: 10 });
+  expect(shellFrame.reports).toEqual([]);
+  shellFrame.send(shellFrame.parent, { ...message, sandbox: "allow-scripts allow-popups" });
+  // Only the email frame's well-formed height reports go on to the app.
   shellFrame.send({}, { type: "rakazo-email-height", height: 10 });
   shellFrame.send(shellFrame.frameWindow, { type: "other", height: 10 });
   shellFrame.send(shellFrame.frameWindow, { type: "rakazo-email-height", height: "10" });
@@ -200,6 +204,21 @@ it("renders only well-formed messages from the embedding app", () => {
   expect(bridge.preview.srcdoc).toBe("");
   bridge.load();
   expect(bridge.reports).toEqual([{ type: "praci-viewer-ready" }]);
+});
+
+it("switches DNS prefetch off first, in the shell and in every preview document", async () => {
+  const off = '<meta http-equiv="x-dns-prefetch-control" content="off">';
+  expect(shell.indexOf(off)).toBeGreaterThanOrEqual(0);
+  expect(shell.startsWith(`<!DOCTYPE html>${off}`)).toBe(true);
+  for (const [scripts, email] of [
+    [true, false],
+    [false, false],
+    [false, true],
+  ] as const) {
+    const view = await render('<link rel="dns-prefetch" href="//x.example">', scripts, email);
+    expect(view.srcDoc.startsWith(off)).toBe(true);
+    await view.cleanup();
+  }
 });
 
 it("pushes data to the shell after the frame is ready and whenever it changes", async () => {

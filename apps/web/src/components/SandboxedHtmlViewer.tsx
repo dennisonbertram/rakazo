@@ -1,4 +1,5 @@
 import { HTML_VIEWER_PATH } from "@rakazo/contracts/content-security-policy";
+import { DNS_PREFETCH_OFF_META } from "@rakazo/core";
 import { useEffect, useRef, useState } from "react";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 
@@ -143,7 +144,7 @@ function withPreviewDocument(html: string, scripts: boolean, email: boolean): st
   const body = email
     ? `${EMAIL_FIT}<script>${EMAIL_HEIGHT_SCRIPT}</script>${openLinksInNewTab(html)}`
     : html;
-  return `${meta}${referrer}${scripts ? PREVIEW_GUARD : ""}${body}`;
+  return `${DNS_PREFETCH_OFF_META}${meta}${referrer}${scripts ? PREVIEW_GUARD : ""}${body}`;
 }
 
 /**
@@ -187,6 +188,8 @@ export function SandboxedHtmlViewer({
   }, [loads, preview, previewSandbox, csp]);
   // Count of documents the shell has finished loading in its frame; each one needs the data again.
   const [documents, setDocuments] = useState(0);
+  // A new document needs its own ready ping before it gets any data.
+  useEffect(() => setDocuments(0), [preview]);
   useEffect(() => {
     if (data === undefined) return;
     const onReady = (event: MessageEvent) => {

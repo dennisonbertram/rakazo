@@ -5,33 +5,65 @@ import { PAGE_SOURCES_MAX_PER_PAGE, PageSourceNameSchema } from "@rakazo/contrac
  *   <meta name="praci-sources" content="Overview, Revenue">
  *   <meta name="praci-history" content="Revenue">
  * This is a small strict reader, not an HTML parser: the document is never executed or fully parsed.
- * Only the first HTML_META_SCAN_CHARS are read. Comments, <script>, <style>, <textarea>, <template>
- * and <title> content is removed first, so a tag inside them declares nothing. If a name appears in
- * more than one tag, the first tag wins. Names are matched to sources case-insensitively.
+ * It walks the document from the start over a leading run of head elements only: whitespace, a doctype,
+ * comments, <html>, <head>, and <meta>, <link>, <base>, <title> and <style> tags. The first other tag,
+ * any text, </head> or <body ends the walk, so a "<meta" inside an attribute value, <xmp>, <textarea>,
+ * <script>, SVG CDATA or the body is never read. Only the first HTML_META_SCAN_CHARS are read. If a name
+ * appears in more than one tag, the first tag wins. Names are matched to sources case-insensitively.
  */
 export const HTML_META_SCAN_CHARS = 20_000;
 const CONTENT_MAX_CHARS = 2_000;
 
-const STRIPPED = /<!--[\s\S]*?(?:-->|$)|<(script|style|textarea|template|title)\b[\s\S]*?(?:<\/\1\s*>|$)/gi;
+const SKIPPED = /(?:\uFEFF|\s+|<!doctype[^>]*>|<!--[\s\S]*?-->)/iy;
 // A tag whose quoted attribute values may contain ">".
-const META_TAG = /<meta\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+const TAG = /<(\/?)([a-z][a-z0-9-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/iy;
+const HEAD_TAGS = new Set(["html", "head", "meta", "link", "base", "title", "style"]);
+const RAW_TEXT = new Set(["title", "style"]);
 const ATTRIBUTE = /([^\s"'<>/=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 
-function metaAttributes(tag: string): Map<string, string> {
+function attributes(text: string): Map<string, string> {
   const attrs = new Map<string, string>();
-  for (const match of tag.slice(5).matchAll(ATTRIBUTE)) {
+  for (const match of text.matchAll(ATTRIBUTE)) {
     const key = (match[1] ?? "").toLowerCase();
     if (!attrs.has(key)) attrs.set(key, match[2] ?? match[3] ?? match[4] ?? "");
   }
   return attrs;
 }
 
-function declared(html: string, wanted: string): string | null {
-  const head = html.slice(0, HTML_META_SCAN_CHARS).replace(STRIPPED, "");
-  for (const tag of head.match(META_TAG) ?? []) {
-    const attrs = metaAttributes(tag);
-    if (attrs.get("name")?.trim().toLowerCase() === wanted) return attrs.get("content") ?? "";
+/** The attributes of each <meta> in the leading run of head elements. */
+function headMetas(html: string): Map<string, string>[] {
+  const text = html.slice(0, HTML_META_SCAN_CHARS);
+  const metas: Map<string, string>[] = [];
+  let at = 0;
+  for (;;) {
+    SKIPPED.lastIndex = at;
+    const skipped = SKIPPED.exec(text);
+    if (skipped) {
+      at += skipped[0].length;
+      continue;
+    }
+    TAG.lastIndex = at;
+    const tag = TAG.exec(text);
+    if (!tag) return metas;
+    const name = (tag[2] ?? "").toLowerCase();
+    if (tag[1] || !HEAD_TAGS.has(name)) return metas; // </head>, <body, <script, <xmp, ...
+    at += tag[0].length;
+    if (name === "meta") metas.push(attributes(tag[3] ?? ""));
+    else if (RAW_TEXT.has(name)) {
+      const close = text.toLowerCase().indexOf(`</${name}`, at);
+      if (close < 0) return metas;
+      at = close;
+      TAG.lastIndex = at;
+      const end = TAG.exec(text);
+      if (!end) return metas;
+      at += end[0].length;
+    }
   }
+}
+
+function declared(html: string, wanted: string): string | null {
+  for (const attrs of headMetas(html))
+    if (attrs.get("name")?.trim().toLowerCase() === wanted) return attrs.get("content") ?? "";
   return null;
 }
 
@@ -81,4 +113,17 @@ export function htmlPageDeclaration(html: string): HtmlPageDeclaration {
     history: history.filter((name) => known.has(name.toLowerCase())),
     ...(errors.length ? { error: errors[0] } : {}),
   };
+}
+
+/**
+ * The sources to send an HTML page: only data for this exact page and revision. Data fetched for
+ * another page or an older or newer revision is never shown, so a page switch or an edit cannot
+ * pass the previous document's data to the new one.
+ */
+export function htmlPageSourcesFor(
+  page: { id: string; revision: number } | null | undefined,
+  data: { pageId: string; revision: number; sources?: Record<string, unknown> } | null | undefined,
+): Record<string, unknown> | undefined {
+  if (!page || !data?.sources) return undefined;
+  return data.pageId === page.id && data.revision === page.revision ? data.sources : undefined;
 }

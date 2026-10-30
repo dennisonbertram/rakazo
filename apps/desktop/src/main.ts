@@ -53,6 +53,7 @@ import { oauthPopupSessionPreferences, shouldOpenInAppPopup } from "./window-ope
 import {
   browserWindowOptions,
   developmentIconFile,
+  restrictWebRtc,
   setupWindowOptions,
   warmWindowTtlMs,
 } from "./window-options.js";
@@ -258,6 +259,7 @@ function createWindow(url: string, partition: string | null) {
       ...(partition === null ? {} : { partition }),
     },
   });
+  restrictWebRtc(win.webContents);
   mainWindow = win;
   appWindowTargets.set(win, url);
   const targetOrigin = safeOrigin(url);

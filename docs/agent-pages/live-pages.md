@@ -100,6 +100,8 @@ A page with `kind: html` stores one HTML document (≤200,000 chars) instead of 
 
 The data bridge only pushes. After load and on every `page.data` event, the app fetches `pages.data({pageId})` (the newest snapshot per source on this page, plus history for sources an HTML page declares with `<meta name="praci-history" content="cash,revenue">`), then posts `{type: "praci-data", sources: {name: {value, fetchedAt, error?, history?}}}` to the shell, which forwards it into the nested frame. The page script reads it with `addEventListener("message", …)`. The shell accepts this message only from its parent and still ignores everything the nested frame sends except the existing email height message, so the HTML cannot ask for anything: it gets the data of its own page's sources and nothing else. On Expo the same object is dispatched with `injectJavaScript`. Mobile native iOS shows HTML pages in a `WKWebView` with the same CSP and injection.
 
+Security limits. A bot-written HTML page receives the values of the sources it declares. The page cannot use normal requests: fetch, images, forms and navigation are all blocked. In a web browser, its script could still send those values out by encoding them into a domain name lookup (a DNS prefetch hint or WebRTC), which no browser setting reliably stops. The viewer turns DNS prefetch off, but that is a hint to the browser, not a guarantee. On desktop, DNS prefetch is off and WebRTC is restricted to proxied UDP. Blocks pages have no such path. If you need a hard guarantee, use a blocks page.
+
 Native iOS in the plan: blocks are native SwiftUI (numbers, rows, `Charts` from the snapshot or the server-rendered SVG), so a native slice is listed separately and follows the iOS native epic's process.
 
 ### Sidebar
