@@ -299,6 +299,7 @@ async function main() {
   });
   const jobHandlers = createBackgroundJobHandlers({
     ticketBoardEnabled,
+    mcp,
     executor,
     prisma,
     sandbox,

@@ -27,6 +27,7 @@ import {
   acquireComputerExecutionLease,
   addScratchpadItemFromTool,
   answerBotShare,
+  answerPageSourceApproval,
   applyCodexLiveCatalog,
   applyPendingSenderRules,
   applyTeachingDesktopInput,
@@ -66,6 +67,7 @@ import {
   expireComputerControl,
   findBotShareEffect,
   findInvestorsAgent,
+  findPageSourceApproval,
   forgetBotSecret,
   getBotPage,
   getBotPins,
@@ -111,6 +113,7 @@ import {
   provisionComputer,
   queueComputerUpdate,
   refreshBotPins,
+  refreshPageSource,
   refreshPageSources,
   releaseComputerExecutionLease,
   removeBotPage,
@@ -184,6 +187,7 @@ import {
   IntegrationProviderIdSchema,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
+  isBrexCardsEndpoint,
   isCartaAgentSpawnKey,
   isCartaEndpoint,
   isCompanyAgentSpawnKey,
@@ -235,6 +239,7 @@ import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
 import {
   AnswerTooLongError,
   addSidebarFolder,
+  addSidebarBotPage,
   addSidebarPage,
   appendEventInTransaction,
   approvalTable,
@@ -332,6 +337,7 @@ import {
   releaseAuditDraft,
   releaseSpaceDeletionClaim,
   removeSidebarFolder,
+  removeSidebarBotPage,
   removeSidebarPage,
   renameSpaceForMember,
   renewSpaceDeletionClaim,
@@ -397,6 +403,14 @@ import {
   listSpaceArtifacts,
 } from "./artifacts.js";
 import { botProfileLabelsChanged, commitBotUpdate } from "./bot-update.js";
+import type { BrexCardsDeps } from "./brex-cards.js";
+import {
+  brexCardsCards,
+  brexCardsConnect,
+  brexCardsGetControls,
+  brexCardsReplaceToken,
+  brexCardsSetControls,
+} from "./brex-cards.js";
 import type { CartaSyncDeps } from "./carta-agent.js";
 import {
   assignToExistingCartaAgent,
@@ -601,12 +615,12 @@ import type { RouterDeps } from "./routes/context.js";
 import { asTenant, createRouteContext } from "./routes/context.js";
 import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
-
 import { listRoutineRuns } from "./routine-runs.js";
 import { listPendingApprovalNotifications, listSpaceRuns } from "./runs.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { querySpaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
+import { requireSpaceOwner } from "./space-owner.js";
 import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { HEARTBEAT, withHeartbeat } from "./stream.js";
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
@@ -813,6 +827,7 @@ function computerContext(actor: Actor, botId: string, operationId: string): Adap
 
 const EXCLUSIVE_SERVER_MESSAGE = "This integration is used only by its agent.";
 const RECONNECT_DEVIN_MESSAGE = "Use Reconnect on the Devin page to replace the key.";
+const REPLACE_BREX_TOKEN_MESSAGE = "Use Replace token on the Brex cards page to change the token.";
 
 function approvalRuleDto(row: {
   id: string;
@@ -1472,6 +1487,16 @@ export function createRouter(deps: RouterDeps) {
     provisionAgent: async (actor, serverId) => (await provisionExclusiveAgent(actor, serverId)).bot,
     archiveBot: archiveActorBot,
     notificationEvents: deps.notificationEvents,
+  };
+  const brexCardsDeps: BrexCardsDeps = {
+    prisma: deps.prisma,
+    secrets: deps.secrets,
+    mcp: deps.mcp ?? {
+      callServerTool: () => Promise.reject(new Error("MCP is not available")),
+    },
+    ...(deps.brexApi ? { brexApi: deps.brexApi } : {}),
+    provisionAgent: async (actor, serverId) => (await provisionExclusiveAgent(actor, serverId)).bot,
+    archiveBot: archiveActorBot,
   };
   const onboardingDeps = { prisma: deps.prisma, events: deps.events, connectors: deps.connectors };
   const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets);
@@ -3510,6 +3535,29 @@ export function createRouter(deps: RouterDeps) {
           userId: context.actor.userId,
           threadId: target.threadId,
         };
+        // A page source card is answered the same way, by server code that checks it still matches
+        // the source's call.
+        if (await findPageSourceApproval(deps.prisma, scope, input)) {
+          const approvalDeps = {
+            prisma: deps.prisma,
+            events: deps.events,
+            ticketBoardEnabled: deps.env?.ticketBoardEnabled,
+            mcp: deps.mcp,
+            secretStore: deps.secrets,
+            network: deps.remoteConnectors,
+            notificationEvents: deps.notificationEvents,
+          };
+          const answered = await answerPageSourceApproval(approvalDeps, scope, input);
+          if (!answered) {
+            throw new ORPCError("CONFLICT", {
+              message: "This prompt is no longer awaiting an answer",
+            });
+          }
+          // Allow runs the approved source once now; a failure is recorded on the source.
+          if (answered !== "denied") await refreshPageSource(approvalDeps, answered);
+          await clearAsked();
+          return { ok: true as const };
+        }
         if (await findBotShareEffect(deps.prisma, scope, input)) {
           const shared = await answerBotShare(deps, scope, input);
           if (!shared) {
@@ -4393,6 +4441,9 @@ export function createRouter(deps: RouterDeps) {
             prisma: deps.prisma,
             events: deps.events,
             ticketBoardEnabled: deps.env?.ticketBoardEnabled,
+            mcp: deps.mcp,
+            secretStore: deps.secrets,
+            network: deps.remoteConnectors,
           },
           { spaceId: bot.spaceId, botId: bot.id, pageId: page.id },
         );
@@ -5732,6 +5783,16 @@ export function createRouter(deps: RouterDeps) {
           return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
         update: authed.mcp.servers.update.handler(async ({ context, input }) => {
+          // The Brex cards token changes only through Replace token, which checks it with Brex
+          // first, and only for the current space owner.
+          const brexRow = await deps.prisma.mcpServer.findFirst({
+            where: { id: input.id, ...actorScope(context.actor) },
+            select: { endpoint: true },
+          });
+          if (isBrexCardsEndpoint(brexRow?.endpoint)) {
+            await requireSpaceOwner(deps.prisma, context.actor);
+            throw new ORPCError("BAD_REQUEST", { message: REPLACE_BREX_TOKEN_MESSAGE });
+          }
           // The space's Devin connection is an owner's to change, and its key only through Reconnect.
           if (await requireOwnerForActiveDevinRow(deps.prisma, context.actor, input.id)) {
             const next = "config" in input ? input.config : input;
@@ -5969,11 +6030,22 @@ export function createRouter(deps: RouterDeps) {
             await devinDisconnect(devinDeps, context.actor, input.id);
             return { ok: true as const };
           }
+          // The current space owner removes a Brex cards server whoever connected it; its rows are
+          // in the connecting user's scope. A former owner who still owns the row is refused.
+          const brexRow = await deps.prisma.mcpServer.findFirst({
+            where: { id: input.id, spaceId: context.actor.spaceId },
+            select: { endpoint: true, userId: true },
+          });
+          let actor: Actor = context.actor;
+          if (isBrexCardsEndpoint(brexRow?.endpoint)) {
+            await requireSpaceOwner(deps.prisma, context.actor);
+            actor = { ...context.actor, userId: brexRow?.userId as string };
+          }
           const server = await deps.prisma.mcpServer.findFirst({
             where: {
               id: input.id,
-              spaceId: context.actor.spaceId,
-              userId: context.actor.userId,
+              spaceId: actor.spaceId,
+              userId: actor.userId,
             },
             select: { id: true, secretId: true },
           });
@@ -5982,13 +6054,8 @@ export function createRouter(deps: RouterDeps) {
           // Cards are closed first, including ones that were never assigned.
           let agentToArchive: string | null = null;
           const seqs = await deps.prisma.$transaction(async (tx) => {
-            const painted = await dismissMcpServerApprovals(
-              onboardingDeps,
-              context.actor,
-              server.id,
-              tx,
-            );
-            await companyWriter(tx, context.actor).disconnectMcpServer(server.id);
+            const painted = await dismissMcpServerApprovals(onboardingDeps, actor, server.id, tx);
+            await companyWriter(tx, actor).disconnectMcpServer(server.id);
             // The deleted row says which agent it had at that moment, so a concurrent relink is seen.
             const deleted = await tx.mcpServer.delete({ where: { id: server.id } });
             // Carta's agent is shared with the Cap table, and the Granola agent with the API key.
@@ -5999,18 +6066,27 @@ export function createRouter(deps: RouterDeps) {
               !isZernioEndpoint(deleted.endpoint)
                 ? deleted.agentBotId
                 : null;
+            // An agent that another server of the space still uses (the Brex finance and cards
+            // servers share one) stays with that server.
+            if (
+              agentToArchive &&
+              (await tx.mcpServer.count({
+                where: { spaceId: actor.spaceId, agentBotId: agentToArchive },
+              }))
+            )
+              agentToArchive = null;
             // Archived with the server, so the agent is never left active without it.
             if (agentToArchive)
               await tx.bot.updateMany({
-                where: { id: agentToArchive, ...actorScope(context.actor), archivedAt: null },
+                where: { id: agentToArchive, ...actorScope(actor), archivedAt: null },
                 data: { archivedAt: new Date(), pinned: false },
               });
             if (server.secretId) {
               await tx.secret.deleteMany({
                 where: {
                   id: server.secretId,
-                  spaceId: context.actor.spaceId,
-                  userId: context.actor.userId,
+                  spaceId: actor.spaceId,
+                  userId: actor.userId,
                 },
               });
             }
@@ -6018,7 +6094,7 @@ export function createRouter(deps: RouterDeps) {
           });
           // Runs and the computer of the archived agent are cleaned up now; the archive itself is done.
           if (agentToArchive)
-            await archiveActorBot(context.actor, agentToArchive).catch((error) =>
+            await archiveActorBot(actor, agentToArchive).catch((error) =>
               getLogger().error("mcp.servers.remove: agent not archived", error),
             );
           for (const event of seqs) await deps.events.notify(event.threadId, event.seq);
@@ -8330,6 +8406,24 @@ export function createRouter(deps: RouterDeps) {
         return { ok: true as const };
       }),
     },
+    brexCards: {
+      connect: authed.brexCards.connect.handler(({ context, input }) =>
+        brexCardsConnect(brexCardsDeps, context.actor, input.token),
+      ),
+      replaceToken: authed.brexCards.replaceToken.handler(async ({ context, input }) => {
+        await brexCardsReplaceToken(brexCardsDeps, context.actor, input.token);
+        return { ok: true as const };
+      }),
+      cards: authed.brexCards.cards.handler(({ context }) =>
+        brexCardsCards(brexCardsDeps, context.actor),
+      ),
+      getControls: authed.brexCards.getControls.handler(({ context }) =>
+        brexCardsGetControls(brexCardsDeps, context.actor),
+      ),
+      setControls: authed.brexCards.setControls.handler(({ context, input }) =>
+        brexCardsSetControls(brexCardsDeps, context.actor, input),
+      ),
+    },
     gtm: {
       agent: authed.gtm.agent.handler(({ context }) =>
         ensureGtmAgent(
@@ -8720,12 +8814,15 @@ export function createRouter(deps: RouterDeps) {
         listSidebarPages(deps.prisma, actorScope(context.actor)),
       ),
       add: authed.sidebarPages.add.handler(({ context, input }) =>
-        addSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey).catch(
-          sidebarPageError,
-        ),
+        ("pageId" in input
+          ? addSidebarBotPage(deps.prisma, actorScope(context.actor), input.pageId)
+          : addSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey)
+        ).catch(sidebarPageError),
       ),
       remove: authed.sidebarPages.remove.handler(({ context, input }) =>
-        removeSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey),
+        "pageId" in input
+          ? removeSidebarBotPage(deps.prisma, actorScope(context.actor), input.pageId)
+          : removeSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey),
       ),
     },
     calendar: {

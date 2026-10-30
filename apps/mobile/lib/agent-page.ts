@@ -1,4 +1,9 @@
-import type { PageLiveBlock, PageLiveStatus, PinFormat } from "@rakazo/contracts";
+import type {
+  PageLiveBlock,
+  PageLiveStatus,
+  PinFormat,
+  SidebarPagesState,
+} from "@rakazo/contracts";
 import type { PageSegment } from "@rakazo/core";
 import { splitPage } from "@rakazo/core";
 
@@ -121,4 +126,9 @@ export function pageBlocks(
     const svg = chartSvgs[chartIndex++];
     return [svg ? { kind: "chart", name: segment.chart.name, svg } : { kind: "chart_error" }];
   });
+}
+
+/** The bot pages the user added to the sidebar, as rows that open `agent-page`. Template rows are web-only. */
+export function sidebarBotPages(state: SidebarPagesState) {
+  return state.pages.flatMap((page) => ("pageId" in page ? [page] : []));
 }

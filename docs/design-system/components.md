@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 317 of 317
-- Web and shared components: 824
+- Web and shared component files with stories: 318 of 318
+- Web and shared components: 825
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 125 in 67 files, native story pending
 
@@ -343,6 +343,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BillingSettingsPanel | [apps/web/src/pages/BillingSettingsPanel.tsx](../../apps/web/src/pages/BillingSettingsPanel.tsx) | [BillingSettingsPanel.stories.tsx](../../apps/web/src/pages/BillingSettingsPanel.stories.tsx) | web |
 | BoardPage, TicketDialog | [apps/web/src/pages/Board.tsx](../../apps/web/src/pages/Board.tsx) | [Board.stories.tsx](../../apps/web/src/pages/Board.stories.tsx) | web |
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
+| BotPageView | [apps/web/src/pages/BotPageView.tsx](../../apps/web/src/pages/BotPageView.tsx) | [BotPageView.stories.tsx](../../apps/web/src/pages/BotPageView.stories.tsx) | web |
 | CalendarPage | [apps/web/src/pages/Calendar.tsx](../../apps/web/src/pages/Calendar.tsx) | [Calendar.stories.tsx](../../apps/web/src/pages/Calendar.stories.tsx) | web |
 | CompanyPage | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
 | CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |

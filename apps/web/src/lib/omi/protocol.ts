@@ -51,7 +51,15 @@ export function parseStatus(view: DataView): RingStatus | null {
 
 export type RingNotification =
   | { kind: "ack"; status: number }
-  | { kind: "info"; readSeq: number; writeSeq: number }
+  | {
+      kind: "info";
+      readSeq: number;
+      writeSeq: number;
+      /** Bytes per ring packet (offset 29); null when the notification is the short form. */
+      packetBytes: number | null;
+      /** Packets the full ring overwrote before they were read (offset 21); null when absent. */
+      droppedPackets: number | null;
+    }
   | { kind: "data"; bytes: Uint8Array }
   | { kind: "done"; status: number; nextSeq: number }
   | { kind: "begin"; startSeq: number; count: number }
@@ -69,6 +77,8 @@ export function parseNotification(bytes: Uint8Array): RingNotification {
             kind: "info",
             readSeq: Number(view.getBigUint64(1)),
             writeSeq: Number(view.getBigUint64(9)),
+            packetBytes: bytes.length >= 31 ? view.getUint16(29) : null,
+            droppedPackets: bytes.length >= 29 ? Number(view.getBigUint64(21)) : null,
           }
         : { kind: "other" };
     case 0x03:

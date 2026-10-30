@@ -24,24 +24,23 @@ export type PageRefreshDeps = Omit<PageSourceDeps, "events"> & {
 const utcMidnight = (now: Date, addDays = 0) =>
   new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + addDays));
 
+export const PAUSE_MESSAGE =
+  "A source on one of your pages stopped working. Call page_source_list to see which one and why.";
+
 /** Tell the bot's thread its source stopped, so the bot can fix it. */
-async function postPauseMessage(
+export async function postPauseMessage(
   deps: PageRefreshDeps,
-  source: { spaceId: string; userId: string; botId: string; pageId: string; name: string },
-  error: string,
+  source: { spaceId: string; userId: string; botId: string },
 ): Promise<void> {
-  const [thread, page] = await Promise.all([
-    deps.prisma.thread.findFirst({
-      where: { botId: source.botId, spaceId: source.spaceId },
-      select: { id: true },
-    }),
-    deps.prisma.botPage.findFirst({
-      where: { id: source.pageId, spaceId: source.spaceId },
-      select: { title: true },
-    }),
-  ]);
+  const thread = await deps.prisma.thread.findFirst({
+    where: { botId: source.botId, spaceId: source.spaceId },
+    select: { id: true },
+  });
   if (!thread) return;
-  const text = `The ${source.name} source on ${page?.title ?? "its page"} stopped working: ${error}`;
+  // Fixed words only: this message starts a run as the owner, so it must carry nothing a bot or a
+  // remote server wrote (the error, the page title, the source name). The bot reads the details
+  // from page_source_list, which is an untrusted tool result.
+  const text = PAUSE_MESSAGE;
   const sent = await deps.events.sendUserMessage({
     spaceId: source.spaceId,
     threadId: thread.id,
@@ -90,7 +89,7 @@ export async function runPageRefreshTick(deps: PageRefreshDeps) {
               return;
             }
             const outcome = await refreshPageSource(deps, claim);
-            if (!outcome.ok && outcome.paused) await postPauseMessage(deps, claim, outcome.error);
+            if (!outcome.ok && outcome.paused) await postPauseMessage(deps, claim);
           });
         } catch (error) {
           // The lease expires in 10 minutes and the source is claimed again.

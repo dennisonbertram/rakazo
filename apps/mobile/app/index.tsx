@@ -1,5 +1,11 @@
 import { MenuView } from "@expo/ui/community/menu";
-import type { RunActivityRow, SearchHit, SpaceBot, SpaceGroup } from "@rakazo/contracts";
+import type {
+  RunActivityRow,
+  SearchHit,
+  SidebarPagesState,
+  SpaceBot,
+  SpaceGroup,
+} from "@rakazo/contracts";
 import { normalizeCreateBotProfile } from "@rakazo/contracts";
 import { Redirect, useFocusEffect, useNavigation, useRouter } from "expo-router";
 import type { ReactNode } from "react";
@@ -42,6 +48,7 @@ import {
   formatActivityRelativeTime,
 } from "../lib/activity";
 import { loadActivityMode, saveActivityMode } from "../lib/activity-mode";
+import { sidebarBotPages } from "../lib/agent-page";
 import type {
   MobileBot,
   MobileBotSection,
@@ -257,6 +264,20 @@ function Home() {
       cancelled = true;
     };
   }, [hasSession]);
+
+  const [sidebarPages, setSidebarPages] = useState<ReturnType<typeof sidebarBotPages>>([]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasSession) return;
+      let cancelled = false;
+      rpc<SidebarPagesState>("sidebarPages/list")
+        .then((state) => !cancelled && setSidebarPages(sidebarBotPages(state)))
+        .catch(() => undefined);
+      return () => {
+        cancelled = true;
+      };
+    }, [hasSession]),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -844,6 +865,21 @@ function Home() {
                 chevron="right"
               />
             ) : null}
+            {!searching && !query.trim()
+              ? sidebarPages.map((page) => (
+                  <SettingsRow
+                    key={page.pageId}
+                    title={page.title}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/agent-page",
+                        params: { botId: page.botId, pageId: page.pageId },
+                      })
+                    }
+                    chevron="right"
+                  />
+                ))
+              : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {spaceRecoveryId ? (
               <Pressable

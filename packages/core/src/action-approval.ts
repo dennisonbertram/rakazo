@@ -776,9 +776,12 @@ export function isSecretAskBlock(block: {
 export function isApprovalAskBlock(block: {
   kind: string;
   approvalEffectId?: string;
+  /** A page source approval has no effect row; its card is still an approval card. */
+  pageSource?: unknown;
   actions?: Array<{ id: string; label: string }>;
 }): boolean {
-  if (block.kind !== "ask" || !block.approvalEffectId || !block.actions?.length) return false;
+  if (block.kind !== "ask" || !(block.approvalEffectId || block.pageSource)) return false;
+  if (!block.actions?.length) return false;
   const actionIds = new Set(block.actions.map((action) => action.id));
   return (
     actionIds.has("allow") &&

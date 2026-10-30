@@ -15,6 +15,7 @@ export interface OmiRecord {
 
 export interface OmiRecording {
   firstSeq: number;
+  lastSeq: number;
   /** Timestamp of the first record, in seconds. */
   timestamp: number;
   frames: Uint8Array[];
@@ -46,25 +47,34 @@ export function parseRecords(bytes: Uint8Array, firstSeq: number): OmiRecord[] {
   return records;
 }
 
-/** Starts a new recording where a record begins more than `gapSeconds` after the last one ended. */
+/**
+ * Starts a new recording where a record begins more than `gapSeconds` after the last one ended, or
+ * once the recording holds `maxMs` of audio.
+ */
 export function splitRecordings(
   records: OmiRecord[],
-  options: { gapSeconds: number; frameMs: number },
+  options: { gapSeconds: number; frameMs: number; maxMs?: number },
 ): OmiRecording[] {
   const out: OmiRecording[] = [];
   let currentEnd = 0;
   for (const record of [...records].sort((a, b) => a.seq - b.seq)) {
     const last = out[out.length - 1];
-    if (!last || record.timestamp - currentEnd > options.gapSeconds) {
+    if (
+      !last ||
+      record.timestamp - currentEnd > options.gapSeconds ||
+      last.durationMs >= (options.maxMs ?? Number.POSITIVE_INFINITY)
+    ) {
       out.push({
         firstSeq: record.seq,
+        lastSeq: record.seq,
         timestamp: record.timestamp,
         frames: [],
         durationMs: 0,
       });
     }
     const recording = out[out.length - 1] as OmiRecording;
-    recording.frames.push(...record.frames);
+    recording.lastSeq = record.seq;
+    for (const frame of record.frames) recording.frames.push(frame);
     recording.durationMs = recording.frames.length * options.frameMs;
     currentEnd = recording.timestamp + recording.durationMs / 1000;
   }

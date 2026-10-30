@@ -12,8 +12,8 @@ import {
 } from "./bluetooth";
 import type { RecordStore } from "./buffer";
 import { createRecordStore, flushRecords } from "./buffer";
-import { framesInRecord, isRingBufferFirmware, progressMinutes, RECORD_SIZE } from "./protocol";
-import { runSync } from "./sync";
+import { isRingBufferFirmware } from "./protocol";
+import { downloadSession } from "./session";
 
 export type OmiSyncState =
   | { kind: "unsupported" }
@@ -61,6 +61,9 @@ export function useOmiSync(status: OmiStatus | undefined, reload: () => Promise<
   const store = useRef<RecordStore | null>(null);
   const running = useRef(false);
   const connectionId = status?.connectionId;
+  // Uploads on the server that no assembly has handled; read through a ref so the open effect runs once.
+  const pending = useRef(false);
+  pending.current = (status?.pendingUploads ?? 0) > 0;
 
   const upload = useCallback(
     (id: string) =>
@@ -108,40 +111,30 @@ export function useOmiSync(status: OmiStatus | undefined, reload: () => Promise<
             })
           ).connectionId;
         if (!connectionId) void reload();
-        const records = recordStore(store);
         // Records left by a closed tab go first, in seq order.
-        await upload(id);
+        const left = await upload(id);
         const { rtcValid } = await link.transport.readStatus();
         const abort = new AbortController();
         device.addEventListener("gattserverdisconnected", () => abort.abort(), {
           once: true,
         });
         setState({ kind: "downloading", done: null, total: null });
-        let frames = 0;
-        const result = await runSync(link.transport, {
+        const result = await downloadSession({
+          transport: link.transport,
+          store: recordStore(store),
+          codec: link.codec,
+          rtcValid,
+          frameMs: link.frameMs,
           signal: abort.signal,
-          onRecords: async (firstSeq, bytes) => {
-            const batch = [];
-            for (let at = 0; at < bytes.length; at += RECORD_SIZE) {
-              const record = bytes.slice(at, at + RECORD_SIZE);
-              frames += framesInRecord(record);
-              batch.push({
-                seq: firstSeq + at / RECORD_SIZE,
-                bytes: record,
-                codec: link.codec,
-                rtcValid,
-              });
-            }
-            await records.put(batch);
-          },
-          onProgress: (done, total) => {
-            lastProgress = progressMinutes(done, total, frames, link.frameMs ?? 20);
-            setState({ kind: "downloading", ...lastProgress });
+          upload: () => upload(id),
+          assemble: () => post("/api/omi/sync-complete", id, {}),
+          hadPending: left > 0 || pending.current,
+          onProgress: (progress) => {
+            lastProgress = progress;
+            setState({ kind: "downloading", ...progress });
           },
         });
-        await upload(id);
         if (result.outcome === "complete") {
-          await post("/api/omi/sync-complete", id, {});
           setState({ kind: "synced", at: Date.now() });
         } else {
           setState({ kind: "paused", ...lastProgress });
@@ -152,6 +145,11 @@ export function useOmiSync(status: OmiStatus | undefined, reload: () => Promise<
         if (error instanceof UploadError) {
           setState({ kind: "upload_failed" });
         } else if (error instanceof DOMException && error.name === "NotFoundError") {
+          // No pendant to read, but uploads waiting on the server can still be turned into recordings.
+          if (connectionId && pending.current) {
+            await post("/api/omi/sync-complete", connectionId, {}).catch(() => undefined);
+            void reload();
+          }
           setState(connectionId ? { kind: "reconnect" } : { kind: "idle" });
         } else {
           setState(
@@ -172,7 +170,10 @@ export function useOmiSync(status: OmiStatus | undefined, reload: () => Promise<
     if (!connectionId || opened.current === connectionId || !bluetoothSupported()) return;
     opened.current = connectionId;
     void (async () => {
-      await upload(connectionId).catch(() => undefined);
+      const left = await upload(connectionId).catch(() => 0);
+      if (left > 0 || pending.current) {
+        await post("/api/omi/sync-complete", connectionId, {}).catch(() => undefined);
+      }
       const device = await savedPendant();
       if (device) void sync(device);
       else setState({ kind: "reconnect" });

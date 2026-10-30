@@ -98,6 +98,16 @@ export const OnePage: Story = {
   beforeEach: () => mockRpc({ "pages.list": [summary("page_cash", "Cash")], "pages.get": page(1) }),
 };
 
+/** The full-width sidebar page: one page, no switcher or new button. */
+export const FixedPage: Story = {
+  args: { fixedPageId: "page_burn" },
+  beforeEach: () =>
+    mockRpc({
+      "pages.list": [summary("page_cash", "Cash"), summary("page_burn", "Burn")],
+      "pages.get": { ...page(1, "# Burn\n\nMonthly burn."), id: "page_burn", title: "Burn" },
+    }),
+};
+
 export const SeveralPages: Story = {
   beforeEach: () =>
     mockRpc({

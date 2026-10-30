@@ -513,8 +513,17 @@ export function BotPagePanel({
   remote,
   dataRemote = null,
   onPageChange,
+  fixedPageId,
+  onTitle,
+  onMissing,
 }: {
   botId: string;
+  /** Shows only this page: no switcher, no new or delete. Used by the full-width page. */
+  fixedPageId?: string;
+  /** The open page's title, so a full-width page can use it as its heading. */
+  onTitle?: (title: string) => void;
+  /** The fixed page is gone (deleted, or not this bot's). */
+  onMissing?: () => void;
   /** The latest `page.updated` event for this bot. */
   remote: PageRemoteUpdate | null;
   /** The latest `page.data` event for this bot. */
@@ -522,7 +531,7 @@ export function BotPagePanel({
   onPageChange?: (page: BotPage | null) => void;
 }) {
   const [pages, setPages] = useState<BotPageSummary[]>([]);
-  const [activeId, setActiveId] = useState<string>();
+  const [activeId, setActiveId] = useState<string | undefined>(fixedPageId);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -532,13 +541,19 @@ export function BotPagePanel({
   const [dataTick, setDataTick] = useState(0);
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
+  const onMissingRef = useRef(onMissing);
+  onMissingRef.current = onMissing;
 
   const loadPages = useCallback(async () => {
     const list = await rpc.pages.list({ botId });
     setPages(list);
+    if (fixedPageId) {
+      if (!list.some((page) => page.id === fixedPageId)) onMissingRef.current?.();
+      return;
+    }
     // Keep the open page; otherwise open the first.
     setActiveId((current) => (list.some((page) => page.id === current) ? current : list[0]?.id));
-  }, [botId]);
+  }, [botId, fixedPageId]);
 
   useEffect(() => {
     let live = true;
@@ -572,6 +587,9 @@ export function BotPagePanel({
 
   const active = pages.find((page) => page.id === activeId);
   const activeTitle = active?.title ?? "";
+  useEffect(() => {
+    if (activeTitle) onTitle?.(activeTitle);
+  }, [activeTitle, onTitle]);
   // Only an event for the open page (or an old event without a page id) reloads it.
   const editorRemote = remote && (!remote.pageId || remote.pageId === activeId) ? remote : null;
 
@@ -635,7 +653,7 @@ export function BotPagePanel({
             </form>
           ) : (
             <div className="min-w-0 flex-1">
-              {pages.length > 1 ? (
+              {pages.length > 1 && !fixedPageId ? (
                 <Tabs value={activeId} onValueChange={(next) => setActiveId(String(next))}>
                   <TabsList aria-label={t`Pages`}>
                     {pages.map((page) => (
@@ -670,22 +688,24 @@ export function BotPagePanel({
               <DropdownMenuItem onClick={() => setRenaming(true)}>
                 <Trans>Rename</Trans>
               </DropdownMenuItem>
-              {pages.length > 1 ? (
+              {pages.length > 1 && !fixedPageId ? (
                 <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
                   <Trans>Delete</Trans>
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t`New page`}
-            disabled={pages.length >= BOT_PAGE_MAX_PAGES}
-            onClick={() => void create()}
-          >
-            <Plus size={16} />
-          </Button>
+          {fixedPageId ? null : (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t`New page`}
+              disabled={pages.length >= BOT_PAGE_MAX_PAGES}
+              onClick={() => void create()}
+            >
+              <Plus size={16} />
+            </Button>
+          )}
         </div>
       ) : null}
       {error && pages.length > 0 ? (
