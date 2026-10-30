@@ -284,7 +284,8 @@ export function createBrexClient(options: BrexClientOptions) {
       request("POST", `/v2/cards/${id(cardId)}/terminate`, BrexCardSchema, { body, key }),
 
     listUsers: (q: { name?: string; email?: string } = {}) =>
-      paginate("/v2/users", BrexUserSchema, q),
+      // `email[]` is the current filter; the legacy `email` cannot be combined with `name`.
+      paginate("/v2/users", BrexUserSchema, { name: q.name, "email[]": q.email }),
     getUser: (userId: string) => request("GET", `/v2/users/${id(userId)}`, BrexUserSchema),
 
     listSpendLimits: (q: { memberUserId?: string } = {}) =>

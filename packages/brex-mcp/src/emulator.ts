@@ -384,9 +384,10 @@ export class BrexApiEmulator {
     const key = header("idempotency-key");
     const replayKey = key && method !== "GET" ? `${method} ${path} ${key}` : undefined;
     const replay = replayKey ? this.replays.get(replayKey) : undefined;
-    if (replay) return replay;
+    if (replay) return [replay[0], structuredClone(replay[1])];
     const result = this.route(method, url, body);
-    if (replayKey && result[0] === 200) this.replays.set(replayKey, [result[0], result[1]]);
+    if (replayKey && result[0] === 200)
+      this.replays.set(replayKey, [result[0], structuredClone(result[1])]);
     return result;
   }
 
@@ -426,11 +427,29 @@ export class BrexApiEmulator {
     if (v === "v2" && a === "users" && method === "GET") {
       if (c === "me") return found(this.users[0]);
       if (parts.length === 3) return found(at(this.users, c));
-      return this.page(this.users, q);
+      const emails = q.getAll("email[]").flatMap((e) => e.split(","));
+      const name = q.get("name")?.toLowerCase();
+      return this.page(
+        this.users
+          .filter((u) => !emails.length || emails.includes(u.email))
+          .filter(
+            (u) =>
+              !name || `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(name),
+          ),
+        q,
+      );
     }
     if (v === "v2" && a === "company" && method === "GET") return [200, this.company];
     if (v === "v2" && a === "spend_limits") {
-      if (parts.length === 2 && method === "GET") return this.page(this.spendLimits, q);
+      if (parts.length === 2 && method === "GET") {
+        const members = q.getAll("member_user_id[]");
+        return this.page(
+          this.spendLimits.filter(
+            (x) => !members.length || members.some((m) => x.member_user_ids.includes(m)),
+          ),
+          q,
+        );
+      }
       if (parts.length === 2 && method === "POST") return this.createSpendLimit(b);
       const target = at(this.spendLimits, c);
       if (parts.length === 3 && method === "GET") return found(target);

@@ -503,8 +503,8 @@ describe("write ordering and caps", () => {
   it("serializes concurrent card updates on the same card", async () => {
     const { emulator, call } = await setup({ readDelayMs: 15 });
     await Promise.all([
-      call("update_card", { ...FIGMA, amountCents: 70_000 }),
-      call("update_card", { ...FIGMA, allowedMerchants: null }),
+      call("update_card", { ...FIGMA, amountCents: 70_000 }, "eff-a"),
+      call("update_card", { ...FIGMA, allowedMerchants: null }, "eff-b"),
     ]);
     const stored = emulator.cards.find((c) => c.id === "card_figma") as any;
     expect(stored.spend_controls.spend_limit.amount).toBe(70_000);

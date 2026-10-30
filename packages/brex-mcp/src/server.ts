@@ -36,6 +36,12 @@ export interface BrexCardsStore {
     maxCardsPerDay: number;
   }): Promise<{ ok: true; reservationId: string } | { ok: false; reason: string }>;
   settleReservation(id: string, status: ReservationStatus, cardId?: string): Promise<void>;
+  /**
+   * Runs `fn` while holding a lock on `key` (`card:<id>` or `spend_limit:<id>`), across every
+   * process. Writes that read a target and then send a full replacement (members, spend controls)
+   * use it so two approved calls cannot overwrite each other.
+   */
+  withTargetLock<T>(key: string, fn: () => Promise<T>): Promise<T>;
   /** The caller's idempotency key, from the request's `_meta`; undefined when there is none. */
   idempotencyKey(meta?: Record<string, unknown>): string | undefined;
 }
@@ -431,29 +437,30 @@ export function createBrexCardsServer({
     "Change a vendor card's limit (USD), duration, lock date or merchant lists. Omitted fields keep their value; null clears the lock date or a merchant list. Name the card exactly as list_cards or get_card shows it.",
     BREX_CARDS_WRITE_ARGS.update_card,
     write,
-    async (args, meta) => {
-      const controls = await store.loadControls();
-      const current = await lookup(`Card ${args.cardId}`, () => client.getCard(args.cardId));
-      matchCard(current, args);
-      const result = checkUpdateCard(controls, current, args, now());
-      if (!result.ok) return refuse(result.reason);
-      const { next } = result;
-      const names = (list: string[] | null) => list?.map((name) => ({ name })) ?? null;
-      const updated = await client.updateCard(
-        args.cardId,
-        {
-          spend_controls: {
-            spend_limit: { amount: next.amountCents, currency: next.currency },
-            spend_duration: next.duration,
-            lock_after_date: next.lockAfterDate,
-            allowed_merchant_details: names(next.allowedMerchants),
-            blocked_merchant_details: names(next.blockedMerchants),
+    (args, meta) =>
+      store.withTargetLock(`card:${args.cardId}`, async () => {
+        const controls = await store.loadControls();
+        const current = await lookup(`Card ${args.cardId}`, () => client.getCard(args.cardId));
+        matchCard(current, args);
+        const result = checkUpdateCard(controls, current, args, now());
+        if (!result.ok) return refuse(result.reason);
+        const { next } = result;
+        const names = (list: string[] | null) => list?.map((name) => ({ name })) ?? null;
+        const updated = await client.updateCard(
+          args.cardId,
+          {
+            spend_controls: {
+              spend_limit: { amount: next.amountCents, currency: next.currency },
+              spend_duration: next.duration,
+              lock_after_date: next.lockAfterDate,
+              allowed_merchant_details: names(next.allowedMerchants),
+              blocked_merchant_details: names(next.blockedMerchants),
+            },
           },
-        },
-        store.idempotencyKey(meta),
-      );
-      return text(cardView(updated));
-    },
+          store.idempotencyKey(meta),
+        );
+        return text(cardView(updated));
+      }),
   );
 
   for (const [name, verb] of [
@@ -467,15 +474,16 @@ export function createBrexCardsServer({
         : "Terminate a card permanently. Lock first if unsure.",
       BREX_CARDS_WRITE_ARGS[name],
       { readOnlyHint: false, destructiveHint: name === "terminate_card" },
-      async (args, meta) => {
-        const current = await lookup(`Card ${args.cardId}`, () => client.getCard(args.cardId));
-        matchCard(current, args);
-        return text(
-          cardView(
-            await client[verb](args.cardId, { reason: args.reason }, store.idempotencyKey(meta)),
-          ),
-        );
-      },
+      (args, meta) =>
+        store.withTargetLock(`card:${args.cardId}`, async () => {
+          const current = await lookup(`Card ${args.cardId}`, () => client.getCard(args.cardId));
+          matchCard(current, args);
+          return text(
+            cardView(
+              await client[verb](args.cardId, { reason: args.reason }, store.idempotencyKey(meta)),
+            ),
+          );
+        }),
     );
   }
 
@@ -529,34 +537,36 @@ export function createBrexCardsServer({
     write,
     async (args, meta) => {
       const key = requireKey(meta);
-      const controls = await store.loadControls();
-      const current = await lookup(`Spend limit ${args.spendLimitId}`, () =>
-        client.getSpendLimit(args.spendLimitId),
-      );
-      if (norm(current.name) !== norm(args.spendLimitName))
-        refuse(
-          `Spend limit ${args.spendLimitId} is named "${current.name}", not "${args.spendLimitName}". Nothing was changed.`,
+      return store.withTargetLock(`spend_limit:${args.spendLimitId}`, async () => {
+        const controls = await store.loadControls();
+        const current = await lookup(`Spend limit ${args.spendLimitId}`, () =>
+          client.getSpendLimit(args.spendLimitId),
         );
-      const result = checkUpdateSpendLimit(controls, current, args);
-      if (!result.ok) return refuse(result.reason);
-      await matchMembers([...(args.addMembers ?? []), ...(args.removeMembers ?? [])]);
-      const updated = await client.updateSpendLimit(
-        args.spendLimitId,
-        {
-          ...(args.amountCents !== undefined
-            ? {
-                authorization_settings: {
-                  base_limit: { amount: args.amountCents, currency: "USD" },
-                },
-              }
-            : {}),
-          ...(result.next.memberUserIds ? { member_user_ids: result.next.memberUserIds } : {}),
-          ...(args.endDate ? { end_date: args.endDate } : {}),
-          ...(args.status ? { status: args.status } : {}),
-        },
-        key,
-      );
-      return text(spendLimitView(updated));
+        if (norm(current.name) !== norm(args.spendLimitName))
+          refuse(
+            `Spend limit ${args.spendLimitId} is named "${current.name}", not "${args.spendLimitName}". Nothing was changed.`,
+          );
+        const result = checkUpdateSpendLimit(controls, current, args);
+        if (!result.ok) return refuse(result.reason);
+        await matchMembers([...(args.addMembers ?? []), ...(args.removeMembers ?? [])]);
+        const updated = await client.updateSpendLimit(
+          args.spendLimitId,
+          {
+            ...(args.amountCents !== undefined
+              ? {
+                  authorization_settings: {
+                    base_limit: { amount: args.amountCents, currency: "USD" },
+                  },
+                }
+              : {}),
+            ...(result.next.memberUserIds ? { member_user_ids: result.next.memberUserIds } : {}),
+            ...(args.endDate ? { end_date: args.endDate } : {}),
+            ...(args.status ? { status: args.status } : {}),
+          },
+          key,
+        );
+        return text(spendLimitView(updated));
+      });
     },
   );
 

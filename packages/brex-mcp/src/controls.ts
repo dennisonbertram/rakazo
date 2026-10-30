@@ -154,9 +154,11 @@ export function checkUpdateSpendLimit(
     return refuse("This spend limit has a spending buffer. Edit it in Brex.");
   if (settings.base_limit.currency !== "USD")
     return refuse("Only USD spend limits can be changed; this one is not in USD.");
-  if (patch.amountCents !== undefined && patch.amountCents > controls.maxSpendLimitBaseCents)
+  // The cap applies to the resulting amount, so an over-cap limit stays blocked until it is lowered.
+  const amountCents = patch.amountCents ?? settings.base_limit.amount;
+  if (amountCents > controls.maxSpendLimitBaseCents)
     return blocked(
-      `spend limit base amount ${usd(patch.amountCents)} exceeds the ${usd(controls.maxSpendLimitBaseCents)} cap.`,
+      `spend limit base amount ${usd(amountCents)} exceeds the ${usd(controls.maxSpendLimitBaseCents)} cap.`,
     );
 
   if (!patch.addMembers?.length && !patch.removeMembers?.length) return { ok: true, next: {} };
