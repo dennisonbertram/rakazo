@@ -215,6 +215,40 @@ describePostgres("Omi transcription (PostgreSQL)", () => {
     );
   });
 
+  it("ends with transcription_failed after three provider errors, and a later run recovers", async () => {
+    const who = actors[0] as Actor;
+    await select(who, "scripted-transcribe", true);
+    await prisma.dataRoomItem.deleteMany({ where: { spaceId: who.spaceId } });
+    const id = await makeItem(who, 5);
+    const failing = {
+      ...deps(),
+      createProvider: () =>
+        ({
+          transcribe: async () => {
+            throw new Error("boom");
+          },
+        }) as never,
+    };
+    await expect(runOmiTranscribe(failing, payload(who, id))).rejects.toThrow();
+    await expect(runOmiTranscribe(failing, payload(who, id))).rejects.toThrow();
+    expect((await row(id)).error).toBeNull();
+    await runOmiTranscribe(failing, payload(who, id));
+    expect(await row(id)).toMatchObject({ error: "transcription_failed", failures: 3 });
+    await requeueOmiTranscriptions(
+      {
+        prisma,
+        jobs: {
+          enqueue: async (j: BackgroundJob) => void queued.push(j),
+        } as unknown as JobPublisher,
+      },
+      who,
+    );
+    expect(queued).toHaveLength(1);
+    await runOmiTranscribe(deps(), payload(who, id));
+    expect(await row(id)).toMatchObject({ error: null, failures: 0 });
+    expect((await row(id)).text?.text).toBe(`[00:00] ${SCRIPTED_TRANSCRIPT}`);
+  });
+
   it("queues again only the caller's recordings that waited for a provider", async () => {
     const [x, y] = [actors[0] as Actor, actors[1] as Actor];
     await prisma.dataRoomItem.deleteMany({ where: { spaceId: { in: [x.spaceId, y.spaceId] } } });

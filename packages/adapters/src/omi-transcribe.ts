@@ -14,7 +14,13 @@ export interface OmiTranscribeDeps {
   prisma: PrismaClient;
   artifacts: ArtifactStore;
   secrets: SecretStore;
+  /** For tests; defaults to the real provider factory. */
+  createProvider?: typeof createTranscriptionProvider;
 }
+
+/** Failed attempts after which the item keeps the error instead of retrying. */
+const MAX_FAILURES = 3;
+export const TRANSCRIPTION_FAILED = "transcription_failed";
 
 const mmss = (seconds: number) =>
   `[${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}]`;
@@ -51,7 +57,7 @@ export async function runOmiTranscribe(
         data: {
           error,
           revision: { increment: 1 },
-          ...(text === undefined ? {} : { previewText: dataRoomPreviewText(text) }),
+          ...(text === undefined ? {} : { previewText: dataRoomPreviewText(text), failures: 0 }),
         },
       });
       if (count === 1 && text !== undefined) {
@@ -64,7 +70,10 @@ export async function runOmiTranscribe(
     });
 
   const { target, consented } = await selectTranscriptionTarget(deps, actor);
-  const provider = target && consented ? createTranscriptionProvider(target.provider) : null;
+  const provider =
+    target && consented
+      ? (deps.createProvider ?? createTranscriptionProvider)(target.provider)
+      : null;
   if (!target || !provider) return void (await save(NO_TRANSCRIPTION_PROVIDER));
 
   const blobContext = dataRoomBlobContext(actor, "omi.transcribe");
@@ -87,7 +96,13 @@ export async function runOmiTranscribe(
       ));
     } catch {
       // The provider's message may echo request details; keep only a short reason.
-      throw new Error("Transcription failed");
+      await prisma.dataRoomItem.updateMany({ where: owned, data: { failures: { increment: 1 } } });
+      const failed = await prisma.dataRoomItem.findFirst({
+        where: owned,
+        select: { failures: true },
+      });
+      if ((failed?.failures ?? 0) < MAX_FAILURES) throw new Error("Transcription failed");
+      return void (await save(TRANSCRIPTION_FAILED));
     }
     if (text.trim()) parts.push(`${mmss(segment.startSeconds)} ${text.trim()}`);
   }
@@ -106,12 +121,16 @@ export async function requeueOmiTranscriptions(
       source: "omi",
       // The pipeline can clear the error while the job waits, so an empty text counts too.
       OR: [
-        { error: NO_TRANSCRIPTION_PROVIDER },
+        { error: { in: [NO_TRANSCRIPTION_PROVIDER, TRANSCRIPTION_FAILED] } },
         { text: { is: null } },
         { text: { is: { text: "" } } },
       ],
     },
     select: { id: true },
+  });
+  await deps.prisma.dataRoomItem.updateMany({
+    where: { id: { in: items.map((item) => item.id) } },
+    data: { failures: 0 },
   });
   for (const { id } of items) {
     await deps.jobs.enqueue(
