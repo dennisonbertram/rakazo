@@ -141,6 +141,7 @@ import {
   scriptedCatalogEntry,
   selectDefaultCredentialId,
   serializeModelSecret,
+  sharePageSnapshot,
   startAuditDraftRun,
   stopMailWatch,
   storeBotSecret,
@@ -238,8 +239,8 @@ import {
 import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
 import {
   AnswerTooLongError,
-  addSidebarFolder,
   addSidebarBotPage,
+  addSidebarFolder,
   addSidebarPage,
   appendEventInTransaction,
   approvalTable,
@@ -336,8 +337,8 @@ import {
   pushSessionExpiresAt,
   releaseAuditDraft,
   releaseSpaceDeletionClaim,
-  removeSidebarFolder,
   removeSidebarBotPage,
+  removeSidebarFolder,
   removeSidebarPage,
   renameSpaceForMember,
   renewSpaceDeletionClaim,
@@ -4448,6 +4449,25 @@ export function createRouter(deps: RouterDeps) {
           { spaceId: bot.spaceId, botId: bot.id, pageId: page.id },
         );
         return resolvePageData(deps, { spaceId: bot.spaceId }, page);
+      }),
+      share: authed.pages.share.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return null;
+        const data = await resolvePageData(deps, { spaceId: bot.spaceId }, page);
+        const { artifactId, token, expiresAt } = await sharePageSnapshot(
+          { prisma: deps.prisma, artifacts: deps.artifacts },
+          { spaceId: bot.spaceId, userId: bot.userId, botId: bot.id, page, data },
+        );
+        return {
+          url: `${deps.env.webOrigin}/s#${token}`,
+          expiresAt: expiresAt.toISOString(),
+          artifactId,
+        };
       }),
       sources: authed.pages.sources.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
