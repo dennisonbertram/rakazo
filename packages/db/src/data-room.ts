@@ -597,6 +597,7 @@ export function createDataRoomRepos(prisma: PrismaClient) {
         sourceUrl?: string | null;
         sourceUpdatedAt?: Date | null;
         notIndexed?: boolean;
+        status?: "ready";
         docType?: string | null;
         docDate?: Date | null;
         parties?: string[];

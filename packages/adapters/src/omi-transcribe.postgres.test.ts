@@ -59,6 +59,7 @@ describePostgres("Omi transcription (PostgreSQL)", () => {
       source: "omi",
       externalId: `omi:${run}:${counter}`,
       notIndexed: true,
+      ready: true,
     });
     return (filed.item as { id: string }).id;
   };
@@ -176,6 +177,7 @@ describePostgres("Omi transcription (PostgreSQL)", () => {
     await runOmiTranscribe(deps(), payload(who, id));
     const item = await row(id);
     expect(item.error).toBe(NO_TRANSCRIPTION_PROVIDER);
+    expect(item.status).toBe("ready");
     expect(item.text?.text ?? "").toBe("");
   });
 
@@ -198,6 +200,7 @@ describePostgres("Omi transcription (PostgreSQL)", () => {
     const item = await row(id);
     expect(item.text?.text).toBe(`[00:00] ${SCRIPTED_TRANSCRIPT}`);
     expect(item.error).toBeNull();
+    expect(item.status).toBe("ready");
     expect(item.notIndexed).toBe(true);
     expect(item.previewText).toContain(SCRIPTED_TRANSCRIPT);
     await runOmiTranscribe(deps(), payload(who, id));

@@ -125,6 +125,7 @@ export async function runOmiAssemble(
           sourceConnectionId: connection.id,
           externalId,
           notIndexed: true,
+          ready: true,
         });
         if (created && item) {
           await deps.jobs.enqueue(
