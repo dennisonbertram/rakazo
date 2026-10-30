@@ -134,3 +134,8 @@ export const PageDataInputSchema = z.object({ botId: Id, pageId: Id.optional() }
 export const PageRefreshInputSchema = PageDataInputSchema;
 export const PageSourcesListInputSchema = PageDataInputSchema;
 export const PageSourceRemoveInputSchema = z.object({ botId: Id, sourceId: Id });
+export const PageSourceScheduleInputSchema = z.object({
+  botId: Id,
+  sourceId: Id,
+  schedule: PageSourceSchedule,
+});

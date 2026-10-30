@@ -126,6 +126,8 @@ export const RECURRING_JOBS: CronItem[] = [
   { task: "company.import.recover", match: "* * * * *" },
   { task: "company.refresh.tick", match: "* * * * *" },
   { task: "watch.probe", match: "* * * * *" },
+  { task: "pages.refresh.tick", match: "* * * * *" },
+  { task: "pages.snapshots.retention", match: "41 3 * * *" },
   // Gmail push watches last 7 days; renew daily. Does nothing unless push is configured.
   { task: "mail.watch.renew", match: "11 4 * * *" },
   // Devin sessions for the Devin page and its alerts.

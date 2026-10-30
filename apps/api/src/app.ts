@@ -92,6 +92,7 @@ import {
   removePiUserSessions,
   resolveEnsName,
   reviewAttachment,
+  runPageRefreshTick,
   runWatchProbeTick,
   ScriptedAgentRuntime,
   SmtpEmailProvider,
@@ -662,6 +663,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     documents: documentReader,
   });
   const jobHandlers = createBackgroundJobHandlers({
+    ticketBoardEnabled,
     executor,
     prisma,
     sandbox,
@@ -718,6 +720,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
             notificationEvents,
             connector: stack.connector,
           }),
+        runPageRefreshes: () => runPageRefreshTick({ prisma, jobs, events, ticketBoardEnabled }),
       })
     : undefined;
   reconciler?.start();

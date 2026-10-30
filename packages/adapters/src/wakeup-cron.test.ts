@@ -14,6 +14,8 @@ describe("RECURRING_JOBS", () => {
       "company.import.recover",
       "company.refresh.tick",
       "watch.probe",
+      "pages.refresh.tick",
+      "pages.snapshots.retention",
       "mail.watch.renew",
       "devin.refresh",
     ]);
