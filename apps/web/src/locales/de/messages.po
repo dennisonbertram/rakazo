@@ -11577,6 +11577,7 @@ msgstr "Form"
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/data-room/ItemMenu.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/shell/bot-page-panel.tsx
 msgid "Share"
 msgstr ""
 
