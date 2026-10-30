@@ -26,7 +26,7 @@ const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 
 /** Brex as the token check sees it: any token except BAD_TOKEN is accepted. */
-const brexFetch = vi.fn(async (url: URL | string, init?: RequestInit) => {
+const defaultBrex = async (url: URL | string, init?: RequestInit) => {
   const u = new URL(String(url));
   if (new Headers(init?.headers).get("authorization") === `Bearer ${BAD_TOKEN}`)
     return json({}, 401);
@@ -35,7 +35,8 @@ const brexFetch = vi.fn(async (url: URL | string, init?: RequestInit) => {
   if (u.pathname === "/v2/cards") return json({ items: [], next_cursor: null });
   if (u.pathname === "/v2/company") return json({ id: "cmp_pg_1", legal_name: "Example Co" });
   return json({}, 404);
-});
+};
+const brexFetch = vi.fn(defaultBrex);
 
 const CARDS_TEXT = JSON.stringify({
   cards: [
@@ -479,5 +480,50 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
     expect(
       (await prisma.bot.findUniqueOrThrow({ where: { id: agentBotId } })).archivedAt,
     ).not.toBeNull();
+  });
+
+  it("regression: two connects at once leave exactly one connection, one server and one secret", async () => {
+    const results = await Promise.allSettled([
+      client(owner1).brexCards.connect({ token: TOKEN }),
+      client(owner1).brexCards.connect({ token: NEW_TOKEN }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(failed.reason).toMatchObject({ code: "CONFLICT" });
+    expect(await servers()).toHaveLength(1);
+    expect(await prisma.secret.count({ where: { spaceId: spaceA } })).toBe(1);
+    expect(await prisma.brexCardsConnection.count({ where: { spaceId: spaceA } })).toBe(1);
+  });
+
+  it("regression: the token appears only in the encrypted secret, never in a server listing, the server row or the agent", async () => {
+    const { serverId, agentBotId } = await client(owner1).brexCards.connect({ token: TOKEN });
+    const listed = await client(owner1).mcp.servers.list();
+    expect(JSON.stringify(listed)).not.toContain(TOKEN);
+    const row = await prisma.mcpServer.findUniqueOrThrow({ where: { id: serverId } });
+    expect(JSON.stringify(row)).not.toContain(TOKEN);
+    const bot = await prisma.bot.findUniqueOrThrow({ where: { id: agentBotId } });
+    expect(JSON.stringify(bot)).not.toContain(TOKEN);
+    expect(JSON.stringify(await connection())).not.toContain(TOKEN);
+  });
+
+  it("regression: a replacement token from another Brex company moves the daily-cap account id with it", async () => {
+    await client(owner1).brexCards.connect({ token: TOKEN });
+    expect((await connection())?.brexAccountId).toBe("cmp_pg_1");
+    brexFetch.mockImplementation(async (url: URL | string) =>
+      new URL(String(url)).pathname === "/v2/company"
+        ? json({ id: "cmp_pg_2", legal_name: "Other Co" })
+        : json(
+            new URL(String(url)).pathname === "/v2/cards"
+              ? { items: [] }
+              : { id: "u", first_name: "A", last_name: "B" },
+          ),
+    );
+    try {
+      await client(owner1).brexCards.replaceToken({ token: NEW_TOKEN });
+    } finally {
+      brexFetch.mockReset();
+      brexFetch.mockImplementation(defaultBrex);
+    }
+    expect((await connection())?.brexAccountId).toBe("cmp_pg_2");
   });
 });
