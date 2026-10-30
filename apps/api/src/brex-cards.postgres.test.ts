@@ -4,10 +4,11 @@ import {
   BREX_AGENT_MODEL,
   BREX_CARDS_CONTROLS_DEFAULTS,
   BREX_CARDS_MCP_ENDPOINT,
+  FINANCE_MCP_ENDPOINTS,
   integrationAgentSpawnKey,
 } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
-import { createDb } from "@rakazo/db";
+import { createDb, createRepos } from "@rakazo/db";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";
@@ -183,21 +184,18 @@ describePostgres("Brex cards connection (PostgreSQL)", () => {
         slug: "brex-finance",
         name: "Brex",
         transport: "streamable_http",
-        endpoint: "https://mcp.brex.com/mcp",
+        endpoint: FINANCE_MCP_ENDPOINTS.brex,
       },
     });
-    const bot = await prisma.bot.create({
-      data: {
-        spaceId: spaceA,
-        userId: owner1.userId,
-        name: "Brex agent",
-        title: "",
-        color: "#111111",
-        description: "Your Brex account",
-        instructions: "You work with the user's Brex account through its tools.",
-        spawnKey: integrationAgentSpawnKey(server.id),
-        modelId,
-      },
+    const bot = await createRepos(prisma).createBot(owner1, {
+      spawnKey: integrationAgentSpawnKey(server.id),
+      name: "Brex agent",
+      title: "",
+      description: "Your Brex account",
+      instructions: "You work with the user's Brex account through its tools.",
+      notifyOnFinish: true,
+      color: "#111111",
+      ...(modelId ? { modelProvider: "openrouter", modelId } : {}),
     });
     await prisma.mcpServer.update({
       where: { id: server.id },

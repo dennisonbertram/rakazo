@@ -2,8 +2,9 @@ import { createRouterClient } from "@orpc/server";
 import type { Actor } from "@rakazo/contracts";
 import {
   BREX_AGENT_MODEL,
-  BREX_CARDS_MCP_ENDPOINT,
   BREX_CARDS_CONTROLS_DEFAULTS,
+  BREX_CARDS_MCP_ENDPOINT,
+  FINANCE_MCP_ENDPOINTS,
   integrationAgentSpawnKey,
 } from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
@@ -113,9 +114,9 @@ function fakeDb(seed: { bot?: Row; server?: Row; connection?: Row } = {}) {
       async ({ where }: { where: Row }) =>
         state.bots.find(
           (b) =>
-            b.id === where.id &&
+            (where.id === undefined || b.id === where.id) &&
             (!where.spawnKey || b.spawnKey === where.spawnKey) &&
-            (!where.userId || b.userId === where.userId),
+            (!where.userId || !b.userId || b.userId === where.userId),
         ) ?? null,
     ),
     // Honors the `modelId: null` condition the way the database does.
@@ -398,8 +399,8 @@ describe("brexCardsReplaceToken", () => {
     const t = deps(db);
     await brexCardsReplaceToken(t.deps, owner, NEW_TOKEN);
 
-    expect(db.state.servers[0]).toMatchObject({ revision: 4, secretId: "sec-1" });
-    expect(db.state.secrets.map((s) => s.id)).toEqual(["sec-1"]);
+    expect(db.state.servers[0]).toMatchObject({ revision: 4, secretId: "sec-2" });
+    expect(db.state.secrets.map((s) => s.id)).toEqual(["sec-2"]);
     expect(JSON.parse(db.state.secrets[0]?.ciphertext as string)).toMatchObject({
       secret: NEW_TOKEN,
     });
@@ -513,7 +514,7 @@ describe("the Brex agent", () => {
     id: "fin",
     spaceId: "space",
     userId: "owner",
-    endpoint: "https://mcp.brex.com/mcp",
+    endpoint: FINANCE_MCP_ENDPOINTS.brex,
     agentBotId: "bot-fin",
   };
   const financeBot = {

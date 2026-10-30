@@ -187,6 +187,7 @@ import {
   IntegrationProviderIdSchema,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
+  isBrexCardsEndpoint,
   isCartaAgentSpawnKey,
   isCartaEndpoint,
   isCompanyAgentSpawnKey,
@@ -402,6 +403,14 @@ import {
   listSpaceArtifacts,
 } from "./artifacts.js";
 import { botProfileLabelsChanged, commitBotUpdate } from "./bot-update.js";
+import type { BrexCardsDeps } from "./brex-cards.js";
+import {
+  brexCardsCards,
+  brexCardsConnect,
+  brexCardsGetControls,
+  brexCardsReplaceToken,
+  brexCardsSetControls,
+} from "./brex-cards.js";
 import type { CartaSyncDeps } from "./carta-agent.js";
 import {
   assignToExistingCartaAgent,
@@ -426,14 +435,6 @@ import {
 } from "./connection-oauth.js";
 import { createDataRoomService } from "./data-room.js";
 import { ensureDataRoomAgent } from "./data-room-agent.js";
-import type { BrexCardsDeps } from "./brex-cards.js";
-import {
-  brexCardsCards,
-  brexCardsConnect,
-  brexCardsGetControls,
-  brexCardsReplaceToken,
-  brexCardsSetControls,
-} from "./brex-cards.js";
 import type { DevinDeps } from "./devin.js";
 import {
   assertNoOtherDevinConnection,
@@ -614,12 +615,12 @@ import type { RouterDeps } from "./routes/context.js";
 import { asTenant, createRouteContext } from "./routes/context.js";
 import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
-
 import { listRoutineRuns } from "./routine-runs.js";
 import { listPendingApprovalNotifications, listSpaceRuns } from "./runs.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { querySpaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
+import { requireSpaceOwner } from "./space-owner.js";
 import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { HEARTBEAT, withHeartbeat } from "./stream.js";
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
@@ -826,6 +827,7 @@ function computerContext(actor: Actor, botId: string, operationId: string): Adap
 
 const EXCLUSIVE_SERVER_MESSAGE = "This integration is used only by its agent.";
 const RECONNECT_DEVIN_MESSAGE = "Use Reconnect on the Devin page to replace the key.";
+const REPLACE_BREX_TOKEN_MESSAGE = "Use Replace token on the Brex cards page to change the token.";
 
 function approvalRuleDto(row: {
   id: string;
@@ -5777,6 +5779,16 @@ export function createRouter(deps: RouterDeps) {
           return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
         update: authed.mcp.servers.update.handler(async ({ context, input }) => {
+          // The Brex cards token changes only through Replace token, which checks it with Brex
+          // first, and only for the current space owner.
+          const brexRow = await deps.prisma.mcpServer.findFirst({
+            where: { id: input.id, ...actorScope(context.actor) },
+            select: { endpoint: true },
+          });
+          if (isBrexCardsEndpoint(brexRow?.endpoint)) {
+            await requireSpaceOwner(deps.prisma, context.actor);
+            throw new ORPCError("BAD_REQUEST", { message: REPLACE_BREX_TOKEN_MESSAGE });
+          }
           // The space's Devin connection is an owner's to change, and its key only through Reconnect.
           if (await requireOwnerForActiveDevinRow(deps.prisma, context.actor, input.id)) {
             const next = "config" in input ? input.config : input;
@@ -6044,6 +6056,19 @@ export function createRouter(deps: RouterDeps) {
               !isZernioEndpoint(deleted.endpoint)
                 ? deleted.agentBotId
                 : null;
+            // The Brex cards server may share the owner's Brex finance agent, which keeps its
+            // other server: only an agent made for this server goes with it.
+            if (agentToArchive && isBrexCardsEndpoint(deleted.endpoint)) {
+              const own = await tx.bot.findFirst({
+                where: {
+                  id: agentToArchive,
+                  ...actorScope(context.actor),
+                  spawnKey: integrationAgentSpawnKey(deleted.id),
+                },
+                select: { id: true },
+              });
+              if (!own) agentToArchive = null;
+            }
             // Archived with the server, so the agent is never left active without it.
             if (agentToArchive)
               await tx.bot.updateMany({
