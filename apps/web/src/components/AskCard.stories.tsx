@@ -395,6 +395,17 @@ export const HeldShareDeclined: Story = {
 /** The owner's approval of a page's data source: answered without a waiting run. */
 export const PageSourcePending: Story = { args: { block: pageSourceAsk() } };
 
+/** An API source: the exact GET, the key's name only, and the page. */
+export const PageSourceHttpPending: Story = {
+  args: {
+    block: pageSourceAsk({
+      text: "Read api.example.com every hour?",
+      detail:
+        "Request: GET https://api.example.com/v1/revenue?period=week\nKey: billing\nPage: Revenue",
+    }),
+  },
+};
+
 export const PageSourceAllowed: Story = {
   args: { block: pageSourceAsk({ status: "answered", answer: "allow" }) },
 };

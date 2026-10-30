@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { BotSecretName } from "./bot-secrets.js";
 import { Id } from "./ids.js";
 import { PinFormat } from "./pins.js";
 
@@ -18,8 +19,8 @@ export const PAGE_METRIC_FENCE = "metric";
 export const PAGE_TABLE_FENCE = "table";
 export const PAGE_LIVE_FENCES = [PAGE_METRIC_FENCE, PAGE_TABLE_FENCE] as const;
 
-/** "http" arrives with S5. An "mcp" source needs the owner's approval before it runs. */
-export const PageSourceKind = z.enum(["praci", "mcp"]);
+/** An "mcp" or "http" source needs the owner's approval before it runs. */
+export const PageSourceKind = z.enum(["praci", "mcp", "http"]);
 export type PageSourceKind = z.infer<typeof PageSourceKind>;
 
 export const PageSourceSchedule = z.enum(["15m", "1h", "6h", "1d", "1w"]);
@@ -58,12 +59,37 @@ export const McpSourceCallSchema = z.strictObject({
 });
 export type McpSourceCall = z.infer<typeof McpSourceCallSchema>;
 
+export const HTTP_SOURCE_URL_MAX = 1_000;
+
+/** One GET of a JSON or CSV API, optionally with a saved key. Never a body, method or header. */
+export const HttpSourceCallSchema = z.strictObject({
+  url: z
+    .string()
+    .max(HTTP_SOURCE_URL_MAX)
+    .refine((value) => {
+      try {
+        const url = new URL(value);
+        return (
+          (url.protocol === "https:" || url.protocol === "http:") &&
+          !url.username &&
+          !url.password &&
+          !value.includes("#")
+        );
+      } catch {
+        return false;
+      }
+    }, "Use an absolute http(s) URL without credentials or a fragment."),
+  secret: BotSecretName.optional(),
+  accept: z.enum(["json", "csv"]).default("json"),
+});
+export type HttpSourceCall = z.infer<typeof HttpSourceCallSchema>;
+
 export const PageSourceSchema = z.object({
   id: Id,
   pageId: Id,
   name: PageSourceNameSchema,
   kind: PageSourceKind,
-  call: z.union([PraciSourceCallSchema, McpSourceCallSchema]),
+  call: z.union([PraciSourceCallSchema, McpSourceCallSchema, HttpSourceCallSchema]),
   /** An mcp source: the server's name, for display. */
   serverName: z.string().optional(),
   schedule: PageSourceSchedule,
