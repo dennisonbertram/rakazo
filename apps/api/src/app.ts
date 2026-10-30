@@ -733,6 +733,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
 
   const router = createRouter({
     email,
+    ...(brexApi ? { brexApi } : {}),
     describeTeachSteps: (input) =>
       describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
     reviewAttachment: (input, signal) =>
