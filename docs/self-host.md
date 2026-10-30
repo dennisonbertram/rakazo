@@ -1098,6 +1098,8 @@ service's trust boundary. `SIGNUPS_ENABLED` applies on the API's first start. A 
 `SIGNUP_ALLOWLIST` applies on every API start.
 The optional marketing site in `apps/www` can be hosted separately.
 
+To run the production stack on a Mac that stays on your tailnet, see [Moving Praci to a Mac mini](mac-mini.md).
+
 ## Connect mobile clients
 
 The iOS and Android app can also point at a self-hosted origin at runtime. On the sign-in screen, tap **Use a custom server** and enter the same HTTPS origin as `WEB_ORIGIN` (for example `https://app.example.com`). Store builds still default to `EXPO_PUBLIC_API_URL`; the in-app setting is an override for people running their own API. Changing the server signs the device out of any previous session.
