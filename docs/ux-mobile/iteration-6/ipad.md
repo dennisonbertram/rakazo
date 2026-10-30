@@ -119,3 +119,14 @@ What changed:
 - I-03: recommendation only. Keep the 1024 px breakpoint for now. If 834 pt portrait should get a persistent sidebar, change it together with the toast and drawer logic, since several files test `isPhone()` and `lg`.
 
 Checks run: vitest for ActivityList and rows-below (pass), tsc for apps/web (pass), biome on touched files (2 existing warnings in ActivityList), `pnpm design-system:check` (pass). No copy changed, so no `intl:extract`.
+
+## Landscape after #984
+
+A first attempt was blocked: under a host load average of about 865 the 13-inch simulator froze mid-rotation and the 11-inch never loaded the page.
+
+A retry on the 13-inch (iPad Pro 13-inch, iOS 26.3, Mobile Safari, demo on main with #984) reached landscape (`l13-land-home.png`, `l13-land-home2.png`):
+
+- The persistent sidebar shows, with Integrations and the account row at its foot and no large empty band above them.
+- The chat column is capped, and the last message ("The pilot converted…") sits fully clear of the "Investors agent needs approval" toast. A "6 new messages" pill shows because this was a fresh sign-in with unread messages.
+- The first-run tour card (step 1 of 10) and Safari's own prompts (Save Password, Highlights) covered part of the sidebar's agent list. Dismissing them by tap in landscape did not work reliably, so the agent rows under the tour card, the Activity view, Data room and Finance were not seen in landscape.
+- The 11-inch was not checked in landscape.
