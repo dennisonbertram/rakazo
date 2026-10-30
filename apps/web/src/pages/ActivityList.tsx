@@ -45,7 +45,10 @@ const ACTIVITY_REQUEST_MS = 12_000;
 
 function within<T>(request: Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(t`Could not load activity`)), ACTIVITY_REQUEST_MS);
+    const timer = window.setTimeout(
+      () => reject(new Error(t`Could not load activity`)),
+      ACTIVITY_REQUEST_MS,
+    );
     request.then(
       (value) => {
         window.clearTimeout(timer);
