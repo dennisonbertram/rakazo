@@ -545,6 +545,7 @@ export function createBackgroundJobHandlers(deps: {
         jobs: deps.jobs,
         ticketBoardEnabled: deps.ticketBoardEnabled,
         mcp: deps.mcp,
+        secretStore: deps.secretStore,
       });
     },
     "pages.snapshots.retention": async () => {

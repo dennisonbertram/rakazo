@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { McpSourceCall, MessageBlock } from "@rakazo/contracts";
+import type { HttpSourceCall, McpSourceCall, MessageBlock } from "@rakazo/contracts";
 import { MessageBlock as MessageBlockSchema } from "@rakazo/contracts";
 import type { NotificationEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
@@ -30,15 +30,21 @@ const canonical = (value: unknown): unknown =>
  * What the owner approves: the kind and the exact call, key order ignored. Anything else about the
  * source (name, schedule, page) can change without a new approval.
  */
-export function pageSourceCallHash(kind: string, call: McpSourceCall): string {
-  const { serverId, tool, args } = call;
+export type OutsideSourceCall = McpSourceCall | HttpSourceCall;
+
+export function pageSourceCallHash(kind: string, call: OutsideSourceCall): string {
+  const parts =
+    "url" in call
+      ? { kind, url: call.url, secret: call.secret, accept: call.accept }
+      : { kind, serverId: call.serverId, tool: call.tool, args: call.args };
   return createHash("sha256")
-    .update(JSON.stringify(canonical({ kind, serverId, tool, args })))
+    .update(JSON.stringify(canonical(parts)))
     .digest("hex");
 }
 
 /** The card's Request line. Never cut: the hash covers every argument. */
-export const pageSourceRequestLine = (call: McpSourceCall) => {
+export const pageSourceRequestLine = (call: OutsideSourceCall) => {
+  if ("url" in call) return `Request: GET ${call.url}`;
   const args = Object.keys(call.args).length ? ` ${JSON.stringify(call.args)}` : "";
   return `Request: ${call.tool}${args}`;
 };
@@ -59,17 +65,20 @@ const EVERY: Record<string, string> = {
 export function pageSourceApprovalBlock(input: {
   sourceId: string;
   callHash: string;
+  /** The MCP server's name, or the API's host. */
   serverName: string;
   schedule: string;
   pageTitle: string;
-  call: McpSourceCall;
+  call: OutsideSourceCall;
 }): MessageBlock {
   return {
     kind: "ask",
     text: `Read ${input.serverName} ${EVERY[input.schedule] ?? input.schedule}?`,
-    detail: [pageSourceRequestLine(input.call), `Page: ${input.pageTitle}`.slice(0, 100)].join(
-      "\n",
-    ),
+    detail: [
+      pageSourceRequestLine(input.call),
+      ...("url" in input.call && input.call.secret ? [`Key: ${input.call.secret}`] : []),
+      `Page: ${input.pageTitle}`.slice(0, 100),
+    ].join("\n"),
     pageSource: { sourceId: input.sourceId, callHash: input.callHash },
     status: "pending",
     actions: [
@@ -220,14 +229,14 @@ export async function answerPageSourceApproval(
       spaceId: scope.spaceId,
       userId: scope.userId,
       botId: bot.id,
-      kind: "mcp",
+      kind: { in: ["mcp", "http"] },
     },
   });
   if (!source) {
     await closeRefusedCard(deps, scope, input.runId, message, "expired");
     return null;
   }
-  if (pageSourceCallHash(source.kind, source.call as McpSourceCall) !== callHash) {
+  if (pageSourceCallHash(source.kind, source.call as OutsideSourceCall) !== callHash) {
     await closeRefusedCard(deps, scope, input.runId, message, "superseded");
     return null;
   }

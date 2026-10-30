@@ -3543,6 +3543,8 @@ export function createRouter(deps: RouterDeps) {
             events: deps.events,
             ticketBoardEnabled: deps.env?.ticketBoardEnabled,
             mcp: deps.mcp,
+            secretStore: deps.secrets,
+            network: deps.remoteConnectors,
             notificationEvents: deps.notificationEvents,
           };
           const answered = await answerPageSourceApproval(approvalDeps, scope, input);
@@ -4440,6 +4442,8 @@ export function createRouter(deps: RouterDeps) {
             events: deps.events,
             ticketBoardEnabled: deps.env?.ticketBoardEnabled,
             mcp: deps.mcp,
+            secretStore: deps.secrets,
+            network: deps.remoteConnectors,
           },
           { spaceId: bot.spaceId, botId: bot.id, pageId: page.id },
         );

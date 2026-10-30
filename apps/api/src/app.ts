@@ -726,7 +726,15 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
             connector: stack.connector,
           }),
         runPageRefreshes: () =>
-          runPageRefreshTick({ prisma, jobs, events, ticketBoardEnabled, mcp }),
+          runPageRefreshTick({
+            prisma,
+            jobs,
+            events,
+            ticketBoardEnabled,
+            mcp,
+            secretStore: secrets,
+            network: remoteConnectors,
+          }),
       })
     : undefined;
   reconciler?.start();

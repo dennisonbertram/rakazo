@@ -549,6 +549,10 @@ export async function requestWithBotSecret(input: {
   signal: AbortSignal;
   remote?: RemoteTransportDependencies;
   registerRedactions?: (values: string[]) => void;
+  /** Awaited right before the request is sent; throwing cancels it. */
+  beforeSend?: () => Promise<void>;
+  /** Longest result body returned, in characters. Default 20,000. */
+  maxOutputChars?: number;
 }): Promise<unknown> {
   const request = SecretHttpRequest.parse(input.request);
   const row = await input.prisma.botSecret.findFirst({
@@ -601,6 +605,7 @@ export async function requestWithBotSecret(input: {
     : createSafeRemoteFetch(input.remote?.fetch, input.remote?.resolveHostname);
   try {
     headers.set(headerName, headerValue);
+    await input.beforeSend?.();
     const response = await withAbort(
       fetch(url, {
         method: request.method,
@@ -627,13 +632,19 @@ export async function requestWithBotSecret(input: {
     }
     // Redact before truncating, so an output boundary cannot expose part of a value.
     const safe = JSON.stringify(redactConnectorPayload(body, redactions));
+    const limit = input.maxOutputChars ?? 20_000;
     return {
       status: response.status,
-      body: safe.length > 20_000 ? safe.slice(0, 20_000) : JSON.parse(safe),
-      truncated: safe.length > 20_000,
+      body: safe.length > limit ? safe.slice(0, limit) : JSON.parse(safe),
+      truncated: safe.length > limit,
     };
-  } catch {
-    return { error: "Authenticated request failed. Check the destination and credential." };
+  } catch (error) {
+    return {
+      error: "Authenticated request failed. Check the destination and credential.",
+      ...(error instanceof Error && /redirects are not allowed/.test(error.message)
+        ? { redirected: true }
+        : {}),
+    };
   } finally {
     controller.abort();
     await withAbort(fetch.close(), AbortSignal.timeout(1000)).catch(() => undefined);

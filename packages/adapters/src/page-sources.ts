@@ -1,6 +1,8 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { SecretStore } from "@rakazo/adapter-kit";
 import type {
   BotPage,
+  HttpSourceCall,
   McpSourceCall,
   PageChart,
   PageData,
@@ -14,6 +16,7 @@ import type {
 } from "@rakazo/contracts";
 import {
   disabledBuiltinToolSet,
+  HttpSourceCallSchema,
   isGtmAgentSpawnKey,
   McpSourceCallSchema,
   PAGE_SOURCE_VALUE_MAX_BYTES,
@@ -37,6 +40,7 @@ import {
 import { fundraisingToolFromTool, fundraisingToolsAllowed } from "./fundraising-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
 import { checkMcpReadSource, mcpSourceContext } from "./mcp-read-source.js";
+import type { OutsideSourceCall } from "./page-source-approval.js";
 import {
   PAGE_SOURCE_REQUEST_LINE_MAX,
   pageSourceApprovalBlock,
@@ -44,10 +48,17 @@ import {
   pageSourceRequestLine,
   postPageSourceApproval,
 } from "./page-source-approval.js";
+import {
+  checkHttpSourceCall,
+  HttpSourceError,
+  httpSourceRefusal,
+  runHttpSource,
+} from "./page-source-http.js";
 import type { PageDeps, PageToolScope } from "./pages.js";
 import { announcePageData, findPageByTitle, getBotPage, renderPageChartSvg } from "./pages.js";
 import { formatPinValue, jsonPointerGet } from "./pin-values.js";
 import { PRACI_SOURCE_TOOLS } from "./praci-source-tools.js";
+import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { listBoardTickets } from "./ticket-tools.js";
 
 export { PRACI_SOURCE_TOOLS };
@@ -80,6 +91,10 @@ export interface PageSourceDeps extends PageDeps {
   ticketBoardEnabled?: boolean;
   /** Needed for mcp sources: lists a server's tools and calls the approved one. */
   mcp?: Pick<McpConnector, "listServerTools"> & Partial<Pick<McpConnector, "callServerTool">>;
+  /** Needed for http sources that use a saved key. */
+  secretStore?: SecretStore;
+  /** The network http sources use (test seam and deployment override); defaults to the safe fetch. */
+  network?: RemoteTransportDependencies;
   /** Lets the "needs approval" notification reach open clients at once. */
   notificationEvents?: NotificationEvents;
   /** Test seam. */
@@ -262,6 +277,76 @@ function sourceBotRefusal(bot: SourceBot): string | null {
 }
 
 /**
+ * The source's call as stored now, only if the owner approved exactly it: status active and the
+ * stored hash matching the call's hash. Read from the database on every use.
+ */
+async function readApprovedCall<T extends OutsideSourceCall>(
+  deps: Pick<PageSourceDeps, "prisma">,
+  source: Pick<SourceRow, "id" | "spaceId" | "userId" | "botId">,
+  kind: "mcp" | "http",
+  parse: (value: unknown) => T | null,
+): Promise<T> {
+  const row = await deps.prisma.pageSource.findFirst({
+    where: {
+      id: source.id,
+      spaceId: source.spaceId,
+      userId: source.userId,
+      botId: source.botId,
+      kind,
+    },
+    select: { status: true, call: true, approvedCallHash: true },
+  });
+  const call = row ? parse(row.call) : null;
+  if (!row || !call) throw new PageSourceError("The source is not available.");
+  if (row.status !== "active") throw new PageSourceError(`The source is ${row.status}.`);
+  if (row.approvedCallHash !== pageSourceCallHash(kind, call)) {
+    throw new PageSourceError("The owner has not approved this request.");
+  }
+  return call;
+}
+
+/**
+ * Run an approved http source's one GET. The owner approved this exact call (hash), no Block rule
+ * covers the site, a key is still saved for the URL's origin, and the approval is read again as
+ * the last step before the request goes out.
+ */
+async function runApprovedHttpSource(
+  deps: PageSourceDeps,
+  source: Pick<SourceRow, "id" | "spaceId" | "userId" | "botId">,
+  bot: SourceBot,
+): Promise<unknown> {
+  const refusal = sourceBotRefusal(bot);
+  if (refusal) throw new PageSourceError(refusal);
+  const scope = { spaceId: source.spaceId, botId: source.botId, userId: source.userId };
+  const approvedCall = () =>
+    readApprovedCall(deps, source, "http", (value) => {
+      const parsed = HttpSourceCallSchema.safeParse(value);
+      return parsed.success ? parsed.data : null;
+    });
+  const call = await approvedCall();
+  const unsafe = checkHttpSourceCall(call);
+  if (typeof unsafe === "string") throw new PageSourceError(unsafe);
+  // Checked now for a clear message, and again as the last step before the request.
+  const refused = async () => {
+    const reason = await httpSourceRefusal(deps.prisma, scope, call);
+    if (reason) throw new PageSourceError(reason);
+  };
+  await refused();
+  try {
+    return await runHttpSource(deps, scope, call, async () => {
+      await refused();
+      const again = await approvedCall();
+      if (pageSourceCallHash("http", again) !== pageSourceCallHash("http", call)) {
+        throw new PageSourceError("The request changed.");
+      }
+    });
+  } catch (error) {
+    if (error instanceof HttpSourceError) throw new PageSourceError(error.message);
+    throw error;
+  }
+}
+
+/**
  * Run an approved mcp source's one read-only tool call. Three things must hold, each read from the
  * database or the server now: the owner approved this exact call (status active and the stored
  * hash matches the call's hash), the shared read-only rule passes, and both still hold right
@@ -277,25 +362,11 @@ async function runMcpSource(
   const refusal = sourceBotRefusal(bot);
   if (refusal) throw new PageSourceError(refusal);
   const scope = { spaceId: source.spaceId, botId: source.botId, userId: source.userId };
-  const approvedCall = async () => {
-    const row = await deps.prisma.pageSource.findFirst({
-      where: {
-        id: source.id,
-        spaceId: source.spaceId,
-        userId: source.userId,
-        botId: source.botId,
-        kind: "mcp",
-      },
-      select: { status: true, call: true, approvedCallHash: true },
+  const approvedCall = () =>
+    readApprovedCall(deps, source, "mcp", (value) => {
+      const parsed = McpSourceCallSchema.safeParse(value);
+      return parsed.success ? parsed.data : null;
     });
-    const call = McpSourceCallSchema.safeParse(row?.call);
-    if (!row || !call.success) throw new PageSourceError("The source is not available.");
-    if (row.status !== "active") throw new PageSourceError(`The source is ${row.status}.`);
-    if (row.approvedCallHash !== pageSourceCallHash("mcp", call.data)) {
-      throw new PageSourceError("The owner has not approved this request.");
-    }
-    return call.data;
-  };
   const check = async (call: { serverId: string; tool: string }) => {
     try {
       return await checkMcpReadSource(deps, scope, call, "page-source");
@@ -372,8 +443,13 @@ export async function refreshPageSource(
     });
     if (!bot) throw new PageSourceError("The bot is gone.");
     const value =
-      source.kind === "mcp"
-        ? await withTimeout(runMcpSource(deps, source, bot), deps.timeoutMs ?? REFRESH_TIMEOUT_MS)
+      source.kind === "mcp" || source.kind === "http"
+        ? await withTimeout(
+            source.kind === "mcp"
+              ? runMcpSource(deps, source, bot)
+              : runApprovedHttpSource(deps, source, bot),
+            deps.timeoutMs ?? REFRESH_TIMEOUT_MS,
+          )
         : await withTimeout(
             runPraciSourceTool(
               deps,
@@ -481,9 +557,22 @@ export async function listPageSources(
     : [];
   const names = new Map(servers.map((server) => [server.id, server.name]));
   return rows.map((row) =>
-    toPageSource(row, names.get((row.call as { serverId?: string }).serverId ?? "")),
+    toPageSource(
+      row,
+      row.kind === "http"
+        ? httpHost((row.call as { url?: string }).url)
+        : names.get((row.call as { serverId?: string }).serverId ?? ""),
+    ),
   );
 }
+
+const httpHost = (url: string | undefined) => {
+  try {
+    return url ? new URL(url).hostname : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 /** Delete a source of this bot's page (its snapshots go with it). False when it is not this bot's. */
 export async function removePageSource(
@@ -751,10 +840,18 @@ export async function pageSourceToolFromTool(
   }
 
   // page_source_set
-  if (args.kind !== undefined && args.kind !== "praci" && args.kind !== "mcp") {
-    return { error: 'kind must be "praci" or "mcp".' };
+  if (
+    args.kind !== undefined &&
+    args.kind !== "praci" &&
+    args.kind !== "mcp" &&
+    args.kind !== "http"
+  ) {
+    return { error: 'kind must be "praci", "mcp" or "http".' };
   }
-  const kind: "praci" | "mcp" = args.kind === "mcp" ? "mcp" : "praci";
+  const kind: "praci" | "mcp" | "http" =
+    args.kind === "mcp" || args.kind === "http" ? args.kind : "praci";
+  // An mcp or http source is the owner's to approve; a praci source starts active.
+  const outside = kind !== "praci";
   const tool = String(args.tool ?? "");
   if (
     args.args !== undefined &&
@@ -769,7 +866,7 @@ export async function pageSourceToolFromTool(
     select: { ...botColumns, name: true },
   });
   if (!bot) return { error: "This bot is not available." };
-  let call: PraciSourceCall | McpSourceCall;
+  let call: PraciSourceCall | McpSourceCall | HttpSourceCall;
   let serverName: string | undefined;
   if (kind === "mcp") {
     const refusal = sourceBotRefusal(bot);
@@ -814,23 +911,43 @@ export async function pageSourceToolFromTool(
       };
     }
     serverName = server.name;
+  } else if (kind === "http") {
+    const refusal = sourceBotRefusal(bot);
+    if (refusal) return { error: refusal };
+    const checked = checkHttpSourceCall({
+      url: args.url,
+      ...(args.secret !== undefined ? { secret: args.secret } : {}),
+      ...(args.accept !== undefined ? { accept: args.accept } : {}),
+    });
+    if (typeof checked === "string") return { error: checked };
+    const blocked = await httpSourceRefusal(
+      prisma,
+      { spaceId: scope.spaceId, botId: scope.botId, userId: scope.userId },
+      checked,
+    );
+    if (blocked) return { error: blocked };
+    call = checked;
+    if (pageSourceRequestLine(call).length > PAGE_SOURCE_REQUEST_LINE_MAX) {
+      return { error: "The URL is too long to show the owner; use a shorter one." };
+    }
+    serverName = new URL(checked.url).hostname;
   } else {
     const refusal = await praciSourceRefusal(deps, bot, tool);
     if (refusal) return { error: refusal };
     call = { tool, args: (args.args as Record<string, unknown>) ?? {} };
   }
   const now = deps.now?.() ?? new Date();
-  const callHash = kind === "mcp" ? pageSourceCallHash(kind, call as McpSourceCall) : null;
+  const callHash = outside ? pageSourceCallHash(kind, call as OutsideSourceCall) : null;
   const common = {
     kind,
     call: JSON.parse(JSON.stringify(call)),
     schedule: schedule.data,
-    status: kind === "mcp" ? "pending" : "active",
+    status: outside ? "pending" : "active",
     approvedCallHash: null as string | null,
     failures: 0,
     lastError: null,
     leaseUntil: null,
-    nextRefreshAt: kind === "mcp" ? null : nextScheduledRefresh(now, schedule.data, deps.random),
+    nextRefreshAt: outside ? null : nextScheduledRefresh(now, schedule.data, deps.random),
   };
   let saved: SourceRow;
   // An mcp source whose call is new or changed needs a card; the same call only changes its schedule.
@@ -851,15 +968,15 @@ export async function pageSourceToolFromTool(
             `This space already has ${PAGE_SOURCES_MAX_PER_SPACE} active sources. Remove one first.`,
           );
         }
-        needsCard = kind === "mcp";
+        needsCard = outside;
         return tx.pageSource.create({
           data: { ...pageScope, userId: scope.userId, name: sourceName.data, ...common },
         });
       }
       const sameCall =
-        kind === "mcp" &&
-        same.kind === "mcp" &&
-        pageSourceCallHash("mcp", same.call as McpSourceCall) === callHash;
+        outside &&
+        same.kind === kind &&
+        pageSourceCallHash(kind, same.call as OutsideSourceCall) === callHash;
       if (sameCall) {
         // Approval is for the call, not the schedule: keep the status. A paused approved source
         // resumes; a denied one stays denied until the call changes.
@@ -891,7 +1008,7 @@ export async function pageSourceToolFromTool(
       await tx.pageSourceSnapshot.deleteMany({
         where: { sourceId: same.id, spaceId: scope.spaceId },
       });
-      needsCard = kind === "mcp";
+      needsCard = outside;
       return tx.pageSource.update({
         where: { id: same.id },
         data: { name: sourceName.data, ...common },
@@ -903,7 +1020,7 @@ export async function pageSourceToolFromTool(
       return { error: "A source with that name was just created. Try again." };
     throw error;
   }
-  if (kind === "mcp") {
+  if (outside) {
     if (needsCard) {
       const run = await prisma.run.findFirst({
         where: { id: scope.runId, spaceId: scope.spaceId, botId: scope.botId },
@@ -920,7 +1037,7 @@ export async function pageSourceToolFromTool(
           serverName: serverName as string,
           schedule: schedule.data,
           pageTitle: page.title,
-          call: call as McpSourceCall,
+          call: call as OutsideSourceCall,
         }),
       );
       await announcePageData(deps, saved);
