@@ -124,6 +124,7 @@ export async function runOmiAssemble(
           source: "omi",
           sourceConnectionId: connection.id,
           externalId,
+          sourceUpdatedAt: start,
           notIndexed: true,
         });
         if (created && item) {

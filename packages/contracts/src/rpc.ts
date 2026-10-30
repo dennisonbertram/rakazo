@@ -348,7 +348,14 @@ import {
   NotificationSchema,
   NotificationSignalSchema,
 } from "./notification.js";
-import { OmiConnectInputSchema, OmiDisconnectInputSchema, OmiStatusSchema } from "./omi.js";
+import {
+  OmiConnectInputSchema,
+  OmiDisconnectInputSchema,
+  OmiSegmentMoveInputSchema,
+  OmiSegmentSchema,
+  OmiSegmentsListInputSchema,
+  OmiStatusSchema,
+} from "./omi.js";
 import {
   BotPageGetInputSchema,
   BotPageSaveInputSchema,
@@ -1768,6 +1775,12 @@ export const appContract = {
     status: oc.output(OmiStatusSchema),
     /** Revokes the connection; recordings stay unless `deleteRecordings` is true. */
     disconnect: oc.input(OmiDisconnectInputSchema).output(z.object({ ok: z.literal(true) })),
+    segments: {
+      /** The caller's sorted stretches, newest first. */
+      list: oc.input(OmiSegmentsListInputSchema).output(z.array(OmiSegmentSchema)),
+      /** Moves one stretch to Meeting, Note or Trash; a re-sort keeps the choice. */
+      move: oc.input(OmiSegmentMoveInputSchema).output(OmiSegmentSchema),
+    },
   },
   devin: {
     /** Any member reads the space's cached sessions; a read older than a minute refreshes them first. */

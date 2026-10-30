@@ -194,7 +194,18 @@ describePostgres("Omi transcription (PostgreSQL)", () => {
     await select(who, "scripted-transcribe", true);
     const id = await makeItem(who, 5);
     await prisma.dataRoomItem.update({ where: { id }, data: { error: NO_TRANSCRIPTION_PROVIDER } });
-    await runOmiTranscribe(deps(), payload(who, id));
+    await runOmiTranscribe(
+      {
+        ...deps(),
+        jobs: {
+          enqueue: async (j: BackgroundJob) => void queued.push(j),
+        } as unknown as JobPublisher,
+      },
+      payload(who, id),
+    );
+    expect(queued.map((j) => [j.name, (j.payload as { itemId: string }).itemId])).toEqual([
+      ["omi.sort", id],
+    ]);
     const item = await row(id);
     expect(item.text?.text).toBe(`[00:00] ${SCRIPTED_TRANSCRIPT}`);
     expect(item.error).toBeNull();

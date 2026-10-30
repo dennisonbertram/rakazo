@@ -1,5 +1,5 @@
 import type { AdapterContext, ArtifactStore, JobPublisher, SecretStore } from "@rakazo/adapter-kit";
-import { omiTranscribeJob } from "@rakazo/adapter-kit";
+import { omiSortJob, omiTranscribeJob } from "@rakazo/adapter-kit";
 import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { dataRoomPreviewText } from "@rakazo/db";
@@ -14,6 +14,8 @@ export interface OmiTranscribeDeps {
   prisma: PrismaClient;
   artifacts: ArtifactStore;
   secrets: SecretStore;
+  /** Queues sorting after a transcript is saved. */
+  jobs?: JobPublisher;
   /** For tests; defaults to the real provider factory. */
   createProvider?: typeof createTranscriptionProvider;
 }
@@ -107,6 +109,7 @@ export async function runOmiTranscribe(
     if (text.trim()) parts.push(`${mmss(segment.startSeconds)} ${text.trim()}`);
   }
   await save(null, parts.join("\n\n"));
+  await deps.jobs?.enqueue(omiSortJob({ ...payload }));
 }
 
 /** Queues transcription again for the user's recordings that were waiting for a provider. */
