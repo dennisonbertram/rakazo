@@ -1,5 +1,5 @@
 import type { AgentRunRequest } from "@rakazo/adapter-kit";
-import { AI_DISCLOSURE_VERSION } from "@rakazo/contracts";
+import { AI_DISCLOSURE_VERSION, PINNED_CONNECTION_LOST_MESSAGE } from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { aiRecipient } from "./ai-consent.js";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
@@ -36,6 +36,7 @@ async function runChat(
   trigger = "user",
   sourceBlocks: unknown[] | null = null,
   delegate = false,
+  pinned: "ok" | "gone" | "no-secret" | null = null,
 ) {
   const switchModel = { provider: "openrouter", modelId: "openai/gpt-4o" };
   const backupReadFails = false;
@@ -82,8 +83,9 @@ async function runChat(
         spawnKey: null,
         title: "Assistant",
         description: "Test assistant",
-        modelProvider: null,
-        modelId: null,
+        modelProvider: pinned ? "openrouter" : null,
+        modelId: pinned ? "openai/gpt-6-luna" : null,
+        modelCredentialId: pinned ? "cred-1" : null,
         thinkingLevel: null,
         computerId: "computer-1",
         computerSwitching: false,
@@ -132,16 +134,25 @@ async function runChat(
         async () => null,
       ),
     },
-    secret: { findFirst: vi.fn(async () => null) },
+    // A pinned connection's key is on file unless the run is meant to lose it.
+    secret: {
+      findFirst: vi.fn(async () =>
+        pinned === "ok" ? { id: "secret-1", ciphertext: "cipher-1", userId: "user-1" } : null,
+      ),
+    },
     userModelCredential: {
-      findFirst: vi.fn(async () => ({
-        id: "cred-1",
-        userId: "user-1",
-        provider: "openrouter",
-        label: "OpenRouter",
-        secretId: "secret-1",
-        createdAt: new Date(0),
-      })),
+      findFirst: vi.fn(async (args?: { where?: { id?: string } }) =>
+        args?.where?.id && pinned === "gone"
+          ? null
+          : {
+              id: "cred-1",
+              userId: "user-1",
+              provider: "openrouter",
+              label: "OpenRouter",
+              secretId: "secret-1",
+              createdAt: new Date(0),
+            },
+      ),
     },
     spaceBackupModel: {
       findMany: vi.fn(async () => {
@@ -218,6 +229,7 @@ async function runChat(
     events: { append: vi.fn(async () => undefined), finalizeRun, pauseRunForInput },
     jobs: { enqueue: vi.fn(async () => undefined) },
     secrets: [],
+    secretStore: { load: vi.fn(async () => "sk-test-key-12345678") },
   } as unknown as Parameters<typeof createRunExecutor>[0]);
 
   await executor.continueRun(run.id, "worker-1");
@@ -262,6 +274,38 @@ describe("Chat runs need AI consent for the model they use", () => {
   it("does not offer a backup model the user has not allowed", async () => {
     const { request } = await runChat(["openai/gpt-6-luna"]);
     expect(request?.fallbackModels ?? []).toEqual([]);
+  });
+
+  it("never offers a backup model to a run pinned to a connection", async () => {
+    const { request, runtimeRun } = await runChat(
+      ["openai/gpt-6-luna", "openai/gpt-4o"],
+      null,
+      "user",
+      null,
+      false,
+      "ok",
+    );
+    expect(runtimeRun).toHaveBeenCalled();
+    expect(request?.fallbackModels ?? []).toEqual([]);
+  });
+
+  it("fails a run whose pinned connection is gone instead of using another", async () => {
+    const { runtimeRun, finalizeRun } = await runChat(true, null, "user", null, false, "gone");
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(finalizeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "failed",
+        error: PINNED_CONNECTION_LOST_MESSAGE,
+      }),
+    );
+  });
+
+  it("fails a pinned run whose secret vanished instead of using the deployment key", async () => {
+    const { runtimeRun, finalizeRun } = await runChat(true, null, "user", null, false, "no-secret");
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(finalizeRun).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "failed", error: PINNED_CONNECTION_LOST_MESSAGE }),
+    );
   });
 
   it("keeps an allowed backup model", async () => {

@@ -2706,7 +2706,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
                 <Text style={{ color: tokens.destructive, fontSize: 13 }}>{runError}</Text>
               </Pressable>
               {/* A key or billing failure is fixed in Models; there is no native retry yet. */}
-              {runErrorAction(snap?.run?.error) === "models" ? (
+              {["models", "connection"].includes(runErrorAction(snap?.run?.error) ?? "") ? (
                 <Pressable accessibilityRole="button" onPress={() => router.push("/models")}>
                   <Text style={{ color: tokens.foreground, fontSize: 13, fontWeight: "600" }}>
                     {t("Models")}

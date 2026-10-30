@@ -214,6 +214,12 @@ msgstr ""
 msgid "{0} (overdue)"
 msgstr ""
 
+#. placeholder {0}: entry.label
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "{0} (Subscription)"
+msgstr ""
+
 #. placeholder {0}: owner(investorName)
 #. placeholder {1}: usd(amountCents)
 #: src/pages/Fundraising.tsx
@@ -968,9 +974,15 @@ msgstr "Активный"
 
 #: src/components/computer/TerminalApp.tsx
 #: src/pages/ActivityList.tsx
+#: src/pages/McpConnectionsPanel.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Activity"
 msgstr "Активность"
+
+#. placeholder {0}: connection.label
+#: src/pages/McpConnectionsPanel.tsx
+msgid "Activity {0}"
+msgstr ""
 
 #: src/components/finance/WalletDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -1338,6 +1350,7 @@ msgstr ""
 #: src/components/ApprovalActionsTable.tsx
 #: src/components/ApprovalRulesSettings.tsx
 #: src/components/AskCard.tsx
+#: src/pages/McpConsent.tsx
 #: src/pages/shell/composer-error.tsx
 msgid "Allow"
 msgstr ""
@@ -1435,6 +1448,7 @@ msgid "Always allow {site}"
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/pages/McpActionCard.tsx
 msgid "Always allow this"
 msgstr ""
 
@@ -1594,6 +1608,7 @@ msgstr ""
 
 #: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
+#: src/pages/McpActionCard.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/message-cards.tsx
@@ -2088,6 +2103,7 @@ msgid "Block"
 msgstr ""
 
 #: src/lib/ticket-status.ts
+#: src/pages/McpConnectionActivity.tsx
 msgid "Blocked"
 msgstr ""
 
@@ -2149,6 +2165,10 @@ msgstr ""
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Bot to link"
 msgstr "Бот для ссылки"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Bot's connection"
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Bot's model"
@@ -2322,6 +2342,7 @@ msgstr "Не удаётся связаться с сервером."
 #: src/components/integrations/SignInStep.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/markdown-link-prompt.tsx
+#: src/components/PasskeySettings.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/components/teach/TeachRecordingChrome.tsx
@@ -2336,6 +2357,8 @@ msgstr "Не удаётся связаться с сервером."
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/Investors.tsx
 #: src/pages/KnowledgeSection.tsx
+#: src/pages/McpConsent.tsx
+#: src/pages/McpTokenDialog.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -2684,6 +2707,10 @@ msgstr ""
 
 #: src/components/MailApprovalCard.tsx
 msgid "Choose an account to send from."
+msgstr ""
+
+#: src/pages/shell/composer-error.tsx
+msgid "Choose another connection"
 msgstr ""
 
 #: src/pages/shell/avatar-studio-popover.tsx
@@ -3185,6 +3212,10 @@ msgstr "Подключить"
 msgid "Connect {0}"
 msgstr ""
 
+#: src/pages/McpConsent.tsx
+msgid "Connect {clientName}"
+msgstr ""
+
 #: src/components/integrations/ConnectAppsStep.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/GranolaPage.tsx
@@ -3388,9 +3419,18 @@ msgstr ""
 msgid "Connecting…"
 msgstr "Подключение…"
 
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "Connection"
+msgstr ""
+
 #: src/lib/model-connection-preflight.ts
 msgid "Connection test failed."
 msgstr "Тест соединения не удался."
+
+#: src/pages/SettingsOverlay.tsx
+msgid "Connections"
+msgstr ""
 
 #: src/components/integrations/DevinConnectDialog.tsx
 msgid "Connects Devin for everyone in this space. Read-only."
@@ -3465,6 +3505,7 @@ msgstr ""
 #: src/components/CopyLinkDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IMessageSection.tsx
+#: src/pages/McpTokenDialog.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Copied"
@@ -3484,8 +3525,16 @@ msgstr "Копировать"
 msgid "Copy .env example"
 msgstr ""
 
+#: src/pages/McpTokenDialog.tsx
+msgid "Copy command"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Copy link"
+msgstr ""
+
+#: src/pages/McpTokenDialog.tsx
+msgid "Copy token"
 msgstr ""
 
 #: src/pages/ScratchpadSection.tsx
@@ -3578,6 +3627,7 @@ msgstr "Не удалось завершить обновление. Попро�
 #: src/components/integrations/ConnectAppDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/pages/McpConsent.tsx
 msgid "Could not connect"
 msgstr "Не удалось подключиться"
 
@@ -3668,6 +3718,10 @@ msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Could not create the link."
+msgstr ""
+
+#: src/pages/McpTokenDialog.tsx
+msgid "Could not create the token"
 msgstr ""
 
 #: src/pages/Onboarding.tsx
@@ -3778,6 +3832,7 @@ msgid "Could not load"
 msgstr "Не удалось загрузить"
 
 #: src/pages/ActivityList.tsx
+#: src/pages/McpConnectionActivity.tsx
 msgid "Could not load activity"
 msgstr ""
 
@@ -3807,6 +3862,10 @@ msgstr "Не удалось загрузить ботов. Обновите ст
 
 #: src/components/computer/TerminalApp.tsx
 msgid "Could not load commands"
+msgstr ""
+
+#: src/pages/McpConnectionsPanel.tsx
+msgid "Could not load connections"
 msgstr ""
 
 #: src/pages/ContactDetail.tsx
@@ -4127,6 +4186,10 @@ msgstr "Не удалось сохранить речевую модель"
 msgid "Could not save that voice"
 msgstr "Не удалось сохранить этот голос"
 
+#: src/pages/McpConnectionsPanel.tsx
+msgid "Could not save the change"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Could not save the credential"
 msgstr ""
@@ -4363,6 +4426,7 @@ msgstr ""
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/Board.tsx
+#: src/pages/McpTokenDialog.tsx
 #: src/pages/shell/dialogs.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Create"
@@ -4444,11 +4508,17 @@ msgstr ""
 msgid "Create space"
 msgstr "Создайте пространство"
 
+#: src/pages/McpConnectionsPanel.tsx
+#: src/pages/McpTokenDialog.tsx
+msgid "Create token"
+msgstr ""
+
 #: src/pages/Auth.tsx
 msgid "Create your account"
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/pages/McpConnectionsPanel.tsx
 msgid "Created"
 msgstr "Создано"
 
@@ -4765,6 +4835,7 @@ msgid "Denied"
 msgstr "Отклонено"
 
 #: src/components/AskCard.tsx
+#: src/pages/McpActionCard.tsx
 msgid "Deny"
 msgstr "Запретить"
 
@@ -4803,6 +4874,7 @@ msgstr ""
 #: src/components/AskCard.tsx
 #: src/components/data-room/ProcessingStrip.tsx
 #: src/pages/CompanyReview.tsx
+#: src/pages/RoutineRunHistory.tsx
 msgid "Details"
 msgstr ""
 
@@ -5025,6 +5097,7 @@ msgstr ""
 #: src/pages/investors/UpdateEditor.tsx
 #: src/pages/Legal.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/McpTokenDialog.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Done"
 msgstr "Готово"
@@ -5610,6 +5683,7 @@ msgstr "неуспешный"
 #: src/pages/ActivityList.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/investors/UpdateEditor.tsx
+#: src/pages/McpConnectionActivity.tsx
 msgid "Failed"
 msgstr "Ошибка"
 
@@ -6785,6 +6859,10 @@ msgstr ""
 msgid "Last three years"
 msgstr ""
 
+#: src/pages/McpConnectionsPanel.tsx
+msgid "Last used"
+msgstr ""
+
 #: src/components/DesktopUpdates.tsx
 msgid "Later"
 msgstr "Позже"
@@ -7141,6 +7219,7 @@ msgid "Mark as read"
 msgstr ""
 
 #: src/pages/BotContextMenu.tsx
+#: src/pages/shell/transcript.tsx
 msgid "Mark as unread"
 msgstr ""
 
@@ -7691,6 +7770,8 @@ msgstr "Выключить микрофон"
 #: src/pages/Contacts.tsx
 #: src/pages/GroupPanel.tsx
 #: src/pages/Investors.tsx
+#: src/pages/McpConnectionsPanel.tsx
+#: src/pages/McpTokenDialog.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -7778,6 +7859,10 @@ msgstr ""
 #. placeholder {0}: transactionAmount(card.totalCents)
 #: src/components/FinanceCards.tsx
 msgid "Net {0}"
+msgstr ""
+
+#: src/pages/McpConnectionsPanel.tsx
+msgid "Never"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
@@ -7999,6 +8084,10 @@ msgstr ""
 msgid "No bots yet"
 msgstr ""
 
+#: src/pages/McpConnectionActivity.tsx
+msgid "No calls yet"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "No chat apps linked yet."
 msgstr "Приложения для чата пока не связаны."
@@ -8013,6 +8102,10 @@ msgstr ""
 
 #: src/pages/Company.tsx
 msgid "No company facts yet"
+msgstr ""
+
+#: src/pages/McpConnectionsPanel.tsx
+msgid "No connections"
 msgstr ""
 
 #: src/pages/Contacts.tsx
@@ -8542,6 +8635,10 @@ msgstr "Теперь используется {0}."
 msgid "Numbered list"
 msgstr ""
 
+#: src/pages/McpConnectionsPanel.tsx
+msgid "OAuth"
+msgstr ""
+
 #: src/pages/GoogleOAuthCallback.tsx
 #: src/pages/McpOAuthCallback.tsx
 msgid "OAuth authorization was cancelled."
@@ -8567,6 +8664,10 @@ msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Off in Settings"
+msgstr ""
+
+#: src/pages/McpConnectionActivity.tsx
+msgid "OK"
 msgstr ""
 
 #. placeholder {0}: call.botName
@@ -8732,6 +8833,7 @@ msgid "Open Mercury"
 msgstr ""
 
 #: src/components/data-room/AutoSortDialog.tsx
+#: src/pages/Legal.tsx
 #: src/pages/shell/composer-error.tsx
 msgid "Open Models settings"
 msgstr ""
@@ -9536,6 +9638,10 @@ msgstr ""
 msgid "Rarely read, and you never wrote to them"
 msgstr ""
 
+#: src/pages/McpConnectionActivity.tsx
+msgid "Rate limited"
+msgstr ""
+
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Re-approve"
 msgstr ""
@@ -9597,6 +9703,16 @@ msgstr ""
 
 #: src/components/tour/FirstRunTour.tsx
 msgid "Read your mail sorted by what needs you, and send replies you approve."
+msgstr ""
+
+#: src/pages/McpConnectionsPanel.tsx
+#: src/pages/McpTokenDialog.tsx
+msgid "Read-only"
+msgstr ""
+
+#. placeholder {0}: connection.label
+#: src/pages/McpConnectionsPanel.tsx
+msgid "Read-only {0}"
 msgstr ""
 
 #: src/components/finance/AddAccountDialog.tsx
@@ -9718,6 +9834,10 @@ msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Receipts"
+msgstr ""
+
+#: src/pages/McpConnectionActivity.tsx
+msgid "Recent activity"
 msgstr ""
 
 #: src/pages/investors/UpdateEditor.tsx
@@ -9943,12 +10063,13 @@ msgid "Remove {0}"
 msgstr "Удалить {0}"
 
 #. placeholder {0}: confirming?.statement.fileName ?? ""
+#. placeholder {0}: removing.label
 #. placeholder {0}: removing?.name
-#. placeholder {0}: removingRow?.displayName ?? ""
 #: src/components/finance/StatementImport.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Remove {0}?"
 msgstr ""
@@ -10308,6 +10429,7 @@ msgstr ""
 #: src/pages/DataRoom.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
+#: src/pages/Legal.tsx
 #: src/pages/ModelBackupsSettings.tsx
 #: src/pages/shell/composer-error.tsx
 msgid "Retry"
@@ -10363,9 +10485,15 @@ msgid "Reviewing"
 msgstr ""
 
 #: src/pages/Investors.tsx
+#: src/pages/McpConnectionsPanel.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Revoke"
 msgstr "Отозвать"
+
+#. placeholder {0}: connection.label
+#: src/pages/McpConnectionsPanel.tsx
+msgid "Revoke {0}"
+msgstr ""
 
 #: src/pages/investors/UpdateEditor.tsx
 msgid "revoked"
@@ -11360,6 +11488,7 @@ msgstr "Войти"
 #: src/components/AccountAccess.tsx
 #: src/lib/user-error.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/composer-error.tsx
 msgid "Sign in again"
 msgstr ""
 
@@ -11444,6 +11573,11 @@ msgstr ""
 
 #: src/pages/Onboarding.tsx
 msgid "Signed in with {signedInLabel}"
+msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+#: src/pages/shell/bot-panel.tsx
+msgid "Signed out or removed"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
@@ -11636,6 +11770,12 @@ msgstr ""
 msgid "Sources and model recipients"
 msgstr ""
 
+#: src/pages/McpConnectionsPanel.tsx
+#: src/pages/McpConsent.tsx
+#: src/pages/McpTokenDialog.tsx
+msgid "Space"
+msgstr ""
+
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Space changed. Reopen Models to load its backup list."
 msgstr "Пространство изменилось. Откройте раздел «Модели» снова, чтобы загрузить список резервных моделей."
@@ -11643,6 +11783,10 @@ msgstr "Пространство изменилось. Откройте разд
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Space changed. Reopen Models to save its backup list."
 msgstr "Пространство изменилось. Откройте раздел «Модели» снова, чтобы сохранить список резервных моделей."
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Space default"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Spaces"
@@ -12568,6 +12712,7 @@ msgstr "Сегодня"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/pages/finance/FinanceCrypto.tsx
+#: src/pages/McpConnectionsPanel.tsx
 msgid "Token"
 msgstr ""
 
@@ -12585,6 +12730,10 @@ msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "Token cap reached"
+msgstr ""
+
+#: src/pages/McpTokenDialog.tsx
+msgid "Token created"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
@@ -12782,6 +12931,7 @@ msgstr ""
 #: src/components/finance/WalletDialog.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/legal/LegalContracts.tsx
+#: src/pages/McpConnectionsPanel.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
 msgstr ""
@@ -13262,6 +13412,11 @@ msgstr "Проверка…"
 msgid "Version"
 msgstr ""
 
+#. placeholder {0}: message.via
+#: src/pages/shell/transcript.tsx
+msgid "via {0}"
+msgstr ""
+
 #: src/components/integrations/parts.tsx
 msgid "via {provider}"
 msgstr ""
@@ -13332,6 +13487,8 @@ msgid "Waiting for AI to be allowed"
 msgstr ""
 
 #: src/lib/roster-status.ts
+#: src/pages/McpConnectionActivity.tsx
+#: src/pages/McpConnectionsPanel.tsx
 msgid "Waiting for approval"
 msgstr ""
 
@@ -13748,6 +13905,10 @@ msgstr "Вы управляете"
 msgid "You read most of these, so keep them unless you are sure"
 msgstr ""
 
+#: src/pages/McpTokenDialog.tsx
+msgid "You won't see this token again."
+msgstr ""
+
 #. placeholder {0}: item.name
 #: src/components/integrations/ConnectAppDialog.tsx
 msgid "You'll sign in to {0} in a new window."
@@ -13817,12 +13978,4 @@ msgstr ""
 
 #: src/components/gtm/GtmCalendar.tsx
 msgid "Zernio queue unavailable"
-msgstr ""
-
-#: src/pages/McpConsent.tsx
-msgid "Connect {clientName}"
-msgstr ""
-
-#: src/pages/McpConsent.tsx
-msgid "Space"
 msgstr ""

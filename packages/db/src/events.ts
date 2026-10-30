@@ -234,6 +234,7 @@ export interface SendUserMessageInput {
   modelPin?: {
     modelProvider: string;
     modelId: string;
+    modelCredentialId?: string | null;
     thinkingLevel: string | null;
   };
 }
@@ -440,7 +441,13 @@ export async function sendUserMessage(
                   in: ["running", "queued", "leased", "waiting_input", "waiting_takeover"],
                 },
               },
-              select: { id: true, taskId: true, trigger: true },
+              select: {
+                id: true,
+                taskId: true,
+                trigger: true,
+                modelPinned: true,
+                modelCredentialId: true,
+              },
             })
           : [];
       // Steer a conversational run when there is one; a routine, webhook, or intro turn only holds the queue.
@@ -476,6 +483,9 @@ export async function sendUserMessage(
               ? {
                   modelProvider: input.modelPin.modelProvider,
                   modelId: input.modelPin.modelId,
+                  ...(input.modelPin.modelCredentialId
+                    ? { modelCredentialId: input.modelPin.modelCredentialId }
+                    : {}),
                   thinkingLevel: input.modelPin.thinkingLevel,
                   modelPinned: true,
                 }
@@ -486,7 +496,20 @@ export async function sendUserMessage(
           await tx.message.update({ where: { id: message.id }, data: { runId: run.id } });
         }
       } else if (createRun && busy) {
-        const held = !isConversationalRun(busy.trigger);
+        // A message on a different connection than the live run's cannot ride along: the run
+        // would answer it on the wrong connection, so it waits and runs on its own pin.
+        const botPin =
+          input.modelPin || busy.modelPinned
+            ? ((
+                await tx.bot.findUnique({
+                  where: { id: input.botId },
+                  select: { modelCredentialId: true },
+                })
+              )?.modelCredentialId ?? null)
+            : null;
+        const messagePin = input.modelPin ? (input.modelPin.modelCredentialId ?? null) : botPin;
+        const runPin = busy.modelPinned ? (busy.modelCredentialId ?? null) : botPin;
+        const held = !isConversationalRun(busy.trigger) || messagePin !== runPin;
         // The run will read this message as steering, so outside content taints it for the rest
         // of its life. The taint alone forces approval cards; `unattended` stays as created.
         if (!held && newRunExternalTaint({ trigger: input.trigger, source: input.sourceRun })) {
@@ -504,6 +527,9 @@ export async function sendUserMessage(
               ? {
                   modelProvider: input.modelPin.modelProvider,
                   modelId: input.modelPin.modelId,
+                  ...(input.modelPin.modelCredentialId
+                    ? { modelCredentialId: input.modelPin.modelCredentialId }
+                    : {}),
                   thinkingLevel: input.modelPin.thinkingLevel,
                 }
               : {}),

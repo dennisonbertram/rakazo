@@ -144,6 +144,8 @@ export const BotSchema = z.object({
   autoSpeak: z.boolean(),
   modelProvider: z.string().nullable(),
   modelId: z.string().nullable(),
+  /** The model connection this bot runs on; null follows the space default. */
+  modelCredentialId: Id.nullable().optional(),
   thinkingLevel: ThinkingLevelSchema.nullable(),
   teamChatAmbientEnabled: z.boolean(),
   teamChatRules: z.string(),
@@ -431,6 +433,8 @@ export const UpdateBotInput = z
     autoSpeak: z.boolean().optional(),
     modelProvider: z.string().trim().min(1).max(80).nullable().optional(),
     modelId: z.string().trim().min(1).max(200).nullable().optional(),
+    /** Pins the bot to one of the caller's own model connections; null follows the space default. */
+    modelCredentialId: Id.nullable().optional(),
     thinkingLevel: ThinkingLevelSchema.nullable().optional(),
     teamChatAmbientEnabled: z.boolean().optional(),
     teamChatRules: z.string().max(TEAM_CHAT_RULES_MAX_LENGTH).optional(),
@@ -517,6 +521,8 @@ export const RoutineSchema = z.object({
   /** Null runs this routine on its bot's model. */
   modelProvider: z.string().nullable(),
   modelId: z.string().nullable(),
+  /** The owner's connection this routine's own model runs on; null uses the bot's pin or the default. */
+  modelCredentialId: Id.nullable().optional(),
   thinkingLevel: ThinkingLevelSchema.nullable(),
   lastRunAt: z.string().nullable(),
   nextRunAt: z.string().nullable(),
@@ -556,6 +562,7 @@ export const CreateRoutineInput = z
       .default(null),
     modelProvider: z.string().trim().min(1).max(80).nullable().default(null),
     modelId: z.string().trim().min(1).max(200).nullable().default(null),
+    modelCredentialId: Id.nullable().default(null),
     thinkingLevel: ThinkingLevelSchema.nullable().default(null),
     /** Defaults to on for a watch and off otherwise. */
     quiet: z.boolean().optional(),
@@ -1860,3 +1867,6 @@ export const ExportManifestSchema = z.object({
   history: z.array(ThreadMessageSchema),
 });
 export type ExportManifest = z.infer<typeof ExportManifestSchema>;
+
+/** The failed-run message when a bot's pinned connection is signed out or removed. */
+export const PINNED_CONNECTION_LOST_MESSAGE = "This bot's connection is signed out or removed.";

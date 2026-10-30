@@ -216,6 +216,7 @@ export function BotSettings({
       voiceId?: string | null;
       modelProvider?: string | null;
       modelId?: string | null;
+      modelCredentialId?: string | null;
       thinkingLevel?: ThinkingLevel | null;
       disabledBuiltinTools?: string[];
     } & AudiencePatch,
@@ -252,6 +253,7 @@ export function BotSettings({
   const [modelKey, setModelKey] = useState(
     bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, bot.modelId) : "",
   );
+  const [credentialId, setCredentialId] = useState(bot.modelCredentialId ?? "");
   const [thinkingLevel, setThinkingLevel] = useState(bot.thinkingLevel ?? "");
   const [disabledBuiltinTools, setDisabledBuiltinTools] = useState<string[]>(
     bot.disabledBuiltinTools ?? [],
@@ -347,7 +349,12 @@ export function BotSettings({
       .catch(() => undefined);
   }, []);
 
-  const connectedOptions = connectedModelChoices(credentials, catalog);
+  // A pinned connection narrows the model list to what that connection can run.
+  const pinnedCredential = credentials.find((entry) => entry.id === credentialId);
+  const connectedOptions = connectedModelChoices(
+    pinnedCredential ? [pinnedCredential] : credentials,
+    catalog,
+  );
   const storedModel = modelKey ? parseModelOptionKey(modelKey) : null;
   const selectedModel = storedModel
     ? {
@@ -439,6 +446,8 @@ export function BotSettings({
         voiceId: voiceId || null,
         modelProvider: selected?.provider ?? null,
         modelId: selected?.modelId ?? null,
+        // Sent as saved even when the connection is gone, so saving other fields keeps the pin.
+        modelCredentialId: selected && credentialId ? credentialId : null,
         ...(modelMetaReady
           ? {
               thinkingLevel: thinkingOptions.length
@@ -781,6 +790,41 @@ export function BotSettings({
                     <KnowledgeSection botId={bot.id} />
                   </Suspense>
                 </ErrorBoundary>
+              ) : null}
+              {credentials.length > 1 || credentialId ? (
+                <label htmlFor={`${ids}-connection`} className={advancedLabelClass}>
+                  <Trans>Connection</Trans>
+                  <NativeSelect
+                    id={`${ids}-connection`}
+                    className="mt-2 w-full"
+                    value={credentialId}
+                    onChange={(event) => {
+                      const next = credentials.find((entry) => entry.id === event.target.value);
+                      const choices = connectedModelChoices(next ? [next] : credentials, catalog);
+                      saveOnChange(() => {
+                        setCredentialId(next?.id ?? "");
+                        setThinkingLevel("");
+                        if (next && !choices.some((choice) => choice.key === selectedModelKey)) {
+                          setModelKey(choices[0]?.key ?? "");
+                        }
+                      });
+                    }}
+                  >
+                    <NativeSelectOption value="">{t`Space default`}</NativeSelectOption>
+                    {credentialId && !pinnedCredential ? (
+                      <NativeSelectOption value={credentialId}>
+                        {t`Signed out or removed`}
+                      </NativeSelectOption>
+                    ) : null}
+                    {credentials.map((entry) => (
+                      <NativeSelectOption key={entry.id} value={entry.id}>
+                        {entry.authKind === "oauth"
+                          ? t`${entry.label} (Subscription)`
+                          : entry.label}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </label>
               ) : null}
               <label htmlFor={`${ids}-model`} className={advancedLabelClass}>
                 <Trans>Model</Trans>

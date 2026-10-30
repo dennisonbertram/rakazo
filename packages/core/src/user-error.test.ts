@@ -299,6 +299,7 @@ describe("runErrorAction", () => {
     ['402: {"message":"Insufficient credits","code":402}', "models"],
     ['429: {"message":"Rate limit exceeded","code":429}', "retry"],
     ["upstream connect error or disconnect/reset before headers. reset reason: timeout", "retry"],
+    ["This bot's connection is signed out or removed.", "connection"],
     ["Allow it on the Legal page.", undefined],
     ["", undefined],
   ])("%s -> %s", (error, action) => {

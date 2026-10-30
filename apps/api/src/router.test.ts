@@ -3542,6 +3542,8 @@ describe("bot model auth on save", () => {
     bot?: Record<string, unknown>;
     /** How many of the chosen message targets are internal bots of this space and user. */
     internalTargets?: number;
+    /** Connection ids that belong to the caller. */
+    ownedCredentialIds?: string[];
   }) {
     const bot = { ...storedBot(options.modelId), ...options.bot };
     const preferenceFindFirst = vi.fn(options.preferences);
@@ -3554,6 +3556,11 @@ describe("bot model auth on save", () => {
       }
       return null;
     });
+    const credentialFindFirst = vi.fn(async (args: { where: { id?: string; userId?: string } }) =>
+      args.where.userId === actor.userId && options.ownedCredentialIds?.includes(args.where.id!)
+        ? credentialRow(args.where.id!, "secret-oauth")
+        : null,
+    );
     const botUpdate = vi.fn(async () => ({
       id: bot.id,
       name: "Ada renamed",
@@ -3576,7 +3583,7 @@ describe("bot model auth on save", () => {
         update: botUpdate,
       },
       spaceModelPreference: { findFirst: preferenceFindFirst },
-      userModelCredential: { findFirst: vi.fn(async () => null) },
+      userModelCredential: { findFirst: credentialFindFirst },
       secret: { findFirst: secretFindFirst },
       // listBots looks for delegate runs that wait for approval.
       run: { findMany: vi.fn(async () => []) },
@@ -3602,6 +3609,7 @@ describe("bot model auth on save", () => {
       preferenceFindFirst,
       secretFindFirst,
       botUpdate,
+      credentialFindFirst,
       userMessageCount: prisma.message.count,
       handler: new RPCHandler(createRouter(deps)),
     };
@@ -3631,6 +3639,74 @@ describe("bot model auth on save", () => {
         data: expect.objectContaining({ name: "Ada renamed", modelId: spark }),
       }),
     );
+  });
+
+  it("pins a bot to the caller's own connection", async () => {
+    const { botUpdate, handler } = saveDeps({
+      modelId: "other-model",
+      preferences: () => null,
+      ownedCredentialIds: ["cred-mine"],
+    });
+
+    const response = await call(handler, "bots/update", {
+      botId: "bot-1",
+      modelProvider: "openai-codex",
+      modelId: luna,
+      modelCredentialId: "cred-mine",
+    });
+
+    expect(response.status).toBe(200);
+    expect(botUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ modelCredentialId: "cred-mine" }),
+      }),
+    );
+  });
+
+  it("saves a rename while an unchanged pin points at a connection that is gone", async () => {
+    const { botUpdate, credentialFindFirst, handler } = saveDeps({
+      modelId: luna,
+      preferences: () => null,
+      bot: { modelCredentialId: "cred-gone" },
+      ownedCredentialIds: [],
+    });
+
+    const response = await call(handler, "bots/update", {
+      botId: "bot-1",
+      name: "Ada renamed",
+      modelProvider: "openai-codex",
+      modelId: luna,
+      modelCredentialId: "cred-gone",
+    });
+
+    expect(response.status).toBe(200);
+    expect(credentialFindFirst).not.toHaveBeenCalled();
+    expect(botUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name: "Ada renamed" }) }),
+    );
+  });
+
+  it("rejects pinning a bot to someone else's connection", async () => {
+    const { botUpdate, credentialFindFirst, handler } = saveDeps({
+      modelId: spark,
+      preferences: () => null,
+      ownedCredentialIds: [],
+    });
+
+    const response = await call(handler, "bots/update", {
+      botId: "bot-1",
+      modelProvider: "openai-codex",
+      modelId: spark,
+      modelCredentialId: "cred-theirs",
+    });
+
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(credentialFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "cred-theirs", userId: actor.userId }),
+      }),
+    );
+    expect(botUpdate).not.toHaveBeenCalled();
   });
 
   it("checks whether the new bot needs a fresh introduction only when its profile text changes", async () => {
