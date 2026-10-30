@@ -66,6 +66,7 @@ import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-delivery.js";
 import { deliverDueNotifications } from "./notification-outbox.js";
 import { runOmiAssemble } from "./omi-assemble.js";
+import { runOmiTranscribe } from "./omi-transcribe.js";
 import { renderPdfPages } from "./pdf-render.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
 import { describeTeachSteps } from "./teach-steps.js";
@@ -389,6 +390,13 @@ export function createBackgroundJobHandlers(deps: {
       if (!deps.artifacts) throw new Error("Artifact store is not configured");
       await runOmiAssemble(
         { prisma: deps.prisma, jobs: deps.jobs, artifacts: deps.artifacts },
+        payload,
+      );
+    }),
+    "omi.transcribe": asPayloadTenant((payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      return runOmiTranscribe(
+        { prisma: deps.prisma, artifacts: deps.artifacts, secrets: deps.secretStore },
         payload,
       );
     }),

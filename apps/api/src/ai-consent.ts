@@ -305,25 +305,6 @@ export async function aiConsentStatus(
   };
 }
 
-/** Whether this user has consented to sending voice data to the provider. A provider that shares nothing outside the app has no recipient and needs none. */
-export async function hasVoiceConsent(
-  prisma: PrismaClient,
-  actor: Actor,
-  provider: string,
-): Promise<boolean> {
-  const recipient = aiRecipient({ provider, use: "voice" });
-  if (!recipient) return true;
-  const count = await prisma.aiDataConsent.count({
-    where: {
-      userId: actor.userId,
-      spaceId: actor.spaceId,
-      recipientKey: recipient.key,
-      version: AI_DISCLOSURE_VERSION,
-    },
-  });
-  return count > 0;
-}
-
 export async function allowAiConsent(
   deps: RouterDeps,
   actor: Actor,
