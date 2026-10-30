@@ -559,3 +559,26 @@ it("other servers never call the Brex RPCs", async () => {
   await show(false, "https://mcp.example.com/sse");
   expect(brex.cards).not.toHaveBeenCalled();
 });
+
+it("Brex cards: Replace token shows the API error and the cards stay as they were", async () => {
+  brex.cards.mockResolvedValue({ ...brexList, writesEnabled: true });
+  brex.getControls.mockResolvedValue(brexControls);
+  brex.replaceToken.mockRejectedValueOnce(new Error("Brex rejected this token"));
+  await showBrex(true);
+  await press("Replace token");
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="API token"]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  await act(async () => {
+    setter?.call(input, "tok_bad");
+    input?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[role="dialog"] button[type="submit"]')?.click(),
+  );
+  expect(brex.replaceToken).toHaveBeenCalledWith({ token: "tok_bad" });
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe("Brex rejected this token");
+  // The dialog stays open, nothing was reloaded or navigated, and the card is still listed.
+  expect(brex.cards).toHaveBeenCalledTimes(1);
+  expect(navigate).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("Figma");
+});
