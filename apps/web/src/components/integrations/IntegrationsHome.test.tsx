@@ -226,7 +226,9 @@ it("offers Brex cards and opens its connect dialog, then lands on the server pag
     setter?.call(input, "tok_demo");
     input?.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await act(async () => document.querySelector<HTMLButtonElement>('button[type="submit"]')?.click());
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
+  );
   expect(brexRpc.connect).toHaveBeenCalledWith({ token: "tok_demo" });
   expect(container.querySelector('[data-testid="where"]')?.textContent).toBe(
     "/app/integrations/mcp/srv_brex",

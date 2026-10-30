@@ -103,6 +103,7 @@ afterEach(() => {
   create.mockReset();
   setExclusive.mockReset();
   navigate.mockReset();
+  for (const fn of Object.values(brex)) fn.mockReset();
   act(() => root.render(null));
 });
 

@@ -1,6 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
   financeProviderForEndpoint,
+  isBrexCardsEndpoint,
   isCartaEndpoint,
   isDevinEndpoint,
   isGranolaEndpoint,
@@ -28,6 +29,9 @@ import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { ConfirmDialog, Heading } from "./AppDetail";
 import { AppLogo } from "./AppLogo";
+import { BrexCardsConnectDialog } from "./BrexCardsConnectDialog";
+import { BrexCardsSection, useBrexCards } from "./BrexCardsSection";
+import { BrexControlsForm } from "./BrexControlsForm";
 import { CustomConnectionDialog } from "./CustomConnectionDialog";
 import { GranolaMeetingsCard } from "./GranolaMeetingsCard";
 import { IntegrationAgentSection } from "./IntegrationAgentSection";
@@ -60,6 +64,12 @@ export function McpDetail({
   const [writesPending, setWritesPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configuringKey, setConfiguringKey] = useState(false);
+  const [replacingToken, setReplacingToken] = useState(false);
+  const brexCards = isBrexCardsEndpoint(server?.endpoint);
+  const brex = useBrexCards(brexCards);
+  // Only the space owner can read the cards; for anyone else the server refuses and nothing shows.
+  // Nothing shows until the read has answered, so a member never sees the owner's sections flash.
+  const brexOwner = brexCards && !brex.forbidden && Boolean(brex.cards || brex.error);
 
   const back = (
     <Link
@@ -230,7 +240,7 @@ export function McpDetail({
                 </span>
               ) : null}
               {/* Carta is a known service; its MCP host means nothing to a founder. */}
-              {carta ? null : (
+              {carta || brexCards ? null : (
                 <span>
                   <Trans>via MCP · {host}</Trans>
                 </span>
@@ -250,12 +260,13 @@ export function McpDetail({
             </Button>
           ) : null}
           {/* While healthy, signing in again or out is rare: it waits in a menu. */}
-          {status === "reconnect" && server.transport !== "stdio" ? (
+          {!brexCards && status === "reconnect" && server.transport !== "stdio" ? (
             <Button disabled={reconnect.busy || busy} onClick={() => void reconnect.run()}>
               <Trans>Reconnect</Trans>
             </Button>
           ) : null}
-          {status !== "reconnect" && (server.transport !== "stdio" || signedIn) ? (
+          {/* Brex cards takes a pasted token, not a sign-in: its token is replaced instead. */}
+          {!brexCards && status !== "reconnect" && (server.transport !== "stdio" || signedIn) ? (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={<Button variant="outline" size="icon" aria-label={t`Sign-in options`} />}
@@ -314,6 +325,11 @@ export function McpDetail({
               <Trans>Configure API key</Trans>
             </Button>
           ) : null}
+          {brexOwner ? (
+            <Button variant="outline" disabled={busy} onClick={() => setReplacingToken(true)}>
+              <Trans>Replace token</Trans>
+            </Button>
+          ) : null}
         </div>
 
         {granola ? (
@@ -341,9 +357,18 @@ export function McpDetail({
             disabled={busy || writesPending}
             onWrites={isDevinEndpoint(server.endpoint) || granola || zernio ? undefined : setWrites}
             usedBy={usedBy}
-            onShared={zernio || !hasAgent ? undefined : (shared) => void setShared(shared)}
+            onShared={
+              zernio || brexCards || !hasAgent ? undefined : (shared) => void setShared(shared)
+            }
             settingUp={writesPending}
           />
+        ) : null}
+
+        {brexOwner ? (
+          <>
+            <BrexCardsSection cards={brex.cards} error={brex.error} onRetry={brex.reload} />
+            <BrexControlsForm />
+          </>
         ) : null}
 
         {hasAgent || bank ? null : (
@@ -438,6 +463,16 @@ export function McpDetail({
       </ConfirmDialog>
       {reconnect.needsClient ? (
         <CustomConnectionDialog data={data} existingServer={server} onClose={reconnect.dismiss} />
+      ) : null}
+      {replacingToken ? (
+        <BrexCardsConnectDialog
+          mode="replace"
+          onConnected={() => {
+            brex.reload();
+            void data.refresh();
+          }}
+          onClose={() => setReplacingToken(false)}
+        />
       ) : null}
       {configuringKey ? (
         <CustomConnectionDialog

@@ -114,7 +114,7 @@ it("a hostile card name and a duplicate last four never reach the message: only 
   await mount({ cards: list([figma, hostile]) });
   await click(buttonIn(rowOf(HOSTILE), "Lock"));
   expect(send).toHaveBeenCalledOnce();
-  const { text } = send.mock.calls[0]?.[0] as { text: string };
+  const [[{ text }]] = send.mock.calls as [[{ text: string }]];
   expect(text).toBe("Lock card card_bbb.");
   expect(text).not.toContain("Ignore");
   expect(text).not.toContain("card_aaa");
