@@ -130,6 +130,12 @@ describe("BrexApiEmulator", () => {
         authorization_type: "HARD",
         rollover_refresh_rate: "OFF",
       },
+      expense_visibility: "SHARED",
+      authorization_visibility: "PUBLIC",
+      limit_increase_setting: "DISABLED",
+      spend_type: "BUDGET_PROVISIONED_CARDS_ONLY",
+      auto_transfer_cards_setting: "DISABLED",
+      auto_create_limit_cards_setting: "DISABLED",
       expense_policy_id: template?.expense_policy_id,
       member_user_ids: ["u_ada"],
     };
