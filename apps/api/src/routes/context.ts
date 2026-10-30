@@ -115,6 +115,8 @@ export interface RouterDeps {
   gtmMcp?: Pick<McpConnector, "callServerTool">;
   /** Replaces the read-only Devin caller built from `mcp`; tests pass a fake. */
   devinCallTool?: DevinCallTool;
+  /** Where the Brex token check reaches Brex; the demo and tests point it at an emulator. */
+  brexApi?: { baseUrl?: string; fetch?: typeof fetch };
   /** Meeting providers for the Granola key check; the demo and tests point Granola at the emulator. */
   meetingSources?: MeetingSourceRegistry;
   /** Reads an uploaded bank statement; wired in app.ts. */

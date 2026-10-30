@@ -426,6 +426,14 @@ import {
 } from "./connection-oauth.js";
 import { createDataRoomService } from "./data-room.js";
 import { ensureDataRoomAgent } from "./data-room-agent.js";
+import type { BrexCardsDeps } from "./brex-cards.js";
+import {
+  brexCardsCards,
+  brexCardsConnect,
+  brexCardsGetControls,
+  brexCardsReplaceToken,
+  brexCardsSetControls,
+} from "./brex-cards.js";
 import type { DevinDeps } from "./devin.js";
 import {
   assertNoOtherDevinConnection,
@@ -1477,6 +1485,16 @@ export function createRouter(deps: RouterDeps) {
     provisionAgent: async (actor, serverId) => (await provisionExclusiveAgent(actor, serverId)).bot,
     archiveBot: archiveActorBot,
     notificationEvents: deps.notificationEvents,
+  };
+  const brexCardsDeps: BrexCardsDeps = {
+    prisma: deps.prisma,
+    secrets: deps.secrets,
+    mcp: deps.mcp ?? {
+      callServerTool: () => Promise.reject(new Error("MCP is not available")),
+    },
+    ...(deps.brexApi ? { brexApi: deps.brexApi } : {}),
+    provisionAgent: async (actor, serverId) => (await provisionExclusiveAgent(actor, serverId)).bot,
+    archiveBot: archiveActorBot,
   };
   const onboardingDeps = { prisma: deps.prisma, events: deps.events, connectors: deps.connectors };
   const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets);
@@ -8356,6 +8374,24 @@ export function createRouter(deps: RouterDeps) {
         await devinDisconnect(devinDeps, context.actor);
         return { ok: true as const };
       }),
+    },
+    brexCards: {
+      connect: authed.brexCards.connect.handler(({ context, input }) =>
+        brexCardsConnect(brexCardsDeps, context.actor, input.token),
+      ),
+      replaceToken: authed.brexCards.replaceToken.handler(async ({ context, input }) => {
+        await brexCardsReplaceToken(brexCardsDeps, context.actor, input.token);
+        return { ok: true as const };
+      }),
+      cards: authed.brexCards.cards.handler(({ context }) =>
+        brexCardsCards(brexCardsDeps, context.actor),
+      ),
+      getControls: authed.brexCards.getControls.handler(({ context }) =>
+        brexCardsGetControls(brexCardsDeps, context.actor),
+      ),
+      setControls: authed.brexCards.setControls.handler(({ context, input }) =>
+        brexCardsSetControls(brexCardsDeps, context.actor, input),
+      ),
     },
     gtm: {
       agent: authed.gtm.agent.handler(({ context }) =>

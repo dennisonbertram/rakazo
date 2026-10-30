@@ -683,6 +683,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     messaging,
     cloudAgent,
     devinCallTool: createDevinCallTool(prisma, mcp),
+    ...(brexApi ? { brexApi } : {}),
     notificationEvents,
     financeCallToolFor: financeCallToolOverride ?? createFinanceCallToolFor(prisma, mcp),
     artifacts,

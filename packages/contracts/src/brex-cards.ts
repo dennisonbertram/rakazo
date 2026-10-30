@@ -208,12 +208,21 @@ export const BrexCardsConnectInputSchema = z
   .object({ token: z.string().trim().min(1).max(4096) })
   .strict();
 
-/** One row of the Brex cards table. The name is Brex-controlled text: display only. */
+/** What a connect shows the caller. The token is never returned. */
+export const BrexCardsConnectOutputSchema = z.object({
+  serverId: z.string(),
+  agentBotId: z.string(),
+});
+
+/**
+ * One row of the Brex cards table. The name is Brex-controlled text: display only. The owner is an
+ * id because the page reads only `list_cards`, which carries no names.
+ */
 export const BrexCardRowSchema = z.object({
   cardId: z.string(),
   name: z.string(),
   lastFour: z.string(),
-  ownerName: z.string().nullable(),
+  ownerUserId: z.string().nullable(),
   status: z.string(),
   limitCents: z.number().int().nullable(),
   currency: z.string().nullable(),
