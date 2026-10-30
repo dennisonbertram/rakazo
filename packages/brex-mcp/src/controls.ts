@@ -156,7 +156,8 @@ export function checkUpdateSpendLimit(
     return refuse("Only USD spend limits can be changed; this one is not in USD.");
   // The cap applies to the resulting amount, so an over-cap limit stays blocked until it is lowered.
   const amountCents = patch.amountCents ?? settings.base_limit.amount;
-  if (amountCents > controls.maxSpendLimitBaseCents)
+  // Archiving stops all spending on the limit, so an over-cap limit can still be archived.
+  if (patch.status !== "ARCHIVED" && amountCents > controls.maxSpendLimitBaseCents)
     return blocked(
       `spend limit base amount ${usd(amountCents)} exceeds the ${usd(controls.maxSpendLimitBaseCents)} cap.`,
     );

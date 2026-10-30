@@ -266,7 +266,8 @@ describe("checkUpdateSpendLimit", () => {
     expect(members.ok === false && members.reason).toMatch(/\$20,000\.00.*\$10,000\.00/);
     expect(checkUpdateSpendLimit(controls, big, { endDate: "2027-01-01" }).ok).toBe(false);
     expect(checkUpdateSpendLimit(controls, big, { status: "ACTIVE" }).ok).toBe(false);
-    // Lowering it below the cap is the way out.
+    // Archiving stops all spending, so it is allowed; lowering below the cap is the other way out.
+    expect(checkUpdateSpendLimit(controls, big, { status: "ARCHIVED" }).ok).toBe(true);
     expect(checkUpdateSpendLimit(controls, big, { amountCents: 500_000 }).ok).toBe(true);
   });
 
