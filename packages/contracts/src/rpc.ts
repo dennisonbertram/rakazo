@@ -357,10 +357,15 @@ import {
   OmiStatusSchema,
 } from "./omi.js";
 import {
+  BotPageCreateInputSchema,
   BotPageGetInputSchema,
+  BotPageListInputSchema,
+  BotPageRemoveInputSchema,
+  BotPageRenameInputSchema,
   BotPageSaveInputSchema,
   BotPageSaveOutputSchema,
   BotPageSchema,
+  BotPageSummarySchema,
 } from "./pages.js";
 import {
   BotPinsGetInputSchema,
@@ -894,6 +899,10 @@ export const appContract = {
   pages: {
     get: oc.input(BotPageGetInputSchema).output(BotPageSchema.nullable()),
     save: oc.input(BotPageSaveInputSchema).output(BotPageSaveOutputSchema),
+    list: oc.input(BotPageListInputSchema).output(z.array(BotPageSummarySchema)),
+    create: oc.input(BotPageCreateInputSchema).output(BotPageSchema),
+    rename: oc.input(BotPageRenameInputSchema).output(BotPageSummarySchema),
+    remove: oc.input(BotPageRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
   },
   pins: {
     get: oc.input(BotPinsGetInputSchema).output(BotPinsSchema.nullable()),

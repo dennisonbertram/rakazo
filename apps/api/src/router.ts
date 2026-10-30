@@ -48,6 +48,7 @@ import {
   computerSupportsTerminal,
   computerSupportsUpdate,
   computerUpdateView,
+  createBotPage,
   createDevinCallTool,
   createFaviconResolver,
   createMeetingSourceRegistry,
@@ -78,6 +79,7 @@ import {
   latestAccountExport,
   latestAuditMessageId,
   listAvailablePiCatalog,
+  listBotPages,
   listBotSecretMetadata,
   listCalendarAccounts,
   listOmiSegments,
@@ -90,6 +92,7 @@ import {
   modelCredentialDto,
   moveOmiSegment,
   normalizeSecretDestination,
+  PageConflictError,
   PageValidationError,
   PinsValidationError,
   parseModelSecret,
@@ -107,7 +110,9 @@ import {
   queueComputerUpdate,
   refreshBotPins,
   releaseComputerExecutionLease,
+  removeBotPage,
   removeScratchpadItemFromUser,
+  renameBotPage,
   renderPageChartSvg,
   replaceComputer,
   requestAccountExport,
@@ -712,6 +717,17 @@ async function reconcilePendingConnections(
 /** Serialize begin/revoke for one user+provider so slug-wide remote deletes cannot race a new connect. */
 
 /** A provider saying the remote account does not exist: it is already gone, so revoke is done. */
+/** Page validation and duplicate-title errors become 400 and 409; anything else is rethrown. */
+function pageError(error: unknown): unknown {
+  if (error instanceof PageValidationError) {
+    return new ORPCError("BAD_REQUEST", { message: error.message });
+  }
+  if (error instanceof PageConflictError) {
+    return new ORPCError("CONFLICT", { message: error.message });
+  }
+  return error;
+}
+
 const shareJson = (share: { artifactId: string; version: number; expiresAt: Date } | null) =>
   share && { ...share, expiresAt: share.expiresAt.toISOString() };
 
@@ -4342,7 +4358,11 @@ export function createRouter(deps: RouterDeps) {
     pages: {
       get: authed.pages.get.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
-        const page = await getBotPage(deps.prisma, { spaceId: bot.spaceId, botId: bot.id });
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
         if (!page || !input.chartSvgs) return page;
         const chartSvgs = await Promise.all(
           splitPage(page.content).flatMap((segment) =>
@@ -4360,6 +4380,7 @@ export function createRouter(deps: RouterDeps) {
               spaceId: bot.spaceId,
               botId: bot.id,
               userId: bot.userId,
+              pageId: input.pageId,
               content: input.content,
               baseRevision: input.baseRevision,
               updatedBy: "user",
@@ -4368,15 +4389,55 @@ export function createRouter(deps: RouterDeps) {
           );
           if (result.ok) return result;
           if (!result.page) {
-            throw new ORPCError("CONFLICT", { message: "The page was changed or removed." });
+            // A pageId of another bot or space also lands here: the page is not this bot's.
+            throw new ORPCError(input.pageId ? "NOT_FOUND" : "CONFLICT", {
+              message: "The page was changed or removed.",
+            });
           }
           return { ok: false as const, reason: "conflict" as const, page: result.page };
         } catch (error) {
-          if (error instanceof PageValidationError) {
-            throw new ORPCError("BAD_REQUEST", { message: error.message });
-          }
-          throw error;
+          throw pageError(error);
         }
+      }),
+      list: authed.pages.list.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        return listBotPages(deps.prisma, { spaceId: bot.spaceId, botId: bot.id });
+      }),
+      create: authed.pages.create.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        try {
+          return await createBotPage(
+            { prisma: deps.prisma, events: deps.events },
+            { spaceId: bot.spaceId, botId: bot.id, userId: bot.userId, title: input.title },
+          );
+        } catch (error) {
+          throw pageError(error);
+        }
+      }),
+      rename: authed.pages.rename.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        try {
+          const page = await renameBotPage(deps.prisma, {
+            spaceId: bot.spaceId,
+            botId: bot.id,
+            pageId: input.pageId,
+            title: input.title,
+          });
+          if (!page) throw new ORPCError("NOT_FOUND", { message: "Page not found." });
+          return page;
+        } catch (error) {
+          throw pageError(error);
+        }
+      }),
+      remove: authed.pages.remove.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const removed = await removeBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!removed) throw new ORPCError("NOT_FOUND", { message: "Page not found." });
+        return { ok: true as const };
       }),
     },
     pins: {

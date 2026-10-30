@@ -58,6 +58,8 @@ interface Recording {
   connectionId: string;
   startedAt: Date;
   lines: Lines;
+  /** The wearer, who is in every recording; lets the digest match their commitments. */
+  attendee: { name: string; email: string };
 }
 
 /** Files the note's text in Omi/Notes; a repeat returns the item already filed. */
@@ -136,8 +138,8 @@ async function upsertOmiMeeting(
   };
   const { id } = await tx.meeting.upsert({
     where: tombstone,
-    create: { ...key, ...data, attendees: [], summary: "" },
-    update: data,
+    create: { ...key, ...data, attendees: [rec.attendee], summary: "" },
+    update: { ...data, attendees: [rec.attendee] },
     select: { id: true },
   });
   return id;
@@ -168,13 +170,18 @@ async function loadRecording(prisma: PrismaClient, actor: Actor, itemId: string)
       text: { select: { text: true } },
     },
   });
-  if (!item?.storageKey || !item.sourceConnectionId || !item.text) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: actor.userId },
+    select: { name: true, email: true },
+  });
+  if (!item?.storageKey || !item.sourceConnectionId || !item.text || !user) return null;
   const rec: Recording = {
     id: itemId,
     name: item.name,
     connectionId: item.sourceConnectionId,
     startedAt: item.sourceUpdatedAt ?? item.createdAt,
     lines: parseOmiTranscript(item.text.text),
+    attendee: { name: user.name, email: user.email },
   };
   return { rec, text: item.text.text, storageKey: item.storageKey };
 }
