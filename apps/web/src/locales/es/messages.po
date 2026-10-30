@@ -5194,6 +5194,12 @@ msgstr ""
 msgid "Downloading"
 msgstr ""
 
+#. placeholder {0}: hours(done)
+#. placeholder {1}: hours(total ?? done)
+#: src/components/integrations/OmiPage.tsx
+msgid "Downloading {0} of {1} h"
+msgstr ""
+
 #. placeholder {0}: Math.round(done)
 #. placeholder {1}: Math.round(total ?? done)
 #: src/components/integrations/OmiPage.tsx
@@ -9291,6 +9297,12 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "En pausa"
+
+#. placeholder {0}: hours(done)
+#. placeholder {1}: hours(total)
+#: src/components/integrations/OmiPage.tsx
+msgid "Paused · {0} of {1} h saved"
+msgstr ""
 
 #. placeholder {0}: Math.round(done)
 #. placeholder {1}: Math.round(total)

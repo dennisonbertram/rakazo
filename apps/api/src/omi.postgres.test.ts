@@ -9,7 +9,7 @@ import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { createDb } from "@rakazo/db";
 import { Hono } from "hono";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { mountOmiRoutes } from "./omi.js";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";
@@ -237,8 +237,8 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
       include: { folder: { include: { parent: true } } },
     });
     expect(items.map((i) => i.externalId)).toEqual([
-      expect.stringMatching(/^omi:0:[0-9a-f]{12}$/),
-      expect.stringMatching(/^omi:4:[0-9a-f]{12}$/),
+      expect.stringMatching(/^omi:0:[0-9a-f]{12}:3$/),
+      expect.stringMatching(/^omi:4:[0-9a-f]{12}:4$/),
     ]);
     expect(items[0]).toMatchObject({
       source: "omi",
@@ -293,7 +293,7 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
     await wait();
     const items = await prisma.dataRoomItem.findMany({ where: { sourceConnectionId: id } });
     expect(items).toHaveLength(2);
-    expect(items.every((i) => /^omi:0:[0-9a-f]{12}$/.test(i.externalId ?? ""))).toBe(true);
+    expect(items.every((i) => /^omi:0:[0-9a-f]{12}:[0-9]+$/.test(i.externalId ?? ""))).toBe(true);
     expect(new Set(items.map((i) => i.externalId)).size).toBe(2);
     expect(await prisma.omiUpload.count({ where: { connectionId: id } })).toBe(2);
   });
@@ -323,5 +323,120 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
     expect(await prisma.dataRoomItem.count({ where: { sourceConnectionId: id } })).toBe(0);
     expect(await prisma.omiSegment.count({ where: { connectionId: id } })).toBe(0);
     expect(await prisma.omiUpload.count({ where: { connectionId: id } })).toBe(0);
+  });
+  /** `count` records from `firstSeq`, 100 ms each (5 frames of 20 ms), uploaded 700 at a time. */
+  async function uploadRun(who: string, firstSeq: number, count: number) {
+    const id = connections[who] as string;
+    // Earlier tests disconnected the connection.
+    await client(actors[who] as Actor).omi.connect({
+      model: "Omi",
+      firmware: "3.0.21",
+      hardware: "dev",
+      deviceId: `device-${who}`,
+    });
+    for (let at = 0; at < count; at += 700) {
+      const n = Math.min(700, count - at);
+      const stamps = Array.from({ length: n }, (_, i) => 5_000_000 + Math.floor((at + i) / 10));
+      expect((await upload(who, id, firstSeq + at, records(stamps))).status).toBe(201);
+    }
+  }
+  const assembleDeps = () => ({
+    prisma,
+    artifacts,
+    jobs: { enqueue: async (j: BackgroundJob) => void enqueued.push(j) },
+  });
+  const payloadOf = (who: string) => ({
+    spaceId: actors[who]?.spaceId as string,
+    userId: actors[who]?.userId as string,
+    connectionId: connections[who] as string,
+  });
+  const assembleJobs = () => enqueued.filter((j) => j.name === "omi.assemble").length;
+  /** Runs assembly the way the queue would: again while it asked to run again. */
+  async function drain(who: string) {
+    for (;;) {
+      const before = assembleJobs();
+      await runOmiAssemble(assembleDeps(), payloadOf(who));
+      if (assembleJobs() === before) return;
+    }
+  }
+  /** [firstSeq, lastSeq] of the recordings filed from `base` up, in order. */
+  async function ranges(who: string, base: number) {
+    const items = await prisma.dataRoomItem.findMany({
+      where: { sourceConnectionId: connections[who], source: "omi" },
+      select: { externalId: true },
+    });
+    return items
+      .map((i) => (i.externalId as string).split(":"))
+      .map((p) => [Number(p[1]), Number(p[3])] as const)
+      .filter(([first]) => first >= base)
+      .sort((x, y) => x[0] - y[0]);
+  }
+  const contiguous = (found: (readonly [number, number])[], first: number, last: number) => {
+    expect(found[0]?.[0]).toBe(first);
+    expect(found.at(-1)?.[1]).toBe(last);
+    for (let i = 1; i < found.length; i += 1) {
+      expect((found[i] as readonly [number, number])[0]).toBe(
+        (found[i - 1] as readonly [number, number])[1] + 1,
+      );
+    }
+  };
+
+  it("assembles a 2.5 hour stretch in bounded batches and 60 minute recordings", async () => {
+    const base = 100_000;
+    await uploadRun("a", base, 90_300);
+    const before = assembleJobs();
+    await runOmiAssemble(assembleDeps(), payloadOf("a"));
+    // One batch (about an hour) per run, and the run asks to run again while more remain.
+    expect(assembleJobs()).toBe(before + 1);
+    expect((await client(actors.a as Actor).omi.status())?.pendingUploads).toBeGreaterThan(0);
+    await drain("a");
+    const found = await ranges("a", base);
+    contiguous(found, base, base + 90_299);
+    // 36,000 records are 60 minutes: no recording is longer, and 2.5 h is three or more.
+    expect(found.every(([first, last]) => last - first + 1 <= 36_000)).toBe(true);
+    expect(found.length).toBeGreaterThanOrEqual(3);
+    expect(
+      await prisma.omiUpload.count({ where: { connectionId: connections.a, assembledAt: null } }),
+    ).toBe(0);
+    // A re-run adds nothing.
+    const count = await prisma.dataRoomItem.count({ where: { sourceConnectionId: connections.a } });
+    await drain("a");
+    expect(await prisma.dataRoomItem.count({ where: { sourceConnectionId: connections.a } })).toBe(
+      count,
+    );
+  }, 120_000);
+
+  it("recovers from a crash between filing and marking, and files audio that arrived after", async () => {
+    const base = 300_000;
+    await uploadRun("b", base, 7_000);
+    const mark = vi
+      .spyOn(prisma.omiUpload, "updateMany")
+      .mockRejectedValueOnce(new Error("crash after filing"));
+    await expect(runOmiAssemble(assembleDeps(), payloadOf("b"))).rejects.toThrow("crash");
+    mark.mockRestore();
+    // Recordings are filed, the uploads are not marked, and their blobs are still there.
+    const pending = await prisma.omiUpload.findMany({
+      where: { connectionId: connections.b, assembledAt: null, firstSeq: { gte: base } },
+    });
+    expect(pending.length).toBe(10);
+    for (const u of pending)
+      expect((await artifacts.get(u.storageKey, blobCtx("b"))).byteLength).toBeGreaterThan(0);
+    expect((await ranges("b", base)).length).toBe(1);
+    // More audio follows the crashed stretch before the next run.
+    await uploadRun("b", base + 7_000, 1_400);
+    await drain("b");
+    const found = await ranges("b", base);
+    contiguous(found, base, base + 8_399);
+    expect(
+      await prisma.omiUpload.count({ where: { connectionId: connections.b, assembledAt: null } }),
+    ).toBe(0);
+  }, 60_000);
+
+  const blobCtx = (who: string) => ({
+    operationId: "t",
+    traceId: "t",
+    spaceId: actors[who]?.spaceId as string,
+    userId: actors[who]?.userId as string,
+    signal: new AbortController().signal,
   });
 });

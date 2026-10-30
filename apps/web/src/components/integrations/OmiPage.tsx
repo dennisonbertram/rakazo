@@ -25,6 +25,10 @@ import { OmiSegments } from "./OmiSegments";
 import { AgentToggleList } from "./parts";
 import type { IntegrationsData } from "./useIntegrations";
 
+/** Hours with at most one decimal: 27, 3.2. */
+const hours = (minutes: number) => Math.round(minutes / 6) / 10;
+const LONG_MIN = 120;
+
 function StatusLine({ state }: { state: OmiSyncState }) {
   const { t } = useLingui();
   if (state.kind === "unsupported") return <Trans>Use Chrome, Edge or the desktop app</Trans>;
@@ -45,6 +49,10 @@ function StatusLine({ state }: { state: OmiSyncState }) {
       <Shimmer>
         {done === null || (total ?? 0) < 1 ? (
           <Trans>Downloading</Trans>
+        ) : (total ?? 0) >= LONG_MIN ? (
+          <Trans>
+            Downloading {hours(done)} of {hours(total ?? done)} h
+          </Trans>
         ) : (
           <Trans>
             Downloading {Math.round(done)} of {Math.round(total ?? done)} min
@@ -57,6 +65,10 @@ function StatusLine({ state }: { state: OmiSyncState }) {
     const { done, total } = state;
     return total === null || total < 1 ? (
       <Trans>Paused</Trans>
+    ) : total >= LONG_MIN ? (
+      <Trans>
+        Paused · {hours(done)} of {hours(total)} h saved
+      </Trans>
     ) : (
       <Trans>
         Paused · {Math.round(done)} of {Math.round(total)} min saved
