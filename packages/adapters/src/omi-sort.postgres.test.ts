@@ -292,6 +292,11 @@ describePostgres("Omi sorting (PostgreSQL)", () => {
     await runOmiSort(deps(), payload(who, id));
     const [meeting, note, trash] = await segments(id);
 
+    const todo = (meetingId: string, who: Actor) =>
+      prisma.inboxTodo.create({
+        data: { spaceId: who.spaceId, userId: who.userId, meetingId, text: "Send the notes" },
+      });
+    await todo(meeting?.meetingId as string, who);
     // meeting -> note
     const toNote = await moveOmiSegment(deps(), who, {
       segmentId: meeting?.id as string,
@@ -300,6 +305,9 @@ describePostgres("Omi sorting (PostgreSQL)", () => {
     expect(toNote).toMatchObject({ kind: "note", sortedBy: "user", meetingId: null });
     expect(toNote.noteItemId).toBeTruthy();
     expect(await prisma.meeting.count({ where: { id: meeting?.meetingId as string } })).toBe(0);
+    expect(
+      await prisma.inboxTodo.count({ where: { text: "Send the notes", userId: who.userId } }),
+    ).toBe(0);
     // note -> trash
     const toTrash = await moveOmiSegment(deps(), who, {
       segmentId: note?.id as string,
@@ -354,10 +362,17 @@ describePostgres("Omi sorting (PostgreSQL)", () => {
     const id = await makeRecording(who);
     replies = [split];
     await runOmiSort(deps(), payload(who, id));
+    const meetingId = (await segments(id))[0]?.meetingId as string;
+    await prisma.inboxTodo.create({
+      data: { spaceId: who.spaceId, userId: who.userId, meetingId, text: "Call back" },
+    });
     const keys = await deleteOmiOutputs(prisma, who, { audioItemId: id });
     expect(keys).toHaveLength(1);
     await createDataRoomRepos(prisma).deleteItem(who, id);
     expect(await segments(id)).toHaveLength(0);
+    expect(await prisma.inboxTodo.count({ where: { userId: who.userId, text: "Call back" } })).toBe(
+      0,
+    );
     expect((await meetings(who)).filter((m) => m.externalId.startsWith(id))).toHaveLength(0);
     expect(
       await prisma.dataRoomItem.count({ where: { externalId: { startsWith: `omi-note:${id}` } } }),

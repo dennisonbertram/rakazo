@@ -7,7 +7,12 @@ import type {
 import { dataRoomBlobDeleteJob, meetingsDigestJob } from "@rakazo/adapter-kit";
 import type { Actor, OmiSegmentDto } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
-import { createDataRoomRepos, IsolationError, recordUsage } from "@rakazo/db";
+import {
+  createDataRoomRepos,
+  deleteMeetingsWithTodos,
+  IsolationError,
+  recordUsage,
+} from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import {
   createFileDataRoomItem,
@@ -276,9 +281,7 @@ async function applyStretches(
     const gone = old.flatMap((o) =>
       o.meetingId && !meetingIds.has(o.meetingId) ? [o.meetingId] : [],
     );
-    await tx.meeting.deleteMany({
-      where: { spaceId: actor.spaceId, userId: actor.userId, id: { in: gone } },
-    });
+    await deleteMeetingsWithTodos(tx, actor, gone);
     await tx.omiSegment.createMany({
       data: rows.map(({ s, meetingId }) => ({
         ...owner,
@@ -329,9 +332,7 @@ export async function moveOmiSegment(
     const meetingId =
       input.kind === "meeting" ? await upsertOmiMeeting(tx, actor, rec, s, false) : null;
     if (segment.meetingId && segment.meetingId !== meetingId) {
-      await tx.meeting.deleteMany({
-        where: { id: segment.meetingId, spaceId: actor.spaceId, userId: actor.userId },
-      });
+      await deleteMeetingsWithTodos(tx, actor, [segment.meetingId]);
     }
     const updated = await tx.omiSegment.update({
       where: { id: segment.id },

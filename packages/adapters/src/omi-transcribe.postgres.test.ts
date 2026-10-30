@@ -222,7 +222,10 @@ describePostgres("Omi transcription (PostgreSQL)", () => {
     const id = await makeItem(who, 700);
     await runOmiTranscribe(deps(), payload(who, id));
     expect((await row(id)).text?.text).toBe(
-      `[00:00] ${SCRIPTED_TRANSCRIPT}\n\n[10:00] ${SCRIPTED_TRANSCRIPT}`,
+      Array.from(
+        { length: 12 },
+        (_, i) => `[${String(i).padStart(2, "0")}:00] ${SCRIPTED_TRANSCRIPT}`,
+      ).join("\n\n"),
     );
   });
 

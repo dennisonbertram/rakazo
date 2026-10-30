@@ -24,6 +24,12 @@ export interface OmiTranscribeDeps {
 const MAX_FAILURES = 3;
 export const TRANSCRIPTION_FAILED = "transcription_failed";
 
+/**
+ * One timestamp per segment, so sorting can cut a meeting out of a long recording. Providers charge
+ * per audio minute, so the cost is the same. ponytail: a word cut at a boundary is lost or split.
+ */
+const SEGMENT_SECONDS = 60;
+
 const mmss = (seconds: number) =>
   `[${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}]`;
 
@@ -86,7 +92,10 @@ export async function runOmiTranscribe(
     userId: actor.userId,
     signal: new AbortController().signal,
   };
-  const segments = splitOggOpus(await deps.artifacts.get(item.storageKey, blobContext));
+  const segments = splitOggOpus(
+    await deps.artifacts.get(item.storageKey, blobContext),
+    SEGMENT_SECONDS,
+  );
   const parts: string[] = [];
   for (const segment of segments) {
     if (segment.bytes.byteLength > MAX_TRANSCRIBE_BYTES) throw new Error("Segment is too large");
