@@ -82,6 +82,7 @@ import {
   listBotPages,
   listBotSecretMetadata,
   listCalendarAccounts,
+  listOmiSegments,
   listPiCatalog,
   listScratchpadItems,
   McpOAuthBroker,
@@ -89,6 +90,7 @@ import {
   mcpStdioRefusal,
   modelCredentialAuthKindsForSpace,
   modelCredentialDto,
+  moveOmiSegment,
   normalizeSecretDestination,
   PageConflictError,
   PageValidationError,
@@ -8214,6 +8216,14 @@ export function createRouter(deps: RouterDeps) {
       disconnect: authed.omi.disconnect.handler(({ context, input }) =>
         disconnectOmi(deps, context.actor, input),
       ),
+      segments: {
+        list: authed.omi.segments.list.handler(({ context, input }) =>
+          listOmiSegments(deps.prisma, context.actor, input),
+        ),
+        move: authed.omi.segments.move.handler(({ context, input }) =>
+          moveOmiSegment(deps, context.actor, input).catch(contactNotFound),
+        ),
+      },
     },
     devin: {
       sessions: authed.devin.sessions.handler(({ context }) =>

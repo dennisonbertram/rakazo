@@ -526,6 +526,7 @@ model Space {
   mcpCallLogs                 McpCallLog[]
   externalActions             ExternalAction[]
   omiUploads                  OmiUpload[]
+  omiSegments                 OmiSegment[]
   mcpConnections              McpConnection[]
   id                          String                       @id
   organizationId              String
@@ -1548,6 +1549,7 @@ model Connection {
   companyEvidence     CompanyEvidence[]
   companyCandidates   CompanyCandidate[]    @relation("CompanyCandidateConnection")
   omiUploads          OmiUpload[]
+  omiSegments         OmiSegment[]
 
   @@index([spaceId, userId, connectorId])
   @@unique([id, spaceId, userId])
@@ -1579,6 +1581,36 @@ model OmiUpload {
   @@unique([connectionId, firstSeq, sha256])
   @@index([connectionId, assembledAt])
   @@map("omi_uploads")
+}
+
+/// One sorted stretch of an Omi recording: a meeting, a note or trash.
+model OmiSegment {
+  id           String       @id @default(cuid())
+  spaceId      String
+  space        Space        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  connectionId String
+  connection   Connection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  audioItemId  String
+  audioItem    DataRoomItem @relation("OmiSegmentAudio", fields: [audioItemId], references: [id], onDelete: Cascade)
+  /// Seconds from the start of the recording.
+  start        Int
+  end          Int
+  /// "meeting", "note" or "trash".
+  kind         String
+  title        String
+  meetingId    String?
+  meeting      Meeting?     @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  noteItemId   String?
+  noteItem     DataRoomItem? @relation("OmiSegmentNote", fields: [noteItemId], references: [id], onDelete: SetNull)
+  /// "agent" or "user"; a re-sort never changes a user's choice.
+  sortedBy     String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([audioItemId, start])
+  @@index([spaceId, userId, createdAt])
+  @@map("omi_segments")
 }
 
 model BotConnectionAccess {
@@ -3442,6 +3474,8 @@ model DataRoomItem {
   companyEntities    CompanyEntity[] @relation("CompanyEntityDataRoomItem")
   companyEvidence    CompanyEvidence[] @relation("CompanyEvidenceDataRoomItem")
   companyCandidates  CompanyCandidate[] @relation("CompanyCandidateDataRoomItem")
+  omiAudioSegments   OmiSegment[]      @relation("OmiSegmentAudio")
+  omiNoteSegments    OmiSegment[]      @relation("OmiSegmentNote")
 
   @@index([spaceId, folderId])
   @@unique([id, spaceId, userId])
@@ -3818,6 +3852,7 @@ model Meeting {
   /// GENERATED ALWAYS AS (to_tsvector('english', title || summary || transcript)) STORED; see the migration.
   tsv               Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, ((((title || ' '::text) || summary) || ' '::text) || COALESCE(transcript, ''::text)))"))
   inboxTodos        InboxTodo[]
+  omiSegments       OmiSegment[]
 
   @@unique([spaceId, userId, provider, externalId])
   @@index([spaceId, userId, startedAt])

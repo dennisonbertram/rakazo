@@ -66,6 +66,7 @@ import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-delivery.js";
 import { deliverDueNotifications } from "./notification-outbox.js";
 import { runOmiAssemble } from "./omi-assemble.js";
+import { runOmiSort } from "./omi-sort.js";
 import { runOmiTranscribe } from "./omi-transcribe.js";
 import { renderPdfPages } from "./pdf-render.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
@@ -396,10 +397,18 @@ export function createBackgroundJobHandlers(deps: {
     "omi.transcribe": asPayloadTenant((payload) => {
       if (!deps.artifacts) throw new Error("Artifact store is not configured");
       return runOmiTranscribe(
-        { prisma: deps.prisma, artifacts: deps.artifacts, secrets: deps.secretStore },
+        {
+          prisma: deps.prisma,
+          artifacts: deps.artifacts,
+          secrets: deps.secretStore,
+          jobs: deps.jobs,
+        },
         payload,
       );
     }),
+    "omi.sort": asPayloadTenant((payload) =>
+      runOmiSort({ ...dataRoomDeps(), runtime: deps.runtime }, payload),
+    ),
     "dataroom.blob.delete": async (payload) =>
       runAsTenant({ spaceId: payload.spaceId, userId: "" }, async () => {
         if (!deps.artifacts) throw new Error("Artifact store is not configured");

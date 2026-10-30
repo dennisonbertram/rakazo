@@ -5,7 +5,7 @@ import { dataRoomBlobContext } from "@rakazo/adapters";
 import type { Actor, OmiConnectInput, OmiStatus } from "@rakazo/contracts";
 import { OMI_CONNECTOR_ID, OMI_UPLOAD_MAX_BYTES } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
-import { createDataRoomRepos, isUniqueViolation } from "@rakazo/db";
+import { createDataRoomRepos, deleteOmiOutputs, isUniqueViolation } from "@rakazo/db";
 import type { Hono } from "hono";
 import { cancelBody } from "./http-body.js";
 import type { ensureConnectedAppAgent } from "./integration-agent.js";
@@ -98,6 +98,9 @@ export async function disconnectOmi(
   if (!input.deleteRecordings) return { ok: true };
   // Blob cleanup is queued first: if a row delete fails, the job finds the row and keeps the blob.
   const repo = createDataRoomRepos(prisma);
+  for (const key of await deleteOmiOutputs(prisma, actor, { connectionId: connection.id })) {
+    await jobs.enqueue(dataRoomBlobDeleteJob(actor.spaceId, key));
+  }
   const items = await prisma.dataRoomItem.findMany({
     where: { ...owner(actor), source: "omi", sourceConnectionId: connection.id },
     select: { id: true, storageKey: true, thumbnailKey: true },
