@@ -27,13 +27,13 @@ import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { builtinAgentTools } from "./builtin-tools.js";
 import { capTableToolsAllowed, contactToolFromTool, contactToolsAllowed } from "./contact-tools.js";
+import { unwrapToolResult } from "./finance-call-tool.js";
 import {
   FINANCE_TOOL_NAMES,
   financeToolFromTool,
   financeToolsAllowed,
   hasFinanceSource,
 } from "./finance-tools.js";
-import { unwrapToolResult } from "./finance-call-tool.js";
 import { fundraisingToolFromTool, fundraisingToolsAllowed } from "./fundraising-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
 import { checkMcpReadSource, mcpSourceContext } from "./mcp-read-source.js";
