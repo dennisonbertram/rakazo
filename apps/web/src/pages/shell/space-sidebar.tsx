@@ -110,6 +110,9 @@ import { moveRosterFocus, rosterRowId, syncRosterTabStops } from "./roster-tab-s
 import { moreBarCover, moreBarHeight, rowsBelow } from "./rows-below";
 import { SidebarHeaderRow } from "./sidebar-header-row";
 
+/** The bar reaches this far below the list: iOS Safari otherwise paints a sliver of the next row over its foot. */
+const BAR_OVERHANG = 12;
+
 type SidebarChat = {
   id: string;
   name: string;
@@ -817,7 +820,7 @@ export function SpaceSidebar({
       ) : null}
       <div
         ref={sidebarPaneRef}
-        className="flex min-h-0 flex-1 flex-col max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col pointer-coarse:md:max-lg:flex-initial max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto"
       >
         {bootstrapMe === undefined ? null : (
           // Waiting for the account (undefined) keeps pages the user hid from flashing in.
@@ -1084,7 +1087,7 @@ export function SpaceSidebar({
         <div
           ref={sidebarScrollRef}
           tabIndex={-1}
-          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 lg:snap-y lg:snap-proximity lg:scroll-pt-10 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
+          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 pointer-coarse:lg:flex-initial lg:snap-y lg:snap-proximity lg:scroll-pt-10 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
         >
           {activityMode && !rail ? (
             <button
@@ -1923,8 +1926,8 @@ export function SpaceSidebar({
           <button
             type="button"
             data-testid="sidebar-more-rows"
-            className="absolute inset-x-0 bottom-0 z-10 flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            style={{ height: moreBarHeight() + barCover }}
+            className="absolute inset-x-0 z-30 flex items-start justify-center border-b border-sidebar-border bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            style={{ height: moreBarHeight() + barCover + BAR_OVERHANG, bottom: -BAR_OVERHANG }}
             onClick={() => {
               const pane = sidebarPaneRef.current;
               const list = sidebarScrollRef.current;
