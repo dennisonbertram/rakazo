@@ -284,6 +284,7 @@ import { useSidebarGlance } from "../lib/use-sidebar-glance";
 import { errorText } from "../lib/user-error";
 import { workingActivity } from "../lib/working-activity";
 import type { ContextMenuPosition } from "./BotContextMenu";
+import { BotPageView } from "./BotPageView";
 import { CalendarPage } from "./Calendar";
 import { CompanyPage } from "./Company";
 import { CompanyImportPage } from "./CompanyImport";
@@ -1168,6 +1169,7 @@ export function ShellPage() {
   const calendarMode = useMatch("/app/calendar") != null;
   const contactMatch = useMatch("/app/contacts/:contactId");
   const contactsMode = useMatch("/app/contacts") != null || contactMatch != null;
+  const botPageMatch = useMatch("/app/pages/:botId/:pageId");
   // Inbox, Finance, Legal, Data room, Investors and Integrations are pages of their own: no bot
   // route. Inbox, Finance, Legal and Investors keep their agent in a side panel.
   const pageMode =
@@ -1184,7 +1186,8 @@ export function ShellPage() {
     artifactsMode ||
     contactsMode ||
     calendarMode ||
-    boardMode;
+    boardMode ||
+    botPageMatch != null;
   useEffect(() => {
     if (!financeMode) setFinanceAgentOpen(false);
   }, [financeMode]);
@@ -1216,7 +1219,13 @@ export function ShellPage() {
     namedOnly: (bot) => pageAgentKind(bot.spawnKey) !== null,
   });
   const active =
-    inGroup || integrationsMode || artifactsMode || contactsMode || calendarMode || boardMode
+    inGroup ||
+    integrationsMode ||
+    artifactsMode ||
+    contactsMode ||
+    calendarMode ||
+    boardMode ||
+    botPageMatch != null
       ? undefined
       : companyMode
         ? findCompanyAgent(bots, userId, companyImportMode)
@@ -5120,6 +5129,14 @@ export function ShellPage() {
             />
           ) : contactMatch?.params.contactId ? (
             <ContactDetailPage id={contactMatch.params.contactId} spaceName={pageSpaceName} />
+          ) : botPageMatch?.params.botId && botPageMatch.params.pageId ? (
+            // No bot is open on this route, so no page events arrive: the page loads when opened.
+            <BotPageView
+              botId={botPageMatch.params.botId}
+              pageId={botPageMatch.params.pageId}
+              remote={null}
+              dataRemote={null}
+            />
           ) : calendarMode ? (
             <CalendarPage spaceName={pageSpaceName} bots={bots} onOpenBot={openBotSettings} />
           ) : contactsMode ? (

@@ -1076,6 +1076,7 @@ export function SpaceSidebar({
                 />
               )}
               <SidebarPages
+                bots={bots}
                 rail={rail}
                 hidden={hiddenPages}
                 onListed={setAddedPages}
