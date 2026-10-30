@@ -38,8 +38,10 @@ import { fundraisingToolFromTool, fundraisingToolsAllowed } from "./fundraising-
 import type { McpConnector } from "./mcp-connector.js";
 import { checkMcpReadSource, mcpSourceContext } from "./mcp-read-source.js";
 import {
+  PAGE_SOURCE_REQUEST_LINE_MAX,
   pageSourceApprovalBlock,
   pageSourceCallHash,
+  pageSourceRequestLine,
   postPageSourceApproval,
 } from "./page-source-approval.js";
 import type { PageDeps, PageToolScope } from "./pages.js";
@@ -277,7 +279,13 @@ async function runMcpSource(
   const scope = { spaceId: source.spaceId, botId: source.botId, userId: source.userId };
   const approvedCall = async () => {
     const row = await deps.prisma.pageSource.findFirst({
-      where: { id: source.id, spaceId: source.spaceId, userId: source.userId, kind: "mcp" },
+      where: {
+        id: source.id,
+        spaceId: source.spaceId,
+        userId: source.userId,
+        botId: source.botId,
+        kind: "mcp",
+      },
       select: { status: true, call: true, approvedCallHash: true },
     });
     const call = McpSourceCallSchema.safeParse(row?.call);
@@ -302,12 +310,14 @@ async function runMcpSource(
   const context = mcpSourceContext(scope, "page-source");
   const result: CallToolResult = await callServerTool(server, context, call.tool, call.args, {
     // The session setup awaits; look at the approval and the tool's status again right before the call.
+    // The tool check lists the server's tools (an await), so the approval is read after it: the
+    // last await before the call is the one that proves this exact call is still approved.
     beforeCall: async () => {
+      await check(call);
       const again = await approvedCall();
       if (pageSourceCallHash("mcp", again) !== pageSourceCallHash("mcp", call)) {
         throw new PageSourceError("The request changed.");
       }
-      await check(again);
     },
   });
   try {
@@ -797,6 +807,12 @@ export async function pageSourceToolFromTool(
       return { error: (error instanceof Error ? error.message : String(error)).slice(0, 200) };
     }
     call = { serverId: server.id, tool, args: (args.args as Record<string, unknown>) ?? {} };
+    // The card shows the whole request that Allow authorizes, so a request too long to show is refused.
+    if (pageSourceRequestLine(call).length > PAGE_SOURCE_REQUEST_LINE_MAX) {
+      return {
+        error: "The request is too long to show the owner; use fewer or shorter arguments.",
+      };
+    }
     serverName = server.name;
   } else {
     const refusal = await praciSourceRefusal(deps, bot, tool);
@@ -849,8 +865,9 @@ export async function pageSourceToolFromTool(
         // resumes; a denied one stays denied until the call changes.
         const approved = same.approvedCallHash === callHash;
         const resume = same.status === "paused" && approved;
-        return tx.pageSource.update({
-          where: { id: same.id },
+        // Conditional on the row as read: a concurrent change of call, status or approval loses.
+        const updated = await tx.pageSource.updateMany({
+          where: { id: same.id, ...pageScope, updatedAt: same.updatedAt },
           data: {
             name: sourceName.data,
             schedule: schedule.data,
@@ -867,6 +884,8 @@ export async function pageSourceToolFromTool(
                 : {}),
           },
         });
+        if (updated.count !== 1) throw new PageSourceError("The source changed; read it again.");
+        return tx.pageSource.findFirstOrThrow({ where: { id: same.id, ...pageScope } });
       }
       // A different call means different data: the old snapshots no longer describe the source.
       await tx.pageSourceSnapshot.deleteMany({

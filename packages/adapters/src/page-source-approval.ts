@@ -37,6 +37,13 @@ export function pageSourceCallHash(kind: string, call: McpSourceCall): string {
     .digest("hex");
 }
 
+/** The card's Request line. Never cut: the hash covers every argument. */
+export const pageSourceRequestLine = (call: McpSourceCall) => {
+  const args = Object.keys(call.args).length ? ` ${JSON.stringify(call.args)}` : "";
+  return `Request: ${call.tool}${args}`;
+};
+export const PAGE_SOURCE_REQUEST_LINE_MAX = 500;
+
 const EVERY: Record<string, string> = {
   "15m": "every 15 minutes",
   "1h": "every hour",
@@ -57,14 +64,12 @@ export function pageSourceApprovalBlock(input: {
   pageTitle: string;
   call: McpSourceCall;
 }): MessageBlock {
-  const args = Object.keys(input.call.args).length ? ` ${JSON.stringify(input.call.args)}` : "";
   return {
     kind: "ask",
     text: `Read ${input.serverName} ${EVERY[input.schedule] ?? input.schedule}?`,
-    detail: [
-      `Request: ${input.call.tool}${args}`.slice(0, 600),
-      `Page: ${input.pageTitle}`.slice(0, 100),
-    ].join("\n"),
+    detail: [pageSourceRequestLine(input.call), `Page: ${input.pageTitle}`.slice(0, 100)].join(
+      "\n",
+    ),
     pageSource: { sourceId: input.sourceId, callHash: input.callHash },
     status: "pending",
     actions: [
@@ -256,6 +261,6 @@ export async function answerPageSourceApproval(
     return "denied" as const;
   }
   return deps.prisma.pageSource.findFirstOrThrow({
-    where: { id: source.id, spaceId: scope.spaceId },
+    where: { id: source.id, spaceId: scope.spaceId, userId: scope.userId, botId: bot.id },
   });
 }

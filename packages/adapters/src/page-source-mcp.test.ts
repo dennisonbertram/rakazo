@@ -406,3 +406,76 @@ describe("refreshing an mcp source", () => {
     expect(source).toMatchObject({ kind: "mcp", serverName: "Mercury", status: "pending" });
   });
 });
+
+describe("review fixes", () => {
+  it("does not dispatch a call that changed while the tools were being listed", async () => {
+    const w = world();
+    await w.set(w.mcpArgs());
+    await w.answer("allow");
+    let listings = 0;
+    w.listServerTools.mockImplementation(async () => {
+      listings += 1;
+      // The second listing is the one inside beforeCall.
+      if (listings === 2) {
+        w.sources[0]!.call = { ...w.sources[0]!.call, args: { limit: 8 } };
+      }
+      return [READ_TOOL];
+    });
+    const outcome = await refreshPageSource(w.deps, w.sources[0] as never);
+    expect(outcome).toMatchObject({ ok: false, error: expect.stringContaining("not approved") });
+    expect(w.snapshots).toHaveLength(0);
+  });
+
+  it("does not resume a paused source that a concurrent change replaced", async () => {
+    const w = world();
+    await w.set(w.mcpArgs());
+    await w.answer("allow");
+    w.sources[0]!.status = "paused";
+    const findMany = (w.prisma as Row).pageSource.findMany;
+    const read = findMany.getMockImplementation()!;
+    findMany.mockImplementationOnce(async (arg: Row) => {
+      const rows = await read(arg);
+      const seen = rows.map((r: Row) => ({ ...r }));
+      // Another save lands after this one read the row.
+      const row = w.sources[0]!;
+      row.call = { ...row.call, args: { limit: 99 } };
+      row.status = "pending";
+      row.approvedCallHash = null;
+      row.updatedAt = new Date(Date.now() + 5);
+      return seen;
+    });
+    const result = await w.set(w.mcpArgs());
+    expect(result).toEqual({ error: "The source changed; read it again." });
+    expect(w.sources[0]).toMatchObject({ status: "pending", approvedCallHash: null });
+  });
+
+  it("refuses a request too long to show, and shows a long one in full", async () => {
+    const w = world();
+    const tooLong = await w.set(w.mcpArgs({ args: { q: "x".repeat(600) } }));
+    expect(tooLong).toEqual({
+      error: "The request is too long to show the owner; use fewer or shorter arguments.",
+    });
+    expect(w.sources).toHaveLength(0);
+    const args = { q: "y".repeat(400) };
+    await w.set(w.mcpArgs({ args }));
+    const card = cards[0]?.blocks[0] as { detail: string } | undefined;
+    expect(card?.detail).toContain(JSON.stringify(args));
+  });
+
+  it("posts the pause message in fixed words", async () => {
+    const { postPauseMessage, PAUSE_MESSAGE } = await import("./page-source-tick.js");
+    const sendUserMessage = vi.fn(async () => ({}));
+    await postPauseMessage(
+      {
+        prisma: { thread: { findFirst: vi.fn(async () => ({ id: "t" })) } },
+        events: { sendUserMessage },
+        jobs: { enqueue: vi.fn() },
+      } as never,
+      { spaceId: "sp", userId: "owner", botId: "bot" },
+    );
+    expect(sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(sendUserMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: PAUSE_MESSAGE, trigger: "user" }),
+    );
+  });
+});

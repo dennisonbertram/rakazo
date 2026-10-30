@@ -683,7 +683,7 @@ export class McpConnector implements ConnectorProvider {
     }
     await options.beforeCall?.();
     try {
-      return await this.withSession(
+      const result = await this.withSession(
         server,
         context,
         (current) => {
@@ -692,6 +692,12 @@ export class McpConnector implements ConnectorProvider {
         },
         session,
       );
+      // The same redaction a bot's own MCP call gets: a server that echoes its token must not
+      // put it in a stored result.
+      return redactConnectorPayload(
+        result,
+        material ? oauthMaterialSecrets(material) : [],
+      ) as CallToolResult;
     } catch (error) {
       const secrets = material ? oauthMaterialSecrets(material) : [];
       await this.evict(sessionKey);

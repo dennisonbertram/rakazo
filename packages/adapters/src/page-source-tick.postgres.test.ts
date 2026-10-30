@@ -162,7 +162,9 @@ describePostgres("page source scheduler (PostgreSQL)", () => {
     expect(sendUserMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         botId,
-        prompt: expect.stringMatching(/^The Revenue source on Cash stopped working: .+/),
+        // Fixed words: nothing the bot or a remote server wrote reaches an owner-trusted message.
+        prompt:
+          "A source on one of your pages stopped working. Call page_source_list to see which one and why.",
       }),
     );
     expect(jobs.enqueue).toHaveBeenCalled();

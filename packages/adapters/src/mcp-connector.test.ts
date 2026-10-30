@@ -1601,6 +1601,58 @@ describe("MCP connector HTTP failures", () => {
   });
 });
 
+describe("MCP connector callServerTool redaction", () => {
+  it.each([false, true])(
+    "redacts the server's key from an echoed result (isError %s)",
+    async (isError) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+          const request = input instanceof Request ? input : new Request(input, init);
+          const message = JSON.parse(await request.text()) as { id?: number; method?: string };
+          if (message.method === "initialize")
+            return Response.json({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                protocolVersion: "2025-11-25",
+                capabilities: { tools: {} },
+                serverInfo: { name: "test", version: "1" },
+              },
+            });
+          if (message.method === "tools/call")
+            return Response.json({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                isError,
+                content: [{ type: "text", text: '{"echo":"token-abc123"}' }],
+                structuredContent: { echo: "token-abc123" },
+              },
+            });
+          return new Response(null, { status: 202 });
+        }),
+      );
+      const prisma = {
+        secret: { findFirst: vi.fn().mockResolvedValue({ id: "secret-1", ciphertext: "x" }) },
+      };
+      const connector = new McpConnector(
+        prisma as never,
+        { load: vi.fn().mockReturnValue(JSON.stringify({ secret: "token-abc123" })) } as never,
+        { network: TEST_NETWORK },
+      );
+      const result = await connector.callServerTool(
+        { ...SERVER, secretId: "secret-1" } as never,
+        { spaceId: "w1", userId: "u1", signal: new AbortController().signal } as never,
+        "getAccounts",
+        {},
+      );
+      expect(JSON.stringify(result)).not.toContain("token-abc123");
+      await connector.close();
+    },
+  );
+});
+
 describe("MCP connector private endpoints", () => {
   const privateAssignment = {
     ...ASSIGNMENT,
