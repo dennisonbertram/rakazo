@@ -48,12 +48,14 @@ describePostgres("Brex cards binding (PostgreSQL)", () => {
   const tenant = (t: (typeof tenants)[0]) => ({ spaceId: t.spaceId, userId: t.userId });
   const storeFor = (
     t: (typeof tenants)[0],
-    options: { now?: () => Date; prisma?: typeof app.prisma } = {},
+    options: { now?: () => Date; prisma?: typeof app.prisma; lockTimeoutMs?: number } = {},
   ) =>
     createBrexCardsStore({
       server: { id: t.serverId, spaceId: t.spaceId, userId: t.userId },
       prisma: options.prisma ?? app.prisma,
+      lockDatabaseUrl: runtimeUrl!,
       ...(options.now ? { now: options.now } : {}),
+      ...(options.lockTimeoutMs ? { lockTimeoutMs: options.lockTimeoutMs } : {}),
     });
   const setCap = (t: (typeof tenants)[0], maxCardsPerDay: number) =>
     owner.prisma.brexCardsConnection.update({
@@ -277,6 +279,70 @@ describePostgres("Brex cards binding (PostgreSQL)", () => {
       firstHolds.open();
       await Promise.all([first, second]);
       expect(events).toEqual(["first:start", "first:end", "second:start"]);
+    });
+
+    it("holds the lock across a long call without holding a database transaction open", async () => {
+      const holds = gate();
+      const started = gate();
+      const held = storeFor(a).withTargetLock("card:card_long", async () => {
+        started.open();
+        await holds.opened;
+      });
+      await started.opened;
+      // A held lock on an open transaction ends with that transaction's timeout, whatever the
+      // call is still doing. The lock has to belong to a plain session instead.
+      const [{ granted, inTransaction }] = await owner.prisma.$queryRaw<
+        Array<{ granted: bigint; inTransaction: bigint }>
+      >`SELECT count(*) FILTER (WHERE l.granted) AS granted,
+               count(*) FILTER (WHERE l.granted AND a.state LIKE 'idle in transaction%') AS "inTransaction"
+        FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE l.locktype = 'advisory' AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`;
+      expect(Number(granted)).toBe(1);
+      expect(Number(inTransaction)).toBe(0);
+      holds.open();
+      await held;
+    });
+
+    it("lets locked calls use the Prisma pool even when it has one connection", async () => {
+      const tiny = createDb(runtimeUrl!, { poolMax: 1 });
+      try {
+        const store = storeFor(a, { prisma: tiny.prisma });
+        const both = await Promise.all(
+          ["card:card_pool_1", "card:card_pool_2"].map((key) =>
+            store.withTargetLock(key, async () => (await store.loadControls()).maxCardsPerDay),
+          ),
+        );
+        expect(both).toHaveLength(2);
+      } finally {
+        await tiny.prisma.$disconnect();
+        await tiny.pool.end();
+      }
+    }, 20_000);
+
+    it("refuses with a clear message when the lock is not free in time, without running the call", async () => {
+      const holds = gate();
+      const started = gate();
+      const held = storeFor(a).withTargetLock("card:card_busy", async () => {
+        started.open();
+        await holds.opened;
+      });
+      await started.opened;
+      let ran = false;
+      const outcome = await Promise.race([
+        storeFor(a, { prisma: secondProcess.prisma, lockTimeoutMs: 300 })
+          .withTargetLock("card:card_busy", async () => {
+            ran = true;
+          })
+          .then(
+            () => "ran",
+            (error: Error) => error.message,
+          ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("still waiting"), 3_000)),
+      ]);
+      holds.open();
+      await held;
+      expect(outcome).toMatch(/another change .* in progress/i);
+      expect(ran).toBe(false);
     });
 
     it("does not make a different target wait", async () => {
