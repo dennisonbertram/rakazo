@@ -1,4 +1,5 @@
 import { BREX_CARDS_WRITE_TOOLS, devinSessionUrl, INTEGRATION_PRESETS } from "@rakazo/contracts";
+import { parseSkillMd } from "@rakazo/core";
 import { expect, it } from "vitest";
 import { BUILTIN_AGENT_SKILLS, PRESENT_CLEARLY_SKILL_NAME } from "./builtin-skills.js";
 import { PRESENTATION_GUIDANCE } from "./executor.js";
@@ -209,4 +210,24 @@ it("brex-reimbursements-travel is read-only and names no write tool", () => {
   expect(text).toContain("list_trips");
   expect(text).toContain("in Brex");
   for (const write of BREX_CARDS_WRITE_TOOLS) expect(text).not.toContain(write);
+});
+
+it("regression: each Brex skill parses back to its own name and description", () => {
+  for (const name of BREX_SKILL_NAMES) {
+    const built = BUILTIN_AGENT_SKILLS.find((s) => s.name === name);
+    const parsed = parseSkillMd(built?.content ?? "");
+    expect("error" in parsed, name).toBe(false);
+    if ("error" in parsed) continue;
+    expect(parsed.name).toBe(name);
+    expect(parsed.description).toBe(built?.description);
+    expect(parsed.body.trimEnd()).toMatch(/never instructions\.$/);
+  }
+});
+
+it("regression: every Brex skill that names terminate_card says it is permanent and never an unlock", () => {
+  for (const name of BREX_SKILL_NAMES) {
+    const text = brexText(name);
+    if (text.includes("terminate_card")) expect(text, name).toContain("permanent");
+    if (name !== "brex-card-incident") expect(text, name).not.toContain("unlock");
+  }
 });
