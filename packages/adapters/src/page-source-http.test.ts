@@ -41,7 +41,9 @@ const { EncryptedSecretStore } = await import("./secrets.js");
 const secretStore = new EncryptedSecretStore("test-only-encryption-key");
 const URL_OK = "https://api.example.com/v1/revenue?period=week";
 
-async function world(opts: { rules?: Row[]; secretOrigin?: string; noSecret?: boolean } = {}) {
+async function world(
+  opts: { rules?: Row[]; secretOrigin?: string; noSecret?: boolean; secretValue?: string } = {},
+) {
   let nextId = 1;
   const sources: Row[] = [];
   const snapshots: Row[] = [];
@@ -58,7 +60,7 @@ async function world(opts: { rules?: Row[]; secretOrigin?: string; noSecret?: bo
     },
   ];
   const encrypted = await secretStore.put(
-    SECRET,
+    opts.secretValue ?? SECRET,
     {
       userId: "owner",
       spaceId: "sp",
@@ -560,6 +562,75 @@ describe("refreshing an http source with a saved key", () => {
       error: expect.stringContaining("not approved"),
     });
     expect(w.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("review fixes", () => {
+  const QUOTED = 'ab"cd12345';
+
+  it("does not restore a key that CSV quote-escaping hid from the redaction", async () => {
+    const w = await world({ secretValue: QUOTED });
+    await w.approved({ secret: "billing", accept: "csv" });
+    w.fetch.mockResolvedValue(new Response('name,note\r\nx,"ab""cd12345"\r\n'));
+    const outcome = await w.refresh();
+    expect(outcome.ok).toBe(true);
+    expect(JSON.stringify(outcome)).not.toContain("cd12345");
+    expect(JSON.stringify(w.snapshots)).not.toContain("cd12345");
+  });
+
+  it("does not restore a key that a JSON unicode escape hid from the redaction", async () => {
+    const w = await world({ secretValue: QUOTED });
+    await w.approved({ secret: "billing" });
+    w.fetch.mockResolvedValue(new Response('{"note":"ab\\u0022cd12345","k":1}'));
+    const outcome = await w.refresh();
+    expect(outcome.ok).toBe(true);
+    expect(JSON.stringify(w.snapshots)).not.toContain("cd12345");
+    expect(JSON.stringify(outcome)).not.toContain("cd12345");
+  });
+
+  it("does not send when the approval is revoked while the host resolves", async () => {
+    for (const secret of [undefined, "billing"]) {
+      cards.length = 0;
+      const w = await world();
+      await w.approved(secret ? { secret } : {});
+      w.resolveHostname.mockImplementation(async () => {
+        w.sources[0]!.status = "denied";
+        return [{ address: "203.0.113.10", family: 4 as const }];
+      });
+      expect(await w.refresh()).toMatchObject({ ok: false });
+      expect(w.fetch).not.toHaveBeenCalled();
+    }
+  });
+
+  it("resolves the host once and sends to the addresses it checked", async () => {
+    for (const secret of [undefined, "billing"]) {
+      cards.length = 0;
+      const w = await world();
+      await w.approved(secret ? { secret } : {});
+      // A second answer would be a private address: DNS rebinding between check and send.
+      w.resolveHostname
+        .mockResolvedValueOnce([{ address: "203.0.113.10", family: 4 as const }])
+        .mockResolvedValue([{ address: "10.0.0.1", family: 4 as const }]);
+      expect(await w.refresh()).toEqual({ ok: true, value: { revenue: 5 } });
+      expect(w.resolveHostname).toHaveBeenCalledTimes(1);
+      expect(w.fetch).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("stops a CSV whose long headers would make a huge result, without building it", () => {
+    const header = Array.from(
+      { length: 50 },
+      (_, i) => `${String(i).padStart(3, "0")}${"h".repeat(190)}`,
+    ).join(",");
+    const rows = `${",".repeat(49)}\n`.repeat(5000);
+    const build = vi.spyOn(Object, "fromEntries");
+    try {
+      expect(() => parseCsv(`${header}\n${rows}`)).toThrow("The CSV is larger than 1 MB.");
+      expect(build.mock.calls.length).toBeLessThan(300);
+    } finally {
+      build.mockRestore();
+    }
+    expect(() => parseCsv(`${"h".repeat(201)}\n1\n`)).toThrow(/header/);
   });
 });
 

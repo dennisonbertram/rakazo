@@ -1,12 +1,15 @@
 import type { SecretStore } from "@rakazo/adapter-kit";
 import type { HttpSourceCall } from "@rakazo/contracts";
-import { HttpSourceCallSchema } from "@rakazo/contracts";
+import { HttpSourceCallSchema, PAGE_SOURCE_VALUE_MAX_BYTES } from "@rakazo/contracts";
 import type { ActionApprovalRule } from "@rakazo/core";
 import { resolveActionApprovalDetail } from "@rakazo/core";
 import { urlSite } from "@rakazo/core/egress";
 import type { PrismaClient } from "@rakazo/db";
 import { listApprovalRules } from "@rakazo/db";
 import { findBotSecret, requestWithBotSecret } from "./bot-secrets.js";
+import { redactConnectorPayload } from "./connector-safety.js";
+import type { ResolveHostname } from "./network-address.js";
+import { defaultResolveHostname, isPrivateAddress } from "./network-address.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { fetchSafeWebBytes, isBlockedHostname } from "./web-ssrf.js";
 
@@ -14,6 +17,9 @@ export const HTTP_SOURCE_MAX_BYTES = 1_000_000;
 export const HTTP_SOURCE_CSV_MAX_ROWS = 5_000;
 export const HTTP_SOURCE_CSV_MAX_COLUMNS = 50;
 const TIMEOUT_MS = 15_000;
+const CSV_HEADER_MAX = 200;
+/** Added per cell when sizing the parsed rows (quotes, colon, comma). */
+const CSV_CELL_OVERHEAD = 6;
 
 type Scope = { spaceId: string; botId: string; userId: string };
 
@@ -118,14 +124,24 @@ export function parseCsv(text: string): Record<string, string | number>[] {
   if (any || field !== "") endRow();
   const [header, ...rows] = table;
   if (!header) throw new HttpSourceError("The CSV is empty.");
-  return rows.map((cells) =>
-    Object.fromEntries(
+  if (header.some((name) => name.length > CSV_HEADER_MAX)) {
+    throw new HttpSourceError(`A CSV header is longer than ${CSV_HEADER_MAX} characters.`);
+  }
+  // Every row repeats every header as a key, so size the output before building each row.
+  const headerBytes = header.reduce((sum, name) => sum + name.length + CSV_CELL_OVERHEAD, 0);
+  let bytes = 0;
+  return rows.map((cells) => {
+    bytes += headerBytes + cells.reduce((sum, cell) => sum + cell.length, 0);
+    if (bytes > PAGE_SOURCE_VALUE_MAX_BYTES) {
+      throw new HttpSourceError("The CSV is larger than 1 MB.");
+    }
+    return Object.fromEntries(
       header.map((name, index) => {
         const cell = cells[index] ?? "";
         return [name, NUMBER.test(cell) ? Number(cell) : cell];
       }),
-    ),
-  );
+    );
+  });
 }
 
 function statusError(status: number): HttpSourceError {
@@ -160,17 +176,30 @@ export async function runHttpSource(
   call: HttpSourceCall,
   beforeSend: () => Promise<void>,
 ): Promise<unknown> {
+  // Resolve once and check the addresses first. The approval check then comes after the only slow
+  // lookup, and the request is sent to exactly these addresses (connect-time checks still run).
+  const resolve = deps.network?.resolveHostname ?? defaultResolveHostname;
+  const addresses = await resolve(new URL(call.url).hostname.replace(/^\[|\]$/g, ""));
+  if (addresses.length === 0 || addresses.some((entry) => isPrivateAddress(entry.address))) {
+    throw new HttpSourceError("The URL targets a private or internal host.");
+  }
+  const pinned: ResolveHostname = async () => addresses;
+  const network = { fetch: deps.network?.fetch, resolveHostname: pinned };
   if (call.secret) {
     if (!deps.secretStore) throw new HttpSourceError("Saved keys are not available.");
     let stopped: unknown;
+    let redactions: string[] = [];
     const result = (await requestWithBotSecret({
       prisma: deps.prisma,
       secretStore: deps.secretStore,
       scope,
       request: { name: call.secret, url: call.url, method: "GET" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      remote: deps.network,
+      remote: network,
       maxOutputChars: HTTP_SOURCE_MAX_BYTES,
+      registerRedactions: (values) => {
+        redactions = values;
+      },
       beforeSend: () =>
         beforeSend().catch((error: unknown) => {
           stopped = error;
@@ -194,7 +223,9 @@ export async function runHttpSource(
     }
     if (result.status < 200 || result.status >= 300) throw statusError(result.status);
     if (result.truncated) throw new HttpSourceError("The response is larger than 1 MB.");
-    return parseBody(call.accept, result.body);
+    // Redact again after parsing: decoding (CSV quotes, JSON escapes) can rebuild a key that the
+    // raw text did not contain.
+    return redactConnectorPayload(parseBody(call.accept, result.body), redactions);
   }
   await beforeSend();
   let response: Awaited<ReturnType<typeof fetchSafeWebBytes>>;
@@ -205,8 +236,8 @@ export async function runHttpSource(
       timeoutMs: TIMEOUT_MS,
       maxBytes: HTTP_SOURCE_MAX_BYTES,
       headers: { accept: call.accept === "csv" ? "text/csv" : "application/json" },
-      fetch: deps.network?.fetch,
-      resolveHostname: deps.network?.resolveHostname,
+      fetch: network.fetch,
+      resolveHostname: pinned,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
