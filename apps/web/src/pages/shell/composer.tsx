@@ -32,6 +32,7 @@ import { maskCurrencyWhenHidden, useHideAmounts } from "../../lib/hide-amounts-p
 import { isFileDrag, isFilePaste } from "../../lib/pending-attachments";
 import type { DataRoomRef } from "../../lib/send-to-agent";
 import { slashSkillOptions as pickSlashSkills, slashSkillLabel } from "../../lib/slash-skills";
+import { isCoarsePointer, revealAboveKeyboard } from "../../lib/visual-viewport";
 import { ComposerReplyPreview, previewMessageText } from "./chat-context";
 import { ComposerError } from "./composer-error";
 import { MentionIcon } from "./mention-icon";
@@ -638,7 +639,7 @@ export const Composer = memo(function Composer({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative z-30 m-0 min-w-0 border-0 px-3 pb-4 pt-3 md:px-[max(1.75rem,calc((100%-900px)/2))] md:pb-6 ${
+      className={`relative z-30 m-0 min-w-0 border-0 px-3 pb-4 pt-3 md:px-[max(1.75rem,calc((100%-720px)/2))] md:pb-6 ${
         draggingFiles ? "rounded-[14px] ring-2 ring-inset ring-ring" : ""
       }`}
     >
@@ -1002,6 +1003,10 @@ export const Composer = memo(function Composer({
             value={draft}
             onChange={(event) => updateDraft(event.target.value)}
             onPaste={handlePaste}
+            enterKeyHint={isCoarsePointer() ? "enter" : undefined}
+            onFocus={(event) =>
+              revealAboveKeyboard(event.currentTarget.closest("fieldset") ?? event.currentTarget)
+            }
             onKeyDown={(event) => {
               if (
                 event.key === "Backspace" &&
@@ -1098,6 +1103,8 @@ export const Composer = memo(function Composer({
                 }
               }
               if (action.type === "send") {
+                // A phone keyboard has no Shift+Return, so Return adds a line and Send sends.
+                if (isCoarsePointer()) return;
                 event.preventDefault();
                 void send();
               }

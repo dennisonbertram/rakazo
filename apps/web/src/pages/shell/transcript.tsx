@@ -744,7 +744,7 @@ export const Transcript = memo(function Transcript({
           }
         }}
         data-transcript=""
-        className="@container rk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-5 pb-[calc(1.25rem+var(--toast-reserve,0px))] md:px-[max(1.75rem,calc((100%-900px)/2))] md:pt-6 md:pb-[calc(1.5rem+var(--toast-reserve,0px))]"
+        className="@container rk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-5 pb-[calc(1.25rem+var(--toast-reserve,0px))] md:px-[max(1.75rem,calc((100%-720px)/2))] md:pt-6 md:pb-[calc(1.5rem+var(--toast-reserve,0px))]"
       >
         {olderCursor != null ? (
           <button
