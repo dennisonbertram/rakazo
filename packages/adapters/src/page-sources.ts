@@ -499,7 +499,7 @@ export async function refreshPageSource(
       sourceId: source.id,
       kind: source.kind,
       shown: message,
-      error: errorChain(error),
+      cause: errorChain(error),
     });
     const failures = source.failures + 1;
     const pause = failures >= PAGE_SOURCE_PAUSE_AFTER;

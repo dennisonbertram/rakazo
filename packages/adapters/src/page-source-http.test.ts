@@ -459,7 +459,7 @@ describe("refreshing an http source", () => {
       expect(await w.refresh()).toEqual({ ok: false, error: "The request failed." });
       expect(warn).toHaveBeenCalledWith(
         "page source refresh failed",
-        expect.objectContaining({ error: expect.stringContaining("ECONNRESET") }),
+        expect.objectContaining({ cause: expect.stringContaining("ECONNRESET") }),
       );
     } finally {
       warn.mockRestore();
