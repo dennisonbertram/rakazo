@@ -1784,6 +1784,8 @@ export const appContract = {
     /** The caller's Omi connection with upload and recording counts; null before connecting. */
     status: oc.output(OmiStatusSchema),
     /** Revokes the connection; recordings stay unless `deleteRecordings` is true. */
+    /** Deletes every recording, transcript, meeting and note; the connection stays. */
+    deleteRecordings: oc.output(z.object({ ok: z.literal(true) })),
     disconnect: oc.input(OmiDisconnectInputSchema).output(z.object({ ok: z.literal(true) })),
     segments: {
       /** The caller's sorted stretches, newest first. */

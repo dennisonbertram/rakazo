@@ -574,7 +574,7 @@ import {
   serializeSpaceMemoryConfig,
   updateMemoryProviderDefaultScope,
 } from "./memory-provider-config.js";
-import { connectOmi, disconnectOmi, omiStatus } from "./omi.js";
+import { connectOmi, deleteOmiRecordingsFor, disconnectOmi, omiStatus } from "./omi.js";
 import {
   chooseFocus,
   dismissFocus,
@@ -8213,6 +8213,9 @@ export function createRouter(deps: RouterDeps) {
         ),
       ),
       status: authed.omi.status.handler(({ context }) => omiStatus(deps, context.actor)),
+      deleteRecordings: authed.omi.deleteRecordings.handler(({ context }) =>
+        deleteOmiRecordingsFor(deps, context.actor),
+      ),
       disconnect: authed.omi.disconnect.handler(({ context, input }) =>
         disconnectOmi(deps, context.actor, input),
       ),

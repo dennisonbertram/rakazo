@@ -5097,6 +5097,7 @@ export function ShellPage() {
                 activeBotId={activeBotId.current}
                 onOpenMessaging={() => setMessagingSettingsOpen(true)}
                 onOpenAiDataSharing={() => openSettings("general")}
+                onOpenVoiceSettings={() => openSettings("voice")}
               />
             </ErrorBoundary>
           ) : dataRoomMode ? (

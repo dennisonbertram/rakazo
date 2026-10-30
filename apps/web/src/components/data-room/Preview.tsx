@@ -35,6 +35,7 @@ import { ItemMenu } from "./ItemMenu";
 import {
   FileViewer,
   FullScreenPreview,
+  isAudio,
   isShowable,
   PreviewActions,
   useFileUrl,
@@ -281,7 +282,8 @@ export function Preview({
   const showFile = !sheet && !hidden;
   const file = useFileUrl(item, showFile);
   const canFullScreen =
-    item.status !== "failed" && (sheet || (showFile && isShowable(item) && !file.failed));
+    item.status !== "failed" &&
+    (sheet || (showFile && isShowable(item) && !isAudio(item) && !file.failed));
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Escape closes the pane from any control inside it
     <aside
@@ -375,7 +377,7 @@ export function Preview({
       ) : facets.summary ? (
         <p className="text-sm">{maskCurrencyWhenHidden(facets.summary)}</p>
       ) : null}
-      {isSettled(item.status, !!item.previewText) && item.notIndexed ? (
+      {isAudio(item) ? null : isSettled(item.status, !!item.previewText) && item.notIndexed ? (
         <p className="text-xs text-muted-foreground">{t`Too large to search inside`}</p>
       ) : isSettled(item.status, !!item.previewText) && item.error ? (
         <p className="text-xs text-muted-foreground">{t`Couldn't classify`}</p>

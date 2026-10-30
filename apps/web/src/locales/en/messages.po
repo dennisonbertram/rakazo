@@ -1040,6 +1040,10 @@ msgstr "Add a schedule, webhook, GitHub, or message trigger"
 msgid "Add a skill"
 msgstr "Add a skill"
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Add a transcription key"
+msgstr "Add a transcription key"
+
 #: src/components/finance/AddAccountDialog.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceAccounts.tsx
@@ -3327,6 +3331,10 @@ msgstr "Connect MCP server “{name}”"
 msgid "Connect Mercury"
 msgstr "Connect Mercury"
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Connect pendant"
+msgstr "Connect pendant"
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Connect Treg"
 msgstr "Connect Treg"
@@ -3410,6 +3418,7 @@ msgstr "Connecting to tools"
 #: src/components/integrations/DevinConnectDialog.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/integrations/OmiPage.tsx
 #: src/components/integrations/parts.tsx
 #: src/pages/Finance.tsx
 #: src/pages/GoogleOAuthCallback.tsx
@@ -4029,6 +4038,10 @@ msgstr "Could not reach Praci. Try again."
 msgid "Could not reach the model server."
 msgstr "Could not reach the model server."
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Could not reach the pendant"
+msgstr "Could not reach the pendant"
+
 #: src/lib/computer-sandbox.ts
 #: src/lib/user-error.ts
 #: src/pages/AccountSettingsOverlay.tsx
@@ -4302,11 +4315,13 @@ msgstr "Could not update"
 
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/OmiPage.tsx
 msgid "Could not update access"
 msgstr "Could not update access"
 
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/OmiPage.tsx
 msgid "Could not update bot access"
 msgstr "Could not update bot access"
 
@@ -4330,6 +4345,10 @@ msgstr "Could not update the default memory scope"
 #: src/pages/Investors.tsx
 msgid "Could not update the request"
 msgstr "Could not update the request"
+
+#: src/components/integrations/OmiPage.tsx
+msgid "Could not upload · saved on this computer"
+msgstr "Could not upload · saved on this computer"
 
 #: src/components/computer/FilesApp.tsx
 msgid "Could not upload file"
@@ -4704,6 +4723,7 @@ msgstr "Default ({0})"
 #: src/components/data-room/ItemMenu.tsx
 #: src/components/data-room/Preview.tsx
 #: src/components/fundraising/SafeList.tsx
+#: src/components/integrations/OmiPage.tsx
 #: src/components/integrations/StoredMeetingsList.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/BotContextMenu.tsx
@@ -4755,6 +4775,14 @@ msgstr "Delete {title}"
 #: src/components/AccountAccess.tsx
 msgid "Delete account"
 msgstr "Delete account"
+
+#: src/components/integrations/OmiPage.tsx
+msgid "Delete all recordings"
+msgstr "Delete all recordings"
+
+#: src/components/integrations/OmiPage.tsx
+msgid "Delete all recordings?"
+msgstr "Delete all recordings?"
 
 #: src/pages/shell/bot-page-panel.tsx
 msgid "Delete block"
@@ -4956,6 +4984,7 @@ msgid "Discarded"
 msgstr "Discarded"
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyPrivacy.tsx
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -5145,6 +5174,15 @@ msgstr "Download Executor"
 #: src/components/inbox/MailAttachments.tsx
 msgid "Downloaded {0}"
 msgstr "Downloaded {0}"
+
+#: src/components/integrations/OmiPage.tsx
+msgid "Downloading"
+msgstr "Downloading"
+
+#. placeholder {0}: total ?? done
+#: src/components/integrations/OmiPage.tsx
+msgid "Downloading {done} of {0} min"
+msgstr "Downloading {done} of {0} min"
 
 #: src/components/DesktopUpdates.tsx
 msgid "Downloading…"
@@ -6595,6 +6633,7 @@ msgstr "Integration sign-in"
 #: src/components/integrations/GranolaPage.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/OmiPage.tsx
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/space-sidebar.tsx
@@ -7384,6 +7423,7 @@ msgid "Medium"
 msgstr "Medium"
 
 #: src/components/ContactDialog.tsx
+#: src/components/integrations/OmiSegments.tsx
 msgid "Meeting"
 msgstr "Meeting"
 
@@ -7640,6 +7680,8 @@ msgstr "Monthly spend · {0} – {1}"
 
 #: src/components/inbox/CleanupActionBar.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/integrations/OmiPage.tsx
+#: src/components/integrations/OmiSegments.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -7734,6 +7776,18 @@ msgstr "Move to"
 #: src/components/inbox/InboxMessageDialog.tsx
 msgid "Move to Inbox"
 msgstr "Move to Inbox"
+
+#: src/components/integrations/OmiSegments.tsx
+msgid "Move to Meeting"
+msgstr "Move to Meeting"
+
+#: src/components/integrations/OmiSegments.tsx
+msgid "Move to Note"
+msgstr "Move to Note"
+
+#: src/components/integrations/OmiSegments.tsx
+msgid "Move to Trash"
+msgstr "Move to Trash"
 
 #: src/pages/shell/bot-page-panel.tsx
 msgid "Move up"
@@ -8561,6 +8615,7 @@ msgid "Not waiting for approval"
 msgstr "Not waiting for approval"
 
 #: src/components/finance/charts.tsx
+#: src/components/integrations/OmiSegments.tsx
 msgid "Note"
 msgstr "Note"
 
@@ -8680,6 +8735,14 @@ msgstr "Off in Settings"
 #: src/pages/McpConnectionActivity.tsx
 msgid "OK"
 msgstr "OK"
+
+#: src/components/data-room/FilterBar.tsx
+msgid "Omi"
+msgstr "Omi"
+
+#: src/components/integrations/OmiPage.tsx
+msgid "Omi agent"
+msgstr "Omi agent"
 
 #. placeholder {0}: call.botName
 #: src/components/call/CallCard.tsx
@@ -9173,10 +9236,15 @@ msgstr "Path"
 msgid "Pause"
 msgstr "Pause"
 
+#: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Paused"
+
+#: src/components/integrations/OmiPage.tsx
+msgid "Paused · {done} of {total} min saved"
+msgstr "Paused · {done} of {total} min saved"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Paused: no access"
@@ -9209,6 +9277,10 @@ msgstr "Payment"
 #: src/components/finance/AddAccountDialog.tsx
 msgid "PDF, CSV, OFX or QFX"
 msgstr "PDF, CSV, OFX or QFX"
+
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Pendant recordings, meetings and notes"
+msgstr "Pendant recordings, meetings and notes"
 
 #: src/pages/Finance.tsx
 msgid "pending"
@@ -9868,6 +9940,7 @@ msgstr "Recipients"
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyPrivacy.tsx
 #: src/pages/Devin.tsx
 #: src/pages/Finance.tsx
@@ -10204,6 +10277,10 @@ msgstr "Removes all {accountCount} accounts and bot access."
 msgid "Removes the account and bot access."
 msgstr "Removes the account and bot access."
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Removes the audio, transcripts and meetings from Praci."
+msgstr "Removes the audio, transcripts and meetings from Praci."
+
 #: src/components/integrations/McpDetail.tsx
 msgid "Removes the connection and bot access."
 msgstr "Removes the connection and bot access."
@@ -10401,6 +10478,7 @@ msgstr "Restart the Praci server to start using iMessage."
 msgid "Restart to update"
 msgstr "Restart to update"
 
+#: src/components/integrations/OmiSegments.tsx
 #: src/pages/Legal.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Restore"
@@ -12140,6 +12218,15 @@ msgstr "Sync failed"
 msgid "Sync failed."
 msgstr "Sync failed."
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Sync now"
+msgstr "Sync now"
+
+#. placeholder {0}: formatRelativeTime(new Date(state.at).toISOString())
+#: src/components/integrations/OmiPage.tsx
+msgid "Synced {0}"
+msgstr "Synced {0}"
+
 #: src/pages/Finance.tsx
 msgid "synced {updated}"
 msgstr "synced {updated}"
@@ -12721,6 +12808,7 @@ msgstr "To-dos"
 #: src/components/EmailCards.tsx
 #: src/components/gtm/GtmCalendar.tsx
 #: src/components/inbox/TodoCard.tsx
+#: src/components/integrations/OmiSegments.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Inbox.tsx
@@ -12861,6 +12949,7 @@ msgid "Transport"
 msgstr "Transport"
 
 #: src/components/inbox/InboxRow.tsx
+#: src/components/integrations/OmiSegments.tsx
 #: src/pages/Inbox.tsx
 msgid "Trash"
 msgstr "Trash"
@@ -13174,6 +13263,10 @@ msgstr "Update options"
 msgid "Update progress"
 msgstr "Update progress"
 
+#: src/components/integrations/OmiPage.tsx
+msgid "Update the pendant in the Omi app"
+msgstr "Update the pendant in the Omi app"
+
 #: src/components/SoftwareUpdateSection.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/devin/DevinSessions.tsx
@@ -13321,6 +13414,10 @@ msgstr "Use an API key instead"
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Use API key"
 msgstr "Use API key"
+
+#: src/components/integrations/OmiPage.tsx
+msgid "Use Chrome, Edge or the desktop app"
+msgstr "Use Chrome, Edge or the desktop app"
 
 #: src/lib/model-connection-preflight.ts
 msgid "Use Connect to verify the key."
