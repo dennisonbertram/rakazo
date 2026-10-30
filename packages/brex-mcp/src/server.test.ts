@@ -549,3 +549,110 @@ describe("reads", () => {
     expect(result.text).toMatch(/token/i);
   });
 });
+
+describe("regression", () => {
+  it("round trip: create, update, lock and terminate act on the same card", async () => {
+    const { emulator, call } = await setup();
+    const created = await call("create_vendor_card", createArgs, "eff-create");
+    expect(created.isError).toBe(false);
+    const target = { cardId: created.json.id, cardName: "Notion", lastFour: created.json.lastFour };
+
+    const updated = await call("update_card", { ...target, amountCents: 40_000 }, "eff-update");
+    expect(updated.json).toMatchObject({
+      id: target.cardId,
+      limitCents: 40_000,
+      duration: "MONTHLY",
+    });
+    expect((await call("lock_card", { ...target, reason: "OTHER" }, "eff-lock")).json.status).toBe(
+      "LOCKED",
+    );
+    expect(
+      (await call("terminate_card", { ...target, reason: "DO_NOT_NEED_VIRTUAL_CARD" }, "eff-end"))
+        .json.status,
+    ).toBe("TERMINATED");
+
+    const stored = emulator.cards.find((c) => c.id === target.cardId);
+    expect(stored).toMatchObject({
+      status: "TERMINATED",
+      spend_controls: { spend_limit: { amount: 40_000 } },
+    });
+    expect(
+      emulator.requests.filter((r) => r.method !== "GET").map((r) => `${r.method} ${r.path}`),
+    ).toEqual([
+      "POST /v2/cards",
+      `PUT /v2/cards/${target.cardId}`,
+      `POST /v2/cards/${target.cardId}/lock`,
+      `POST /v2/cards/${target.cardId}/terminate`,
+    ]);
+  });
+
+  it("a safe spend limit stays safe: every attempt to loosen it is refused and the limit is unchanged", async () => {
+    const { emulator, call } = await setup();
+    const before = structuredClone(emulator.spendLimits.find((s) => s.id === "sl_template"));
+    const target = { spendLimitId: "sl_template", spendLimitName: "Software template" };
+    for (const extra of [
+      { authorizationType: "SOFT" },
+      { authorization_settings: { authorization_type: "SOFT" } },
+      { limitBufferPercentage: 25 },
+      { status: "DELETED" },
+      { expensePolicyId: "pol_other" },
+    ])
+      expect(
+        (await call("update_spend_limit", { ...target, amountCents: 1000, ...extra })).isError,
+      ).toBe(true);
+    expect(emulator.spendLimits.find((s) => s.id === "sl_template")).toEqual(before);
+    expect(emulator.requests.filter((r) => r.method !== "GET")).toEqual([]);
+  });
+
+  it("a new spend limit is HARD even when the template is SOFT", async () => {
+    const { emulator, call } = await setup();
+    const result = await call("create_spend_limit", {
+      ...limitArgs,
+      templateSpendLimitId: "sl_soft",
+      templateName: "Soft travel",
+    });
+    expect(result.isError).toBe(false);
+    expect(result.json).toMatchObject({
+      authorizationType: "HARD",
+      bufferPercentage: null,
+      autoCreateCards: "DISABLED",
+    });
+    const stored = emulator.spendLimits.find((s) => s.id === result.json.id);
+    expect(stored?.authorization_settings).toMatchObject({
+      authorization_type: "HARD",
+      rollover_refresh_rate: "OFF",
+    });
+  });
+
+  it("no tool ever requests /pan, secure_email, unlock or a transfer", async () => {
+    const { emulator, call } = await setup();
+    const card = { cardId: "card_figma", cardName: "Figma", lastFour: "4242" };
+    const limit = { spendLimitId: "sl_template", spendLimitName: "Software template" };
+    const calls: Array<[string, Record<string, unknown>]> = [
+      ["list_cards", {}],
+      ["get_card", { cardId: "card_figma" }],
+      ["list_users", {}],
+      ["list_spend_limits", {}],
+      ["get_spend_limit", { spendLimitId: "sl_template" }],
+      ["list_expenses", {}],
+      ["list_card_transactions", {}],
+      ["list_trips", {}],
+      ["list_cash_accounts", {}],
+      ["list_statements", {}],
+      ["create_vendor_card", createArgs],
+      ["update_card", { ...card, amountCents: 1000 }],
+      ["lock_card", { ...card, reason: "OTHER" }],
+      ["terminate_card", { ...card, reason: "OTHER" }],
+      ["create_spend_limit", limitArgs],
+      ["update_spend_limit", { ...limit, amountCents: 1000 }],
+      ["update_expense_memo", { expenseId: "exp_1", memo: "Design seats" }],
+    ];
+    for (const [name, args] of calls) await call(name, args);
+    expect(emulator.requests.length).toBeGreaterThan(calls.length);
+    expect(
+      emulator.requests
+        .map((r) => r.path)
+        .filter((p) => /pan|secure_email|unlock|transfer/.test(p)),
+    ).toEqual([]);
+  });
+});
