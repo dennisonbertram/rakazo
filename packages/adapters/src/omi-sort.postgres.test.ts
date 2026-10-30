@@ -149,7 +149,14 @@ describePostgres("Omi sorting (PostgreSQL)", () => {
         },
       });
       await prisma.connection.create({
-        data: { spaceId, userId, connectorId: "omi", provider: "omi", displayName: "Omi", status: "connected" },
+        data: {
+          spaceId,
+          userId,
+          connectorId: "omi",
+          provider: "omi",
+          displayName: "Omi",
+          status: "connected",
+        },
       });
       actors.push({ userId, spaceId, email: `${userId}@rakazo.test`, isDeploymentOwner: false });
     }

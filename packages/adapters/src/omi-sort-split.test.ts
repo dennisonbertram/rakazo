@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { normalizeStretches, parseOmiTranscript } from "./omi-sort-split.js";
 
-const seg = (start: number, end: number, kind: "meeting" | "note" | "trash" = "note", title = "t") => ({
+const seg = (
+  start: number,
+  end: number,
+  kind: "meeting" | "note" | "trash" = "note",
+  title = "t",
+) => ({
   start,
   end,
   kind,
