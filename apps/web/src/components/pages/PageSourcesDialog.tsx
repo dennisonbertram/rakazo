@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { PageSource } from "@rakazo/contracts";
+import type { PageSource, PageSourceSchedule } from "@rakazo/contracts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,12 +19,34 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@rakazo/ui-web";
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
+
+const SCHEDULES: PageSourceSchedule[] = ["15m", "1h", "6h", "1d", "1w"];
+
+function scheduleLabel(schedule: PageSourceSchedule): string {
+  switch (schedule) {
+    case "15m":
+      return t`Every 15 min`;
+    case "1h":
+      return t`Hourly`;
+    case "6h":
+      return t`Every 6 hours`;
+    case "1d":
+      return t`Daily`;
+    case "1w":
+      return t`Weekly`;
+  }
+}
 
 function statusBadge(source: PageSource): {
   label: string;
@@ -87,6 +109,17 @@ export function PageSourcesDialog({
     };
   }, [open, botId, pageId]);
 
+  /** Run an owner change and show the source the server returns. */
+  const change = async (work: Promise<PageSource>) => {
+    try {
+      const saved = await work;
+      setSources((list) => list?.map((source) => (source.id === saved.id ? saved : source)));
+      onChanged();
+    } catch (cause) {
+      setError(errorText(cause));
+    }
+  };
+
   const remove = async () => {
     if (!removing) return;
     try {
@@ -126,7 +159,9 @@ export function PageSourcesDialog({
                     <li key={source.id} className="flex items-center gap-3 py-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{source.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{source.call.tool}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {source.call.tool} · {scheduleLabel(source.schedule)}
+                        </p>
                       </div>
                       <span className="text-xs text-muted-foreground">
                         {refreshedText(source.lastRefreshAt)}
@@ -145,6 +180,53 @@ export function PageSourcesDialog({
                           }
                         />
                         <DropdownMenuContent align="end">
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <Trans>Change schedule</Trans>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              <DropdownMenuRadioGroup
+                                value={source.schedule}
+                                onValueChange={(schedule) =>
+                                  void change(
+                                    rpc.pages.setSourceSchedule({
+                                      botId,
+                                      sourceId: source.id,
+                                      schedule: schedule as PageSourceSchedule,
+                                    }),
+                                  )
+                                }
+                              >
+                                {SCHEDULES.map((schedule) => (
+                                  <DropdownMenuRadioItem
+                                    key={schedule}
+                                    value={schedule}
+                                    closeOnClick
+                                  >
+                                    {scheduleLabel(schedule)}
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                          {source.status === "active" ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                void change(rpc.pages.pauseSource({ botId, sourceId: source.id }))
+                              }
+                            >
+                              <Trans>Pause</Trans>
+                            </DropdownMenuItem>
+                          ) : null}
+                          {source.status === "paused" ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                void change(rpc.pages.resumeSource({ botId, sourceId: source.id }))
+                              }
+                            >
+                              <Trans>Resume</Trans>
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem
                             variant="destructive"
                             onClick={() => setRemoving(source)}

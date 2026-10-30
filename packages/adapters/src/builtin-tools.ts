@@ -589,7 +589,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "page_source_set",
     description:
-      "Save or replace a named data source on a page: a read-only Praci data tool that the server reruns on a schedule without you. Page metric, table and chart blocks show its stored result by source name. Runs the tool once now and returns the saved source and a preview of the result (up to 4,000 characters) so you can choose the path to show. A page can have 20 sources.",
+      "Save or replace a named data source on a page: a read-only Praci data tool that the server reruns on a schedule without you. Page metric, table and chart blocks show its stored result by source name. Runs the tool once now and returns the saved source and a preview of the result (up to 4,000 characters) so you can choose the path to show. A page can have 20 sources and a space 100. A source that fails five times in a row is paused (you get a message); call this again with the same name to fix it and resume it.",
     inputSchema: {
       type: "object",
       properties: {

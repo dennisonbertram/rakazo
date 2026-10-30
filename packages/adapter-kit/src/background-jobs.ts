@@ -92,6 +92,8 @@ const payloadSchemas = {
   "company.import.recover": z.object({}),
   "company.refresh.tick": z.object({}),
   "watch.probe": z.object({}),
+  "pages.refresh.tick": z.object({}),
+  "pages.snapshots.retention": z.object({}),
   "finance.sync": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
   "omi.assemble": z.object({
     spaceId: z.string().min(1),

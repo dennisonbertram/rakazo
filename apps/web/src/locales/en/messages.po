@@ -2513,6 +2513,10 @@ msgstr "Change"
 msgid "Change password"
 msgstr "Change password"
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Change schedule"
+msgstr "Change schedule"
+
 #: src/pages/Investors.tsx
 msgid "Change source"
 msgstr "Change source"
@@ -4631,6 +4635,7 @@ msgstr "Customize bot avatar"
 msgid "Cut costs"
 msgstr "Cut costs"
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Daily"
 msgstr "Daily"
@@ -5592,6 +5597,10 @@ msgstr "Every"
 msgid "every {intervalAmountSelect} {intervalUnitSelect}"
 msgstr "every {intervalAmountSelect} {intervalUnitSelect}"
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Every 15 min"
+msgstr "Every 15 min"
+
 #: src/pages/RoutineEditor.tsx
 msgid "Every 15 minutes"
 msgstr "Every 15 minutes"
@@ -5599,6 +5608,10 @@ msgstr "Every 15 minutes"
 #: src/pages/shell/bot-panel.tsx
 msgid "Every 4 hours"
 msgstr "Every 4 hours"
+
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Every 6 hours"
+msgstr "Every 6 hours"
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Every bot loses access to {name}."
@@ -6362,6 +6375,10 @@ msgstr "Holdings as of today, not {0}"
 #: src/pages/RoutineSchedule.tsx
 msgid "hour"
 msgstr "hour"
+
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "Hourly"
+msgstr "Hourly"
 
 #: src/pages/ExternalConversationSettings.tsx
 #: src/pages/RoutineSchedule.tsx
@@ -9260,6 +9277,7 @@ msgstr "Paste your API key, then test again."
 msgid "Path"
 msgstr "Path"
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Pause"
 msgstr "Pause"
@@ -10546,6 +10564,7 @@ msgstr "Restored {name}"
 msgid "Restoring your workspace"
 msgstr "Restoring your workspace"
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Resume"
 msgstr "Resume"
@@ -13781,6 +13800,7 @@ msgstr "Week"
 msgid "Weekdays"
 msgstr "Weekdays"
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Weekly"
 msgstr "Weekly"

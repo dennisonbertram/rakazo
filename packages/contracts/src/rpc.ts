@@ -361,6 +361,7 @@ import {
   PageDataSchema,
   PageRefreshInputSchema,
   PageSourceRemoveInputSchema,
+  PageSourceScheduleInputSchema,
   PageSourceSchema,
   PageSourcesListInputSchema,
 } from "./page-sources.js";
@@ -915,6 +916,9 @@ export const appContract = {
     refresh: oc.input(PageRefreshInputSchema).output(PageDataSchema.nullable()),
     sources: oc.input(PageSourcesListInputSchema).output(z.array(PageSourceSchema)),
     removeSource: oc.input(PageSourceRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
+    setSourceSchedule: oc.input(PageSourceScheduleInputSchema).output(PageSourceSchema),
+    pauseSource: oc.input(PageSourceRemoveInputSchema).output(PageSourceSchema),
+    resumeSource: oc.input(PageSourceRemoveInputSchema).output(PageSourceSchema),
   },
   pins: {
     get: oc.input(BotPinsGetInputSchema).output(BotPinsSchema.nullable()),

@@ -146,6 +146,7 @@ import {
   toComputerRef,
   touchRunningComputer,
   UNAVAILABLE_MODEL_FOR_AUTH_MESSAGE,
+  updatePageSourceByOwner,
   updateScratchpadItemFromUser,
   updateTicket,
   validateConnectedModelChoice,
@@ -4420,6 +4421,39 @@ export function createRouter(deps: RouterDeps) {
         );
         if (!removed) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
         return { ok: true as const };
+      }),
+      setSourceSchedule: authed.pages.setSourceSchedule.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const source = await updatePageSourceByOwner(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          input.sourceId,
+          { schedule: input.schedule },
+        );
+        if (!source) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return source;
+      }),
+      pauseSource: authed.pages.pauseSource.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const source = await updatePageSourceByOwner(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          input.sourceId,
+          { action: "pause" },
+        );
+        if (!source) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return source;
+      }),
+      resumeSource: authed.pages.resumeSource.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const source = await updatePageSourceByOwner(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          input.sourceId,
+          { action: "resume" },
+        );
+        if (!source) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return source;
       }),
       save: authed.pages.save.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);

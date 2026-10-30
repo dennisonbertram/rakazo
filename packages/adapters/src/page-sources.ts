@@ -45,7 +45,14 @@ const PREVIEW_CHARS = 4_000;
 const HISTORY_POINTS = 500;
 const CHART_MAX_ROWS = 5_000;
 
-const SCHEDULE_MS: Record<PageSourceSchedule, number> = {
+/** A source that fails this many times in a row is paused. */
+export const PAGE_SOURCE_PAUSE_AFTER = 5;
+/** Active and pending sources per space, checked when a source is created. */
+export const PAGE_SOURCES_MAX_PER_SPACE = 100;
+const BACKOFF_CAP_MS = 6 * 3_600_000;
+const JITTER = 0.05;
+
+export const SCHEDULE_MS: Record<PageSourceSchedule, number> = {
   "15m": 15 * 60_000,
   "1h": 3_600_000,
   "6h": 6 * 3_600_000,
@@ -59,6 +66,26 @@ export interface PageSourceDeps extends PageDeps {
   /** Test seam. */
   timeoutMs?: number;
   now?: () => Date;
+  /** Test seam for the schedule jitter; 0 to 1. */
+  random?: () => number;
+}
+
+/** The next normal run: the schedule's interval plus up to 5% jitter so sources do not fire together. */
+export function nextScheduledRefresh(
+  now: Date,
+  schedule: string,
+  random: () => number = Math.random,
+): Date {
+  const interval = SCHEDULE_MS[schedule as PageSourceSchedule];
+  return new Date(now.getTime() + interval * (1 + JITTER * random()));
+}
+
+/** After the nth failure in a row: double each time up to 6 hours, never sooner than the normal interval. */
+function backoffRefresh(now: Date, schedule: string, failures: number): Date {
+  const interval = SCHEDULE_MS[schedule as PageSourceSchedule];
+  return new Date(
+    now.getTime() + Math.max(interval, Math.min(interval * 2 ** failures, BACKOFF_CAP_MS)),
+  );
 }
 
 /** A source could not run. The message is short and written for the owner or the model. */
@@ -80,6 +107,7 @@ type SourceRow = {
   call: unknown;
   schedule: string;
   status: string;
+  failures: number;
   lastRefreshAt: Date | null;
   lastError: string | null;
 };
@@ -206,7 +234,10 @@ const botColumns = {
   disabledBuiltinTools: true,
 } as const;
 
-type RefreshOutcome = { ok: true; value: unknown } | { ok: false; error: string };
+export type RefreshOutcome =
+  | { ok: true; value: unknown }
+  /** `paused` is set only for the call that paused the source (its fifth failure in a row). */
+  | { ok: false; error: string; paused?: true };
 
 /** Never resolves later than `ms`; the timer is always cleared. */
 async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
@@ -279,9 +310,8 @@ export async function refreshPageSource(
           lastRefreshAt: now,
           lastError: null,
           failures: 0,
-          nextRefreshAt: new Date(
-            now.getTime() + SCHEDULE_MS[source.schedule as PageSourceSchedule],
-          ),
+          leaseUntil: null,
+          nextRefreshAt: nextScheduledRefresh(now, source.schedule, deps.random),
         },
       });
     });
@@ -294,11 +324,24 @@ export async function refreshPageSource(
         error: error instanceof Error ? error.message : String(error),
       });
     }
-    outcome = { ok: false, error: message };
-    await deps.prisma.pageSource.updateMany({
-      where: { id: source.id, spaceId: source.spaceId },
-      data: { lastError: message, failures: { increment: 1 } },
+    const failures = source.failures + 1;
+    const pause = failures >= PAGE_SOURCE_PAUSE_AFTER;
+    // Only an active source is touched, so the call that pauses it is the only one that reports it.
+    const updated = await deps.prisma.pageSource.updateMany({
+      where: { id: source.id, spaceId: source.spaceId, status: "active" },
+      data: {
+        lastError: message,
+        failures,
+        leaseUntil: null,
+        nextRefreshAt: backoffRefresh(now, source.schedule, failures),
+        ...(pause ? { status: "paused" } : {}),
+      },
     });
+    outcome = {
+      ok: false,
+      error: message,
+      ...(pause && updated.count === 1 ? { paused: true } : {}),
+    };
   }
   await announcePageData(deps, source);
   return outcome;
@@ -354,6 +397,36 @@ export async function removePageSource(
   if (removed.count === 0) return false;
   await announcePageData(deps, row);
   return true;
+}
+
+/** Owner changes to one source of this bot. Null when it is not this bot's. */
+export async function updatePageSourceByOwner(
+  deps: PageSourceDeps,
+  scope: { spaceId: string; botId: string },
+  sourceId: string,
+  change: { schedule: PageSourceSchedule } | { action: "pause" | "resume" },
+): Promise<PageSource | null> {
+  const where = { id: sourceId, ...scope };
+  const row = await deps.prisma.pageSource.findFirst({ where });
+  if (!row) return null;
+  const now = deps.now?.() ?? new Date();
+  let data: Record<string, unknown> | null = null;
+  if ("schedule" in change) {
+    data = {
+      schedule: change.schedule,
+      ...(row.status === "active"
+        ? { nextRefreshAt: nextScheduledRefresh(now, change.schedule, deps.random) }
+        : {}),
+    };
+  } else if (change.action === "pause" && row.status === "active") {
+    data = { status: "paused" };
+  } else if (change.action === "resume" && row.status === "paused") {
+    data = { status: "active", failures: 0, nextRefreshAt: now };
+  }
+  if (!data) return toPageSource(row);
+  const saved = await deps.prisma.pageSource.update({ where: { id: row.id }, data });
+  await announcePageData(deps, row);
+  return toPageSource(saved);
 }
 
 // ---- Resolving live blocks ----
@@ -595,7 +668,8 @@ export async function pageSourceToolFromTool(
     status: "active",
     failures: 0,
     lastError: null,
-    nextRefreshAt: new Date(now.getTime() + SCHEDULE_MS[schedule.data]),
+    leaseUntil: null,
+    nextRefreshAt: nextScheduledRefresh(now, schedule.data, deps.random),
   };
   let saved: SourceRow;
   try {
@@ -606,6 +680,14 @@ export async function pageSourceToolFromTool(
         throw new PageSourceError(`This page already has ${PAGE_SOURCES_MAX_PER_PAGE} sources.`);
       }
       if (!same) {
+        const inSpace = await tx.pageSource.count({
+          where: { spaceId: scope.spaceId, status: { in: ["active", "pending"] } },
+        });
+        if (inSpace >= PAGE_SOURCES_MAX_PER_SPACE) {
+          throw new PageSourceError(
+            `This space already has ${PAGE_SOURCES_MAX_PER_SPACE} active sources. Remove one first.`,
+          );
+        }
         return tx.pageSource.create({
           data: {
             ...pageScope,

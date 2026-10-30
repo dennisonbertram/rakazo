@@ -86,6 +86,11 @@ function setup() {
         }
         return { count: row ? 1 : 0 };
       }),
+      update: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
+        const row = sources.find((r) => match(r, where)) as Row;
+        Object.assign(row, data);
+        return row;
+      }),
       deleteMany: vi.fn(async ({ where }: { where: Row }) => {
         const i = sources.findIndex((r) => match(r, where));
         if (i >= 0) sources.splice(i, 1);
@@ -123,7 +128,10 @@ function setup() {
       | "data"
       | "refresh"
       | "sources"
-      | "removeSource",
+      | "removeSource"
+      | "setSourceSchedule"
+      | "pauseSource"
+      | "resumeSource",
     input: unknown,
   ) {
     const { response } = await handler.handle(
@@ -305,6 +313,42 @@ describe("pages router", () => {
       expect(events.append).toHaveBeenCalledWith(
         expect.objectContaining({ type: "page.data", payload: { pageId: "page-1" } }),
       );
+    });
+
+    it("changes the schedule, pauses and resumes only this bot's source", async () => {
+      const { call, sources } = await withPage();
+      sources.push(source({ failures: 5 }), source({ id: "foreign", botId: "bot-other-user" }));
+      const before = Date.now();
+      expect(
+        (await call("setSourceSchedule", { botId: "bot-1", sourceId: "src-1", schedule: "1d" }))
+          .body.json,
+      ).toMatchObject({ id: "src-1", schedule: "1d" });
+      expect(new Date(sources[0]?.nextRefreshAt as Date).getTime()).toBeGreaterThanOrEqual(
+        before + 86_400_000,
+      );
+      expect(
+        (await call("pauseSource", { botId: "bot-1", sourceId: "src-1" })).body.json,
+      ).toMatchObject({ status: "paused" });
+      expect(
+        (await call("resumeSource", { botId: "bot-1", sourceId: "src-1" })).body.json,
+      ).toMatchObject({ status: "active" });
+      expect(sources[0]).toMatchObject({ status: "active", failures: 0 });
+      for (const path of ["pauseSource", "resumeSource"] as const) {
+        expect((await call(path, { botId: "bot-1", sourceId: "foreign" })).status).toBe(404);
+      }
+      expect(
+        (
+          await call("setSourceSchedule", {
+            botId: "bot-1",
+            sourceId: "foreign",
+            schedule: "1w",
+          })
+        ).status,
+      ).toBe(404);
+      expect(sources[1]).toMatchObject({ status: "active", schedule: "1h" });
+      expect(
+        (await call("pauseSource", { botId: "bot-other-user", sourceId: "src-1" })).status,
+      ).toBeGreaterThanOrEqual(400);
     });
 
     it("refresh skips a source refreshed in the last minute and records a failure for the rest", async () => {

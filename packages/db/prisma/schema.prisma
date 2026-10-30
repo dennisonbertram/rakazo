@@ -1756,6 +1756,8 @@ model PageSourceSnapshot {
   bytes     Int
 
   @@index([sourceId, fetchedAt(sort: Desc)])
+  /// The per-space daily refresh budget counts a space's snapshots since UTC midnight.
+  @@index([spaceId, fetchedAt])
   @@map("page_source_snapshots")
 }
 
