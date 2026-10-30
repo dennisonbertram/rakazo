@@ -5,14 +5,11 @@ import type { BrexCardsControls } from "@rakazo/contracts";
 import { BrexCardsControlsSchema } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { runAsSystem, runAsTenant } from "@rakazo/db";
+import { Client } from "pg";
 import type { McpSession } from "./mcp-transport.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-// The lock is held while the Brex client works: up to 5 tries of 30 seconds, with up to 30 seconds
-// of backoff between them, for each request a write makes. The transaction that holds the lock must
-// outlive all of that, or Postgres would release it while the write is still running.
-const TARGET_LOCK_TIMEOUT_MS = 15 * 60 * 1000;
-const TARGET_LOCK_MAX_WAIT_MS = 10_000;
+const DEFAULT_LOCK_TIMEOUT_MS = 60_000;
 
 export interface BrexCardsBindingOptions {
   /** The `McpServer` row this session belongs to; the session is never used for another space. */
@@ -20,6 +17,13 @@ export interface BrexCardsBindingOptions {
   prisma: PrismaClient;
   /** Replaces the clock, so a test can place a reservation on a chosen day. */
   now?: () => Date;
+  /**
+   * The Postgres connection string that target locks use, on their own connection outside the
+   * Prisma pool. Defaults to DATABASE_URL, the runtime login the API and workers already use.
+   */
+  lockDatabaseUrl?: string;
+  /** How long a write waits for another change to the same card or spend limit. */
+  lockTimeoutMs?: number;
 }
 
 export interface BrexCardsSessionOptions extends BrexCardsBindingOptions {
@@ -39,6 +43,8 @@ export function createBrexCardsStore({
   server,
   prisma,
   now = () => new Date(),
+  lockDatabaseUrl,
+  lockTimeoutMs = DEFAULT_LOCK_TIMEOUT_MS,
 }: BrexCardsBindingOptions): BrexCardsStore {
   const tenant = { spaceId: server.spaceId, userId: server.userId };
 
@@ -107,23 +113,43 @@ export function createBrexCardsStore({
     },
 
     /**
-     * A Postgres advisory lock on the target and the Brex account, so it holds across the API and
-     * every worker. It is transaction-scoped: Prisma gives no handle on one connection to take a
-     * session lock and release it later, and a transaction that ends for any reason (a crash, a
-     * dropped connection) frees the lock without cleanup.
+     * A session-level Postgres advisory lock on the Brex account and target, so it holds across
+     * the API and every worker. It lives on its own short-lived connection, not on the Prisma
+     * pool and not in a transaction: a transaction timeout would release it while the Brex call
+     * still runs, and a held pool connection would starve the queries the call itself makes. The
+     * lock has no expiry while this process lives; if the process dies, the connection drops and
+     * Postgres releases it.
      */
     async withTargetLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
       const { brexAccountId } = await loadConnection();
-      // ponytail: each held lock keeps one pooled connection busy, so as many concurrent Brex
-      // writes as the pool has connections would starve its other users; give the pool headroom
-      // if writes ever run in bulk.
-      return prisma.$transaction(
-        async (tx) => {
-          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`brex-cards:${brexAccountId}:${key}`}, 0))`;
-          return fn();
-        },
-        { timeout: TARGET_LOCK_TIMEOUT_MS, maxWait: TARGET_LOCK_MAX_WAIT_MS },
-      );
+      const connectionString = lockDatabaseUrl ?? process.env.DATABASE_URL;
+      if (!connectionString) throw new Error("The database connection for locks is not set.");
+      const lockKey = `brex-cards:${brexAccountId}:${key}`;
+      const lock = new Client({ connectionString, application_name: "rakazo-brex-cards-lock" });
+      // A dropped connection already released the lock; nothing here needs to crash the process.
+      lock.on("error", () => undefined);
+      await lock.connect();
+      try {
+        await lock.query("SELECT set_config('lock_timeout', $1, false)", [`${lockTimeoutMs}ms`]);
+        try {
+          await lock.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
+        } catch (error) {
+          if ((error as { code?: string }).code === "55P03")
+            throw new Error(
+              "Another change to this card or spend limit is in progress. Try again in a moment. Nothing was changed.",
+            );
+          throw error;
+        }
+        try {
+          return await fn();
+        } finally {
+          await lock
+            .query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [lockKey])
+            .catch(() => undefined);
+        }
+      } finally {
+        await lock.end().catch(() => undefined);
+      }
     },
 
     idempotencyKey(meta) {

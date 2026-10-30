@@ -291,14 +291,14 @@ describePostgres("Brex cards binding (PostgreSQL)", () => {
       await started.opened;
       // A held lock on an open transaction ends with that transaction's timeout, whatever the
       // call is still doing. The lock has to belong to a plain session instead.
-      const [{ granted, inTransaction }] = await owner.prisma.$queryRaw<
+      const [counts] = await owner.prisma.$queryRaw<
         Array<{ granted: bigint; inTransaction: bigint }>
       >`SELECT count(*) FILTER (WHERE l.granted) AS granted,
                count(*) FILTER (WHERE l.granted AND a.state LIKE 'idle in transaction%') AS "inTransaction"
         FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
         WHERE l.locktype = 'advisory' AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`;
-      expect(Number(granted)).toBe(1);
-      expect(Number(inTransaction)).toBe(0);
+      expect(Number(counts?.granted)).toBe(1);
+      expect(Number(counts?.inTransaction)).toBe(0);
       holds.open();
       await held;
     });
