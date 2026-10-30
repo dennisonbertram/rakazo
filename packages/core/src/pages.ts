@@ -79,6 +79,9 @@ const FENCE_OPEN = new RegExp(
 const FENCE_CLOSE = /^`{3,}[ \t]*$/;
 const CODE_FENCE_OPEN = /^(`{3,}|~{3,})/;
 const GTM_FENCE_CANDIDATE = /^```(gtm-[^\s`]*)(.*)$/;
+const LIVE_FENCE_WITH_INFO = new RegExp(
+  `^\`\`\`(${PAGE_METRIC_FENCE}|${PAGE_TABLE_FENCE})[ \\t]+\\S`,
+);
 
 function parseGtmPageQuery(
   fence: GtmPageBlock["type"],
@@ -149,6 +152,21 @@ export function splitPage(content: string): PageSegment[] {
           ? { kind: "gtm", block: result.block }
           : { kind: "invalid_gtm", raw, error: result.error },
       );
+      if (end === -1) return segments;
+      i = end;
+      continue;
+    }
+    const inlineLive = LIVE_FENCE_WITH_INFO.exec(line)?.[1];
+    if (inlineLive) {
+      // A live fence with text after its name is a mistake, not a code block: report it so a
+      // save fails with a message the bot can act on.
+      flushText();
+      const end = lines.findIndex((candidate, j) => j > i && FENCE_CLOSE.test(candidate));
+      segments.push({
+        kind: "invalid_live",
+        raw: line.slice(3 + inlineLive.length).trim(),
+        error: `Put the ${inlineLive} block's JSON on its own line after \`\`\`${inlineLive}, not on the fence line.`,
+      });
       if (end === -1) return segments;
       i = end;
       continue;

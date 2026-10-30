@@ -88,6 +88,21 @@ describe("splitPage", () => {
 });
 
 describe("live blocks", () => {
+  it("reports JSON written on the fence line instead of passing it through as code", () => {
+    // Seen in a real run: the model wrote ```metric {...} with an empty body.
+    const segments = splitPage(
+      'Intro\n\n```metric {"label":"Cash","source":"cash","path":"/balance"}\n```\n\nAfter',
+    );
+    expect(segments.map((segment) => segment.kind)).toEqual([
+      "markdown",
+      "invalid_live",
+      "markdown",
+    ]);
+    expect(segments[1]).toMatchObject({
+      error: "Put the metric block's JSON on its own line after ```metric, not on the fence line.",
+    });
+  });
+
   const metric = { label: "Cash", source: "cash", path: "/balance", format: "usd" as const };
   const table = {
     name: "Vendors",
