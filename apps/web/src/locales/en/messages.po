@@ -937,6 +937,7 @@ msgid "Action items"
 msgstr "Action items"
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/shell/composer.tsx
 msgid "Actions"
 msgstr "Actions"
@@ -1416,6 +1417,10 @@ msgstr "Allow writing"
 msgid "Allowed"
 msgstr "Allowed"
 
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Allowed durations"
+msgstr "Allowed durations"
+
 #: src/pages/Auth.tsx
 msgid "Already have an account?"
 msgstr "Already have an account?"
@@ -1591,6 +1596,10 @@ msgstr "API key required"
 #: src/components/gtm/GtmCalendar.tsx
 msgid "API key required for Zernio queue"
 msgstr "API key required for Zernio queue"
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "API token"
+msgstr "API token"
 
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "App connections aren't set up on this server yet."
@@ -2342,6 +2351,8 @@ msgstr "Can't reach the server."
 #: src/components/gtm/EmailItemCard.tsx
 #: src/components/inbox/InboxCleanup.tsx
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/ConnectAppDialog.tsx
 #: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -2377,6 +2388,10 @@ msgstr "Can't reach the server."
 #: src/pages/shell/dialogs.tsx
 msgid "Cancel"
 msgstr "Cancel"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Cancel card"
+msgstr "Cancel card"
 
 #: src/pages/GroupPanel.tsx
 msgid "Cancel new group"
@@ -2442,6 +2457,14 @@ msgstr "Card payment · not spend"
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Cardholder"
 msgstr "Cardholder"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Cards"
+msgstr "Cards"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Cards per day"
+msgstr "Cards per day"
 
 #: src/pages/Investors.tsx
 msgid "Carta"
@@ -2649,6 +2672,10 @@ msgstr "Check size"
 #: src/lib/model-connection-preflight.ts
 msgid "Check the API key or sign-in, then test again."
 msgstr "Check the API key or sign-in, then test again."
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Check the highlighted fields"
+msgstr "Check the highlighted fields"
 
 #: src/lib/model-connection-preflight.ts
 msgid "Check the server URL and network, then test again."
@@ -3198,6 +3225,7 @@ msgid "Conflicting evidence"
 msgstr "Conflicting evidence"
 
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
 #: src/components/integrations/ConnectAppDialog.tsx
 #: src/components/integrations/ConnectAppsStep.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -3283,6 +3311,10 @@ msgstr "Connect API key"
 #: src/components/integrations/BlockscoutConnectDialog.tsx
 msgid "Connect Blockscout"
 msgstr "Connect Blockscout"
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Connect Brex cards"
+msgstr "Connect Brex cards"
 
 #: src/pages/Investors.tsx
 msgid "Connect Carta"
@@ -3520,6 +3552,10 @@ msgstr "Contracts"
 #: src/pages/Shell.tsx
 msgid "contracts, NDA, deadlines"
 msgstr "contracts, NDA, deadlines"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Controls"
+msgstr "Controls"
 
 #: src/components/ComputersUnavailableHint.tsx
 #: src/components/CopyLinkDialog.tsx
@@ -5386,6 +5422,10 @@ msgstr "Edit files and run commands"
 msgid "Edit first"
 msgstr "Edit first"
 
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Edit limit"
+msgstr "Edit limit"
+
 #: src/components/fundraising/Pipeline.tsx
 msgid "Edit prospect"
 msgstr "Edit prospect"
@@ -5540,6 +5580,10 @@ msgstr "Enter a whole number from 1 to 1000 for the image limit."
 #: src/components/fundraising/SafeDialog.tsx
 msgid "Enter an amount"
 msgstr "Enter an amount"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Enter an amount above 0"
+msgstr "Enter an amount above 0"
 
 #: src/lib/model-connection-preflight.ts
 msgid "Enter an API key before testing."
@@ -6560,6 +6604,10 @@ msgstr "Importing {done} of {total}"
 msgid "In"
 msgstr "In"
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "In Brex, Settings → Developer, create a user token with the scopes cards, budgets, companies.readonly, users.readonly, expenses.card, transactions.card.readonly, travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add cards.pan."
+msgstr "In Brex, Settings → Developer, create a user token with the scopes cards, budgets, companies.readonly, users.readonly, expenses.card, transactions.card.readonly, travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add cards.pan."
+
 #: src/components/data-room/ImportFromEmail.tsx
 msgid "In Data room"
 msgstr "In Data room"
@@ -6881,6 +6929,10 @@ msgstr "Last completed"
 msgid "Last emailed"
 msgstr "Last emailed"
 
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Last four"
+msgstr "Last four"
+
 #: src/components/inbox/ContextPanel.tsx
 msgid "Last meeting"
 msgstr "Last meeting"
@@ -7025,6 +7077,10 @@ msgstr "Letter or email"
 msgid "Light"
 msgstr "Light"
 
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Limit"
+msgstr "Limit"
+
 #: src/lib/devin-format.ts
 msgid "Linear"
 msgstr "Linear"
@@ -7101,6 +7157,8 @@ msgstr "Load web images automatically"
 
 #: src/components/inbox/ContextPanel.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/integrations/BrexCardsSection.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Finance.tsx
@@ -7194,6 +7252,10 @@ msgstr "Local server"
 #: src/pages/LocalSettings.tsx
 msgid "Local Server Settings"
 msgstr "Local Server Settings"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Lock"
+msgstr "Lock"
 
 #: src/pages/CompanyFactDetail.tsx
 msgid "Locked fields"
@@ -7422,6 +7484,18 @@ msgstr "Max"
 #: src/lib/model-catalog.ts
 msgid "Max"
 msgstr "Max"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Max limit a card can be raised to"
+msgstr "Max limit a card can be raised to"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Max limit for a new card"
+msgstr "Max limit for a new card"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Max spend limit base amount"
+msgstr "Max spend limit base amount"
 
 #: src/pages/Artifacts.tsx
 msgid "Maximize"
@@ -7686,6 +7760,7 @@ msgstr "Month"
 msgid "Month to date"
 msgstr "Month to date"
 
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/Investors.tsx
 msgid "Monthly"
@@ -7856,6 +7931,7 @@ msgstr "Mute"
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/data-room/ItemRows.tsx
 #: src/components/fundraising/RoundCard.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Artifacts.tsx
@@ -8016,6 +8092,10 @@ msgstr "New group chat"
 #: src/pages/CompanyImport.tsx
 msgid "New import"
 msgstr "New import"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "New limit"
+msgstr "New limit"
 
 #: src/components/investors/ActionItems.tsx
 msgid "New mail"
@@ -8187,6 +8267,10 @@ msgstr "No bots yet"
 #: src/pages/McpConnectionActivity.tsx
 msgid "No calls yet"
 msgstr "No calls yet"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "No cards"
+msgstr "No cards"
 
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "No chat apps linked yet."
@@ -8804,6 +8888,14 @@ msgstr "On a call with {0}"
 msgid "On a schedule"
 msgstr "On a schedule"
 
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "One time"
+msgstr "One time"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "One-time cards lock within (days)"
+msgstr "One-time cards lock within (days)"
+
 #: src/pages/CompanyHistory.tsx
 msgid "Ongoing"
 msgstr "Ongoing"
@@ -9122,6 +9214,7 @@ msgstr "Overdue"
 msgid "Overview"
 msgstr "Overview"
 
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/Board.tsx
 msgid "Owner"
 msgstr "Owner"
@@ -9760,6 +9853,7 @@ msgstr "Q{quarter} so far"
 msgid "Quarter"
 msgstr "Quarter"
 
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/pages/Investors.tsx
 msgid "Quarterly"
 msgstr "Quarterly"
@@ -9964,6 +10058,10 @@ msgstr "Ready"
 #: src/components/DataExport.tsx
 msgid "Ready until {0}"
 msgstr "Ready until {0}"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Reason"
+msgstr "Reason"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Reasoning effort"
@@ -10428,6 +10526,11 @@ msgstr "Replace file"
 msgid "Replace key"
 msgstr "Replace key"
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+#: src/components/integrations/McpDetail.tsx
+msgid "Replace token"
+msgstr "Replace token"
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Replace value"
 msgstr "Replace value"
@@ -10587,6 +10690,8 @@ msgstr "Resume"
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/DropZone.tsx
 #: src/components/inbox/AttachmentReviewDialog.tsx
+#: src/components/integrations/BrexCardsSection.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
@@ -10857,6 +10962,8 @@ msgstr "Sandbox"
 #: src/components/gtm/EmailItemCard.tsx
 #: src/components/integrations/AlchemyConnectDialog.tsx
 #: src/components/integrations/BlockscoutConnectDialog.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
@@ -10925,6 +11032,7 @@ msgstr "Save the workspace and install current software."
 
 #: src/components/AskCard.tsx
 #: src/components/cap-table/CapTableEditor.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/ExternalConversationSettings.tsx
@@ -11257,6 +11365,7 @@ msgstr "Self-custody"
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/inbox/InboxCleanup.tsx
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/investors/UpdateEditor.tsx
 #: src/pages/shell/composer.tsx
@@ -12102,6 +12211,7 @@ msgstr "Stats"
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/ItemRows.tsx
 #: src/components/finance/ui.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/Board.tsx
 #: src/pages/devin/DevinSessions.tsx
@@ -14053,6 +14163,7 @@ msgstr "year"
 msgid "Year"
 msgstr "Year"
 
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Yearly"
 msgstr "Yearly"

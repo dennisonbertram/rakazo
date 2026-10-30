@@ -937,6 +937,7 @@ msgid "Action items"
 msgstr ""
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/shell/composer.tsx
 msgid "Actions"
 msgstr ""
@@ -1416,6 +1417,10 @@ msgstr ""
 msgid "Allowed"
 msgstr ""
 
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Allowed durations"
+msgstr ""
+
 #: src/pages/Auth.tsx
 msgid "Already have an account?"
 msgstr "पहले से खाता है?"
@@ -1590,6 +1595,10 @@ msgstr ""
 
 #: src/components/gtm/GtmCalendar.tsx
 msgid "API key required for Zernio queue"
+msgstr ""
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "API token"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
@@ -2342,6 +2351,8 @@ msgstr "सर्वर तक नहीं पहुंचा जा सका�
 #: src/components/gtm/EmailItemCard.tsx
 #: src/components/inbox/InboxCleanup.tsx
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/ConnectAppDialog.tsx
 #: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -2377,6 +2388,10 @@ msgstr "सर्वर तक नहीं पहुंचा जा सका�
 #: src/pages/shell/dialogs.tsx
 msgid "Cancel"
 msgstr "रद्द करें"
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Cancel card"
+msgstr ""
 
 #: src/pages/GroupPanel.tsx
 msgid "Cancel new group"
@@ -2441,6 +2456,14 @@ msgstr ""
 
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Cardholder"
+msgstr ""
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Cards"
+msgstr ""
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Cards per day"
 msgstr ""
 
 #: src/pages/Investors.tsx
@@ -2649,6 +2672,10 @@ msgstr ""
 #: src/lib/model-connection-preflight.ts
 msgid "Check the API key or sign-in, then test again."
 msgstr "API कुंजी या साइन-इन जाँचें, फिर फिर से परीक्षण करें।"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Check the highlighted fields"
+msgstr ""
 
 #: src/lib/model-connection-preflight.ts
 msgid "Check the server URL and network, then test again."
@@ -3198,6 +3225,7 @@ msgid "Conflicting evidence"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
 #: src/components/integrations/ConnectAppDialog.tsx
 #: src/components/integrations/ConnectAppsStep.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -3282,6 +3310,10 @@ msgstr "API कुंजी कनेक्ट करें"
 
 #: src/components/integrations/BlockscoutConnectDialog.tsx
 msgid "Connect Blockscout"
+msgstr ""
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Connect Brex cards"
 msgstr ""
 
 #: src/pages/Investors.tsx
@@ -3519,6 +3551,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "contracts, NDA, deadlines"
+msgstr ""
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Controls"
 msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
@@ -5386,6 +5422,10 @@ msgstr ""
 msgid "Edit first"
 msgstr "पहले संपादित करें"
 
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Edit limit"
+msgstr ""
+
 #: src/components/fundraising/Pipeline.tsx
 msgid "Edit prospect"
 msgstr ""
@@ -5539,6 +5579,10 @@ msgstr "इमेज सीमा के लिए 1 से 1000 के बी�
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/fundraising/SafeDialog.tsx
 msgid "Enter an amount"
+msgstr ""
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Enter an amount above 0"
 msgstr ""
 
 #: src/lib/model-connection-preflight.ts
@@ -6560,6 +6604,10 @@ msgstr ""
 msgid "In"
 msgstr ""
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "In Brex, Settings → Developer, create a user token with the scopes cards, budgets, companies.readonly, users.readonly, expenses.card, transactions.card.readonly, travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add cards.pan."
+msgstr ""
+
 #: src/components/data-room/ImportFromEmail.tsx
 msgid "In Data room"
 msgstr ""
@@ -6881,6 +6929,10 @@ msgstr ""
 msgid "Last emailed"
 msgstr ""
 
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Last four"
+msgstr ""
+
 #: src/components/inbox/ContextPanel.tsx
 msgid "Last meeting"
 msgstr ""
@@ -7025,6 +7077,10 @@ msgstr ""
 msgid "Light"
 msgstr "लाइट"
 
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Limit"
+msgstr ""
+
 #: src/lib/devin-format.ts
 msgid "Linear"
 msgstr ""
@@ -7101,6 +7157,8 @@ msgstr "वेब छवियाँ अपने-आप लोड करें"
 
 #: src/components/inbox/ContextPanel.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
+#: src/components/integrations/BrexCardsSection.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Finance.tsx
@@ -7193,6 +7251,10 @@ msgstr ""
 
 #: src/pages/LocalSettings.tsx
 msgid "Local Server Settings"
+msgstr ""
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Lock"
 msgstr ""
 
 #: src/pages/CompanyFactDetail.tsx
@@ -7422,6 +7484,18 @@ msgstr "अधिकतम"
 #: src/lib/model-catalog.ts
 msgid "Max"
 msgstr "अधिकतम"
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Max limit a card can be raised to"
+msgstr ""
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Max limit for a new card"
+msgstr ""
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "Max spend limit base amount"
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Maximize"
@@ -7686,6 +7760,7 @@ msgstr ""
 msgid "Month to date"
 msgstr ""
 
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/Investors.tsx
 msgid "Monthly"
@@ -7856,6 +7931,7 @@ msgstr "म्यूट करें"
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/data-room/ItemRows.tsx
 #: src/components/fundraising/RoundCard.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Artifacts.tsx
@@ -8015,6 +8091,10 @@ msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "New import"
+msgstr ""
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "New limit"
 msgstr ""
 
 #: src/components/investors/ActionItems.tsx
@@ -8186,6 +8266,10 @@ msgstr ""
 
 #: src/pages/McpConnectionActivity.tsx
 msgid "No calls yet"
+msgstr ""
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "No cards"
 msgstr ""
 
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -8804,6 +8888,14 @@ msgstr "{0} के साथ कॉल पर"
 msgid "On a schedule"
 msgstr ""
 
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "One time"
+msgstr ""
+
+#: src/components/integrations/BrexControlsForm.tsx
+msgid "One-time cards lock within (days)"
+msgstr ""
+
 #: src/pages/CompanyHistory.tsx
 msgid "Ongoing"
 msgstr ""
@@ -9122,6 +9214,7 @@ msgstr ""
 msgid "Overview"
 msgstr ""
 
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/Board.tsx
 msgid "Owner"
 msgstr ""
@@ -9760,6 +9853,7 @@ msgstr ""
 msgid "Quarter"
 msgstr ""
 
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/pages/Investors.tsx
 msgid "Quarterly"
 msgstr ""
@@ -9963,6 +10057,10 @@ msgstr ""
 #. placeholder {0}: i18n.date(new Date(job.expiresAt), { dateStyle: "medium" })
 #: src/components/DataExport.tsx
 msgid "Ready until {0}"
+msgstr ""
+
+#: src/components/integrations/BrexCardsSection.tsx
+msgid "Reason"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -10428,6 +10526,11 @@ msgstr ""
 msgid "Replace key"
 msgstr "कुंजी बदलें"
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+#: src/components/integrations/McpDetail.tsx
+msgid "Replace token"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Replace value"
 msgstr ""
@@ -10587,6 +10690,8 @@ msgstr ""
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/DropZone.tsx
 #: src/components/inbox/AttachmentReviewDialog.tsx
+#: src/components/integrations/BrexCardsSection.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
@@ -10857,6 +10962,8 @@ msgstr ""
 #: src/components/gtm/EmailItemCard.tsx
 #: src/components/integrations/AlchemyConnectDialog.tsx
 #: src/components/integrations/BlockscoutConnectDialog.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
@@ -10925,6 +11032,7 @@ msgstr "कार्यक्षेत्र सहेजें और नवी
 
 #: src/components/AskCard.tsx
 #: src/components/cap-table/CapTableEditor.tsx
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/ExternalConversationSettings.tsx
@@ -11257,6 +11365,7 @@ msgstr ""
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/inbox/InboxCleanup.tsx
 #: src/components/inbox/InboxShortcuts.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/pages/investors/UpdateEditor.tsx
 #: src/pages/shell/composer.tsx
@@ -12102,6 +12211,7 @@ msgstr ""
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/ItemRows.tsx
 #: src/components/finance/ui.tsx
+#: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/Board.tsx
 #: src/pages/devin/DevinSessions.tsx
@@ -14053,6 +14163,7 @@ msgstr ""
 msgid "Year"
 msgstr ""
 
+#: src/components/integrations/BrexControlsForm.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Yearly"
 msgstr ""

@@ -21,8 +21,16 @@ const financeRpc = vi.hoisted(() => ({
 }));
 const messagingRpc = vi.hoisted(() => ({ get: vi.fn() }));
 const devinRpc = vi.hoisted(() => ({ sessions: vi.fn(), connect: vi.fn(), replaceKey: vi.fn() }));
+const brexRpc = vi.hoisted(() => ({ connect: vi.fn() }));
+const spacesRpc = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("../../lib/rpc", () => ({
-  rpc: { finance: financeRpc, messagingSetup: messagingRpc, devin: devinRpc },
+  rpc: {
+    finance: financeRpc,
+    messagingSetup: messagingRpc,
+    devin: devinRpc,
+    brexCards: brexRpc,
+    spaces: spacesRpc,
+  },
 }));
 
 import { IntegrationsHome } from "./IntegrationsHome";
@@ -67,6 +75,13 @@ const data = (canConfigure: boolean, managed: boolean): IntegrationsData => ({
   refresh: async () => {},
 });
 
+function spaceRole(owner: boolean) {
+  spacesRpc.list.mockResolvedValue({
+    current: { id: "space_1", name: "Demo" },
+    spaces: [{ id: "space_1", name: "Demo", canRename: owner }],
+  });
+}
+
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 function Where() {
@@ -103,6 +118,8 @@ beforeEach(() => {
   });
   financeRpc.exchanges.mockResolvedValue([]);
   messagingRpc.get.mockRejectedValue(new Error("not owner"));
+  // The current space, with the caller as its owner unless a test says otherwise.
+  spaceRole(true);
   devinRpc.sessions.mockReset();
   devinRpc.sessions.mockRejectedValue(new Error("not mocked"));
   devinRpc.connect.mockReset();
@@ -209,6 +226,62 @@ it("offers Devin and opens its own connect dialog, not the custom connection for
   expect(document.querySelector('[aria-label="API key"]')).toBeNull();
   expect(document.querySelector('input[aria-label="Server URL"]')).toBeNull();
   expect(document.body.textContent).not.toContain("starts with cog_");
+});
+
+it("offers Brex cards and opens its connect dialog, then lands on the server page", async () => {
+  brexRpc.connect.mockResolvedValue({ serverId: "srv_brex", agentBotId: "bot_brex" });
+  await show(data(true, false));
+  const connect = container.querySelector<HTMLButtonElement>('[aria-label="Connect Brex cards"]');
+  expect(connect).not.toBeNull();
+  await act(async () => connect?.click());
+  expect(document.body.textContent).toContain("Do not add cards.pan.");
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="API token"]');
+  expect(input?.type).toBe("password");
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  await act(async () => {
+    setter?.call(input, "tok_demo");
+    input?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
+  );
+  expect(brexRpc.connect).toHaveBeenCalledWith({ token: "tok_demo" });
+  expect(container.querySelector('[data-testid="where"]')?.textContent).toBe(
+    "/app/integrations/mcp/srv_brex",
+  );
+});
+
+it("shows the Brex cards tile only to the space owner, and not while the role is unknown", async () => {
+  spaceRole(false);
+  await show(data(true, false));
+  expect(container.querySelector('[aria-label="Connect Brex cards"]')).toBeNull();
+  act(() => root.unmount());
+  container.remove();
+
+  spacesRpc.list.mockRejectedValue(new Error("offline"));
+  await show(data(true, false));
+  expect(container.querySelector('[aria-label="Connect Brex cards"]')).toBeNull();
+  act(() => root.unmount());
+  container.remove();
+
+  spaceRole(true);
+  await show(data(true, false));
+  expect(container.querySelector('[aria-label="Connect Brex cards"]')).not.toBeNull();
+});
+
+it("hides the Brex cards tile once its server is connected, and its card has no host line", async () => {
+  const server = {
+    id: "s4",
+    name: "Brex cards",
+    endpoint: "rakazo+brex://cards",
+    agentBotId: "bot_brex",
+    oauthStatus: "none",
+    oauthAttempted: false,
+  } as unknown as IntegrationsData["servers"][number];
+  await show({ ...data(true, true), servers: [server] });
+  expect(container.querySelector('[aria-label="Connect Brex cards"]')).toBeNull();
+  expect(container.querySelector('a[href="/app/integrations/mcp/s4"]')).not.toBeNull();
+  expect(container.textContent).not.toContain("cards.pan");
 });
 
 const devinServer = {
