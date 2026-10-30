@@ -26,6 +26,15 @@ type Scope = { spaceId: string; botId: string; userId: string };
 /** A message safe to show the owner or the model: fixed words, no response content. */
 export class HttpSourceError extends Error {}
 
+/** Every message in an error's cause chain, for logs. Never includes a response body. */
+export function errorChain(error: unknown): string {
+  const parts: string[] = [];
+  for (let e = error, depth = 0; e instanceof Error && depth < 5; e = e.cause, depth++) {
+    parts.push(e.message);
+  }
+  return parts.join(" <- ");
+}
+
 /**
  * The checks the fetch applies, minus DNS (made at fetch time): the shape of the URL and a
  * private or internal host written out in it. Returns the parsed call, or the reason it is refused.
@@ -144,10 +153,10 @@ export function parseCsv(text: string): Record<string, string | number>[] {
   });
 }
 
-function statusError(status: number): HttpSourceError {
+function statusError(status: number, cause?: unknown): HttpSourceError {
   return status >= 300 && status < 400
-    ? new HttpSourceError("The API redirected; update the source URL.")
-    : new HttpSourceError(`The API returned ${status}.`);
+    ? new HttpSourceError("The API redirected; update the source URL.", { cause })
+    : new HttpSourceError(`The API returned ${status}.`, { cause });
 }
 
 function parseBody(accept: "json" | "csv", body: unknown): unknown {
@@ -240,17 +249,17 @@ export async function runHttpSource(
       resolveHostname: pinned,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
+    // The safe fetch wraps transport errors, so read the whole chain.
+    const message = errorChain(error);
+    const fail = (text: string) => new HttpSourceError(text, { cause: error });
     const status = /HTTP (\d{3})/.exec(message)?.[1];
-    if (status) throw statusError(Number(status));
-    if (message === "Too many redirects") throw statusError(302);
-    if (message === "Response is too large") {
-      throw new HttpSourceError("The response is larger than 1 MB.");
+    if (status) throw statusError(Number(status), error);
+    if (/Too many redirects|Redirects are not followed|Redirect missing/.test(message)) {
+      throw statusError(302, error);
     }
-    if (/private|internal/.test(message)) {
-      throw new HttpSourceError("The URL targets a private or internal host.");
-    }
-    throw new HttpSourceError("The request failed.");
+    if (/Response is too large/.test(message)) throw fail("The response is larger than 1 MB.");
+    if (/private|internal/.test(message)) throw fail("The URL targets a private or internal host.");
+    throw fail("The request failed.");
   }
   const text = new TextDecoder().decode(response.body);
   if (call.accept === "csv") return parseCsv(text);

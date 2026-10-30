@@ -50,6 +50,7 @@ import {
 } from "./page-source-approval.js";
 import {
   checkHttpSourceCall,
+  errorChain,
   HttpSourceError,
   httpSourceRefusal,
   runHttpSource,
@@ -124,8 +125,8 @@ function backoffRefresh(now: Date, schedule: string, failures: number): Date {
 
 /** A source could not run. The message is short and written for the owner or the model. */
 export class PageSourceError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "PageSourceError";
   }
 }
@@ -341,7 +342,9 @@ async function runApprovedHttpSource(
       }
     });
   } catch (error) {
-    if (error instanceof HttpSourceError) throw new PageSourceError(error.message);
+    if (error instanceof HttpSourceError) {
+      throw new PageSourceError(error.message, { cause: error.cause ?? error });
+    }
     throw error;
   }
 }
@@ -491,12 +494,13 @@ export async function refreshPageSource(
   } catch (error) {
     const message =
       error instanceof PageSourceError ? error.message : "The source could not be refreshed.";
-    if (!(error instanceof PageSourceError)) {
-      getLogger().warn("page source refresh failed", {
-        sourceId: source.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    // The owner sees fixed text; the log keeps the underlying error chain (never a response body).
+    getLogger().warn("page source refresh failed", {
+      sourceId: source.id,
+      kind: source.kind,
+      shown: message,
+      error: errorChain(error),
+    });
     const failures = source.failures + 1;
     const pause = failures >= PAGE_SOURCE_PAUSE_AFTER;
     // Only an active source is touched, so the call that pauses it is the only one that reports it.

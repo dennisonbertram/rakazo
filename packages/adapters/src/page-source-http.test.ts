@@ -449,6 +449,23 @@ describe("refreshing an http source", () => {
     expect(w.sources[0]?.lastError).toBe("The API returned 503.");
   });
 
+  it("logs the underlying error at warn while the owner sees fixed text", async () => {
+    const { getLogger } = await import("@rakazo/logging");
+    const warn = vi.spyOn(getLogger(), "warn").mockImplementation(() => undefined);
+    try {
+      const w = await world();
+      await w.approved();
+      w.fetch.mockRejectedValue(new TypeError("fetch failed", { cause: new Error("ECONNRESET") }));
+      expect(await w.refresh()).toEqual({ ok: false, error: "The request failed." });
+      expect(warn).toHaveBeenCalledWith(
+        "page source refresh failed",
+        expect.objectContaining({ error: expect.stringContaining("ECONNRESET") }),
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("refuses a body over 1 MB", async () => {
     const w = await world();
     await w.approved();

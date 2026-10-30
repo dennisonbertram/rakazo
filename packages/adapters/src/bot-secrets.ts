@@ -639,6 +639,11 @@ export async function requestWithBotSecret(input: {
       truncated: safe.length > limit,
     };
   } catch (error) {
+    // The caller sees fixed text; the log keeps why (transport errors carry no credential).
+    getLogger().warn("secret request failed", {
+      host: url.host,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       error: "Authenticated request failed. Check the destination and credential.",
       ...(error instanceof Error && /redirects are not allowed/.test(error.message)
