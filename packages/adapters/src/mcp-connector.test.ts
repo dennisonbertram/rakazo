@@ -2964,10 +2964,13 @@ describe("MCP connector Brex cards (in-process server)", () => {
     writesEnabled = true,
     asAgent = true,
     lazy = false,
+    secret = { secret: TOKEN } as Record<string, unknown>,
   }: {
     writesEnabled?: boolean;
     asAgent?: boolean;
     lazy?: boolean;
+    /** What the row's decrypted secret holds. */
+    secret?: Record<string, unknown>;
   } = {}) {
     const emulator = new BrexApiEmulator({ token: TOKEN });
     emulators.push(emulator);
@@ -3093,7 +3096,7 @@ describe("MCP connector Brex cards (in-process server)", () => {
     };
     const connector = new McpConnector(
       prisma as never,
-      { load: vi.fn(async () => JSON.stringify({ secret: TOKEN })) } as never,
+      { load: vi.fn(async () => JSON.stringify(secret)) } as never,
       { network: TEST_NETWORK, brexApi: { baseUrl } } as never,
     );
     connectors.push(connector);
@@ -3251,5 +3254,72 @@ describe("MCP connector Brex cards (in-process server)", () => {
     expect(resolved?.tool.route?.toolName).toBe("create_vendor_card");
     expect(await s.execute(resolved!.call)).toMatchObject([{ type: "result" }]);
     expect(s.posts().map((post) => post.idempotencyKey)).toEqual(["effect-1"]);
+  });
+
+  it("keeps the token out of what the model sees when Brex rejects it", async () => {
+    const wrong = "bxt_wrong_token_abcdefghijklmnop";
+    const s = await setup({ secret: { secret: wrong } });
+    const events = await s.callTool("list_cards", {}, "read-1");
+    const seen = JSON.stringify(events);
+    expect(seen).toContain("Brex rejected the token");
+    expect(seen).not.toContain(wrong);
+    expect(seen).not.toContain(TOKEN);
+  });
+
+  it("refuses to connect without a token in the row's secret, and never reaches Brex", async () => {
+    const s = await setup({ secret: {} });
+    expect(await s.callTool("list_cards", {}, "read-1")).toMatchObject([
+      { type: "error", message: expect.stringContaining("token is missing") },
+    ]);
+    expect(s.emulator.requests).toEqual([]);
+  });
+
+  it("sends the idempotency key to Brex cards only: other servers' calls carry no request metadata", async () => {
+    const bodies: Array<{ method?: string; params?: { _meta?: unknown } }> = [];
+    const state = { failNext: false, initializations: 0 };
+    const inner = mcpFetch(state);
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input.clone() : new Request(input, init);
+      if (request.method === "POST")
+        void request
+          .text()
+          .then((text) => bodies.push(JSON.parse(text)))
+          .catch(() => undefined);
+      return inner(input, init);
+    });
+    const assignment = { ...ASSIGNMENT, bot: null, server: { ...SERVER, slug: "demo" } };
+    const connector = new McpConnector(
+      {
+        botMcpServer: {
+          findMany: vi.fn(async () => [assignment]),
+          findFirst: vi.fn(async () => assignment),
+        },
+      } as never,
+      {} as never,
+      { network: TEST_NETWORK },
+    );
+    connectors.push(connector);
+    const context = {
+      operationId: "test",
+      traceId: "test",
+      spaceId: "w1",
+      userId: "u1",
+      botId: "bot-1",
+      signal: new AbortController().signal,
+    };
+    for await (const event of connector.execute(
+      {
+        tool: "mcp__demo__echo",
+        args: {},
+        executionId: "effect-1",
+        route: { connectorId: "mcp", resourceId: "server-1", toolName: "echo" },
+      },
+      context,
+    ))
+      expect(event.type).toBe("result");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const calls = bodies.filter((body) => body.method === "tools/call");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.params?._meta).toBeUndefined();
   });
 });

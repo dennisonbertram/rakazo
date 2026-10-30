@@ -234,6 +234,17 @@ describePostgres("Brex cards binding (PostgreSQL)", () => {
     });
   });
 
+  it("settles only its own space's reservation", async () => {
+    const mine = await storeFor(c).reserveCard({ maxCardsPerDay: 100 });
+    if (!mine.ok) throw new Error("expected a reservation");
+    // Another space, even one that guesses the id, cannot change the row.
+    await storeFor(a).settleReservation(mine.reservationId, "failed");
+    const row = await owner.prisma.brexCardReservation.findUniqueOrThrow({
+      where: { id: mine.reservationId },
+    });
+    expect(row.status).toBe("reserved");
+  });
+
   describe("withTargetLock", () => {
     const gate = () => {
       let open!: () => void;
