@@ -80,7 +80,12 @@ export async function omiStatus(deps: OmiDeps, actor: Actor): Promise<OmiStatus>
       where: { ...owner(actor), source: "omi", sourceConnectionId: connection.id },
     }),
   ]);
-  return { connectionId: connection.id, pendingUploads, recordings };
+  return {
+    connectionId: connection.id,
+    pendingUploads,
+    recordings,
+    agentBotId: connection.agentBotId,
+  };
 }
 
 export async function disconnectOmi(

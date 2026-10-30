@@ -46,6 +46,12 @@ it("hides the browser PDF toolbar so only the app's Open and Download show", () 
   expect(frame?.getAttribute("src")).toBe("blob:file#toolbar=0");
 });
 
+it("plays a recording in the browser's audio controls", () => {
+  const audio = render(item("Recording 29 Oct 09:14", "audio/ogg")).querySelector("audio");
+  expect(audio?.getAttribute("src")).toBe("blob:file");
+  expect(audio?.hasAttribute("controls")).toBe(true);
+});
+
 it("gives a PDF Open and Download below sm, where the frame would be blank", () => {
   const view = render(item("agreement.pdf", "application/pdf"));
   expect(view.querySelector("iframe")?.className).toContain("max-sm:hidden");

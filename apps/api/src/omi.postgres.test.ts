@@ -165,6 +165,7 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
       connectionId: connections.a,
       pendingUploads: 0,
       recordings: 0,
+      agentBotId: row.agentBotId,
     });
     // The generic app list never shows it.
     expect((await a.connections.list()).some((c) => c.id === connections.a)).toBe(false);

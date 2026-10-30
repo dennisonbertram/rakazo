@@ -73,6 +73,11 @@ export const Image: Story = {
   beforeEach: () => serveFile("png"),
   args: { item: { ...readyItem, name: "Sample photo.png", mimeType: "image/png" } },
 };
+/** A recording plays in the browser's own audio controls. The story's bytes are not audio, so it cannot play here. */
+export const Audio: Story = {
+  beforeEach: () => serveFile("png"),
+  args: { item: { ...readyItem, name: "Recording 29 Oct 09:14", mimeType: "audio/ogg" } },
+};
 /** A type the browser cannot show keeps the file icon. */
 export const OtherType: Story = {
   args: { item: { ...readyItem, name: "Sample budget.csv", mimeType: "text/csv" } },
