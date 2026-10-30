@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type { BotMcpServer, McpServer } from "@rakazo/contracts";
+import { BREX_CARDS_MCP_ENDPOINT } from "@rakazo/contracts";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -14,8 +15,16 @@ const setExclusive = vi.hoisted(() => vi.fn());
 const navigate = vi.hoisted(() => vi.fn());
 const listAssignments = vi.hoisted(() => vi.fn());
 const replaceAssignments = vi.hoisted(() => vi.fn());
+const brex = vi.hoisted(() => ({
+  cards: vi.fn(),
+  getControls: vi.fn(),
+  setControls: vi.fn(),
+  replaceToken: vi.fn(),
+}));
 vi.mock("../../lib/rpc", () => ({
   rpc: {
+    brexCards: brex,
+    threads: { send: vi.fn() },
     mcp: {
       servers: { setWrites },
       assignments: { list: listAssignments, replace: replaceAssignments },
@@ -445,4 +454,107 @@ it("shows a skeleton, not an empty page, while the connections load", async () =
     ),
   );
   expect(container.querySelector('[data-testid="mcp-detail-loading"]')).not.toBeNull();
+});
+
+const brexList = {
+  serverId: "s1",
+  agentBotId: "bot_brex",
+  writesEnabled: false,
+  cards: [
+    {
+      cardId: "card_aaa",
+      name: "Figma",
+      lastFour: "4242",
+      ownerUserId: "user_1",
+      status: "ACTIVE",
+      limitCents: 20_000,
+      currency: "USD",
+      duration: "MONTHLY",
+    },
+  ],
+};
+const brexControls = {
+  maxNewCardLimitCents: 100_000,
+  maxCardLimitCents: 500_000,
+  maxSpendLimitBaseCents: 1_000_000,
+  maxCardsPerDay: 5,
+  allowedDurations: ["MONTHLY", "ONE_TIME"],
+  oneTimeMaxDays: 90,
+};
+const showBrex = (writesEnabled = false) =>
+  show(writesEnabled, BREX_CARDS_MCP_ENDPOINT, {
+    name: "Brex cards",
+    slug: "brex-cards",
+    transport: "streamable_http",
+    agentBotId: "bot_brex",
+    agentExclusive: true,
+    writesEnabled,
+  });
+const headings = () => [...container.querySelectorAll("h2")].map((h) => h.textContent);
+
+it("Brex cards: the owner sees Cards, Controls and Replace token, and no sharing control or Unlock", async () => {
+  brex.cards.mockResolvedValue(brexList);
+  brex.getControls.mockResolvedValue(brexControls);
+  await showBrex();
+  expect(headings()).toEqual(expect.arrayContaining(["Cards", "Controls"]));
+  expect(container.textContent).toContain("Figma");
+  expect(
+    [...container.querySelectorAll("button")].some((b) => b.textContent === "Replace token"),
+  ).toBe(true);
+  // The agent section stays, with its changes switch, but never the sharing control or its list.
+  expect(writesSwitch()).not.toBeNull();
+  expect(container.querySelector("#server-shared")).toBeNull();
+  expect(container.textContent).not.toContain("Let other agents use");
+  expect(container.textContent).not.toContain("Used by");
+  expect(container.textContent).not.toMatch(/unlock/i);
+  // The token is pasted, not OAuth: no sign-in menu and no host line.
+  expect(container.querySelector('[aria-label="Sign-in options"]')).toBeNull();
+  expect(container.textContent).not.toContain("via MCP");
+  // Changes are off, so the row buttons wait.
+  const lock = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+    (b) => b.textContent === "Lock",
+  );
+  expect(lock?.disabled).toBe(true);
+});
+
+it("Brex cards: row buttons enable once changes are on", async () => {
+  brex.cards.mockResolvedValue({ ...brexList, writesEnabled: true });
+  brex.getControls.mockResolvedValue(brexControls);
+  await showBrex(true);
+  const lock = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+    (b) => b.textContent === "Lock",
+  );
+  expect(lock?.disabled).toBe(false);
+});
+
+it("Brex cards: a member (or former owner) is refused and sees none of the owner's sections", async () => {
+  brex.cards.mockRejectedValue(
+    Object.assign(new Error("Only the space owner can do this."), { code: "FORBIDDEN" }),
+  );
+  brex.getControls.mockRejectedValue(
+    Object.assign(new Error("Only the space owner can do this."), { code: "FORBIDDEN" }),
+  );
+  await showBrex();
+  expect(headings()).not.toContain("Cards");
+  expect(headings()).not.toContain("Controls");
+  expect(container.textContent).not.toContain("Replace token");
+  expect(container.querySelector("table")).toBeNull();
+  expect(container.querySelector("#server-shared")).toBeNull();
+  expect(brex.getControls).not.toHaveBeenCalled();
+});
+
+it("Brex cards: when Brex cannot be reached the owner still gets Replace token", async () => {
+  brex.cards.mockRejectedValue(new Error("Could not reach Brex"));
+  brex.getControls.mockResolvedValue(brexControls);
+  await showBrex();
+  expect(container.textContent).toContain("Could not reach Brex");
+  expect(
+    [...container.querySelectorAll("button")].some((b) => b.textContent === "Replace token"),
+  ).toBe(true);
+});
+
+it("other servers never call the Brex RPCs", async () => {
+  brex.cards.mockClear();
+  await show(false, "https://mcp.example.com/sse");
+  expect(brex.cards).not.toHaveBeenCalled();
 });
