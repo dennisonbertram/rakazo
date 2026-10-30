@@ -23,8 +23,11 @@ struct SandboxedHTMLTests {
 
   @Test func prependsMetaAfterDoctype() {
     let meta = "\(SandboxedHTML.dnsPrefetchOffMeta)<meta http-equiv=\"Content-Security-Policy\" content=\"\(SandboxedHTML.csp)\">"
-    #expect(SandboxedHTML.document("<p>x</p>") == "<!DOCTYPE html>\(meta)<p>x</p>")
-    #expect(SandboxedHTML.document("<!doctype html><p>x</p>") == "<!doctype html>\(meta)<p>x</p>")
+    let withViewport = meta + SandboxedHTML.viewportMeta
+    #expect(SandboxedHTML.document("<p>x</p>") == "<!DOCTYPE html>\(withViewport)<p>x</p>")
+    #expect(SandboxedHTML.document("<!doctype html><p>x</p>") == "<!doctype html>\(withViewport)<p>x</p>")
+    let own = "<meta name=\"viewport\" content=\"width=500\"><p>x</p>"
+    #expect(SandboxedHTML.document(own) == "<!DOCTYPE html>\(meta)\(own)")
   }
 
   /// Runs the script in JavaScriptCore with a stub window and returns what the page's listener gets.

@@ -8,9 +8,15 @@ public enum SandboxedHTML {
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'; base-uri 'none'"
   public static let dnsPrefetchOffMeta = "<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\">"
 
+  public static let viewportMeta = "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+
   /// Prepends the DNS-prefetch and CSP meta tags, after a leading plain doctype when there is one.
   public static func document(_ html: String) -> String {
-    let meta = "\(dnsPrefetchOffMeta)<meta http-equiv=\"Content-Security-Policy\" content=\"\(csp)\">"
+    var meta = "\(dnsPrefetchOffMeta)<meta http-equiv=\"Content-Security-Policy\" content=\"\(csp)\">"
+    // So a page without its own viewport is not drawn at desktop width.
+    if html.firstMatch(of: /<meta[^>]+name\s*=\s*["']?viewport/.ignoresCase()) == nil {
+      meta += viewportMeta
+    }
     if let doctype = html.firstMatch(of: /^\s*<!doctype\s+html\s*>/.ignoresCase()) {
       var out = html
       out.insert(contentsOf: meta, at: doctype.range.upperBound)
