@@ -110,6 +110,9 @@ import { moveRosterFocus, rosterRowId, syncRosterTabStops } from "./roster-tab-s
 import { moreBarCover, moreBarHeight, rowsBelow } from "./rows-below";
 import { SidebarHeaderRow } from "./sidebar-header-row";
 
+/** The bar reaches this far below the list: iOS Safari otherwise paints a sliver of the next row over its foot. */
+const BAR_OVERHANG = 12;
+
 type SidebarChat = {
   id: string;
   name: string;
@@ -1923,8 +1926,8 @@ export function SpaceSidebar({
           <button
             type="button"
             data-testid="sidebar-more-rows"
-            className="absolute inset-x-0 bottom-0 z-30 transform-gpu flex items-start justify-center bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            style={{ height: moreBarHeight() + barCover }}
+            className="absolute inset-x-0 z-30 flex items-start justify-center border-b border-sidebar-border bg-sidebar pt-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            style={{ height: moreBarHeight() + barCover + BAR_OVERHANG, bottom: -BAR_OVERHANG }}
             onClick={() => {
               const pane = sidebarPaneRef.current;
               const list = sidebarScrollRef.current;
