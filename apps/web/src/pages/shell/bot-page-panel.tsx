@@ -449,6 +449,8 @@ export function BotPagePanel({
                 aria-label={t`Page title`}
                 defaultValue={active.title}
                 maxLength={BOT_PAGE_TITLE_MAX}
+                // Typing replaces the title, so "New page" never ends up as a prefix.
+                onFocus={(event) => event.currentTarget.select()}
                 onKeyDown={(event) => event.key === "Escape" && setRenaming(false)}
                 onBlur={() => setRenaming(false)}
               />

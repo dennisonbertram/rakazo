@@ -145,5 +145,9 @@ it("has no tab row for one page and creates a new page from the New page button"
   });
   expect(mocks.create).toHaveBeenCalledWith({ botId: "bot_demo", title: "New page" });
   expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
-  expect(container.querySelector('input[aria-label="Page title"]')).not.toBeNull();
+  const title = container.querySelector('input[aria-label="Page title"]') as HTMLInputElement;
+  expect(title).not.toBeNull();
+  // The default title is selected, so typing a name replaces it.
+  expect(document.activeElement).toBe(title);
+  expect([title.selectionStart, title.selectionEnd]).toEqual([0, "New page".length]);
 });
