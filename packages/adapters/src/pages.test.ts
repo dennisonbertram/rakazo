@@ -402,6 +402,7 @@ describe("named pages", () => {
     expect(await run("page_create", { title: "Cash" })).toEqual({
       ok: true,
       title: "Cash",
+      kind: "blocks",
       revision: 1,
     });
     expect(await run("page_create", { title: "cash" })).toMatchObject({

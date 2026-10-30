@@ -4415,7 +4415,7 @@ export function createRouter(deps: RouterDeps) {
           botId: bot.id,
           pageId: input.pageId,
         });
-        if (!page || !input.chartSvgs) return page;
+        if (!page || !input.chartSvgs || page.kind === "html") return page;
         const chartSvgs = await pageChartSvgs(deps, { spaceId: bot.spaceId }, page);
         return { ...page, chartSvgs };
       }),
@@ -4543,7 +4543,13 @@ export function createRouter(deps: RouterDeps) {
         try {
           return await createBotPage(
             { prisma: deps.prisma, events: deps.events },
-            { spaceId: bot.spaceId, botId: bot.id, userId: bot.userId, title: input.title },
+            {
+              spaceId: bot.spaceId,
+              botId: bot.id,
+              userId: bot.userId,
+              title: input.title,
+              kind: input.kind,
+            },
           );
         } catch (error) {
           throw pageError(error);

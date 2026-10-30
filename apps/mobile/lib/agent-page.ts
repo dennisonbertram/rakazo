@@ -132,3 +132,18 @@ export function pageBlocks(
 export function sidebarBotPages(state: SidebarPagesState) {
   return state.pages.flatMap((page) => ("pageId" in page ? [page] : []));
 }
+
+/**
+ * JavaScript for the page WebView that delivers an HTML page's data as a "praci-data" message event,
+ * the same event the web viewer posts. The data goes in as a JSON string that the page-side code parses,
+ * so it stays plain data whatever it contains; U+2028/2029 are escaped for older JavaScript engines.
+ */
+export function htmlPageDataScript(sources: unknown): string {
+  const json = JSON.stringify({ type: "praci-data", sources })
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+  const literal = JSON.stringify(json)
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+  return `(function(){window.dispatchEvent(new MessageEvent("message",{data:JSON.parse(${literal})}))})();true;`;
+}

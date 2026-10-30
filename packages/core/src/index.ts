@@ -57,6 +57,7 @@ export * from "./mail-results.js";
 export * from "./mail-unsubscribe.js";
 export * from "./markdown-plain.js";
 export * from "./mcp.js";
+export * from "./html-page.js";
 export * from "./message-pages.js";
 export * from "./message-reactions.js";
 export * from "./message-replies.js";

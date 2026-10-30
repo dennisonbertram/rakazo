@@ -9,6 +9,12 @@ export const SANDBOXED_EMAIL_CSP = SANDBOXED_ARTIFACT_CSP.replace(
   "script-src 'none'",
 ).replace("img-src data:", "img-src data: https:");
 
+/**
+ * Hostile HTML could leak data by encoding it in a hostname that the browser resolves ahead of time
+ * (<link rel="dns-prefetch">). CSP does not cover that, so every sandboxed document starts with this tag.
+ */
+export const DNS_PREFETCH_OFF_META = '<meta http-equiv="x-dns-prefetch-control" content="off">';
+
 const PLAIN_HTML_DOCTYPE = /^\s*<!doctype\s+html\s*>/i;
 
 /**
@@ -23,7 +29,7 @@ const PLAIN_HTML_DOCTYPE = /^\s*<!doctype\s+html\s*>/i;
  */
 export function withSandboxedArtifactCsp(html: string, options: { email?: boolean } = {}): string {
   const csp = options.email ? SANDBOXED_EMAIL_CSP : SANDBOXED_ARTIFACT_CSP;
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
+  const meta = `${DNS_PREFETCH_OFF_META}<meta http-equiv="Content-Security-Policy" content="${csp}">`;
   const leadingDoctype = html.match(PLAIN_HTML_DOCTYPE);
   if (!leadingDoctype) return `<!DOCTYPE html>${meta}${html}`;
   const end = leadingDoctype[0].length;

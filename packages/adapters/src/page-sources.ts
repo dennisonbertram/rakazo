@@ -4,8 +4,11 @@ import type {
   BotPage,
   HttpSourceCall,
   McpSourceCall,
+  PageBlocksData,
   PageChart,
   PageData,
+  PageHtmlData,
+  PageHtmlSourceData,
   PageLiveBlock,
   PageMetricBlock,
   PageSource,
@@ -19,12 +22,14 @@ import {
   HttpSourceCallSchema,
   isGtmAgentSpawnKey,
   McpSourceCallSchema,
+  PAGE_HTML_DATA_MAX_BYTES,
+  PAGE_HTML_HISTORY_MAX,
   PAGE_SOURCE_VALUE_MAX_BYTES,
   PAGE_SOURCES_MAX_PER_PAGE,
   PageSourceNameSchema,
   PageSourceSchedule as PageSourceScheduleSchema,
 } from "@rakazo/contracts";
-import { splitPage } from "@rakazo/core";
+import { htmlPageDeclaration, splitPage } from "@rakazo/core";
 import type { NotificationEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -708,8 +713,120 @@ const sourceNameOf = (request: LiveRequest) =>
 export async function resolvePageData(
   deps: Pick<PageDeps, "prisma">,
   scope: { spaceId: string },
-  page: Pick<BotPage, "id" | "botId" | "content" | "revision">,
+  page: Pick<BotPage, "id" | "botId" | "content" | "revision"> & { kind?: string },
 ): Promise<PageData> {
+  if (page.kind === "html") return resolveHtmlPageData(deps, scope, page);
+  return resolveBlocksPageData(deps, scope, page);
+}
+
+const HTML_ENTRY_OVERHEAD_BYTES = 40;
+
+/**
+ * Data for an HTML page: the sources it names in its praci-sources meta tag and nothing else.
+ * A declared name with no source on this page is "missing". Values were redacted when stored.
+ * The payload stays under PAGE_HTML_DATA_MAX_BYTES: latest values are placed first, then history
+ * newest first across sources, so the oldest history is what gets dropped.
+ */
+export async function resolveHtmlPageData(
+  deps: Pick<PageDeps, "prisma">,
+  scope: { spaceId: string },
+  page: Pick<BotPage, "id" | "botId" | "content" | "revision">,
+): Promise<PageHtmlData> {
+  const declaration = htmlPageDeclaration(page.content);
+  const rows = declaration.sources.length
+    ? await deps.prisma.pageSource.findMany({
+        where: { pageId: page.id, botId: page.botId, spaceId: scope.spaceId },
+      })
+    : [];
+  const byName = new Map(rows.map((source) => [source.name.toLowerCase(), source]));
+  const wantsHistory = new Set(declaration.history.map((name) => name.toLowerCase()));
+  const sources: Record<string, PageHtmlSourceData> = {};
+  let budget = PAGE_HTML_DATA_MAX_BYTES;
+  const latestIds: { name: string; id: string }[] = [];
+  const historyCandidates: { name: string; id: string; at: Date; bytes: number }[] = [];
+  for (const name of declaration.sources) {
+    const source = byName.get(name.toLowerCase());
+    if (!source) {
+      sources[name] = { status: "missing", fetchedAt: null };
+      continue;
+    }
+    const metas = await deps.prisma.pageSourceSnapshot.findMany({
+      where: { sourceId: source.id, spaceId: scope.spaceId },
+      orderBy: { fetchedAt: "desc" },
+      take: wantsHistory.has(name.toLowerCase()) ? PAGE_HTML_HISTORY_MAX : 1,
+      select: { id: true, fetchedAt: true, bytes: true },
+    });
+    const latest = metas[0];
+    const error = source.lastError ?? undefined;
+    const status: PageHtmlSourceData["status"] =
+      source.status !== "active"
+        ? (source.status as PageHtmlSourceData["status"])
+        : !latest
+          ? error
+            ? "failed"
+            : "empty"
+          : error
+            ? "failed"
+            : "ok";
+    sources[name] = {
+      status,
+      fetchedAt: latest?.fetchedAt.toISOString() ?? null,
+      ...(error ? { error } : {}),
+    };
+    // A source the owner has not approved shows no data.
+    if (!latest || source.status === "pending" || source.status === "denied") continue;
+    const cost = latest.bytes + HTML_ENTRY_OVERHEAD_BYTES;
+    if (cost > budget) {
+      sources[name] = { status: "failed", fetchedAt: latest.fetchedAt.toISOString(), error: "Too large to show." };
+      continue;
+    }
+    budget -= cost;
+    latestIds.push({ name, id: latest.id });
+    if (wantsHistory.has(name.toLowerCase()))
+      for (const meta of metas)
+        historyCandidates.push({ name, id: meta.id, at: meta.fetchedAt, bytes: meta.bytes });
+  }
+  historyCandidates.sort((a, b) => b.at.getTime() - a.at.getTime());
+  const chosen: typeof historyCandidates = [];
+  for (const candidate of historyCandidates) {
+    const cost = candidate.bytes + HTML_ENTRY_OVERHEAD_BYTES;
+    if (cost > budget) continue;
+    budget -= cost;
+    chosen.push(candidate);
+  }
+  const ids = [...new Set([...latestIds.map((entry) => entry.id), ...chosen.map((entry) => entry.id)])];
+  const values = new Map(
+    ids.length
+      ? (
+          await deps.prisma.pageSourceSnapshot.findMany({
+            where: { id: { in: ids }, spaceId: scope.spaceId },
+            select: { id: true, value: true },
+          })
+        ).map((row) => [row.id, row.value])
+      : [],
+  );
+  for (const { name, id } of latestIds) {
+    const target = sources[name];
+    if (target && values.has(id)) target.value = values.get(id);
+  }
+  for (const candidate of chosen) {
+    const target = sources[candidate.name];
+    if (!target || !values.has(candidate.id)) continue;
+    (target.history ??= []).push({ at: candidate.at.toISOString(), value: values.get(candidate.id) });
+  }
+  // A history source whose entries were all dropped still says it has history, so a page can tell.
+  for (const name of declaration.history) {
+    const target = sources[declaration.sources.find((n) => n.toLowerCase() === name.toLowerCase()) ?? name];
+    if (target && target.status !== "missing") target.history ??= [];
+  }
+  return { kind: "html", pageId: page.id, revision: page.revision, sources };
+}
+
+export async function resolveBlocksPageData(
+  deps: Pick<PageDeps, "prisma">,
+  scope: { spaceId: string },
+  page: Pick<BotPage, "id" | "botId" | "content" | "revision">,
+): Promise<PageBlocksData> {
   const requests = liveRequests(page.content);
   const sources = requests.length
     ? await deps.prisma.pageSource.findMany({
@@ -792,7 +909,8 @@ export async function pageChartSvgs(
   scope: { spaceId: string },
   page: Pick<BotPage, "id" | "botId" | "content" | "revision">,
 ): Promise<string[]> {
-  const live = (await resolvePageData(deps, scope, page)).blocks;
+  const data = await resolveBlocksPageData(deps, scope, page);
+  const live = data.blocks;
   let next = 0;
   const svgs: Promise<string>[] = [];
   for (const segment of splitPage(page.content)) {

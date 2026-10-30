@@ -8,7 +8,7 @@ import {
 } from "./page-source-tick.js";
 import {
   pageSourceToolFromTool,
-  resolvePageData,
+  resolveBlocksPageData,
   updatePageSourceByOwner,
 } from "./page-sources.js";
 import { createBotPage, saveBotPage } from "./pages.js";
@@ -242,7 +242,7 @@ describePostgres("page source scheduler (PostgreSQL)", () => {
     );
     expect(saved.ok).toBe(true);
     const page = await prisma.botPage.findFirstOrThrow({ where: { id: pageId } });
-    const data = await resolvePageData({ prisma }, { spaceId }, page);
+    const data = await resolveBlocksPageData({ prisma }, { spaceId }, page);
     const rows = (data.blocks[0]?.rows ?? []) as { value: number }[];
     expect(rows).toHaveLength(500);
     // Oldest first, ending with the newest snapshot.

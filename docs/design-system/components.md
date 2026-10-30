@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 321 of 321
-- Web and shared components: 830
+- Web and shared component files with stories: 322 of 322
+- Web and shared components: 831
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 125 in 67 files, native story pending
 
@@ -115,7 +115,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | PdfViewer | [apps/web/src/components/PdfViewer.tsx](../../apps/web/src/components/PdfViewer.tsx) | [PdfViewer.stories.tsx](../../apps/web/src/components/PdfViewer.stories.tsx) | web |
 | RowsSkeleton | [apps/web/src/components/RowsSkeleton.tsx](../../apps/web/src/components/RowsSkeleton.tsx) | [RowsSkeleton.stories.tsx](../../apps/web/src/components/RowsSkeleton.stories.tsx) | web |
 | RunsOnPicker, DefaultRunsOnSection | [apps/web/src/components/RunsOnPicker.tsx](../../apps/web/src/components/RunsOnPicker.tsx) | [RunsOnPicker.stories.tsx](../../apps/web/src/components/RunsOnPicker.stories.tsx) | web |
-| SandboxedHtmlViewer | [apps/web/src/components/SandboxedHtmlViewer.tsx](../../apps/web/src/components/SandboxedHtmlViewer.tsx) | [SandboxedHtmlViewer.stories.tsx](../../apps/web/src/components/SandboxedHtmlViewer.stories.tsx) | web |
+| SandboxedHtmlViewer | [apps/web/src/components/SandboxedHtmlViewer.tsx](../../apps/web/src/components/SandboxedHtmlViewer.tsx) | [SandboxedHtmlViewer.stories.tsx](../../apps/web/src/components/SandboxedHtmlViewer.stories.tsx), [HtmlPageView.stories.tsx](../../apps/web/src/components/pages/HtmlPageView.stories.tsx) | web |
 | SecretRequestDialog | [apps/web/src/components/SecretRequestDialog.tsx](../../apps/web/src/components/SecretRequestDialog.tsx) | [SecretRequestDialog.stories.tsx](../../apps/web/src/components/SecretRequestDialog.stories.tsx) | web |
 | SectionCard | [apps/web/src/components/SectionCard.tsx](../../apps/web/src/components/SectionCard.tsx) | [SectionCard.stories.tsx](../../apps/web/src/components/SectionCard.stories.tsx) | web |
 | SheetPreview, SheetRow | [apps/web/src/components/SheetPreview.tsx](../../apps/web/src/components/SheetPreview.tsx) | [SheetPreview.stories.tsx](../../apps/web/src/components/SheetPreview.stories.tsx) | web |
@@ -308,6 +308,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
+| HtmlPageView | [apps/web/src/components/pages/HtmlPageView.tsx](../../apps/web/src/components/pages/HtmlPageView.tsx) | [HtmlPageView.stories.tsx](../../apps/web/src/components/pages/HtmlPageView.stories.tsx) | web |
 | LiveBlockFrame, FailedDot, PageMetricBlock, PageTableBlock, PageChartFrame | [apps/web/src/components/pages/PageLiveBlocks.tsx](../../apps/web/src/components/pages/PageLiveBlocks.tsx) | [PageLiveBlocks.stories.tsx](../../apps/web/src/components/pages/PageLiveBlocks.stories.tsx) | web |
 | PageSourcesDialog | [apps/web/src/components/pages/PageSourcesDialog.tsx](../../apps/web/src/components/pages/PageSourcesDialog.tsx) | [PageSourcesDialog.stories.tsx](../../apps/web/src/components/pages/PageSourcesDialog.stories.tsx) | web |
 
