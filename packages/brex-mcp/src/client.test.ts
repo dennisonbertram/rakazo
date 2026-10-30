@@ -78,6 +78,25 @@ describe("createBrexClient", () => {
     expect(paged.error?.kind).toBe("unavailable");
   });
 
+  it("filters users with email[] and name, never the legacy singular email", async () => {
+    const { emulator, client } = await setup();
+    const byEmail = await client.listUsers({ email: "ben@example.test", name: "sample" });
+    expect(byEmail.items.map((u) => u.id)).toEqual(["u_ben"]);
+    const params = new URLSearchParams(emulator.requests.at(-1)?.query);
+    expect(params.get("email[]")).toBe("ben@example.test");
+    expect(params.has("email")).toBe(false);
+    expect((await client.listUsers({ name: "CY" })).items.map((u) => u.id)).toEqual(["u_cy"]);
+    expect((await client.listUsers({ email: "nobody@example.test" })).items).toEqual([]);
+  });
+
+  it("lists only the spend limits a user belongs to", async () => {
+    const { client } = await setup();
+    const none = await client.listSpendLimits({ memberUserId: "u_cy" });
+    expect(none.items).toEqual([]);
+    const ada = await client.listSpendLimits({ memberUserId: "u_ada" });
+    expect(ada.items.length).toBeGreaterThan(0);
+  });
+
   it("backs off on 429 using Retry-After plus jitter, then succeeds", async () => {
     const { emulator, client, sleeps } = await setup({ random: () => 0.5 });
     emulator.rateLimitNext = 2;

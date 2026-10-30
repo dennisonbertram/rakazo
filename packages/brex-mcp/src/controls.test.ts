@@ -254,6 +254,22 @@ describe("checkUpdateSpendLimit", () => {
     expect(over.ok === false && over.reason).toMatch(/base amount/i);
   });
 
+  it("checks the resulting amount, so an over-cap limit cannot be extended or given members", () => {
+    const big = spendLimit({
+      authorization_settings: {
+        base_limit: { amount: 2_000_000, currency: "USD" },
+        authorization_type: "HARD",
+        rollover_refresh_rate: "OFF",
+      },
+    });
+    const members = checkUpdateSpendLimit(controls, big, { addMembers: [cy] });
+    expect(members.ok === false && members.reason).toMatch(/\$20,000\.00.*\$10,000\.00/);
+    expect(checkUpdateSpendLimit(controls, big, { endDate: "2027-01-01" }).ok).toBe(false);
+    expect(checkUpdateSpendLimit(controls, big, { status: "ACTIVE" }).ok).toBe(false);
+    // Lowering it below the cap is the way out.
+    expect(checkUpdateSpendLimit(controls, big, { amountCents: 500_000 }).ok).toBe(true);
+  });
+
   it("refuses removing someone who is not a member", () => {
     const result = checkUpdateSpendLimit(controls, spendLimit(), { removeMembers: [cy] });
     expect(result.ok === false && result.reason).toContain("Cy Demo");

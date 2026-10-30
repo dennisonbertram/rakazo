@@ -31,6 +31,8 @@ interface Options {
   refuseReservation?: string;
   /** Replaces the network for these requests, to simulate a lost connection. */
   dropRequest?: (method: string, path: string) => boolean;
+  /** Delay every Brex GET by this many ms, so concurrent calls interleave. */
+  readDelayMs?: number;
 }
 
 async function setup(options: Options = {}) {
@@ -52,9 +54,12 @@ async function setup(options: Options = {}) {
       const path = new URL(String(url)).pathname;
       events.push(`brex:${method} ${path}`);
       if (options.dropRequest?.(method, path)) throw new TypeError("connection lost");
+      if (options.readDelayMs && method === "GET")
+        await new Promise((r) => setTimeout(r, options.readDelayMs));
       return fetch(url, init);
     },
   });
+  const locks = new Map<string, Promise<void>>();
   const store: BrexCardsStore = {
     loadControls: async () => ({ ...DEFAULT_CONTROLS, ...options.controls }),
     reserveCard: async () => {
@@ -67,6 +72,18 @@ async function setup(options: Options = {}) {
     settleReservation: async (id, status, cardId) => {
       events.push(`store:settle:${status}`);
       settled.push({ id, status, ...(cardId ? { cardId } : {}) });
+    },
+    withTargetLock: (key, fn) => {
+      const previous = locks.get(key) ?? Promise.resolve();
+      const run = previous.then(fn, fn);
+      locks.set(
+        key,
+        run.then(
+          () => {},
+          () => {},
+        ),
+      );
+      return run;
     },
     idempotencyKey: (meta) =>
       typeof meta?.idempotencyKey === "string" ? meta.idempotencyKey : undefined,
@@ -447,6 +464,51 @@ describe("update_spend_limit", () => {
       ).toBe(true);
     }
     expect(writes()).toEqual([]);
+  });
+});
+
+describe("write ordering and caps", () => {
+  it("refuses to give members to a spend limit that is over the base cap, with no write", async () => {
+    const { emulator, call, writes } = await setup();
+    const limit = emulator.spendLimits.find((s) => s.id === "sl_template") as any;
+    limit.authorization_settings.base_limit.amount = 2_000_000;
+    const result = await call("update_spend_limit", {
+      spendLimitId: "sl_template",
+      spendLimitName: "Software template",
+      addMembers: [{ userId: "u_cy", name: "Cy Demo" }],
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toMatch(/\$10,000\.00/);
+    expect(writes()).toEqual([]);
+  });
+
+  it("serializes concurrent updates to one spend limit, so a removed member stays removed", async () => {
+    const { emulator, call } = await setup({ readDelayMs: 15 });
+    const target = { spendLimitId: "sl_template", spendLimitName: "Software template" };
+    const [removed, added] = await Promise.all([
+      call("update_spend_limit", { ...target, removeMembers: [ADA] }, "eff-a"),
+      call(
+        "update_spend_limit",
+        { ...target, addMembers: [{ userId: "u_cy", name: "Cy Demo" }] },
+        "eff-b",
+      ),
+    ]);
+    expect([removed.isError, added.isError]).toEqual([false, false]);
+    const members = (emulator.spendLimits.find((s) => s.id === "sl_template") as any)
+      .member_user_ids;
+    expect(members).not.toContain("u_ada");
+    expect(members).toContain("u_cy");
+  });
+
+  it("serializes concurrent card updates on the same card", async () => {
+    const { emulator, call } = await setup({ readDelayMs: 15 });
+    await Promise.all([
+      call("update_card", { ...FIGMA, amountCents: 70_000 }),
+      call("update_card", { ...FIGMA, allowedMerchants: null }),
+    ]);
+    const stored = emulator.cards.find((c) => c.id === "card_figma") as any;
+    expect(stored.spend_controls.spend_limit.amount).toBe(70_000);
+    expect(stored.spend_controls.allowed_merchant_details).toBeNull();
   });
 });
 

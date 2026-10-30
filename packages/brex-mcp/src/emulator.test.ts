@@ -62,6 +62,26 @@ describe("BrexApiEmulator", () => {
     expect(emulator.requests[0]?.idempotencyKey).toBe("k1");
   });
 
+  it("replays the response as it was first returned, not the card's current state", async () => {
+    const { api } = await setup();
+    const first = await api("/v2/cards", { method: "POST", json: newCard, key: "k1" });
+    await api(`/v2/cards/${first.body.id}/lock`, { method: "POST", json: { reason: "OTHER" } });
+    const replay = await api("/v2/cards", { method: "POST", json: newCard, key: "k1" });
+    expect(replay.body.id).toBe(first.body.id);
+    expect(replay.body.status).toBe("ACTIVE");
+  });
+
+  it("filters spend limits by member_user_id[] and users by name and email[]", async () => {
+    const { api } = await setup();
+    const mine = await api("/v2/spend_limits?member_user_id[]=u_ada");
+    expect(mine.body.items.length).toBeGreaterThan(0);
+    expect((await api("/v2/spend_limits?member_user_id[]=u_cy")).body.items).toEqual([]);
+    expect(
+      (await api("/v2/users?email[]=cy@example.test")).body.items.map((u: any) => u.id),
+    ).toEqual(["u_cy"]);
+    expect((await api("/v2/users?name=ben")).body.items.map((u: any) => u.id)).toEqual(["u_ben"]);
+  });
+
   it("rejects a vendor card without spend controls and an unknown owner", async () => {
     const { api } = await setup();
     const { spend_controls: _omit, ...noControls } = newCard;
