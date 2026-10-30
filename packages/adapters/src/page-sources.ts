@@ -1,10 +1,13 @@
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type {
   BotPage,
+  McpSourceCall,
   PageChart,
   PageData,
   PageLiveBlock,
   PageMetricBlock,
   PageSource,
+  PageSourceKind,
   PageSourceSchedule,
   PageTableBlock,
   PraciSourceCall,
@@ -12,13 +15,14 @@ import type {
 import {
   disabledBuiltinToolSet,
   isGtmAgentSpawnKey,
+  McpSourceCallSchema,
   PAGE_SOURCE_VALUE_MAX_BYTES,
   PAGE_SOURCES_MAX_PER_PAGE,
   PageSourceNameSchema,
   PageSourceSchedule as PageSourceScheduleSchema,
 } from "@rakazo/contracts";
 import { splitPage } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+import type { NotificationEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { builtinAgentTools } from "./builtin-tools.js";
@@ -29,7 +33,15 @@ import {
   financeToolsAllowed,
   hasFinanceSource,
 } from "./finance-tools.js";
+import { unwrapToolResult } from "./finance-call-tool.js";
 import { fundraisingToolFromTool, fundraisingToolsAllowed } from "./fundraising-tools.js";
+import type { McpConnector } from "./mcp-connector.js";
+import { checkMcpReadSource, mcpSourceContext } from "./mcp-read-source.js";
+import {
+  pageSourceApprovalBlock,
+  pageSourceCallHash,
+  postPageSourceApproval,
+} from "./page-source-approval.js";
 import type { PageDeps, PageToolScope } from "./pages.js";
 import { announcePageData, findPageByTitle, getBotPage, renderPageChartSvg } from "./pages.js";
 import { formatPinValue, jsonPointerGet } from "./pin-values.js";
@@ -61,8 +73,13 @@ export const SCHEDULE_MS: Record<PageSourceSchedule, number> = {
 };
 
 export interface PageSourceDeps extends PageDeps {
+  events: PageDeps["events"] & Partial<Pick<ThreadEvents, "notify">>;
   /** From the deployment; board_tickets is only a source where the ticket board is on. */
   ticketBoardEnabled?: boolean;
+  /** Needed for mcp sources: lists a server's tools and calls the approved one. */
+  mcp?: Pick<McpConnector, "listServerTools"> & Partial<Pick<McpConnector, "callServerTool">>;
+  /** Lets the "needs approval" notification reach open clients at once. */
+  notificationEvents?: NotificationEvents;
   /** Test seam. */
   timeoutMs?: number;
   now?: () => Date;
@@ -112,13 +129,14 @@ type SourceRow = {
   lastError: string | null;
 };
 
-export function toPageSource(row: SourceRow): PageSource {
+export function toPageSource(row: SourceRow, serverName?: string): PageSource {
   return {
     id: row.id,
     pageId: row.pageId,
     name: row.name,
-    kind: "praci",
-    call: row.call as PraciSourceCall,
+    kind: row.kind as PageSourceKind,
+    call: row.call as PageSource["call"],
+    ...(serverName ? { serverName } : {}),
     schedule: row.schedule as PageSourceSchedule,
     status: row.status as PageSource["status"],
     lastRefreshAt: row.lastRefreshAt?.toISOString() ?? null,
@@ -155,10 +173,8 @@ export async function praciSourceRefusal(
   if (builtinAgentTools.find((candidate) => candidate.name === tool)?.readOnly !== true) {
     return `${tool} is not a read-only tool.`;
   }
-  if (bot.archivedAt) return "This bot is archived.";
-  if (bot.audience === "external" || isGtmAgentSpawnKey(bot.spawnKey)) {
-    return "This bot cannot save page sources.";
-  }
+  const botRefusal = sourceBotRefusal(bot);
+  if (botRefusal) return botRefusal;
   if (disabledBuiltinToolSet(bot.disabledBuiltinTools).has(tool)) {
     return `${tool} is switched off for this bot.`;
   }
@@ -234,6 +250,75 @@ const botColumns = {
   disabledBuiltinTools: true,
 } as const;
 
+/** Why this bot may not keep any saved source, or null. */
+function sourceBotRefusal(bot: SourceBot): string | null {
+  if (bot.archivedAt) return "This bot is archived.";
+  if (bot.audience === "external" || isGtmAgentSpawnKey(bot.spawnKey)) {
+    return "This bot cannot save page sources.";
+  }
+  return null;
+}
+
+/**
+ * Run an approved mcp source's one read-only tool call. Three things must hold, each read from the
+ * database or the server now: the owner approved this exact call (status active and the stored
+ * hash matches the call's hash), the shared read-only rule passes, and both still hold right
+ * before the call. Anything else records an error and calls nothing.
+ */
+async function runMcpSource(
+  deps: PageSourceDeps,
+  source: Pick<SourceRow, "id" | "spaceId" | "userId" | "botId">,
+  bot: SourceBot,
+): Promise<unknown> {
+  const callServerTool = deps.mcp?.callServerTool?.bind(deps.mcp);
+  if (!callServerTool) throw new PageSourceError("MCP is not available.");
+  const refusal = sourceBotRefusal(bot);
+  if (refusal) throw new PageSourceError(refusal);
+  const scope = { spaceId: source.spaceId, botId: source.botId, userId: source.userId };
+  const approvedCall = async () => {
+    const row = await deps.prisma.pageSource.findFirst({
+      where: { id: source.id, spaceId: source.spaceId, userId: source.userId, kind: "mcp" },
+      select: { status: true, call: true, approvedCallHash: true },
+    });
+    const call = McpSourceCallSchema.safeParse(row?.call);
+    if (!row || !call.success) throw new PageSourceError("The source is not available.");
+    if (row.status !== "active") throw new PageSourceError(`The source is ${row.status}.`);
+    if (row.approvedCallHash !== pageSourceCallHash("mcp", call.data)) {
+      throw new PageSourceError("The owner has not approved this request.");
+    }
+    return call.data;
+  };
+  const check = async (call: { serverId: string; tool: string }) => {
+    try {
+      return await checkMcpReadSource(deps, scope, call, "page-source");
+    } catch (error) {
+      throw new PageSourceError(
+        (error instanceof Error ? error.message : String(error)).slice(0, 200),
+      );
+    }
+  };
+  const call = await approvedCall();
+  const server = await check(call);
+  const context = mcpSourceContext(scope, "page-source");
+  const result: CallToolResult = await callServerTool(server, context, call.tool, call.args, {
+    // The session setup awaits; look at the approval and the tool's status again right before the call.
+    beforeCall: async () => {
+      const again = await approvedCall();
+      if (pageSourceCallHash("mcp", again) !== pageSourceCallHash("mcp", call)) {
+        throw new PageSourceError("The request changed.");
+      }
+      await check(again);
+    },
+  });
+  try {
+    return unwrapToolResult(result);
+  } catch (error) {
+    throw new PageSourceError(
+      error instanceof Error ? error.message.slice(0, 200) : "Tool failed.",
+    );
+  }
+}
+
 export type RefreshOutcome =
   | { ok: true; value: unknown }
   /** `paused` is set only for the call that paused the source (its fifth failure in a row). */
@@ -276,16 +361,18 @@ export async function refreshPageSource(
       select: botColumns,
     });
     if (!bot) throw new PageSourceError("The bot is gone.");
-    const call = source.call as PraciSourceCall;
-    const value = await withTimeout(
-      runPraciSourceTool(
-        deps,
-        { spaceId: source.spaceId, userId: source.userId, bot },
-        call.tool,
-        call.args ?? {},
-      ),
-      deps.timeoutMs ?? REFRESH_TIMEOUT_MS,
-    );
+    const value =
+      source.kind === "mcp"
+        ? await withTimeout(runMcpSource(deps, source, bot), deps.timeoutMs ?? REFRESH_TIMEOUT_MS)
+        : await withTimeout(
+            runPraciSourceTool(
+              deps,
+              { spaceId: source.spaceId, userId: source.userId, bot },
+              (source.call as PraciSourceCall).tool,
+              (source.call as PraciSourceCall).args ?? {},
+            ),
+            deps.timeoutMs ?? REFRESH_TIMEOUT_MS,
+          );
     const json = JSON.stringify(value);
     const bytes = Buffer.byteLength(json ?? "");
     if (json === undefined) throw new PageSourceError("The tool returned nothing.");
@@ -372,7 +459,20 @@ export async function listPageSources(
     where: scope,
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
-  return rows.map(toPageSource);
+  const serverIds = rows.flatMap((row) => {
+    const id = row.kind === "mcp" ? (row.call as { serverId?: unknown }).serverId : undefined;
+    return typeof id === "string" ? [id] : [];
+  });
+  const servers = serverIds.length
+    ? await prisma.mcpServer.findMany({
+        where: { id: { in: serverIds }, spaceId: scope.spaceId },
+        select: { id: true, name: true },
+      })
+    : [];
+  const names = new Map(servers.map((server) => [server.id, server.name]));
+  return rows.map((row) =>
+    toPageSource(row, names.get((row.call as { serverId?: string }).serverId ?? "")),
+  );
 }
 
 /** Delete a source of this bot's page (its snapshots go with it). False when it is not this bot's. */
@@ -641,9 +741,10 @@ export async function pageSourceToolFromTool(
   }
 
   // page_source_set
-  if (args.kind !== undefined && args.kind !== "praci") {
-    return { error: 'Only kind "praci" is supported.' };
+  if (args.kind !== undefined && args.kind !== "praci" && args.kind !== "mcp") {
+    return { error: 'kind must be "praci" or "mcp".' };
   }
+  const kind: "praci" | "mcp" = args.kind === "mcp" ? "mcp" : "praci";
   const tool = String(args.tool ?? "");
   if (
     args.args !== undefined &&
@@ -655,23 +756,69 @@ export async function pageSourceToolFromTool(
   if (!schedule.success) return { error: "schedule must be one of 15m, 1h, 6h, 1d, 1w." };
   const bot = await prisma.bot.findFirst({
     where: { id: scope.botId, spaceId: scope.spaceId, userId: scope.userId },
-    select: botColumns,
+    select: { ...botColumns, name: true },
   });
   if (!bot) return { error: "This bot is not available." };
-  const refusal = await praciSourceRefusal(deps, bot, tool);
-  if (refusal) return { error: refusal };
-  const call: PraciSourceCall = { tool, args: (args.args as Record<string, unknown>) ?? {} };
+  let call: PraciSourceCall | McpSourceCall;
+  let serverName: string | undefined;
+  if (kind === "mcp") {
+    const refusal = sourceBotRefusal(bot);
+    if (refusal) return { error: refusal };
+    const wanted = String(args.server ?? "")
+      .trim()
+      .toLowerCase();
+    const assigned = await prisma.botMcpServer.findMany({
+      where: {
+        botId: scope.botId,
+        spaceId: scope.spaceId,
+        userId: scope.userId,
+        server: { enabled: true, spaceId: scope.spaceId, userId: scope.userId },
+      },
+      select: { server: { select: { id: true, name: true, slug: true } } },
+    });
+    const server = assigned
+      .map((row) => row.server)
+      .find(
+        (candidate) =>
+          wanted !== "" &&
+          [candidate.id, candidate.slug, candidate.name].some(
+            (value) => value.toLowerCase() === wanted,
+          ),
+      );
+    if (!server) return { error: "server must be the name of an MCP server assigned to this bot." };
+    try {
+      await checkMcpReadSource(
+        deps,
+        { spaceId: scope.spaceId, botId: scope.botId, userId: scope.userId },
+        { serverId: server.id, tool },
+        "page-source",
+      );
+    } catch (error) {
+      return { error: (error instanceof Error ? error.message : String(error)).slice(0, 200) };
+    }
+    call = { serverId: server.id, tool, args: (args.args as Record<string, unknown>) ?? {} };
+    serverName = server.name;
+  } else {
+    const refusal = await praciSourceRefusal(deps, bot, tool);
+    if (refusal) return { error: refusal };
+    call = { tool, args: (args.args as Record<string, unknown>) ?? {} };
+  }
   const now = deps.now?.() ?? new Date();
+  const callHash = kind === "mcp" ? pageSourceCallHash(kind, call as McpSourceCall) : null;
   const common = {
+    kind,
     call: JSON.parse(JSON.stringify(call)),
     schedule: schedule.data,
-    status: "active",
+    status: kind === "mcp" ? "pending" : "active",
+    approvedCallHash: null as string | null,
     failures: 0,
     lastError: null,
     leaseUntil: null,
-    nextRefreshAt: nextScheduledRefresh(now, schedule.data, deps.random),
+    nextRefreshAt: kind === "mcp" ? null : nextScheduledRefresh(now, schedule.data, deps.random),
   };
   let saved: SourceRow;
+  // An mcp source whose call is new or changed needs a card; the same call only changes its schedule.
+  let needsCard = false;
   try {
     saved = await prisma.$transaction(async (tx) => {
       const existing = await tx.pageSource.findMany({ where: pageScope });
@@ -688,22 +835,44 @@ export async function pageSourceToolFromTool(
             `This space already has ${PAGE_SOURCES_MAX_PER_SPACE} active sources. Remove one first.`,
           );
         }
+        needsCard = kind === "mcp";
         return tx.pageSource.create({
+          data: { ...pageScope, userId: scope.userId, name: sourceName.data, ...common },
+        });
+      }
+      const sameCall =
+        kind === "mcp" &&
+        same.kind === "mcp" &&
+        pageSourceCallHash("mcp", same.call as McpSourceCall) === callHash;
+      if (sameCall) {
+        // Approval is for the call, not the schedule: keep the status. A paused approved source
+        // resumes; a denied one stays denied until the call changes.
+        const approved = same.approvedCallHash === callHash;
+        const resume = same.status === "paused" && approved;
+        return tx.pageSource.update({
+          where: { id: same.id },
           data: {
-            ...pageScope,
-            userId: scope.userId,
             name: sourceName.data,
-            kind: "praci",
-            ...common,
+            schedule: schedule.data,
+            ...(resume
+              ? {
+                  status: "active",
+                  failures: 0,
+                  lastError: null,
+                  leaseUntil: null,
+                  nextRefreshAt: now,
+                }
+              : same.status === "active"
+                ? { nextRefreshAt: nextScheduledRefresh(now, schedule.data, deps.random) }
+                : {}),
           },
         });
       }
       // A different call means different data: the old snapshots no longer describe the source.
-      if (JSON.stringify(same.call) !== JSON.stringify(call)) {
-        await tx.pageSourceSnapshot.deleteMany({
-          where: { sourceId: same.id, spaceId: scope.spaceId },
-        });
-      }
+      await tx.pageSourceSnapshot.deleteMany({
+        where: { sourceId: same.id, spaceId: scope.spaceId },
+      });
+      needsCard = kind === "mcp";
       return tx.pageSource.update({
         where: { id: same.id },
         data: { name: sourceName.data, ...common },
@@ -714,6 +883,58 @@ export async function pageSourceToolFromTool(
     if (isUniqueViolation(error))
       return { error: "A source with that name was just created. Try again." };
     throw error;
+  }
+  if (kind === "mcp") {
+    if (needsCard) {
+      const run = await prisma.run.findFirst({
+        where: { id: scope.runId, spaceId: scope.spaceId, botId: scope.botId },
+        select: { id: true, spaceId: true, userId: true, botId: true, threadId: true },
+      });
+      if (!run) return { error: "Could not ask the owner. Try again." };
+      await postPageSourceApproval(
+        deps,
+        run,
+        bot.name,
+        pageSourceApprovalBlock({
+          sourceId: saved.id,
+          callHash: callHash as string,
+          serverName: serverName as string,
+          schedule: schedule.data,
+          pageTitle: page.title,
+          call: call as McpSourceCall,
+        }),
+      );
+      await announcePageData(deps, saved);
+    }
+    const fresh = await prisma.pageSource.findFirst({
+      where: { id: saved.id, spaceId: scope.spaceId },
+    });
+    const row = fresh ?? saved;
+    if (row.status === "pending") {
+      return {
+        source: toPageSource(row, serverName),
+        status: "pending",
+        note: "Waiting for the owner's approval",
+      };
+    }
+    if (row.status === "denied") {
+      return {
+        source: toPageSource(row, serverName),
+        status: "denied",
+        note: "The owner declined this request. Change the request to ask again.",
+      };
+    }
+    // Approved earlier and unchanged: run it once now like any source.
+    const outcome = await refreshPageSource(deps, row);
+    const after = await prisma.pageSource.findFirst({
+      where: { id: saved.id, spaceId: scope.spaceId },
+    });
+    return {
+      source: toPageSource(after ?? row, serverName),
+      preview: outcome.ok
+        ? JSON.stringify(outcome.value).slice(0, PREVIEW_CHARS)
+        : `Error: ${outcome.error}`,
+    };
   }
   const outcome = await refreshPageSource(deps, saved);
   const fresh = await prisma.pageSource.findFirst({
