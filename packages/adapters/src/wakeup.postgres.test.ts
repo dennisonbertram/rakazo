@@ -44,6 +44,7 @@ function handlers(overrides: Partial<BackgroundJobHandlers> = {}): BackgroundJob
     "devin.refresh": vi.fn(async () => undefined),
     "finance.sync": vi.fn(async () => undefined),
     "omi.assemble": vi.fn(async () => undefined),
+    "omi.transcribe": vi.fn(async () => undefined),
     "meetings.sync": vi.fn(async () => undefined),
     "meetings.digest": vi.fn(async () => undefined),
     "dataroom.blob.delete": vi.fn(async () => undefined),
