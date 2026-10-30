@@ -83,6 +83,7 @@ import {
   listBotSecretMetadata,
   listCalendarAccounts,
   listOmiSegments,
+  listPageSources,
   listPiCatalog,
   listScratchpadItems,
   McpOAuthBroker,
@@ -95,6 +96,7 @@ import {
   PageConflictError,
   PageValidationError,
   PinsValidationError,
+  pageChartSvgs,
   parseModelSecret,
   persistPreparedSecret,
   personCalendarMeetings,
@@ -109,11 +111,12 @@ import {
   provisionComputer,
   queueComputerUpdate,
   refreshBotPins,
+  refreshPageSources,
   releaseComputerExecutionLease,
   removeBotPage,
+  removePageSource,
   removeScratchpadItemFromUser,
   renameBotPage,
-  renderPageChartSvg,
   replaceComputer,
   requestAccountExport,
   requestContactPhotos,
@@ -123,6 +126,7 @@ import {
   resolveBotWorkspaceCwd,
   resolveBotWorkspacePath,
   resolveDataRoomAi,
+  resolvePageData,
   revokeScreenControl,
   routineRunModelPin,
   sanitizeComposioError,
@@ -223,7 +227,6 @@ import {
   messagingProviderBlocksBot,
   newRunUnattended,
   nextCronDateAcrossStrict,
-  splitPage,
   stableJsonText,
   withAppDirectory,
 } from "@rakazo/core";
@@ -4364,12 +4367,59 @@ export function createRouter(deps: RouterDeps) {
           pageId: input.pageId,
         });
         if (!page || !input.chartSvgs) return page;
-        const chartSvgs = await Promise.all(
-          splitPage(page.content).flatMap((segment) =>
-            segment.kind === "chart" ? [renderPageChartSvg(segment.chart)] : [],
-          ),
-        );
+        const chartSvgs = await pageChartSvgs(deps, { spaceId: bot.spaceId }, page);
         return { ...page, chartSvgs };
+      }),
+      data: authed.pages.data.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        return page ? resolvePageData(deps, { spaceId: bot.spaceId }, page) : null;
+      }),
+      refresh: authed.pages.refresh.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return null;
+        await refreshPageSources(
+          {
+            prisma: deps.prisma,
+            events: deps.events,
+            ticketBoardEnabled: deps.env?.ticketBoardEnabled,
+          },
+          { spaceId: bot.spaceId, botId: bot.id, pageId: page.id },
+        );
+        return resolvePageData(deps, { spaceId: bot.spaceId }, page);
+      }),
+      sources: authed.pages.sources.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return [];
+        return listPageSources(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: page.id,
+        });
+      }),
+      removeSource: authed.pages.removeSource.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const removed = await removePageSource(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          { id: input.sourceId },
+        );
+        if (!removed) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return { ok: true as const };
       }),
       save: authed.pages.save.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);

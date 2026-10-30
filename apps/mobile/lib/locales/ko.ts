@@ -948,4 +948,9 @@ export const KO_MESSAGES: Record<string, string> = {
     "AI 키가 지출 한도에 도달했습니다. 제공업체에서 한도를 올리거나 설정 > AI 모델에서 다른 키를 사용하세요.",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "모델 제공업체가 요청을 제한하고 있습니다. 몇 분 후에 다시 시도하세요.",
+  "Waiting for approval": "승인 대기 중",
+  "Not approved": "승인되지 않음",
+  "Source not found": "소스를 찾을 수 없음",
+  "No data yet": "아직 데이터 없음",
+  "Source failed": "소스 실패",
 };

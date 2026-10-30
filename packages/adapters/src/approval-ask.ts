@@ -3,6 +3,7 @@ import type { MailApproval, MailEdits, MessageBlock } from "@rakazo/contracts";
 import {
   AI_DATA_DISCLOSURES,
   AI_DISCLOSURE_VERSION,
+  BREX_CARDS_WRITE_ARGS,
   CARTA_WRITE_TOOLS,
   integrationPresetForEndpoint,
   isCartaAgentSpawnKey,
@@ -319,9 +320,93 @@ function integrationWriteDetail(
   lines.push(
     `tool: ${toolName}`,
     ...(rawTool === toolName ? [] : [`server tool: ${rawTool}`]),
-    `arguments: ${JSON.stringify(args, null, 2)}`,
+    ...(brexCardsPreview(rawTool, args) ?? [`arguments: ${JSON.stringify(args, null, 2)}`]),
   );
   return lines.join("\n");
+}
+
+// Brex names, merchants and memos are text from outside Rakazo: quoted with their newlines
+// escaped, so they stay on one line of the card and cannot pass for the card's own wording.
+const quoted = (value: string) => JSON.stringify(value);
+const flat = (value: string) => value.replace(/\s+/g, " ").trim();
+const words = (value: string) => value.toLowerCase().replace(/_/g, " ");
+const dollars = (cents: number) => `${formatAmount(cents / 100, "USD")} USD`;
+const person = (m: { userId: string; name: string }) => `${quoted(m.name)} (${flat(m.userId)})`;
+const people = (list: { userId: string; name: string }[]) =>
+  list.length ? list.map(person).join(", ") : "none";
+const merchants = (list: string[] | null) =>
+  list ? list.map(quoted).join(", ") : "none (cleared)";
+
+/**
+ * The change a Brex cards write makes, in words, built only from its own arguments (the same
+ * schema the server checks). Returns undefined when the tool is not a Brex write or the arguments
+ * do not match, so the card falls back to the generic rendering.
+ */
+function brexCardsPreview(rawTool: string, args: Record<string, unknown>): string[] | undefined {
+  if (!Object.hasOwn(BREX_CARDS_WRITE_ARGS, rawTool)) return undefined;
+  const tool = rawTool as keyof typeof BREX_CARDS_WRITE_ARGS;
+  const parsed = BREX_CARDS_WRITE_ARGS[tool].safeParse(args);
+  if (!parsed.success) return undefined;
+  const a = parsed.data as Record<string, any>;
+  const card = () => `Card: ${quoted(a.cardName)} ••${a.lastFour} (${flat(a.cardId)})`;
+  const optional = (label: string, value: unknown, text?: string) =>
+    value === undefined ? [] : [`${label}: ${text ?? value}`];
+  switch (tool) {
+    case "create_vendor_card":
+      return [
+        "Create virtual vendor card",
+        `Card: ${quoted(a.cardName)}`,
+        `Owner: ${person({ userId: a.ownerUserId, name: a.ownerName })}`,
+        `Limit: ${dollars(a.amountCents)}, ${words(a.duration)}`,
+        ...optional("Allowed merchants", a.allowedMerchants, merchants(a.allowedMerchants)),
+        ...optional("Blocked merchants", a.blockedMerchants, merchants(a.blockedMerchants)),
+        ...optional("Locks after", a.lockAfterDate),
+      ];
+    case "update_card":
+      return [
+        "Update card",
+        card(),
+        ...optional("Limit", a.amountCents, a.amountCents && dollars(a.amountCents)),
+        ...optional("Period", a.duration, a.duration && words(a.duration)),
+        ...optional("Locks after", a.lockAfterDate, a.lockAfterDate ?? "none (cleared)"),
+        ...optional("Allowed merchants", a.allowedMerchants, merchants(a.allowedMerchants)),
+        ...optional("Blocked merchants", a.blockedMerchants, merchants(a.blockedMerchants)),
+      ];
+    case "lock_card":
+      return ["Lock card", card(), `Reason: ${words(a.reason)}`];
+    case "terminate_card":
+      return [
+        "Terminate card permanently. This cannot be undone.",
+        card(),
+        `Reason: ${words(a.reason)}`,
+      ];
+    case "create_spend_limit":
+      return [
+        "Create spend limit",
+        `Name: ${quoted(a.name)}`,
+        `Limit: ${dollars(a.amountCents)}, ${words(a.period)}`,
+        ...optional("Starts", a.startDate),
+        ...optional("Ends", a.endDate),
+        `Template: ${quoted(a.templateName)} (${flat(a.templateSpendLimitId)})`,
+        `Members: ${people(a.members)}`,
+      ];
+    case "update_spend_limit":
+      return [
+        "Update spend limit",
+        `Spend limit: ${quoted(a.spendLimitName)} (${flat(a.spendLimitId)})`,
+        ...optional("Limit", a.amountCents, a.amountCents && dollars(a.amountCents)),
+        ...optional("Ends", a.endDate),
+        ...optional("Status", a.status, a.status && words(a.status)),
+        ...optional("Add members", a.addMembers, a.addMembers && people(a.addMembers)),
+        ...optional("Remove members", a.removeMembers, a.removeMembers && people(a.removeMembers)),
+      ];
+    case "update_expense_memo":
+      return [
+        "Replace expense memo",
+        `Expense: ${flat(a.expenseId)}`,
+        `New memo: ${quoted(a.memo)}`,
+      ];
+  }
 }
 
 /** Who, on which line, and the whole text. */

@@ -12,12 +12,20 @@ export const BOT_PAGE_MAX_PAGES = 20;
 export const BOT_PAGE_TITLE_MAX = 60;
 export const PAGE_CHART_FENCE = "chart";
 
-/** Snapshot charts carry their rows. Live charts (a later `source` field) will resolve them on view. */
+/**
+ * Snapshot charts carry their rows. A chart with a `source` reads its rows from that page source
+ * instead (see page-sources.ts); `data` stays as the fallback and the save-time render check.
+ */
 export const PageChartSchema = z.object({
   name: z.string().min(1).max(200),
   /** Declarative Observable Plot spec; validated with the same PlotSpec rules as render_plot. */
   spec: ChartSpecSchema,
   data: ChartDataSchema,
+  /** A page source name (PageSourceNameSchema rules are checked when the page is saved). */
+  source: z.string().min(1).max(40).optional(),
+  /** JSON Pointer into the source's result. latest: the array there. history: the number there, one row {at, value} per snapshot. */
+  path: z.string().max(300).optional(),
+  over: z.enum(["latest", "history"]).optional(),
 });
 /**
  * PageChartSchema plus the combined row limit (rows embedded in the spec count too). Use it

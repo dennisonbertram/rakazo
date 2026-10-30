@@ -1004,4 +1004,9 @@ export const RU_MESSAGES: Record<string, string> = {
     "Ключ ИИ достиг лимита расходов. Увеличьте лимит у провайдера или используйте другой ключ в разделе Настройки > Модели.",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "Провайдер модели ограничивает частоту запросов. Повторите попытку через несколько минут.",
+  "Waiting for approval": "Ожидает одобрения",
+  "Not approved": "Не одобрено",
+  "Source not found": "Источник не найден",
+  "No data yet": "Данных пока нет",
+  "Source failed": "Источник не сработал",
 };

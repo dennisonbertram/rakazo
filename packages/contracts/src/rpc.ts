@@ -357,6 +357,14 @@ import {
   OmiStatusSchema,
 } from "./omi.js";
 import {
+  PageDataInputSchema,
+  PageDataSchema,
+  PageRefreshInputSchema,
+  PageSourceRemoveInputSchema,
+  PageSourceSchema,
+  PageSourcesListInputSchema,
+} from "./page-sources.js";
+import {
   BotPageCreateInputSchema,
   BotPageGetInputSchema,
   BotPageListInputSchema,
@@ -903,6 +911,10 @@ export const appContract = {
     create: oc.input(BotPageCreateInputSchema).output(BotPageSchema),
     rename: oc.input(BotPageRenameInputSchema).output(BotPageSummarySchema),
     remove: oc.input(BotPageRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
+    data: oc.input(PageDataInputSchema).output(PageDataSchema.nullable()),
+    refresh: oc.input(PageRefreshInputSchema).output(PageDataSchema.nullable()),
+    sources: oc.input(PageSourcesListInputSchema).output(z.array(PageSourceSchema)),
+    removeSource: oc.input(PageSourceRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
   },
   pins: {
     get: oc.input(BotPinsGetInputSchema).output(BotPinsSchema.nullable()),

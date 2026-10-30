@@ -1,6 +1,15 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { BotPage, BotPageSummary, GtmPageBlock, PageChart } from "@rakazo/contracts";
+import type {
+  BotPage,
+  BotPageSummary,
+  GtmPageBlock,
+  PageChart,
+  PageData,
+  PageLiveBlock,
+  PageMetricBlock as PageMetricBlockSpec,
+  PageTableBlock as PageTableBlockSpec,
+} from "@rakazo/contracts";
 import { BOT_PAGE_MAX_PAGES, BOT_PAGE_TITLE_MAX } from "@rakazo/contracts";
 import {
   AlertDialog,
@@ -23,8 +32,14 @@ import {
 import type { NodeViewProps } from "@tiptap/react";
 import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor } from "@tiptap/react";
 import { ArrowDown, ArrowUp, GripVertical, MoreHorizontal, Plus, X } from "lucide-react";
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { GtmBlock, GtmBlockContext } from "../../components/gtm/GtmBlock";
+import {
+  PageChartFrame,
+  PageMetricBlock,
+  PageTableBlock,
+} from "../../components/pages/PageLiveBlocks";
+import { PageSourcesDialog } from "../../components/pages/PageSourcesDialog";
 import { isNewerRemote, resolveRemotePage } from "../../lib/page-sync";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
@@ -32,12 +47,29 @@ import { ChartCanvas } from "./message-cards";
 import { PageChartNode, usePageChartRows } from "./page-chart-extension";
 import { PAGE_EXTENSIONS } from "./page-extensions";
 import { PageGtmNode } from "./page-gtm-extension";
+import { chartKey, liveKey, mapLiveBlocks, PageLiveContext, usePageLive } from "./page-live";
+import { PageMetricNode, PageTableNode } from "./page-live-extensions";
 
 const SAVE_DELAY_MS = 800;
+
+function LiveDelete({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={t`Delete block`}
+      className="absolute end-1 bottom-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      onClick={onClick}
+    >
+      <X size={14} />
+    </Button>
+  );
+}
 
 function ChartView({ node, deleteNode, editor }: NodeViewProps) {
   const chart = node.attrs.chart as PageChart;
   const rows = usePageChartRows(chart);
+  const live = usePageLive();
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
@@ -50,21 +82,32 @@ function ChartView({ node, deleteNode, editor }: NodeViewProps) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+  const canvas = (
+    <div ref={ref}>
+      {width > 0 ? <ChartCanvas spec={chart.spec} data={rows} width={width} /> : null}
+    </div>
+  );
   return (
     <NodeViewWrapper className="group relative my-3 rounded-lg border border-border p-3">
-      <div ref={ref}>
-        {width > 0 ? <ChartCanvas spec={chart.spec} data={rows} width={width} /> : null}
-      </div>
+      {chart.source ? (
+        <PageChartFrame data={live.blocks.get(chartKey(chart))}>{canvas}</PageChartFrame>
+      ) : (
+        canvas
+      )}
       {editor.isEditable ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t`Delete chart`}
-          className="absolute end-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-          onClick={deleteNode}
-        >
-          <X size={14} />
-        </Button>
+        chart.source ? (
+          <LiveDelete onClick={deleteNode} />
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t`Delete chart`}
+            className="absolute end-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            onClick={deleteNode}
+          >
+            <X size={14} />
+          </Button>
+        )
       ) : null}
     </NodeViewWrapper>
   );
@@ -73,6 +116,40 @@ function ChartView({ node, deleteNode, editor }: NodeViewProps) {
 const PageChartView = PageChartNode.extend({
   addNodeView() {
     return ReactNodeViewRenderer(ChartView);
+  },
+});
+
+function MetricView({ node, deleteNode, editor }: NodeViewProps) {
+  const block = node.attrs.block as PageMetricBlockSpec;
+  const live = usePageLive();
+  return (
+    <NodeViewWrapper className="group relative my-3 min-w-0" contentEditable={false}>
+      <PageMetricBlock block={block} data={live.blocks.get(liveKey("pageMetric", block))} />
+      {editor.isEditable ? <LiveDelete onClick={deleteNode} /> : null}
+    </NodeViewWrapper>
+  );
+}
+
+function TableView({ node, deleteNode, editor }: NodeViewProps) {
+  const block = node.attrs.block as PageTableBlockSpec;
+  const live = usePageLive();
+  return (
+    <NodeViewWrapper className="group relative my-3 min-w-0" contentEditable={false}>
+      <PageTableBlock block={block} data={live.blocks.get(liveKey("pageTable", block))} />
+      {editor.isEditable ? <LiveDelete onClick={deleteNode} /> : null}
+    </NodeViewWrapper>
+  );
+}
+
+const PageMetricView = PageMetricNode.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(MetricView);
+  },
+});
+
+const PageTableView = PageTableNode.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(TableView);
   },
 });
 
@@ -139,21 +216,35 @@ export type PageRemoteUpdate = {
   seq: number;
 };
 
+/** `pageId` is missing on events that name no page. */
+export type PageDataUpdate = { pageId?: string; seq: number };
+
 /** Edits one page. Remount it (key) to switch pages: each page keeps its own editor state. */
 function PageEditor({
   botId,
   pageId,
   remote,
+  dataTick = 0,
+  refreshTick = 0,
+  onSources,
   onPageChange,
 }: {
   botId: string;
   /** Without one, the bot's first page. */
   pageId?: string;
   remote: PageRemoteUpdate | null;
+  /** Changes when the page's live data should be fetched again. */
+  dataTick?: number;
+  /** Changes when the user asked to rerun the page's sources. */
+  refreshTick?: number;
+  /** Whether the page has data sources, for the options menu. */
+  onSources?: (has: boolean) => void;
   onPageChange?: (page: BotPage | null) => void;
 }) {
   const reportPage = useRef(onPageChange);
   reportPage.current = onPageChange;
+  const reportSources = useRef(onSources);
+  reportSources.current = onSources;
   const revision = useRef(0);
   const seenRevision = useRef(0);
   const baseline = useRef("");
@@ -164,6 +255,9 @@ function PageEditor({
   const [loaded, setLoaded] = useState<BotPage | null>();
   const [offerReload, setOfferReload] = useState(false);
   const [error, setError] = useState("");
+  const [liveBlocks, setLiveBlocks] = useState<ReadonlyMap<string, PageLiveBlock>>(new Map());
+  const [liveLoaded, setLiveLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -172,7 +266,11 @@ function PageEditor({
         ? PageChartView
         : extension === PageGtmNode
           ? PageGtmView
-          : extension,
+          : extension === PageMetricNode
+            ? PageMetricView
+            : extension === PageTableNode
+              ? PageTableView
+              : extension,
     ),
     editorProps: {
       attributes: {
@@ -185,6 +283,44 @@ function PageEditor({
       },
     },
   });
+
+  // Live data follows the saved revision: blocks pair with the saved document in order, so data
+  // for another revision waits until that revision is shown or saved. Until then the last data
+  // stays, matched to blocks by what they show.
+  const applyData = useCallback(
+    (data: PageData | null) => {
+      setLiveLoaded(true);
+      if (!data || !editor || editor.isDestroyed || data.revision !== revision.current) return;
+      const doc = editor.markdown?.parse(baseline.current);
+      if (doc) setLiveBlocks(mapLiveBlocks(doc, data.blocks));
+    },
+    [editor],
+  );
+
+  const loadData = useCallback(async () => {
+    try {
+      const [data, sources] = await Promise.all([
+        rpc.pages.data({ botId, pageId }),
+        rpc.pages.sources({ botId, pageId }),
+      ]);
+      applyData(data);
+      reportSources.current?.(sources.length > 0);
+    } catch {
+      // Blocks keep their last data; a live block never blocks the page.
+      setLiveLoaded(true);
+    }
+  }, [botId, pageId, applyData]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      applyData(await rpc.pages.refresh({ botId, pageId }));
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [botId, pageId, applyData]);
 
   const show = useCallback(
     (page: BotPage) => {
@@ -199,8 +335,9 @@ function PageEditor({
       setError("");
       setLoaded(page);
       reportPage.current?.(page);
+      void loadData();
     },
-    [editor],
+    [editor, loadData],
   );
 
   // Fetches the page; replaces the editor only if nothing was typed while the request was out.
@@ -243,6 +380,7 @@ function PageEditor({
           baseline.current = content;
           setError("");
           reportPage.current?.(result.page);
+          void loadData();
         } else {
           stale.current = true;
           setOfferReload(true);
@@ -260,7 +398,7 @@ function PageEditor({
         setOfferReload(true);
       } else void fetchPage();
     }
-  }, [botId, pageId, fetchPage]);
+  }, [botId, pageId, fetchPage, loadData]);
 
   useEffect(() => {
     if (!editor) return;
@@ -309,6 +447,29 @@ function PageEditor({
     void fetchPage().catch(() => undefined);
   }, [remote, editor, fetchPage, loaded]);
 
+  // A tick that was already set when this editor mounted is old news: show() fetches on load.
+  const handledTicks = useRef({ data: dataTick, refresh: refreshTick });
+  useEffect(() => {
+    if (handledTicks.current.data === dataTick) return;
+    handledTicks.current.data = dataTick;
+    void loadData();
+  }, [dataTick, loadData]);
+  useEffect(() => {
+    if (handledTicks.current.refresh === refreshTick) return;
+    handledTicks.current.refresh = refreshTick;
+    void refresh();
+  }, [refreshTick, refresh]);
+
+  const liveContext = useMemo(
+    () => ({
+      loaded: liveLoaded,
+      refreshing,
+      blocks: liveBlocks,
+      refresh: () => void refresh(),
+    }),
+    [liveLoaded, refreshing, liveBlocks, refresh],
+  );
+
   if (!loaded)
     return error ? (
       <p role="alert" className="text-sm text-destructive">
@@ -332,7 +493,9 @@ function PageEditor({
           {error}
         </p>
       ) : null}
-      <EditorContent editor={editor} />
+      <PageLiveContext.Provider value={liveContext}>
+        <EditorContent editor={editor} />
+      </PageLiveContext.Provider>
     </div>
   );
 }
@@ -348,11 +511,14 @@ function nextTitle(pages: BotPageSummary[]): string {
 export function BotPagePanel({
   botId,
   remote,
+  dataRemote = null,
   onPageChange,
 }: {
   botId: string;
   /** The latest `page.updated` event for this bot. */
   remote: PageRemoteUpdate | null;
+  /** The latest `page.data` event for this bot. */
+  dataRemote?: PageDataUpdate | null;
   onPageChange?: (page: BotPage | null) => void;
 }) {
   const [pages, setPages] = useState<BotPageSummary[]>([]);
@@ -360,6 +526,10 @@ export function BotPagePanel({
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [hasSources, setHasSources] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [dataTick, setDataTick] = useState(0);
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
 
@@ -385,6 +555,14 @@ export function BotPagePanel({
     if (remoteSeq === undefined || !remoteId) return;
     if (!pages.some((page) => page.id === remoteId)) void loadPages().catch(() => undefined);
   }, [remoteSeq, remoteId, pages, loadPages]);
+
+  // A page.data event for the open page (or one naming no page) reloads its live data.
+  const dataSeq = dataRemote?.seq;
+  const dataPageId = dataRemote?.pageId;
+  useEffect(() => {
+    if (dataSeq === undefined) return;
+    if (!dataPageId || dataPageId === activeIdRef.current) setDataTick((n) => n + 1);
+  }, [dataSeq, dataPageId]);
 
   const reportPage = (page: BotPage | null) => {
     if (page && !pages.some((entry) => entry.id === page.id))
@@ -479,6 +657,16 @@ export function BotPagePanel({
               }
             />
             <DropdownMenuContent align="end">
+              {hasSources ? (
+                <DropdownMenuItem onClick={() => setRefreshTick((n) => n + 1)}>
+                  <Trans>Refresh</Trans>
+                </DropdownMenuItem>
+              ) : null}
+              {hasSources ? (
+                <DropdownMenuItem onClick={() => setSourcesOpen(true)}>
+                  <Trans>Sources</Trans>
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onClick={() => setRenaming(true)}>
                 <Trans>Rename</Trans>
               </DropdownMenuItem>
@@ -511,6 +699,9 @@ export function BotPagePanel({
           botId={botId}
           pageId={activeId}
           remote={editorRemote}
+          dataTick={dataTick}
+          refreshTick={refreshTick}
+          onSources={setHasSources}
           onPageChange={reportPage}
         />
       ) : null}
@@ -519,6 +710,13 @@ export function BotPagePanel({
           {error}
         </p>
       ) : null}
+      <PageSourcesDialog
+        botId={botId}
+        pageId={activeId}
+        open={sourcesOpen}
+        onOpenChange={setSourcesOpen}
+        onChanged={() => setDataTick((n) => n + 1)}
+      />
       <AlertDialog open={deleting} onOpenChange={setDeleting}>
         <AlertDialogContent>
           <AlertDialogHeader>

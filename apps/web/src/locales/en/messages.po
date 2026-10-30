@@ -343,6 +343,11 @@ msgstr "{0} of {1}"
 msgid "{0} of {1} approvals before auto · {2} of {3} today"
 msgstr "{0} of {1} approvals before auto · {2} of {3} today"
 
+#. placeholder {0}: source.name
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "{0} options"
+msgstr "{0} options"
+
 #. placeholder {0}: run.sources.find((item) => item.id === source.id)?.label ?? source.sourceKind
 #: src/pages/CompanyImport.tsx
 msgid "{0} progress"
@@ -2346,6 +2351,7 @@ msgstr "Can't reach the server."
 #: src/components/integrations/SignInStep.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/markdown-link-prompt.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -4864,6 +4870,10 @@ msgstr "Deleting…"
 msgid "Deletion code"
 msgstr "Deletion code"
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "denied"
+msgstr "denied"
+
 #: src/components/AskCard.tsx
 msgid "Denied"
 msgstr "Denied"
@@ -5179,10 +5189,11 @@ msgstr "Downloaded {0}"
 msgid "Downloading"
 msgstr "Downloading"
 
-#. placeholder {0}: total ?? done
+#. placeholder {0}: Math.round(done)
+#. placeholder {1}: Math.round(total ?? done)
 #: src/components/integrations/OmiPage.tsx
-msgid "Downloading {done} of {0} min"
-msgstr "Downloading {done} of {0} min"
+msgid "Downloading {0} of {1} min"
+msgstr "Downloading {0} of {1} min"
 
 #: src/components/DesktopUpdates.tsx
 msgid "Downloading…"
@@ -5715,6 +5726,7 @@ msgid "Facts"
 msgstr "Facts"
 
 #: src/components/CloudAgentCard.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 msgid "failed"
 msgstr "failed"
 
@@ -8195,6 +8207,10 @@ msgstr "No contracts yet"
 msgid "No credentials saved for this bot."
 msgstr "No credentials saved for this bot."
 
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "No data yet"
+msgstr "No data yet"
+
 #: src/pages/CompanyHistory.tsx
 msgid "No dated facts"
 msgstr "No dated facts"
@@ -8414,6 +8430,10 @@ msgstr "No SAFEs yet"
 msgid "No scheduled items in this view."
 msgstr "No scheduled items in this view."
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "No sources"
+msgstr "No sources"
+
 #: src/pages/Finance.tsx
 msgid "No spend in this period"
 msgstr "No spend in this period"
@@ -8473,6 +8493,10 @@ msgstr "Not a real deadline: hide it"
 #: src/components/compose/RecipientField.tsx
 msgid "Not a valid email address"
 msgstr "Not a valid email address"
+
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Not approved"
+msgstr "Not approved"
 
 #: src/components/ComposeEmail.tsx
 msgid "Not attached, over the {MAX_COMPOSE_ATTACHMENT_MB} MB limit: {leftOutNames}. Download it from the original to share it another way."
@@ -8731,6 +8755,10 @@ msgstr "Off"
 #: src/pages/shell/bot-panel.tsx
 msgid "Off in Settings"
 msgstr "Off in Settings"
+
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "ok"
+msgstr "ok"
 
 #: src/pages/McpConnectionActivity.tsx
 msgid "OK"
@@ -9236,15 +9264,21 @@ msgstr "Path"
 msgid "Pause"
 msgstr "Pause"
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "paused"
+msgstr "paused"
+
 #: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Paused"
 
+#. placeholder {0}: Math.round(done)
+#. placeholder {1}: Math.round(total)
 #: src/components/integrations/OmiPage.tsx
-msgid "Paused · {done} of {total} min saved"
-msgstr "Paused · {done} of {total} min saved"
+msgid "Paused · {0} of {1} min saved"
+msgstr "Paused · {0} of {1} min saved"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Paused: no access"
@@ -9282,6 +9316,7 @@ msgstr "PDF, CSV, OFX or QFX"
 msgid "Pendant recordings, meetings and notes"
 msgstr "Pendant recordings, meetings and notes"
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/Finance.tsx
 msgid "pending"
 msgstr "pending"
@@ -10060,6 +10095,7 @@ msgstr "Redirect URI"
 #: src/pages/Finance.tsx
 #: src/pages/Investors.tsx
 #: src/pages/RoutineRunHistory.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/bot-pins.tsx
 msgid "Refresh"
 msgstr "Refresh"
@@ -10076,6 +10112,10 @@ msgstr "Refresh sources"
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Refresh view"
 msgstr "Refresh view"
+
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Refreshing"
+msgstr "Refreshing"
 
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Refreshing…"
@@ -10133,6 +10173,7 @@ msgstr "Reminder"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
@@ -10159,6 +10200,7 @@ msgstr "Remove {0}"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Remove {0}?"
@@ -10515,6 +10557,7 @@ msgstr "Resume"
 #: src/components/data-room/DropZone.tsx
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyCalendar.tsx
@@ -11854,11 +11897,21 @@ msgstr "Sorting your mail…"
 msgid "Source"
 msgstr "Source"
 
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Source failed"
+msgstr "Source failed"
+
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Source not found"
+msgstr "Source not found"
+
 #: src/components/data-room/DataRoomStats.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/CompanyPrivacy.tsx
+#: src/pages/shell/bot-page-panel.tsx
 msgid "Sources"
 msgstr "Sources"
 
@@ -13601,6 +13654,7 @@ msgstr "Waiting {minutes}m"
 msgid "Waiting for AI to be allowed"
 msgstr "Waiting for AI to be allowed"
 
+#: src/components/pages/PageLiveBlocks.tsx
 #: src/lib/roster-status.ts
 #: src/pages/McpConnectionActivity.tsx
 #: src/pages/McpConnectionsPanel.tsx

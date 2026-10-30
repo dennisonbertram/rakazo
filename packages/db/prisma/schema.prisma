@@ -527,6 +527,7 @@ model Space {
   externalActions             ExternalAction[]
   omiUploads                  OmiUpload[]
   omiSegments                 OmiSegment[]
+  brexCardReservations        BrexCardReservation[]
   mcpConnections              McpConnection[]
   id                          String                       @id
   organizationId              String
@@ -573,6 +574,8 @@ model Space {
   capabilities                CapabilityInstall[]
   memoryDocuments             MemoryDocument[]
   botPages                    BotPage[]
+  pageSources                 PageSource[]
+  pageSourceSnapshots         PageSourceSnapshot[]
   botPins                     BotPins[]
   contacts                    Contact[]
   contactPhotos               ContactPhoto[]
@@ -866,6 +869,7 @@ model Bot {
   taughtSkills           TaughtSkill[]
   memoryDocuments        MemoryDocument[]
   pages                  BotPage[]
+  pageSources            PageSource[]
   pins                   BotPins?
   agentHome              AgentHome?
   browserProfile         BrowserProfile?
@@ -1696,12 +1700,63 @@ model BotPage {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   revisions BotPageRevision[]
+  sources   PageSource[]
 
   // Titles are unique per bot ignoring case: unique index bot_pages_botId_title_key (raw SQL in
   // migration 20261231000026) on (botId, lower(title)).
   @@index([botId])
   @@index([spaceId])
   @@map("bot_pages")
+}
+
+/// A saved read-only data call on a bot page. Page blocks name it; the server reruns it without a model and stores each result as a snapshot.
+model PageSource {
+  id               String               @id @default(cuid())
+  spaceId          String
+  space            Space                @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  /// The bot's owner.
+  userId           String
+  botId            String
+  bot              Bot                  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  pageId           String
+  page             BotPage              @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  name             String
+  /// "praci" for now.
+  kind             String
+  call             Json
+  schedule         String
+  /// "pending" | "active" | "paused" | "denied"
+  status           String
+  nextRefreshAt    DateTime?
+  leaseUntil       DateTime?
+  failures         Int                  @default(0)
+  lastError        String?
+  lastRefreshAt    DateTime?
+  approvedCallHash String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  snapshots        PageSourceSnapshot[]
+
+  // Names are unique per page ignoring case: unique index page_sources_pageId_name_key (raw SQL in
+  // migration 20261231000029) on (pageId, lower(name)).
+  @@index([spaceId])
+  @@index([status, nextRefreshAt])
+  @@map("page_sources")
+}
+
+/// One successful result of a page source.
+model PageSourceSnapshot {
+  id        String     @id @default(cuid())
+  spaceId   String
+  space     Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  sourceId  String
+  source    PageSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  fetchedAt DateTime   @default(now())
+  value     Json
+  bytes     Int
+
+  @@index([sourceId, fetchedAt(sort: Desc)])
+  @@map("page_source_snapshots")
 }
 
 /// A bot's numbers strip (stats) and one sidebar list; separate from the page so refreshes never conflict with page edits.
@@ -2107,6 +2162,7 @@ model McpServer {
   financeBills          FinanceBill[]
   financeSyncState      FinanceSyncState?
   devinConnectionState  DevinConnectionState?
+  brexCards             BrexCardsConnection?
   devinSessions         DevinSession[]
   meetings              Meeting[]
   meetingSyncState      MeetingSyncState?
@@ -3785,6 +3841,51 @@ model DevinConnectionState {
   lastError       String?
 
   @@map("devin_connection_states")
+}
+
+/// The owner's hard limits for the Brex cards server. One row per space.
+model BrexCardsConnection {
+  serverId               String    @id
+  server                 McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  spaceId                String    @unique
+  createdByUserId        String
+  /// Brex company id (GET /v2/company), set at connect. The daily card cap is per Brex account.
+  brexAccountId          String
+  /// Amounts are USD cents.
+  maxNewCardLimitCents   Int       @default(100000)
+  maxCardLimitCents      Int       @default(500000)
+  maxSpendLimitBaseCents Int       @default(1000000)
+  /// New cards per rolling 24 hours, per Brex account.
+  maxCardsPerDay         Int       @default(5)
+  allowedDurations       String[]  @default(["MONTHLY", "ONE_TIME"])
+  /// A ONE_TIME card must lock within this many days; null means no rule.
+  oneTimeMaxDays         Int?      @default(90)
+  updatedAt              DateTime  @updatedAt
+
+  @@map("brex_cards_connections")
+}
+
+enum BrexCardReservationStatus {
+  reserved
+  created
+  failed
+  uncertain
+}
+
+/// A durable claim on the daily card cap, written before the Brex call. Reserved, created and
+/// uncertain rows count against the cap; failed rows do not.
+model BrexCardReservation {
+  id            String                    @id @default(cuid())
+  /// For row security. The cap itself is per brexAccountId.
+  spaceId       String
+  space         Space                     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  brexAccountId String
+  reservedAt    DateTime                  @default(now())
+  status        BrexCardReservationStatus
+  brexCardId    String?
+
+  @@index([brexAccountId, reservedAt])
+  @@map("brex_card_reservations")
 }
 
 /// The last-seen state of one Devin session, read by the page and the alert step.

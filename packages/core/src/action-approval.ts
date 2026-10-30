@@ -101,6 +101,8 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "page_create",
   "pins_write",
   "page_edit",
+  "page_source_set",
+  "page_source_remove",
   // Praci's own legal records (reads and upserts in the actor's space and user rows). No mail,
   // posting or connector write. Tainted runs still ask: none of these is in EXTERNAL_TAINT_SAFE_TOOLS
   // or MEETING_TAINT_FREE_TOOLS, and the executor checks taint separately from this gate. Integration-agent
@@ -238,6 +240,8 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "create_ui_artifact",
   "render_ui",
   "page_write",
+  "page_source_set",
+  "page_source_remove",
   "page_create",
   "pins_write",
   "attach_file",

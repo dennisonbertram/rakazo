@@ -1001,4 +1001,9 @@ export const DE_MESSAGES: Record<string, string> = {
     "Der KI-Schlüssel hat sein Ausgabenlimit erreicht. Erhöhe das Limit bei deinem Anbieter oder verwende in Einstellungen > Modelle einen anderen Schlüssel.",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "Der Modellanbieter begrenzt die Anfragen. Versuche es in ein paar Minuten erneut.",
+  "Waiting for approval": "Wartet auf Genehmigung",
+  "Not approved": "Nicht genehmigt",
+  "Source not found": "Quelle nicht gefunden",
+  "No data yet": "Noch keine Daten",
+  "Source failed": "Quelle fehlgeschlagen",
 };

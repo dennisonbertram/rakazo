@@ -21,6 +21,9 @@ const e2eGrep = grepArg?.slice("--grep=".length);
 const agentRuntime = runtimeArg?.slice("--runtime=".length) ?? "scripted";
 
 const ROW_SECURITY_SUITE = "packages/db/src/row-security.postgres.test.ts";
+const BREX_CARDS_RLS_SUITE = "packages/db/src/brex-cards-rls.postgres.test.ts";
+// Suites that check the runtime login rather than the owner login.
+const RUNTIME_LOGIN_SUITES = new Set([ROW_SECURITY_SUITE, BREX_CARDS_RLS_SUITE]);
 
 if (Number(integration) + Number(e2e) !== 1) {
   throw new Error("Pass exactly one of --integration or --e2e");
@@ -126,6 +129,7 @@ async function main() {
         "packages/testkit/src/runs-list.test.ts",
         "packages/db/src/space-membership.postgres.test.ts",
         ROW_SECURITY_SUITE,
+        BREX_CARDS_RLS_SUITE,
         "packages/db/src/messaging.postgres.test.ts",
         "packages/db/src/billing.postgres.test.ts",
         "apps/api/src/billing.postgres.test.ts",
@@ -166,7 +170,7 @@ async function main() {
         suiteMigrationUrl.pathname = `/${database}`;
         // Suites drive app code without a request or job around it, so they keep
         // the owner login; the row-level security suite checks the runtime login.
-        const suiteUrl = new URL(suite === ROW_SECURITY_SUITE ? databaseUrl : migrationUrl);
+        const suiteUrl = new URL(RUNTIME_LOGIN_SUITES.has(suite) ? databaseUrl : migrationUrl);
         suiteUrl.pathname = `/${database}`;
         try {
           await runProcess("pnpm", ["exec", "vitest", "run", suite], {

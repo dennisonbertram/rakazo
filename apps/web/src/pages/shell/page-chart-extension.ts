@@ -2,10 +2,12 @@ import type { PageChart } from "@rakazo/contracts";
 import { PAGE_CHART_FENCE } from "@rakazo/contracts";
 import { pageChartFence, parsePageChart } from "@rakazo/core";
 import { Node } from "@tiptap/react";
+import { chartKey, usePageLive } from "./page-live";
 
-/** The one place chart rows are read, so live data can replace the snapshot later. */
+/** The one place chart rows are read: live rows for a chart with a source, else its snapshot. */
 export function usePageChartRows(chart: PageChart): unknown[] {
-  return chart.data;
+  const { blocks } = usePageLive();
+  return (chart.source && blocks.get(chartKey(chart))?.rows) || chart.data;
 }
 
 const FENCE = new RegExp(

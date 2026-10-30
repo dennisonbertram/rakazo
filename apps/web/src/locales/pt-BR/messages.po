@@ -343,6 +343,11 @@ msgstr ""
 msgid "{0} of {1} approvals before auto · {2} of {3} today"
 msgstr ""
 
+#. placeholder {0}: source.name
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "{0} options"
+msgstr ""
+
 #. placeholder {0}: run.sources.find((item) => item.id === source.id)?.label ?? source.sourceKind
 #: src/pages/CompanyImport.tsx
 msgid "{0} progress"
@@ -2346,6 +2351,7 @@ msgstr "Não é possível acessar o servidor."
 #: src/components/integrations/SignInStep.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/markdown-link-prompt.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -4864,6 +4870,10 @@ msgstr "Excluindo…"
 msgid "Deletion code"
 msgstr "Código de exclusão"
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "denied"
+msgstr ""
+
 #: src/components/AskCard.tsx
 msgid "Denied"
 msgstr "Negado"
@@ -5179,9 +5189,10 @@ msgstr ""
 msgid "Downloading"
 msgstr ""
 
-#. placeholder {0}: total ?? done
+#. placeholder {0}: Math.round(done)
+#. placeholder {1}: Math.round(total ?? done)
 #: src/components/integrations/OmiPage.tsx
-msgid "Downloading {done} of {0} min"
+msgid "Downloading {0} of {1} min"
 msgstr ""
 
 #: src/components/DesktopUpdates.tsx
@@ -5715,6 +5726,7 @@ msgid "Facts"
 msgstr ""
 
 #: src/components/CloudAgentCard.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 msgid "failed"
 msgstr "falhou"
 
@@ -8195,6 +8207,10 @@ msgstr ""
 msgid "No credentials saved for this bot."
 msgstr ""
 
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "No data yet"
+msgstr ""
+
 #: src/pages/CompanyHistory.tsx
 msgid "No dated facts"
 msgstr ""
@@ -8414,6 +8430,10 @@ msgstr ""
 msgid "No scheduled items in this view."
 msgstr ""
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "No sources"
+msgstr ""
+
 #: src/pages/Finance.tsx
 msgid "No spend in this period"
 msgstr ""
@@ -8472,6 +8492,10 @@ msgstr ""
 
 #: src/components/compose/RecipientField.tsx
 msgid "Not a valid email address"
+msgstr ""
+
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Not approved"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
@@ -8730,6 +8754,10 @@ msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Off in Settings"
+msgstr ""
+
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "ok"
 msgstr ""
 
 #: src/pages/McpConnectionActivity.tsx
@@ -9236,14 +9264,20 @@ msgstr ""
 msgid "Pause"
 msgstr ""
 
+#: src/components/pages/PageSourcesDialog.tsx
+msgid "paused"
+msgstr ""
+
 #: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr ""
 
+#. placeholder {0}: Math.round(done)
+#. placeholder {1}: Math.round(total)
 #: src/components/integrations/OmiPage.tsx
-msgid "Paused · {done} of {total} min saved"
+msgid "Paused · {0} of {1} min saved"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
@@ -9282,6 +9316,7 @@ msgstr ""
 msgid "Pendant recordings, meetings and notes"
 msgstr ""
 
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/Finance.tsx
 msgid "pending"
 msgstr ""
@@ -10060,6 +10095,7 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/Investors.tsx
 #: src/pages/RoutineRunHistory.tsx
+#: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/bot-pins.tsx
 msgid "Refresh"
 msgstr "Atualizar"
@@ -10075,6 +10111,10 @@ msgstr ""
 
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Refresh view"
+msgstr ""
+
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Refreshing"
 msgstr ""
 
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -10133,6 +10173,7 @@ msgstr ""
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 #: src/pages/ModelBackupsSettings.tsx
@@ -10159,6 +10200,7 @@ msgstr "Remover {0}"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Remove {0}?"
@@ -10515,6 +10557,7 @@ msgstr ""
 #: src/components/data-room/DropZone.tsx
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyCalendar.tsx
@@ -11854,11 +11897,21 @@ msgstr ""
 msgid "Source"
 msgstr ""
 
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Source failed"
+msgstr ""
+
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Source not found"
+msgstr ""
+
 #: src/components/data-room/DataRoomStats.tsx
+#: src/components/pages/PageSourcesDialog.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/CompanyPrivacy.tsx
+#: src/pages/shell/bot-page-panel.tsx
 msgid "Sources"
 msgstr ""
 
@@ -13601,6 +13654,7 @@ msgstr ""
 msgid "Waiting for AI to be allowed"
 msgstr ""
 
+#: src/components/pages/PageLiveBlocks.tsx
 #: src/lib/roster-status.ts
 #: src/pages/McpConnectionActivity.tsx
 #: src/pages/McpConnectionsPanel.tsx
