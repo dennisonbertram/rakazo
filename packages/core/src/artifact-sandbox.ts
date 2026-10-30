@@ -35,3 +35,20 @@ export function withSandboxedArtifactCsp(html: string, options: { email?: boolea
   const end = leadingDoctype[0].length;
   return `${html.slice(0, end)}${meta}${html.slice(end)}`;
 }
+
+/**
+ * JavaScript that delivers an HTML page's data as the "praci-data" message event the live viewer
+ * posts. The data goes in as a JSON string the page-side code parses, so it stays plain data
+ * whatever it contains. `<` and U+2028/2029 are escaped so it is also safe inside a <script> element.
+ */
+export function htmlPageDataScript(sources: unknown): string {
+  const escapeForScript = (text: string) =>
+    text
+      .replace(/</g, "\\u003c")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
+  const literal = escapeForScript(
+    JSON.stringify(escapeForScript(JSON.stringify({ type: "praci-data", sources }))),
+  );
+  return `(function(){window.dispatchEvent(new MessageEvent("message",{data:JSON.parse(${literal})}))})();true;`;
+}

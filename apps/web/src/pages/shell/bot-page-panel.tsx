@@ -33,6 +33,7 @@ import type { NodeViewProps } from "@tiptap/react";
 import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor } from "@tiptap/react";
 import { ArrowDown, ArrowUp, GripVertical, MoreHorizontal, Plus, X } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { ArtifactShareDialog } from "../../components/ArtifactShareDialog";
 import { GtmBlock, GtmBlockContext } from "../../components/gtm/GtmBlock";
 import { HtmlPageView } from "../../components/pages/HtmlPageView";
 import {
@@ -545,6 +546,8 @@ export function BotPagePanel({
   const [error, setError] = useState("");
   const [hasSources, setHasSources] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [shared, setShared] = useState<{ url: string; artifactId: string } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [dataTick, setDataTick] = useState(0);
   const activeIdRef = useRef(activeId);
@@ -627,6 +630,23 @@ export function BotPagePanel({
       setRenaming(false);
     });
 
+  const share = () =>
+    run(async () => {
+      if (!active) return;
+      const result = await rpc.pages.share({ botId, pageId: active.id });
+      if (result) setShared({ url: result.url, artifactId: result.artifactId });
+    });
+
+  const stopSharing = async () => {
+    if (!shared) return;
+    setShareBusy(true);
+    await run(async () => {
+      await rpc.artifactShares.revoke({ artifactId: shared.artifactId });
+      setShared(null);
+    });
+    setShareBusy(false);
+  };
+
   const remove = () =>
     run(async () => {
       if (active) await rpc.pages.remove({ botId, pageId: active.id });
@@ -693,6 +713,9 @@ export function BotPagePanel({
                   <Trans>Sources</Trans>
                 </DropdownMenuItem>
               ) : null}
+              <DropdownMenuItem onClick={() => void share()}>
+                <Trans>Share</Trans>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setRenaming(true)}>
                 <Trans>Rename</Trans>
               </DropdownMenuItem>
@@ -756,6 +779,16 @@ export function BotPagePanel({
         onOpenChange={setSourcesOpen}
         onChanged={() => setDataTick((n) => n + 1)}
       />
+      {shared ? (
+        <ArtifactShareDialog
+          name={activeTitle}
+          url={shared.url}
+          busy={shareBusy}
+          error={error || null}
+          onStop={() => void stopSharing()}
+          onClose={() => setShared(null)}
+        />
+      ) : null}
       <AlertDialog open={deleting} onOpenChange={setDeleting}>
         <AlertDialogContent>
           <AlertDialogHeader>

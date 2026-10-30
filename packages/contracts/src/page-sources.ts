@@ -196,6 +196,13 @@ export type PageData = z.infer<typeof PageDataSchema>;
 export const PageDataInputSchema = z.object({ botId: Id, pageId: Id.optional() });
 /** Reruns every active source on the page now (at most once a minute per page). */
 export const PageRefreshInputSchema = PageDataInputSchema;
+export const PageShareInputSchema = z.object({ botId: Id, pageId: Id.optional() });
+/** A view-only link to a frozen copy of the page. artifactId names the copy for Stop sharing. */
+export const PageShareOutputSchema = z.object({
+  url: z.string(),
+  expiresAt: z.string(),
+  artifactId: Id,
+});
 export const PageSourcesListInputSchema = PageDataInputSchema;
 export const PageSourceRemoveInputSchema = z.object({ botId: Id, sourceId: Id });
 export const PageSourceScheduleInputSchema = z.object({

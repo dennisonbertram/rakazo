@@ -5,7 +5,7 @@ import type {
   SidebarPagesState,
 } from "@rakazo/contracts";
 import type { PageSegment } from "@rakazo/core";
-import { splitPage } from "@rakazo/core";
+import { htmlPageDataScript, splitPage } from "@rakazo/core";
 
 /** A table cell or metric value; `usd` values are masked while amounts are hidden. */
 export type LiveCell = { text: string; usd: boolean };
@@ -133,17 +133,4 @@ export function sidebarBotPages(state: SidebarPagesState) {
   return state.pages.flatMap((page) => ("pageId" in page ? [page] : []));
 }
 
-/**
- * JavaScript for the page WebView that delivers an HTML page's data as a "praci-data" message event,
- * the same event the web viewer posts. The data goes in as a JSON string that the page-side code parses,
- * so it stays plain data whatever it contains; U+2028/2029 are escaped for older JavaScript engines.
- */
-export function htmlPageDataScript(sources: unknown): string {
-  const json = JSON.stringify({ type: "praci-data", sources })
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
-  const literal = JSON.stringify(json)
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
-  return `(function(){window.dispatchEvent(new MessageEvent("message",{data:JSON.parse(${literal})}))})();true;`;
-}
+export { htmlPageDataScript };

@@ -201,6 +201,11 @@ const liveMocks = (blocks: unknown[]) => ({
   "pages.data": liveData(blocks),
   "pages.sources": sources,
   "pages.refresh": liveData(liveBlocks),
+  "pages.share": {
+    url: "https://app.example.test/s#example-token",
+    expiresAt: "2026-11-29T00:00:00.000Z",
+    artifactId: "art_snapshot",
+  },
 });
 
 /** Two numbers, a chart over stored snapshots and a table, all read from saved sources. */

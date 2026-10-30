@@ -16,8 +16,12 @@ const mocks = vi.hoisted(() => ({
   setSourceSchedule: vi.fn(),
   pauseSource: vi.fn(),
   resumeSource: vi.fn(),
+  share: vi.fn(),
 }));
-vi.mock("../../lib/rpc", () => ({ rpc: { pages: mocks } }));
+const revoke = vi.hoisted(() => vi.fn());
+vi.mock("../../lib/rpc", () => ({
+  rpc: { pages: mocks, artifactShares: { revoke } },
+}));
 vi.mock("@lingui/core/macro", () => ({
   t: (parts: TemplateStringsArray, ...values: unknown[]) =>
     parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
@@ -264,4 +268,25 @@ it("shows the error and Retry on the warning dot, and Retry reruns the sources",
   await click(byText("Retry", "button"));
   expect(mocks.refresh).toHaveBeenCalledTimes(1);
   expect(text()).toContain("$87K");
+});
+
+it("Share makes the snapshot link and Stop sharing revokes the snapshot artifact", async () => {
+  mocks.share.mockResolvedValue({
+    url: "https://app.example.test/s#tok",
+    expiresAt: "2026-11-29T00:00:00.000Z",
+    artifactId: "art1",
+  });
+  revoke.mockResolvedValue({ ok: true });
+  await render();
+  await openMenu();
+  await click(byText("Share", '[role="menuitem"]'));
+  expect(mocks.share).toHaveBeenCalledWith({ botId: "bot_demo", pageId: "p1" });
+  const input = document.querySelector<HTMLInputElement>("input[readonly]");
+  expect(input?.value).toBe("https://app.example.test/s#tok");
+  await click(byText("Stop sharing", "button"));
+  await click(
+    [...document.querySelectorAll("button")].filter((b) => b.textContent === "Stop sharing").at(-1),
+  );
+  expect(revoke).toHaveBeenCalledWith({ artifactId: "art1" });
+  expect(document.querySelector("input[readonly]")).toBeNull();
 });
