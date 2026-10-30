@@ -39,6 +39,8 @@ export const ProductEventType = z.enum([
   "memory.revised",
   /** payload: { pageId, revision, updatedBy } (older events have no pageId) */
   "page.updated",
+  /** payload: { pageId } — a page's live data changed (a source refreshed, or was added or removed) */
+  "page.data",
   /** payload: { revision, updatedBy } */
   "pins.updated",
   "routine.created",

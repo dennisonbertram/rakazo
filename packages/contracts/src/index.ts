@@ -51,6 +51,7 @@ export * from "./model-backups.js";
 export * from "./notification.js";
 export * from "./omi.js";
 export * from "./openai-compatible-ui.js";
+export * from "./page-sources.js";
 export * from "./pages.js";
 export * from "./pin-list.js";
 export * from "./pins.js";
