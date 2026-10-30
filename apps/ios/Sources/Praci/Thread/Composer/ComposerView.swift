@@ -12,6 +12,7 @@ struct ComposerView: View {
   @State private var photos: [PhotosPickerItem] = []
   @FocusState private var focused: Bool
   @State private var dictation = DictationModel()
+  @Environment(\.scenePhase) private var scenePhase
 
   private var composer: ComposerModel { model.composer }
 
@@ -45,6 +46,9 @@ struct ComposerView: View {
     }
     .padding(.horizontal, 16).padding(.vertical, 8)
     .task { SendQueue.shared.bind(app) }
+    .onChange(of: scenePhase) { _, phase in
+      if phase != .active { dictation.stop() }
+    }
     .photosPicker(
       isPresented: $picking, selection: $photos, maxSelectionCount: max(composer.slotsLeft, 1),
       matching: .images

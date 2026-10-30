@@ -15,6 +15,8 @@ final class CallCoordinator {
 
   @ObservationIgnored private let player = SpeechPlayer()
   @ObservationIgnored private var dictation: DictationSession?
+  /// Bumped by `end()` so a call still waiting on consent or a permission prompt does not start.
+  @ObservationIgnored private var epoch = 0
 
   var isActive: Bool { session?.state != nil }
 
@@ -22,6 +24,7 @@ final class CallCoordinator {
     guard !starting, !isActive else { return }
     starting = true
     failure = nil
+    let started = epoch
     defer { starting = false }
     let server = VoiceServer(app: app)
     let status = (try? await server.status()) ?? CallVoiceStatus()
@@ -35,6 +38,7 @@ final class CallCoordinator {
       failure = error.localizedDescription
       return
     }
+    guard epoch == started else { return }
     let call = CallSession(deps: deps(server: server, hosted: hosted, botID: botID))
     session = call
     call.start(
@@ -42,6 +46,7 @@ final class CallCoordinator {
   }
 
   func end() {
+    epoch += 1
     session?.end()
     dictation?.stop()
     dictation = nil
@@ -74,7 +79,12 @@ final class CallCoordinator {
   }
 
   private func dictate(_ handlers: DictationHandlers) async -> Bool {
+    // Without on-device recognition the call records clips and sends them to hosted transcription
+    // (which asks for consent itself) instead; nothing is captured for Apple's servers.
+    guard VoiceAudio.onDeviceSupported() else { return false }
+    let started = epoch
     guard await VoiceAudio.requestMicrophone(), await VoiceAudio.requestSpeech() else { return false }
+    guard epoch == started else { return false }
     dictation?.stop()
     let next = DictationSession(
       recognizer: DeviceSpeechRecognizer(), language: VoiceAudio.language,

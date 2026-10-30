@@ -10,6 +10,7 @@ struct CallButton: View {
   @Environment(AppModel.self) private var app
   @State private var coordinator = CallCoordinator()
   @State private var presenting = false
+  @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     Button {
@@ -22,6 +23,12 @@ struct CallButton: View {
     // swiftlint:disable:next multiple_closures_with_trailing_closure
     .fullScreenCover(isPresented: $presenting, onDismiss: { coordinator.end() }) {
       CallView(coordinator: coordinator, name: name, avatar: avatar, close: { presenting = false })
+    }
+    // The app does not keep the microphone in the background, so leaving the foreground hangs up.
+    .onChange(of: scenePhase) { _, phase in
+      guard phase != .active else { return }
+      coordinator.end()
+      presenting = false
     }
     // The agent hung up, or the caller did: the call screen goes away with the call.
     .onChange(of: coordinator.isActive) { wasActive, active in

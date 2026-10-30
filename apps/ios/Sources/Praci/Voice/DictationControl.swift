@@ -10,12 +10,17 @@ final class DictationModel {
   /// Shown under the composer when dictation cannot start; the Settings link goes with it.
   var message: String?
   @ObservationIgnored private var session: DictationSession?
+  /// Bumped by `stop()` so a start still waiting on a permission prompt does not begin afterwards.
+  @ObservationIgnored private var epoch = 0
 
   func toggle(text: Binding<String>) async {
     if listening { stop(); return }
     message = nil
+    let started = epoch
+    guard VoiceAudio.onDeviceSupported() else { message = VoiceAudio.dictationUnavailable; return }
     guard await VoiceAudio.requestMicrophone() else { message = VoiceAudio.micDenied; return }
     guard await VoiceAudio.requestSpeech() else { message = VoiceAudio.speechDenied; return }
+    guard epoch == started else { return }
     let base = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
     let set: (String) -> Void = { heard in text.wrappedValue = base.isEmpty ? heard : "\(base) \(heard)" }
     let next = DictationSession(
@@ -27,6 +32,7 @@ final class DictationModel {
   }
 
   func stop() {
+    epoch += 1
     session?.stop()
     session = nil
     listening = false

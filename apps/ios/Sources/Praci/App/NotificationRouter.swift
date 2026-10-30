@@ -35,14 +35,18 @@ struct PushTarget: Equatable {
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
   private let app: AppModel
   private let defaults: UserDefaults
-  private var pending: PushTarget?
+  private(set) var pending: PushTarget?
+  private var startupDone = false
   private static let tokenKey = "pushToken"
 
   init(app: AppModel, defaults: UserDefaults = .standard) {
     self.app = app
     self.defaults = defaults
     super.init()
-    app.authentication.beforeSessionEnds = { [weak self] in await self?.unregisterIfNeeded() }
+    app.authentication.beforeSessionEnds = { [weak self] in
+      self?.pending = nil
+      await self?.unregisterIfNeeded()
+    }
   }
 
   /// The app has no push registration yet: it needs the APNs entitlement and signing, which stay
@@ -64,7 +68,9 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
   /// Opens a tapped push now, or keeps it until sign-in finishes restoring.
   func open(_ target: PushTarget) {
     guard app.authentication.isSignedIn else {
-      pending = target
+      // Only a launch tap that arrives before the session is restored waits; later taps could
+      // otherwise open a thread in another account or on another server.
+      pending = startupDone ? nil : target
       return
     }
     pending = nil
@@ -75,7 +81,8 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
 
   /// Run when sign-in state changes or startup finishes. A tap that arrives while signed out is
   /// dropped once startup is done: the payload names no server, so it cannot be matched.
-  func settle(startupDone: Bool) {
+  func settle(startupDone done: Bool) {
+    if done { startupDone = true }
     guard let target = pending else { return }
     if app.authentication.isSignedIn {
       open(target)

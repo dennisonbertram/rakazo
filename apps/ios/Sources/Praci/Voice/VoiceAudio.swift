@@ -15,6 +15,14 @@ enum VoiceAudio {
     await AVAudioApplication.requestRecordPermission()
   }
 
+  /// Speech recognition that stays on the phone. Without it nothing is captured: audio is never
+  /// sent to Apple's servers, and hosted transcription needs its own consent.
+  static func onDeviceSupported() -> Bool {
+    recognizer()?.supportsOnDeviceRecognition == true
+  }
+
+  static let dictationUnavailable = "Dictation isn't available on this device."
+
   /// Asks for speech recognition. False when denied or the device cannot recognise speech.
   static func requestSpeech() async -> Bool {
     let status = await withCheckedContinuation { continuation in

@@ -23,7 +23,7 @@ final class DeviceSpeechRecognizer: SpeechRecognizing {
 
   func start(language: String) {
     guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language)),
-      recognizer.isAvailable
+      recognizer.isAvailable, recognizer.supportsOnDeviceRecognition
     else {
       onEvent?(.fatalError)
       return
@@ -31,7 +31,7 @@ final class DeviceSpeechRecognizer: SpeechRecognizing {
     task?.cancel()
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
-    if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
+    request.requiresOnDeviceRecognition = true
     sink.set(request)
     do {
       try VoiceAudio.activate()
