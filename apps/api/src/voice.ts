@@ -4,14 +4,17 @@ import {
   aiRecipient,
   createTranscriptionProvider,
   createVoiceProvider,
+  findTranscriptionSelection,
   isFishSpeechModelId,
   isTranscriptionProviderId,
   isVoiceProviderId,
   listVoiceCatalog,
+  loadVoiceCredential,
   MAX_SPEAK_CHARS,
   MAX_TRANSCRIBE_BYTES,
   NoVoiceConfigured,
   persistPreparedSecret,
+  selectTranscriptionTarget,
   voiceCatalogEntry,
 } from "@rakazo/adapters";
 import type { Actor, VoiceCredential, VoiceStatus } from "@rakazo/contracts";
@@ -29,7 +32,6 @@ import {
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import type { Context, Hono } from "hono";
-import { hasVoiceConsent } from "./ai-consent.js";
 import { dictationVocabulary } from "./dictation-vocabulary.js";
 import { readBoundedBody } from "./http-body.js";
 import { withSerializableRetry } from "./serializable-retry.js";
@@ -74,23 +76,6 @@ export function toVoiceStatus(
     transcriptionProvider,
     // ponytail: S3b turns this on when a selected provider can serve dictation.
     transcriptionReady: false,
-  };
-}
-
-export async function findTranscriptionSelection(deps: VoiceDeps, actor: Actor) {
-  return deps.prisma.transcriptionSelection.findUnique({ where: { userId: actor.userId } });
-}
-
-/** The selected provider, with its key or null when the key is unavailable; null when nothing is selected. */
-async function loadTranscriptionSelection(deps: VoiceDeps, actor: Actor) {
-  const selection = await findTranscriptionSelection(deps, actor);
-  if (!selection) return null;
-  const secret = await deps.prisma.secret.findFirst({
-    where: { id: selection.secretId, userId: actor.userId, spaceId: null },
-  });
-  return {
-    provider: selection.provider,
-    apiKey: secret ? await deps.secrets.load(secret.ciphertext, secret.id) : null,
   };
 }
 
@@ -212,17 +197,7 @@ export async function loadDefaultVoiceCredential(deps: VoiceDeps, actor: Actor) 
   return loadVoiceCredential(deps, actor);
 }
 
-export async function loadVoiceCredential(deps: VoiceDeps, actor: Actor, provider?: string) {
-  const cred = provider
-    ? await findVoiceCredential(deps.prisma, actor, provider)
-    : await findDefaultVoiceCredential(deps.prisma, actor);
-  if (!cred) return null;
-  const secret = await deps.prisma.secret.findFirst({
-    where: { id: cred.secretId, userId: actor.userId, spaceId: null },
-  });
-  if (!secret) return null;
-  return { cred, apiKey: await deps.secrets.load(secret.ciphertext, secret.id) };
-}
+export { findTranscriptionSelection, loadVoiceCredential };
 
 export async function resolveVoiceTarget(
   deps: VoiceDeps,
@@ -491,25 +466,10 @@ export async function transcribeVoice(
     signal?: AbortSignal;
   },
 ) {
-  // The server picks the provider; clients only upload. A selected provider is used only with its
-  // recipient's consent, otherwise the voice provider (also needing consent while a selection
-  // exists). Without a selection, behaviour is unchanged: the voice provider, no consent check.
-  // A selection row whose key is unavailable (for example mid-replacement) still follows the
-  // selection rules, so audio never skips the consent check.
-  const selected = await loadTranscriptionSelection(deps, actor);
-  let target: { provider: string; apiKey: string } | null = null;
-  // One consent decision for the chosen provider, used for both audio and context.
-  let consented = false;
-  if (selected?.apiKey && (await hasVoiceConsent(deps.prisma, actor, selected.provider))) {
-    target = { provider: selected.provider, apiKey: selected.apiKey };
-    consented = true;
-  } else {
-    const loaded = await loadDefaultVoiceCredential(deps, actor);
-    if (loaded) target = { provider: loaded.cred.provider, apiKey: loaded.apiKey };
-    if (target) consented = await hasVoiceConsent(deps.prisma, actor, target.provider);
-    if (selected && !consented) {
-      throw new ORPCError("CONFLICT", { message: "AI data sharing needs your permission." });
-    }
+  // The server picks the provider; clients only upload. See `selectTranscriptionTarget`.
+  const { target, consented, selected } = await selectTranscriptionTarget(deps, actor);
+  if (selected && !consented) {
+    throw new ORPCError("CONFLICT", { message: "AI data sharing needs your permission." });
   }
   if (!target) throw new NoVoiceConfigured("key");
   const { apiKey } = target;

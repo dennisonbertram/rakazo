@@ -110,6 +110,7 @@ import {
   replaceComputer,
   requestAccountExport,
   requestContactPhotos,
+  requeueOmiTranscriptions,
   resolveAutoReviewChecker,
   resolveBotUploadPath,
   resolveBotWorkspaceCwd,
@@ -9325,9 +9326,14 @@ export function createRouter(deps: RouterDeps) {
         const selection = await findTranscriptionSelection(deps, context.actor);
         return toVoiceStatus(cred, selection?.provider ?? null);
       }),
-      setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) =>
-        setTranscription(deps, context.actor, { ...input, signal: context.signal }),
-      ),
+      setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) => {
+        const result = await setTranscription(deps, context.actor, {
+          ...input,
+          signal: context.signal,
+        });
+        await requeueOmiTranscriptions(deps, context.actor);
+        return result;
+      }),
       clearTranscription: authed.voice.clearTranscription.handler(async ({ context }) =>
         clearTranscription(deps, context.actor),
       ),
@@ -9351,15 +9357,17 @@ export function createRouter(deps: RouterDeps) {
           });
         });
       }),
-      connect: authed.voice.connect.handler(async ({ context, input }) =>
-        persistVoiceCredential(deps, context.actor, {
+      connect: authed.voice.connect.handler(async ({ context, input }) => {
+        const result = await persistVoiceCredential(deps, context.actor, {
           provider: input.provider,
           plaintext: input.apiKey,
           voiceId: input.voiceId,
           speechModel: input.speechModel,
           signal: context.signal,
-        }),
-      ),
+        });
+        await requeueOmiTranscriptions(deps, context.actor);
+        return result;
+      }),
       disconnect: authed.voice.disconnect.handler(async ({ context, input }) =>
         disconnectVoiceCredential(deps, context.actor, { provider: input.provider }),
       ),

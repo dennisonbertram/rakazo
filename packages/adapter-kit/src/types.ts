@@ -826,6 +826,8 @@ export interface BackgroundJobPayloads {
   "finance.sync": { userId: string; spaceId: string };
   /** Turns a pendant connection's uploaded records into audio recordings in the Data room. Ids only. */
   "omi.assemble": { spaceId: string; userId: string; connectionId: string };
+  /** Transcribes one Omi recording in the Data room. Ids only. */
+  "omi.transcribe": { spaceId: string; userId: string; itemId: string };
   /** Removes a deleted Data room item's blob. Idempotent: a missing blob is success. */
   "dataroom.blob.delete": { spaceId: string; storageKey: string };
   /** Pipeline steps for one Data room item, in order; each queues the next. */

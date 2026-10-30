@@ -243,8 +243,12 @@ describePostgres("Omi uploads (PostgreSQL)", () => {
       source: "omi",
       mimeType: "audio/ogg",
       notIndexed: true,
+      status: "ready",
       name: "Recording 1 Jan 00:16",
     });
+    // Pendant audio never enters the Data room pipeline.
+    expect(items.every((i) => i.status === "ready")).toBe(true);
+    expect(enqueued.some((j) => j.name === "dataroom.ingest")).toBe(false);
     expect(items[0]?.folder?.name).toBe("Audio");
     expect(items[0]?.folder?.parent?.name).toBe("Omi");
     expect(items[0]?.folder?.createdBy).toBe("agent");

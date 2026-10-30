@@ -47,6 +47,8 @@ export interface FileDataRoomInput {
   sourceUpdatedAt?: Date;
   /** Stored and listed but never read for search (pendant audio). */
   notIndexed?: boolean;
+  /** Filed as ready and never sent through the pipeline (pendant audio has nothing to extract). */
+  ready?: boolean;
 }
 
 /** A filed item, or (`item: null`) a zip stored for unpacking in the background. */
@@ -143,10 +145,11 @@ export function createFileDataRoomItem(
     input: FileDataRoomInput,
     stored: { id: string; hash: string; size: number },
   ) => {
-    const { content: _content, signal: _signal, ...fields } = input;
+    const { content: _content, signal: _signal, ready, ...fields } = input;
     const { item, created } = await repo
       .createItem(actor, {
         ...fields,
+        ...(ready ? { status: "ready" } : {}),
         sha256: stored.hash,
         size: stored.size,
         storageKey: stored.id,
@@ -159,7 +162,7 @@ export function createFileDataRoomItem(
     if (!created) {
       await dropBlob(actor, stored.id);
       await requeueStuck(actor, item);
-    } else {
+    } else if (!ready) {
       // The file itself is saved; a queue outage must not turn it into a failure.
       await deps.jobs
         .enqueue(dataRoomStepJob("dataroom.ingest", actor, item.id))

@@ -1,6 +1,6 @@
 # Usage: maestro --udid <UDID> test maestro/smoke.yaml -e EMAIL=... -e PASSWORD=... -e SERVER=http://127.0.0.1:3301
 # The app must already be installed. Signs in, creates an agent, sends a message and sees it in the thread.
-appId: com.rakazo.app.dev
+appId: ai.praci.mobile.dev
 ---
 - runFlow: sign-in.yaml
 - tapOn:

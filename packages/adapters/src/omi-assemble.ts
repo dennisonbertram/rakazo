@@ -1,4 +1,5 @@
 import type { ArtifactStore, JobPublisher } from "@rakazo/adapter-kit";
+import { omiTranscribeJob } from "@rakazo/adapter-kit";
 import type { Actor } from "@rakazo/contracts";
 import { OMI_CONNECTOR_ID } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
@@ -115,7 +116,7 @@ export async function runOmiAssemble(
         const start = first.rtcValid
           ? new Date(recording.timestamp * 1000)
           : new Date(last.receivedAt.getTime() - (runEnd - recording.timestamp) * 1000);
-        await filing.storeAndFile(actor, {
+        const { item, created } = await filing.storeAndFile(actor, {
           content: { bytes: muxOggOpus(recording.frames, { sampleRate: 16000, frameMs }) },
           name: omiRecordingName(start),
           mimeType: "audio/ogg",
@@ -124,7 +125,13 @@ export async function runOmiAssemble(
           sourceConnectionId: connection.id,
           externalId,
           notIndexed: true,
+          ready: true,
         });
+        if (created && item) {
+          await deps.jobs.enqueue(
+            omiTranscribeJob({ spaceId: actor.spaceId, userId: actor.userId, itemId: item.id }),
+          );
+        }
       }
     }
     await prisma.omiUpload.updateMany({

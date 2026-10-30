@@ -6,13 +6,13 @@ Written 2026-10-28 against `main` 4fb16c667 and issues #412–#427. It turns [pl
 
 | Phase | Status | Evidence |
 |---|---|---|
-| 0 Scaffold #412 | Code done; not yet verified on the build Mac | `apps/ios/project.yml` (iOS 26.0, Swift 6 strict concurrency, `com.rakazo.app` with `.dev` for Debug, `rakazo` scheme), three SwiftPM packages, `RakazoUI/Tokens.swift` from `pnpm ios:tokens`, Swift Testing, `scripts/test.sh`. Gaps: never built on this Mac; `test.sh` defaults to an "iPhone 17" destination; lint config disagrees with the code (`.swiftformat --indent 4` against 2-space code, 55 `trailing_comma` violations); `xcodebuild` needs `-skipPackagePluginValidation` for the OpenAPIGenerator plugin. |
+| 0 Scaffold #412 | Code done; not yet verified on the build Mac | `apps/ios/project.yml` (iOS 26.0, Swift 6 strict concurrency, `ai.praci.mobile` with `.dev` for Debug, `rakazo` scheme), three SwiftPM packages, `RakazoUI/Tokens.swift` from `pnpm ios:tokens`, Swift Testing, `scripts/test.sh`. Gaps: never built on this Mac; `test.sh` defaults to an "iPhone 17" destination; lint config disagrees with the code (`.swiftformat --indent 4` against 2-space code, 55 `trailing_comma` violations); `xcodebuild` needs `-skipPackagePluginValidation` for the OpenAPIGenerator plugin. |
 | 1 Contracts export #413 | Done for its scope | `packages/contracts/src/openapi.ts`, `scripts/openapi.ts --check`, `openapi.json` (488 operations, operationId `rpc_<path with _>`). The generator config filters to `rpc_health`, and the generated client is unused. |
 | 2 Connect and sign in #414 | Code done; acceptance and the RPC path missing | `RakazoCore/AuthClient.swift`, `ServerEndpoint.swift`, `HTTPTransport.swift`; app `AuthenticationModel`, `AuthenticationView`, `ServerView`, `KeychainSessionStorage`, `SSOBrowser`; 27 core and 5 app tests. Missing: no authenticated RPC call (no 401 recovery, no `x-rakazo-space-id`), the signed-in screen is a placeholder, and sign-in has never been walked on a simulator. |
 | 3–6, 8, 9, 11, 12 | Not started | Issues labelled `status:blocked` pending contract churn; the owner asked on 2026-10-28 to start implementing. |
 | 7 Duo layouts | Cannot build here | Needs Xcode 27.1 (macOS Tahoe). |
 | 10 Push | Server not started | `notifications.registerPush` takes `{token, replacesToken?}` only; only `ExpoPushProvider` exists. |
-| 13, 14 | Maintainer | Need a physical iPhone and signing. Open: native uses `com.rakazo.app` while Expo uses `ai.praci.app`; the plan says "same bundle id" — decide before phase 14. |
+| 13, 14 | Maintainer | Need a physical iPhone and signing. Decided (owner, 2026-10-30): the native app's bundle id is `ai.praci.mobile`, with extensions under it (for example `ai.praci.mobile.widget`); Debug builds use `ai.praci.mobile.dev`. The Expo app keeps `ai.praci.app`. |
 
 ## 2. Defaults implementers assume
 
@@ -48,7 +48,7 @@ X="xcodebuild -project Praci.xcodeproj -scheme Praci -destination platform=iOS\ 
 $X build && $X test
 swift test --package-path Packages/RakazoCore
 xcrun simctl install $SIM_UDID DerivedData/Build/Products/Debug-iphonesimulator/Praci.app
-xcrun simctl launch $SIM_UDID com.rakazo.app.dev -serverOrigin $API
+xcrun simctl launch $SIM_UDID ai.praci.mobile.dev -serverOrigin $API
 maestro --udid $SIM_UDID test maestro/sign-in.yaml -e EMAIL=… -e PASSWORD=…
 xcrun simctl openurl $SIM_UDID "rakazo://open/inbox"
 xcrun simctl ui $SIM_UDID appearance light|dark
