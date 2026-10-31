@@ -72,7 +72,8 @@ import { errorText } from "../lib/user-error";
 import { ModelBackupsSettings } from "./ModelBackupsSettings";
 
 /** Every disclosure on Settings shows the same chevron, not the browser's filled triangle. */
-const DISCLOSURE_SUMMARY = "flex w-fit cursor-pointer list-none select-none items-center gap-1";
+const DISCLOSURE_SUMMARY =
+  "flex w-fit cursor-pointer list-none select-none items-center gap-1";
 
 function DisclosureChevron() {
   return (
@@ -84,7 +85,14 @@ function DisclosureChevron() {
   );
 }
 
-const COMMON_PROVIDERS = ["anthropic", "openai", "google", "openrouter", "xai", "mistral"];
+const COMMON_PROVIDERS = [
+  "anthropic",
+  "openai",
+  "google",
+  "openrouter",
+  "xai",
+  "mistral",
+];
 
 export function ModelSettingsOverlay({
   onClose,
@@ -114,7 +122,9 @@ export function ModelSettingsOverlay({
 }) {
   const { t } = useLingui();
   // A person on the system model sees one line; providers, backups, search model and Voice open on request.
-  const [ownOpen, setOwnOpen] = useState(focusProvider !== undefined || view === "voice");
+  const [ownOpen, setOwnOpen] = useState(
+    focusProvider !== undefined || view === "voice",
+  );
   const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
   const [credentials, setCredentials] = useState<ModelCredential[]>([]);
   // A connected key keeps the full panel open, even after the last one is disconnected.
@@ -124,7 +134,9 @@ export function ModelSettingsOverlay({
   const [me, setMe] = useState<Me | null>(null);
   const [provider, setProvider] = useState(focusProvider ?? "");
   // The provider whose optional personal-key form is open.
-  const [ownKeyProvider, setOwnKeyProvider] = useState<string | null>(focusProvider || null);
+  const [ownKeyProvider, setOwnKeyProvider] = useState<string | null>(
+    focusProvider || null,
+  );
   // Opened from a "add your key" link: bring the key field on screen once, even on a phone.
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const keyShown = useRef(false);
@@ -145,17 +157,25 @@ export function ModelSettingsOverlay({
   const [gatewayId, setGatewayId] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [reasoning, setReasoning] = useState(false);
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(
+    null,
+  );
   const [maxTokens, setMaxTokens] = useState(String(DEFAULT_MODEL_MAX_TOKENS));
-  const [contextWindow, setContextWindow] = useState(String(DEFAULT_MODEL_CONTEXT_WINDOW));
+  const [contextWindow, setContextWindow] = useState(
+    String(DEFAULT_MODEL_CONTEXT_WINDOW),
+  );
   const [supportsImages, setSupportsImages] = useState(false);
   const [maxImagesPerPrompt, setMaxImagesPerPrompt] = useState("");
-  const [{ models: probeModels, probing }, setProbe] = useState(initialModelProbeState);
+  const [{ models: probeModels, probing }, setProbe] = useState(
+    initialModelProbeState,
+  );
   const [modelProbe] = useState(() => createModelProbe(setProbe));
   const resetOpenAiCompatibleProbe = modelProbe.reset;
   const [codeCopied, copyOAuthCode] = useCopyText();
   const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState<"connect" | "default" | "disconnect" | null>(null);
+  const [pending, setPending] = useState<
+    "connect" | "default" | "disconnect" | null
+  >(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -164,12 +184,14 @@ export function ModelSettingsOverlay({
     "api-key" | "sign-in" | "compatible" | null
   >(null);
   const [preflightSuccess, setPreflightSuccess] = useState<string | null>(null);
-  const [preflightFailure, setPreflightFailure] = useState<ModelPreflightFailure | null>(null);
+  const [preflightFailure, setPreflightFailure] =
+    useState<ModelPreflightFailure | null>(null);
   const preflightRevisionRef = useRef(0);
   const detailScrollRef = useRef<HTMLDivElement>(null);
   const refreshRevisionRef = useRef(0);
   const selectionRevisionRef = useRef(0);
   const selectedLabelRef = useRef<string | undefined>(undefined);
+  const selectedProviderRef = useRef("");
 
   const {
     oauth,
@@ -184,9 +206,9 @@ export function ModelSettingsOverlay({
     onClearError: () => setError(null),
     onError: setError,
     onFinished: async (controller) => {
-      await refresh();
+      const next = await refresh();
       if (controller.signal.aborted) return;
-      setNotice(t`Connected and using ${selectedLabelRef.current ?? "this model"}.`);
+      setNotice(connectedNotice(next?.credentials));
     },
   });
 
@@ -194,10 +216,21 @@ export function ModelSettingsOverlay({
     onClearError: () => setError(null),
     onError: setError,
     onConnected: async () => {
-      await refresh();
-      setNotice(t`Connected and using ${selectedLabelRef.current ?? "this model"}.`);
+      const next = await refresh();
+      setNotice(connectedNotice(next?.credentials));
     },
   });
+
+  // A connection that is not the space default must not claim it is in use.
+  function connectedNotice(
+    next: ModelCredential[] | undefined,
+    label = selectedLabelRef.current,
+  ) {
+    return next?.find((entry) => entry.provider === selectedProviderRef.current)
+      ?.isDefault === false
+      ? t`Connected.`
+      : t`Connected and using ${label ?? "this model"}.`;
+  }
 
   async function refresh() {
     const refreshRevision = ++refreshRevisionRef.current;
@@ -207,19 +240,24 @@ export function ModelSettingsOverlay({
       rpc.models.credentials(),
       rpc.me(),
     ]);
-    if (refreshRevision !== refreshRevisionRef.current) return;
+    if (refreshRevision !== refreshRevisionRef.current) return undefined;
     const nextProvider =
       provider && nextCatalog.some((entry) => entry.provider === provider)
         ? provider
         : (nextMe.defaultProvider ?? nextCatalog[0]?.provider ?? "");
-    const nextCredential = nextCredentials.find((entry) => entry.provider === nextProvider);
+    const nextCredential = nextCredentials.find(
+      (entry) => entry.provider === nextProvider,
+    );
     const nextModel =
       nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID
         ? (nextCredential?.modelId ??
-          (nextMe.defaultProvider === OPENAI_COMPATIBLE_PROVIDER_ID ? nextMe.defaultModel : "") ??
+          (nextMe.defaultProvider === OPENAI_COMPATIBLE_PROVIDER_ID
+            ? nextMe.defaultModel
+            : "") ??
           "")
-        : (nextCatalog.find((entry) => entry.provider === nextProvider && entry.id === modelId)
-            ?.id ??
+        : (nextCatalog.find(
+            (entry) => entry.provider === nextProvider && entry.id === modelId,
+          )?.id ??
           pickCatalogModelId(
             nextCatalog,
             nextProvider,
@@ -232,18 +270,23 @@ export function ModelSettingsOverlay({
       invalidatePreflight();
       resetOpenAiCompatibleProbe();
       setProvider(nextProvider);
-      if (focusProvider === "" && !keyShown.current) setOwnKeyProvider(nextProvider);
+      if (focusProvider === "" && !keyShown.current)
+        setOwnKeyProvider(nextProvider);
       setModelId(nextModel);
       if (nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID) {
         setBaseUrl(nextCredential?.baseUrl ?? "");
         setReasoning(nextCredential?.reasoning ?? false);
         setThinkingLevel(
           clampCatalogThinkingLevel(
-            nextCredential?.modelId === nextModel ? nextCredential?.thinkingLevel : null,
+            nextCredential?.modelId === nextModel
+              ? nextCredential?.thinkingLevel
+              : null,
             nextCredential?.reasoning ? COMPATIBLE_THINKING_LEVELS : [],
           ) as ThinkingLevel | null,
         );
-        setContextWindow(String(nextCredential?.contextWindow ?? DEFAULT_MODEL_CONTEXT_WINDOW));
+        setContextWindow(
+          String(nextCredential?.contextWindow ?? DEFAULT_MODEL_CONTEXT_WINDOW),
+        );
         setSupportsImages(nextCredential?.supportsImages ?? false);
         setMaxImagesPerPrompt(String(nextCredential?.maxImagesPerPrompt ?? ""));
       } else {
@@ -253,22 +296,29 @@ export function ModelSettingsOverlay({
         );
         setThinkingLevel(
           clampCatalogThinkingLevel(
-            nextCredential?.modelId === nextModel ? nextCredential.thinkingLevel : null,
+            nextCredential?.modelId === nextModel
+              ? nextCredential.thinkingLevel
+              : null,
             nextEntry?.thinkingLevels,
           ) as ThinkingLevel | null,
         );
       }
-      setMaxTokens(connectionMaxTokensField(nextProvider, nextCredential?.maxTokens));
+      setMaxTokens(
+        connectionMaxTokensField(nextProvider, nextCredential?.maxTokens),
+      );
       setAccountId(nextCredential?.accountId ?? "");
       setGatewayId(nextCredential?.gatewayId ?? "");
     }
+    return { credentials: nextCredentials, me: nextMe, catalog: nextCatalog };
   }
 
   useEffect(() => {
     // A superseded first load resolves with nothing; only the live one ends loading.
     let live = true;
     void refresh()
-      .catch((err: unknown) => setError(errorText(err, t`Could not load model settings`)))
+      .catch((err: unknown) =>
+        setError(errorText(err, t`Could not load model settings`)),
+      )
       .finally(() => {
         if (live) setLoading(false);
       });
@@ -320,7 +370,11 @@ export function ModelSettingsOverlay({
     const query = providerQuery.trim().toLowerCase();
     const matched = query
       ? groups.filter((group) =>
-          [group.id, group.name, ...group.entries.flatMap((entry) => [entry.id, entry.label])]
+          [
+            group.id,
+            group.name,
+            ...group.entries.flatMap((entry) => [entry.id, entry.label]),
+          ]
             .join(" ")
             .toLowerCase()
             .includes(query),
@@ -330,23 +384,30 @@ export function ModelSettingsOverlay({
     // then float connected providers so they are reachable without scrolling.
     const score = (group: (typeof groups)[number]) =>
       query
-        ? group.id.toLowerCase().startsWith(query) || group.name.toLowerCase().startsWith(query)
+        ? group.id.toLowerCase().startsWith(query) ||
+          group.name.toLowerCase().startsWith(query)
           ? 0
-          : group.name.toLowerCase().includes(query) || group.id.toLowerCase().includes(query)
+          : group.name.toLowerCase().includes(query) ||
+              group.id.toLowerCase().includes(query)
             ? 1
             : 2
         : 0;
     return [...matched].sort(
       (a, b) =>
         score(a) - score(b) ||
-        Number(inUseProviderIds.has(b.id)) - Number(inUseProviderIds.has(a.id)) ||
-        Number(connectedProviderIds.has(b.id)) - Number(connectedProviderIds.has(a.id)),
+        Number(inUseProviderIds.has(b.id)) -
+          Number(inUseProviderIds.has(a.id)) ||
+        Number(connectedProviderIds.has(b.id)) -
+          Number(connectedProviderIds.has(a.id)),
     );
   }, [groups, providerQuery, connectedProviderIds, inUseProviderIds]);
   // Browsing separates connected providers into their own section; searching
   // flattens back into one ranked list.
   const connectedGroups = useMemo(
-    () => (searching ? [] : filteredGroups.filter((group) => connectedProviderIds.has(group.id))),
+    () =>
+      searching
+        ? []
+        : filteredGroups.filter((group) => connectedProviderIds.has(group.id)),
     [searching, filteredGroups, connectedProviderIds],
   );
   const otherGroups = useMemo(
@@ -366,28 +427,38 @@ export function ModelSettingsOverlay({
             group.id === provider ||
             inUseProviderIds.has(group.id),
         );
-  const modelsForProvider = catalog.filter((entry) => entry.provider === provider);
-  const selected = modelsForProvider.find((entry) => entry.id === modelId) ?? modelsForProvider[0];
+  const modelsForProvider = catalog.filter(
+    (entry) => entry.provider === provider,
+  );
+  const selected =
+    modelsForProvider.find((entry) => entry.id === modelId) ??
+    modelsForProvider[0];
   selectedLabelRef.current = selected?.label;
-  const selectedProviderName = selected?.providerName ?? selected?.provider ?? "";
+  selectedProviderRef.current = selected?.provider ?? "";
+  const selectedProviderName =
+    selected?.providerName ?? selected?.provider ?? "";
   const disconnectName = selectedProviderName;
   const hostCredentialSource = me?.hostCredentialSource ?? "";
   const defaultModelLabel =
-    catalog.find((entry) => entry.provider === me?.defaultProvider && entry.id === me?.defaultModel)
-      ?.label ??
+    catalog.find(
+      (entry) =>
+        entry.provider === me?.defaultProvider && entry.id === me?.defaultModel,
+    )?.label ??
     me?.defaultModel ??
     "";
   const serverCredentialsNote = (
     <p className="text-sm leading-[1.5] text-muted-foreground">
       <Trans>
-        Uses this server's own {hostCredentialSource} credentials to access {selectedProviderName}.
+        Uses this server's own {hostCredentialSource} credentials to access{" "}
+        {selectedProviderName}.
       </Trans>
     </p>
   );
   const isOpenAiCompatible = provider === OPENAI_COMPATIBLE_PROVIDER_ID;
   const isCloudflareGateway = provider === CLOUDFLARE_AI_GATEWAY_PROVIDER_ID;
   const cloudflareRoutingReady =
-    !isCloudflareGateway || cloudflareGatewayRouting({ accountId, gatewayId }) !== undefined;
+    !isCloudflareGateway ||
+    cloudflareGatewayRouting({ accountId, gatewayId }) !== undefined;
   const credential = credentials.find((entry) => entry.provider === provider);
   const isActive =
     me?.defaultProvider === selected?.provider &&
@@ -406,7 +477,8 @@ export function ModelSettingsOverlay({
     !isOpenAiCompatible && credential?.modelId === selected?.id
       ? (credential?.thinkingLevel ?? null)
       : null;
-  const thinkingDirty = !isOpenAiCompatible && (thinkingLevel ?? null) !== selectedStoredLevel;
+  const thinkingDirty =
+    !isOpenAiCompatible && (thinkingLevel ?? null) !== selectedStoredLevel;
   const busy = pending !== null || oauthPending;
   const effectiveBaseUrl = baseUrl.trim();
   const openAiCompatibleReady = openAiCompatibleConnectReady({
@@ -459,11 +531,17 @@ export function ModelSettingsOverlay({
   function chooseProvider(nextProvider: string) {
     cancelOAuthAttempt();
     selectionRevisionRef.current += 1;
-    const nextCredential = credentials.find((entry) => entry.provider === nextProvider);
+    const nextCredential = credentials.find(
+      (entry) => entry.provider === nextProvider,
+    );
     const nextModelId =
       nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID
         ? (nextCredential?.modelId ?? "")
-        : pickCatalogModelId(catalog, nextProvider, nextCredential?.modelId ?? me?.defaultModel);
+        : pickCatalogModelId(
+            catalog,
+            nextProvider,
+            nextCredential?.modelId ?? me?.defaultModel,
+          );
     setProvider(nextProvider);
     setReasoning(nextCredential?.reasoning ?? false);
     const nextEntry = catalog.find(
@@ -471,7 +549,9 @@ export function ModelSettingsOverlay({
     );
     setThinkingLevel(
       clampCatalogThinkingLevel(
-        nextCredential?.modelId === nextModelId ? nextCredential.thinkingLevel : null,
+        nextCredential?.modelId === nextModelId
+          ? nextCredential.thinkingLevel
+          : null,
         nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID
           ? nextCredential?.reasoning
             ? COMPATIBLE_THINKING_LEVELS
@@ -479,15 +559,23 @@ export function ModelSettingsOverlay({
           : nextEntry?.thinkingLevels,
       ) as ThinkingLevel | null,
     );
-    setMaxTokens(connectionMaxTokensField(nextProvider, nextCredential?.maxTokens));
-    setContextWindow(String(nextCredential?.contextWindow ?? DEFAULT_MODEL_CONTEXT_WINDOW));
+    setMaxTokens(
+      connectionMaxTokensField(nextProvider, nextCredential?.maxTokens),
+    );
+    setContextWindow(
+      String(nextCredential?.contextWindow ?? DEFAULT_MODEL_CONTEXT_WINDOW),
+    );
     setSupportsImages(nextCredential?.supportsImages ?? false);
     setMaxImagesPerPrompt(String(nextCredential?.maxImagesPerPrompt ?? ""));
     setModelId(nextModelId);
     setBaseUrl(
-      nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID ? (nextCredential?.baseUrl ?? "") : "",
+      nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID
+        ? (nextCredential?.baseUrl ?? "")
+        : "",
     );
     detailScrollRef.current?.scrollTo({ top: 0 });
+    // On a narrow screen the detail sits below the list; on desktop it is already in view.
+    detailScrollRef.current?.scrollIntoView({ block: "nearest" });
     setApiKey("");
     setAccountId(nextCredential?.accountId ?? "");
     setGatewayId(nextCredential?.gatewayId ?? "");
@@ -553,7 +641,9 @@ export function ModelSettingsOverlay({
     if (!preflightStillCurrent(revision)) return;
     setPreflightTesting(false);
     if (result.ok) {
-      setPreflightSuccess(modelPreflightSuccessMessage(result.discoveredModels.length));
+      setPreflightSuccess(
+        modelPreflightSuccessMessage(result.discoveredModels.length),
+      );
       return;
     }
     setPreflightFailure(result.failure);
@@ -611,7 +701,11 @@ export function ModelSettingsOverlay({
           : {}),
       });
       await refresh();
-      setNotice(isOpenAiCompatible ? t`Model updated.` : t`Now using ${selected.label}.`);
+      setNotice(
+        isOpenAiCompatible
+          ? t`Model updated.`
+          : t`Now using ${selected.label}.`,
+      );
     } catch (err) {
       setError(errorText(err, t`Could not change the default model`));
     } finally {
@@ -634,7 +728,8 @@ export function ModelSettingsOverlay({
       thinkingLevel,
       supportedThinking,
     ) as ThinkingLevel | null;
-    const modelChanged = (credential?.modelId ?? null) !== (activeModelId || null);
+    const modelChanged =
+      (credential?.modelId ?? null) !== (activeModelId || null);
     if (isOpenAiCompatible) {
       if (!effectiveBaseUrl || !modelId.trim()) return;
     } else if (savingLimitOnly) {
@@ -642,8 +737,13 @@ export function ModelSettingsOverlay({
     } else if (apiKey.trim().length < 8) {
       return;
     }
-    const parsedMaxTokens = maxTokens.trim() ? parseModelMaxTokens(maxTokens) : undefined;
-    if ((isOpenAiCompatible || maxTokens.trim()) && parsedMaxTokens === undefined) {
+    const parsedMaxTokens = maxTokens.trim()
+      ? parseModelMaxTokens(maxTokens)
+      : undefined;
+    if (
+      (isOpenAiCompatible || maxTokens.trim()) &&
+      parsedMaxTokens === undefined
+    ) {
       setError(
         t`Enter a whole number from 1 to ${MAX_MODEL_MAX_TOKENS} for maximum output tokens.`,
       );
@@ -662,7 +762,9 @@ export function ModelSettingsOverlay({
       return;
     }
     const maxImagesPerPromptInput =
-      supportsImages && !maxImagesPerPrompt.trim() ? null : parsedMaxImagesPerPrompt;
+      supportsImages && !maxImagesPerPrompt.trim()
+        ? null
+        : parsedMaxImagesPerPrompt;
     const parsedContextWindow = isOpenAiCompatible
       ? parseModelContextWindow(contextWindow)
       : undefined;
@@ -702,18 +804,20 @@ export function ModelSettingsOverlay({
               // A limits-only save leaves the stored effort alone while the model
               // stays put. Changing the model sends the clamped level, including
               // null, so the previous model's effort is not reused.
-              ...(!savingLimitOnly || modelChanged ? { thinkingLevel: stagedThinking } : {}),
+              ...(!savingLimitOnly || modelChanged
+                ? { thinkingLevel: stagedThinking }
+                : {}),
               maxTokens: parsedMaxTokens ?? null,
               label: selected.providerName ?? selected.provider,
             },
       );
       setApiKey("");
-      await refresh();
+      const next = await refresh();
       detailScrollRef.current?.scrollTo({ top: 0 });
       setNotice(
         isOpenAiCompatible || savingLimitOnly
           ? t`Saved.`
-          : t`Connected and using ${selected.label}.`,
+          : connectedNotice(next?.credentials, selected.label),
       );
     } catch (err) {
       setError(errorText(err, t`Could not connect this provider`));
@@ -728,13 +832,26 @@ export function ModelSettingsOverlay({
     setError(null);
     setNotice(null);
     setPending("disconnect");
+    const wasDefault = credential.isDefault;
     try {
       await rpc.models.disconnect({ provider: selected.provider });
       setApiKey("");
       setThinkingLevel(null);
-      await refresh();
+      const next = await refresh();
       detailScrollRef.current?.scrollTo({ top: 0 });
-      setNotice(t`Disconnected ${selected.providerName ?? selected.provider}.`);
+      const name = selected.providerName ?? selected.provider;
+      const fallback = next
+        ? (next.catalog.find(
+            (entry) =>
+              entry.provider === next.me.defaultProvider &&
+              entry.id === next.me.defaultModel,
+          )?.label ?? next.me.defaultModel)
+        : "";
+      setNotice(
+        wasDefault && fallback
+          ? t`Disconnected ${name}. Bots now use ${fallback}.`
+          : t`Disconnected ${name}.`,
+      );
     } catch (err) {
       setError(errorText(err, t`Could not disconnect this provider`));
     } finally {
@@ -761,11 +878,14 @@ export function ModelSettingsOverlay({
     });
   }
 
-  function renderProviderRow(group: (typeof groups)[number], connectedSection: boolean) {
+  function renderProviderRow(
+    group: (typeof groups)[number],
+    connectedSection: boolean,
+  ) {
     const rowCredential = credentialByProvider.get(group.id);
     const savedModelLabel = rowCredential?.modelId
-      ? (group.entries.find((entry) => entry.id === rowCredential.modelId)?.label ??
-        rowCredential.modelId)
+      ? (group.entries.find((entry) => entry.id === rowCredential.modelId)
+          ?.label ?? rowCredential.modelId)
       : null;
     return (
       <button
@@ -774,17 +894,25 @@ export function ModelSettingsOverlay({
         aria-current={group.id === provider ? "true" : undefined}
         onClick={() => chooseProvider(group.id)}
         className={`flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-start last:border-0 ${
-          group.id === provider ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+          group.id === provider
+            ? "bg-accent text-accent-foreground"
+            : "hover:bg-accent/50"
         }`}
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] text-foreground">{group.name}</span>
+          <span className="block truncate text-[15px] text-foreground">
+            {group.name}
+          </span>
           <span className="mt-0.5 block truncate text-[12px] text-muted-foreground/80">
             {connectedSection && savedModelLabel ? (
               savedModelLabel
             ) : (
               <>
-                <Plural value={group.entries.length} one="# model" other="# models" />
+                <Plural
+                  value={group.entries.length}
+                  one="# model"
+                  other="# models"
+                />
                 {" · "}
                 {localizedProviderHint(group.entries[0]!)}
               </>
@@ -793,7 +921,11 @@ export function ModelSettingsOverlay({
         </span>
         {inUseProviderIds.has(group.id) ? (
           <span className="text-[12px] text-muted-foreground">
-            {connectedProviderIds.has(group.id) ? <Trans>In use</Trans> : <Trans>Included</Trans>}
+            {connectedProviderIds.has(group.id) ? (
+              <Trans>In use</Trans>
+            ) : (
+              <Trans>Included</Trans>
+            )}
           </span>
         ) : !connectedSection && rowCredential ? (
           <span className="text-[12px] text-success">
@@ -823,7 +955,9 @@ export function ModelSettingsOverlay({
             options={modelsForProvider.map((entry) => ({
               ...entry,
               value: entry.id,
-              badgeLabel: entry.billing.toLowerCase().includes("free") ? t`Free` : undefined,
+              badgeLabel: entry.billing.toLowerCase().includes("free")
+                ? t`Free`
+                : undefined,
             }))}
             label={t`Model`}
             searchLabel={t`Search models`}
@@ -836,10 +970,14 @@ export function ModelSettingsOverlay({
               selectionRevisionRef.current += 1;
               invalidatePreflight();
               setModelId(nextModelId);
-              const nextEntry = modelsForProvider.find((entry) => entry.id === nextModelId);
+              const nextEntry = modelsForProvider.find(
+                (entry) => entry.id === nextModelId,
+              );
               setThinkingLevel(
                 clampCatalogThinkingLevel(
-                  nextModelId === credential?.modelId ? credential?.thinkingLevel : null,
+                  nextModelId === credential?.modelId
+                    ? credential?.thinkingLevel
+                    : null,
                   nextEntry?.thinkingLevels,
                 ) as ThinkingLevel | null,
               );
@@ -873,7 +1011,9 @@ export function ModelSettingsOverlay({
               disabled={busy}
               onChange={(event) => {
                 selectionRevisionRef.current += 1;
-                setThinkingLevel((event.target.value || null) as ThinkingLevel | null);
+                setThinkingLevel(
+                  (event.target.value || null) as ThinkingLevel | null,
+                );
                 setNotice(null);
               }}
             >
@@ -893,7 +1033,9 @@ export function ModelSettingsOverlay({
           </label>
         ) : null}
         {selected.billing && credential && !usingServerCredentials ? (
-          <p className="mt-2 text-[13px] leading-[1.5] text-muted-foreground">{selected.billing}</p>
+          <p className="mt-2 text-[13px] leading-[1.5] text-muted-foreground">
+            {selected.billing}
+          </p>
         ) : null}
       </>
     ) : null;
@@ -933,7 +1075,8 @@ export function ModelSettingsOverlay({
                         >
                           {new URL(oauth.verificationUri).hostname}
                         </a>
-                        . The final page may not load; paste its URL or code here.
+                        . The final page may not load; paste its URL or code
+                        here.
                       </Trans>
                     )}
                   </p>
@@ -1064,7 +1207,10 @@ export function ModelSettingsOverlay({
             )}
           </Button>
           {preflightTarget === "sign-in" ? (
-            <ModelPreflightFeedback success={preflightSuccess} failure={preflightFailure} />
+            <ModelPreflightFeedback
+              success={preflightSuccess}
+              failure={preflightFailure}
+            />
           ) : null}
         </div>
       ) : null}
@@ -1137,7 +1283,9 @@ export function ModelSettingsOverlay({
                 id="model-api-key"
                 value={apiKey}
                 onChange={(event) => updateApiKey(event.target.value)}
-                placeholder={credential?.hasKey ? t`Paste a replacement key` : "sk-…"}
+                placeholder={
+                  credential?.hasKey ? t`Paste a replacement key` : "sk-…"
+                }
                 type="password"
                 autoComplete="new-password"
                 className="mt-2 h-10 text-foreground"
@@ -1160,7 +1308,10 @@ export function ModelSettingsOverlay({
                 )}
               </Button>
               {preflightTarget === "api-key" ? (
-                <ModelPreflightFeedback success={preflightSuccess} failure={preflightFailure} />
+                <ModelPreflightFeedback
+                  success={preflightSuccess}
+                  failure={preflightFailure}
+                />
               ) : null}
             </>
           ) : null}
@@ -1170,7 +1321,9 @@ export function ModelSettingsOverlay({
             className="mt-3 rounded-full"
             size="sm"
             disabled={
-              busy || !cloudflareRoutingReady || (!builtinLimitSave && apiKey.trim().length < 8)
+              busy ||
+              !cloudflareRoutingReady ||
+              (!builtinLimitSave && apiKey.trim().length < 8)
             }
             onClick={() => void connectKey()}
           >
@@ -1190,8 +1343,8 @@ export function ModelSettingsOverlay({
       {selected?.auth === "oauth" && !subscriptionSignIn ? (
         <p className="mt-5 text-sm leading-[1.5] text-muted-foreground first:mt-0">
           <Trans>
-            This subscription sign-in is not available in Praci yet. Use a deployment credential or
-            choose another provider.
+            This subscription sign-in is not available in Praci yet. Use a
+            deployment credential or choose another provider.
           </Trans>
         </p>
       ) : null}
@@ -1210,7 +1363,9 @@ export function ModelSettingsOverlay({
           aria-label={t`API key`}
           value={apiKey}
           onChange={(event) => updateApiKey(event.target.value)}
-          placeholder={credential?.hasKey ? t`Paste a replacement key` : t`Optional`}
+          placeholder={
+            credential?.hasKey ? t`Paste a replacement key` : t`Optional`
+          }
           type="password"
           autoComplete="new-password"
           className="mt-2 h-10 text-foreground"
@@ -1257,8 +1412,8 @@ export function ModelSettingsOverlay({
     <Trans>Models for the server owner’s default space.</Trans>
   ) : (
     <Trans>
-      The AI your bots think with. They already have one, so change this only to use another AI
-      company or your own key.
+      The AI your bots think with. They already have one, so change this only to
+      use another AI company or your own key.
     </Trans>
   );
 
@@ -1275,7 +1430,13 @@ export function ModelSettingsOverlay({
             </DialogDescription>
           </div>
           <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t`Close model settings`} />}
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t`Close model settings`}
+              />
+            }
           >
             <X />
           </DialogClose>
@@ -1321,7 +1482,9 @@ export function ModelSettingsOverlay({
                     <p className="border-b border-border px-3.5 pb-1.5 pt-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
                       <Trans>Connected</Trans>
                     </p>
-                    {connectedGroups.map((group) => renderProviderRow(group, true))}
+                    {connectedGroups.map((group) =>
+                      renderProviderRow(group, true),
+                    )}
                     {otherGroups.length ? (
                       <p className="border-b border-border px-3.5 pb-1.5 pt-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
                         <Trans>All providers</Trans>
@@ -1329,7 +1492,9 @@ export function ModelSettingsOverlay({
                     ) : null}
                   </>
                 ) : null}
-                {shownOtherGroups.map((group) => renderProviderRow(group, false))}
+                {shownOtherGroups.map((group) =>
+                  renderProviderRow(group, false),
+                )}
                 {shownOtherGroups.length < otherGroups.length ? (
                   <Button
                     variant="ghost"
@@ -1402,11 +1567,18 @@ export function ModelSettingsOverlay({
                       disabled={busy || probing || !effectiveBaseUrl}
                       onClick={() => void probeServerModels()}
                     >
-                      {probing ? <Trans>Finding…</Trans> : <Trans>Find models</Trans>}
+                      {probing ? (
+                        <Trans>Finding…</Trans>
+                      ) : (
+                        <Trans>Find models</Trans>
+                      )}
                     </Button>
                   </div>
                   {preflightTarget === "compatible" ? (
-                    <ModelPreflightFeedback success={null} failure={preflightFailure} />
+                    <ModelPreflightFeedback
+                      success={null}
+                      failure={preflightFailure}
+                    />
                   ) : null}
                   <div className="mt-4 block">
                     <span>
@@ -1429,7 +1601,10 @@ export function ModelSettingsOverlay({
                         emptyLabel={t`No matching models`}
                         loadingLabel={t`Loading models…`}
                         options={[
-                          ...probeModels.map((id) => ({ value: id, label: id })),
+                          ...probeModels.map((id) => ({
+                            value: id,
+                            label: id,
+                          })),
                           { value: "", label: t`Other model…` },
                         ]}
                       />
@@ -1564,7 +1739,9 @@ export function ModelSettingsOverlay({
                     className="group mt-6 border-t border-border pt-4 text-sm text-muted-foreground"
                     open={ownKeyProvider === provider}
                     onToggle={(event) =>
-                      setOwnKeyProvider(event.currentTarget.open ? provider : null)
+                      setOwnKeyProvider(
+                        event.currentTarget.open ? provider : null,
+                      )
                     }
                   >
                     <summary className={DISCLOSURE_SUMMARY}>
@@ -1591,24 +1768,29 @@ export function ModelSettingsOverlay({
                     className="group mt-5 text-sm text-muted-foreground"
                     open={ownKeyProvider === provider}
                     onToggle={(event) =>
-                      setOwnKeyProvider(event.currentTarget.open ? provider : null)
+                      setOwnKeyProvider(
+                        event.currentTarget.open ? provider : null,
+                      )
                     }
                   >
                     <summary className={DISCLOSURE_SUMMARY}>
                       <DisclosureChevron />
                       <Trans>Use your own key</Trans>
                     </summary>
-                    <div className="mt-5">{connectionControls}</div>
-                    <div className="mt-6">{catalogModelConfig}</div>
+                    <div className="mt-5">{catalogModelConfig}</div>
+                    <div className="mt-6">{connectionControls}</div>
                   </details>
                 </>
               ) : (
                 <>
                   <p className="text-sm leading-[1.5] text-muted-foreground">
-                    <Trans>Connect {selectedProviderName} to use it as your personal model.</Trans>
+                    <Trans>
+                      Connect {selectedProviderName} to use it as your personal
+                      model.
+                    </Trans>
                   </p>
-                  {connectionControls}
-                  <div className="mt-6">{catalogModelConfig}</div>
+                  <div className="mt-5">{catalogModelConfig}</div>
+                  <div className="mt-6">{connectionControls}</div>
                 </>
               )}
             </>
@@ -1661,15 +1843,24 @@ export function ModelSettingsOverlay({
   if (embedded) {
     const modelLabel = defaultModelLabel;
     // Not while loading: the full panel's own skeleton shows instead of a line that then changes.
-    const simple = !ownOpen && !!me && !me.needsModel && credentials.length === 0;
+    const simple =
+      !ownOpen && !!me && !me.needsModel && credentials.length === 0;
     return (
-      <div data-testid="model-settings" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        data-testid="model-settings"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
         {!me && loading ? (
-          <Skeleton data-testid="provider-skeleton" className="mx-6 h-10 sm:mx-8" />
+          <Skeleton
+            data-testid="provider-skeleton"
+            className="mx-6 h-10 sm:mx-8"
+          />
         ) : simple ? (
           <section className="mx-6 flex flex-col items-start gap-3 rounded-xl border border-border px-4 py-4 sm:mx-8">
             <p className="text-[14px] text-foreground/75">
-              {modelLabel ? t`Your bots use ${modelLabel}.` : t`Your bots already have a model.`}
+              {modelLabel
+                ? t`Your bots use ${modelLabel}.`
+                : t`Your bots already have a model.`}
             </p>
             <Button
               variant="outline"
@@ -1695,7 +1886,11 @@ export function ModelSettingsOverlay({
                     disabled={switchDisabled}
                     onClick={() => onViewChange?.(next)}
                   >
-                    {next === "model" ? <Trans>Model</Trans> : <Trans>Voice</Trans>}
+                    {next === "model" ? (
+                      <Trans>Model</Trans>
+                    ) : (
+                      <Trans>Voice</Trans>
+                    )}
                   </Button>
                 ))}
               </div>
@@ -1744,7 +1939,8 @@ function EmbeddingModelField() {
         setLoaded(true);
       })
       .catch((error) => {
-        if (live) setFailed(errorText(error, t`Could not load the embedding model`));
+        if (live)
+          setFailed(errorText(error, t`Could not load the embedding model`));
       });
     return () => {
       live = false;

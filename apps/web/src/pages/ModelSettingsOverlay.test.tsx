@@ -12,7 +12,9 @@ const models = vi.hoisted(() => ({
   embeddingModel: vi.fn(async () => ({ modelId: null })),
   setEmbeddingModel: vi.fn(),
   autoFileEmail: vi.fn(async () => ({ enabled: true })),
-  setAutoFileEmail: vi.fn(async ({ enabled }: { enabled: boolean }) => ({ enabled })),
+  setAutoFileEmail: vi.fn(async ({ enabled }: { enabled: boolean }) => ({
+    enabled,
+  })),
   credentials: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
@@ -38,21 +40,36 @@ vi.mock("../lib/localized-provider-hint", () => ({
 vi.mock("@lingui/react/macro", () => {
   const t = (parts: TemplateStringsArray, ...values: unknown[]) =>
     parts.reduce(
-      (text, part, index) => `${text}${index > 0 ? String(values[index - 1]) : ""}${part}`,
+      (text, part, index) =>
+        `${text}${index > 0 ? String(values[index - 1]) : ""}${part}`,
       "",
     );
   return {
     useLingui: () => ({ t }),
     Trans: ({ children }: { children?: ReactNode }) => children,
-    Plural: ({ one, other, value }: { one: string; other: string; value: number }) =>
-      value === 1 ? one : other,
+    Plural: ({
+      one,
+      other,
+      value,
+    }: {
+      one: string;
+      other: string;
+      value: number;
+    }) => (value === 1 ? one : other),
   };
 });
 vi.mock("@rakazo/ui-web", () => {
-  const Pass = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+  const Pass = ({ children }: { children?: ReactNode }) => (
+    <div>{children}</div>
+  );
   return {
-    AlertDialog: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
-      open ? <div>{children}</div> : null,
+    AlertDialog: ({
+      open,
+      children,
+    }: {
+      open?: boolean;
+      children?: ReactNode;
+    }) => (open ? <div>{children}</div> : null),
     AlertDialogAction: ({
       children,
       onClick,
@@ -66,7 +83,13 @@ vi.mock("@rakazo/ui-web", () => {
         {children}
       </button>
     ),
-    AlertDialogCancel: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) => (
+    AlertDialogCancel: ({
+      children,
+      onClick,
+    }: {
+      children?: ReactNode;
+      onClick?: () => void;
+    }) => (
       <button type="button" onClick={onClick}>
         {children}
       </button>
@@ -97,7 +120,9 @@ vi.mock("@rakazo/ui-web", () => {
     Input: (props: ComponentProps<"input">) => <input {...props} />,
     ModelThinkingOptions: () => null,
     NativeSelect: (props: ComponentProps<"select">) => <select {...props} />,
-    NativeSelectOption: (props: ComponentProps<"option">) => <option {...props} />,
+    NativeSelectOption: (props: ComponentProps<"option">) => (
+      <option {...props} />
+    ),
     Skeleton: (props: ComponentProps<"div">) => <div {...props} />,
   };
 });
@@ -159,7 +184,8 @@ function buttons(container: HTMLElement, text: string) {
 
 function keyField(container: HTMLElement) {
   const input = container.querySelector("#model-api-key");
-  if (!(input instanceof HTMLInputElement)) throw new Error("Missing API key field");
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Missing API key field");
   return input;
 }
 
@@ -167,13 +193,17 @@ function compatibleKeyField(container: HTMLElement) {
   const input = [...container.querySelectorAll("input")].find(
     (entry) => entry.getAttribute("aria-label") === "API key",
   );
-  if (!(input instanceof HTMLInputElement)) throw new Error("Missing compatible API key field");
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Missing compatible API key field");
   return input;
 }
 
 async function typeInto(input: HTMLInputElement, value: string) {
   await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
     setter?.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
@@ -187,14 +217,20 @@ async function renderSettings(focusProvider?: string, ownModel = true) {
   const root = createRoot(container);
   await act(async () => {
     root.render(
-      <ModelSettingsOverlay embedded onClose={() => undefined} focusProvider={focusProvider} />,
+      <ModelSettingsOverlay
+        embedded
+        onClose={() => undefined}
+        focusProvider={focusProvider}
+      />,
     );
   });
   await act(async () => {
     await Promise.resolve();
   });
   const open = ownModel
-    ? [...container.querySelectorAll("button")].find((b) => b.textContent === "Use my own model")
+    ? [...container.querySelectorAll("button")].find(
+        (b) => b.textContent === "Use my own model",
+      )
     : undefined;
   if (open) await act(async () => open.click());
   return {
@@ -209,6 +245,12 @@ async function renderSettings(focusProvider?: string, ownModel = true) {
 }
 
 beforeEach(() => {
+  for (const name of ["scrollTo", "scrollIntoView"]) {
+    Object.defineProperty(Element.prototype, name, {
+      configurable: true,
+      value: vi.fn(),
+    });
+  }
   vi.mocked(rpc.me).mockResolvedValue(account("deepseek", "deepseek-chat"));
   models.list.mockResolvedValue([deepseekEntry]);
   models.credentials.mockResolvedValue([]);
@@ -234,11 +276,15 @@ it("saves a typed Data room embedding id unchanged and resets it to the default"
     configurable: true,
     value: vi.fn(),
   });
-  models.setEmbeddingModel.mockImplementation(async ({ modelId }: { modelId: string | null }) => ({
-    modelId,
-  }));
+  models.setEmbeddingModel.mockImplementation(
+    async ({ modelId }: { modelId: string | null }) => ({
+      modelId,
+    }),
+  );
   const view = await renderSettings();
-  const trigger = view.container.querySelector<HTMLButtonElement>("#data-room-embedding-model")!;
+  const trigger = view.container.querySelector<HTMLButtonElement>(
+    "#data-room-embedding-model",
+  )!;
   trigger.closest("details")!.open = true;
   await act(async () => trigger.click());
   await typeInto(
@@ -248,14 +294,18 @@ it("saves a typed Data room embedding id unchanged and resets it to the default"
   await act(async () => {
     document
       .querySelector("input[aria-label='Model id']")!
-      .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
   });
-  expect(models.setEmbeddingModel).toHaveBeenLastCalledWith({ modelId: "sample/embedding-v2" });
+  expect(models.setEmbeddingModel).toHaveBeenLastCalledWith({
+    modelId: "sample/embedding-v2",
+  });
   expect(trigger.textContent).toContain("sample/embedding-v2");
   await act(async () => trigger.click());
-  const reset = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-    (option) => option.textContent === "Default",
-  )!;
+  const reset = [
+    ...document.querySelectorAll<HTMLElement>('[role="option"]'),
+  ].find((option) => option.textContent === "Default")!;
   await act(async () => reset.click());
   expect(models.setEmbeddingModel).toHaveBeenLastCalledWith({ modelId: null });
   await view.unmount();
@@ -297,7 +347,10 @@ it("shows a stored BYOK key when provider settings reopen", async () => {
       await Promise.resolve();
     });
     expect(models.connect).toHaveBeenCalledWith(
-      expect.objectContaining({ provider: "deepseek", apiKey: "sk-replacement-key" }),
+      expect.objectContaining({
+        provider: "deepseek",
+        apiKey: "sk-replacement-key",
+      }),
     );
     expect(keyField(view.container).value).toBe("");
     expect(keyField(view.container).placeholder).toBe(STORED_PLACEHOLDER);
@@ -327,7 +380,9 @@ it("says no model is active, not the saved default, while no model is set up", a
     needsModel: true,
   });
   const view = await renderSettings();
-  expect(view.container.textContent).toContain("Pick a provider below and connect it.");
+  expect(view.container.textContent).toContain(
+    "Pick a provider below and connect it.",
+  );
   expect(view.container.textContent).not.toContain("Active model");
   // The detail names the provider it is about, since none is marked as connected yet.
   expect(view.container.textContent).toContain(
@@ -430,7 +485,9 @@ it("focuses the stored key's replace field when opened from a rejected key", asy
     expect(document.activeElement).toBe(keyField(view.container));
     // With no new key typed, the button under the field says what it would do.
     expect(view.container.textContent).not.toContain("Save limits");
-    expect(buttons(view.container, "Replace API key").at(-1)?.disabled).toBe(true);
+    expect(buttons(view.container, "Replace API key").at(-1)?.disabled).toBe(
+      true,
+    );
   } finally {
     await view.unmount();
   }
@@ -479,10 +536,18 @@ it("shows Cloudflare account and gateway fields for a new and a saved connection
   const saved = await renderSettings();
   try {
     expect(
-      (saved.container.querySelector("#cloudflare-account-id") as HTMLInputElement).value,
+      (
+        saved.container.querySelector(
+          "#cloudflare-account-id",
+        ) as HTMLInputElement
+      ).value,
     ).toBe("acct1234");
     expect(
-      (saved.container.querySelector("#cloudflare-gateway-id") as HTMLInputElement).value,
+      (
+        saved.container.querySelector(
+          "#cloudflare-gateway-id",
+        ) as HTMLInputElement
+      ).value,
     ).toBe("gateway-1");
   } finally {
     await saved.unmount();
@@ -490,7 +555,9 @@ it("shows Cloudflare account and gateway fields for a new and a saved connection
 });
 
 it("shows a stored OpenAI-compatible key and stays empty when none is saved", async () => {
-  vi.mocked(rpc.me).mockResolvedValue(account("openai-compatible", "deepseek-chat"));
+  vi.mocked(rpc.me).mockResolvedValue(
+    account("openai-compatible", "deepseek-chat"),
+  );
   models.list.mockResolvedValue([compatibleEntry]);
   models.credentials.mockResolvedValue([
     {
@@ -541,8 +608,18 @@ it("lists the server's own provider as In use, not Connected, ahead of the A-Z l
     hostCredentialSource: "environment",
   } as never);
   models.list.mockResolvedValue([
-    { ...deepseekEntry, provider: "amazon", providerName: "Amazon Bedrock", id: "a" },
-    { ...deepseekEntry, provider: "openrouter", providerName: "OpenRouter", id: "or-model" },
+    {
+      ...deepseekEntry,
+      provider: "amazon",
+      providerName: "Amazon Bedrock",
+      id: "a",
+    },
+    {
+      ...deepseekEntry,
+      provider: "openrouter",
+      providerName: "OpenRouter",
+      id: "or-model",
+    },
   ]);
   const view = await renderSettings();
   try {
@@ -553,7 +630,9 @@ it("lists the server's own provider as In use, not Connected, ahead of the A-Z l
     // No key is stored, so nothing is "Connected" or "In use"; the server's model is "Included".
     expect(text).toContain("Included");
     expect(text).not.toContain("Connected");
-    expect(text.indexOf("OpenRouter")).toBeLessThan(text.indexOf("Amazon Bedrock"));
+    expect(text.indexOf("OpenRouter")).toBeLessThan(
+      text.indexOf("Amazon Bedrock"),
+    );
   } finally {
     await view.unmount();
   }
@@ -566,8 +645,18 @@ it("marks In use on the provider of the active model only, not also the server's
     hostCredentialSource: "environment",
   } as never);
   models.list.mockResolvedValue([
-    { ...deepseekEntry, provider: "amazon", providerName: "Amazon Bedrock", id: "a" },
-    { ...deepseekEntry, provider: "openrouter", providerName: "OpenRouter", id: "or-model" },
+    {
+      ...deepseekEntry,
+      provider: "amazon",
+      providerName: "Amazon Bedrock",
+      id: "a",
+    },
+    {
+      ...deepseekEntry,
+      provider: "openrouter",
+      providerName: "OpenRouter",
+      id: "or-model",
+    },
   ]);
   const view = await renderSettings();
   try {
@@ -582,7 +671,9 @@ it("shows a skeleton, not 'No providers found', while the catalog loads", async 
   const view = await renderSettings();
   try {
     expect(view.container.textContent).not.toContain("No providers found");
-    expect(view.container.querySelector("[data-testid='provider-skeleton']")).not.toBeNull();
+    expect(
+      view.container.querySelector("[data-testid='provider-skeleton']"),
+    ).not.toBeNull();
   } finally {
     await view.unmount();
   }
@@ -601,7 +692,9 @@ it("says no providers were found once an empty catalog has loaded", async () => 
 it("keeps the Data room attachment setting out of Models", async () => {
   const view = await renderSettings();
   try {
-    expect(view.container.textContent).not.toContain("Add email attachments to the Data room");
+    expect(view.container.textContent).not.toContain(
+      "Add email attachments to the Data room",
+    );
   } finally {
     await view.unmount();
   }
@@ -609,7 +702,12 @@ it("keeps the Data room attachment setting out of Models", async () => {
 
 it("lists common providers first and reveals the rest behind More", async () => {
   models.list.mockResolvedValue([
-    { ...deepseekEntry, provider: "anthropic", providerName: "Anthropic", id: "c" },
+    {
+      ...deepseekEntry,
+      provider: "anthropic",
+      providerName: "Anthropic",
+      id: "c",
+    },
     { ...deepseekEntry, provider: "zeta", providerName: "Zeta AI", id: "z" },
   ]);
   const view = await renderSettings();
@@ -628,10 +726,14 @@ it("lists common providers first and reveals the rest behind More", async () => 
 it("shows one line and one action on the system model, and opens the providers on request", async () => {
   const view = await renderSettings(undefined, false);
   try {
-    expect(view.container.textContent).toContain("Your bots use DeepSeek Chat.");
+    expect(view.container.textContent).toContain(
+      "Your bots use DeepSeek Chat.",
+    );
     expect(view.container.textContent).not.toContain("Providers");
     expect(view.container.querySelectorAll("button")).toHaveLength(1);
-    await act(async () => buttons(view.container, "Use my own model")[0]?.click());
+    await act(async () =>
+      buttons(view.container, "Use my own model")[0]?.click(),
+    );
     expect(view.container.textContent).toContain("Providers");
     expect(view.container.textContent).toContain("Data room search model");
     // The key form is already open: one click, not a second disclosure.
@@ -662,9 +764,112 @@ it("disables the Model and Voice switch while a voice change is pending", async 
       />,
     );
   });
-  const pills = [...container.querySelectorAll("button[aria-pressed]")] as HTMLButtonElement[];
+  const pills = [
+    ...container.querySelectorAll("button[aria-pressed]"),
+  ] as HTMLButtonElement[];
   expect(pills).toHaveLength(2);
   expect(pills.every((b) => b.disabled)).toBe(true);
   await act(async () => root.unmount());
   container.remove();
+});
+
+const mistralEntry = {
+  provider: "mistral",
+  providerName: "Mistral",
+  id: "mistral-medium",
+  label: "Mistral Medium",
+  billing: "API key",
+  auth: "api-key" as const,
+  authHint: "API key",
+};
+const deepseekCredential = {
+  id: "cred-deepseek",
+  provider: "deepseek",
+  label: "DeepSeek",
+  hasKey: true,
+  isDefault: true,
+  modelId: "deepseek-chat",
+};
+const mistralCredential = {
+  id: "cred-mistral",
+  provider: "mistral",
+  label: "Mistral",
+  hasKey: true,
+  isDefault: false,
+  modelId: "mistral-medium",
+};
+
+function providerRow(container: HTMLElement, name: string) {
+  const row = [...container.querySelectorAll("button")].find((b) =>
+    b.textContent?.startsWith(name),
+  );
+  if (!row) throw new Error(`Missing provider row: ${name}`);
+  return row;
+}
+
+it("shows the Model field before the API key field on an unconnected provider", async () => {
+  models.list.mockResolvedValue([deepseekEntry, mistralEntry]);
+  models.credentials.mockResolvedValue([deepseekCredential]);
+  const view = await renderSettings();
+  try {
+    await act(async () => providerRow(view.container, "Mistral").click());
+    const label = [...view.container.querySelectorAll("span")].find(
+      (s) => s.textContent === "Model",
+    )!;
+    const position = label.compareDocumentPosition(keyField(view.container));
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("says Connected. and offers Use this model when a second provider joins a default", async () => {
+  models.list.mockResolvedValue([deepseekEntry, mistralEntry]);
+  models.credentials.mockResolvedValue([deepseekCredential]);
+  const view = await renderSettings();
+  try {
+    await act(async () => providerRow(view.container, "Mistral").click());
+    await typeInto(keyField(view.container), "sk-mistral-key");
+    models.credentials.mockResolvedValue([
+      deepseekCredential,
+      mistralCredential,
+    ]);
+    await act(async () => {
+      buttons(view.container, "Connect API key")[0]?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const text = view.container.textContent ?? "";
+    expect(text).toContain("Connected.");
+    expect(text).not.toContain("Connected and using");
+    expect(buttons(view.container, "Use this model").length).toBeGreaterThan(0);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("names the model the bots fall back to when the default is disconnected", async () => {
+  models.list.mockResolvedValue([deepseekEntry, mistralEntry]);
+  models.credentials.mockResolvedValue([deepseekCredential, mistralCredential]);
+  const view = await renderSettings();
+  try {
+    vi.mocked(rpc.me).mockResolvedValue(account("mistral", "mistral-medium"));
+    models.credentials.mockResolvedValue([mistralCredential]);
+    await act(async () => {
+      buttons(view.container, "Disconnect")[0]?.click();
+    });
+    const confirm = buttons(view.container, "Disconnect");
+    await act(async () => {
+      confirm[confirm.length - 1]?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(view.container.textContent).toContain(
+      "Disconnected DeepSeek. Bots now use Mistral Medium.",
+    );
+  } finally {
+    await view.unmount();
+  }
 });
