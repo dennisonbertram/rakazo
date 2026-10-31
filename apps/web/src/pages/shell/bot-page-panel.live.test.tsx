@@ -28,6 +28,10 @@ vi.mock("@lingui/core/macro", () => ({
 }));
 vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
+  useLingui: () => ({
+    t: (parts: TemplateStringsArray, ...values: unknown[]) =>
+      parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
+  }),
 }));
 
 import { setHideAmounts } from "../../lib/hide-amounts-preference";
@@ -289,4 +293,47 @@ it("Share makes the snapshot link and Stop sharing revokes the snapshot artifact
   );
   expect(revoke).toHaveBeenCalledWith({ artifactId: "art1" });
   expect(document.querySelector("input[readonly]")).toBeNull();
+});
+
+it("puts the single Page options button in the header row on the full-width page", async () => {
+  await render({ fixedPageId: "p1" });
+  const buttons = container.querySelectorAll('[aria-label="Page options"]');
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]?.closest("[data-page-header]")).not.toBeNull();
+  expect(container.querySelector("h1")?.textContent).toBe("Cash");
+});
+
+it("keeps the options menu out of a page header in the docked panel", async () => {
+  await render();
+  expect(container.querySelector("[data-page-header]")).toBeNull();
+});
+
+it("leaves Markdown table borders out of live tables", async () => {
+  await render();
+  const cls = container.querySelector('[role="textbox"]')?.getAttribute("class") ?? "";
+  expect(cls).not.toMatch(/(^|\s)\[&_td\]:border/);
+  expect(cls).toContain("[&_table:not([data-slot=table])_td]:border");
+});
+
+it("opens the review from a pending block on the full-width page only", async () => {
+  mocks.data.mockResolvedValue({
+    ...data(""),
+    blocks: [
+      { status: "pending", fetchedAt: null },
+      { status: "pending", fetchedAt: null },
+    ],
+  });
+  const onReview = vi.fn();
+  await render({ fixedPageId: "p1", onReview });
+  const link = [...container.querySelectorAll("button")].find((b) =>
+    b.textContent?.includes("Waiting for approval"),
+  );
+  await act(async () => link?.click());
+  expect(onReview).toHaveBeenCalled();
+  await render({ fixedPageId: undefined, onReview });
+  expect(
+    [...container.querySelectorAll("button")].some((b) =>
+      b.textContent?.includes("Waiting for approval"),
+    ),
+  ).toBe(false);
 });

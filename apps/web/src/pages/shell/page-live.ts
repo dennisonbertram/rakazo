@@ -8,6 +8,8 @@ export type PageLive = {
   refreshing: boolean;
   blocks: ReadonlyMap<string, PageLiveBlock>;
   refresh: () => void;
+  /** Opens where a pending source is approved; set only on the full-width page. */
+  onReview?: () => void;
 };
 
 export const PageLiveContext = createContext<PageLive>({
