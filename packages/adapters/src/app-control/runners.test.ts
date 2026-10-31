@@ -5,7 +5,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AgentDesktopAppControl } from "./agent-desktop.js";
 import { createAppControlProvider } from "./factory.js";
 import { FakeAppControl, InMemoryAppControlStore } from "./fake.js";
-import { bridgeAgentDesktopRunner, spawnAgentDesktopRunner } from "./runners.js";
+import {
+  AgentDesktopNotInstalledError,
+  bridgeAgentDesktopRunner,
+  spawnAgentDesktopRunner,
+} from "./runners.js";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -107,6 +111,17 @@ describe("spawnAgentDesktopRunner", () => {
     );
   });
 
+  it("throws the typed not-installed error when no binary is found", async () => {
+    const run = spawnAgentDesktopRunner({
+      privateDir: path.join(tmp(), "ad"),
+      binary: undefined,
+      env: { PATH: tmp(), NODE_ENV: "test" },
+    });
+    const result = await run(["list-apps"], { timeoutMs: 1000 }).catch((error: unknown) => error);
+    // Skip when a real install exists in the usual directories.
+    if (result instanceof Error) expect(result).toBeInstanceOf(AgentDesktopNotInstalledError);
+  });
+
   it("refuses to run outside development, tests and the desktop app", () => {
     expect(() =>
       spawnAgentDesktopRunner({ privateDir: tmp(), env: { NODE_ENV: "production" } }),
@@ -130,6 +145,19 @@ describe("bridgeAgentDesktopRunner", () => {
       runner: bridgeAgentDesktopRunner({ url: "http://host:1234/", token: TOKEN, fetch: fetcher }),
     };
   }
+
+  it("throws the typed not-installed error for the bridge's exit 127", async () => {
+    const b = bridge(() =>
+      Response.json({ exitCode: 127, stdout: "", stderr: "agent-desktop not found" }),
+    );
+    await expect(b.runner(["status"], { timeoutMs: 1000 })).rejects.toBeInstanceOf(
+      AgentDesktopNotInstalledError,
+    );
+    const other = bridge(() => Response.json({ exitCode: 127, stdout: "", stderr: "other" }));
+    await expect(other.runner(["status"], { timeoutMs: 1000 })).resolves.toMatchObject({
+      exitCode: 127,
+    });
+  });
 
   it("posts argv with the bearer token and returns the result", async () => {
     const b = bridge(() => Response.json({ exitCode: 0, stdout: "{}", stderr: "" }));

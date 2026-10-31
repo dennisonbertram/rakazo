@@ -20,6 +20,7 @@ import type { AppControlApp } from "@rakazo/contracts";
 import { isDeniedApp } from "@rakazo/contracts";
 import { allowedEntry, requireActionableRef, requireKey } from "./policy.js";
 import type { AgentDesktopRunner } from "./runners.js";
+import { AgentDesktopNotInstalledError } from "./runners.js";
 
 /**
  * The only code that knows agent-desktop's argv and JSON envelopes. Every call is checked
@@ -332,6 +333,7 @@ export class AgentDesktopAppControl implements AppControlProvider {
       return {
         available: false,
         accessibility: "unknown",
+        ...(error instanceof AgentDesktopNotInstalledError ? { installed: false } : {}),
         reason: error instanceof Error ? error.message : "agent-desktop is unavailable.",
       };
     }

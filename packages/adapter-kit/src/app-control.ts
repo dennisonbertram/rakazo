@@ -29,6 +29,8 @@ export interface AppControlStatus {
   accessibility: "granted" | "denied" | "unknown";
   /** The host that runs agent-desktop, when known. */
   platform?: "macos" | "windows" | "linux";
+  /** False only when the agent-desktop binary is known to be missing. */
+  installed?: boolean;
   reason?: string;
 }
 

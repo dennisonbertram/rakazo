@@ -89,6 +89,24 @@ describe("appControl.status and appControl.apps", () => {
     });
   });
 
+  it("tells only the owner when agent-desktop is not installed", async () => {
+    const missing = {
+      status: async () => ({ available: false, accessibility: "unknown", installed: false }),
+    } as unknown as AppControlProvider;
+    const { call } = setup({ provider: missing });
+    expect((await call(owner, "appControl/status")).body.json).toMatchObject({
+      available: false,
+      needsInstall: true,
+    });
+    expect((await call(member, "appControl/status")).body.json).not.toHaveProperty("needsInstall");
+    const unreachable = {
+      status: async () => ({ available: false, accessibility: "unknown" }),
+    } as unknown as AppControlProvider;
+    expect(
+      (await setup({ provider: unreachable }).call(owner, "appControl/status")).body.json,
+    ).not.toHaveProperty("needsInstall");
+  });
+
   it("is unavailable without a provider or when the provider fails", async () => {
     expect(
       (await setup({ provider: null }).call(owner, "appControl/status")).body.json.available,

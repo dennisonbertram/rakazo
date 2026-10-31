@@ -3889,6 +3889,10 @@ msgstr ""
 msgid "Could not duplicate"
 msgstr ""
 
+#: src/components/BotAppControlSection.tsx
+msgid "Could not list apps"
+msgstr ""
+
 #: src/components/computer/FilesApp.tsx
 msgid "Could not list files"
 msgstr ""
@@ -7994,6 +7998,10 @@ msgstr ""
 
 #: src/components/integrations/IMessageSection.tsx
 msgid "Needs a server restart"
+msgstr ""
+
+#: src/components/BotAppControlSection.tsx
+msgid "Needs agent-desktop: <0>npm install -g agent-desktop</0>"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx

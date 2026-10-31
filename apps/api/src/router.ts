@@ -1994,6 +1994,7 @@ export function createRouter(deps: RouterDeps) {
             available: status.available,
             accessibility: status.accessibility,
             platform: status.platform ?? null,
+            ...(status.installed === false ? { needsInstall: true } : {}),
           };
         } catch {
           return none;

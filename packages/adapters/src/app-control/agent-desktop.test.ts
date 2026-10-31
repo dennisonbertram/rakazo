@@ -9,6 +9,7 @@ import { AgentDesktopAppControl } from "./agent-desktop.js";
 import { FakeAppControl, InMemoryAppControlStore } from "./fake.js";
 import calculatorSnapshot from "./fixtures/calculator-snapshot.json" with { type: "json" };
 import type { AgentDesktopRunner, AgentDesktopRunResult } from "./runners.js";
+import { AgentDesktopNotInstalledError } from "./runners.js";
 
 type Node = Record<string, unknown>;
 
@@ -799,5 +800,25 @@ describe("status on a bridged host", () => {
       accessibility: "granted",
       platform: "macos",
     });
+  });
+});
+
+describe("status when agent-desktop is missing", () => {
+  const providerFor = (runner: AgentDesktopRunner) =>
+    new AgentDesktopAppControl({ runner, store: new InMemoryAppControlStore(), platform: null });
+
+  it("flags a missing binary as not installed", async () => {
+    const status = await providerFor(async () => {
+      throw new AgentDesktopNotInstalledError();
+    }).status(context);
+    expect(status).toMatchObject({ available: false, installed: false });
+  });
+
+  it("sets no flag for any other runner error", async () => {
+    const status = await providerFor(async () => {
+      throw new Error("The app control bridge is unreachable.");
+    }).status(context);
+    expect(status.available).toBe(false);
+    expect(status).not.toHaveProperty("installed");
   });
 });

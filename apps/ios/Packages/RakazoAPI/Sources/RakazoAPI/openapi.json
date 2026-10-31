@@ -3826,6 +3826,9 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "needsInstall": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -28708,7 +28711,8 @@
                               "write_file",
                               "attach_file",
                               "open_path",
-                              "launch_app"
+                              "launch_app",
+                              "desktop_app"
                             ]
                           },
                           "command": {
@@ -131145,7 +131149,7 @@
         ]
       },
       "RpcBotsUpdateInputSchema22": {
-        "maxItems": 134,
+        "maxItems": 137,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
