@@ -3429,8 +3429,7 @@ msgstr ""
 msgid "Connected {0}."
 msgstr "Подключено: {0}."
 
-#. placeholder {0}: selected.label
-#. placeholder {0}: selectedLabelRef.current ?? "this model"
+#. placeholder {0}: label ?? "this model"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connected and using {0}."
 msgstr "Подключено и используется {0}."
@@ -3441,6 +3440,10 @@ msgstr ""
 
 #: src/pages/CompanyRefresh.tsx
 msgid "Connected Data Room sources require manual re-import."
+msgstr ""
+
+#: src/pages/ModelSettingsOverlay.tsx
+msgid "Connected."
 msgstr ""
 
 #: src/pages/shell/message-cards.tsx
@@ -5067,9 +5070,12 @@ msgstr ""
 msgid "Disconnected"
 msgstr ""
 
-#. placeholder {0}: selected.providerName ?? selected.provider
 #: src/pages/ModelSettingsOverlay.tsx
-msgid "Disconnected {0}."
+msgid "Disconnected {name}."
+msgstr ""
+
+#: src/pages/ModelSettingsOverlay.tsx
+msgid "Disconnected {name}. Bots now use {fallback}."
 msgstr ""
 
 #: src/pages/MemorySettingsOverlay.tsx
@@ -10817,7 +10823,6 @@ msgid "Round actions"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
-#: src/pages/Shell.tsx
 msgid "Routine"
 msgstr "Задача"
 
