@@ -1,3 +1,4 @@
+import { OPEN_DIALOG_SELECTOR } from "@rakazo/ui-web";
 import { useEffect, useRef } from "react";
 
 interface InboxKeyboard {
@@ -15,6 +16,8 @@ interface InboxKeyboard {
   hasPicked: boolean;
   /** Archives the checked rows when there are any, else the selected one. */
   archive: ((id: string | undefined) => void) | undefined;
+  /** Toggles read state of the selected row; the caller ignores ids that are not messages, such as groups. */
+  read: (id: string) => void;
   help: () => void;
 }
 
@@ -52,6 +55,7 @@ export function useInboxKeyboard(options: InboxKeyboard) {
         toggle,
         hasPicked,
         archive,
+        read,
         help,
       } = latest.current;
       if (!enabled || event.defaultPrevented) return;
@@ -60,8 +64,16 @@ export function useInboxKeyboard(options: InboxKeyboard) {
       if (target?.closest("input,textarea,select,[contenteditable],[role=menu],[role=tablist]"))
         return;
       // Keys pressed elsewhere on the screen, such as by the Inbox agent's message box, are not for the list.
-      if (target && target !== document.body && !target.closest("[data-inbox-page]")) return;
-      if (document.querySelector('[role="dialog"],[role="alertdialog"]')) return;
+      // Focus rests on the body, the main landmark or the current page's sidebar link after navigating.
+      if (
+        target &&
+        target !== document.body &&
+        target.id !== "main-content" &&
+        target.getAttribute("aria-current") !== "page" &&
+        !target.closest("[data-inbox-page]")
+      )
+        return;
+      if (document.querySelector(OPEN_DIALOG_SELECTOR)) return;
       const key = event.key;
       // A selection a filter or search has hidden is no selection.
       const selectedId = selection && ids.includes(selection) ? selection : undefined;
@@ -96,6 +108,9 @@ export function useInboxKeyboard(options: InboxKeyboard) {
       } else if (key === "e" && archive && (selectedId || hasPicked)) {
         event.preventDefault();
         archive(selectedId);
+      } else if (key === "u" && !event.repeat && selectedId) {
+        event.preventDefault();
+        read(selectedId);
       } else if (key === "?") {
         event.preventDefault();
         help();

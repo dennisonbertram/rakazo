@@ -370,12 +370,17 @@ function InboxMessage({
       if (step) {
         if (allowStep(event)) onNavigate(step);
       } else if (event.key === "e" && canArchive) canArchive();
+      else if (event.key === "u" && !event.repeat && onRead && shownUnread !== undefined) {
+        // Back to the list, so the read timer cannot mark it read again.
+        onRead(false);
+        closeDialog();
+      }
       else if (message && event.key in COMPOSE_KEYS && (event.key !== "a" || canReplyAll))
         setComposing(COMPOSE_KEYS[event.key] ?? null);
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onNavigate, composing, setComposing, nextId, previousId, message, canArchive, canReplyAll]);
+  }, [onNavigate, composing, setComposing, nextId, previousId, message, canArchive, canReplyAll, onRead, shownUnread, closeDialog]);
 
   // Ask agent and the Agent tab both open this email's agent beside it.
   const askAgent = () => {

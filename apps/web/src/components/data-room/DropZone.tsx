@@ -1,7 +1,7 @@
 import { plural, t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { DataRoomApiImport } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import { Button, OPEN_DIALOG_SELECTOR } from "@rakazo/ui-web";
 import { Upload, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
@@ -80,7 +80,7 @@ export function DataRoomDropZone({ userId }: { userId: string | null }) {
       if (event.defaultPrevented) return;
       setDragging(true);
       // Close any open menu or popover (not a dialog); they would stay open under the overlay.
-      if (depth === 1 && !document.querySelector('[role="dialog"], [role="alertdialog"]'))
+      if (depth === 1 && !document.querySelector(OPEN_DIALOG_SELECTOR))
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     };
     const over = (event: DragEvent) => {

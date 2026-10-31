@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import type { NotificationToastData } from "./notification-toaster.js";
-import { enqueueNotificationToast, NotificationToaster } from "./notification-toaster.js";
+import { enqueueNotificationToast, NotificationToaster, OPEN_DIALOG_SELECTOR } from "./notification-toaster.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -37,6 +37,15 @@ it("shows three toasts and collapses the rest into +N", async () => {
   expect(document.querySelector('[data-slot="notification-toast-overflow"]')?.textContent).toBe(
     "+2",
   );
+});
+
+it("a toast is an alertdialog that the open-dialog selector skips", async () => {
+  await mount();
+  await add(1);
+  const card = cards()[0];
+  expect(card?.getAttribute("role")).toBe("alertdialog");
+  expect(card?.matches(OPEN_DIALOG_SELECTOR)).toBe(false);
+  expect(document.querySelector(OPEN_DIALOG_SELECTOR)).toBeNull();
 });
 
 it("shows one toast on a phone", async () => {

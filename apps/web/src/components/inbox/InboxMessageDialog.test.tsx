@@ -209,6 +209,30 @@ it("ignores keys typed in inputs", async () => {
   expect(onNavigate).not.toHaveBeenCalled();
 });
 
+it("u marks the message unread and closes it", async () => {
+  get.mockImplementation(async ({ messageId }) => message(messageId));
+  const onRead = vi.fn();
+  const onClose = vi.fn();
+  act(() =>
+    root.render(
+      <InboxMessageDialog
+        messageId="m2"
+        unread={false}
+        onRead={onRead}
+        onNavigate={vi.fn()}
+        onClose={onClose}
+      />,
+    ),
+  );
+  await flush();
+  await press("u");
+  expect(onRead).toHaveBeenCalledWith(false);
+  expect(onClose).toHaveBeenCalledTimes(1);
+  // A held key must not close again, which would step back through the history.
+  await press("u", document.body, { repeat: true });
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
 it("is wide on large screens", async () => {
   await open();
   const popup = document.querySelector('[data-slot="dialog-content"]')?.className ?? "";
