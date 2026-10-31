@@ -278,7 +278,7 @@ const crumbState = (crumb: Crumb | undefined) => (crumb?.back ? { back: crumb.ba
  * The trail shown above a page: its own crumbs, or, when it was opened from somewhere else (the
  * dashboard's Breakdown, a category page), Finance, that origin and the page itself.
  */
-export function trailFor(own: Crumb[], cameFrom: Crumb | null): Crumb[] {
+export function trailFor(own: Crumb[], cameFrom: Crumb | null, path?: string): Crumb[] {
   // A crumb whose name has not loaded yet (or never will, on a missing page) is left out.
   const crumbs = own.filter((crumb) => crumb.label);
   const [root, ...rest] = crumbs;
@@ -286,7 +286,11 @@ export function trailFor(own: Crumb[], cameFrom: Crumb | null): Crumb[] {
   if (!cameFrom || !root || !here) return crumbs;
   // The origin's own origins come too, so the trail is as deep as when the page is opened directly.
   const chain: Crumb[] = [];
-  for (let c: Crumb | undefined = cameFrom; c && c.to !== root.to; c = c.back) chain.unshift(c);
+  // Reaching this page's own address again (vendor, charge, Merchant) drops the loop, so nothing repeats.
+  for (let c: Crumb | undefined = cameFrom; c && c.to !== root.to; c = c.back) {
+    if (path && c.to === path) chain.length = 0;
+    else chain.unshift(c);
+  }
   return [root, ...chain, here];
 }
 
@@ -298,7 +302,7 @@ export function trailFor(own: Crumb[], cameFrom: Crumb | null): Crumb[] {
 export function hereCrumb(own: Crumb[], cameFrom: Crumb | null, to: string): Crumb | null {
   const label = own.at(-1)?.label;
   if (!label) return null;
-  const back = trailFor(own, cameFrom)
+  const back = trailFor(own, cameFrom, to)
     .slice(1, -1)
     .reduce<Crumb | undefined>(
       (parent, c) =>
@@ -323,7 +327,8 @@ export function DetailHead({
   actions?: ReactNode;
 }) {
   const cameFrom = useCameFrom();
-  const crumbs = trailFor(own, cameFrom);
+  const location = useLocation();
+  const crumbs = trailFor(own, cameFrom, `${location.pathname}${location.search}`);
   // Before the page's own name loads (or when it never will), Back still returns to the real origin.
   const previous = crumbs.length > 1 ? crumbs[crumbs.length - 2] : (cameFrom ?? undefined);
   // The page's own name is the heading below, so the trail stops at the page before it.
@@ -1113,9 +1118,9 @@ export function KvRow({ label, children }: { label: ReactNode; children: ReactNo
 /** A link inside a detail value, with a trailing chevron. */
 export function ValueLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <Link to={to} className="rk-tap hover:underline pointer-coarse:-my-3">
+    <HereLink to={to} className="rk-tap hover:underline pointer-coarse:-my-3">
       {children} <span aria-hidden="true">›</span>
-    </Link>
+    </HereLink>
   );
 }
 

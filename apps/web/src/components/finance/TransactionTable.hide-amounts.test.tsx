@@ -146,7 +146,10 @@ it("shows Pending under the amount of a pending row only, where the Status colum
   const el = document.createElement("div");
   document.body.append(el);
   const root = createRoot(el);
-  const rows = [{ ...txn("1", -61_200), status: "pending" }, txn("2", -5_000)] as FinanceTransaction[];
+  const rows = [
+    { ...txn("1", -61_200), status: "pending" },
+    txn("2", -5_000),
+  ] as FinanceTransaction[];
   await act(async () =>
     root.render(
       <MemoryRouter>
@@ -154,7 +157,9 @@ it("shows Pending under the amount of a pending row only, where the Status colum
       </MemoryRouter>,
     ),
   );
-  const marks = [...el.querySelectorAll("tbody tr")].map((tr) => tr.querySelector(".\\@2xl\\:hidden")?.textContent ?? null);
+  const marks = [...el.querySelectorAll("tbody tr")].map(
+    (tr) => tr.querySelector(".\\@2xl\\:hidden")?.textContent ?? null,
+  );
   expect(marks).toEqual(["Pending", null]);
   act(() => root.unmount());
   el.remove();
