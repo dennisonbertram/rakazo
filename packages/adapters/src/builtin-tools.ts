@@ -537,7 +537,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "page_create",
     description:
-      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design.',
+      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design. Style it for light and dark (prefers-color-scheme).',
     inputSchema: {
       type: "object",
       properties: { title: { type: "string" }, kind: { type: "string", enum: ["blocks", "html"] } },
@@ -554,7 +554,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "page_write",
     description:
-      "Replace this bot's page. baseRevision is the revision from page_read (0 for a new page). A stale revision saves nothing and returns the current page.",
+      "Replace this bot's page. baseRevision is the revision from page_read (0 for a new page). A stale revision saves nothing and returns the current page. The title is shown above the page; do not start with a heading that repeats it.",
     inputSchema: {
       type: "object",
       properties: {

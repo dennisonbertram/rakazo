@@ -68,3 +68,26 @@ export const Sources: Story = {
     }),
 };
 export const NoSources: Story = { beforeEach: () => mockRpc({ "pages.sources": [] }) };
+export const Loading: Story = {
+  beforeEach: () => mockRpc({ "pages.sources": () => new Promise(() => {}) }),
+};
+export const FailedWithError: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "pages.sources": [
+        source({ lastError: "The server returned an error (HTTP 503) and nothing was saved." }),
+      ],
+    }),
+};
+export const PausedWithError: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "pages.sources": [
+        source({ status: "paused", lastError: "Paused after 5 failed refreshes in a row." }),
+      ],
+    }),
+};
+export const Pending: Story = {
+  beforeEach: () =>
+    mockRpc({ "pages.sources": [source({ status: "pending", lastRefreshAt: null })] }),
+};
