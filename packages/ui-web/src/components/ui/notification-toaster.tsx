@@ -66,6 +66,13 @@ export function enqueueNotificationToast({
   });
 }
 
+/**
+ * Matches an open dialog but not a toast. Base UI gives every toast root `role="alertdialog"` (or
+ * `dialog`), and `data-slot="notification-toast"` lands on that same element.
+ */
+export const OPEN_DIALOG_SELECTOR =
+  '[role="dialog"]:not([data-slot="notification-toast"]),[role="alertdialog"]:not([data-slot="notification-toast"])';
+
 type ToastItem = ReturnType<typeof Toast.useToastManager<NotificationToastData>>["toasts"][number];
 
 function ToastBody({

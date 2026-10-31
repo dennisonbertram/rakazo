@@ -29,6 +29,7 @@ import {
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
+  OPEN_DIALOG_SELECTOR,
   Skeleton,
   Spinner,
   Tabs,
@@ -1244,7 +1245,7 @@ function InboxListPage({
       if (event.key !== "Escape" || event.defaultPrevented) return;
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("input,textarea,select,[contenteditable]")) return;
-      if (document.querySelector('[role="dialog"],[role="alertdialog"]')) return;
+      if (document.querySelector(OPEN_DIALOG_SELECTOR)) return;
       setPicked(new Set());
     };
     window.addEventListener("keydown", onKey);
