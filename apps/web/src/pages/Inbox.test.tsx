@@ -930,6 +930,19 @@ it("a burst of 140 j presses in the open message moves one row and marks only it
   expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "b", read: true });
 });
 
+it("u in the open message marks it unread and it stays unread after the read dwell", async () => {
+  realDialog.on = true;
+  const c = await render();
+  await click(c.querySelector('[data-row-id="a"]'));
+  await dwell(100);
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true }));
+  });
+  await dwell(1000);
+  expect(c.querySelector('[data-testid="message"]')).toBeNull();
+  expect(rpcMock.markRead).toHaveBeenLastCalledWith({ messageId: "a", read: false });
+});
+
 it("keeps a mark's Undo on screen long enough to reach it", async () => {
   const c = await render();
   await click(byText(c, "noise b"));

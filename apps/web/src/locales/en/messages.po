@@ -7409,6 +7409,10 @@ msgstr "Mark posted"
 msgid "Mark read"
 msgstr "Mark read"
 
+#: src/components/inbox/InboxShortcuts.tsx
+msgid "Mark read or unread"
+msgstr "Mark read or unread"
+
 #: src/components/inbox/InboxMessageDialog.tsx
 msgid "Mark reply done"
 msgstr "Mark reply done"

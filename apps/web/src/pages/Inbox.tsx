@@ -1236,6 +1236,10 @@ function InboxListPage({
     toggle: toggleId,
     hasPicked: pickedRows.length > 0,
     archive: archiveFocused,
+    read: (id) => {
+      const row = [...(shown?.rows ?? []), ...moreRows].find((r) => r.id === id);
+      if (row) setRead(id, !!row.unread);
+    },
     help: () => setHelp(true),
   });
   // Escape unchecks the rows when no dialog or field is using the key.

@@ -16,6 +16,8 @@ interface InboxKeyboard {
   hasPicked: boolean;
   /** Archives the checked rows when there are any, else the selected one. */
   archive: ((id: string | undefined) => void) | undefined;
+  /** Toggles read state of the selected row; the caller ignores ids that are not messages, such as groups. */
+  read: (id: string) => void;
   help: () => void;
 }
 
@@ -53,6 +55,7 @@ export function useInboxKeyboard(options: InboxKeyboard) {
         toggle,
         hasPicked,
         archive,
+        read,
         help,
       } = latest.current;
       if (!enabled || event.defaultPrevented) return;
@@ -105,6 +108,9 @@ export function useInboxKeyboard(options: InboxKeyboard) {
       } else if (key === "e" && archive && (selectedId || hasPicked)) {
         event.preventDefault();
         archive(selectedId);
+      } else if (key === "u" && !event.repeat && selectedId) {
+        event.preventDefault();
+        read(selectedId);
       } else if (key === "?") {
         event.preventDefault();
         help();

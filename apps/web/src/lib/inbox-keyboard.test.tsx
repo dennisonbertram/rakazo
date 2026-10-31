@@ -8,6 +8,7 @@ import { useInboxKeyboard } from "./inbox-keyboard";
 const toggle = vi.fn();
 const archive = vi.fn();
 const select = vi.fn();
+const read = vi.fn();
 let clock = Date.now();
 let root: ReturnType<typeof createRoot>;
 
@@ -23,6 +24,7 @@ function Harness(props: { selectedId: string | undefined; hasPicked: boolean }) 
     compose: undefined,
     toggle,
     archive,
+    read,
     help: () => {},
   });
   return null;
@@ -119,3 +121,12 @@ it("j works with focus on the current page's sidebar link", async () => {
   expect(select).toHaveBeenCalledTimes(1);
 });
 
+it("u marks the selected message read or unread, and does nothing with no selection", async () => {
+  await show("m1");
+  await press("u");
+  expect(read).toHaveBeenLastCalledWith("m1");
+  read.mockClear();
+  await show(undefined);
+  await press("u");
+  expect(read).not.toHaveBeenCalled();
+});
