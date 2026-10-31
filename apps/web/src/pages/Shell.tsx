@@ -305,6 +305,7 @@ import { NotFoundPage } from "./NotFound";
 import { ResizableSidePanel } from "./ResizableSidePanel";
 import type { RoutineDraftState } from "./RoutineEditor";
 import {
+  defaultRoutineName,
   draftFromRoutine,
   emptyRoutineDraft,
   RoutineEditor,
@@ -5450,6 +5451,7 @@ export function ShellPage() {
             {panel === "computer" && active ? (
               <div>
                 <RoutineListHeader
+                  empty={activeRoutines.every((r) => r.managedKind !== null)}
                   onCreate={() => {
                     setRoutineDraft(emptyRoutineDraft());
                     setRoutineWebhookSecret(null);
@@ -5772,7 +5774,9 @@ export function ShellPage() {
                       }
                       saved = await rpc.routines.update({
                         routineId: targetRoutine.id,
-                        name: routineDraft.name || t`Routine`,
+                        name:
+                          routineDraft.name.trim() ||
+                          defaultRoutineName(routineDraft.prompt, routineDraft.taughtSkill?.name),
                         prompt: routineDraft.prompt.trim(),
                         taughtSkillId: routineDraft.taughtSkill?.id ?? null,
                         crons,
@@ -5799,7 +5803,9 @@ export function ShellPage() {
                     } else {
                       saved = await rpc.routines.create({
                         botId: targetBotId,
-                        name: routineDraft.name || t`Routine`,
+                        name:
+                          routineDraft.name.trim() ||
+                          defaultRoutineName(routineDraft.prompt, routineDraft.taughtSkill?.name),
                         prompt: routineDraft.prompt.trim(),
                         taughtSkillId: routineDraft.taughtSkill?.id ?? null,
                         crons,
