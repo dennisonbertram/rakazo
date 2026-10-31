@@ -15,6 +15,7 @@ import {
   extractRoutineSkillMentions,
   formatCron,
   isOneShotRoutineCrons,
+  modelKeyForConnection,
   presetFromCron,
 } from "@rakazo/core";
 import {
@@ -724,15 +725,13 @@ export function RoutineEditor({
                     value={draft.credentialId}
                     onChange={(event) => {
                       const next = credentials.find((entry) => entry.id === event.target.value);
-                      const choices = connectedModelOptions(next ? [next] : credentials, catalog);
                       onChange({
                         ...draft,
                         credentialId: next?.id ?? "",
                         thinkingLevel: "",
-                        modelKey:
-                          next && !choices.some((c) => c.key === draft.modelKey)
-                            ? (choices[0]?.key ?? "")
-                            : draft.modelKey,
+                        modelKey: next
+                          ? modelKeyForConnection(next, catalog, draft.modelKey)
+                          : draft.modelKey,
                       });
                     }}
                   >
