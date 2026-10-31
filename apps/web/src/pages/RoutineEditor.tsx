@@ -251,16 +251,39 @@ export function routineStatusLine(
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-export function RoutineListHeader({ onCreate }: { onCreate: () => void }) {
+const ROUTINE_NAME_CHARS = 40;
+
+/** The name a routine gets when none is typed: the instruction's first line, cut at a word. */
+export function defaultRoutineName(prompt: string, skillName?: string): string {
+  const line = prompt
+    .split("\n")
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .find(Boolean);
+  if (!line) return (skillName?.trim() || t`Routine`).slice(0, 80);
+  if (line.length <= ROUTINE_NAME_CHARS) return line;
+  const cut = line.slice(0, ROUTINE_NAME_CHARS + 1).lastIndexOf(" ");
+  return `${line.slice(0, cut > 0 ? cut : ROUTINE_NAME_CHARS)}…`;
+}
+
+export function RoutineListHeader({
+  onCreate,
+  empty,
+}: {
+  onCreate: () => void;
+  /** The bot has no routines of its own yet; only then is the example worth showing. */
+  empty: boolean;
+}) {
   return (
     <div className="mt-[30px] mb-3 flex items-center justify-between gap-3">
       <div className="min-w-0">
         <div className="text-sm text-muted-foreground">
           <Trans>Routines</Trans>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground/70 max-sm:hidden">
-          <Trans>Work this bot repeats for you, like a cash check every Monday.</Trans>
-        </p>
+        {empty ? (
+          <p className="mt-0.5 text-xs text-muted-foreground/70 max-sm:hidden">
+            <Trans>Work this bot repeats for you, like a cash check every Monday.</Trans>
+          </p>
+        ) : null}
       </div>
       <Button variant="secondary" size="sm" data-testid="routine-create-button" onClick={onCreate}>
         <Plus strokeWidth={1.9} />
@@ -583,7 +606,11 @@ export function RoutineEditor({
         <Input
           id={`${fieldId}-name`}
           value={draft.name}
-          placeholder={t`Name this routine`}
+          placeholder={
+            draft.prompt.trim()
+              ? defaultRoutineName(draft.prompt, draft.taughtSkill?.name)
+              : t`Name this routine`
+          }
           onChange={(e) => onChange({ ...draft, name: e.target.value })}
           className="mt-2"
         />
