@@ -185,7 +185,7 @@ export function PageTableBlock({
         label={block.name}
         hasValue={rows !== undefined && rows.length > 0}
       >
-        <Table>
+        <Table compact>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
