@@ -35,6 +35,7 @@ import { ArrowDown, ArrowUp, GripVertical, MoreHorizontal, Plus, X } from "lucid
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ArtifactShareDialog } from "../../components/ArtifactShareDialog";
 import { GtmBlock, GtmBlockContext } from "../../components/gtm/GtmBlock";
+import { PageHeader } from "../../components/PageHeader";
 import { HtmlPageView } from "../../components/pages/HtmlPageView";
 import {
   PageChartFrame,
@@ -230,8 +231,11 @@ function PageEditor({
   refreshTick = 0,
   onSources,
   onPageChange,
+  onReview,
 }: {
   botId: string;
+  /** Opens where a pending source is approved; set only on the full-width page. */
+  onReview?: () => void;
   /** Without one, the bot's first page. */
   pageId?: string;
   remote: PageRemoteUpdate | null;
@@ -281,7 +285,7 @@ function PageEditor({
         "aria-label": t`Page`,
         dir: "auto",
         class:
-          "min-h-40 text-sm outline-none [&_a]:text-link [&_a]:underline [&_blockquote]:border-s-2 [&_blockquote]:border-border [&_blockquote]:ps-3 [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:ps-5 [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3 [&_ul]:list-disc [&_ul]:ps-5 [&_table]:w-full [&_td]:border [&_td]:border-border [&_td]:p-1 [&_th]:border [&_th]:border-border [&_th]:p-1 [&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:ps-0 [&_ul[data-type=taskList]_li]:flex [&_ul[data-type=taskList]_li]:gap-2 [&_img]:max-w-full",
+          "min-h-40 text-sm outline-none [&_a]:text-link [&_a]:underline [&_blockquote]:border-s-2 [&_blockquote]:border-border [&_blockquote]:ps-3 [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:ps-5 [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3 [&_ul]:list-disc [&_ul]:ps-5 [&_table]:w-full [&_table:not([data-slot=table])_td]:border [&_table:not([data-slot=table])_td]:border-border [&_table:not([data-slot=table])_td]:p-1 [&_table:not([data-slot=table])_th]:border [&_table:not([data-slot=table])_th]:border-border [&_table:not([data-slot=table])_th]:p-1 [&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:ps-0 [&_ul[data-type=taskList]_li]:flex [&_ul[data-type=taskList]_li]:gap-2 [&_img]:max-w-full",
       },
     },
   });
@@ -475,8 +479,9 @@ function PageEditor({
       refreshing,
       blocks: liveBlocks,
       refresh: () => void refresh(),
+      onReview,
     }),
-    [liveLoaded, refreshing, liveBlocks, refresh],
+    [liveLoaded, refreshing, liveBlocks, refresh, onReview],
   );
 
   if (!loaded)
@@ -525,7 +530,10 @@ export function BotPagePanel({
   fixedPageId,
   onTitle,
   onMissing,
+  onReview,
 }: {
+  /** Opens where a pending source is approved; used by the full-width page only. */
+  onReview?: () => void;
   botId: string;
   /** Shows only this page: no switcher, no new or delete. Used by the full-width page. */
   fixedPageId?: string;
@@ -655,33 +663,76 @@ export function BotPagePanel({
       await loadPages();
     });
 
+  const renameForm =
+    renaming && active ? (
+      <form
+        className="min-w-0 flex-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void rename(String(new FormData(event.currentTarget).get("title") ?? ""));
+        }}
+      >
+        <Input
+          name="title"
+          autoFocus
+          aria-label={t`Page title`}
+          defaultValue={active.title}
+          maxLength={BOT_PAGE_TITLE_MAX}
+          // Typing replaces the title, so "New page" never ends up as a prefix.
+          onFocus={(event) => event.currentTarget.select()}
+          onKeyDown={(event) => event.key === "Escape" && setRenaming(false)}
+          onBlur={() => setRenaming(false)}
+        />
+      </form>
+    ) : null;
+
+  const optionsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label={t`Page options`}>
+            <MoreHorizontal size={16} />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        {hasSources ? (
+          <DropdownMenuItem onClick={() => setRefreshTick((n) => n + 1)}>
+            <Trans>Refresh</Trans>
+          </DropdownMenuItem>
+        ) : null}
+        {hasSources ? (
+          <DropdownMenuItem onClick={() => setSourcesOpen(true)}>
+            <Trans>Sources</Trans>
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onClick={() => void share()}>
+          <Trans>Share</Trans>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setRenaming(true)}>
+          <Trans>Rename</Trans>
+        </DropdownMenuItem>
+        {pages.length > 1 && !fixedPageId ? (
+          <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
+            <Trans>Delete</Trans>
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div>
-      {pages.length > 0 ? (
+      {fixedPageId ? (
+        <PageHeader
+          title={renameForm ?? activeTitle}
+          actions={pages.length > 0 ? optionsMenu : null}
+        />
+      ) : pages.length > 0 ? (
         <div className="mb-3 flex items-center gap-1">
-          {renaming && active ? (
-            <form
-              className="min-w-0 flex-1"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void rename(String(new FormData(event.currentTarget).get("title") ?? ""));
-              }}
-            >
-              <Input
-                name="title"
-                autoFocus
-                aria-label={t`Page title`}
-                defaultValue={active.title}
-                maxLength={BOT_PAGE_TITLE_MAX}
-                // Typing replaces the title, so "New page" never ends up as a prefix.
-                onFocus={(event) => event.currentTarget.select()}
-                onKeyDown={(event) => event.key === "Escape" && setRenaming(false)}
-                onBlur={() => setRenaming(false)}
-              />
-            </form>
-          ) : (
+          {renameForm ?? (
             <div className="min-w-0 flex-1">
-              {pages.length > 1 && !fixedPageId ? (
+              {pages.length > 1 ? (
                 <Tabs value={activeId} onValueChange={(next) => setActiveId(String(next))}>
                   <TabsList aria-label={t`Pages`}>
                     {pages.map((page) => (
@@ -694,49 +745,16 @@ export function BotPagePanel({
               ) : null}
             </div>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" aria-label={t`Page options`}>
-                  <MoreHorizontal size={16} />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end">
-              {hasSources ? (
-                <DropdownMenuItem onClick={() => setRefreshTick((n) => n + 1)}>
-                  <Trans>Refresh</Trans>
-                </DropdownMenuItem>
-              ) : null}
-              {hasSources ? (
-                <DropdownMenuItem onClick={() => setSourcesOpen(true)}>
-                  <Trans>Sources</Trans>
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuItem onClick={() => void share()}>
-                <Trans>Share</Trans>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setRenaming(true)}>
-                <Trans>Rename</Trans>
-              </DropdownMenuItem>
-              {pages.length > 1 && !fixedPageId ? (
-                <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
-                  <Trans>Delete</Trans>
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {fixedPageId ? null : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t`New page`}
-              disabled={pages.length >= BOT_PAGE_MAX_PAGES}
-              onClick={() => void create()}
-            >
-              <Plus size={16} />
-            </Button>
-          )}
+          {optionsMenu}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t`New page`}
+            disabled={pages.length >= BOT_PAGE_MAX_PAGES}
+            onClick={() => void create()}
+          >
+            <Plus size={16} />
+          </Button>
         </div>
       ) : null}
       {error && pages.length > 0 ? (
@@ -765,6 +783,7 @@ export function BotPagePanel({
           refreshTick={refreshTick}
           onSources={setHasSources}
           onPageChange={reportPage}
+          onReview={fixedPageId ? onReview : undefined}
         />
       ) : null}
       {pages.length === 0 && error ? (
