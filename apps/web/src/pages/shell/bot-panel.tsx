@@ -359,12 +359,13 @@ export function BotSettings({
   // A lost pin is fixed in Advanced > Connection: open it once, without saving.
   const advancedRef = useRef<HTMLDetailsElement>(null);
   const openedForLostPin = useRef(false);
+  const scrollToConnection = useRef(false);
   const pinLost = modelMetaReady && credentialId !== "" && !pinnedCredential;
   useEffect(() => {
     if (!pinLost || openedForLostPin.current || !advancedRef.current) return;
     openedForLostPin.current = true;
+    scrollToConnection.current = true;
     advancedRef.current.open = true;
-    advancedRef.current.querySelector("select")?.scrollIntoView?.({ block: "nearest" });
   }, [pinLost]);
   const storedModel = modelKey ? parseModelOptionKey(modelKey) : null;
   const selectedModel = storedModel
@@ -766,9 +767,15 @@ export function BotSettings({
             onToggle={(event) => {
               if (!event.currentTarget.open) return;
               setAdvancedOpened(true);
-              event.currentTarget
-                .querySelector("summary")
-                ?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+              const target = scrollToConnection.current
+                ? event.currentTarget.querySelector('select[id$="-connection"]')
+                : event.currentTarget.querySelector("summary");
+              const block = scrollToConnection.current ? "center" : "nearest";
+              scrollToConnection.current = false;
+              target?.scrollIntoView?.({
+                block,
+                behavior: "smooth",
+              });
             }}
           >
             <summary
