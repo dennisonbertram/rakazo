@@ -756,6 +756,10 @@ function TransactionRow({ row }: { row: FinanceTransaction }) {
       </TableCell>
       <TableCell className="whitespace-nowrap ps-3 text-end tabular-nums">
         {listAmount(row.amountCents, undefined, row.currency)}
+        {/* The Status column is hidden below @2xl, so a pending charge says so under its amount. */}
+        {row.status === "pending" ? (
+          <div className="text-xs text-muted-foreground @2xl:hidden">{statusLabel(row.status)}</div>
+        ) : null}
       </TableCell>
       <TableCell className="hidden w-24 ps-4 text-muted-foreground @2xl:table-cell">
         {statusLabel(row.status)}

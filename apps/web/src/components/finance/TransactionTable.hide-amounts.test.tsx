@@ -141,3 +141,21 @@ it("offers List / By vendor only when the rows have more than one vendor", async
   );
   expect(two.textContent).toContain("By vendor");
 });
+
+it("shows Pending under the amount of a pending row only, where the Status column is hidden", async () => {
+  const el = document.createElement("div");
+  document.body.append(el);
+  const root = createRoot(el);
+  const rows = [{ ...txn("1", -61_200), status: "pending" }, txn("2", -5_000)] as FinanceTransaction[];
+  await act(async () =>
+    root.render(
+      <MemoryRouter>
+        <TransactionTable rows={rows} />
+      </MemoryRouter>,
+    ),
+  );
+  const marks = [...el.querySelectorAll("tbody tr")].map((tr) => tr.querySelector(".\\@2xl\\:hidden")?.textContent ?? null);
+  expect(marks).toEqual(["Pending", null]);
+  act(() => root.unmount());
+  el.remove();
+});
