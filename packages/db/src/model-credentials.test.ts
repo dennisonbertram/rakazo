@@ -3,8 +3,8 @@ import type { PrismaClient } from "./client.js";
 import {
   chooseModelCredential,
   defaultModelCredentialCandidates,
-  findDefaultModelCredential,
   findBotModelCredential,
+  findDefaultModelCredential,
   findModelCredential,
   newestModelCredentialOrder,
   PinnedConnectionLostError,
@@ -370,6 +370,29 @@ describe("selectSpaceModelPreference", () => {
       expect.objectContaining({
         create: expect.objectContaining({ isDefault: true, modelId: "model" }),
         update: { isDefault: true, modelId: "model", thinkingLevel: null },
+      }),
+    );
+  });
+
+  it("leaves every default alone when makeDefault is false", async () => {
+    const updateMany = vi.fn();
+    const upsert = vi.fn().mockResolvedValue({ id: "preference" });
+    const prisma = { spaceModelPreference: { updateMany, upsert } } as unknown as PrismaClient;
+
+    await selectSpaceModelPreference(
+      prisma,
+      { userId: "user", spaceId: "space" },
+      "credential",
+      "model",
+      null,
+      { makeDefault: false },
+    );
+
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ isDefault: false, modelId: "model" }),
+        update: { modelId: "model", thinkingLevel: null },
       }),
     );
   });
