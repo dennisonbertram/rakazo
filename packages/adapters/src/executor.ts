@@ -4284,7 +4284,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
             context,
             redact: (value) => redactConnectorPayload(value, [...runSecrets]),
-            activity: async (line, failed) => {
+            activity: async (line, failure) => {
               await deps.events
                 .append({
                   spaceId: run.spaceId,
@@ -4298,8 +4298,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     command: line,
                     cwd: ".",
                     status: "done",
-                    exitCode: failed ? 1 : 0,
-                    output: "",
+                    exitCode: failure ? 1 : 0,
+                    output: failure ?? "",
                   } satisfies ComputerCommand,
                 })
                 .catch((error: unknown) => getLogger().error("computer command event", error));
