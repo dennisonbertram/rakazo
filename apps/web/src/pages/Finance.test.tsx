@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const text = vi.hoisted(
   () =>
@@ -1613,4 +1613,30 @@ it("shows the Crypto card loading, not $0, while a wallet's first sync runs", as
   const card = container.querySelector('a[href="/app/finance/crypto"]');
   expect(card?.textContent).not.toContain("$0");
   expect(card?.querySelector('[aria-label="Loading"]')).not.toBeNull();
+});
+
+describe("syncing on mount", () => {
+  it("skips the sync when the data is fresh, and Refresh still forces one", async () => {
+    const lastSyncedAt = new Date(Date.now() - 60_000).toISOString();
+    rpcMock.overview.mockResolvedValue(connectedOverview({ lastSyncedAt }));
+    await show("/app/finance");
+    await flush();
+    expect(rpcMock.refresh).not.toHaveBeenCalled();
+    await act(async () => button(/^Refresh$/)?.click());
+    await flush();
+    expect(rpcMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("syncs on mount when the crypto data is stale", async () => {
+    const fresh = new Date(Date.now() - 60_000).toISOString();
+    rpcMock.overview.mockResolvedValue(
+      connectedOverview({
+        lastSyncedAt: fresh,
+        crypto: { totalCents: 0, byChain: [], byWallet: [], lastSyncedAt: null, unpricedTokenCount: 0 },
+      }),
+    );
+    await show("/app/finance");
+    await flush();
+    expect(rpcMock.refresh).toHaveBeenCalledTimes(1);
+  });
 });
