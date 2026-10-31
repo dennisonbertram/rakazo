@@ -492,6 +492,7 @@ export const ComputerCommandKind = z.enum([
   "attach_file",
   "open_path",
   "launch_app",
+  "desktop_app",
 ]);
 export type ComputerCommandKind = z.infer<typeof ComputerCommandKind>;
 export const ComputerCommandSchema = z.object({

@@ -59,6 +59,8 @@ const BUILTIN_MAIL_WRITE_TOOLS = new Set(["mail_draft", "mail_modify", "mail_sen
 /** Cannot be auto-reviewed or permanently allowed. imessage_send is a message to a person from the user's agent line. */
 const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "respond_agent_connection",
+  // The owner's own card per app per run (docs/local-desktop-control); never a saved rule.
+  "desktop_app_act",
   "create_space",
   "imessage_send",
   "company_fact_upsert",
@@ -347,6 +349,7 @@ const BUILTIN_ACTION_TYPES: Record<string, ApprovalActionType> = {
   open_path: "files_and_commands",
   launch_app: "files_and_commands",
   computer_act: "use_computer",
+  desktop_app_act: "use_computer",
   browser_act: "use_computer",
   browser_navigate: "use_computer",
   delete_bot: "delete_data",

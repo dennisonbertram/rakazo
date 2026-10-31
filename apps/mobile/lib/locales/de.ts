@@ -580,6 +580,7 @@ export const DE_MESSAGES: Record<string, string> = {
   "Passwords do not match": "Die Passwörter stimmen nicht überein",
   // components/AskActions.tsx
   "Allow once": "Einmal erlauben",
+  "Allow for this run": "Für diesen Lauf erlauben",
   "Always allow": "Immer erlauben",
   "Could not submit answer": "Antwort konnte nicht gesendet werden",
   Deny: "Ablehnen",

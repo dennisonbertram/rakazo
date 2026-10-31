@@ -187,3 +187,25 @@ it("holds a new card's buttons for a second after another card was answered", as
   await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
   expect((button(second, "Allow once") as HTMLButtonElement).disabled).toBe(false);
 });
+
+it("keeps the run-scoped allow label of a desktop app card and offers no Always allow", () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const card: AskBlock = {
+    kind: "ask",
+    text: "Use Music on this Mac",
+    approvalEffectId: "effect_desktop",
+    actions: [
+      { id: "allow", label: "Allow for this run" },
+      { id: "deny", label: "Deny" },
+    ],
+    status: "pending",
+  };
+  act(() =>
+    createRoot(container).render(
+      <AskCard block={card} canAnswer onAnswer={async () => undefined} />,
+    ),
+  );
+  expect(button(container, "Allow for this run")).toBeTruthy();
+  expect(container.textContent).not.toContain("Always allow");
+});

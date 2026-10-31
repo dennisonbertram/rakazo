@@ -1406,6 +1406,10 @@ msgid "Allow cross-space bot communication"
 msgstr "Allow cross-space bot communication"
 
 #: src/components/AskCard.tsx
+msgid "Allow for this run"
+msgstr "Allow for this run"
+
+#: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "Allow once"
 

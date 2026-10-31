@@ -385,9 +385,10 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       prisma,
     });
   // Local desktop control: absent unless APP_CONTROL_PROVIDER is set (docs/local-desktop-control).
+  const appControlStore = new PostgresAppControlStore(prisma);
   const appControl = createAppControlProvider(process.env, {
     dataDir: env.dataDir,
-    store: new PostgresAppControlStore(prisma),
+    store: appControlStore,
   });
   const mcpOAuth = new McpOAuthBroker(
     prisma,
@@ -592,6 +593,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const codexCatalog = new CodexCatalogCache();
   let companyImport: ReturnType<typeof createCompanyImportEngine> | undefined;
   const executor = createRunExecutor({
+    appControl,
+    appControlStore,
     notificationEvents,
     contextStrategy,
     prisma,
