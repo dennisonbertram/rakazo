@@ -8,7 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@rakazo/ui-web";
-import { Download, Mail, Send, X } from "lucide-react";
+import { Download, FolderInput, Mail, Send, X } from "lucide-react";
+import { TOOLBAR_BUTTON, TOOLBAR_LABEL } from "./FilterBar";
 import type { SendTarget } from "./SendToAgent";
 
 /** What can be done with the ticked files. It shows only while at least one row is ticked. */
@@ -17,6 +18,7 @@ export function SelectionBar({
   total,
   onSelectAll,
   busy = false,
+  onMove,
   onDownload,
   onSend,
   onClear,
@@ -30,6 +32,8 @@ export function SelectionBar({
   onSelectAll?: () => void;
   /** A download or a send is reading the files. */
   busy?: boolean;
+  /** Opens the Move dialog for the ticked files. */
+  onMove?: () => void;
   onDownload: () => void;
   /** Without it (no connected mailbox is known) there is no Email. */
   onSend?: () => void;
@@ -61,23 +65,55 @@ export function SelectionBar({
           </Button>
         ) : null}
       </span>
-      <Button variant="outline" size="sm" disabled={busy} onClick={onDownload}>
+      {onMove ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className={TOOLBAR_BUTTON}
+          disabled={busy}
+          onClick={onMove}
+        >
+          <FolderInput aria-hidden="true" />
+          <span className={TOOLBAR_LABEL}>
+            <Trans>Move</Trans>
+          </span>
+        </Button>
+      ) : null}
+      <Button
+        variant="outline"
+        size="sm"
+        className={TOOLBAR_BUTTON}
+        disabled={busy}
+        onClick={onDownload}
+      >
         <Download aria-hidden="true" />
-        <Trans>Download</Trans>
+        <span className={TOOLBAR_LABEL}>
+          <Trans>Download</Trans>
+        </span>
       </Button>
       {onSend ? (
-        <Button variant="outline" size="sm" disabled={busy} onClick={onSend}>
+        <Button
+          variant="outline"
+          size="sm"
+          className={TOOLBAR_BUTTON}
+          disabled={busy}
+          onClick={onSend}
+        >
           <Mail aria-hidden="true" />
-          <Trans>Email</Trans>
+          <span className={TOOLBAR_LABEL}>
+            <Trans>Email</Trans>
+          </span>
         </Button>
       ) : null}
       {agents?.length && onSendToAgent ? (
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" size="sm" disabled={busy}>
+              <Button variant="outline" size="sm" className={TOOLBAR_BUTTON} disabled={busy}>
                 <Send aria-hidden="true" />
-                <Trans>Send to agent</Trans>
+                <span className={TOOLBAR_LABEL}>
+                  <Trans>Send to agent</Trans>
+                </span>
               </Button>
             }
           />

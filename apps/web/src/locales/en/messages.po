@@ -2727,6 +2727,10 @@ msgstr "Choose a bot…"
 msgid "Choose a contact"
 msgstr "Choose a contact"
 
+#: src/components/data-room/ItemDialogs.tsx
+msgid "Choose a folder…"
+msgstr "Choose a folder…"
+
 #: src/components/data-room/ImportFromDrive.tsx
 msgid "Choose a Google Sheet"
 msgstr "Choose a Google Sheet"
@@ -4041,7 +4045,9 @@ msgstr "Could not mark delivered"
 msgid "Could not mark sent"
 msgstr "Could not mark sent"
 
+#. placeholder {0}: names.join(", ")
 #. placeholder {0}: prospect.name
+#: src/pages/DataRoom.tsx
 #: src/pages/Fundraising.tsx
 msgid "Could not move {0}"
 msgstr "Could not move {0}"
@@ -7849,9 +7855,15 @@ msgstr "More settings"
 
 #: src/components/data-room/AutoSortDialog.tsx
 #: src/components/data-room/ItemMenu.tsx
+#: src/components/data-room/SelectionBar.tsx
 #: src/pages/shell/command-palette.tsx
 msgid "Move"
 msgstr "Move"
+
+#. placeholder {0}: items.length
+#: src/components/data-room/ItemDialogs.tsx
+msgid "Move {0} files to"
+msgstr "Move {0} files to"
 
 #. placeholder {0}: item.name
 #: src/components/data-room/ItemDialogs.tsx
@@ -10817,7 +10829,6 @@ msgid "Round actions"
 msgstr "Round actions"
 
 #: src/pages/RoutineEditor.tsx
-#: src/pages/Shell.tsx
 msgid "Routine"
 msgstr "Routine"
 

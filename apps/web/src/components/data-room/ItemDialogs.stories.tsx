@@ -6,7 +6,7 @@ const contracts = folders[0]!;
 const reports = folders.find((folder) => folder.name === "Reports")!;
 
 import { folderNodes } from "./folders";
-import { ItemDialog, NewFolderDialog } from "./ItemDialogs";
+import { ItemDialog, MoveFilesDialog, NewFolderDialog } from "./ItemDialogs";
 import type { ItemAction } from "./ItemMenu";
 
 const meta = {
@@ -103,5 +103,32 @@ export const NewFolder: Story = {
         onDone={() => undefined}
       />
     </>
+  ),
+};
+
+const filesIn = (...ids: (string | null)[]) =>
+  ids.map((folderId, index) => ({ ...readyItem, id: `file-${index}`, folderId }));
+
+/** Ticked files that share a folder start with that folder chosen. */
+export const MoveFilesSameFolder: StoryObj = {
+  render: () => (
+    <MoveFilesDialog
+      items={filesIn(contracts.id, contracts.id, contracts.id)}
+      folders={folderNodes(folders)}
+      onClose={() => undefined}
+      onDone={() => undefined}
+    />
+  ),
+};
+
+/** Files from different folders start unchosen, and Save stays off until a folder is picked. */
+export const MoveFilesMixedFolders: StoryObj = {
+  render: () => (
+    <MoveFilesDialog
+      items={filesIn(contracts.id, reports.id, null)}
+      folders={folderNodes(folders)}
+      onClose={() => undefined}
+      onDone={() => undefined}
+    />
   ),
 };
