@@ -243,6 +243,7 @@ export function FilterBar({
   onFolder,
   onNewFolder,
   onAutoSort,
+  previewBeside = false,
 }: {
   /** Where the folder tree is hidden (a narrow page), this picker chooses the folder. */
   folders: FolderNode[];
@@ -252,6 +253,8 @@ export function FilterBar({
   onNewFolder: () => void;
   /** Opens Auto-sort; on this narrow page the folder tree's own button is hidden too. */
   onAutoSort?: () => void;
+  /** A preview sits beside the list, so the tree hides below 1100px instead of 800px. */
+  previewBeside?: boolean;
   query: string;
   onQuery: (query: string) => void;
   searching: boolean;
@@ -364,7 +367,9 @@ export function FilterBar({
         </div>
       ) : null}
       {/* Where the folder tree is hidden, this picks the folder; it sits with Sort, not the pills. */}
-      <div className="order-2 flex min-h-8 min-w-0 items-center gap-1 @min-[800px]/bd:hidden">
+      <div
+        className={`order-2 flex min-h-8 min-w-0 items-center gap-1 ${previewBeside ? "@min-[1100px]/bd:hidden" : "@min-[800px]/bd:hidden"}`}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger
             data-testid="data-room-folder-picker"
