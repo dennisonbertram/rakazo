@@ -19,6 +19,8 @@ struct SandboxedHTMLViewTests {
     #expect(AgentPageScreen.placeholder("denied") == "Not approved")
     #expect(AgentPageScreen.placeholder("missing") == "Source not found")
     #expect(AgentPageScreen.placeholder("paused") == "Paused")
+    #expect(AgentPageScreen.warningLabel(canRetry: true) == "Source failed")
+    #expect(AgentPageScreen.warningLabel(canRetry: false) == "Source paused")
     #expect(AgentPageScreen.placeholder("empty") == "No data yet")
   }
 }

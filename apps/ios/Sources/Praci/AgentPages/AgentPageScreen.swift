@@ -175,6 +175,8 @@ struct AgentPageScreen: View {
     cell.usd && model.hideAmounts ? maskCurrencyText(cell.text) : cell.text
   }
 
+  static func warningLabel(canRetry: Bool) -> String { canRetry ? "Source failed" : "Source paused" }
+
   static func placeholder(_ status: String) -> String {
     switch status {
     case "pending": "Waiting for approval"
@@ -202,7 +204,7 @@ private struct FailedSource: View {
     Button { showing = true } label: {
       Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.token(.warning))
     }
-    .accessibilityLabel("Source failed")
+    .accessibilityLabel(AgentPageScreen.warningLabel(canRetry: canRetry))
     .popover(isPresented: $showing) {
       VStack(alignment: .leading, spacing: 12) {
         if let error { Text(error).font(.footnote) }
