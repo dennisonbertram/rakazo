@@ -28,6 +28,10 @@ vi.mock("@lingui/core/macro", () => ({
 }));
 vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
+  useLingui: () => ({
+    t: (parts: TemplateStringsArray, ...values: unknown[]) =>
+      parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
+  }),
 }));
 
 import { setHideAmounts } from "../../lib/hide-amounts-preference";

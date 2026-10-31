@@ -1,17 +1,25 @@
 // @vitest-environment jsdom
 
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
+import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ sources: vi.fn() }));
+vi.mock("@lingui/core/macro", () => ({
+  t: (parts: TemplateStringsArray, ...values: unknown[]) =>
+    parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
+}));
+vi.mock("@lingui/react/macro", () => ({
+  Trans: ({ children }: { children: ReactNode }) => children,
+  useLingui: () => ({
+    t: (parts: TemplateStringsArray, ...values: unknown[]) =>
+      parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
+  }),
+}));
 vi.mock("../../lib/rpc", () => ({ rpc: { pages: { sources: mocks.sources } } }));
 
 import { PageSourcesDialog } from "./PageSourcesDialog";
-
-i18n.loadAndActivate({ locale: "en", messages: {} });
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -35,15 +43,13 @@ function mount(pageId: string) {
   const render = (id: string) =>
     act(async () => {
       root.render(
-        <I18nProvider i18n={i18n}>
-          <PageSourcesDialog
-            botId="b"
-            pageId={id}
-            open
-            onOpenChange={() => {}}
-            onChanged={() => {}}
-          />
-        </I18nProvider>,
+        <PageSourcesDialog
+          botId="b"
+          pageId={id}
+          open
+          onOpenChange={() => {}}
+          onChanged={() => {}}
+        />,
       );
     });
   return { render: () => render(pageId), rerender: render };
