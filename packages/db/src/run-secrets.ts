@@ -39,7 +39,7 @@ export async function deleteRunSecretsInTransaction(
  * run's user and space here for the secrets index.
  */
 export async function clearEndedRunState(
-  prisma: Pick<PrismaClient, "run" | "secret" | "externalEffect">,
+  prisma: Pick<PrismaClient, "run" | "secret" | "externalEffect" | "appControlSnapshot">,
   runIds: readonly string[],
 ): Promise<void> {
   if (runIds.length === 0) return;
@@ -49,4 +49,12 @@ export async function clearEndedRunState(
     select: { id: true, userId: true, spaceId: true },
   });
   await deleteRunSecretsInTransaction(prisma, runs);
+  // Snapshot ownership for desktop app control lives only as long as the run.
+  if (runs.length > 0) {
+    await prisma.appControlSnapshot.deleteMany({
+      where: {
+        OR: runs.map((run) => ({ runId: run.id, spaceId: run.spaceId, userId: run.userId })),
+      },
+    });
+  }
 }

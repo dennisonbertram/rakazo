@@ -15,6 +15,9 @@ export type AppControlApp = z.infer<typeof AppControlAppSchema>;
 
 export const APP_CONTROL_MAX_APPS = 20;
 
+/** The effect a person approves to let one run use one app; only the run's owner may answer it. */
+export const DESKTOP_APP_USE_EFFECT_KIND = "desktop_app_use";
+
 /** A bot's app control settings, as the owner sees them. */
 export const BotAppControlSchema = z.object({
   enabled: z.boolean(),

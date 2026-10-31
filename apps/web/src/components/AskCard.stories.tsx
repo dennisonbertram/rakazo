@@ -147,6 +147,19 @@ export const Approval: Story = {
   },
 };
 
+export const DesktopAppApproval: Story = {
+  args: {
+    block: ask({
+      text: "Use Music on this Mac",
+      approvalEffectId: "effect_desktop_app",
+      actions: [
+        { id: "allow", label: "Allow for this run" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
 export const ApprovalWithReason: Story = {
   args: {
     block: ask({

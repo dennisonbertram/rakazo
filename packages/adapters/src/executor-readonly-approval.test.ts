@@ -349,12 +349,19 @@ function fixture({
       async ({
         where,
       }: {
-        where?: { id?: string; runId?: string; status?: string; kind?: string | { not: string } };
+        where?: {
+          id?: string;
+          runId?: string;
+          status?: string;
+          kind?: string | { not?: string; notIn?: string[] };
+        };
       } = {}) =>
         effects.filter((effect) => {
           if (where?.status && effect.status !== where.status) return false;
           if (typeof where?.kind === "string" && effect.kind !== where.kind) return false;
           if (typeof where?.kind === "object" && effect.kind === where.kind.not) return false;
+          if (typeof where?.kind === "object" && where.kind.notIn?.includes(effect.kind))
+            return false;
           if (where?.runId && effect.runId && effect.runId !== where.runId) return false;
           if (where?.id && effect.id !== where.id) return false;
           return true;

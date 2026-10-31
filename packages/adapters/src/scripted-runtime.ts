@@ -162,6 +162,25 @@ export function inferScript(
       },
     ];
   }
+  // Apps on this computer (docs/local-desktop-control): list, read, then open, which asks once.
+  const desktopApp = /use the app (.+?) on this computer/i.exec(prompt)?.[1]?.trim();
+  if (desktopApp) {
+    return [
+      {
+        assistant: "checking which apps I may use.",
+        toolCalls: [{ name: "desktop_app_list", args: {} }],
+      },
+      {
+        assistant: `reading ${desktopApp}.`,
+        toolCalls: [{ name: "desktop_app_snapshot", args: { app: desktopApp } }],
+      },
+      {
+        assistant: `opening ${desktopApp}.`,
+        toolCalls: [{ name: "desktop_app_act", args: { app: desktopApp, action: "launch" } }],
+        complete: true,
+      },
+    ];
+  }
   if (lower.includes("show email cards")) {
     const emails = [...prompt.matchAll(/([\w-]+)=(today|within_3_days|this_week|later)\b/g)].map(
       ([, id, urgency]) => ({ id, urgency }),
