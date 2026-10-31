@@ -79,9 +79,20 @@ that runs on this Mac):
 - Switch: **Use real mouse and keyboard**, off by default, with one line under
   it shown only when it is on: "Moves your pointer and takes focus."
 - When macOS has not granted Accessibility to the process that runs
-  agent-desktop, one line replaces the list: "Allow Praci in System Settings >
-  Privacy & Security > Accessibility." It is needed because nothing works
-  without it and the owner cannot discover it otherwise.
+  agent-desktop, one line is added above the list and Add app is hidden: "Allow
+  Praci in System Settings > Privacy & Security > Accessibility." The allowed
+  apps and their Remove buttons stay, because removing does not need
+  Accessibility and a vanished list looks like data loss. The line is needed
+  because nothing works without it and the owner cannot discover it otherwise.
+  The status is read again when the window regains focus, so granting takes
+  effect on return.
+- When the agent-desktop binary is known to be missing (the desktop app's
+  provider is always configured), only the switch shows, disabled unless it is
+  already on, with one line: "Needs agent-desktop: `npm install -g
+  agent-desktop`". Only the deployment owner sees it.
+- "Use real mouse and keyboard" shows only when apps are allowed or it is
+  already on. If listing open apps fails, the Add app menu shows a disabled
+  "Could not list apps"; reopening retries.
 
 Approval card (existing `AskCard`): title "Use Music on this Mac", actions
 "Allow for this run" and "Deny". No "Always allow". The label differs from

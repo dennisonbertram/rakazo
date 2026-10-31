@@ -39,6 +39,8 @@ export const AppControlStatusOutputSchema = z.object({
   available: z.boolean(),
   accessibility: z.enum(["granted", "denied", "unknown"]),
   platform: z.enum(["macos", "windows", "linux"]).nullable(),
+  /** True only for the deployment owner when the agent-desktop binary is known to be missing. */
+  needsInstall: z.boolean().optional(),
 });
 
 /** The only keys a bot may press: unmodified navigation keys, so no paste or shortcut. */

@@ -67,6 +67,41 @@ export const AccessibilityDenied: Story = {
   },
 };
 
+/** agent-desktop is missing: only the switch and the install line show. */
+export const NeedsInstall: Story = {
+  beforeEach: () => {
+    window.rakazoDesktop = { platform: "darwin" } as unknown as RakazoDesktop;
+    mockRpc({
+      "appControl.status": () => ({
+        available: false,
+        accessibility: "unknown",
+        platform: null,
+        needsInstall: true,
+      }),
+    });
+    return () => {
+      window.rakazoDesktop = undefined;
+    };
+  },
+};
+
+/** Listing open apps failed: the menu shows one disabled item, and reopening retries. */
+export const AppsCouldNotLoad: Story = {
+  args: { value: { enabled: true, apps: [music], headed: false }, defaultMenuOpen: true },
+  beforeEach: () => {
+    window.rakazoDesktop = { platform: "darwin" } as unknown as RakazoDesktop;
+    mockRpc({
+      "appControl.status": () => granted,
+      "appControl.apps": () => {
+        throw new Error("unavailable");
+      },
+    });
+    return () => {
+      window.rakazoDesktop = undefined;
+    };
+  },
+};
+
 /** The menu lists running apps that are not already allowed. */
 export const AddAppMenuOpen: Story = {
   args: { value: { enabled: true, apps: [music], headed: false }, defaultMenuOpen: true },

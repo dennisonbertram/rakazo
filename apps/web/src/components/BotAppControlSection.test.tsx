@@ -155,22 +155,76 @@ it("lists allowed apps, removes one, and adds only apps not already allowed", as
 });
 
 it("shows the pointer hint only while real mouse and keyboard is on", async () => {
-  await show({ enabled: true, apps: [], headed: false });
+  await show({ enabled: true, apps: [music], headed: false });
   expect(text()).toContain("Use real mouse and keyboard");
   expect(text()).not.toContain("Moves your pointer");
   const switches = container.querySelectorAll('[role="switch"]');
   await click(switches[1] ?? null);
   expect(onChange).toHaveBeenCalledWith({ headed: true });
-  await show({ enabled: true, apps: [], headed: true });
+  await show({ enabled: true, apps: [music], headed: true });
   expect(text()).toContain("Moves your pointer and takes focus.");
 });
 
-it("replaces the list with the Accessibility line when permission is denied", async () => {
+it("keeps the list and Remove when permission is denied, and hides only Add app", async () => {
   api.status.mockResolvedValue({ available: true, accessibility: "denied", platform: "macos" });
   await show({ enabled: true, apps: [music], headed: false });
   expect(text()).toContain("Allow Praci in System Settings > Privacy & Security > Accessibility.");
+  expect(text()).toContain("Music");
+  expect(container.querySelector('[aria-label="Remove Music"]')).not.toBeNull();
   expect(text()).not.toContain("Add app");
-  expect(container.querySelector('[aria-label="Remove Music"]')).toBeNull();
+});
+
+it("refetches the status when the window regains focus", async () => {
+  api.status.mockResolvedValueOnce({
+    available: true,
+    accessibility: "denied",
+    platform: "macos",
+  });
+  await show({ enabled: true, apps: [music], headed: false });
+  expect(text()).toContain("Allow Praci in System Settings");
+  expect(text()).not.toContain("Add app");
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(text()).not.toContain("Allow Praci in System Settings");
+  expect(text()).toContain("Add app");
+});
+
+it("keeps the last status when a refetch on focus fails", async () => {
+  await show({ enabled: true, apps: [music], headed: false });
+  api.status.mockRejectedValue(new Error("down"));
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(text()).toContain("Add app");
+});
+
+it("shows only the switch and the install line when agent-desktop is missing", async () => {
+  api.status.mockResolvedValue({
+    available: false,
+    accessibility: "unknown",
+    platform: null,
+    needsInstall: true,
+  });
+  await show({ enabled: false, apps: [], headed: false });
+  expect(text()).toContain("Use apps on this Mac");
+  expect(text()).toContain("Needs agent-desktop:");
+  expect(container.querySelector("code")?.textContent).toBe("npm install -g agent-desktop");
+  const toggle = container.querySelector<HTMLButtonElement>('[role="switch"]');
+  expect(toggle?.disabled).toBe(true);
+  await show({ enabled: true, apps: [music], headed: true }, false);
+  const on = container.querySelector<HTMLButtonElement>('[role="switch"]');
+  expect(on?.disabled).toBe(false);
+  expect(container.querySelectorAll('[role="switch"]').length).toBe(1);
+  expect(text()).not.toContain("Add app");
+  expect(text()).not.toContain("Music");
+});
+
+it("shows the real mouse switch only with allowed apps or when already on", async () => {
+  await show({ enabled: true, apps: [], headed: false });
+  expect(text()).not.toContain("Use real mouse and keyboard");
+  await show({ enabled: true, apps: [], headed: true });
+  expect(text()).toContain("Use real mouse and keyboard");
 });
 
 it("adds against the latest saved list, not a stale one", async () => {
@@ -191,10 +245,19 @@ it("looks for open apps on every open and recovers from a failed look", async ()
   const items = () => [
     ...container.querySelectorAll<HTMLButtonElement>('[data-testid="menu-item"]'),
   ];
-  expect(items().map((i) => [i.textContent, i.disabled])).toEqual([["No other open apps", true]]);
+  expect(items().map((i) => [i.textContent, i.disabled])).toEqual([["Could not list apps", true]]);
   await click(trigger());
   expect(api.apps).toHaveBeenCalledTimes(2);
   expect(items().map((i) => i.textContent)).toEqual(["Notes"]);
+});
+
+it("says no other open apps for a real empty list", async () => {
+  api.apps.mockResolvedValue({ apps: [music] });
+  await show({ enabled: true, apps: [music], headed: false });
+  await click(container.querySelector('[data-testid="add-app"]'));
+  expect(
+    [...container.querySelectorAll('[data-testid="menu-item"]')].map((i) => i.textContent),
+  ).toEqual(["No other open apps"]);
 });
 
 it("shows no items while the apps are loading", async () => {

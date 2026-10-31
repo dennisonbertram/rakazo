@@ -18,6 +18,14 @@ export interface AgentDesktopRunner {
   reset?: () => Promise<void>;
 }
 
+/** The agent-desktop binary is known to be absent (not just unreachable or failing). */
+export class AgentDesktopNotInstalledError extends Error {
+  constructor() {
+    super("agent-desktop is not installed.");
+    this.name = "AgentDesktopNotInstalledError";
+  }
+}
+
 const MAX_STDOUT_BYTES = 2 * 1024 * 1024;
 const MAX_STDERR_CHARS = 64 * 1024;
 const BINARY_DIRS = ["/opt/homebrew/bin", "/usr/local/bin"];
@@ -60,7 +68,7 @@ export function spawnAgentDesktopRunner(opts: {
   const runner: AgentDesktopRunner = (argv, { timeoutMs, signal }) =>
     new Promise((resolve, reject) => {
       const binary = opts.binary ?? findBinary(source);
-      if (!binary) return reject(new Error("agent-desktop is not installed."));
+      if (!binary) return reject(new AgentDesktopNotInstalledError());
       mkdirSync(opts.privateDir, { recursive: true, mode: 0o700 });
       chmodSync(opts.privateDir, 0o700);
       const child = spawn(binary, argv, {
@@ -150,6 +158,10 @@ export function bridgeAgentDesktopRunner(opts: {
     const response = await post("/v1/agent-desktop", { argv, timeoutMs }, timeoutMs, signal);
     const body: unknown = await response.json().catch(() => undefined);
     const result = body as Partial<AgentDesktopRunResult> | null | undefined;
+    // The desktop bridge answers exit 127 with this stderr when the binary is missing.
+    if (result?.exitCode === 127 && result.stderr?.includes("agent-desktop not found")) {
+      throw new AgentDesktopNotInstalledError();
+    }
     if (
       typeof result?.exitCode !== "number" ||
       typeof result.stdout !== "string" ||

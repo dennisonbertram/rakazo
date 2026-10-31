@@ -3889,6 +3889,10 @@ msgstr "Could not draft with the agent"
 msgid "Could not duplicate"
 msgstr "Could not duplicate"
 
+#: src/components/BotAppControlSection.tsx
+msgid "Could not list apps"
+msgstr "Could not list apps"
+
 #: src/components/computer/FilesApp.tsx
 msgid "Could not list files"
 msgstr "Could not list files"
@@ -7995,6 +7999,10 @@ msgstr "Needs a monthly burn"
 #: src/components/integrations/IMessageSection.tsx
 msgid "Needs a server restart"
 msgstr "Needs a server restart"
+
+#: src/components/BotAppControlSection.tsx
+msgid "Needs agent-desktop: <0>npm install -g agent-desktop</0>"
+msgstr "Needs agent-desktop: <0>npm install -g agent-desktop</0>"
 
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
