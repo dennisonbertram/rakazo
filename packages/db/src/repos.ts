@@ -1,11 +1,24 @@
-import type { Actor, Bot, BotSection, MessageBlock, SpaceBot } from "@rakazo/contracts";
-import { BOT_COLORS, isVoiceAgentSpawnKey, retiredVoiceAgentSpawnKey } from "@rakazo/contracts";
+import type {
+  Actor,
+  AppControlApp,
+  Bot,
+  BotSection,
+  MessageBlock,
+  SpaceBot,
+} from "@rakazo/contracts";
+import {
+  AppControlAppSchema,
+  BOT_COLORS,
+  isVoiceAgentSpawnKey,
+  retiredVoiceAgentSpawnKey,
+} from "@rakazo/contracts";
 import {
   BACKGROUND_RUN_TRIGGERS,
   isBackgroundRunTrigger,
   messageReaction,
   userVisibleMessages,
 } from "@rakazo/core";
+import * as z from "zod";
 import type { PrismaClient } from "./client.js";
 import type { ComputerMode } from "./computers.js";
 import { ensureComputerRecord, parseComputerMode } from "./computers.js";
@@ -27,6 +40,12 @@ import { withTransactionRetry } from "./transaction-retry.js";
 
 /** Newest messages loaded for sidebar preview; enough to skip a short peer-run tail. */
 const SIDEBAR_PREVIEW_MESSAGE_WINDOW = 16;
+
+/** The stored allowlist; a malformed row reads as no apps. */
+function storedAppControlApps(value: unknown): AppControlApp[] {
+  const parsed = z.array(AppControlAppSchema).safeParse(value);
+  return parsed.success ? parsed.data : [];
+}
 
 function isSpawnKeyConflict(error: unknown): boolean {
   if (!isUniqueViolation(error)) return false;
@@ -80,6 +99,9 @@ function mapBot(
     teamChatAmbientEnabled?: boolean;
     teamChatRules?: string;
     crossSpaceCommunication?: boolean;
+    appControlEnabled?: boolean;
+    appControlApps?: unknown;
+    appControlHeaded?: boolean;
     disabledBuiltinTools?: string[];
     audience?: string;
     externalMessageTargets?: string[];
@@ -131,6 +153,11 @@ function mapBot(
     teamChatAmbientEnabled: bot.teamChatAmbientEnabled ?? false,
     teamChatRules: bot.teamChatRules ?? "",
     crossSpaceCommunication: bot.crossSpaceCommunication ?? false,
+    appControl: {
+      enabled: bot.appControlEnabled ?? false,
+      apps: storedAppControlApps(bot.appControlApps),
+      headed: bot.appControlHeaded ?? false,
+    },
     disabledBuiltinTools: bot.disabledBuiltinTools ?? [],
     audience: bot.audience === "external" ? "external" : "internal",
     externalMessageTargets: bot.externalMessageTargets ?? [],

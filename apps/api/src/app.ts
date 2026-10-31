@@ -29,6 +29,7 @@ import {
   CodexCatalogCache,
   ComposioConnector,
   createAgentHomeStore,
+  createAppControlProvider,
   createArtifactStore,
   createBackgroundJobHandlers,
   createBlueBubblesPollState,
@@ -120,6 +121,7 @@ import {
   describeRowSecurity,
   endSessionPushTokens,
   IsolationError,
+  PostgresAppControlStore,
   parsePositiveInteger,
   provisionMessagingIdentity,
   pushSessionExpiresAt,
@@ -382,6 +384,11 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       dataDir: env.dataDir,
       prisma,
     });
+  // Local desktop control: absent unless APP_CONTROL_PROVIDER is set (docs/local-desktop-control).
+  const appControl = createAppControlProvider(process.env, {
+    dataDir: env.dataDir,
+    store: new PostgresAppControlStore(prisma),
+  });
   const mcpOAuth = new McpOAuthBroker(
     prisma,
     secrets,
@@ -767,6 +774,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     auth,
     jobs,
     sandbox,
+    ...(appControl ? { appControl } : {}),
     memory,
     memoryProviders,
     home,

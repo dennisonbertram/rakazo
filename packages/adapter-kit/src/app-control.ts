@@ -27,6 +27,8 @@ export interface AppControlCapabilities {
 export interface AppControlStatus {
   available: boolean;
   accessibility: "granted" | "denied" | "unknown";
+  /** The host that runs agent-desktop, when known. */
+  platform?: "macos" | "windows" | "linux";
   reason?: string;
 }
 

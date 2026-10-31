@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 322 of 322
-- Web and shared components: 831
+- Web and shared component files with stories: 323 of 323
+- Web and shared components: 832
 - Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 125 in 67 files, native story pending
+- SwiftUI views: 126 in 67 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -80,6 +80,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | AskBotButton | [apps/web/src/components/AskBotButton.tsx](../../apps/web/src/components/AskBotButton.tsx) | [AskBotButton.stories.tsx](../../apps/web/src/components/AskBotButton.stories.tsx) | web |
 | AskCard | [apps/web/src/components/AskCard.tsx](../../apps/web/src/components/AskCard.tsx) | [AskCard.stories.tsx](../../apps/web/src/components/AskCard.stories.tsx) | web |
 | AutoFileEmailSetting | [apps/web/src/components/AutoFileEmailSetting.tsx](../../apps/web/src/components/AutoFileEmailSetting.tsx) | [AutoFileEmailSetting.stories.tsx](../../apps/web/src/components/AutoFileEmailSetting.stories.tsx) | web |
+| BotAppControlSection | [apps/web/src/components/BotAppControlSection.tsx](../../apps/web/src/components/BotAppControlSection.tsx) | [BotAppControlSection.stories.tsx](../../apps/web/src/components/BotAppControlSection.stories.tsx) | web |
 | BotAudienceTag | [apps/web/src/components/BotAudienceTag.tsx](../../apps/web/src/components/BotAudienceTag.tsx) | [BotAudienceTag.stories.tsx](../../apps/web/src/components/BotAudienceTag.stories.tsx) | web |
 | BotTodos | [apps/web/src/components/BotTodos.tsx](../../apps/web/src/components/BotTodos.tsx) | [BotTodos.stories.tsx](../../apps/web/src/components/BotTodos.stories.tsx) | web |
 | CloudAgentCard | [apps/web/src/components/CloudAgentCard.tsx](../../apps/web/src/components/CloudAgentCard.tsx) | [CloudAgentCard.stories.tsx](../../apps/web/src/components/CloudAgentCard.stories.tsx) | web |
@@ -560,7 +561,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
-| AgentPageScreen | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
+| AgentPageScreen, FailedSource | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
 | AppShell | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
 | RootView | [apps/ios/Sources/Praci/App/RootView.swift](../../apps/ios/Sources/Praci/App/RootView.swift) | native story pending | iOS |
 | ArtifactScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift) | native story pending | iOS |

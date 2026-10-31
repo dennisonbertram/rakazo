@@ -1,19 +1,32 @@
 import type { AppControlScope, AppControlStore } from "@rakazo/adapter-kit";
 import { describe, expect, it } from "vitest";
 
-const scope = (runId = "run1", spaceId = "space"): AppControlScope => ({
-  spaceId,
-  userId: "user",
-  botId: "bot",
-  runId,
-});
+export interface AppControlStoreContractIds {
+  space: string;
+  otherSpace: string;
+  user: string;
+  bot: string;
+}
 const row = { snapshotId: "s1", appId: "app", surface: "window" as const, sensitive: false };
 
 /** The behavior every AppControlStore must have; the Postgres store runs this too. */
 export function appControlStoreContract(
   name: string,
   makeStore: () => AppControlStore | Promise<AppControlStore>,
+  /** Ids the scopes use; a store with foreign keys passes ids of rows that exist. */
+  ids: AppControlStoreContractIds = {
+    space: "space",
+    otherSpace: "space2",
+    user: "user",
+    bot: "bot",
+  },
 ) {
+  const scope = (runId = "run1", spaceId = ids.space): AppControlScope => ({
+    spaceId,
+    userId: ids.user,
+    botId: ids.bot,
+    runId,
+  });
   describe(`${name} contract`, () => {
     it("records, reads and finds the latest snapshot of an app", async () => {
       const store = await makeStore();
@@ -41,7 +54,7 @@ export function appControlStoreContract(
       const store = await makeStore();
       await store.record(scope("run1"), row);
       expect(await store.get(scope("run2"), "s1")).toBeUndefined();
-      expect(await store.get(scope("run1", "space2"), "s1")).toBeUndefined();
+      expect(await store.get(scope("run1", ids.otherSpace), "s1")).toBeUndefined();
       await store.record(scope("run2"), row);
       await store.markSpent(scope("run2"), "s1");
       expect(await store.get(scope("run1"), "s1")).toMatchObject({ spent: false });

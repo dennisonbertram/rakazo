@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type {
   AgentSkillCatalogEntry,
   Bot,
+  BotAppControl,
   BotAudience,
   ComputerHost,
   ComputerMode,
@@ -9,6 +10,7 @@ import type {
   ModelCatalogEntry,
   ModelCredential,
   ThinkingLevel,
+  UpdateBotAppControl,
   VoiceInfo,
 } from "@rakazo/contracts";
 import {
@@ -38,6 +40,7 @@ import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { ApprovalActionsTable } from "../../components/ApprovalActionsTable";
 import { SuccessPop } from "../../components/ai/primitives";
+import { BotAppControlSection } from "../../components/BotAppControlSection";
 import { ErrorBoundary, SectionLoadFailed } from "../../components/ErrorBoundary";
 import { RunsOnPicker } from "../../components/RunsOnPicker";
 import { botProfilePatch } from "../../lib/bot-profile-patch";
@@ -61,7 +64,11 @@ type AudiencePatch = {
   audience?: BotAudience;
   externalMessageTargets?: string[];
   externalComputerTools?: boolean;
+  /** Local desktop control; sent only when it changed. */
+  appControl?: UpdateBotAppControl;
 };
+
+const NO_APP_CONTROL: BotAppControl = { enabled: false, apps: [], headed: false };
 
 /** The selected segment is a filled ink pill, so Internal/External and Team/Private read at a glance. */
 const SELECTED_SEGMENT =
@@ -249,6 +256,11 @@ export function BotSettings({
   const [crossSpaceCommunication, setCrossSpaceCommunication] = useState(
     bot.crossSpaceCommunication ?? false,
   );
+  const [appControl, setAppControl] = useState(bot.appControl ?? NO_APP_CONTROL);
+  // Follow the saved settings when nothing is being saved, so a stale copy cannot be edited.
+  useEffect(() => {
+    if (pendingSavesRef.current === 0) setAppControl(bot.appControl ?? NO_APP_CONTROL);
+  }, [bot.appControl]);
   const [voiceId, setVoiceId] = useState(bot.voiceId ?? "");
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [modelKey, setModelKey] = useState(
@@ -450,6 +462,7 @@ export function BotSettings({
         ...(patchOverrides?.externalMessageTargets !== undefined
           ? { externalMessageTargets: patchOverrides.externalMessageTargets }
           : {}),
+        ...(patchOverrides?.appControl ? { appControl: patchOverrides.appControl } : {}),
         ...(patchOverrides?.externalComputerTools !== undefined
           ? { externalComputerTools: patchOverrides.externalComputerTools }
           : {}),
@@ -507,6 +520,7 @@ export function BotSettings({
       setAudience(bot.audience);
       setAllowedTargets(bot.externalMessageTargets);
       setComputerOn(bot.externalComputerTools);
+      setAppControl(bot.appControl ?? NO_APP_CONTROL);
     } finally {
       pendingSavesRef.current -= 1;
       if (pendingSavesRef.current === 0) {
@@ -803,6 +817,14 @@ export function BotSettings({
                   />
                 </div>
               ) : null}
+              <BotAppControlSection
+                value={appControl}
+                runsOnThisMac={(hostComputer ? runsOn : bot.runsOn) === "this-mac"}
+                onChange={(patch) => {
+                  setAppControl((current) => ({ ...current, ...patch }));
+                  void enqueueSave({ appControl: patch });
+                }}
+              />
               {advancedOpened ? (
                 <ErrorBoundary fallback={<SectionLoadFailed />}>
                   <Suspense fallback={null}>
