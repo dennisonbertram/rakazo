@@ -55,6 +55,21 @@ export const Metric: Story = {};
 export const MetricFailed: Story = {
   args: { data: { ...ok, status: "failed", error: "Request timed out" } },
 };
+export const MetricPaused: Story = {
+  args: { data: { ...ok, status: "paused", error: "Paused after 5 failures" } },
+};
+export const MetricPausedEmpty: Story = { args: { data: { status: "paused", fetchedAt: null } } };
+/** An old value shows its date without hover. */
+export const MetricFailedTwoDaysAgo: Story = {
+  args: {
+    data: {
+      ...ok,
+      status: "failed",
+      error: "Request timed out",
+      fetchedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    },
+  },
+};
 export const MetricRefreshing: Story = { parameters: { refreshing: true } };
 export const MetricPending: Story = { args: { data: { status: "pending", fetchedAt: null } } };
 export const MetricEmpty: Story = { args: { data: { status: "empty", fetchedAt: null } } };
