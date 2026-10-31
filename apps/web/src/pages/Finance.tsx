@@ -172,7 +172,7 @@ function Dashboard() {
 
   // An explicit refresh is forced by the server; the overview queues its own throttled background
   // sync. This reads the vendors, then the dashboard reads the stored result.
-  // A click holds "Syncing…" briefly: a throttled refresh answers at once and would show no change.
+  // A click holds "Syncing…" briefly: a quick refresh would otherwise flash no visible change.
   const sync = (holdMs = 0) => {
     setSyncing(true);
     setSyncError("");
