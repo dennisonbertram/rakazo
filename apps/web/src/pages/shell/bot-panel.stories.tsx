@@ -116,7 +116,10 @@ export const PinnedConnectionRemoved: Story = {
       modelCredentialId: "cred_gone",
     },
   },
-  play: PinnedConnection.play,
+  // A lost pin opens Advanced by itself, so the play must not click it shut.
+  play: async () => {
+    await screen.findByRole("combobox", { name: "Model" });
+  },
 };
 
 const openAdvanced: Story["play"] = async ({ canvasElement }) => {

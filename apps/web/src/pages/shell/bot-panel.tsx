@@ -19,6 +19,7 @@ import {
 } from "@rakazo/contracts";
 import {
   connectedModelChoices,
+  modelKeyForConnection,
   modelOptionKey,
   parseModelOptionKey,
   resolveSelectableModelId,
@@ -355,6 +356,17 @@ export function BotSettings({
     pinnedCredential ? [pinnedCredential] : credentials,
     catalog,
   );
+  // A lost pin is fixed in Advanced > Connection: open it once, without saving.
+  const advancedRef = useRef<HTMLDetailsElement>(null);
+  const openedForLostPin = useRef(false);
+  const scrollToConnection = useRef(false);
+  const pinLost = modelMetaReady && credentialId !== "" && !pinnedCredential;
+  useEffect(() => {
+    if (!pinLost || openedForLostPin.current || !advancedRef.current) return;
+    openedForLostPin.current = true;
+    scrollToConnection.current = true;
+    advancedRef.current.open = true;
+  }, [pinLost]);
   const storedModel = modelKey ? parseModelOptionKey(modelKey) : null;
   const selectedModel = storedModel
     ? {
@@ -749,14 +761,21 @@ export function BotSettings({
             <ApprovalActionsTable botId={bot.id} />
           </section>
           <details
+            ref={advancedRef}
             data-testid="bot-settings-advanced"
             className="group mt-5 open:pb-3"
             onToggle={(event) => {
               if (!event.currentTarget.open) return;
               setAdvancedOpened(true);
-              event.currentTarget
-                .querySelector("summary")
-                ?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+              const target = scrollToConnection.current
+                ? event.currentTarget.querySelector('select[id$="-connection"]')
+                : event.currentTarget.querySelector("summary");
+              const block = scrollToConnection.current ? "center" : "nearest";
+              scrollToConnection.current = false;
+              target?.scrollIntoView?.({
+                block,
+                behavior: "smooth",
+              });
             }}
           >
             <summary
@@ -800,13 +819,11 @@ export function BotSettings({
                     value={credentialId}
                     onChange={(event) => {
                       const next = credentials.find((entry) => entry.id === event.target.value);
-                      const choices = connectedModelChoices(next ? [next] : credentials, catalog);
                       saveOnChange(() => {
                         setCredentialId(next?.id ?? "");
                         setThinkingLevel("");
-                        if (next && !choices.some((choice) => choice.key === selectedModelKey)) {
-                          setModelKey(choices[0]?.key ?? "");
-                        }
+                        if (next)
+                          setModelKey(modelKeyForConnection(next, catalog, selectedModelKey));
                       });
                     }}
                   >
