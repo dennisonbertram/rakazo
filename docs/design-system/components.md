@@ -4,9 +4,9 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 322 of 322
-- Web and shared components: 831
+- Web and shared components: 832
 - Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 125 in 67 files, native story pending
+- SwiftUI views: 126 in 67 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -189,7 +189,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ImportActivity | [apps/web/src/components/data-room/ImportActivity.tsx](../../apps/web/src/components/data-room/ImportActivity.tsx) | [ImportActivity.stories.tsx](../../apps/web/src/components/data-room/ImportActivity.stories.tsx) | web |
 | DrivePicker | [apps/web/src/components/data-room/ImportFromDrive.tsx](../../apps/web/src/components/data-room/ImportFromDrive.tsx) | [ImportFromDrive.stories.tsx](../../apps/web/src/components/data-room/ImportFromDrive.stories.tsx) | web |
 | MessageRow, EmailPicker, ImportSources | [apps/web/src/components/data-room/ImportFromEmail.tsx](../../apps/web/src/components/data-room/ImportFromEmail.tsx) | [ImportFromEmail.stories.tsx](../../apps/web/src/components/data-room/ImportFromEmail.stories.tsx) | web |
-| NameInput, FolderOptions, NewFolderDialog, ItemDialog, ShareDialog, DeleteDialog | [apps/web/src/components/data-room/ItemDialogs.tsx](../../apps/web/src/components/data-room/ItemDialogs.tsx) | [ItemDialogs.stories.tsx](../../apps/web/src/components/data-room/ItemDialogs.stories.tsx) | web |
+| NameInput, FolderOptions, MoveFilesDialog, NewFolderDialog, ItemDialog, ShareDialog, DeleteDialog | [apps/web/src/components/data-room/ItemDialogs.tsx](../../apps/web/src/components/data-room/ItemDialogs.tsx) | [ItemDialogs.stories.tsx](../../apps/web/src/components/data-room/ItemDialogs.stories.tsx) | web |
 | ItemMenuItems, ItemMenu | [apps/web/src/components/data-room/ItemMenu.tsx](../../apps/web/src/components/data-room/ItemMenu.tsx) | [ItemDialogs.stories.tsx](../../apps/web/src/components/data-room/ItemDialogs.stories.tsx), [ItemMenu.stories.tsx](../../apps/web/src/components/data-room/ItemMenu.stories.tsx) | web |
 | FileContext, Marker, Columns, ListHead, RetryButton, ReplaceButton, FailedAction, ItemRow, SubfolderList, ListView, ThumbnailImage, TextPreview, TilePreview, GridView, TypeAndDate, Snippet | [apps/web/src/components/data-room/ItemRows.tsx](../../apps/web/src/components/data-room/ItemRows.tsx) | [ItemRows.stories.tsx](../../apps/web/src/components/data-room/ItemRows.stories.tsx) | web |
 | PathBar | [apps/web/src/components/data-room/PathBar.tsx](../../apps/web/src/components/data-room/PathBar.tsx) | [PathBar.stories.tsx](../../apps/web/src/components/data-room/PathBar.stories.tsx) | web |
@@ -560,7 +560,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
-| AgentPageScreen | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
+| AgentPageScreen, FailedSource | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
 | AppShell | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
 | RootView | [apps/ios/Sources/Praci/App/RootView.swift](../../apps/ios/Sources/Praci/App/RootView.swift) | native story pending | iOS |
 | ArtifactScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift) | native story pending | iOS |

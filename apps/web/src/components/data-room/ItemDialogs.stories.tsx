@@ -112,23 +112,29 @@ const filesIn = (...ids: (string | null)[]) =>
 /** Ticked files that share a folder start with that folder chosen. */
 export const MoveFilesSameFolder: StoryObj = {
   render: () => (
-    <MoveFilesDialog
-      items={filesIn(contracts.id, contracts.id, contracts.id)}
-      folders={folderNodes(folders)}
-      onClose={() => undefined}
-      onDone={() => undefined}
-    />
+    <>
+      <p className="p-4 text-sm">3 files ticked</p>
+      <MoveFilesDialog
+        items={filesIn(contracts.id, contracts.id, contracts.id)}
+        folders={folderNodes(folders)}
+        onClose={() => undefined}
+        onDone={() => undefined}
+      />
+    </>
   ),
 };
 
 /** Files from different folders start unchosen, and Save stays off until a folder is picked. */
 export const MoveFilesMixedFolders: StoryObj = {
   render: () => (
-    <MoveFilesDialog
-      items={filesIn(contracts.id, reports.id, null)}
-      folders={folderNodes(folders)}
-      onClose={() => undefined}
-      onDone={() => undefined}
-    />
+    <>
+      <p className="p-4 text-sm">3 files ticked</p>
+      <MoveFilesDialog
+        items={filesIn(contracts.id, reports.id, null)}
+        folders={folderNodes(folders)}
+        onClose={() => undefined}
+        onDone={() => undefined}
+      />
+    </>
   ),
 };
