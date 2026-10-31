@@ -22,5 +22,10 @@ export function createAppControlProvider(
     url && token
       ? bridgeAgentDesktopRunner({ url, token })
       : spawnAgentDesktopRunner({ privateDir: path.join(opts.dataDir, "app-control"), env });
-  return new AgentDesktopAppControl({ runner, store: opts.store });
+  // A bridge runs the CLI on the owner's host, so this process's platform says nothing.
+  return new AgentDesktopAppControl({
+    runner,
+    store: opts.store,
+    platform: url && token ? null : undefined,
+  });
 }

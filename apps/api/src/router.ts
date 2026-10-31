@@ -171,6 +171,7 @@ import type {
   NotificationDto,
   Routine,
   SpaceNavigation,
+  UpdateBotAppControl,
   WatchPausedReason,
 } from "@rakazo/contracts";
 import {
@@ -195,6 +196,7 @@ import {
   isCompanyImporterSpawnKey,
   isCustomPageSpawnKey,
   isDataRoomAgentSpawnKey,
+  isDeniedApp,
   isFinanceAgentSpawnKey,
   isGranolaEndpoint,
   isGtmAgentSpawnKey,
@@ -1980,6 +1982,32 @@ export function createRouter(deps: RouterDeps) {
         spaces: navigation.spaces,
       };
     }),
+    appControl: {
+      status: authed.appControl.status.handler(async ({ context }) => {
+        const none = { available: false, accessibility: "unknown", platform: null } as const;
+        if (!deps.appControl || !context.actor.isDeploymentOwner) return none;
+        try {
+          const status = await deps.appControl.status(
+            connectionContext(context.actor, randomUUID()),
+          );
+          return {
+            available: status.available,
+            accessibility: status.accessibility,
+            platform: status.platform ?? null,
+          };
+        } catch {
+          return none;
+        }
+      }),
+      apps: authed.appControl.apps.handler(async ({ context }) => {
+        if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+        if (!deps.appControl) {
+          throw new ORPCError("PRECONDITION_FAILED", { message: "App control is not set up" });
+        }
+        const apps = await deps.appControl.listApps(connectionContext(context.actor, randomUUID()));
+        return { apps: apps.filter((app) => !isDeniedApp(app)) };
+      }),
+    },
     deployment: {
       get: authed.deployment.get.handler(async ({ context }) => {
         if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
@@ -2757,6 +2785,7 @@ export function createRouter(deps: RouterDeps) {
           }
         }
         if (!existing.thread) throw new IsolationError();
+        const appControl = await checkAppControlUpdate(deps, context.actor, existing, input);
         if (input.runsOn !== undefined && input.runsOn !== (existing.runsOn ?? null)) {
           assertRunsOnAllowed({
             runsOn: input.runsOn,
@@ -2827,6 +2856,9 @@ export function createRouter(deps: RouterDeps) {
             ...(input.crossSpaceCommunication !== undefined
               ? { crossSpaceCommunication: input.crossSpaceCommunication }
               : {}),
+            ...(appControl?.enabled !== undefined ? { appControlEnabled: appControl.enabled } : {}),
+            ...(appControl?.apps !== undefined ? { appControlApps: appControl.apps } : {}),
+            ...(appControl?.headed !== undefined ? { appControlHeaded: appControl.headed } : {}),
             ...(input.disabledBuiltinTools !== undefined
               ? { disabledBuiltinTools: input.disabledBuiltinTools }
               : {}),
@@ -10268,6 +10300,54 @@ export function assertRunsOnAllowed(input: {
     });
   }
   if (input.runsOn === "this-mac" && !input.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+}
+
+/**
+ * Validates an owner's app control change and returns what to store. Turning it off, removing
+ * apps and the headed switch need no more than ownership; turning it on or adding apps needs a
+ * provider and a bot that does not run on this Mac.
+ */
+async function checkAppControlUpdate(
+  deps: RouterDeps,
+  actor: Actor,
+  bot: { runsOn?: string | null; appControlEnabled?: boolean },
+  input: { appControl?: UpdateBotAppControl; runsOn?: string | null },
+): Promise<UpdateBotAppControl | undefined> {
+  const change = input.appControl;
+  const movesHost = input.runsOn !== undefined && input.runsOn !== (bot.runsOn ?? null);
+  if (!change && !movesHost) return undefined;
+  if (change && !actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+  let apps = change?.apps;
+  if (apps) {
+    const seen = new Set<string>();
+    apps = apps.filter((app) => {
+      if (isDeniedApp(app)) {
+        throw new ORPCError("BAD_REQUEST", { message: `${app.name} cannot be used` });
+      }
+      const key = app.id.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  const adds = change?.enabled === true || (apps !== undefined && apps.length > 0);
+  if (adds && !deps.appControl) {
+    throw new ORPCError("PRECONDITION_FAILED", { message: "App control is not set up" });
+  }
+  // The settings as they will be after this update, so a combined change cannot slip through.
+  const enabledAfter = change?.enabled ?? bot.appControlEnabled ?? false;
+  if (enabledAfter && (adds || movesHost)) {
+    const hostAfter =
+      (input.runsOn !== undefined ? input.runsOn : bot.runsOn) ??
+      (await deploymentComputerHost(deps));
+    if (hostAfter === "this-mac") {
+      throw new ORPCError("BAD_REQUEST", {
+        message:
+          "A bot that runs on this Mac cannot use apps on it. Turn off apps on this Mac first.",
+      });
+    }
+  }
+  return change ? { ...change, ...(apps ? { apps } : {}) } : undefined;
 }
 
 async function deploymentComputerHost(deps: RouterDeps): Promise<"docker" | "this-mac"> {

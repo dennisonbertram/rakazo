@@ -1072,6 +1072,10 @@ msgstr ""
 msgid "Add API key"
 msgstr ""
 
+#: src/components/BotAppControlSection.tsx
+msgid "Add app"
+msgstr ""
+
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/components/cap-table/HoldingsTable.tsx
 msgid "Add as contact"
@@ -1407,6 +1411,10 @@ msgstr "Permitir una vez"
 
 #: src/components/integrations/SignInStep.tsx
 msgid "Allow pop-ups for this site, or open the sign-in page directly."
+msgstr ""
+
+#: src/components/BotAppControlSection.tsx
+msgid "Allow Praci in System Settings > Privacy & Security > Accessibility."
 msgstr ""
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
@@ -7921,6 +7929,10 @@ msgstr ""
 msgid "Moved {n} to trash"
 msgstr ""
 
+#: src/components/BotAppControlSection.tsx
+msgid "Moves your pointer and takes focus."
+msgstr ""
+
 #: src/components/SecretRequestDialog.tsx
 msgid "Multi line"
 msgstr ""
@@ -8472,6 +8484,10 @@ msgstr ""
 
 #: src/pages/Company.tsx
 msgid "No organisations yet"
+msgstr ""
+
+#: src/components/BotAppControlSection.tsx
+msgid "No other open apps"
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -10315,9 +10331,10 @@ msgstr ""
 msgid "Remove"
 msgstr "Quitar"
 
+#. placeholder {0}: app.name
 #. placeholder {0}: attachment.file.name
 #. placeholder {0}: file.filename
-#. placeholder {0}: file.name
+#: src/components/BotAppControlSection.tsx
 #: src/components/compose/RecipientField.tsx
 #: src/components/ComposeEmail.tsx
 #: src/components/integrations/AppDetail.tsx
@@ -10817,7 +10834,6 @@ msgid "Round actions"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
-#: src/pages/Shell.tsx
 msgid "Routine"
 msgstr "Rutina"
 
@@ -13619,6 +13635,14 @@ msgstr ""
 msgid "Use API key"
 msgstr ""
 
+#: src/components/BotAppControlSection.tsx
+msgid "Use apps on this computer"
+msgstr ""
+
+#: src/components/BotAppControlSection.tsx
+msgid "Use apps on this Mac"
+msgstr ""
+
 #: src/components/integrations/OmiPage.tsx
 msgid "Use Chrome, Edge or the desktop app"
 msgstr ""
@@ -13641,6 +13665,10 @@ msgstr ""
 
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Use Protected input for passwords."
+msgstr ""
+
+#: src/components/BotAppControlSection.tsx
+msgid "Use real mouse and keyboard"
 msgstr ""
 
 #: src/components/ApprovalActionsTable.tsx

@@ -3582,6 +3582,341 @@
         ]
       }
     },
+    "/rpc/appControl/apps": {
+      "post": {
+        "operationId": "rpc_appControl_apps",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "apps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "apps"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/appControl/status": {
+      "post": {
+        "operationId": "rpc_appControl_status",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "available": {
+                          "type": "boolean"
+                        },
+                        "accessibility": {
+                          "type": "string",
+                          "enum": [
+                            "granted",
+                            "denied",
+                            "unknown"
+                          ]
+                        },
+                        "platform": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "macos",
+                                "windows",
+                                "linux"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "available",
+                        "accessibility",
+                        "platform"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/approvalRules/list": {
       "post": {
         "operationId": "rpc_approvalRules_list",
@@ -8251,13 +8586,13 @@
                         "groups": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
+                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema22"
                           }
                         },
                         "botSections": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
+                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema32"
                           }
                         },
                         "archivedBots": {
@@ -8269,7 +8604,7 @@
                         "archivedGroups": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
+                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema22"
                           }
                         },
                         "thread": {
@@ -8302,7 +8637,7 @@
                                         "maximum": 9007199254740991
                                       },
                                       "role": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema32"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema33"
                                       },
                                       "blocks": {
                                         "type": "array",
@@ -8517,13 +8852,13 @@
                                                   "type": "object",
                                                   "properties": {
                                                     "name": {
-                                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema33"
-                                                    },
-                                                    "origin": {
                                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema34"
                                                     },
-                                                    "auth": {
+                                                    "origin": {
                                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema35"
+                                                    },
+                                                    "auth": {
+                                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema36"
                                                     }
                                                   },
                                                   "required": [
@@ -9050,16 +9385,16 @@
                                               "type": "object",
                                               "properties": {
                                                 "kind": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema36"
-                                                },
-                                                "name": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema37"
                                                 },
-                                                "spec": {
+                                                "name": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema38"
                                                 },
-                                                "data": {
+                                                "spec": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema39"
+                                                },
+                                                "data": {
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema40"
                                                 }
                                               },
                                               "required": [
@@ -9133,7 +9468,7 @@
                                                   "maxItems": 20,
                                                   "type": "array",
                                                   "items": {
-                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema41"
+                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
                                                   }
                                                 }
                                               },
@@ -9157,7 +9492,7 @@
                                                   "minItems": 1,
                                                   "type": "array",
                                                   "items": {
-                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema42"
+                                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
                                                   }
                                                 }
                                               },
@@ -9185,10 +9520,10 @@
                                                           "const": "overview"
                                                         },
                                                         "cashCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                         },
                                                         "burnCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                         },
                                                         "runwayMonths": {
                                                           "type": [
@@ -9197,7 +9532,7 @@
                                                           ]
                                                         },
                                                         "monthSpendCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                         }
                                                       },
                                                       "required": [
@@ -9227,13 +9562,13 @@
                                                           "type": "string"
                                                         },
                                                         "totalCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                         },
                                                         "rows": {
                                                           "maxItems": 5,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
                                                           }
                                                         }
                                                       },
@@ -9265,13 +9600,13 @@
                                                           "maximum": 9007199254740991
                                                         },
                                                         "totalCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                         },
                                                         "rows": {
                                                           "maxItems": 5,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema46"
                                                           }
                                                         }
                                                       },
@@ -9291,16 +9626,16 @@
                                                           "const": "recurring"
                                                         },
                                                         "monthlyCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                         },
                                                         "upcomingCents": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
                                                         },
                                                         "rows": {
                                                           "maxItems": 5,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema45"
                                                           }
                                                         }
                                                       },
@@ -9334,16 +9669,16 @@
                                                       "type": "object",
                                                       "properties": {
                                                         "type": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema46"
-                                                        },
-                                                        "title": {
                                                           "$ref": "#/components/schemas/RpcBootstrapOutputSchema47"
                                                         },
+                                                        "title": {
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                                        },
                                                         "columns": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
                                                         },
                                                         "rows": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema52"
                                                         }
                                                       },
                                                       "required": [
@@ -9365,7 +9700,7 @@
                                                           "maxItems": 20,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
                                                           }
                                                         }
                                                       },
@@ -9383,14 +9718,14 @@
                                                           "const": "summary"
                                                         },
                                                         "title": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
                                                         },
                                                         "items": {
                                                           "minItems": 1,
                                                           "maxItems": 20,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema56"
                                                           }
                                                         }
                                                       },
@@ -9412,7 +9747,7 @@
                                                           "maxItems": 6,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema57"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema58"
                                                           }
                                                         }
                                                       },
@@ -9434,7 +9769,7 @@
                                                           "maxItems": 20,
                                                           "type": "array",
                                                           "items": {
-                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema58"
+                                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
                                                           }
                                                         }
                                                       },
@@ -9461,10 +9796,10 @@
                                                           ]
                                                         },
                                                         "title": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
                                                         },
                                                         "body": {
-                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
+                                                          "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
                                                         }
                                                       },
                                                       "required": [
@@ -9635,7 +9970,7 @@
                                                   "type": "string"
                                                 },
                                                 "intent": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
                                                 }
                                               },
                                               "required": [
@@ -9663,7 +9998,7 @@
                                                   "type": "string"
                                                 },
                                                 "intent": {
-                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema59"
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
                                                 },
                                                 "returnToMessageId": {
                                                   "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -9719,7 +10054,7 @@
                                             "type": "object",
                                             "properties": {
                                               "role": {
-                                                "$ref": "#/components/schemas/RpcBootstrapOutputSchema32"
+                                                "$ref": "#/components/schemas/RpcBootstrapOutputSchema33"
                                               },
                                               "botId": {
                                                 "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -9823,13 +10158,13 @@
                                 "members": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
+                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema28"
                                   }
                                 },
                                 "run": {
                                   "anyOf": [
                                     {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
                                     },
                                     {
                                       "type": "null"
@@ -9839,7 +10174,7 @@
                                 "activeRuns": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema60"
+                                    "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
                                   }
                                 },
                                 "delegatePending": {
@@ -10102,7 +10437,7 @@
                                             "maxLength": 2048
                                           },
                                           "intervalMinutes": {
-                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
                                           }
                                         },
                                         "required": [
@@ -10141,10 +10476,10 @@
                                           "arguments": {
                                             "type": "object",
                                             "propertyNames": {
-                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
                                             },
                                             "additionalProperties": {
-                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
+                                              "$ref": "#/components/schemas/RpcBootstrapOutputSchema64"
                                             }
                                           },
                                           "appName": {
@@ -10152,7 +10487,7 @@
                                             "pattern": "^[A-Za-z0-9 ._-]{1,60}$"
                                           },
                                           "intervalMinutes": {
-                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema61"
+                                            "$ref": "#/components/schemas/RpcBootstrapOutputSchema62"
                                           }
                                         },
                                         "required": [
@@ -10359,7 +10694,7 @@
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema11"
                                     },
                                     "spawnKey": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema20"
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
                                     },
                                     "preview": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema12"
@@ -10410,28 +10745,28 @@
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
                                     },
                                     "name": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema22"
-                                    },
-                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema23"
                                     },
-                                    "sectionId": {
+                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema24"
                                     },
-                                    "position": {
+                                    "sectionId": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema25"
                                     },
-                                    "members": {
+                                    "position": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema26"
                                     },
-                                    "preview": {
-                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema28"
+                                    "members": {
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
                                     },
-                                    "unread": {
+                                    "preview": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema29"
                                     },
-                                    "updatedAt": {
+                                    "unread": {
                                       "$ref": "#/components/schemas/RpcBootstrapOutputSchema30"
+                                    },
+                                    "updatedAt": {
+                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
                                     }
                                   },
                                   "required": [
@@ -10492,10 +10827,10 @@
                                     "automatedSenderPolicies": {
                                       "type": "object",
                                       "propertyNames": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema64"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema65"
                                       },
                                       "additionalProperties": {
-                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema65"
+                                        "$ref": "#/components/schemas/RpcBootstrapOutputSchema66"
                                       }
                                     },
                                     "automatedSenders": {
@@ -10556,7 +10891,7 @@
                               "botSections": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
+                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema32"
                                 }
                               }
                             },
@@ -13005,6 +13340,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcBotsCreateOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -13465,6 +13824,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcBotsDuplicateOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -13927,6 +14310,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcBotsGetOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -14376,6 +14783,30 @@
                           },
                           "crossSpaceCommunication": {
                             "type": "boolean"
+                          },
+                          "appControl": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "apps": {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/RpcBotsListOutputSchema1"
+                                }
+                              },
+                              "headed": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "enabled",
+                              "apps",
+                              "headed"
+                            ],
+                            "additionalProperties": false
                           },
                           "disabledBuiltinTools": {
                             "default": [],
@@ -14827,6 +15258,30 @@
                           },
                           "crossSpaceCommunication": {
                             "type": "boolean"
+                          },
+                          "appControl": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "apps": {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/RpcBotsListArchivedOutputSchema1"
+                                }
+                              },
+                              "headed": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "enabled",
+                              "apps",
+                              "headed"
+                            ],
+                            "additionalProperties": false
                           },
                           "disabledBuiltinTools": {
                             "default": [],
@@ -15951,6 +16406,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcBotsSetComputerOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -16203,20 +16682,23 @@
                       "crossSpaceCommunication": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema19"
                       },
-                      "disabledBuiltinTools": {
+                      "appControl": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema20"
                       },
-                      "audience": {
+                      "disabledBuiltinTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema22"
                       },
-                      "externalMessageTargets": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
-                      },
-                      "externalComputerTools": {
+                      "audience": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema24"
                       },
-                      "runsOn": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema25"
+                      },
+                      "externalComputerTools": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema26"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
                       }
                     },
                     "required": [
@@ -16484,6 +16966,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcBotsUpdateOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -19024,6 +19530,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcCartaAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -19806,6 +20336,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcCompanyAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -24432,6 +24986,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcCompanyImportAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -36077,6 +36655,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcDataRoomAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -43083,6 +43685,30 @@
                                 "crossSpaceCommunication": {
                                   "type": "boolean"
                                 },
+                                "appControl": {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "type": "boolean"
+                                    },
+                                    "apps": {
+                                      "maxItems": 20,
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/components/schemas/RpcDevinAgentOutputSchema1"
+                                      }
+                                    },
+                                    "headed": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "enabled",
+                                    "apps",
+                                    "headed"
+                                  ],
+                                  "additionalProperties": false
+                                },
                                 "disabledBuiltinTools": {
                                   "default": [],
                                   "type": "array",
@@ -47317,6 +47943,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcFinanceAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -64409,6 +65059,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcGtmAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -66049,6 +66723,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcInboxAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -66862,6 +67560,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcInboxAskAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -73648,6 +74370,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcInvestorsAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -80597,6 +81343,30 @@
                         },
                         "crossSpaceCommunication": {
                           "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcLegalAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
                         },
                         "disabledBuiltinTools": {
                           "default": [],
@@ -100490,6 +101260,13 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 60
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "blocks",
+                          "html"
+                        ]
                       }
                     },
                     "required": [
@@ -100535,6 +101312,14 @@
                           "type": "string",
                           "maxLength": 200000
                         },
+                        "kind": {
+                          "default": "blocks",
+                          "type": "string",
+                          "enum": [
+                            "blocks",
+                            "html"
+                          ]
+                        },
                         "revision": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -100562,6 +101347,7 @@
                         "botId",
                         "title",
                         "content",
+                        "kind",
                         "revision",
                         "updatedBy",
                         "updatedAt"
@@ -100719,65 +101505,129 @@
                       "$schema": "https://json-schema.org/draft/2020-12/schema",
                       "anyOf": [
                         {
-                          "type": "object",
-                          "properties": {
-                            "pageId": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "revision": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            "blocks": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "ok",
-                                      "failed",
-                                      "pending",
-                                      "paused",
-                                      "denied",
-                                      "missing",
-                                      "empty"
-                                    ]
-                                  },
-                                  "fetchedAt": {
-                                    "type": [
-                                      "string",
-                                      "null"
-                                    ]
-                                  },
-                                  "error": {
-                                    "type": "string"
-                                  },
-                                  "text": {
-                                    "type": "string"
-                                  },
-                                  "rows": {
-                                    "type": "array",
-                                    "items": {}
-                                  }
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "html"
                                 },
-                                "required": [
-                                  "status",
-                                  "fetchedAt"
-                                ],
-                                "additionalProperties": false
-                              }
+                                "pageId": {
+                                  "$ref": "#/components/schemas/RpcPagesDataOutputSchema0"
+                                },
+                                "revision": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "sources": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "$ref": "#/components/schemas/RpcPagesDataOutputSchema1"
+                                      },
+                                      "fetchedAt": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "error": {
+                                        "type": "string"
+                                      },
+                                      "value": {},
+                                      "history": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "at": {
+                                              "type": "string"
+                                            },
+                                            "value": {}
+                                          },
+                                          "required": [
+                                            "at",
+                                            "value"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "status",
+                                      "fetchedAt"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "pageId",
+                                "revision",
+                                "sources"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "pageId": {
+                                  "$ref": "#/components/schemas/RpcPagesDataOutputSchema0"
+                                },
+                                "revision": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "blocks": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "$ref": "#/components/schemas/RpcPagesDataOutputSchema1"
+                                      },
+                                      "fetchedAt": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "error": {
+                                        "type": "string"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "rows": {
+                                        "type": "array",
+                                        "items": {}
+                                      }
+                                    },
+                                    "required": [
+                                      "status",
+                                      "fetchedAt"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "pageId",
+                                "revision",
+                                "blocks"
+                              ],
+                              "additionalProperties": false
                             }
-                          },
-                          "required": [
-                            "pageId",
-                            "revision",
-                            "blocks"
-                          ],
-                          "additionalProperties": false
+                          ]
                         },
                         {
                           "type": "null"
@@ -100955,6 +101805,14 @@
                               "type": "string",
                               "maxLength": 200000
                             },
+                            "kind": {
+                              "default": "blocks",
+                              "type": "string",
+                              "enum": [
+                                "blocks",
+                                "html"
+                              ]
+                            },
                             "revision": {
                               "type": "integer",
                               "exclusiveMinimum": 0,
@@ -100982,6 +101840,7 @@
                             "botId",
                             "title",
                             "content",
+                            "kind",
                             "revision",
                             "updatedBy",
                             "updatedAt"
@@ -101153,6 +102012,14 @@
                             "minLength": 1,
                             "maxLength": 60
                           },
+                          "kind": {
+                            "default": "blocks",
+                            "type": "string",
+                            "enum": [
+                              "blocks",
+                              "html"
+                            ]
+                          },
                           "revision": {
                             "type": "integer",
                             "exclusiveMinimum": 0,
@@ -101165,6 +102032,7 @@
                         "required": [
                           "id",
                           "title",
+                          "kind",
                           "revision",
                           "updatedAt"
                         ],
@@ -101622,65 +102490,129 @@
                       "$schema": "https://json-schema.org/draft/2020-12/schema",
                       "anyOf": [
                         {
-                          "type": "object",
-                          "properties": {
-                            "pageId": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "revision": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            "blocks": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "ok",
-                                      "failed",
-                                      "pending",
-                                      "paused",
-                                      "denied",
-                                      "missing",
-                                      "empty"
-                                    ]
-                                  },
-                                  "fetchedAt": {
-                                    "type": [
-                                      "string",
-                                      "null"
-                                    ]
-                                  },
-                                  "error": {
-                                    "type": "string"
-                                  },
-                                  "text": {
-                                    "type": "string"
-                                  },
-                                  "rows": {
-                                    "type": "array",
-                                    "items": {}
-                                  }
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "html"
                                 },
-                                "required": [
-                                  "status",
-                                  "fetchedAt"
-                                ],
-                                "additionalProperties": false
-                              }
+                                "pageId": {
+                                  "$ref": "#/components/schemas/RpcPagesRefreshOutputSchema0"
+                                },
+                                "revision": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "sources": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "$ref": "#/components/schemas/RpcPagesRefreshOutputSchema1"
+                                      },
+                                      "fetchedAt": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "error": {
+                                        "type": "string"
+                                      },
+                                      "value": {},
+                                      "history": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "at": {
+                                              "type": "string"
+                                            },
+                                            "value": {}
+                                          },
+                                          "required": [
+                                            "at",
+                                            "value"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "status",
+                                      "fetchedAt"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "pageId",
+                                "revision",
+                                "sources"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "pageId": {
+                                  "$ref": "#/components/schemas/RpcPagesRefreshOutputSchema0"
+                                },
+                                "revision": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "blocks": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "$ref": "#/components/schemas/RpcPagesRefreshOutputSchema1"
+                                      },
+                                      "fetchedAt": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "error": {
+                                        "type": "string"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "rows": {
+                                        "type": "array",
+                                        "items": {}
+                                      }
+                                    },
+                                    "required": [
+                                      "status",
+                                      "fetchedAt"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "pageId",
+                                "revision",
+                                "blocks"
+                              ],
+                              "additionalProperties": false
                             }
-                          },
-                          "required": [
-                            "pageId",
-                            "revision",
-                            "blocks"
-                          ],
-                          "additionalProperties": false
+                          ]
                         },
                         {
                           "type": "null"
@@ -102178,6 +103110,14 @@
                           "minLength": 1,
                           "maxLength": 60
                         },
+                        "kind": {
+                          "default": "blocks",
+                          "type": "string",
+                          "enum": [
+                            "blocks",
+                            "html"
+                          ]
+                        },
                         "revision": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -102190,6 +103130,7 @@
                       "required": [
                         "id",
                         "title",
+                        "kind",
                         "revision",
                         "updatedAt"
                       ],
@@ -114602,6 +115543,30 @@
                                   "crossSpaceCommunication": {
                                     "type": "boolean"
                                   },
+                                  "appControl": {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "type": "boolean"
+                                      },
+                                      "apps": {
+                                        "maxItems": 20,
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/RpcSpacesListOutputSchema16"
+                                        }
+                                      },
+                                      "headed": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "enabled",
+                                      "apps",
+                                      "headed"
+                                    ],
+                                    "additionalProperties": false
+                                  },
                                   "disabledBuiltinTools": {
                                     "default": [],
                                     "type": "array",
@@ -114632,7 +115597,7 @@
                                     "type": "boolean"
                                   },
                                   "spawnKey": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema16"
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema17"
                                   }
                                 },
                                 "required": [
@@ -114687,16 +115652,16 @@
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
                                   },
                                   "name": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema17"
-                                  },
-                                  "pinned": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema18"
                                   },
-                                  "sectionId": {
+                                  "pinned": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema19"
                                   },
-                                  "position": {
+                                  "sectionId": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema20"
+                                  },
+                                  "position": {
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema21"
                                   },
                                   "archivedAt": {
                                     "type": [
@@ -114705,19 +115670,19 @@
                                     ]
                                   },
                                   "members": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema21"
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema22"
                                   },
                                   "threadId": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
                                   },
                                   "preview": {
-                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema22"
-                                  },
-                                  "unread": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema23"
                                   },
-                                  "updatedAt": {
+                                  "unread": {
                                     "$ref": "#/components/schemas/RpcSpacesListOutputSchema24"
+                                  },
+                                  "updatedAt": {
+                                    "$ref": "#/components/schemas/RpcSpacesListOutputSchema25"
                                   },
                                   "createdAt": {
                                     "type": "string"
@@ -114743,13 +115708,13 @@
                             "externalConversations": {
                               "type": "array",
                               "items": {
-                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema25"
+                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema26"
                               }
                             },
                             "botSections": {
                               "type": "array",
                               "items": {
-                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema31"
+                                "$ref": "#/components/schemas/RpcSpacesListOutputSchema32"
                               }
                             }
                           },
@@ -114833,7 +115798,7 @@
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema10"
                                     },
                                     "spawnKey": {
-                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema16"
+                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema17"
                                     },
                                     "preview": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema11"
@@ -114884,28 +115849,28 @@
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
                                     },
                                     "name": {
-                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema17"
-                                    },
-                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema18"
                                     },
-                                    "sectionId": {
+                                    "pinned": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema19"
                                     },
-                                    "position": {
+                                    "sectionId": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema20"
                                     },
-                                    "members": {
+                                    "position": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema21"
                                     },
-                                    "preview": {
+                                    "members": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema22"
                                     },
-                                    "unread": {
+                                    "preview": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema23"
                                     },
-                                    "updatedAt": {
+                                    "unread": {
                                       "$ref": "#/components/schemas/RpcSpacesListOutputSchema24"
+                                    },
+                                    "updatedAt": {
+                                      "$ref": "#/components/schemas/RpcSpacesListOutputSchema25"
                                     }
                                   },
                                   "required": [
@@ -114925,13 +115890,13 @@
                               "externalConversations": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema25"
+                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema26"
                                 }
                               },
                               "botSections": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema31"
+                                  "$ref": "#/components/schemas/RpcSpacesListOutputSchema32"
                                 }
                               }
                             },
@@ -126303,6 +127268,30 @@
                         "crossSpaceCommunication": {
                           "type": "boolean"
                         },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcVoiceAgentOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
                         "disabledBuiltinTools": {
                           "default": [],
                           "type": "array",
@@ -128668,6 +129657,30 @@
           "crossSpaceCommunication": {
             "type": "boolean"
           },
+          "appControl": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "apps": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema20"
+                }
+              },
+              "headed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "enabled",
+              "apps",
+              "headed"
+            ],
+            "additionalProperties": false
+          },
           "disabledBuiltinTools": {
             "default": [],
             "type": "array",
@@ -128698,7 +129711,7 @@
             "type": "boolean"
           },
           "spawnKey": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema20"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema21"
           }
         },
         "required": [
@@ -128882,12 +129895,32 @@
         ]
       },
       "RpcBootstrapOutputSchema20": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBootstrapOutputSchema21": {
         "type": [
           "string",
           "null"
         ]
       },
-      "RpcBootstrapOutputSchema21": {
+      "RpcBootstrapOutputSchema22": {
         "type": "object",
         "properties": {
           "id": {
@@ -128897,16 +129930,16 @@
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
           },
           "name": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema22"
-          },
-          "pinned": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema23"
           },
-          "sectionId": {
+          "pinned": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema24"
           },
-          "position": {
+          "sectionId": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema25"
+          },
+          "position": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema26"
           },
           "archivedAt": {
             "type": [
@@ -128915,19 +129948,19 @@
             ]
           },
           "members": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema26"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
           },
           "threadId": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
           },
           "preview": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema28"
-          },
-          "unread": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema29"
           },
-          "updatedAt": {
+          "unread": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema30"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema31"
           },
           "createdAt": {
             "type": "string"
@@ -128949,13 +129982,13 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema22": {
+      "RpcBootstrapOutputSchema23": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema23": {
+      "RpcBootstrapOutputSchema24": {
         "type": "boolean"
       },
-      "RpcBootstrapOutputSchema24": {
+      "RpcBootstrapOutputSchema25": {
         "anyOf": [
           {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
@@ -128965,7 +129998,7 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema25": {
+      "RpcBootstrapOutputSchema26": {
         "anyOf": [
           {
             "type": "integer",
@@ -128977,13 +130010,13 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema26": {
+      "RpcBootstrapOutputSchema27": {
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema27"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema28"
         }
       },
-      "RpcBootstrapOutputSchema27": {
+      "RpcBootstrapOutputSchema28": {
         "type": "object",
         "properties": {
           "botId": {
@@ -129006,16 +130039,16 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema28": {
-        "type": "string"
-      },
       "RpcBootstrapOutputSchema29": {
-        "type": "boolean"
+        "type": "string"
       },
       "RpcBootstrapOutputSchema30": {
-        "type": "string"
+        "type": "boolean"
       },
       "RpcBootstrapOutputSchema31": {
+        "type": "string"
+      },
+      "RpcBootstrapOutputSchema32": {
         "type": "object",
         "properties": {
           "id": {
@@ -129050,7 +130083,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema32": {
+      "RpcBootstrapOutputSchema33": {
         "type": "string",
         "enum": [
           "user",
@@ -129058,16 +130091,16 @@
           "system"
         ]
       },
-      "RpcBootstrapOutputSchema33": {
+      "RpcBootstrapOutputSchema34": {
         "type": "string",
         "pattern": "^[a-z][a-z0-9_-]{0,63}$"
       },
-      "RpcBootstrapOutputSchema34": {
+      "RpcBootstrapOutputSchema35": {
         "default": "",
         "type": "string",
         "maxLength": 2048
       },
-      "RpcBootstrapOutputSchema35": {
+      "RpcBootstrapOutputSchema36": {
         "oneOf": [
           {
             "type": "object",
@@ -129148,29 +130181,29 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema36": {
+      "RpcBootstrapOutputSchema37": {
         "type": "string",
         "const": "chart"
       },
-      "RpcBootstrapOutputSchema37": {
+      "RpcBootstrapOutputSchema38": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema38": {
+      "RpcBootstrapOutputSchema39": {
         "type": "object",
         "propertyNames": {
           "type": "string"
         },
         "additionalProperties": {}
       },
-      "RpcBootstrapOutputSchema39": {
+      "RpcBootstrapOutputSchema40": {
         "maxItems": 5000,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema40"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema41"
         }
       },
-      "RpcBootstrapOutputSchema40": {},
-      "RpcBootstrapOutputSchema41": {
+      "RpcBootstrapOutputSchema41": {},
+      "RpcBootstrapOutputSchema42": {
         "type": "object",
         "properties": {
           "id": {
@@ -129217,7 +130250,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema42": {
+      "RpcBootstrapOutputSchema43": {
         "type": "object",
         "properties": {
           "from": {
@@ -129250,12 +130283,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema43": {
+      "RpcBootstrapOutputSchema44": {
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
       },
-      "RpcBootstrapOutputSchema44": {
+      "RpcBootstrapOutputSchema45": {
         "type": "object",
         "properties": {
           "key": {
@@ -129265,7 +130298,7 @@
             "type": "string"
           },
           "cents": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
           }
         },
         "required": [
@@ -129275,7 +130308,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema45": {
+      "RpcBootstrapOutputSchema46": {
         "type": "object",
         "properties": {
           "id": {
@@ -129288,7 +130321,7 @@
             "type": "string"
           },
           "cents": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema43"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema44"
           }
         },
         "required": [
@@ -129299,27 +130332,27 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema46": {
+      "RpcBootstrapOutputSchema47": {
         "type": "string",
         "const": "table"
       },
-      "RpcBootstrapOutputSchema47": {
-        "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
-      },
       "RpcBootstrapOutputSchema48": {
+        "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
+      },
+      "RpcBootstrapOutputSchema49": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcBootstrapOutputSchema49": {
+      "RpcBootstrapOutputSchema50": {
         "minItems": 1,
         "maxItems": 8,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema50"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema51"
         }
       },
-      "RpcBootstrapOutputSchema50": {
+      "RpcBootstrapOutputSchema51": {
         "type": "object",
         "properties": {
           "label": {
@@ -129339,14 +130372,14 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema51": {
+      "RpcBootstrapOutputSchema52": {
         "maxItems": 50,
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RpcBootstrapOutputSchema52"
+          "$ref": "#/components/schemas/RpcBootstrapOutputSchema53"
         }
       },
-      "RpcBootstrapOutputSchema52": {
+      "RpcBootstrapOutputSchema53": {
         "type": "array",
         "items": {
           "anyOf": [
@@ -129360,14 +130393,14 @@
           ]
         }
       },
-      "RpcBootstrapOutputSchema53": {
+      "RpcBootstrapOutputSchema54": {
         "type": "object",
         "properties": {
           "heading": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
           },
           "body": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
           }
         },
         "required": [
@@ -129376,16 +130409,16 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema54": {
+      "RpcBootstrapOutputSchema55": {
         "type": "string",
         "minLength": 1,
         "maxLength": 4000
       },
-      "RpcBootstrapOutputSchema55": {
+      "RpcBootstrapOutputSchema56": {
         "type": "object",
         "properties": {
           "label": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema56"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema57"
           },
           "value": {
             "type": "string",
@@ -129398,16 +130431,16 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema56": {
+      "RpcBootstrapOutputSchema57": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcBootstrapOutputSchema57": {
+      "RpcBootstrapOutputSchema58": {
         "type": "object",
         "properties": {
           "label": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema56"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema57"
           },
           "value": {
             "type": "string",
@@ -129425,18 +130458,18 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema58": {
+      "RpcBootstrapOutputSchema59": {
         "type": "object",
         "properties": {
           "title": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema48"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema49"
           },
           "subtitle": {
             "type": "string",
             "maxLength": 200
           },
           "body": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema54"
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema55"
           },
           "badge": {
             "type": "string",
@@ -129452,7 +130485,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema59": {
+      "RpcBootstrapOutputSchema60": {
         "type": "string",
         "enum": [
           "request",
@@ -129462,7 +130495,7 @@
           "fyi"
         ]
       },
-      "RpcBootstrapOutputSchema60": {
+      "RpcBootstrapOutputSchema61": {
         "type": "object",
         "properties": {
           "id": {
@@ -129584,7 +130617,7 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema61": {
+      "RpcBootstrapOutputSchema62": {
         "anyOf": [
           {
             "type": "number",
@@ -129600,10 +130633,10 @@
           }
         ]
       },
-      "RpcBootstrapOutputSchema62": {
+      "RpcBootstrapOutputSchema63": {
         "type": "string"
       },
-      "RpcBootstrapOutputSchema63": {
+      "RpcBootstrapOutputSchema64": {
         "anyOf": [
           {
             "type": "string"
@@ -129620,7 +130653,7 @@
           {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema64"
             }
           },
           {
@@ -129629,27 +130662,27 @@
               "type": "string"
             },
             "additionalProperties": {
-              "$ref": "#/components/schemas/RpcBootstrapOutputSchema63"
+              "$ref": "#/components/schemas/RpcBootstrapOutputSchema64"
             }
           }
         ]
       },
-      "RpcBootstrapOutputSchema64": {
+      "RpcBootstrapOutputSchema65": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcBootstrapOutputSchema65": {
+      "RpcBootstrapOutputSchema66": {
         "type": "object",
         "properties": {
           "name": {
-            "$ref": "#/components/schemas/RpcBootstrapOutputSchema66"
-          },
-          "mode": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema67"
           },
-          "rollupHours": {
+          "mode": {
             "$ref": "#/components/schemas/RpcBootstrapOutputSchema68"
+          },
+          "rollupHours": {
+            "$ref": "#/components/schemas/RpcBootstrapOutputSchema69"
           }
         },
         "required": [
@@ -129658,12 +130691,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcBootstrapOutputSchema66": {
+      "RpcBootstrapOutputSchema67": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcBootstrapOutputSchema67": {
+      "RpcBootstrapOutputSchema68": {
         "type": "string",
         "enum": [
           "ignore",
@@ -129672,7 +130705,7 @@
           "user"
         ]
       },
-      "RpcBootstrapOutputSchema68": {
+      "RpcBootstrapOutputSchema69": {
         "type": "integer",
         "minimum": 1,
         "maximum": 720
@@ -129770,21 +130803,121 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcBotsCreateOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcBotsDuplicateOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcBotsDuplicateOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcBotsGetOutputSchema0": {
         "type": "string",
         "minLength": 1
       },
+      "RpcBotsGetOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcBotsListOutputSchema0": {
         "type": "string",
         "minLength": 1
       },
+      "RpcBotsListOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcBotsListArchivedOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcBotsListArchivedOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcBotsReorderInputSchema0": {
         "type": "string",
@@ -129794,9 +130927,49 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcBotsSetComputerOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcBotsUpdateOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcBotsUpdateOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcBotsUpdateInputSchema0": {
         "type": "string",
@@ -129935,35 +131108,72 @@
         "type": "boolean"
       },
       "RpcBotsUpdateInputSchema20": {
-        "maxItems": 134,
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema21"
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "apps": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RpcBotsUpdateInputSchema21"
+            }
+          },
+          "headed": {
+            "type": "boolean"
+          }
         }
       },
       "RpcBotsUpdateInputSchema21": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "RpcBotsUpdateInputSchema22": {
+        "maxItems": 134,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
+        }
+      },
+      "RpcBotsUpdateInputSchema23": {
         "type": "string",
         "minLength": 1,
         "maxLength": 64
       },
-      "RpcBotsUpdateInputSchema22": {
+      "RpcBotsUpdateInputSchema24": {
         "type": "string",
         "enum": [
           "internal",
           "external"
         ]
       },
-      "RpcBotsUpdateInputSchema23": {
+      "RpcBotsUpdateInputSchema25": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema24": {
+      "RpcBotsUpdateInputSchema26": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema25": {
+      "RpcBotsUpdateInputSchema27": {
         "anyOf": [
           {
             "type": "string",
@@ -130041,9 +131251,49 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcCartaAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcCompanyAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcCompanyAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcCompanyEditEdgeInputSchema0": {
         "type": "string",
@@ -132635,6 +133885,26 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcCompanyImportAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcCompanyImportCatalogOutputSchema0": {
         "type": "string",
         "minLength": 1,
@@ -132994,6 +134264,26 @@
       "RpcDataRoomAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcDataRoomAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcDataRoomAutoSortApplyInputSchema0": {
         "oneOf": [
@@ -133453,6 +134743,26 @@
       "RpcDevinAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcDevinAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcExportBotOutputSchema0": {
         "type": "string",
@@ -134063,6 +135373,26 @@
       "RpcFinanceAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcFinanceAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcFinanceBurnOutputSchema0": {
         "type": "integer",
@@ -135001,6 +136331,26 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcGtmAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcGtmOverviewOutputSchema0": {
         "type": "object",
         "properties": {
@@ -135313,6 +136663,26 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcInboxAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcInboxArchiveManyOutputSchema0": {
         "type": "string",
         "minLength": 1
@@ -135324,6 +136694,26 @@
       "RpcInboxAskAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcInboxAskAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcInboxCleanupArchiveInputSchema0": {
         "type": "string",
@@ -135515,6 +136905,26 @@
       "RpcInvestorsAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcInvestorsAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "RpcInvestorsAuditsDraftOutputSchema0": {
         "type": "string",
@@ -136395,6 +137805,26 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcLegalAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
       "RpcLegalDoneDeadlinesOutputSchema0": {
         "type": "string",
         "minLength": 1
@@ -136879,6 +138309,22 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcPagesDataOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcPagesDataOutputSchema1": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "failed",
+          "pending",
+          "paused",
+          "denied",
+          "missing",
+          "empty"
+        ]
+      },
       "RpcPagesDataInputSchema0": {
         "type": "string",
         "minLength": 1
@@ -136898,6 +138344,22 @@
       "RpcPagesPauseSourceInputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcPagesRefreshOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcPagesRefreshOutputSchema1": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "failed",
+          "pending",
+          "paused",
+          "denied",
+          "missing",
+          "empty"
+        ]
       },
       "RpcPagesRefreshInputSchema0": {
         "type": "string",
@@ -136941,6 +138403,14 @@
             "type": "string",
             "maxLength": 200000
           },
+          "kind": {
+            "default": "blocks",
+            "type": "string",
+            "enum": [
+              "blocks",
+              "html"
+            ]
+          },
           "revision": {
             "type": "integer",
             "exclusiveMinimum": 0,
@@ -136968,6 +138438,7 @@
           "botId",
           "title",
           "content",
+          "kind",
           "revision",
           "updatedBy",
           "updatedAt"
@@ -138433,18 +139904,38 @@
         "type": "string"
       },
       "RpcSpacesListOutputSchema16": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "RpcSpacesListOutputSchema17": {
         "type": [
           "string",
           "null"
         ]
       },
-      "RpcSpacesListOutputSchema17": {
+      "RpcSpacesListOutputSchema18": {
         "type": "string"
       },
-      "RpcSpacesListOutputSchema18": {
+      "RpcSpacesListOutputSchema19": {
         "type": "boolean"
       },
-      "RpcSpacesListOutputSchema19": {
+      "RpcSpacesListOutputSchema20": {
         "anyOf": [
           {
             "$ref": "#/components/schemas/RpcSpacesListOutputSchema0"
@@ -138454,7 +139945,7 @@
           }
         ]
       },
-      "RpcSpacesListOutputSchema20": {
+      "RpcSpacesListOutputSchema21": {
         "anyOf": [
           {
             "type": "integer",
@@ -138466,7 +139957,7 @@
           }
         ]
       },
-      "RpcSpacesListOutputSchema21": {
+      "RpcSpacesListOutputSchema22": {
         "type": "array",
         "items": {
           "type": "object",
@@ -138492,16 +139983,16 @@
           "additionalProperties": false
         }
       },
-      "RpcSpacesListOutputSchema22": {
-        "type": "string"
-      },
       "RpcSpacesListOutputSchema23": {
-        "type": "boolean"
+        "type": "string"
       },
       "RpcSpacesListOutputSchema24": {
-        "type": "string"
+        "type": "boolean"
       },
       "RpcSpacesListOutputSchema25": {
+        "type": "string"
+      },
+      "RpcSpacesListOutputSchema26": {
         "type": "object",
         "properties": {
           "id": {
@@ -138543,10 +140034,10 @@
           "automatedSenderPolicies": {
             "type": "object",
             "propertyNames": {
-              "$ref": "#/components/schemas/RpcSpacesListOutputSchema26"
+              "$ref": "#/components/schemas/RpcSpacesListOutputSchema27"
             },
             "additionalProperties": {
-              "$ref": "#/components/schemas/RpcSpacesListOutputSchema27"
+              "$ref": "#/components/schemas/RpcSpacesListOutputSchema28"
             }
           },
           "automatedSenders": {
@@ -138603,22 +140094,22 @@
         ],
         "additionalProperties": false
       },
-      "RpcSpacesListOutputSchema26": {
+      "RpcSpacesListOutputSchema27": {
         "type": "string",
         "minLength": 1,
         "maxLength": 200
       },
-      "RpcSpacesListOutputSchema27": {
+      "RpcSpacesListOutputSchema28": {
         "type": "object",
         "properties": {
           "name": {
-            "$ref": "#/components/schemas/RpcSpacesListOutputSchema28"
-          },
-          "mode": {
             "$ref": "#/components/schemas/RpcSpacesListOutputSchema29"
           },
-          "rollupHours": {
+          "mode": {
             "$ref": "#/components/schemas/RpcSpacesListOutputSchema30"
+          },
+          "rollupHours": {
+            "$ref": "#/components/schemas/RpcSpacesListOutputSchema31"
           }
         },
         "required": [
@@ -138627,12 +140118,12 @@
         ],
         "additionalProperties": false
       },
-      "RpcSpacesListOutputSchema28": {
+      "RpcSpacesListOutputSchema29": {
         "type": "string",
         "minLength": 1,
         "maxLength": 120
       },
-      "RpcSpacesListOutputSchema29": {
+      "RpcSpacesListOutputSchema30": {
         "type": "string",
         "enum": [
           "ignore",
@@ -138641,12 +140132,12 @@
           "user"
         ]
       },
-      "RpcSpacesListOutputSchema30": {
+      "RpcSpacesListOutputSchema31": {
         "type": "integer",
         "minimum": 1,
         "maximum": 720
       },
-      "RpcSpacesListOutputSchema31": {
+      "RpcSpacesListOutputSchema32": {
         "type": "object",
         "properties": {
           "id": {
@@ -139951,6 +141442,26 @@
       "RpcVoiceAgentOutputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcVoiceAgentOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       }
     },
     "responses": {

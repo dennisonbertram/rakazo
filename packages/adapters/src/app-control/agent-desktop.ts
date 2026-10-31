@@ -271,15 +271,28 @@ function limitSize(tree: Node): { tree: Node; truncated: boolean } {
   }
 }
 
+function hostPlatform(value: string | null | undefined): "macos" | "windows" | "linux" | undefined {
+  const v = value?.toLowerCase();
+  if (v === "macos" || v === "darwin") return "macos";
+  if (v === "windows" || v === "win32") return "windows";
+  if (v === "linux") return "linux";
+  return undefined;
+}
+
 export class AgentDesktopAppControl implements AppControlProvider {
   private readonly runner: AgentDesktopRunner;
   private readonly store: AppControlStore;
-  private readonly platform: string;
+  /** The platform this process runs the CLI on; null when a bridge runs it on another host. */
+  private readonly platform: string | null;
 
-  constructor(opts: { runner: AgentDesktopRunner; store: AppControlStore; platform?: string }) {
+  constructor(opts: {
+    runner: AgentDesktopRunner;
+    store: AppControlStore;
+    platform?: string | null;
+  }) {
     this.runner = opts.runner;
     this.store = opts.store;
-    this.platform = opts.platform ?? process.platform;
+    this.platform = opts.platform === undefined ? process.platform : opts.platform;
   }
 
   describe(): AdapterDescriptor<AppControlCapabilities> {
@@ -306,14 +319,15 @@ export class AgentDesktopAppControl implements AppControlProvider {
   }
 
   async status(_context: AdapterContext): Promise<AppControlStatus> {
-    if (this.platform !== "darwin") {
+    if (this.platform !== null && this.platform !== "darwin") {
       return { available: false, accessibility: "unknown", reason: "Only macOS is supported." };
     }
     try {
       const data = await this.read(["status"]);
       const state = text(record(record(data.permissions)?.accessibility)?.state);
       const accessibility = state === "granted" || state === "denied" ? state : "unknown";
-      return { available: true, accessibility };
+      const platform = hostPlatform(text(data.platform) ?? this.platform);
+      return { available: true, accessibility, ...(platform ? { platform } : {}) };
     } catch (error) {
       return {
         available: false,

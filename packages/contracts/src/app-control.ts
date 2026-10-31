@@ -15,6 +15,29 @@ export type AppControlApp = z.infer<typeof AppControlAppSchema>;
 
 export const APP_CONTROL_MAX_APPS = 20;
 
+/** A bot's app control settings, as the owner sees them. */
+export const BotAppControlSchema = z.object({
+  enabled: z.boolean(),
+  apps: z.array(AppControlAppSchema).max(APP_CONTROL_MAX_APPS),
+  /** Real pointer and keyboard instead of accessibility actions. */
+  headed: z.boolean(),
+});
+export type BotAppControl = z.infer<typeof BotAppControlSchema>;
+
+export const UpdateBotAppControlSchema = z.object({
+  enabled: z.boolean().optional(),
+  apps: z.array(AppControlAppSchema).max(APP_CONTROL_MAX_APPS).optional(),
+  headed: z.boolean().optional(),
+});
+
+export type UpdateBotAppControl = z.infer<typeof UpdateBotAppControlSchema>;
+
+export const AppControlStatusOutputSchema = z.object({
+  available: z.boolean(),
+  accessibility: z.enum(["granted", "denied", "unknown"]),
+  platform: z.enum(["macos", "windows", "linux"]).nullable(),
+});
+
 /** The only keys a bot may press: unmodified navigation keys, so no paste or shortcut. */
 export const APP_CONTROL_KEYS = [
   "return",

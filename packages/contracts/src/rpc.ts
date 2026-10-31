@@ -1,6 +1,7 @@
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
 import { AiConsentQuerySchema, AiConsentStatusSchema } from "./ai-consent.js";
+import { AppControlAppSchema, AppControlStatusOutputSchema } from "./app-control.js";
 import {
   ARTIFACT_DESCRIPTION_MAX_LENGTH,
   ARTIFACT_NAME_MAX_LENGTH,
@@ -570,6 +571,10 @@ export const appContract = {
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
   },
   bootstrap: oc.input(z.object({ botId: Id.optional() })).output(AppBootstrapSchema),
+  appControl: {
+    status: oc.output(AppControlStatusOutputSchema),
+    apps: oc.output(z.object({ apps: z.array(AppControlAppSchema) })),
+  },
   deployment: {
     get: oc.output(DeploymentSettingsSchema),
     update: oc

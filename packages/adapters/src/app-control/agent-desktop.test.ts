@@ -782,3 +782,22 @@ describe.each(harnesses)("%s conformance", (_name, make) => {
     });
   });
 });
+
+describe("status on a bridged host", () => {
+  it("reports the host platform, not this process's, when a bridge runs the CLI", async () => {
+    const runner = Object.assign(
+      async () => ok({ platform: "macos", permissions: { accessibility: { state: "granted" } } }),
+      {},
+    );
+    const provider = new AgentDesktopAppControl({
+      runner,
+      store: new InMemoryAppControlStore(),
+      platform: null,
+    });
+    expect(await provider.status(context)).toEqual({
+      available: true,
+      accessibility: "granted",
+      platform: "macos",
+    });
+  });
+});
