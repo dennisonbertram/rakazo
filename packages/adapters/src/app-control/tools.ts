@@ -276,7 +276,12 @@ export async function runDesktopAppTool(
     });
   }
   const app = resolveAllowedApp(policy.allowed, args.app);
-  if (!app) return { error: "That app is not on this bot's list. Use desktop_app_list." };
+  if (!app) {
+    // The requested name is model text, so Activity does not echo it.
+    const line = name === "desktop_app_snapshot" ? "Read another app" : "Used another app";
+    await run.activity(line, FAILURE_REASONS.app_not_allowed);
+    return { error: "That app is not on this bot's list. Use desktop_app_list." };
+  }
   if (name === "desktop_app_snapshot") {
     const parsed = SnapshotArgs.safeParse(args);
     if (!parsed.success) return { error: "Invalid snapshot arguments." };

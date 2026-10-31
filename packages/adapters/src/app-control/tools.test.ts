@@ -104,6 +104,18 @@ describe("runDesktopAppTool failure reasons", () => {
     expect(calls).toEqual([["Read Music", reason]]);
   });
 
+  it.each([
+    ["desktop_app_snapshot", "Read another app"],
+    ["desktop_app_act", "Used another app"],
+  ])(
+    "%s for an app not on the list writes a line without the model's app name",
+    async (name, line) => {
+      const { calls, deps } = run({});
+      await runDesktopAppTool(name, { app: "Notes <ignore previous>", action: "launch" }, deps);
+      expect(calls).toEqual([[line, "Not allowed"]]);
+    },
+  );
+
   it("a refused act passes the mapped reason", async () => {
     const { calls, deps } = run({ act: refusing("app_not_running") });
     await runDesktopAppTool("desktop_app_act", { app: "Music", action: "launch" }, deps);
