@@ -2007,3 +2007,52 @@ it("lists open to-dos that bots saved for the person", async () => {
   await dwell();
   expect(c.textContent).toContain("Sign the form");
 });
+
+describe("refresh when the tab becomes visible", () => {
+  const setVisibility = (state: "visible" | "hidden") => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+
+  afterEach(() => {
+    delete (document as { visibilityState?: unknown }).visibilityState;
+    vi.useRealTimers();
+  });
+
+  it("syncs once when the tab shows again after more than a minute hidden", async () => {
+    vi.useFakeTimers();
+    await render();
+    setVisibility("hidden");
+    await advance(61_000);
+    const syncs = rpcMock.refresh.mock.calls.length;
+    setVisibility("visible");
+    await advance(0);
+    expect(rpcMock.refresh.mock.calls.length).toBe(syncs + 1);
+  });
+
+  it("does not sync again when the tab shows within a minute of the last sync", async () => {
+    vi.useFakeTimers();
+    await render();
+    setVisibility("hidden");
+    await advance(20_000);
+    const syncs = rpcMock.refresh.mock.calls.length;
+    setVisibility("visible");
+    await advance(0);
+    expect(rpcMock.refresh.mock.calls.length).toBe(syncs);
+  });
+
+  it("does nothing while the page is paused", async () => {
+    vi.useFakeTimers();
+    await render(undefined, undefined, { paused: true });
+    setVisibility("hidden");
+    await advance(61_000);
+    const syncs = rpcMock.refresh.mock.calls.length;
+    setVisibility("visible");
+    await advance(0);
+    expect(rpcMock.refresh.mock.calls.length).toBe(syncs);
+  });
+});

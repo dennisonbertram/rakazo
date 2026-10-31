@@ -341,6 +341,7 @@ function InboxListPage({
   const [retried, setRetried] = useState(false);
   const [reload, setReload] = useState(0);
   const [attempt, setAttempt] = useState(0);
+  const lastSyncStart = useRef(0);
   const polls = useRef(0);
   const autoRetried = useRef(false);
   // Triage still pending after the last poll: say so and offer a retry instead of spinning.
@@ -415,7 +416,19 @@ function InboxListPage({
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") setAttempt((n) => n + 1);
     }, NEW_MAIL_POLL_MS);
-    return () => clearInterval(timer);
+    // Coming back to the tab: sync now, unless one started inside the server's 60-second window.
+    const onVisible = () => {
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - lastSyncStart.current >= NEW_MAIL_POLL_MS
+      )
+        setAttempt((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [paused]);
 
   useEffect(() => {
@@ -586,6 +599,7 @@ function InboxListPage({
     let live = true;
     let wake: (() => void) | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    lastSyncStart.current = Date.now();
     // The server queues the sync and answers at once; ask again until it is done, then list.
     const sync = async () => {
       let result = await rpc.inbox.refresh({});
