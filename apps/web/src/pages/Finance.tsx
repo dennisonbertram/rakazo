@@ -158,6 +158,10 @@ export function FinancePage(chrome: FinanceChrome) {
 }
 
 const REFRESH_HOLD_MS = 800;
+// Matches STALE_MS in apps/api/src/finance.ts: older data is synced when the dashboard opens.
+const FRESH_MS = 15 * 60_000;
+const isStale = (iso: string | null | undefined) =>
+  !iso || Date.now() - new Date(iso).getTime() > FRESH_MS;
 
 function Dashboard() {
   const overview = useFinanceQuery(() => rpc.finance.overview(), []);
@@ -166,7 +170,8 @@ function Dashboard() {
   const reload = useRef(overview.reload);
   reload.current = overview.reload;
 
-  // Sync reads the vendors (throttled by the server), then the dashboard reads the stored result.
+  // An explicit refresh is forced by the server; the overview queues its own throttled background
+  // sync. This reads the vendors, then the dashboard reads the stored result.
   // A click holds "Syncing…" briefly: a throttled refresh answers at once and would show no change.
   const sync = (holdMs = 0) => {
     setSyncing(true);
@@ -184,11 +189,12 @@ function Dashboard() {
 
   const connected = overview.data?.sources.some((s) => s.status !== "not_connected") ?? false;
   const synced = useRef(false);
-  // Runs once, when the first overview shows a connected source.
+  // Runs once, when the first overview shows a connected source, and only if the data is stale.
   useEffect(() => {
-    if (!connected || synced.current) return;
+    if (!connected || synced.current || !overview.data) return;
     synced.current = true;
-    sync();
+    const { lastSyncedAt, crypto } = overview.data;
+    if (isStale(lastSyncedAt) || (crypto && isStale(crypto.lastSyncedAt))) sync();
   }, [connected]);
 
   // The add dialogs live here, above the empty and loaded states: the first import turns the empty
