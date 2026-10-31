@@ -18,6 +18,7 @@ struct SandboxedHTMLViewTests {
     #expect(AgentPageScreen.placeholder("pending") == "Waiting for approval")
     #expect(AgentPageScreen.placeholder("denied") == "Not approved")
     #expect(AgentPageScreen.placeholder("missing") == "Source not found")
+    #expect(AgentPageScreen.placeholder("paused") == "Paused")
     #expect(AgentPageScreen.placeholder("empty") == "No data yet")
   }
 }

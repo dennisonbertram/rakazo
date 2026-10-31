@@ -129,7 +129,9 @@ struct AgentPageScreen: View {
       HStack(spacing: 8) {
         Text(label)
         Spacer(minLength: 8)
-        if status == "failed" { FailedSource(error: error) { Task { await model.refresh(app) } } }
+        if status == "failed" || status == "paused" {
+          FailedSource(error: error, canRetry: status == "failed") { Task { await model.refresh(app) } }
+        }
         Text(value.map(cell) ?? Self.placeholder(status))
           .monospacedDigit()
           .foregroundStyle(value == nil ? Color.token(.mutedForeground) : Color.token(.foreground))
@@ -140,7 +142,9 @@ struct AgentPageScreen: View {
       VStack(alignment: .leading, spacing: 6) {
         HStack {
           Text(name).font(.footnote).foregroundStyle(Color.token(.mutedForeground))
-          if status == "failed" { FailedSource(error: error) { Task { await model.refresh(app) } } }
+          if status == "failed" || status == "paused" {
+          FailedSource(error: error, canRetry: status == "failed") { Task { await model.refresh(app) } }
+        }
         }
         .padding(.horizontal, 16)
         if rows.isEmpty {
@@ -176,6 +180,7 @@ struct AgentPageScreen: View {
     case "pending": "Waiting for approval"
     case "denied": "Not approved"
     case "missing": "Source not found"
+    case "paused": "Paused"
     default: "No data yet"
     }
   }
@@ -186,9 +191,10 @@ struct AgentPageScreen: View {
   }
 }
 
-/// A warning mark for a source whose last refresh failed; tapping it shows the error and Retry.
+/// A warning mark for a source whose last refresh failed or is paused; tapping it shows the error, and Retry for a failed one.
 private struct FailedSource: View {
   let error: String?
+  let canRetry: Bool
   let retry: () -> Void
   @State private var showing = false
 
@@ -200,9 +206,11 @@ private struct FailedSource: View {
     .popover(isPresented: $showing) {
       VStack(alignment: .leading, spacing: 12) {
         if let error { Text(error).font(.footnote) }
-        Button("Retry") {
-          showing = false
-          retry()
+        if canRetry {
+          Button("Retry") {
+            showing = false
+            retry()
+          }
         }
       }
       .padding()
