@@ -6,6 +6,7 @@ export * from "./ai-consent.js";
 export * from "./alchemy-crypto-key.js";
 export * from "./alchemy-crypto-source.js";
 export * from "./apns-push.js";
+export * from "./app-control/index.js";
 export {
   mailRequestIsValid,
   type NormalizedMailEdits,
