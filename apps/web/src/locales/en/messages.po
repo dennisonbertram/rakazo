@@ -9386,6 +9386,7 @@ msgid "paused"
 msgstr "paused"
 
 #: src/components/integrations/OmiPage.tsx
+#: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
@@ -12045,6 +12046,10 @@ msgstr "Source failed"
 #: src/components/pages/PageLiveBlocks.tsx
 msgid "Source not found"
 msgstr "Source not found"
+
+#: src/components/pages/PageLiveBlocks.tsx
+msgid "Source paused"
+msgstr "Source paused"
 
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/pages/PageSourcesDialog.tsx
