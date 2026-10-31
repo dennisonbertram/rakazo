@@ -18,8 +18,8 @@ import {
   TableRow,
 } from "@rakazo/ui-web";
 import type { ReactNode } from "react";
-import { formatMailTime } from "../../lib/mail-time";
 import { maskCurrencyText, useHideAmounts } from "../../lib/hide-amounts-preference";
+import { formatMailTime } from "../../lib/mail-time";
 import { cellValue, formatCell, tableColumns, usePageLive } from "../../pages/shell/page-live";
 import { Shimmer } from "../ai/primitives";
 

@@ -1,14 +1,21 @@
 // @vitest-environment jsdom
 
-import { i18n } from "@lingui/core";
 import type { PageLiveBlock } from "@rakazo/contracts";
+import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
+
+vi.mock("@lingui/core/macro", () => ({
+  t: (parts: TemplateStringsArray, ...values: unknown[]) =>
+    parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
+}));
+vi.mock("@lingui/react/macro", () => ({
+  Trans: ({ children }: { children: ReactNode }) => children,
+}));
+
 import { PageLiveContext } from "../../pages/shell/page-live";
 import { PageMetricBlock } from "./PageLiveBlocks";
-
-i18n.loadAndActivate({ locale: "en", messages: {} });
 
 const metric = { label: "Burn", source: "cash", path: "/burn", format: "usd" as const };
 
