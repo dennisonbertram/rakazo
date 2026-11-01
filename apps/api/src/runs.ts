@@ -137,7 +137,7 @@ export async function listSpaceRuns(
     }
   }
   const found = await prisma.run.findMany({
-    where: ids ? { id: { in: ids } } : where,
+    where: ids ? { ...where, id: { in: ids } } : where,
     include: {
       bot: { select: { name: true, archivedAt: true, notifyOnFinish: true } },
       routine: { select: { name: true } },
@@ -152,7 +152,8 @@ export async function listSpaceRuns(
     },
     orderBy,
   });
-  const rows = ids ? ids.map((id) => found.find((row) => row.id === id)!) : found;
+  // A row can vanish between the two queries (deleted or archived meanwhile); skip it.
+  const rows = ids ? ids.flatMap((id) => found.filter((row) => row.id === id)) : found;
 
   // A held run previews its own question or approval instead of the prompt that started it.
   const heldRunIds = rows.filter((row) => row.status === "waiting_input").map((row) => row.id);
