@@ -3999,6 +3999,10 @@ msgstr "Не удалось загрузить настройки модели."
 msgid "Could not load more rows."
 msgstr ""
 
+#: src/pages/investors/UpdateEditor.tsx
+msgid "Could not load recipients"
+msgstr ""
+
 #: src/pages/RoutineRunHistory.tsx
 msgid "Could not load run history"
 msgstr "Не удалось загрузить историю запусков"
@@ -6833,6 +6837,10 @@ msgstr ""
 #: src/pages/Shell.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Investors"
+msgstr ""
+
+#: src/pages/Investors.tsx
+msgid "Investors will no longer see it on the portal."
 msgstr ""
 
 #: src/pages/Contacts.tsx
@@ -11588,6 +11596,7 @@ msgstr ""
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailOutbox.tsx
+#: src/pages/investors/UpdateEditor.tsx
 msgid "Sending…"
 msgstr "Отправка…"
 
@@ -13437,6 +13446,7 @@ msgstr ""
 #: src/pages/Fundraising.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
+#: src/pages/investors/UpdateEditor.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Undo"

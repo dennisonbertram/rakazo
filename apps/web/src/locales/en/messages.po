@@ -3999,6 +3999,10 @@ msgstr "Could not load model settings"
 msgid "Could not load more rows."
 msgstr "Could not load more rows."
 
+#: src/pages/investors/UpdateEditor.tsx
+msgid "Could not load recipients"
+msgstr "Could not load recipients"
+
 #: src/pages/RoutineRunHistory.tsx
 msgid "Could not load run history"
 msgstr "Could not load run history"
@@ -6834,6 +6838,10 @@ msgstr "Investor email"
 #: src/pages/shell/space-sidebar.tsx
 msgid "Investors"
 msgstr "Investors"
+
+#: src/pages/Investors.tsx
+msgid "Investors will no longer see it on the portal."
+msgstr "Investors will no longer see it on the portal."
 
 #: src/pages/Contacts.tsx
 msgid "Investors, advisors and customers you add or your bots find appear here."
@@ -11588,6 +11596,7 @@ msgstr "Sending was not confirmed. Check Sent in Inbox; this email will not be s
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailOutbox.tsx
+#: src/pages/investors/UpdateEditor.tsx
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -13437,6 +13446,7 @@ msgstr "Undid {restored}, skipped {skipped}"
 #: src/pages/Fundraising.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
+#: src/pages/investors/UpdateEditor.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Undo"
