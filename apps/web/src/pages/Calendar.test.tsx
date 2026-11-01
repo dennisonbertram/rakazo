@@ -293,3 +293,91 @@ it("says a phone's empty day is empty", async () => {
   await mount("/app/calendar?view=day");
   expect(container.textContent).toContain("Nothing scheduled");
 });
+
+it("lists a repeating routine once in the schedule and opens it by its routine id", async () => {
+  asPhone();
+  const run = (days: number) =>
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, 8);
+  agendaMock.mockImplementation(
+    answer(
+      agenda({
+        items: [1, 2, 3].map((days) =>
+          local(`routine:r1:${run(days).toISOString()}`, "Morning briefing", run(days), {
+            kind: "routine",
+          }),
+        ),
+      }),
+    ),
+  );
+  await mount();
+  const rows = [...container.querySelectorAll("a")].filter((a) =>
+    a.textContent?.includes("Morning briefing"),
+  );
+  expect(rows).toHaveLength(1);
+  expect(rows[0]?.getAttribute("href")).toBe("/app/b1?routine=r1");
+});
+
+it("puts the Connect link before the grid", async () => {
+  agendaMock.mockImplementation(answer(agenda({ googleConnected: false })));
+  await mount();
+  const connect = [...container.querySelectorAll("a")].find((a) =>
+    a.textContent?.includes("Connect Google Calendar"),
+  )!;
+  const grid = container.querySelector("[data-day]")!;
+  expect(connect.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("lists a meeting before a routine in a month cell, whatever the time", async () => {
+  const day = (hour: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour);
+  agendaMock.mockImplementation(
+    answer(
+      agenda({
+        items: [
+          local("routine:r1:x", "Morning briefing", day(7), {
+            kind: "routine",
+          }),
+          local("e1", "Board call", day(10), {
+            kind: "event",
+            botId: null,
+            botName: null,
+          }),
+        ],
+      }),
+    ),
+  );
+  await mount("/app/calendar?view=month");
+  const cell = column(localDay(now)).textContent ?? "";
+  expect(cell.indexOf("Board call")).toBeGreaterThan(-1);
+  expect(cell.indexOf("Board call")).toBeLessThan(cell.indexOf("Morning briefing"));
+});
+
+it("draws timed items and the now line by wall-clock time on a daylight-saving day", async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "America/New_York";
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    // Clocks go back at 2:00 AM on Sun 2026-11-01, so that day has 25 hours.
+    vi.setSystemTime(new Date(2026, 10, 1, 14, 0));
+    const hourFrom = (day: number) => ({ end: new Date(2026, 10, day, 15, 0).toISOString() });
+    const items = [
+      local("d1", "Switch day", new Date(2026, 10, 1, 14, 0), hourFrom(1)),
+      local("d2", "Normal day", new Date(2026, 10, 2, 14, 0), hourFrom(2)),
+    ];
+    agendaMock.mockImplementation(answer(agenda({ items })));
+    await mount();
+    const styleOf = (day: string, title: string) =>
+      Array.from(column(day).querySelectorAll<HTMLElement>("*")).find(
+        (el) => el.style.top && el.textContent?.includes(title),
+      )!.style;
+    expect(styleOf("2026-11-01", "Switch day").top).toBe("672px");
+    expect(styleOf("2026-11-01", "Switch day").height).toBe("48px");
+    expect(styleOf("2026-11-02", "Normal day").top).toBe("672px");
+    expect((column("2026-11-01").querySelector("[data-now-line]") as HTMLElement).style.top).toBe(
+      "672px",
+    );
+  } finally {
+    vi.useRealTimers();
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});

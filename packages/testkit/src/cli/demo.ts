@@ -24,6 +24,7 @@ import {
   DEMO_RATE_LIMIT_SPACE,
   DEMO_RECONNECT_SPACE,
   demoBrexCards,
+  demoCalendar,
   demoCarta,
   demoCrypto,
   demoFinance,
@@ -426,6 +427,7 @@ async function serve() {
     composio,
     meetingSources: createMeetingSourceRegistry({ granolaBaseUrl }),
     brexApi: { baseUrl: brexBaseUrl },
+    calendar: demoCalendar(),
     financeCallToolFor: demoFinance().callToolFor,
     mcpServers: {
       [new URL(CARTA_MCP_ENDPOINT).hostname]: demoCarta(WEB_ORIGIN),

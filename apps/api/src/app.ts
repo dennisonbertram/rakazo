@@ -248,6 +248,8 @@ type CreateAppOverrides = Partial<AppEnv> & {
   /** Offline acceptance seams limited to GTM account and queue reads. */
   gtmQueueReader?: GtmQueueReader;
   gtmMcp?: Pick<McpConnector, "callServerTool">;
+  /** Replaces the Google connector, so the demo stack reads Calendar from an emulator. */
+  google?: ManagedConnectorProvider;
 };
 
 async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
@@ -270,6 +272,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     brexApi,
     gtmQueueReader,
     gtmMcp,
+    google: googleOverride,
     ...envOverrides
   } = overrides;
   const env = { ...loadEnv(process.env), ...envOverrides };
@@ -485,7 +488,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     installed,
     ...integrationSettings
       .providers()
-      .filter((provider) => !composioOverride || provider.describe().id !== "composio"),
+      .filter((provider) => !composioOverride || provider.describe().id !== "composio")
+      .filter((provider) => !googleOverride || provider.describe().id !== "google"),
+    ...(googleOverride ? [googleOverride] : []),
     mcp,
   ]);
   const connector = stack.destination;

@@ -3,17 +3,33 @@ import { describe, expect, it, vi } from "vitest";
 import { calendarAgenda } from "./calendar-agenda.js";
 
 const scope = { spaceId: "space-1", userId: "user-1" };
-const range = { from: new Date("2026-11-01T00:00:00Z"), to: new Date("2026-11-08T00:00:00Z") };
+const range = {
+  from: new Date("2026-11-01T00:00:00Z"),
+  to: new Date("2026-11-08T00:00:00Z"),
+};
 const context = {
   operationId: "op",
   traceId: "op",
   ...scope,
   signal: new AbortController().signal,
 };
-const accountA = { id: "a", connectorId: "google", accountRef: "ref-a", label: "Work" };
-const accountB = { id: "b", connectorId: "google", accountRef: "ref-b", label: "Personal" };
+const accountA = {
+  id: "a",
+  connectorId: "google",
+  accountRef: "ref-a",
+  label: "Work",
+};
+const accountB = {
+  id: "b",
+  connectorId: "google",
+  accountRef: "ref-b",
+  label: "Personal",
+};
 
-function setup(google: (url: string, ref: string) => unknown) {
+function setup(
+  google: (url: string, ref: string) => unknown,
+  extraRoutines: unknown[] = [],
+) {
   const prisma = {
     scratchpadItem: {
       findMany: vi.fn().mockResolvedValue([
@@ -54,11 +70,18 @@ function setup(google: (url: string, ref: string) => unknown) {
           botId: "bot-2",
           bot: { name: "Scout" },
         },
+        ...extraRoutines,
       ]),
     },
   };
   const request = vi.fn(
-    async ({ account, url }: { account: { providerRef: string }; url: string }) => ({
+    async ({
+      account,
+      url,
+    }: {
+      account: { providerRef: string };
+      url: string;
+    }) => ({
       status: 200,
       data: google(url, account.providerRef),
     }),
@@ -108,7 +131,10 @@ describe("calendarAgenda", () => {
             ],
           },
     );
-    const result = await calendarAgenda(deps, scope, range, { accounts: [accountA], context });
+    const result = await calendarAgenda(deps, scope, range, {
+      accounts: [accountA],
+      context,
+    });
     expect(result.errors).toEqual([]);
     expect(result.googleConnected).toBe(true);
     expect(result.items.map((i) => [i.kind, i.title, i.allDay])).toEqual([
@@ -126,7 +152,9 @@ describe("calendarAgenda", () => {
       account: "Work",
       botId: null,
     });
-    expect(result.items.find((i) => i.title === "Sign form")?.mailId).toBe("m1");
+    expect(result.items.find((i) => i.title === "Sign form")?.mailId).toBe(
+      "m1",
+    );
     expect(result.items.find((i) => i.title === "Send deck")).toMatchObject({
       botId: "bot-1",
       botName: "Chief",
@@ -139,7 +167,9 @@ describe("calendarAgenda", () => {
     );
     await calendarAgenda(deps, scope, range, { accounts: [accountA], context });
     const urls = request.mock.calls.map(([call]) => call.url);
-    expect(urls.some((u) => u.includes("/calendars/primary/events"))).toBe(true);
+    expect(urls.some((u) => u.includes("/calendars/primary/events"))).toBe(
+      true,
+    );
     expect(urls.some((u) => u.includes("hidden"))).toBe(false);
   });
 
@@ -149,7 +179,13 @@ describe("calendarAgenda", () => {
       return url.includes("calendarList")
         ? calendars
         : {
-            items: [{ id: "p1", summary: "Dentist", start: { dateTime: "2026-11-06T15:00:00Z" } }],
+            items: [
+              {
+                id: "p1",
+                summary: "Dentist",
+                start: { dateTime: "2026-11-06T15:00:00Z" },
+              },
+            ],
           };
     });
     const result = await calendarAgenda(deps, scope, range, {
@@ -173,7 +209,9 @@ describe("calendarAgenda", () => {
   it("scopes every query to the space and user, in range, skipping watches", async () => {
     const { deps, prisma } = setup(() => ({}));
     await calendarAgenda(deps, scope, range, null);
-    expect(prisma.scratchpadItem.findMany.mock.calls[0]?.[0].where).toMatchObject({
+    expect(
+      prisma.scratchpadItem.findMany.mock.calls[0]?.[0].where,
+    ).toMatchObject({
       ...scope,
       status: { in: ["open", "parked"] },
       dueAt: { gte: range.from, lt: range.to },
@@ -186,16 +224,20 @@ describe("calendarAgenda", () => {
       ...scope,
       active: true,
       managedKind: null,
-      nextRunAt: { gte: range.from, lt: range.to },
+      nextRunAt: { not: null, lt: range.to },
     });
-    expect(prisma.routine.findMany.mock.calls[0]?.[0].where.watch).toBeDefined();
+    expect(
+      prisma.routine.findMany.mock.calls[0]?.[0].where.watch,
+    ).toBeDefined();
   });
 
   it("returns the local items without waiting for a hanging Google account, then reports it", async () => {
     const { deps, request } = setup(() => ({}));
     request.mockImplementation(() => new Promise(() => {}));
     const google = { accounts: [accountA], context };
-    const local = await calendarAgenda(deps, scope, range, google, { sources: "local" });
+    const local = await calendarAgenda(deps, scope, range, google, {
+      sources: "local",
+    });
     expect(request).not.toHaveBeenCalled();
     expect(local.items).toHaveLength(4);
     expect(local.googleConnected).toBe(true);
@@ -204,7 +246,9 @@ describe("calendarAgenda", () => {
       accountTimeoutMs: 20,
     });
     expect(remote.items).toEqual([]);
-    expect(remote.errors).toEqual([{ account: "Work", message: "Couldn't load Work" }]);
+    expect(remote.errors).toEqual([
+      { account: "Work", message: "Couldn't load Work" },
+    ]);
   });
 
   it("follows calendarList pages", async () => {
@@ -218,5 +262,75 @@ describe("calendarAgenda", () => {
     await calendarAgenda(deps, scope, range, { accounts: [accountA], context });
     const urls = request.mock.calls.map(([call]) => call.url);
     expect(urls.some((u) => u.includes("/calendars/second/events"))).toBe(true);
+  });
+
+  const routineRow = (over: Record<string, unknown>) => ({
+    id: "r9",
+    name: "Briefing",
+    crons: ["0 8 * * 1-5"],
+    timezone: "America/New_York",
+    nextRunAt: new Date("2026-11-02T13:00:00Z"),
+    botId: "bot-1",
+    bot: { name: "Chief" },
+    ...over,
+  });
+  const run = async (row: unknown) => {
+    const { deps, prisma } = setup(() => ({}), [row]);
+    prisma.routine.findMany.mockResolvedValue([row]);
+    const result = await calendarAgenda(deps, scope, range, null);
+    return result.items.filter((i) => i.id.startsWith("routine:"));
+  };
+
+  it("lists every weekday run of a repeating routine with distinct ids", async () => {
+    const items = await run(routineRow({}));
+    expect(items).toHaveLength(5);
+    expect(new Set(items.map((i) => i.id)).size).toBe(5);
+    expect(items[0]).toMatchObject({
+      id: "routine:r9:2026-11-02T13:00:00.000Z",
+      kind: "routine",
+    });
+  });
+
+  it("keeps a routine whose stored next run is before the range", async () => {
+    const items = await run(
+      routineRow({ nextRunAt: new Date("2026-10-30T12:00:00Z") }),
+    );
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((i) => i.start >= range.from.toISOString())).toBe(true);
+  });
+
+  it("shows a sub-daily routine once", async () => {
+    expect(await run(routineRow({ crons: ["0 * * * *"] }))).toHaveLength(1);
+  });
+
+  it("leaves a check-back as one item with a plain id", async () => {
+    const items = await run(routineRow({ crons: [ONCE_ROUTINE_CRON] }));
+    expect(items.map((i) => [i.id, i.kind])).toEqual([
+      ["routine:r9", "check_back"],
+    ]);
+  });
+
+  it("follows event pages", async () => {
+    const { deps, request } = setup((url) =>
+      url.includes("calendarList")
+        ? calendars
+        : url.includes("pageToken=e2")
+          ? {
+              items: [
+                {
+                  id: "late",
+                  summary: "Late",
+                  start: { dateTime: "2026-11-06T15:00:00Z" },
+                },
+              ],
+            }
+          : { items: [], nextPageToken: "e2" },
+    );
+    const result = await calendarAgenda(deps, scope, range, {
+      accounts: [accountA],
+      context,
+    });
+    expect(result.items.some((i) => i.title === "Late")).toBe(true);
+    expect(request.mock.calls.length).toBeGreaterThan(2);
   });
 });
