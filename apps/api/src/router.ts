@@ -10401,8 +10401,27 @@ async function persistModelCredential(
   ) {
     throw new ORPCError("BAD_REQUEST", { message: authError });
   }
+  // Signing in again without a model (OpenRouter OAuth) keeps the model this
+  // provider already uses in this space instead of resetting to the first catalog row.
+  const keptModelId = requestedModelId
+    ? undefined
+    : usableModelId(
+        (
+          await deps.prisma.spaceModelPreference.findFirst({
+            where: {
+              spaceId: actor.spaceId,
+              userId: actor.userId,
+              credential: { provider: input.provider },
+              modelId: { not: null },
+            },
+            orderBy: { updatedAt: "desc" },
+            select: { modelId: true },
+          })
+        )?.modelId,
+      );
   const defaultModel =
     requestedModelId ??
+    keptModelId ??
     defaultCatalogModelId(input.provider, input.plaintext) ??
     usableModelId(deps.env.defaultModel);
   const allowedThinking = defaultModel
@@ -10475,7 +10494,20 @@ async function persistModelCredential(
         thinkingLevel = defaultModel
           ? clampCatalogThinkingLevel(thinkingLevel, allowedThinking)
           : null;
-        await selectSpaceModelPreference(tx, actor, credential.id, defaultModel, thinkingLevel);
+        // A new connection only becomes the default when the space has none yet or this
+        // credential already is it; otherwise the owner's choice stays in place.
+        const currentDefault = await tx.spaceModelPreference.findFirst({
+          where: { spaceId: actor.spaceId, userId: actor.userId, isDefault: true },
+          select: { credentialId: true },
+        });
+        const preference = await selectSpaceModelPreference(
+          tx,
+          actor,
+          credential.id,
+          defaultModel,
+          thinkingLevel,
+          { makeDefault: !currentDefault || currentDefault.credentialId === credential.id },
+        );
         input.signal?.throwIfAborted();
         if (existing) {
           await deleteUnreferencedCredentialSecret(tx, {
@@ -10485,7 +10517,7 @@ async function persistModelCredential(
           });
           input.signal?.throwIfAborted();
         }
-        return { ...credential, isDefault: true, defaultModel };
+        return { ...credential, isDefault: preference.isDefault, defaultModel };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     ),
