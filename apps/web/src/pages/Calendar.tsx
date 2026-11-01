@@ -75,6 +75,8 @@ const KIND_ICON = {
   routine: Repeat,
 } as const;
 
+const MONTH_ORDER: CalendarItemKind[] = ["event", "todo", "check_back", "routine"];
+
 const kindNames = (): Record<CalendarItemKind, string> => ({
   event: t`Events`,
   todo: t`To-dos`,
@@ -149,12 +151,15 @@ function rangeTitle(view: View, start: string, end: string, phone: boolean) {
       day: "numeric",
     }).format(first);
   if (phone && view !== "month")
-    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).formatRange(
-      first,
-      last,
-    );
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+    }).formatRange(first, last);
   if (view === "month")
-    return new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(first);
+    return new Intl.DateTimeFormat(undefined, {
+      month: "long",
+      year: "numeric",
+    }).format(first);
   if (view === "day")
     return new Intl.DateTimeFormat(undefined, {
       weekday: "long",
@@ -172,11 +177,18 @@ function rangeTitle(view: View, start: string, end: string, phone: boolean) {
 const timeText = (item: CalendarItem) =>
   item.allDay
     ? t`All day`
-    : new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
-        new Date(item.start),
-      );
+    : new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(item.start));
 
-type Block = { item: CalendarItem; start: number; end: number; col: number; cols: number };
+type Block = {
+  item: CalendarItem;
+  start: number;
+  end: number;
+  col: number;
+  cols: number;
+};
 
 /** Timed items of one day with side-by-side columns for the ones that overlap. */
 function layoutDay(items: CalendarItem[], day: string): Block[] {
@@ -304,7 +316,16 @@ export function CalendarPage({
             field?.toLowerCase().includes(needle),
           )),
     )
-    .sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
+    .sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id))
+    // The schedule lists what is coming, so a repeating routine appears once, at its next run.
+    .filter(
+      (item, i, all) =>
+        view !== "schedule" ||
+        item.kind !== "routine" ||
+        all.findIndex(
+          (other) => other.kind === "routine" && other.id.split(":")[1] === item.id.split(":")[1],
+        ) === i,
+    );
   const itemsOn = (day: string) => shown.filter((item) => daysOf(item).includes(day));
   const botOptions = [
     ...new Map(
@@ -354,7 +375,7 @@ export function CalendarPage({
         </a>
       );
     // A routine opens in its bot's chat with the routine editor, not in the bot's panel.
-    const routineId = item.id.startsWith("routine:") ? item.id.slice("routine:".length) : null;
+    const routineId = item.id.startsWith("routine:") ? item.id.split(":")[1] : null;
     if (item.botId && routineId)
       return (
         <Link
@@ -459,6 +480,7 @@ export function CalendarPage({
     const accent = parsed && !parsed.isImage && /^#[0-9a-f]{3,8}$/i.test(parsed.color);
     // All-day bars and timed blocks an hour or longer have room for a second title line.
     const tall = !style || (typeof style.height === "number" && style.height >= 40);
+    const phoneBlocks = phone && view === "week";
     const full = [timeText(item), item.title, item.botName].filter(Boolean).join(" · ");
     return wrap(
       item,
@@ -471,14 +493,14 @@ export function CalendarPage({
         item.kind === "event" ? "bg-muted" : "bg-card"
       } ${item.botId ? "border-s-2" : ""}`,
       <>
-        {crowded ? null : kindIcon(item)}
+        {crowded || phoneBlocks ? null : kindIcon(item)}
         <span
           className={`min-w-0 flex-1 ${tall ? "line-clamp-2 break-words" : "truncate"}`}
           title={full}
         >
           {item.title}
         </span>
-        {crowded ? null : avatar(item, 14)}
+        {crowded || (phoneBlocks && accent) ? null : avatar(item, 14)}
       </>,
       { ...style, ...(accent ? { borderInlineStartColor: parsed.color } : {}) },
       full,
@@ -550,9 +572,10 @@ export function CalendarPage({
                   scope="col"
                   className="p-1 text-start text-xs font-normal text-muted-foreground max-sm:text-center sm:p-2"
                 >
-                  {new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" }).format(
-                    new Date(Date.UTC(2024, 0, 7 + day)),
-                  )}
+                  {new Intl.DateTimeFormat(undefined, {
+                    weekday: "short",
+                    timeZone: "UTC",
+                  }).format(new Date(Date.UTC(2024, 0, 7 + day)))}
                 </th>
               ))}
             </tr>
@@ -563,7 +586,10 @@ export function CalendarPage({
                 {Array.from({ length: 7 }, (_, weekday) => {
                   const day = week * 7 + weekday - bounds.offset + 1;
                   const date = `${month}-${pad(day)}`;
-                  const items = day > 0 && day <= bounds.days ? itemsOn(date) : [];
+                  // Meetings stay visible; routines fall into "+N more".
+                  const items = (day > 0 && day <= bounds.days ? itemsOn(date) : []).sort(
+                    (a, b) => MONTH_ORDER.indexOf(a.kind) - MONTH_ORDER.indexOf(b.kind),
+                  );
                   return (
                     <td
                       key={weekday}
@@ -702,7 +728,9 @@ export function CalendarPage({
     const days = Array.from({ length: view === "day" ? 1 : weekDays(phone) }, (_, i) =>
       addDays(start, i),
     );
-    const columns = { gridTemplateColumns: `3rem repeat(${days.length}, minmax(0, 1fr))` };
+    const columns = {
+      gridTemplateColumns: `3rem repeat(${days.length}, minmax(0, 1fr))`,
+    };
     content = (
       <div className={view === "week" && !phone ? "min-w-[40rem]" : undefined}>
         <div className="sticky top-0 z-20 grid border-b bg-background" style={columns}>
@@ -911,6 +939,16 @@ export function CalendarPage({
           <Trans>Couldn't load {account}</Trans>
         </p>
       ))}
+      {googleConnected === false ? (
+        <p className={`${PAGE_GUTTER_X} mb-2 text-sm`}>
+          <Link
+            to={CONNECT_GOOGLE}
+            className="inline-flex items-center text-muted-foreground underline underline-offset-4 pointer-coarse:min-h-11"
+          >
+            <Trans>Connect Google Calendar</Trans>
+          </Link>
+        </p>
+      ) : null}
       {/* A grid scrolls to the current hour, so on a phone the block stays above it instead of scrolling away. */}
       {phone && !isGrid ? null : <div className={PAGE_GUTTER_X}>{todos}</div>}
       {phone && view === "day" && !loading && itemsOn(start).length === 0 ? (
@@ -924,16 +962,6 @@ export function CalendarPage({
       >
         {phone && !isGrid ? todos : null}
         {content}
-        {googleConnected === false ? (
-          <p className="mt-4 text-sm">
-            <Link
-              to={CONNECT_GOOGLE}
-              className="inline-flex items-center text-muted-foreground underline underline-offset-4 pointer-coarse:min-h-11"
-            >
-              <Trans>Connect Google Calendar</Trans>
-            </Link>
-          </p>
-        ) : null}
       </div>
     </div>
   );
