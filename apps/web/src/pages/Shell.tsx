@@ -4675,6 +4675,7 @@ export function ShellPage() {
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
               running={composerShowsStop(currentRuns)}
               disabled={composerDisabled}
+              canDictate={Boolean(voiceStatus?.transcribe || voiceStatus?.transcriptionReady)}
               disabledPlaceholder={
                 legalWaitsForConsent ? t`Allow access on the page to ask` : undefined
               }
@@ -6038,9 +6039,7 @@ export function ShellPage() {
                   await refreshBots();
                   navigate(contextBot ? `/app/${chat.id}` : `/app/g/${chat.id}`);
                 })
-                .catch((error: unknown) =>
-                  setSendError(errorText(error, t`Failed to duplicate`)),
-                );
+                .catch((error: unknown) => setSendError(errorText(error, t`Failed to duplicate`)));
             }}
             onClear={
               contextBot

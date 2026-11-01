@@ -124,6 +124,23 @@ export function transcriptionLanguage(): string | undefined {
   return tag ? tag.split("-")[0]?.toLowerCase() : undefined;
 }
 
+/** Puts `insert` in place of the selection, with a space on a side only where words would touch. */
+export function insertAtCursor(
+  draft: string,
+  start: number,
+  end: number,
+  insert: string,
+): { text: string; caret: number } {
+  const before = draft.slice(0, start);
+  const after = draft.slice(end);
+  const lead = before && !/\s$/u.test(before) ? " " : "";
+  const trail = after && !/^\s/u.test(after) ? " " : "";
+  return {
+    text: `${before}${lead}${insert}${trail}${after}`,
+    caret: before.length + lead.length + insert.length,
+  };
+}
+
 function normalizedTranscript(text: string): string {
   return text.trim().replace(/\s+/g, " ");
 }
@@ -244,6 +261,8 @@ export class Dictation {
   async listen(opts: {
     mode: DictationMode;
     transcribe?: boolean;
+    /** Record and transcribe on the server even where on-device speech exists. */
+    server?: boolean;
     endpointMs?: number;
     onFinal: (text: string) => void;
   }): Promise<void> {
@@ -255,7 +274,7 @@ export class Dictation {
     const transcribe = Boolean(opts.transcribe);
     // An unknown capability is not a refusal: a device whose browser cannot hold the
     // microphone open goes to the server even before the voice status has loaded.
-    if (prefersServerDictation() && opts.transcribe !== false) {
+    if (opts.server || (prefersServerDictation() && opts.transcribe !== false)) {
       await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
       return;
     }

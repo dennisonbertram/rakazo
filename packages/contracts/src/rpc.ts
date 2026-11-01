@@ -1605,9 +1605,19 @@ export const appContract = {
     catalog: oc.output(z.array(VoiceCatalogEntrySchema)),
     status: oc.output(VoiceStatusSchema),
     credentials: oc.output(z.array(VoiceCredentialSchema)),
-    /** Select a transcription provider with its own key. The key is never returned. */
+    /**
+     * Select a transcription provider with its own key. The key is never returned.
+     * An OpenAI-compatible server sends `baseUrl` and `model` and may omit the key.
+     */
     setTranscription: oc
-      .input(z.object({ provider: z.string().min(1), apiKey: z.string().min(8) }))
+      .input(
+        z.object({
+          provider: z.string().min(1),
+          apiKey: z.string().min(8).optional(),
+          baseUrl: z.string().max(2048).optional(),
+          model: z.string().max(120).optional(),
+        }),
+      )
       .output(z.object({ provider: z.string() })),
     clearTranscription: oc.output(z.object({ ok: z.literal(true) })),
     connect: oc
