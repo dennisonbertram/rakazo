@@ -5581,6 +5581,10 @@ msgstr "Enter a post-money cap"
 msgid "Enter a username and password"
 msgstr "Enter a username and password"
 
+#: src/pages/gtm/GtmPlan.tsx
+msgid "Enter a valid date and time."
+msgstr "Enter a valid date and time."
+
 #: src/components/ContactDialog.tsx
 #: src/lib/user-error.ts
 msgid "Enter a valid email"
@@ -11203,8 +11207,8 @@ msgid "Scheduled run failed."
 msgstr "Scheduled run failed."
 
 #: src/pages/gtm/GtmPlan.tsx
-msgid "Scheduled time (ISO)"
-msgstr "Scheduled time (ISO)"
+msgid "Scheduled time"
+msgstr "Scheduled time"
 
 #: src/pages/Inbox.tsx
 msgid "Scheduling"

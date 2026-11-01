@@ -5581,6 +5581,10 @@ msgstr ""
 msgid "Enter a username and password"
 msgstr ""
 
+#: src/pages/gtm/GtmPlan.tsx
+msgid "Enter a valid date and time."
+msgstr ""
+
 #: src/components/ContactDialog.tsx
 #: src/lib/user-error.ts
 msgid "Enter a valid email"
@@ -11203,7 +11207,7 @@ msgid "Scheduled run failed."
 msgstr ""
 
 #: src/pages/gtm/GtmPlan.tsx
-msgid "Scheduled time (ISO)"
+msgid "Scheduled time"
 msgstr ""
 
 #: src/pages/Inbox.tsx
