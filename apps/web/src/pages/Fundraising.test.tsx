@@ -351,6 +351,32 @@ it("moves a prospect to another stage from its row menu", async () => {
   expect(rpcMock.prospectSave).toHaveBeenCalledWith({ id: "p1", stage: "committed" });
 });
 
+it("offers Undo after a stage move and restores the old stage", async () => {
+  rpcMock.overview.mockResolvedValue(overview(openRound, [prospect("p1", "Ada Fund")]));
+  await show();
+  await click(container.querySelector('button[aria-label="Actions for Ada Fund"]'));
+  await click(menuItem("Move to"));
+  rpcMock.prospectSave.mockResolvedValue(prospect("p1", "Ada Fund", { stage: "committed" }));
+  await click(menuItem("Committed"));
+  await flush();
+  expect(document.body.textContent).toContain("Moved Ada Fund to Committed");
+  await click(button("Undo"));
+  expect(rpcMock.prospectSave).toHaveBeenLastCalledWith({ id: "p1", stage: "target" });
+});
+
+it("offers no Undo when restoring would move a commitment into another round", async () => {
+  const old = prospect("p1", "Ada Fund", { stage: "committed", roundId: "r0" });
+  rpcMock.overview.mockResolvedValue(overview(openRound, [old]));
+  await show();
+  await click(container.querySelector('button[aria-label="Actions for Ada Fund"]'));
+  await click(menuItem("Move to"));
+  rpcMock.prospectSave.mockResolvedValue({ ...old, stage: "passed" });
+  await click(menuItem("Passed"));
+  await flush();
+  expect(document.body.textContent).toContain("Moved Ada Fund to Passed");
+  expect(button("Undo")).toBeUndefined();
+});
+
 it("opens the contact that already has the typed email instead of failing", async () => {
   const existing = { ...prospect("c7", "Dee Existing"), kind: "investor" as const, stage: null };
   rpcMock.overview.mockResolvedValue(overview(null, []));

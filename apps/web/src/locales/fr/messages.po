@@ -7944,6 +7944,12 @@ msgstr ""
 msgid "Moved \"{0}\" to Inbox"
 msgstr ""
 
+#. placeholder {0}: prospect.name
+#. placeholder {1}: contactStageNames()[stage]
+#: src/pages/Fundraising.tsx
+msgid "Moved {0} to {1}"
+msgstr ""
+
 #. placeholder {0}: status.count
 #: src/pages/Inbox.tsx
 msgid "Moved {0} to trash"
