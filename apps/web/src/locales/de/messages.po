@@ -1636,7 +1636,6 @@ msgstr "Bestätigungsgrenzen"
 msgid "Approvals"
 msgstr ""
 
-#: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/McpActionCard.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -11426,6 +11425,7 @@ msgid "Self-custody"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
+#: src/components/gtm/EmailItemCard.tsx
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/inbox/InboxCleanup.tsx
 #: src/components/inbox/InboxShortcuts.tsx
