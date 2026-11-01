@@ -11,6 +11,7 @@ import {
   BOT_COLORS,
   isVoiceAgentSpawnKey,
   retiredVoiceAgentSpawnKey,
+  SandboxKind,
 } from "@rakazo/contracts";
 import {
   BACKGROUND_RUN_TRIGGERS,
@@ -539,7 +540,8 @@ export function createRepos(prisma: PrismaClient) {
         }
       }
       const settings = await prisma.deploymentSettings.findUnique({ where: { id: "default" } });
-      const envKind = process.env.SANDBOX_PROVIDER ?? "docker";
+      const parsedEnvKind = SandboxKind.safeParse(process.env.SANDBOX_PROVIDER ?? "docker");
+      const envKind = parsedEnvKind.success ? parsedEnvKind.data : "docker";
       const kind =
         envKind === "docker" && settings?.computerHost === "this-mac" ? "desktop" : envKind;
       const insertBot = () =>
