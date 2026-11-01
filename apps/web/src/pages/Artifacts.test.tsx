@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { i18n } from "@lingui/core";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -11,7 +12,10 @@ const api = vi.hoisted(() => ({
   listVersions: vi.fn(() => new Promise(() => {})),
   getById: vi.fn(),
 }));
-const shares = vi.hoisted(() => ({ get: vi.fn(async () => null as unknown) }));
+const shares = vi.hoisted(() => ({
+  get: vi.fn(async () => null as unknown),
+  create: vi.fn(),
+}));
 vi.mock("../lib/rpc", () => ({ rpc: { artifacts: api, artifactShares: shares } }));
 vi.mock("../lib/artifact-open", () => ({
   bytesToBase64: vi.fn(),
@@ -29,6 +33,8 @@ vi.mock("@rakazo/chat-ui/web", () => ({
 }));
 
 import { ArtifactsPage } from "./Artifacts";
+
+i18n.loadAndActivate({ locale: "en", messages: {} });
 
 function artifact(name: string, id: string, createdAt = new Date().toISOString()) {
   return {
@@ -608,6 +614,72 @@ it("keeps the filters in the URL when an artifact opens", async () => {
   } finally {
     await page.cleanup();
     window.localStorage.removeItem("rakazo:artifacts-view-mode");
+    vi.unstubAllGlobals();
+  }
+});
+
+async function openSharedHtml(expiresAt: string) {
+  api.listSpace.mockResolvedValue({
+    items: [artifact("Page.html", "artifact-1")],
+    nextCursor: null,
+  });
+  api.listVersions.mockRejectedValueOnce(new Error("no versions"));
+  api.getById.mockResolvedValue({
+    ...artifact("Page.html", "artifact-1"),
+    mimeType: "text/html",
+    contentBase64: "",
+  });
+  vi.mocked((await import("../lib/artifact-open")).decodeArtifactBase64).mockReturnValue(
+    new TextEncoder().encode("<p>hi</p>"),
+  );
+  shares.get.mockResolvedValueOnce({ artifactId: "artifact-1", version: 1, expiresAt });
+  const page = await renderArtifacts("/app/artifacts/artifact-1");
+  const share = [...page.container.querySelectorAll("button")].find((b) =>
+    b.textContent?.includes("Share"),
+  );
+  await act(async () => share?.click());
+  return page;
+}
+const dialogButton = (name: string) =>
+  [...document.querySelectorAll("[data-slot=dialog-content] button")].find(
+    (b) => b.textContent === name,
+  ) as HTMLButtonElement | undefined;
+
+it("lets the owner replace a reopened share link and shows when it expires", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  shares.create.mockResolvedValueOnce({
+    url: "https://app.example.test/s#new-token",
+    share: { artifactId: "artifact-1", version: 1, expiresAt: "2030-03-15T12:00:00.000Z" },
+  });
+  const page = await openSharedHtml("2030-02-10T12:00:00.000Z");
+  try {
+    const dialog = () => document.querySelector("[data-slot=dialog-content]")?.textContent ?? "";
+    expect(dialog()).toContain("Feb 10, 2030");
+    expect(dialog()).toContain("Links are shown once. Replacing this one stops the old link.");
+    await act(async () => dialogButton("Replace link")?.click());
+    expect(shares.create).toHaveBeenCalledTimes(1);
+    expect(shares.create).toHaveBeenCalledWith({ artifactId: "artifact-1" });
+    expect(dialogButton("Copy")).toBeDefined();
+    expect(
+      document.querySelector<HTMLInputElement>("[data-slot=dialog-content] input")?.value,
+    ).toBe("https://app.example.test/s#new-token");
+  } finally {
+    await page.cleanup();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("shows a failed replace inside the share dialog", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  shares.create.mockRejectedValueOnce(new Error("boom"));
+  const page = await openSharedHtml("2030-02-10T12:00:00.000Z");
+  try {
+    await act(async () => dialogButton("Replace link")?.click());
+    expect(
+      document.querySelector("[data-slot=dialog-content] [role=alert]")?.textContent,
+    ).toBeTruthy();
+  } finally {
+    await page.cleanup();
     vi.unstubAllGlobals();
   }
 });

@@ -1373,6 +1373,8 @@ function PreviewPane({
         <ArtifactShareDialog
           name={displayName(state.artifact.name)}
           url={shareDialog.url}
+          expiresAt={share?.expiresAt}
+          onReplace={() => void createShare(state.artifact.id)}
           busy={shareBusy}
           error={shareError}
           onStop={() => void stopShare(state.artifact.id)}

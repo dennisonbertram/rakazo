@@ -53,7 +53,7 @@ export function CopyLinkDialog({
   links: PortalLink[];
   onClose: () => void;
   title?: string;
-  note?: string;
+  note?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
@@ -66,7 +66,7 @@ export function CopyLinkDialog({
           {links.map((link) => (
             <LinkRow key={link.contactId} link={link} named={links.length > 1} />
           ))}
-          {note ? <p className="text-[13.5px] text-muted-foreground">{note}</p> : null}
+          {note ? <div className="text-[13.5px] text-muted-foreground">{note}</div> : null}
         </DialogBody>
         <DialogFooter>
           {actions}
