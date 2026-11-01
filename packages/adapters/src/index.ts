@@ -45,6 +45,7 @@ export * from "./browser-tools.js";
 export * from "./builtin-skills.js";
 export * from "./builtin-tools.js";
 export * from "./calendar-agenda.js";
+export * from "./calendar-api-emulator.js";
 export * from "./calendar-person.js";
 export { type CalendarAccount, listCalendarAccounts } from "./calendar-tools.js";
 export * from "./cartesia-voice.js";
