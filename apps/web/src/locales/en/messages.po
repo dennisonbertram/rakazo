@@ -6595,6 +6595,10 @@ msgid "Import from Google Drive"
 msgstr "Import from Google Drive"
 
 #: src/pages/Company.tsx
+msgid "Import from your mail and files to fill this page."
+msgstr "Import from your mail and files to fill this page."
+
+#: src/pages/Company.tsx
 msgid "Import in progress"
 msgstr "Import in progress"
 
