@@ -1,6 +1,7 @@
 import type { Group } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { SetStateAction } from "react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROOT_CONTAINER } from "../../components/sidebar-folders/drop-target";
@@ -146,6 +147,7 @@ export function SidebarFixture({
   activeEmailChat = false,
   activityMode = false,
   toggleActivityMode = () => undefined,
+  onFocusComposer,
 }: {
   mode: Mode;
   gtmMode?: boolean;
@@ -169,6 +171,8 @@ export function SidebarFixture({
   activeEmailChat?: boolean;
   activityMode?: boolean;
   toggleActivityMode?: () => void;
+  /** Called when a row click asks for the message box to take focus. */
+  onFocusComposer?: (botId: string | null) => void;
 }) {
   const navigate = useNavigate();
   const sidebarRef = useRef<HTMLElement>(null);
@@ -182,7 +186,11 @@ export function SidebarFixture({
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [fileDropBotId, setFileDropBotId] = useState<string | null>(null);
-  const [, setFocusComposerBotId] = useState<string | null>(null);
+  const [, setFocusComposerBotIdState] = useState<string | null>(null);
+  const setFocusComposerBotId = (value: SetStateAction<string | null>) => {
+    if (typeof value !== "function") onFocusComposer?.(value);
+    setFocusComposerBotIdState(value);
+  };
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
   const [, setNewSpaceOpen] = useState(false);
   const [, setPickerInfoTopic] = useState<"group" | "space" | null>(null);
