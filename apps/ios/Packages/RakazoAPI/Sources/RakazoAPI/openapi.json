@@ -89989,6 +89989,14 @@
                       "cursor": {
                         "type": "string",
                         "maxLength": 200
+                      },
+                      "q": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "provider": {
+                        "type": "string",
+                        "maxLength": 64
                       }
                     }
                   }

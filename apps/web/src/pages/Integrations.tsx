@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { AppDetail } from "../components/integrations/AppDetail";
 import { GranolaPage } from "../components/integrations/GranolaPage";
 import { IntegrationsHome } from "../components/integrations/IntegrationsHome";
@@ -30,6 +30,10 @@ export function IntegrationsPage({
       <Route
         path="granola"
         element={<GranolaPage data={data} onOpenAiDataSharing={onOpenAiDataSharing} />}
+      />
+      <Route
+        path="granola/meetings"
+        element={<Navigate replace to="/app/meetings?source=granola" />}
       />
       <Route
         path="omi"

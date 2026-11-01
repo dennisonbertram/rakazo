@@ -637,4 +637,42 @@ describePostgres("meetings.* (PostgreSQL)", () => {
       { code: "NOT_FOUND" },
     );
   });
+
+  it("filters the list by title text and source, for the owner only", async () => {
+    const f = actor(id("user-filter"));
+    await prisma.user.create({
+      data: { id: f.userId, name: "f", email: f.email, emailVerified: false },
+    });
+    await prisma.member.create({
+      data: {
+        id: id("member-filter"),
+        organizationId: orgId,
+        userId: f.userId,
+        role: "member",
+        createdAt: new Date(),
+      },
+    });
+    const mk = (userId: string, provider: string, externalId: string, title: string) => ({
+      spaceId,
+      userId,
+      provider,
+      externalId,
+      title,
+      startedAt: new Date(),
+      sourceUpdatedAt: new Date(),
+    });
+    await prisma.meeting.createMany({
+      data: [
+        mk(f.userId, "hex", "f1", "Pricing Review"),
+        mk(f.userId, "granola", "f2", "Weekly sync"),
+        mk(f.userId, "granola", "f3", "pricing follow-up"),
+        mk(b.userId, "granola", "f4", "Pricing secret"),
+      ],
+    });
+    const titles = async (input: { q?: string; provider?: string }) =>
+      (await client(f).meetings.list(input)).items.map((item) => item.title).sort();
+    expect(await titles({ q: "PRICING" })).toEqual(["Pricing Review", "pricing follow-up"]);
+    expect(await titles({ provider: "granola" })).toEqual(["Weekly sync", "pricing follow-up"]);
+    expect(await titles({ q: "pricing", provider: "granola" })).toEqual(["pricing follow-up"]);
+  });
 });

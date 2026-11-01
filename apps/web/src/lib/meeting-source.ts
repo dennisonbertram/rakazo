@@ -7,6 +7,9 @@ const NAMES: Record<string, string> = {
   praci: "Praci",
 };
 
+/** The sources the Source filter offers. */
+export const MEETING_SOURCES = Object.keys(NAMES);
+
 /** The source's display name; a provider this app does not know shows as its own id. */
 export const meetingSourceName = (provider: string) => NAMES[provider] ?? provider;
 

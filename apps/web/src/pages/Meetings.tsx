@@ -12,13 +12,13 @@ import {
   TableHeadRow,
   TableRow,
 } from "@rakazo/ui-web";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PickFilter, SearchField } from "../components/ListControls";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
 import { sortBy, useListParams } from "../lib/list-params";
-import { meetingMinutes, meetingSourceName } from "../lib/meeting-source";
+import { MEETING_SOURCES, meetingMinutes, meetingSourceName } from "../lib/meeting-source";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 
@@ -44,26 +44,38 @@ export function MeetingsPage({ spaceName }: { spaceName?: string }) {
   const query = list.param("q") ?? "";
   const source = list.param("source");
 
-  const load = useCallback(async (cursor?: string) => {
-    try {
-      const page = await rpc.meetings.list(cursor ? { cursor } : {});
-      setRows((prev) => (cursor ? [...(prev ?? []), ...page.items] : page.items));
-      setNext(page.nextCursor);
-      setError("");
-    } catch (cause) {
-      setError(errorText(cause, t`Could not load meetings`));
-    }
-  }, []);
+  // The server filters; typing waits a moment before asking.
+  const [needle, setNeedle] = useState(query.trim());
+  useEffect(() => {
+    const timer = setTimeout(() => setNeedle(query.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+  // Only the latest request may fill the list.
+  const latest = useRef(0);
+  const load = useCallback(
+    async (cursor?: string) => {
+      const request = cursor ? latest.current : ++latest.current;
+      try {
+        const page = await rpc.meetings.list({
+          ...(cursor ? { cursor } : {}),
+          ...(needle ? { q: needle } : {}),
+          ...(source ? { provider: source } : {}),
+        });
+        if (request !== latest.current) return;
+        setRows((prev) => (cursor ? [...(prev ?? []), ...page.items] : page.items));
+        setNext(page.nextCursor);
+        setError("");
+      } catch (cause) {
+        if (request === latest.current) setError(errorText(cause, t`Could not load meetings`));
+      }
+    },
+    [needle, source],
+  );
   useEffect(() => {
     void load();
   }, [load]);
 
-  const needle = query.trim().toLowerCase();
-  const found = (rows ?? []).filter(
-    (meeting) =>
-      (!source || meeting.provider === source) &&
-      (!needle || meeting.title.toLowerCase().includes(needle)),
-  );
+  const found = rows ?? [];
   const { field, dir } = list.sort;
   const shown = sortBy(
     found,
@@ -77,10 +89,7 @@ export function MeetingsPage({ spaceName }: { spaceName?: string }) {
             : m.startedAt,
     dir,
   );
-  const sources = [...new Set((rows ?? []).map((m) => m.provider))].map((p): [string, string] => [
-    p,
-    meetingSourceName(p),
-  ]);
+  const sources = MEETING_SOURCES.map((p): [string, string] => [p, meetingSourceName(p)]);
   const sortHead = (target: (typeof MEETING_SORTS)[number]) => ({
     sortDirection: field === target ? dir : null,
     onSort: () => list.toggleSort(target),
@@ -105,7 +114,7 @@ export function MeetingsPage({ spaceName }: { spaceName?: string }) {
           </div>
         ) : rows === null ? (
           <RowsSkeleton className="pt-2" />
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && !query && !source ? (
           <p className="pt-2 text-sm text-muted-foreground">
             <Trans>No meetings</Trans>
           </p>

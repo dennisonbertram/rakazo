@@ -6,8 +6,11 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const tag = vi.hoisted(() => (parts: TemplateStringsArray, ...values: unknown[]) =>
-  parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""));
+const tag = vi.hoisted(
+  () =>
+    (parts: TemplateStringsArray, ...values: unknown[]) =>
+      parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
+);
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: tag }),
   Trans: ({ children }: { children: ReactNode }) => children,
@@ -48,23 +51,27 @@ async function mount(node: ReactNode, url = "/app/meetings") {
   return container;
 }
 
-it("lists every source with its duration and filters by the source in the URL", async () => {
+it("lists every source with its duration", async () => {
   rpc.meetings.list.mockResolvedValue({ items: rows, nextCursor: null });
   const all = await mount(<MeetingsPage />);
   expect(all.textContent).toContain("Weekly sync");
   expect(all.textContent).toContain("Zoom call");
   expect(all.textContent).toContain("30 min");
-  document.body.innerHTML = "";
-  const granola = await mount(<MeetingsPage />, "/app/meetings?source=granola");
-  expect(granola.textContent).toContain("Weekly sync");
-  expect(granola.textContent).not.toContain("Zoom call");
+  expect(rpc.meetings.list).toHaveBeenCalledWith({});
 });
 
-it("searches titles", async () => {
-  rpc.meetings.list.mockResolvedValue({ items: rows, nextCursor: null });
-  const page = await mount(<MeetingsPage />, "/app/meetings?q=zoom");
+it("asks the server for the source and search in the URL", async () => {
+  rpc.meetings.list.mockResolvedValue({ items: [rows[1]], nextCursor: null });
+  const page = await mount(<MeetingsPage />, "/app/meetings?source=hex&q=zoom");
+  expect(rpc.meetings.list).toHaveBeenCalledWith({ q: "zoom", provider: "hex" });
   expect(page.textContent).toContain("Zoom call");
-  expect(page.textContent).not.toContain("Weekly sync");
+});
+
+it("keeps the search box when a filter matches nothing", async () => {
+  rpc.meetings.list.mockResolvedValue({ items: [], nextCursor: null });
+  const page = await mount(<MeetingsPage />, "/app/meetings?q=zzz");
+  expect(page.querySelector("input[type=search]")).not.toBeNull();
+  expect(page.textContent).toContain("No matches");
 });
 
 it("says No meetings when there are none", async () => {
@@ -91,4 +98,37 @@ it("shows a meeting's digest and to-dos with the transcript collapsed", async ()
   const transcript = page.querySelector("details");
   expect(transcript?.open).toBe(false);
   expect(transcript?.textContent).toContain("Transcript");
+});
+
+it("shows the meeting the page is on when an earlier one answers last", async () => {
+  const full = (id: string, title: string) => ({
+    ...row(id, title, "hex"),
+    summary: "",
+    decisions: [],
+    followUps: [],
+    todos: [],
+    transcript: null,
+  });
+  let answerA: (value: unknown) => void = () => {};
+  rpc.meetings.get.mockImplementation(({ meetingId }: { meetingId: string }) =>
+    meetingId === "a"
+      ? new Promise((resolve) => (answerA = resolve))
+      : Promise.resolve(full("b", "Meeting B")),
+  );
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const show = (id: string) =>
+    act(async () =>
+      root.render(
+        <MemoryRouter>
+          <MeetingDetailPage meetingId={id} />
+        </MemoryRouter>,
+      ),
+    );
+  await show("a");
+  await show("b");
+  await act(async () => answerA(full("a", "Meeting A")));
+  expect(container.textContent).toContain("Meeting B");
+  expect(container.textContent).not.toContain("Meeting A");
 });

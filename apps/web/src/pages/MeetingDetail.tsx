@@ -4,7 +4,7 @@ import type { StoredMeetingDetail } from "@rakazo/contracts";
 import { Button, Checkbox } from "@rakazo/ui-web";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { dueLabel } from "../components/inbox/TodoCard";
 import { ConfirmDialog } from "../components/integrations/AppDetail";
@@ -47,17 +47,24 @@ export function MeetingDetailPage({
   const { search } = useLocation();
   const back = () => navigate(`/app/meetings${search}`);
 
+  // A reply for a meeting the page has since left is ignored.
+  const current = useRef(meetingId);
+  current.current = meetingId;
   const load = useCallback(() => {
     rpc.meetings
       .get({ meetingId })
       .then((loaded) => {
+        if (current.current !== meetingId) return;
         setMeeting(loaded);
         setError("");
       })
-      .catch((cause) => setError(errorText(cause, t`Could not load meeting`)));
+      .catch((cause) => {
+        if (current.current === meetingId) setError(errorText(cause, t`Could not load meeting`));
+      });
   }, [meetingId]);
   useEffect(() => {
     setMeeting(null);
+    setError("");
     load();
   }, [load]);
 

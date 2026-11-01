@@ -302,6 +302,7 @@ export async function listStoredMeetings(
   deps: MeetingsDeps,
   actor: Actor,
   cursor?: string,
+  filter: { q?: string; provider?: string } = {},
 ): Promise<StoredMeetingsPage> {
   // The cursor is the last row's start time and id; rows sort by start time (newest first), then id.
   const at = cursor ? cursor.split("|") : [];
@@ -315,7 +316,13 @@ export async function listStoredMeetings(
         }
       : {};
   const rows = await deps.router.prisma.meeting.findMany({
-    where: { ...owner(actor), deletedAt: null, ...after },
+    where: {
+      ...owner(actor),
+      deletedAt: null,
+      ...(filter.provider ? { provider: filter.provider } : {}),
+      ...(filter.q ? { title: { contains: filter.q, mode: "insensitive" as const } } : {}),
+      ...after,
+    },
     select: { id: true, title: true, startedAt: true, endedAt: true, provider: true },
     orderBy: [{ startedAt: "desc" }, { id: "asc" }],
     take: STORED_MEETINGS_PAGE_SIZE + 1,
