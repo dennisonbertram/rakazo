@@ -29,8 +29,8 @@ export const TrialAvailable: Story = {};
 
 export const Subscribe: Story = { args: { status: { ...status, trialAvailable: false } } };
 
-export const PastDueWithPortal: Story = {
-  args: { status: { ...status, trialAvailable: false, state: "past_due", hasCustomer: true } },
+export const CanceledWithPortal: Story = {
+  args: { status: { ...status, trialAvailable: false, state: "canceled", hasCustomer: true } },
 };
 
 /** Members cannot subscribe; they can only log out. */

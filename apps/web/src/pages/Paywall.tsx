@@ -17,7 +17,7 @@ export function PaywallPage({ status }: { status: BillingStatus }) {
   const showPortal =
     status.canManage &&
     status.hasCustomer &&
-    (status.state === "past_due" || status.state === "incomplete" || status.state === "canceled");
+    (status.state === "incomplete" || status.state === "canceled");
 
   async function open(target: "checkout" | "portal") {
     if (pending) return;
