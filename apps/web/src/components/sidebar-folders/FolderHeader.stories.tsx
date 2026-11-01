@@ -35,6 +35,16 @@ export const CollapsedWithStatus: Story = { args: { collapsed: true, status: "ne
 
 export const CollapsedUnread: Story = { args: { collapsed: true, unread: true } };
 
+/** "Delete folder" on a folder with chats asks first; the dialog is open from the start. */
+export const ConfirmDelete: Story = {
+  play: async ({ canvasElement }) => {
+    const { userEvent, within } = await import("storybook/test");
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Actions for Apps" }));
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Delete folder" }));
+  },
+};
+
 export const Renaming: Story = { args: { editing: true, name: "Untitled folder" } };
 
 /** A folder of another space opens and closes but has no menu and cannot be dragged. */

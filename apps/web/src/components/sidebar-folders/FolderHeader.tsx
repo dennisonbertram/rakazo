@@ -1,6 +1,14 @@
 import { useLingui } from "@lingui/react/macro";
 import type { NotificationKind } from "@rakazo/contracts";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +64,7 @@ export function FolderHeader({
 }) {
   const { t } = useLingui();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const dnd = useFolderDnd(id, readOnly || editing);
   const actions = t`Actions for ${name}`;
   return (
@@ -136,13 +145,30 @@ export function FolderHeader({
               <Pencil />
               {t`Rename`}
             </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={count > 0 ? () => setConfirmingDelete(true) : onDelete}
+            >
               <Trash2 />
               {t`Delete folder`}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t`Delete ${name}?`}</AlertDialogTitle>
+            <AlertDialogDescription>{t`Its chats stay in the sidebar.`}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onDelete}>
+              {t`Delete folder`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

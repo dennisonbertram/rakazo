@@ -79,3 +79,66 @@ it("pins the header while its folder is open, not when collapsed", async () => {
   await render(true);
   expect(header.classList.contains("sticky")).toBe(false);
 });
+
+async function openDeleteMenu(count: number, onDelete: () => void) {
+  document.body.innerHTML = "";
+  const container = document.createElement("div");
+  document.body.append(container);
+  await act(async () =>
+    createRoot(container).render(
+      <FolderHeader
+        id="f1"
+        name="Apps"
+        count={count}
+        collapsed={false}
+        editing={false}
+        onToggle={() => undefined}
+        onStartRename={() => undefined}
+        onRename={() => undefined}
+        onCancelRename={() => undefined}
+        onDelete={onDelete}
+      />,
+    ),
+  );
+  const trigger = container.querySelector<HTMLElement>("[data-roster-actions]")!;
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    trigger.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    trigger.click();
+  });
+  const item = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find((el) =>
+    el.textContent?.includes("Delete folder"),
+  )!;
+  await act(async () => item.click());
+  return container;
+}
+
+const dialogButton = (label: string) =>
+  [...document.querySelectorAll<HTMLElement>("[role=alertdialog] button")].find(
+    (el) => el.textContent === label,
+  );
+
+it("asks before deleting a folder that has chats", async () => {
+  const onDelete = vi.fn();
+  await openDeleteMenu(2, onDelete);
+  const dialog = document.querySelector("[role=alertdialog]")!;
+  expect(dialog.textContent).toContain("Delete Apps?");
+  expect(dialog.textContent).toContain("Its chats stay in the sidebar.");
+  expect(onDelete).not.toHaveBeenCalled();
+  await act(async () => dialogButton("Delete folder")!.click());
+  expect(onDelete).toHaveBeenCalledTimes(1);
+});
+
+it("keeps the folder when the delete is cancelled", async () => {
+  const onDelete = vi.fn();
+  await openDeleteMenu(2, onDelete);
+  await act(async () => dialogButton("Cancel")!.click());
+  expect(onDelete).not.toHaveBeenCalled();
+});
+
+it("deletes an empty folder at once", async () => {
+  const onDelete = vi.fn();
+  await openDeleteMenu(0, onDelete);
+  expect(onDelete).toHaveBeenCalledTimes(1);
+  expect(document.querySelector("[role=alertdialog]")).toBeNull();
+});
