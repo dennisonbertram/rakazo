@@ -59,23 +59,33 @@ export function StoredMeetingsList() {
             {error}
           </p>
         ) : null}
-        <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-          {(rows ?? []).map((meeting) => (
-            <li key={meeting.id} className="flex items-center gap-3 px-3.5 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-sm">{meeting.title}</span>
-              <time dateTime={meeting.startedAt} className="shrink-0 text-xs text-muted-foreground">
-                {new Date(meeting.startedAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </time>
-              <Button size="sm" variant="outline" onClick={() => setDeleting(meeting)}>
-                <Trans>Delete</Trans>
-              </Button>
-            </li>
-          ))}
-        </ul>
+        {rows?.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            <Trans>No meetings</Trans>
+          </p>
+        ) : null}
+        {rows?.length ? (
+          <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+            {rows.map((meeting) => (
+              <li key={meeting.id} className="flex items-center gap-3 px-3.5 py-2.5">
+                <span className="min-w-0 flex-1 truncate text-sm">{meeting.title}</span>
+                <time
+                  dateTime={meeting.startedAt}
+                  className="shrink-0 text-xs text-muted-foreground"
+                >
+                  {new Date(meeting.startedAt).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </time>
+                <Button size="sm" variant="outline" onClick={() => setDeleting(meeting)}>
+                  <Trans>Delete</Trans>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {next ? (
           <div className="mt-4 flex justify-center">
             <Button variant="outline" size="sm" onClick={() => void load(next)}>
@@ -93,9 +103,13 @@ export function StoredMeetingsList() {
         onConfirm={() => deleting && void remove(deleting)}
       >
         <li>
-          <Trans>
-            Removes this meeting and its to-dos from Praci. Your note in Granola is not changed.
-          </Trans>
+          {deleting?.provider === "granola" ? (
+            <Trans>
+              Removes this meeting and its to-dos from Praci. Your note in Granola is not changed.
+            </Trans>
+          ) : (
+            <Trans>Removes this meeting and its to-dos from Praci.</Trans>
+          )}
         </li>
       </ConfirmDialog>
     </div>

@@ -26,8 +26,8 @@ import { StoredMeetingsList } from "./StoredMeetingsList";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const rows = [
-  { id: "m1", title: "Weekly sync", startedAt: "2026-10-19T10:00:00Z" },
-  { id: "m2", title: "Board prep", startedAt: "2026-10-18T10:00:00Z" },
+  { id: "m1", title: "Weekly sync", startedAt: "2026-10-19T10:00:00Z", provider: "granola" },
+  { id: "m2", title: "Board prep", startedAt: "2026-10-18T10:00:00Z", provider: "granola" },
 ];
 
 beforeEach(() => {
@@ -97,4 +97,28 @@ it("loads the next page with Show more and hides it on the last page", async () 
   expect(container.textContent).toContain("Weekly sync");
   expect(container.textContent).toContain("Board prep");
   expect(more()).toBeUndefined();
+});
+
+it("does not mention Granola when deleting a meeting from another provider", async () => {
+  meetings.list.mockResolvedValue({
+    items: [
+      { id: "m3", title: "Pendant chat", startedAt: "2026-10-17T10:00:00Z", provider: "omi" },
+    ],
+    nextCursor: null,
+  });
+  const container = await mount();
+  await click([...container.querySelectorAll("button")].find((b) => b.textContent === "Delete"));
+  expect(dialog()?.textContent).toContain("Removes this meeting and its to-dos from Praci.");
+  expect(dialog()?.textContent).not.toContain("Granola");
+});
+
+it("shows No meetings instead of an empty box, and no box while loading", async () => {
+  meetings.list.mockReturnValueOnce(new Promise(() => {}));
+  const loading = await mount();
+  expect(loading.querySelector("ul")).toBeNull();
+  document.body.innerHTML = "";
+  meetings.list.mockResolvedValueOnce({ items: [], nextCursor: null });
+  const empty = await mount();
+  expect(empty.querySelector("ul")).toBeNull();
+  expect(empty.textContent).toContain("No meetings");
 });

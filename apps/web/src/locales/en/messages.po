@@ -8529,6 +8529,10 @@ msgstr "No matching artifacts on this page."
 msgid "No matching models"
 msgstr "No matching models"
 
+#: src/components/integrations/StoredMeetingsList.tsx
+msgid "No meetings"
+msgstr "No meetings"
+
 #: src/pages/PeerMessagesOverlay.tsx
 msgid "No messages with {peerBotName} yet."
 msgstr "No messages with {peerBotName} yet."
@@ -10560,6 +10564,10 @@ msgstr "Removes the audio, transcripts and meetings from Praci."
 #: src/components/integrations/McpDetail.tsx
 msgid "Removes the connection and bot access."
 msgstr "Removes the connection and bot access."
+
+#: src/components/integrations/StoredMeetingsList.tsx
+msgid "Removes this meeting and its to-dos from Praci."
+msgstr "Removes this meeting and its to-dos from Praci."
 
 #: src/components/integrations/StoredMeetingsList.tsx
 msgid "Removes this meeting and its to-dos from Praci. Your note in Granola is not changed."
