@@ -4351,6 +4351,10 @@ msgstr "Could not send that"
 msgid "Could not share"
 msgstr "Could not share"
 
+#: src/lib/sign-out.ts
+msgid "Could not sign out. Try again."
+msgstr "Could not sign out. Try again."
+
 #: src/pages/Investors.tsx
 msgid "Could not start an update"
 msgstr "Could not start an update"
