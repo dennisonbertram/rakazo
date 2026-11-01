@@ -277,6 +277,16 @@ describe("ticket mutations", () => {
     });
     expect(s.changes).toHaveBeenCalledWith(expect.objectContaining({ wakeAssignee: false }));
   });
+  it("wakes the owner when a person comments", async () => {
+    const s = mutationDeps();
+    await commentTicket(s.deps, { spaceId: "ws", userId: "user-1", id: "t1", body: "Answer" });
+    expect(s.changes).toHaveBeenCalledWith(expect.objectContaining({ wakeAssignee: true }));
+  });
+  it("does not wake when another bot comments", async () => {
+    const s = mutationDeps();
+    await commentTicket(s.deps, { spaceId: "ws", botId: "bot-2", id: "t1", body: "Hi" });
+    expect(s.changes).toHaveBeenCalledWith(expect.objectContaining({ wakeAssignee: false }));
+  });
   it("reads tickets with their comments", async () => {
     const s = mutationDeps();
     await expect(getTicket(s.deps, { spaceId: "ws", ref: "RAK-1" })).resolves.toEqual({

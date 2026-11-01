@@ -34,6 +34,7 @@ import { WindowChrome } from "./WindowChrome";
 export function BoardPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useLingui();
   const statuses = useTicketStatusLabels();
+  const priorities = useTicketPriorityLabels();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [bots, setBots] = useState<Bot[]>([]);
   const [selected, setSelected] = useState<Ticket | "new" | null>(null);
@@ -162,7 +163,7 @@ export function BoardPage({ embedded = false }: { embedded?: boolean }) {
             {/* Phones stack the columns; side by side they would need sideways scrolling. */}
             <div data-testid="board-columns" className="flex min-h-full flex-col gap-3 md:flex-row">
               {TICKET_STATUSES.map((status) => (
-                <section key={status} className="flex-1 space-y-2 md:min-w-40">
+                <section key={status} className="flex-1 space-y-2 md:min-w-32">
                   <h2 className="px-1 text-sm font-medium">{statuses[status]}</h2>
                   {tickets
                     .filter((ticket) => ticket.status === status)
@@ -174,7 +175,11 @@ export function BoardPage({ embedded = false }: { embedded?: boolean }) {
                         className="h-auto w-full flex-col items-start gap-1 whitespace-normal p-3 text-left font-normal"
                         onClick={() => setSelected(ticket)}
                       >
-                        <span className="text-xs text-muted-foreground">{ticket.ref}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {ticket.priority === "high" || ticket.priority === "urgent"
+                            ? `${ticket.ref} · ${priorities[ticket.priority]}`
+                            : ticket.ref}
+                        </span>
                         <span>{ticket.title}</span>
                         <span className="text-xs text-muted-foreground">
                           {bots.find((bot) => bot.id === ticket.assigneeBotId)?.name}
