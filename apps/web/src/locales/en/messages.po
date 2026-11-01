@@ -3234,6 +3234,10 @@ msgid "Computers are available. Reload or open a bot to continue."
 msgstr "Computers are available. Reload or open a bot to continue."
 
 #: src/components/ComputersUnavailableHint.tsx
+msgid "Computers are off. Ask the server owner to turn them on."
+msgstr "Computers are off. Ask the server owner to turn them on."
+
+#: src/components/ComputersUnavailableHint.tsx
 msgid "Computers are off. Set SANDBOX_PROVIDER=docker with SANDBOX_SUPERVISOR_TOKEN, or set SANDBOX_PROVIDER to e2b, daytona, or box with its API key. Recreate the stack after changing .env."
 msgstr "Computers are off. Set SANDBOX_PROVIDER=docker with SANDBOX_SUPERVISOR_TOKEN, or set SANDBOX_PROVIDER to e2b, daytona, or box with its API key. Recreate the stack after changing .env."
 
@@ -4379,6 +4383,10 @@ msgstr "Could not start teaching"
 #: src/pages/Shell.tsx
 msgid "Could not start the call"
 msgstr "Could not start the call"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the computer"
+msgstr "Could not start the computer"
 
 #: src/pages/Investors.tsx
 msgid "Could not start the draft"

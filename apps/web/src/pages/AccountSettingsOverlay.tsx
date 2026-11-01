@@ -439,6 +439,7 @@ export function ComputerSettingsPanel({
       <ComputersUnavailableHint
         className="mt-3 text-[13px] leading-relaxed text-muted-foreground"
         sandboxProvider={sandboxProvider}
+        deploymentOwner
         onRecovered={onSandboxProviderChange}
         onRecoveryDismissed={onRecoveryDismissed}
       />
