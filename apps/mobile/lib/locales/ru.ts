@@ -1009,4 +1009,7 @@ export const RU_MESSAGES: Record<string, string> = {
   "Source not found": "Источник не найден",
   "No data yet": "Данных пока нет",
   "Source failed": "Источник не сработал",
+  "Connected.": "Подключено.",
+  "Disconnected {provider}. Bots now use {model}.": "{provider} отключён. Теперь боты используют {model}.",
+  "Source paused": "Источник приостановлен",
 };

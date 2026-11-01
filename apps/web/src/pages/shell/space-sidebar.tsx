@@ -102,6 +102,7 @@ import {
 import { formatRosterTime } from "../../lib/roster-time";
 import { clearSpaceSelection, rpc } from "../../lib/rpc";
 import { sidebarInert } from "../../lib/shell-layout";
+import { isCoarsePointer } from "../../lib/visual-viewport";
 import { ActivityList } from "../ActivityList";
 import type { ContextMenuPosition } from "../BotContextMenu";
 import type { SettingsSection } from "../SettingsOverlay";
@@ -1622,7 +1623,14 @@ export function SpaceSidebar({
                                             },
                                       );
                                     }}
-                                    onClick={() => {
+                                    onClick={(event) => {
+                                      // detail is 0 for keyboard activation, which keeps focus on the row.
+                                      if (
+                                        item.kind === "bot" &&
+                                        event.detail > 0 &&
+                                        !isCoarsePointer()
+                                      )
+                                        setFocusComposerBotId(item.chat.id);
                                       openSpaceChat(
                                         item.chat.spaceId,
                                         item.kind === "bot"

@@ -11356,10 +11356,6 @@ msgstr ""
 msgid "See all in Data room"
 msgstr ""
 
-#: src/pages/shell/composer.tsx
-msgid "See usage"
-msgstr ""
-
 #: src/components/tour/FirstRunTour.tsx
 msgid "See what bots can reach and add more."
 msgstr ""

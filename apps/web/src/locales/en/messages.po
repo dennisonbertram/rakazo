@@ -11356,10 +11356,6 @@ msgstr "See all in Artifacts"
 msgid "See all in Data room"
 msgstr "See all in Data room"
 
-#: src/pages/shell/composer.tsx
-msgid "See usage"
-msgstr "See usage"
-
 #: src/components/tour/FirstRunTour.tsx
 msgid "See what bots can reach and add more."
 msgstr "See what bots can reach and add more."
