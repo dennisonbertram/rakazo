@@ -61,7 +61,8 @@ export function HexCard({
 
   const reload = useCallback(
     () =>
-      Promise.resolve(rpc.meetings.localStatus())
+      Promise.resolve()
+        .then(() => rpc.meetings.localStatus())
         .then((next) => setStatus(next ?? null))
         .catch(() => setStatus((previous) => previous ?? null)),
     [],
