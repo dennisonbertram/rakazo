@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scanner control mockup</title>
+<!--
+Mockup for docs/scanner/README.md ("Web (renderer)"). Sample data is invented.
+Frame labels and notes are mockup annotations, not product copy. Everything inside a .win is product UI.
+Tokens copied from docs/omi/mockup.html (semantic tokens from packages/ui-tokens).
+Mirrors: Import button + Tip in apps/web/src/components/data-room/ImportFromEmail.tsx (ImportSources),
+TOOLBAR_BUTTON in FilterBar.tsx, toast card in DropZone.tsx (rounded-lg border bg-card p-3 text-sm shadow-md),
+toast states in upload-toasts.ts.
+Light and dark follow the OS; the button at the top toggles.
+-->
+<style>
+:root{
+  --background:#fafafa; --card:#fff; --muted:#f2f2f2; --muted-fg:#636363;
+  --fg:#111; --border:#e6e6e6; --primary:#111; --primary-fg:#fff;
+  --sidebar:#f5f5f4; --sidebar-accent:#e9e9e7; --destructive:#c4352b; --warning:#8f5a0a; --success:#276749;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --background:#0f0f0f; --card:#171717; --muted:#1f1f1f; --muted-fg:#9a9a9a;
+    --fg:#ededed; --border:#2a2a2a; --primary:#ededed; --primary-fg:#111;
+    --sidebar:#141414; --sidebar-accent:#232323;
+    --destructive:#e5645a; --warning:#d9a441; --success:#4fb37f; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --background:#0f0f0f; --card:#171717; --muted:#1f1f1f; --muted-fg:#9a9a9a;
+  --fg:#ededed; --border:#2a2a2a; --primary:#ededed; --primary-fg:#111;
+  --sidebar:#141414; --sidebar-accent:#232323;
+  --destructive:#e5645a; --warning:#d9a441; --success:#4fb37f; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--background);color:var(--fg);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--card)}
+.top b{font-size:11px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.04em}
+.top button{margin-left:auto}
+main{max-width:980px;margin:0 auto;padding:8px 16px 80px}
+section{padding-top:28px}
+h2{font-size:15px;margin:0 0 4px}
+.note{color:var(--muted-fg);font-size:12px;margin:0 0 10px}
+.win{border:1px solid var(--border);border-radius:12px;background:var(--background);overflow:hidden}
+.pane{padding:16px 20px;min-height:84px;position:relative}
+.bar{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.bar h1{font-size:19px;margin:0}
+.acts{display:flex;gap:8px;align-items:center;position:relative}
+/* Button, outline variant */
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--border);background:var(--card);border-radius:8px;font-weight:500;position:relative}
+.btn:hover{background:var(--muted)}
+.btn.icon{width:32px;padding:0;justify-content:center}
+.btn.pri{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.btn.pri:hover{opacity:.9}
+.btn.sm{height:28px;padding:0 10px;font-size:12px}
+.btn[disabled]{color:var(--muted-fg);cursor:default}
+.btn:hover{background:var(--muted)}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.dot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 2px var(--card)}
+.dot.off{background:var(--muted-fg)}
+.dot.err{background:var(--destructive)}
+.tip{position:absolute;top:38px;right:0;background:var(--primary);color:var(--primary-fg);font-size:12px;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.pop{position:absolute;top:38px;right:0;z-index:2;width:288px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:12px;display:flex;flex-direction:column;gap:10px}
+.pop.static{position:relative;top:0;right:auto;margin-left:auto}
+.dev{font-weight:600}
+.line{font-size:12px;color:var(--muted-fg)}
+.line.err{color:var(--destructive)}
+.line.ok{color:var(--success)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.fold{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted-fg)}
+.fold b{color:var(--fg);font-weight:500}
+.link{background:none;border:0;padding:0;color:var(--fg);font-size:12px;font-weight:500;text-decoration:underline;text-underline-offset:2px}
+.tgl{width:34px;height:20px;border-radius:999px;background:var(--border);border:0;position:relative;flex:none}
+.tgl::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
+.tgl[aria-checked=true]{background:var(--primary)}
+.tgl[aria-checked=true]::after{left:16px;background:var(--primary-fg)}
+.spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--muted-fg);animation:spin .8s linear infinite;display:inline-block;vertical-align:-1px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.cell small{display:block;font-size:11px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+/* toast: DropZone.tsx */
+.toast{width:288px;border:1px solid var(--border);background:var(--card);border-radius:8px;padding:12px;font-size:14px;box-shadow:0 4px 10px rgba(0,0,0,.12)}
+.toast .t{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.toast .t span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toast .x{border:0;background:none;width:24px;height:24px;display:grid;place-items:center;border-radius:6px;color:var(--muted-fg)}
+.toast .x:hover{background:var(--muted)}
+.toast .x svg{width:14px;height:14px}
+.pct{font-size:12px;color:var(--muted-fg);font-variant-numeric:tabular-nums}
+.prog{margin-top:8px;height:4px;border-radius:999px;background:var(--muted);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--primary)}
+.toast .d{margin-top:4px;display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.toast .d a{font-weight:500;color:var(--fg);text-underline-offset:2px}
+.ok-t{color:var(--success)}
+</style>
+</head>
+<body>
+<div class="top"><b>Scanner control</b><span class="line">Desktop app only. Frame labels are annotations.</span>
+<button class="btn sm" id="theme" type="button">Toggle theme</button></div>
+<main>
+
+<section id="ready">
+<h2>1. Toolbar, ready</h2>
+<p class="note">Scanner icon button beside Import, icon only (like the narrow-width Import). Tooltip "Scanner". No status dot: the state shows inside the control, and errors also raise a toast.</p>
+<div class="win"><div class="pane"><div class="bar">
+  <h1>Data room</h1>
+  <div class="acts">
+    <button class="btn icon" aria-label="Scanner" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h18v6H3z"/><path d="M6 14V9l12-3v8"/><path d="M7 17h.01"/></svg>
+    </button>
+    <button class="btn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>Import<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <button class="btn pri" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add files</button>
+    <span class="tip" style="right:150px">Scanner</span>
+  </div>
+</div></div></div>
+</section>
+
+<section id="open">
+<h2>2. Control open</h2>
+<p class="note">Same popover style as the menus. Changing the folder opens the existing folder picker.</p>
+<div class="win"><div class="pane" style="min-height:230px"><div class="bar">
+  <h1>Data room</h1>
+  <div class="acts">
+    <button class="btn icon" aria-label="Scanner" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h18v6H3z"/><path d="M6 14V9l12-3v8"/><path d="M7 17h.01"/></svg></button>
+    <button class="btn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>Import<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <button class="btn pri" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add files</button>
+    <div class="pop" style="right:150px">
+      <div><div class="dev">ScanSnap iX1600</div><div class="line ok">Ready</div></div>
+      <div class="row"><span>Scan when paper is loaded</span><button class="tgl" role="switch" aria-checked="true" aria-label="Scan when paper is loaded" type="button"></button></div>
+      <button class="btn pri" type="button" style="justify-content:center">Scan</button>
+      <div class="fold"><span>Save to <b>Scans</b></span><button class="link" type="button">Change</button></div>
+    </div>
+  </div>
+</div></div></div>
+</section>
+
+<section id="states">
+<h2>3. States inside the control</h2>
+<p class="note">Only the status line (and what must change with it) differs. The switch and folder stay; Scan is disabled unless the state is Ready or Error.</p>
+<div class="grid">
+
+<div class="cell"><small>SANE missing</small><div class="pop static">
+  <div><div class="dev">Scanner</div><div class="line err">Install sane-backends with Homebrew</div></div>
+  <button class="btn sm" type="button" style="align-self:flex-start">Copy command</button>
+</div></div>
+
+<div class="cell"><small>No scanner found</small><div class="pop static">
+  <div><div class="dev">Scanner</div><div class="line">No scanner found</div></div>
+</div></div>
+
+<div class="cell"><small>Busy</small><div class="pop static">
+  <div><div class="dev">ScanSnap iX1600</div><div class="line err">In use by another app</div></div>
+  <div class="row"><span>Scan when paper is loaded</span><button class="tgl" role="switch" aria-checked="true" aria-label="Scan when paper is loaded" type="button"></button></div>
+  <button class="btn pri" type="button" disabled style="justify-content:center">Scan</button>
+</div></div>
+
+<div class="cell"><small>Scanning</small><div class="pop static">
+  <div><div class="dev">ScanSnap iX1600</div><div class="line"><span class="spin"></span>Scanning, 3 pages</div></div>
+  <div class="row"><span>Scan when paper is loaded</span><button class="tgl" role="switch" aria-checked="true" aria-label="Scan when paper is loaded" type="button"></button></div>
+  <button class="btn" type="button" style="justify-content:center">Cancel</button>
+  <div class="fold"><span>Save to <b>Scans</b></span></div>
+</div></div>
+
+<div class="cell"><small>Error</small><div class="pop static">
+  <div><div class="dev">ScanSnap iX1600</div><div class="line err">Paper jam. Reload and scan again.</div></div>
+  <div class="row"><span>Scan when paper is loaded</span><button class="tgl" role="switch" aria-checked="true" aria-label="Scan when paper is loaded" type="button"></button></div>
+  <button class="btn pri" type="button" style="justify-content:center">Scan</button>
+  <div class="fold"><span>Save to <b>Scans</b></span><button class="link" type="button">Change</button></div>
+</div></div>
+
+</div>
+</div></div>
+</section>
+
+<section id="toast">
+<h2>4. Upload toast</h2>
+<p class="note">The existing toast, unchanged. The file is named by time. The done line is the existing "Uploaded to {folder}" text with the folder "Scans"; no new string.</p>
+<div class="grid">
+<div class="cell"><small>Uploading</small>
+  <div class="toast"><div class="t"><span title="Scan 2026-11-01 09.01.pdf">Scan 2026-11-01 09.01.pdf</span><span class="pct">62%</span></div>
+  <div class="prog" role="progressbar" aria-valuenow="62" aria-valuemin="0" aria-valuemax="100"><i style="width:62%"></i></div></div></div>
+<div class="cell"><small>Done</small>
+  <div class="toast"><div class="t"><span title="Scan 2026-11-01 09.01.pdf">Scan 2026-11-01 09.01.pdf</span>
+  <button class="x" aria-label="Dismiss" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="d"><span class="ok-t">Uploaded to Scans</span><a href="#toast">View</a></div></div></div>
+</div>
+</section>
+
+</main>
+<script>
+document.getElementById("theme").onclick=()=>{
+  const r=document.documentElement,dark=matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur=r.dataset.theme||(dark?"dark":"light");
+  r.dataset.theme=cur==="dark"?"light":"dark";
+};
+document.querySelectorAll(".tgl").forEach(b=>b.onclick=()=>b.setAttribute("aria-checked",b.getAttribute("aria-checked")==="true"?"false":"true"));
+</script>
+</body>
+</html>
