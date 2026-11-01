@@ -597,8 +597,16 @@ msgid "{item} dropped."
 msgstr "{item} dropped."
 
 #: src/components/sidebar-folders/SidebarDnd.tsx
+msgid "{item} is over {target} in {folder}."
+msgstr "{item} is over {target} in {folder}."
+
+#: src/components/sidebar-folders/SidebarDnd.tsx
 msgid "{item} is over {target}."
 msgstr "{item} is over {target}."
+
+#: src/components/sidebar-folders/SidebarDnd.tsx
+msgid "{item} moved to {folder}."
+msgstr "{item} moved to {folder}."
 
 #: src/components/data-room/folders.ts
 msgid "{items, plural, one {# item} other {# items}}"
@@ -5873,6 +5881,10 @@ msgstr "Failed to archive"
 #: src/pages/Shell.tsx
 msgid "Failed to create bot"
 msgstr "Failed to create bot"
+
+#: src/pages/Shell.tsx
+msgid "Failed to delete folder"
+msgstr "Failed to delete folder"
 
 #: src/pages/Shell.tsx
 msgid "Failed to duplicate"
