@@ -3,6 +3,7 @@ import {
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
   BOT_SECRET_VALUE_MAX_LENGTH,
+  DESKTOP_APP_USE_EFFECT_KIND,
   encodeLoginSecret,
   LoginSecretValue,
   MessageBlock as MessageBlockSchema,
@@ -498,7 +499,11 @@ async function commitAnswerRunInput(
       approvalUserId = input.answeredByUserId;
     }
     // Only the run's owner can answer for their data.
-    if (approvalEffect.kind === AI_CONSENT_EFFECT_KIND && run.userId !== input.answeredByUserId) {
+    if (
+      (approvalEffect.kind === AI_CONSENT_EFFECT_KIND ||
+        approvalEffect.kind === DESKTOP_APP_USE_EFFECT_KIND) &&
+      run.userId !== input.answeredByUserId
+    ) {
       return null;
     }
   }

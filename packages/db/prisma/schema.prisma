@@ -576,6 +576,7 @@ model Space {
   botPages                    BotPage[]
   pageSources                 PageSource[]
   pageSourceSnapshots         PageSourceSnapshot[]
+  appControlSnapshots         AppControlSnapshot[]
   botPins                     BotPins[]
   contacts                    Contact[]
   contactPhotos               ContactPhoto[]
@@ -864,6 +865,12 @@ model Bot {
   teamChatAmbientEnabled Boolean               @default(false)
   teamChatRules          String                @default("")
   crossSpaceCommunication Boolean              @default(false)
+  // Local desktop control (docs/local-desktop-control): off by default, owner-only.
+  appControlEnabled      Boolean               @default(false)
+  // [{ id, name }], max 20.
+  appControlApps         Json                  @default("[]")
+  appControlHeaded       Boolean               @default(false)
+  appControlSnapshots    AppControlSnapshot[]
   routines               Routine[]
   scratchpadItems        ScratchpadItem[]
   taughtSkills           TaughtSkill[]
@@ -1745,6 +1752,29 @@ model PageSource {
   @@index([spaceId])
   @@index([status, nextRefreshAt])
   @@map("page_sources")
+}
+
+/// Snapshot ids a run's app control produced, so refs stay owned by one run across processes.
+model AppControlSnapshot {
+  id         String   @id @default(cuid())
+  spaceId    String
+  space      Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId     String
+  botId      String
+  bot        Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  runId      String
+  snapshotId String
+  appId      String
+  windowId   String?
+  surface    String
+  sensitive  Boolean
+  spent      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([spaceId, userId, botId, runId, snapshotId])
+  @@index([runId])
+  @@index([createdAt])
+  @@map("app_control_snapshots")
 }
 
 /// One successful result of a page source.

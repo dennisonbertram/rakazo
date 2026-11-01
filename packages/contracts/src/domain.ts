@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { AGENT_SECRET_NAME_PATTERN } from "./agent-secret-name.js";
+import { BotAppControlSchema, UpdateBotAppControlSchema } from "./app-control.js";
 import { BotAvatarValueSchema } from "./bot-avatar.js";
 import { DisabledBuiltinToolsSchema } from "./builtin-tools.js";
 import {
@@ -150,6 +151,8 @@ export const BotSchema = z.object({
   teamChatAmbientEnabled: z.boolean(),
   teamChatRules: z.string(),
   crossSpaceCommunication: z.boolean().optional(),
+  /** Local desktop control; only the deployment owner can change it. */
+  appControl: BotAppControlSchema.optional(),
   disabledBuiltinTools: z.array(z.string()).default([]),
   audience: BotAudienceSchema.default("internal"),
   /** An external bot may message only these internal bots. */
@@ -439,6 +442,7 @@ export const UpdateBotInput = z
     teamChatAmbientEnabled: z.boolean().optional(),
     teamChatRules: z.string().max(TEAM_CHAT_RULES_MAX_LENGTH).optional(),
     crossSpaceCommunication: z.boolean().optional(),
+    appControl: UpdateBotAppControlSchema.optional(),
     disabledBuiltinTools: DisabledBuiltinToolsSchema.optional(),
     audience: BotAudienceSchema.optional(),
     externalMessageTargets: z.array(Id).max(200).optional(),

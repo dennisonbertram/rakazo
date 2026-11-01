@@ -16,6 +16,7 @@ import {
 } from "@rakazo/contracts";
 import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
+import { appControlTools } from "./app-control/tools.js";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
 import { PRACI_SOURCE_TOOLS } from "./praci-source-tools.js";
@@ -2461,6 +2462,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   ...voiceAgentTools,
   ...calendarToolDefinitions,
+  ...appControlTools,
 ];
 
 export const gtmPostTool: ConnectorTool = {
