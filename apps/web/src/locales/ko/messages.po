@@ -84,6 +84,11 @@ msgstr ""
 msgid "{0, plural, one {# finance lookup} other {# finance lookups}}"
 msgstr ""
 
+#. placeholder {0}: status.count
+#: src/components/integrations/HexCard.tsx
+msgid "{0, plural, one {# meeting} other {# meetings}}"
+msgstr ""
+
 #. placeholder {0}: group.count
 #: src/components/inbox/InboxDigest.tsx
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -2397,6 +2402,7 @@ msgstr "서버에 연결할 수 없습니다."
 #: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/DevinConnectDialog.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
@@ -3286,6 +3292,7 @@ msgstr ""
 #: src/components/integrations/ExchangeConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -4454,6 +4461,10 @@ msgstr ""
 msgid "Could not update computer"
 msgstr "컴퓨터를 업데이트할 수 없습니다"
 
+#: src/components/integrations/HexCard.tsx
+msgid "Could not update Hex"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "Could not update reaction"
 msgstr "반응을 업데이트할 수 없습니다"
@@ -4521,6 +4532,10 @@ msgstr ""
 
 #: src/lib/inbox-sync-error.ts
 msgid "Couldn't reach Gmail."
+msgstr ""
+
+#: src/components/integrations/HexCard.tsx
+msgid "Couldn't read Hex"
 msgstr ""
 
 #: src/components/data-room/Preview.tsx
@@ -4939,6 +4954,10 @@ msgstr "그룹 삭제"
 msgid "Delete holder"
 msgstr ""
 
+#: src/components/integrations/HexCard.tsx
+msgid "Delete imported meetings too"
+msgstr ""
+
 #: src/pages/shell/dialogs.tsx
 msgid "Delete memories too"
 msgstr "기억도 함께 삭제"
@@ -5024,6 +5043,7 @@ msgid "Desktop"
 msgstr ""
 
 #: src/components/DesktopUpdates.tsx
+#: src/components/integrations/HexCard.tsx
 msgid "Desktop app"
 msgstr ""
 
@@ -5123,6 +5143,7 @@ msgid "Discarded"
 msgstr ""
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyPrivacy.tsx
 #: src/pages/MemorySettingsOverlay.tsx
@@ -5141,6 +5162,10 @@ msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Disconnect {name}?"
+msgstr ""
+
+#: src/components/integrations/HexCard.tsx
+msgid "Disconnect Hex?"
 msgstr ""
 
 #: src/components/integrations/McpDetail.tsx
@@ -6817,6 +6842,10 @@ msgstr ""
 msgid "Inside"
 msgstr ""
 
+#: src/components/integrations/HexCard.tsx
+msgid "Install Hex"
+msgstr ""
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Instance API key"
 msgstr "인스턴스 API 키"
@@ -7128,6 +7157,11 @@ msgstr ""
 
 #: src/pages/Legal.tsx
 msgid "Last scan failed: The AI key was rejected."
+msgstr ""
+
+#. placeholder {0}: formatRelativeTime(status.lastSyncedAt)
+#: src/components/integrations/HexCard.tsx
+msgid "Last sync {0}"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
@@ -7706,6 +7740,10 @@ msgstr ""
 
 #: src/pages/ContactDetail.tsx
 msgid "Meetings"
+msgstr ""
+
+#: src/components/integrations/HexCard.tsx
+msgid "Meetings recorded on this Mac"
 msgstr ""
 
 #: src/pages/shell/GroupIntro.tsx
@@ -10935,6 +10973,7 @@ msgstr ""
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/BrexControlsForm.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
@@ -12682,6 +12721,10 @@ msgstr ""
 msgid "Sync now"
 msgstr ""
 
+#: src/components/integrations/HexCard.tsx
+msgid "Synced"
+msgstr ""
+
 #. placeholder {0}: formatRelativeTime(new Date(state.at).toISOString())
 #: src/components/integrations/OmiPage.tsx
 msgid "Synced {0}"
@@ -12693,6 +12736,7 @@ msgstr ""
 
 #: src/components/inbox/TodoCard.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 msgid "Syncing"
 msgstr ""
 
@@ -13723,6 +13767,10 @@ msgstr "업데이트 실패"
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Update finished with errors"
 msgstr "오류와 함께 업데이트가 완료되었습니다"
+
+#: src/components/integrations/HexCard.tsx
+msgid "Update Hex"
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Update link"

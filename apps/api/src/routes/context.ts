@@ -168,7 +168,7 @@ export interface RouterDeps {
   };
 }
 
-type RouteAuthContext = {
+export type RouteAuthContext = {
   actor: Actor | null;
   /** The signed-in session, so a push token ends with the session that registered it. */
   sessionId?: string;

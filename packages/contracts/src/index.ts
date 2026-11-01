@@ -35,6 +35,7 @@ export * from "./finance-statements.js";
 export * from "./fundraising.js";
 export * from "./granola.js";
 export * from "./gtm.js";
+export * from "./hex.js";
 export * from "./history.js";
 export * from "./ids.js";
 export * from "./inbox.js";

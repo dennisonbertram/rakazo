@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     download: () => ipcRenderer.invoke("desktop.update.download"),
     install: () => ipcRenderer.invoke("desktop.update.install"),
   },
+  hex: {
+    available: () => ipcRenderer.invoke("desktop.hex.available"),
+    list: (sinceMs) => ipcRenderer.invoke("desktop.hex.list", sinceMs),
+    show: (id) => ipcRenderer.invoke("desktop.hex.show", id),
+  },
   oauth: {
     open: (url) => ipcRenderer.invoke("desktop.oauth.open", url),
     cancel: (url) => ipcRenderer.invoke("desktop.oauth.cancel", url),

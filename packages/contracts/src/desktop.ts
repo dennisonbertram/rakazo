@@ -1,3 +1,5 @@
+import type { HexMeetingList, HexMeetingShow, HexResult } from "./hex.js";
+
 /**
  * `unsupported` covers an unpackaged build and a repository with no published releases, which is
  * the normal state for a fork. It is not an error the user needs to act on. Automatic checks stay
@@ -31,6 +33,15 @@ export interface RakazoDesktopUpdate {
   install: () => Promise<DesktopUpdateState>;
 }
 
+/** Reads the Hex meeting recorder on this Mac (macOS only). Main runs it; the renderer sends no command. */
+export interface RakazoDesktopHex {
+  available: () => Promise<boolean>;
+  /** Meetings overlapping the time from `sinceMs` (Unix milliseconds) to now. */
+  list: (sinceMs: number) => Promise<HexResult<HexMeetingList>>;
+  /** One meeting by its Hex id (digits, a dash, digits). */
+  show: (id: string) => Promise<HexResult<HexMeetingShow>>;
+}
+
 export interface RakazoDesktopOAuthCallback {
   code: string;
   state?: string;
@@ -51,6 +62,8 @@ export interface RakazoDesktop {
     state: () => Promise<{ minimized: boolean; maximized: boolean; fullScreen: boolean }>;
   };
   update: RakazoDesktopUpdate;
+  /** Optional: older desktops and non-macOS builds do not have it. */
+  hex?: RakazoDesktopHex;
   oauth: {
     /**
      * Open system-browser auth. A redirect_uri must be HTTP loopback with state;

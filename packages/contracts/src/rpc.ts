@@ -264,6 +264,13 @@ import {
   SafeSchema,
 } from "./fundraising.js";
 import { GtmOverviewSchema, GtmQueueInputSchema, GtmQueueOutputSchema } from "./gtm.js";
+import {
+  LocalMeetingsConnectInputSchema,
+  LocalMeetingsDisconnectInputSchema,
+  LocalMeetingsImportInputSchema,
+  LocalMeetingsImportOutputSchema,
+  LocalMeetingsStatusSchema,
+} from "./hex.js";
 import { Id, IsoDate } from "./ids.js";
 import {
   CleanupArchiveInputSchema,
@@ -1828,6 +1835,16 @@ export const appContract = {
       .output(StoredMeetingsPageSchema),
     /** Deletes one of the caller's meetings with its to-dos; sync does not bring it back. */
     delete: oc.input(z.object({ meetingId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Creates or reuses the caller's one connection for a source that runs on their computer (Hex), with its agent. */
+    connectLocal: oc.input(LocalMeetingsConnectInputSchema).output(z.object({ connectionId: Id })),
+    /** The local source's connection and what it imported; null before connecting. */
+    localStatus: oc.output(LocalMeetingsStatusSchema),
+    /** Stores up to 10 meetings the desktop app read from the user's computer. Idempotent by source id; the user becomes the only attendee; a meeting already recorded another way is skipped. */
+    importLocal: oc.input(LocalMeetingsImportInputSchema).output(LocalMeetingsImportOutputSchema),
+    /** Stops importing; imported meetings stay unless `deleteMeetings` is true. */
+    disconnectLocal: oc
+      .input(LocalMeetingsDisconnectInputSchema)
+      .output(z.object({ ok: z.literal(true) })),
   },
   omi: {
     /** Creates or reuses the caller's one Omi connection for this space and its agent. */
