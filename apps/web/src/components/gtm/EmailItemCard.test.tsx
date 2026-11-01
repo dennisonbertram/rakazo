@@ -89,8 +89,8 @@ it.each(["sent", "unknown", "saved", "failed", "reconnect", "disabled"] as const
     mocks.send.mockResolvedValue({ status });
     await render();
     await act(async () => {
-      button("Approve").click();
-      button("Approve").click();
+      button("Send").click();
+      button("Send").click();
     });
     expect(mocks.send).toHaveBeenCalledTimes(1);
     expect(mocks.send).toHaveBeenCalledWith({
@@ -126,9 +126,15 @@ it.each(["sent", "unknown", "saved", "failed", "reconnect", "disabled"] as const
   },
 );
 
+it("labels a clean parked email Send, not Approve", async () => {
+  await render();
+  expect(button("Send")).toBeTruthy();
+  expect(button("Approve")).toBeUndefined();
+});
+
 it("disables approval until both checks pass, and saves edits separately from sending", async () => {
   await render({ ...email, notes: "Join our beta." });
-  expect(button("Approve").disabled).toBe(true);
+  expect(button("Send").disabled).toBe(true);
   await type(host.querySelector('[aria-label="Message"]')!, email.notes);
   await act(async () => button("Save").click());
   expect(mocks.update).toHaveBeenCalledWith({
@@ -160,7 +166,7 @@ it("saves a founder address in the body without sending", async () => {
 it("does not send when the approval version is stale", async () => {
   mocks.update.mockRejectedValue({ code: "CONFLICT" });
   await render();
-  await act(async () => button("Approve").click());
+  await act(async () => button("Send").click());
   expect(mocks.send).not.toHaveBeenCalled();
   expect(host.textContent).toContain("Changed, review again");
 });

@@ -188,7 +188,7 @@ export function EmailItemCard({
           canAnswer
           initialEditing
           toOnly
-          allowLabel={dirty ? t`Save` : item.status === "open" ? t`Review again` : t`Approve`}
+          allowLabel={dirty ? t`Save` : item.status === "open" ? t`Review again` : t`Send`}
           allowDisabled={
             busy ||
             !validSize ||
