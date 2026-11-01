@@ -1617,6 +1617,10 @@ msgstr ""
 msgid "API key"
 msgstr "Chave de API"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "API key (optional)"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "API key configured (not verified)."
 msgstr ""
@@ -2116,6 +2120,7 @@ msgid "Bank only: {bankRunwayMonths} mo"
 msgstr ""
 
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Base URL"
 msgstr "URL Base"
 
@@ -5081,6 +5086,10 @@ msgstr ""
 msgid "Devin sessions are not affected."
 msgstr ""
 
+#: src/pages/shell/dictation-button.tsx
+msgid "Dictate"
+msgstr ""
+
 #: src/components/integrations/SignInStep.tsx
 msgid "Didn't open?"
 msgstr ""
@@ -7897,6 +7906,7 @@ msgstr ""
 #: src/pages/Onboarding.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-panel.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Model"
 msgstr "Modelo"
 
@@ -12578,6 +12588,10 @@ msgstr "Parar"
 msgid "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 msgstr ""
 
+#: src/pages/shell/dictation-button.tsx
+msgid "Stop dictation"
+msgstr ""
+
 #: src/components/ArtifactShareDialog.tsx
 msgid "Stop sharing"
 msgstr ""
@@ -13428,6 +13442,14 @@ msgstr ""
 #. placeholder {0}: moneyExact(Math.abs(check.differenceCents))
 #: src/components/finance/StatementReviewCard.tsx
 msgid "Transactions are {0} off the closing balance"
+msgstr ""
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Transcribe"
+msgstr ""
+
+#: src/pages/shell/dictation-button.tsx
+msgid "Transcribing…"
 msgstr ""
 
 #: src/components/call/CallCard.tsx

@@ -28,6 +28,8 @@ import {
   writeChatDraftSkill,
 } from "../../lib/chat-draft";
 import { stepComposerHistory } from "../../lib/composer-history";
+import type { DictationSnapshot } from "../../lib/dictation";
+import { Dictation, insertAtCursor } from "../../lib/dictation";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../../lib/hide-amounts-preference";
 import { isFileDrag, isFilePaste } from "../../lib/pending-attachments";
 import type { DataRoomRef } from "../../lib/send-to-agent";
@@ -35,6 +37,7 @@ import { slashSkillOptions as pickSlashSkills, slashSkillLabel } from "../../lib
 import { isCoarsePointer, revealAboveKeyboard } from "../../lib/visual-viewport";
 import { ComposerReplyPreview, previewMessageText } from "./chat-context";
 import { ComposerError } from "./composer-error";
+import { DictationButton, DictationError } from "./dictation-button";
 import { MentionIcon } from "./mention-icon";
 
 export type PendingAttachment = {
@@ -83,6 +86,7 @@ export const Composer = memo(function Composer({
   onSend,
   onStop,
   onVoice,
+  canDictate,
   quickAsk,
   replyTarget,
   replyQuote,
@@ -130,6 +134,8 @@ export const Composer = memo(function Composer({
   onSend: (text: string, mentions: ComposerMention[], clientNonce: string) => Promise<boolean>;
   onStop: () => Promise<void>;
   onVoice?: () => void;
+  /** A speech-to-text engine is set up; the mic stays hidden until then. */
+  canDictate?: boolean;
   /** One suggested question shown above the empty composer; sending it is one tap. */
   quickAsk?: { label: string; onAsk: () => void };
   artifactTarget: ArtifactTarget;
@@ -153,6 +159,8 @@ export const Composer = memo(function Composer({
   useEffect(() => {
     writeChatDraft(draftKey, draft);
   }, [draftKey, draft]);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const historyIndex = useRef<number | null>(null);
   const historyDraft = useRef("");
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -332,6 +340,45 @@ export const Composer = memo(function Composer({
     const nextSlash = slashMatch ? (slashMatch[1] ?? "") : null;
     if (nextSlash !== null && slashQuery === null) onSlashOpen?.();
     setSlashQuery(nextSlash);
+  }
+
+  // Own instance: the shared one belongs to Call Elio.
+  const dictation = useRef<Dictation | null>(null);
+  const [dictationState, setDictationState] = useState<DictationSnapshot>({
+    status: "idle",
+    transcript: "",
+  });
+  useEffect(() => {
+    const instance = new Dictation();
+    dictation.current = instance;
+    const unsubscribe = instance.subscribe(setDictationState);
+    return () => {
+      unsubscribe();
+      instance.stop("cancel");
+    };
+  }, []);
+
+  function toggleDictation() {
+    const instance = dictation.current;
+    if (!instance) return;
+    if (dictationState.status === "listening") return instance.submitHold();
+    if (dictationState.status === "transcribing") return instance.stop("cancel");
+    void instance.listen({
+      mode: "endpoint",
+      transcribe: true,
+      server: true,
+      onFinal: (text) => {
+        // Read the caret now: the draft may have changed while the audio was transcribed.
+        const field = textareaRef.current;
+        const start = field?.selectionStart ?? draftRef.current.length;
+        const end = field?.selectionEnd ?? start;
+        const next = insertAtCursor(draftRef.current, start, end, text);
+        updateDraft(next.text);
+        window.requestAnimationFrame(() =>
+          textareaRef.current?.setSelectionRange(next.caret, next.caret),
+        );
+      },
+    });
   }
 
   function focusComposer() {
@@ -685,6 +732,7 @@ export const Composer = memo(function Composer({
           }}
         />
       ) : null}
+      {dictationState.error ? <DictationError message={dictationState.error} /> : null}
       {attachmentNotice ? (
         <div
           role="status"
@@ -1163,6 +1211,13 @@ export const Composer = memo(function Composer({
             >
               <AudioLines size={16} strokeWidth={1.8} />
             </Button>
+          ) : null}
+          {canDictate && (draft.trim().length === 0 || dictationState.status !== "idle") ? (
+            <DictationButton
+              status={dictationState.status}
+              disabled={disabled}
+              onClick={toggleDictation}
+            />
           ) : null}
           {running ? (
             <>

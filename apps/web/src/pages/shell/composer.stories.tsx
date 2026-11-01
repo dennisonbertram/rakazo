@@ -121,6 +121,11 @@ export const ComposerVoiceAgent: Story = {
   render: () => composer({ onVoice: () => undefined }),
   beforeEach: loaded,
 };
+/** A speech-to-text engine is set up: the mic sits left of Send while the draft is empty. */
+export const ComposerDictation: Story = {
+  render: () => composer({ canDictate: true }),
+  beforeEach: loaded,
+};
 /** After Skip tour: one suggested question, one tap. */
 export const ComposerQuickAsk: Story = {
   render: () =>

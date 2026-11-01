@@ -1617,6 +1617,10 @@ msgstr "API is back, but the update did not finish. Check the host logs."
 msgid "API key"
 msgstr "API key"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "API key (optional)"
+msgstr "API key (optional)"
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "API key configured (not verified)."
 msgstr "API key configured (not verified)."
@@ -2116,6 +2120,7 @@ msgid "Bank only: {bankRunwayMonths} mo"
 msgstr "Bank only: {bankRunwayMonths} mo"
 
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Base URL"
 msgstr "Base URL"
 
@@ -5081,6 +5086,10 @@ msgstr "Devin sessions"
 msgid "Devin sessions are not affected."
 msgstr "Devin sessions are not affected."
 
+#: src/pages/shell/dictation-button.tsx
+msgid "Dictate"
+msgstr "Dictate"
+
 #: src/components/integrations/SignInStep.tsx
 msgid "Didn't open?"
 msgstr "Didn't open?"
@@ -7897,6 +7906,7 @@ msgstr "Mixed"
 #: src/pages/Onboarding.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-panel.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Model"
 msgstr "Model"
 
@@ -12578,6 +12588,10 @@ msgstr "Stop"
 msgid "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 msgstr "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
 
+#: src/pages/shell/dictation-button.tsx
+msgid "Stop dictation"
+msgstr "Stop dictation"
+
 #: src/components/ArtifactShareDialog.tsx
 msgid "Stop sharing"
 msgstr "Stop sharing"
@@ -13429,6 +13443,14 @@ msgstr "Transactions"
 #: src/components/finance/StatementReviewCard.tsx
 msgid "Transactions are {0} off the closing balance"
 msgstr "Transactions are {0} off the closing balance"
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Transcribe"
+msgstr "Transcribe"
+
+#: src/pages/shell/dictation-button.tsx
+msgid "Transcribing…"
+msgstr "Transcribing…"
 
 #: src/components/call/CallCard.tsx
 msgid "Transcript"

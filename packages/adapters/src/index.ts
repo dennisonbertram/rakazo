@@ -185,6 +185,7 @@ export * from "./omi-sort.js";
 export * from "./omi-sort-split.js";
 export * from "./omi-transcribe.js";
 export * from "./openai-compatible-embedder.js";
+export * from "./openai-compatible-transcription.js";
 export * from "./openai-compatible-url.js";
 export * from "./openai-voice.js";
 export * from "./page-browser-session.js";
