@@ -44,6 +44,17 @@ export const Offline: Story = {
 
 export const Transcribing: Story = { args: { state: { kind: "transcribing" } } };
 
+export const MicrophoneStopped: Story = {
+  args: { state: { kind: "transcribing", micStopped: true } },
+};
+
+export const Closed: Story = {
+  args: {
+    state: { kind: "failed", message: "This recording was closed and could not be saved." },
+    onDismiss: () => undefined,
+  },
+};
+
 export const LongRecording: Story = {
   args: {
     state: {

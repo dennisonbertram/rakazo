@@ -1680,6 +1680,8 @@ export const VoiceStatusSchema = z.object({
   transcriptionProvider: z.string().nullable(),
   /** True once the selected transcription provider can be used for dictation. Always false until S3b. */
   transcriptionReady: z.boolean(),
+  /** This user has agreed, in this space, to send audio to the provider that would transcribe it. Absent on older servers. */
+  transcriptionConsented: z.boolean().optional(),
 });
 export type VoiceStatus = z.infer<typeof VoiceStatusSchema>;
 

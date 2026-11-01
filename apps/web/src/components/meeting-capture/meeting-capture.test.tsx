@@ -172,3 +172,33 @@ it("policy card: members do not see it", async () => {
   const card = await mount(<MeetingRecordingSettings />);
   expect(card.textContent).toBe("");
 });
+
+it("without consent for this space Record is replaced by Add speech to text", async () => {
+  rpc.voice.status.mockResolvedValue({
+    transcribe: false,
+    transcriptionReady: true,
+    transcriptionConsented: false,
+  });
+  rpc.spaces.list.mockResolvedValue(space());
+  await mount(<RecordButton />);
+  expect(button("Record")).toBeUndefined();
+  expect(button("Add speech to text")).toBeDefined();
+});
+
+it("pill: a closed capture shows why and can be dismissed; a stopped microphone is named", async () => {
+  const onDismiss = vi.fn();
+  const failed = await mount(
+    <RecordingPill
+      state={{ kind: "failed", message: "Closed." }}
+      onStop={() => {}}
+      onDismiss={onDismiss}
+    />,
+  );
+  expect(failed.textContent).toContain("Closed.");
+  await click(button("Dismiss"));
+  expect(onDismiss).toHaveBeenCalled();
+  const mic = await mount(
+    <RecordingPill state={{ kind: "transcribing", micStopped: true }} onStop={() => {}} />,
+  );
+  expect(mic.textContent).toContain("Microphone stopped");
+});

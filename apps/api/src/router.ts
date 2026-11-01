@@ -74,6 +74,7 @@ import {
   getBotPage,
   getBotPins,
   hasActiveComputerControl,
+  hasVoiceConsent,
   hostCredentialSource,
   isAutoReviewCheckerConfigured,
   isComputerScreenUnavailable,
@@ -9724,7 +9725,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
       status: authed.voice.status.handler(async ({ context }) => {
         const cred = await findDefaultVoiceCredential(deps.prisma, context.actor);
         const selection = await findTranscriptionSelection(deps, context.actor);
-        return toVoiceStatus(cred, selection?.provider ?? null);
+        const status = toVoiceStatus(cred, selection?.provider ?? null);
+        // The provider audio would go to: the selection, else the voice credential if it transcribes.
+        const provider =
+          selection?.provider ?? (status.transcribe ? (cred?.provider ?? null) : null);
+        return {
+          ...status,
+          transcriptionConsented: provider
+            ? await hasVoiceConsent(deps.prisma, context.actor, provider)
+            : false,
+        };
       }),
       setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) => {
         const result = await setTranscription(deps, context.actor, {

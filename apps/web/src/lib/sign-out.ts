@@ -25,6 +25,6 @@ export async function signOutAndLeave(
   clearTourStep(userId);
   clearAgentAppCache();
   clearSpaceSelection();
-  await clearCaptureOnSignOut();
+  await clearCaptureOnSignOut(userId);
   navigate("/");
 }

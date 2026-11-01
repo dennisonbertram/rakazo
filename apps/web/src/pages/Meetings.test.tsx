@@ -166,3 +166,27 @@ it("shows Summarizing while a fresh recording has only its transcript", async ()
   const page = await mount(<MeetingDetailPage meetingId="m2" />, "/app/meetings/m2");
   expect(page.textContent).toContain("Summarizing…");
 });
+
+it("keeps asking for the summary every 5 seconds while it is pending", async () => {
+  vi.useFakeTimers();
+  try {
+    rpc.meetings.get.mockResolvedValue({
+      ...rows[1],
+      provider: "praci",
+      endedAt: new Date().toISOString(),
+      summary: "",
+      decisions: [],
+      followUps: [],
+      todos: [],
+      transcript: "Ada: hello",
+      partial: false,
+    });
+    await mount(<MeetingDetailPage meetingId="m2" />, "/app/meetings/m2");
+    expect(rpc.meetings.get).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(rpc.meetings.get.mock.calls.length).toBeGreaterThanOrEqual(3);
+  } finally {
+    vi.useRealTimers();
+  }
+});

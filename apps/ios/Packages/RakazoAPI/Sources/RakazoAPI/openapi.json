@@ -131159,6 +131159,9 @@
                         },
                         "transcriptionReady": {
                           "type": "boolean"
+                        },
+                        "transcriptionConsented": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -131333,6 +131336,9 @@
                           ]
                         },
                         "transcriptionReady": {
+                          "type": "boolean"
+                        },
+                        "transcriptionConsented": {
                           "type": "boolean"
                         }
                       },

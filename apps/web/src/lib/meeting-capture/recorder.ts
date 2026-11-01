@@ -1,5 +1,5 @@
 import type { MeetingCaptureTrack } from "@rakazo/contracts";
-import type { BufferedChunk } from "./buffer";
+import type { BufferedChunk, CaptureOwner } from "./buffer";
 import { chunkKey } from "./buffer";
 import type { ChunkLimits } from "./chunker";
 import { createChunkCutter, DEFAULT_LIMITS } from "./chunker";
@@ -32,12 +32,14 @@ export class TrackRecorder {
     private readonly options: {
       stream: MediaStream;
       track: MeetingCaptureTrack;
-      captureId: string;
+      owner: CaptureOwner;
       /** Epoch ms of the capture's start; chunk offsets count from it. */
       startedAt: number;
       seqBase: number;
       limits?: ChunkLimits;
       onChunk: (chunk: BufferedChunk) => Promise<void>;
+      /** The device or permission went away (the microphone being unplugged, say). */
+      onEnded?: () => void;
     },
   ) {
     this.seq = options.seqBase;
@@ -64,7 +66,8 @@ export class TrackRecorder {
       last = now;
     }, TICK_MS);
     // The user stopped sharing the tab: keep what was recorded and carry on without it.
-    for (const audio of stream.getAudioTracks()) audio.onended = () => void this.stop();
+    for (const audio of stream.getAudioTracks())
+      audio.onended = () => (this.options.onEnded ? this.options.onEnded() : void this.stop());
   }
 
   private startPiece() {
@@ -96,8 +99,8 @@ export class TrackRecorder {
           blob.size === 0
             ? undefined
             : this.options.onChunk({
-                key: chunkKey(this.options.captureId, this.options.track, seq),
-                captureId: this.options.captureId,
+                key: chunkKey(this.options.owner, this.options.track, seq),
+                ...this.options.owner,
                 track: this.options.track,
                 seq,
                 startMs,

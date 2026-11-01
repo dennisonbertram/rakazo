@@ -113,8 +113,8 @@ export function MeetingDetailPage({
     now.getTime() - Date.parse(meeting.endedAt) < SUMMARIZING_WINDOW_MS;
   useEffect(() => {
     if (!summarizing) return;
-    const timer = setTimeout(load, 5000);
-    return () => clearTimeout(timer);
+    const timer = setInterval(load, 5000);
+    return () => clearInterval(timer);
   }, [summarizing, load]);
   return (
     <div className="@container/bd flex min-h-0 min-w-0 flex-1 flex-col">

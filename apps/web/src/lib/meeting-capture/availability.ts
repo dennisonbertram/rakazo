@@ -19,7 +19,10 @@ export function useRecordAvailability(): RecordAvailability {
         loaded: true,
         // A server that does not report a policy is an older one: reminding is its behavior.
         policy: space?.meetingRecording ?? "remind",
-        engine: Boolean(voice.transcribe || voice.transcriptionReady),
+        // The server transcribes only for a provider this person agreed to send audio to, here.
+        engine:
+          Boolean(voice.transcribe || voice.transcriptionReady) &&
+          voice.transcriptionConsented !== false,
       });
     })().catch(() => undefined); // Without an answer Record stays hidden; the page does not need it.
     return () => {

@@ -21,16 +21,20 @@ export type RecordingPillState =
       noCallAudio?: boolean;
       offline?: boolean;
     }
-  | { kind: "transcribing" };
+  | { kind: "transcribing"; micStopped?: boolean }
+  /** The capture was closed by the server; the person reads why and dismisses it. */
+  | { kind: "failed"; message: string };
 
 /** The recording indicator at the top of the app. It has no close button: stopping is the only way out. */
 export function RecordingPill({
   state,
   onStop,
+  onDismiss,
   className,
 }: {
   state: RecordingPillState;
   onStop: () => void;
+  onDismiss?: () => void;
   className?: string;
 }) {
   return (
@@ -42,8 +46,21 @@ export function RecordingPill({
         className,
       )}
     >
-      {state.kind === "transcribing" ? (
+      {state.kind === "failed" ? (
+        <>
+          <span className="py-1 text-destructive">{state.message}</span>
+          <Button variant="ghost" size="sm" className="shrink-0 rounded-full" onClick={onDismiss}>
+            <Trans>Dismiss</Trans>
+          </Button>
+        </>
+      ) : state.kind === "transcribing" ? (
         <span className="py-1 pe-2 text-muted-foreground">
+          {state.micStopped ? (
+            <>
+              <Trans>Microphone stopped</Trans>
+              {" · "}
+            </>
+          ) : null}
           <Trans>Transcribing…</Trans>
         </span>
       ) : (

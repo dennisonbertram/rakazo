@@ -5239,6 +5239,7 @@ msgstr "Discount"
 #: src/components/data-room/ImportActivity.tsx
 #: src/components/finance/StatementImport.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Legal.tsx
 #: src/pages/legal/LegalDeadlines.tsx
@@ -7943,6 +7944,10 @@ msgstr "Microphone access is blocked. Allow it in your browser and try again."
 #: src/lib/call-session.ts
 msgid "Microphone failed"
 msgstr "Microphone failed"
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Microphone stopped"
+msgstr "Microphone stopped"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Minimal"
@@ -13326,6 +13331,10 @@ msgstr "This provider is not connected yet."
 msgid "This reader has no verified incremental change feed."
 msgstr "This reader has no verified incremental change feed."
 
+#: src/lib/meeting-capture/controller.ts
+msgid "This recording was closed and could not be saved."
+msgstr "This recording was closed and could not be saved."
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "This removes the connection from every space."
 msgstr "This removes the connection from every space."
@@ -14690,6 +14699,10 @@ msgstr "You have control"
 #: src/components/inbox/CleanupSenderRow.tsx
 msgid "You read most of these, so keep them unless you are sure"
 msgstr "You read most of these, so keep them unless you are sure"
+
+#: src/lib/meeting-capture/controller.ts
+msgid "You were signed out."
+msgstr "You were signed out."
 
 #: src/pages/McpTokenDialog.tsx
 msgid "You won't see this token again."

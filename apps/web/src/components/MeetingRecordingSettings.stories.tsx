@@ -21,11 +21,18 @@ const space = (policy: string, canSet = true) => ({
   spaces: [{ id: "s1", meetingRecording: policy, canSetMeetingRecording: canSet }],
 });
 
-export const Remind: Story = { beforeEach: () => mockRpc({ "spaces.list": space("remind") }) };
-export const Confirm: Story = { beforeEach: () => mockRpc({ "spaces.list": space("confirm") }) };
-export const Off: Story = { beforeEach: () => mockRpc({ "spaces.list": space("off") }) };
+const policyMocks = (policy: string, canSet = true) => ({
+  "spaces.list": space(policy, canSet),
+  "spaces.setMeetingRecording": (input: unknown) => ({
+    policy: (input as { policy: string }).policy,
+  }),
+});
+
+export const Remind: Story = { beforeEach: () => mockRpc(policyMocks("remind")) };
+export const Confirm: Story = { beforeEach: () => mockRpc(policyMocks("confirm")) };
+export const Off: Story = { beforeEach: () => mockRpc(policyMocks("off")) };
 
 /** Members see nothing: only owners and admins change the policy. */
 export const Member: Story = {
-  beforeEach: () => mockRpc({ "spaces.list": space("remind", false) }),
+  beforeEach: () => mockRpc(policyMocks("remind", false)),
 };

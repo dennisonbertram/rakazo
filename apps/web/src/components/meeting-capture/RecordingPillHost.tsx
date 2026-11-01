@@ -32,11 +32,20 @@ export function RecordingPillHost() {
     dismissStored();
   }, [view, pathname, navigate]);
 
-  if (view.phase !== "recording" && view.phase !== "transcribing") return null;
+  if (view.phase === "idle" || view.phase === "stored") return null;
   return (
     <div className="flex shrink-0 justify-center px-2 pt-2">
-      {view.phase === "transcribing" ? (
-        <RecordingPill state={{ kind: "transcribing" }} onStop={() => undefined} />
+      {view.phase === "failed" ? (
+        <RecordingPill
+          state={{ kind: "failed", message: view.message }}
+          onStop={() => undefined}
+          onDismiss={dismissStored}
+        />
+      ) : view.phase === "transcribing" ? (
+        <RecordingPill
+          state={{ kind: "transcribing", micStopped: view.micStopped }}
+          onStop={() => undefined}
+        />
       ) : (
         <RecordingPill
           state={{
