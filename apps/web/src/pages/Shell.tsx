@@ -5438,7 +5438,7 @@ export function ShellPage() {
                     ) : panel === "list" ? (
                       <Trans>List</Trans>
                     ) : active ? (
-                      computerScreenError || noComputerScreen ? null : (
+                      computerScreenError || noComputerScreen || computersOff ? null : (
                         computerStateLabel(computer?.state)
                       )
                     ) : (
