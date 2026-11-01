@@ -134,6 +134,8 @@ function MemoryDocumentList({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A Save conflict is shown beside the open editor, where the draft is.
+  const [conflictId, setConflictId] = useState<string | null>(null);
   const generation = useRef(0);
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -205,6 +207,7 @@ function MemoryDocumentList({
   );
 
   function openDoc(doc: MemoryDocument) {
+    setConflictId(null);
     setOpenId(doc.id);
     setDraft(doc.content);
     setError(null);
@@ -247,6 +250,7 @@ function MemoryDocumentList({
     if (busy) return;
     setBusy(true);
     setError(null);
+    setConflictId(null);
     try {
       const updated = await rpc.memory.update({
         documentId: doc.id,
@@ -259,7 +263,7 @@ function MemoryDocumentList({
       if ((cause as { code?: string } | null)?.code === "CONFLICT") {
         // Keep the draft; the next Save uses the fresh revision.
         await reload();
-        setError(t`Changed since you opened it`);
+        setConflictId(doc.id);
       } else setError(t`Could not save`);
     } finally {
       setBusy(false);
@@ -389,6 +393,11 @@ function MemoryDocumentList({
                         <Trans>Delete</Trans>
                       </Button>
                     </div>
+                    {conflictId === doc.id ? (
+                      <p role="alert" className="mt-2 text-[13px] text-destructive">
+                        {t`Changed since you opened it`}
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

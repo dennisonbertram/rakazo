@@ -224,7 +224,11 @@ it("keeps the draft and says so when the memory changed since it was opened", as
       content: "- Likes coffee",
       expectedRevision: 3,
     });
-    expect(ui.container.textContent).toContain("Changed since you opened it");
+    // Shown beside the open editor, not at the top of the list.
+    const editor = ui.container.querySelector("textarea")!;
+    expect(editor.parentElement!.querySelector('[role="alert"]')?.textContent).toBe(
+      "Changed since you opened it",
+    );
     expect(ui.container.querySelector("textarea")!.value).toBe("- Likes coffee");
   } finally {
     await ui.done();
