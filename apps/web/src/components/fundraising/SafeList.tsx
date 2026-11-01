@@ -2,7 +2,7 @@ import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { FundraiseRound, Safe, SafeMarkInput, SafeStatus } from "@rakazo/contracts";
-import { needsAttention } from "@rakazo/core";
+import { isActiveSafe, needsAttention } from "@rakazo/core";
 import {
   Badge,
   Button,
@@ -224,6 +224,9 @@ function SafeRow({
   const native = safe.source === "native";
   // Cap and source appear only when they differ from the round and the page's native default.
   const notes = [
+    round && isActiveSafe(safe.status) && safe.roundId !== round.id
+      ? t`Not in ${round.name}`
+      : null,
     safe.capCents != null && safe.capCents !== round?.capCents
       ? safe.valuationType === "pre_money_cap"
         ? t`Pre-money cap ${usd(safe.capCents)}`

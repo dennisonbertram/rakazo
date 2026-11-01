@@ -114,6 +114,9 @@ often without a lawyer or CFO:
     lines; one Add contact entry in the header; the typed-in table reads as a table (Add holder
     row, labelled pool value cell); Fundraising shows Attention, Round, Pipeline grouped by
     stage and SAFEs cards. Mockup: `docs/fundraising/redesign.html`.
+    Update: UX pass 15 (`afff3a0ac`) replaced the static skeletons for empty sections with
+    one quiet line ("No prospects yet", "No SAFEs yet"), because grey placeholder bars read as
+    endless loading.
 
 Standing constraints: no hosted vendor required (Carta, Google, Mercury, Gmail are
 optional adapters); every row scoped to space and user; email goes out only on the
@@ -590,7 +593,8 @@ header with Add contact and Ask, then the Cap table card, which holds three equa
 this order: Connect Carta, Use a Google Sheet, Type it in, with static skeleton figures,
 ownership bar and table rows below them. None of the buttons is filled because the plan
 cannot know which source the founder has. Updates and Contacts below it show their
-skeleton layout (static rows, no "No … yet" line) until they hold data. The source line reads "Carta · as of <date>", "Sheet · as of <date>",
+skeleton layout (static rows, no "No … yet" line) until they hold data. (UX pass 15,
+`afff3a0ac`, later replaced these empty-section skeletons with one quiet line.) The source line reads "Carta · as of <date>", "Sheet · as of <date>",
 "Typed in · as of <date>" or "Reading sheet…" (during the first read, with no
 snapshot yet, the page body is the one line "Reading <sheet name>…" and no buttons); after a failed read it keeps the
 label of the data shown, in the warning color. Sections, in order:
@@ -1616,7 +1620,8 @@ and what the demo cannot provide.
   skeletons and no "No … yet" line; exactly one Add contact entry in the Investors header;
   the typed-in table shows the Add holder row and the labelled pool cell; Fundraising empty
   shows the skeleton Round, Pipeline and SAFEs cards.
-- **Regression test.** The empty-state skeleton test.
+- **Regression test.** The empty-state skeleton test. (UX pass 15, `afff3a0ac`, replaced the
+  empty-section skeletons with one quiet line, and the test now checks that line.)
 - **Verify.** `pnpm vitest run apps/web/src/pages/Investors.test.tsx apps/web/src/pages/Fundraising.test.tsx`;
   the existing e2e specs updated, with screenshots named `investors-empty`,
   `investors-typed-empty` and `fundraising-empty`; `pnpm design-system:check`.
