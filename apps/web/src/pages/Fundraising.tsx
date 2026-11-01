@@ -119,6 +119,29 @@ export function FundraisingPage({
     wasBusy.current = agentBusy;
   }, [agentBusy, load]);
 
+  // Coming back from Mercury after sending a SAFE: pick up the new SAFE, at most once a minute.
+  const lastRefresh = useRef(0);
+  const waitingOnMercury =
+    overview?.mercury.status === "ok" && overview.prospects.some((p) => p.mercurySentAt);
+  useEffect(() => {
+    if (!waitingOnMercury) return;
+    const refresh = () => {
+      if (Date.now() - lastRefresh.current < 60_000) return;
+      lastRefresh.current = Date.now();
+      rpc.fundraising
+        .refresh()
+        .then(load)
+        .catch(() => undefined);
+    };
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [waitingOnMercury, load]);
+
   const round = overview?.round ?? null;
   const open = round && !round.closedAt ? round : null;
 
