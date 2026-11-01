@@ -30,6 +30,7 @@ import type { IntegrationsData } from "./useIntegrations";
 
 it("names the header button Sign in once the key is connected", async () => {
   const data = {
+    loaded: true,
     servers: [],
     bots: [],
     refresh: vi.fn(),
@@ -54,4 +55,24 @@ it("names the header button Sign in once the key is connected", async () => {
   const labels = [...container.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"));
   expect(labels).toContain("Sign in to Granola");
   expect(labels).not.toContain("Connect Granola");
+});
+
+it("shows no Connect form until the integrations have loaded", async () => {
+  const data = {
+    loaded: false,
+    servers: [],
+    bots: [],
+    refresh: vi.fn(),
+  } as unknown as IntegrationsData;
+  const container = document.createElement("div");
+  await act(async () =>
+    createRoot(container).render(
+      <MemoryRouter>
+        <GranolaPage data={data} />
+      </MemoryRouter>,
+    ),
+  );
+  expect(container.querySelector("input")).toBeNull();
+  expect(container.textContent).not.toContain("Connect");
+  expect(container.textContent).toContain("Integrations");
 });

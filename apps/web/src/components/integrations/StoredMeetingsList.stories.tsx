@@ -11,9 +11,19 @@ const meta = {
     mockRpc({
       "meetings.list": {
         items: [
-          { id: "m1", title: "Weekly sync", startedAt: "2026-10-19T10:00:00Z" },
-          { id: "m2", title: "Board prep", startedAt: "2026-10-18T15:30:00Z" },
-          { id: "m3", title: "Customer call", startedAt: "2026-10-16T09:00:00Z" },
+          {
+            id: "m1",
+            title: "Weekly sync",
+            startedAt: "2026-10-19T10:00:00Z",
+            provider: "granola",
+          },
+          { id: "m2", title: "Board prep", startedAt: "2026-10-18T15:30:00Z", provider: "granola" },
+          {
+            id: "m3",
+            title: "Customer call",
+            startedAt: "2026-10-16T09:00:00Z",
+            provider: "granola",
+          },
         ],
         nextCursor: null,
       },
@@ -33,4 +43,22 @@ export const ConfirmingDelete: Story = {
     const [first] = await within(canvasElement).findAllByRole("button", { name: "Delete" });
     if (first) await userEvent.click(first);
   },
+};
+
+export const OmiMeetingConfirmingDelete: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "meetings.list": {
+        items: [
+          {
+            id: "m4",
+            title: "Pendant conversation",
+            startedAt: "2026-10-17T11:00:00Z",
+            provider: "omi",
+          },
+        ],
+        nextCursor: null,
+      },
+    }),
+  play: ConfirmingDelete.play,
 };

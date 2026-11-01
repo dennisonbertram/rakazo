@@ -8533,6 +8533,10 @@ msgstr ""
 msgid "No matching models"
 msgstr "Нет подходящих моделей"
 
+#: src/components/integrations/StoredMeetingsList.tsx
+msgid "No meetings"
+msgstr ""
+
 #: src/pages/PeerMessagesOverlay.tsx
 msgid "No messages with {peerBotName} yet."
 msgstr "Сообщений с {peerBotName} пока нет."
@@ -10563,6 +10567,10 @@ msgstr ""
 
 #: src/components/integrations/McpDetail.tsx
 msgid "Removes the connection and bot access."
+msgstr ""
+
+#: src/components/integrations/StoredMeetingsList.tsx
+msgid "Removes this meeting and its to-dos from Praci."
 msgstr ""
 
 #: src/components/integrations/StoredMeetingsList.tsx
