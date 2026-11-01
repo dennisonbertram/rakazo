@@ -1035,8 +1035,8 @@ export function ShellPage() {
   const [keepComputerRecovery, setKeepComputerRecovery] = useState(false);
   const recoveryHoldTimer = useRef<number | undefined>(undefined);
   const notificationsOff = useNotificationsOff(panel === "settings");
-  const showComputerRecoveryHint =
-    computersAreUnavailable(bootstrapMe?.sandboxProvider) || keepComputerRecovery;
+  const computersOff = computersAreUnavailable(bootstrapMe?.sandboxProvider);
+  const showComputerRecoveryHint = computersOff || keepComputerRecovery;
   const releaseComputerRecovery = useCallback(() => {
     window.clearTimeout(recoveryHoldTimer.current);
     recoveryHoldTimer.current = undefined;
@@ -4060,7 +4060,9 @@ export function ShellPage() {
       await refreshComputerFor(targetBotId);
     } catch (error) {
       if (!stillThisBoot() || !stillThisBot()) return;
-      setComputerError(errorText(error, t`Could not take control`));
+      setComputerError(
+        errorText(error, takeControl ? t`Could not take control` : t`Could not start the computer`),
+      );
       setComputerErrorFromScreen(false);
       throw error;
     } finally {
@@ -4086,7 +4088,7 @@ export function ShellPage() {
       autoBooted.current = null;
       return;
     }
-    if (!active) return;
+    if (!active || bootstrapMe === undefined) return;
     const botId = active.id;
     let cancelled = false;
     void (async () => {
@@ -4097,7 +4099,7 @@ export function ShellPage() {
       const state = snap?.computer?.state;
       const screen = state === "running" ? await refreshComputerScreen(botId) : null;
       if (cancelled || activeBotId.current !== botId) return;
-      const action = computerPanelAutoBoot(state, screen);
+      const action = computerPanelAutoBoot(state, screen, computersOff);
       if (action === "wait") {
         if (state === "running") autoBooted.current = botId;
         return;
@@ -4115,7 +4117,7 @@ export function ShellPage() {
     return () => {
       cancelled = true;
     };
-  }, [panel, active?.id]);
+  }, [panel, active?.id, bootstrapMe?.sandboxProvider]);
 
   useEffect(() => {
     setComputerOpen(false);
@@ -5448,7 +5450,7 @@ export function ShellPage() {
                   {active &&
                   panel === "computer" &&
                   !computerOpen &&
-                  computerPanelNeedsMaintenance(computer?.state, booting) ? (
+                  computerPanelNeedsMaintenance(computer?.state, booting, computersOff) ? (
                     <ComputerMaintenanceActions
                       botId={active.id}
                       computer={computer}
@@ -5565,6 +5567,7 @@ export function ShellPage() {
                             (showComputerRecoveryHint ? (
                               <ComputersUnavailableHint
                                 sandboxProvider={bootstrapMe?.sandboxProvider}
+                                deploymentOwner={bootstrapMe?.isDeploymentOwner === true}
                                 onRecovered={(sandboxProvider) => {
                                   setBootstrapMe((prev) =>
                                     prev ? { ...prev, sandboxProvider } : prev,
@@ -6595,7 +6598,7 @@ export function ShellPage() {
                     onRefresh={refreshActiveTeaching}
                   />
                 ) : null}
-                {computerBot && !recordingSkill ? (
+                {computerBot && !recordingSkill && !computersOff ? (
                   <ComputerMaintenanceActions
                     botId={computerBot.id}
                     computer={computer}
