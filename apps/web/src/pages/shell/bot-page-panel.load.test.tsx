@@ -142,9 +142,13 @@ it("has no tab row for one page and creates a new page from the New page button"
   expect(container.querySelector('[role="tab"]')).toBeNull();
   mocks.create.mockResolvedValue(pageOf("p2", "New page", ""));
   mocks.list.mockResolvedValue([summary("p1", "Cash"), summary("p2", "New page")]);
+  const changed = vi.fn();
+  window.addEventListener("praci:sidebar-pages-changed", changed);
   await act(async () => {
     (container.querySelector('[aria-label="New page"]') as HTMLElement).click();
   });
+  window.removeEventListener("praci:sidebar-pages-changed", changed);
+  expect(changed).toHaveBeenCalledTimes(1);
   expect(mocks.create).toHaveBeenCalledWith({ botId: "bot_demo", title: "New page" });
   expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
   const title = container.querySelector('input[aria-label="Page title"]') as HTMLInputElement;
@@ -182,4 +186,24 @@ it("pins one page: no tabs or new button, reports its title, and reports a missi
     );
   });
   expect(onMissing).toHaveBeenCalled();
+});
+
+it("lets the page tab strip scroll sideways without hiding the options and New page buttons", async () => {
+  const summaries = ["Cash", "Burn", "Pipeline"].map((title, i) => ({
+    id: `page_${i}`,
+    title,
+    revision: 1,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  }));
+  mocks.list.mockResolvedValue(summaries);
+  mocks.get.mockResolvedValue(null);
+  await act(async () => {
+    root.render(<BotPagePanel botId="bot_demo" remote={null} />);
+  });
+  const list = container.querySelector('[role="tablist"]');
+  expect(list?.className).toMatch(/(^|\s)overflow-x-auto(\s|$)/);
+  for (const tab of container.querySelectorAll('[role="tab"]')) {
+    expect(tab.className).toContain("flex-none");
+  }
+  expect(container.querySelector('[aria-label="New page"]')?.className).toContain("shrink-0");
 });

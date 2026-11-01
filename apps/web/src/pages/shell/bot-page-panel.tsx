@@ -45,6 +45,7 @@ import {
 import { PageSourcesDialog } from "../../components/pages/PageSourcesDialog";
 import { isNewerRemote, resolveRemotePage } from "../../lib/page-sync";
 import { rpc } from "../../lib/rpc";
+import { SIDEBAR_PAGES_CHANGED_EVENT } from "../../lib/sidebar-pages-event";
 import { errorText } from "../../lib/user-error";
 import { ChartCanvas } from "./message-cards";
 import { PageChartNode, usePageChartRows } from "./page-chart-extension";
@@ -522,6 +523,9 @@ function nextTitle(pages: BotPageSummary[]): string {
 }
 
 /** The bot's page: a row of page titles when there are several, and the active page's editor. */
+const announcePagesChanged = () =>
+  window.dispatchEvent(new CustomEvent(SIDEBAR_PAGES_CHANGED_EVENT));
+
 export function BotPagePanel({
   botId,
   remote,
@@ -567,7 +571,10 @@ export function BotPagePanel({
     const list = await rpc.pages.list({ botId });
     setPages(list);
     if (fixedPageId) {
-      if (!list.some((page) => page.id === fixedPageId)) onMissingRef.current?.();
+      if (!list.some((page) => page.id === fixedPageId)) {
+        announcePagesChanged();
+        onMissingRef.current?.();
+      }
       return;
     }
     // Keep the open page; otherwise open the first.
@@ -625,6 +632,7 @@ export function BotPagePanel({
     run(async () => {
       const page = await rpc.pages.create({ botId, title: nextTitle(pages) });
       await loadPages();
+      announcePagesChanged();
       setActiveId(page.id);
       setRenaming(true);
     });
@@ -634,6 +642,7 @@ export function BotPagePanel({
       if (active && title.trim() && title.trim() !== active.title) {
         const renamed = await rpc.pages.rename({ botId, pageId: active.id, title });
         setPages((list) => list.map((page) => (page.id === renamed.id ? renamed : page)));
+        announcePagesChanged();
       }
       setRenaming(false);
     });
@@ -661,6 +670,7 @@ export function BotPagePanel({
       setDeleting(false);
       setActiveId(undefined);
       await loadPages();
+      announcePagesChanged();
     });
 
   const renameForm =
@@ -690,7 +700,7 @@ export function BotPagePanel({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label={t`Page options`}>
+          <Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t`Page options`}>
             <MoreHorizontal size={16} />
           </Button>
         }
@@ -734,9 +744,12 @@ export function BotPagePanel({
             <div className="min-w-0 flex-1">
               {pages.length > 1 ? (
                 <Tabs value={activeId} onValueChange={(next) => setActiveId(String(next))}>
-                  <TabsList aria-label={t`Pages`}>
+                  <TabsList
+                    aria-label={t`Pages`}
+                    className="justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
                     {pages.map((page) => (
-                      <TabsTrigger key={page.id} value={page.id} className="px-3">
+                      <TabsTrigger key={page.id} value={page.id} className="flex-none px-3">
                         {page.title}
                       </TabsTrigger>
                     ))}
@@ -749,6 +762,7 @@ export function BotPagePanel({
           <Button
             variant="ghost"
             size="icon-sm"
+            className="shrink-0"
             aria-label={t`New page`}
             disabled={pages.length >= BOT_PAGE_MAX_PAGES}
             onClick={() => void create()}
