@@ -15,6 +15,7 @@ import type { ElectronAutoUpdater } from "./auto-update.js";
 import { DesktopUpdateController, LAUNCH_CHECK_DELAY_MS } from "./auto-update.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
+import { createHexRunner } from "./hex-bridge.js";
 import { requestLocalSettings } from "./local-settings.js";
 import {
   LocalStackController,
@@ -1074,6 +1075,23 @@ app.whenReady().then(async () => {
       fullScreen: win?.isFullScreen() ?? false,
     };
   });
+  // Hex records meetings on macOS only; elsewhere the answers are "not found" and nothing runs.
+  const hex = createHexRunner();
+  const hexMac = process.platform === "darwin";
+  ipcMain.handle(
+    "desktop.hex.available",
+    (event) => hexMac && fromMainWindow(event) && hex.available(),
+  );
+  ipcMain.handle("desktop.hex.list", (event, sinceMs: unknown) =>
+    hexMac && fromMainWindow(event) && typeof sinceMs === "number"
+      ? hex.list(sinceMs)
+      : { state: "not_found" },
+  );
+  ipcMain.handle("desktop.hex.show", (event, id: unknown) =>
+    hexMac && fromMainWindow(event) && typeof id === "string"
+      ? hex.show(id)
+      : { state: "not_found" },
+  );
   ipcMain.handle("desktop.update.state", () => desktopUpdater.state());
   ipcMain.handle("desktop.update.check", (event) =>
     fromMainWindow(event) ? desktopUpdater.check(true) : desktopUpdater.state(),
