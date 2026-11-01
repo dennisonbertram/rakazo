@@ -683,3 +683,23 @@ it("shows a failed replace inside the share dialog", async () => {
     vi.unstubAllGlobals();
   }
 });
+
+it("offers the sort control in list view without an open artifact", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  window.localStorage.setItem("rakazo:artifacts-view-mode", "list");
+  api.listSpace.mockResolvedValue({
+    items: [artifact("Bravo", "a"), artifact("Alpha", "b")],
+    nextCursor: null,
+  });
+  const page = await renderArtifacts();
+  try {
+    const sort = [...page.container.querySelectorAll("button")].find((b) =>
+      /Sort: Added/.test(b.textContent ?? ""),
+    );
+    expect(sort).toBeDefined();
+  } finally {
+    await page.cleanup();
+    window.localStorage.removeItem("rakazo:artifacts-view-mode");
+    vi.unstubAllGlobals();
+  }
+});

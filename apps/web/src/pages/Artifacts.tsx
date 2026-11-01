@@ -422,23 +422,21 @@ export function ArtifactsPage({
               onChange={(next) => list.setParam("bot", next)}
             />
           ) : null}
-          {viewMode === "grid" ? (
-            <SortControl
-              fields={[
-                ["name", t`Name`],
-                ["bot", t`Bot`],
-                ["type", t`Type`],
-                ["added", t`Added`],
-              ]}
-              field={list.sort.field}
-              fieldLabel={
-                { name: t`Name`, bot: t`Bot`, type: t`Type`, added: t`Added` }[list.sort.field]
-              }
-              direction={list.sort.dir}
-              onField={(field) => list.setSort({ field, dir: field === "added" ? "desc" : "asc" })}
-              onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
-            />
-          ) : null}
+          <SortControl
+            fields={[
+              ["name", t`Name`],
+              ["bot", t`Bot`],
+              ["type", t`Type`],
+              ["added", t`Added`],
+            ]}
+            field={list.sort.field}
+            fieldLabel={
+              { name: t`Name`, bot: t`Bot`, type: t`Type`, added: t`Added` }[list.sort.field]
+            }
+            direction={list.sort.dir}
+            onField={(field) => list.setSort({ field, dir: field === "added" ? "desc" : "asc" })}
+            onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+          />
           {/* On a phone the header has no room for the view switch, so it waits here with the filters. */}
           {!artifactId ? viewToggle("ms-auto md:hidden") : null}
         </div>
