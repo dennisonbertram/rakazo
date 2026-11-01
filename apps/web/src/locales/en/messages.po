@@ -3249,7 +3249,6 @@ msgstr "Conflicting evidence"
 #: src/components/integrations/ExchangeConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
-#: src/components/integrations/GranolaPage.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -3277,7 +3276,6 @@ msgstr "Connect {clientName}"
 
 #: src/components/integrations/ConnectAppsStep.tsx
 #: src/components/integrations/FinanceSection.tsx
-#: src/components/integrations/GranolaPage.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Connect {name}"
 msgstr "Connect {name}"
@@ -11808,6 +11806,7 @@ msgstr "Sidebar"
 msgid "Sidebar density"
 msgstr "Sidebar density"
 
+#: src/components/integrations/GranolaPage.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/Auth.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -11826,6 +11825,10 @@ msgstr "Sign in again"
 #: src/components/integrations/SignInStep.tsx
 msgid "Sign in to {appName} in the new window"
 msgstr "Sign in to {appName} in the new window"
+
+#: src/components/integrations/GranolaPage.tsx
+msgid "Sign in to {name}"
+msgstr "Sign in to {name}"
 
 #: src/pages/Auth.tsx
 msgid "Sign in to Praci"

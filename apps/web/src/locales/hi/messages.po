@@ -3249,7 +3249,6 @@ msgstr ""
 #: src/components/integrations/ExchangeConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
-#: src/components/integrations/GranolaPage.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -3277,7 +3276,6 @@ msgstr ""
 
 #: src/components/integrations/ConnectAppsStep.tsx
 #: src/components/integrations/FinanceSection.tsx
-#: src/components/integrations/GranolaPage.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Connect {name}"
 msgstr ""
@@ -11808,6 +11806,7 @@ msgstr ""
 msgid "Sidebar density"
 msgstr ""
 
+#: src/components/integrations/GranolaPage.tsx
 #: src/lib/localized-provider-hint.ts
 #: src/pages/Auth.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -11825,6 +11824,10 @@ msgstr ""
 
 #: src/components/integrations/SignInStep.tsx
 msgid "Sign in to {appName} in the new window"
+msgstr ""
+
+#: src/components/integrations/GranolaPage.tsx
+msgid "Sign in to {name}"
 msgstr ""
 
 #: src/pages/Auth.tsx
