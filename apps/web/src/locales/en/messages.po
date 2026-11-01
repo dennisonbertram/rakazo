@@ -84,6 +84,11 @@ msgstr "{0, plural, one {# file failed} other {# files failed}}"
 msgid "{0, plural, one {# finance lookup} other {# finance lookups}}"
 msgstr "{0, plural, one {# finance lookup} other {# finance lookups}}"
 
+#. placeholder {0}: status.count
+#: src/components/integrations/HexCard.tsx
+msgid "{0, plural, one {# meeting} other {# meetings}}"
+msgstr "{0, plural, one {# meeting} other {# meetings}}"
+
 #. placeholder {0}: group.count
 #: src/components/inbox/InboxDigest.tsx
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -2392,6 +2397,7 @@ msgstr "Can't reach the server."
 #: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/DevinConnectDialog.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
@@ -3281,6 +3287,7 @@ msgstr "Conflicting evidence"
 #: src/components/integrations/ExchangeConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -4449,6 +4456,10 @@ msgstr "Could not update changes"
 msgid "Could not update computer"
 msgstr "Could not update computer"
 
+#: src/components/integrations/HexCard.tsx
+msgid "Could not update Hex"
+msgstr "Could not update Hex"
+
 #: src/pages/Shell.tsx
 msgid "Could not update reaction"
 msgstr "Could not update reaction"
@@ -4517,6 +4528,10 @@ msgstr "Couldn't load senders"
 #: src/lib/inbox-sync-error.ts
 msgid "Couldn't reach Gmail."
 msgstr "Couldn't reach Gmail."
+
+#: src/components/integrations/HexCard.tsx
+msgid "Couldn't read Hex"
+msgstr "Couldn't read Hex"
 
 #: src/components/data-room/Preview.tsx
 msgid "Couldn't read this file"
@@ -4934,6 +4949,10 @@ msgstr "Delete group"
 msgid "Delete holder"
 msgstr "Delete holder"
 
+#: src/components/integrations/HexCard.tsx
+msgid "Delete imported meetings too"
+msgstr "Delete imported meetings too"
+
 #: src/pages/shell/dialogs.tsx
 msgid "Delete memories too"
 msgstr "Delete memories too"
@@ -5019,6 +5038,7 @@ msgid "Desktop"
 msgstr "Desktop"
 
 #: src/components/DesktopUpdates.tsx
+#: src/components/integrations/HexCard.tsx
 msgid "Desktop app"
 msgstr "Desktop app"
 
@@ -5114,6 +5134,7 @@ msgid "Discarded"
 msgstr "Discarded"
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyPrivacy.tsx
 #: src/pages/MemorySettingsOverlay.tsx
@@ -5133,6 +5154,10 @@ msgstr "Disconnect {name}"
 #: src/components/integrations/AppDetail.tsx
 msgid "Disconnect {name}?"
 msgstr "Disconnect {name}?"
+
+#: src/components/integrations/HexCard.tsx
+msgid "Disconnect Hex?"
+msgstr "Disconnect Hex?"
 
 #: src/components/integrations/McpDetail.tsx
 msgid "Disconnect sign-in"
@@ -6808,6 +6833,10 @@ msgstr "Insert link"
 msgid "Inside"
 msgstr "Inside"
 
+#: src/components/integrations/HexCard.tsx
+msgid "Install Hex"
+msgstr "Install Hex"
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Instance API key"
 msgstr "Instance API key"
@@ -7120,6 +7149,11 @@ msgstr "Last scan failed: {0}"
 #: src/pages/Legal.tsx
 msgid "Last scan failed: The AI key was rejected."
 msgstr "Last scan failed: The AI key was rejected."
+
+#. placeholder {0}: formatRelativeTime(status.lastSyncedAt)
+#: src/components/integrations/HexCard.tsx
+msgid "Last sync {0}"
+msgstr "Last sync {0}"
 
 #: src/pages/CompanyImport.tsx
 msgid "Last three years"
@@ -7698,6 +7732,10 @@ msgstr "Meeting notes and transcripts"
 #: src/pages/ContactDetail.tsx
 msgid "Meetings"
 msgstr "Meetings"
+
+#: src/components/integrations/HexCard.tsx
+msgid "Meetings recorded on this Mac"
+msgstr "Meetings recorded on this Mac"
 
 #: src/pages/shell/GroupIntro.tsx
 msgid "Members"
@@ -10925,6 +10963,7 @@ msgstr "Resume"
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/BrexControlsForm.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
@@ -12668,6 +12707,10 @@ msgstr "Sync failed."
 msgid "Sync now"
 msgstr "Sync now"
 
+#: src/components/integrations/HexCard.tsx
+msgid "Synced"
+msgstr "Synced"
+
 #. placeholder {0}: formatRelativeTime(new Date(state.at).toISOString())
 #: src/components/integrations/OmiPage.tsx
 msgid "Synced {0}"
@@ -12679,6 +12722,7 @@ msgstr "synced {updated}"
 
 #: src/components/inbox/TodoCard.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 msgid "Syncing"
 msgstr "Syncing"
 
@@ -13701,6 +13745,10 @@ msgstr "Update failed"
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Update finished with errors"
 msgstr "Update finished with errors"
+
+#: src/components/integrations/HexCard.tsx
+msgid "Update Hex"
+msgstr "Update Hex"
 
 #: src/pages/Artifacts.tsx
 msgid "Update link"

@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 323 of 323
-- Web and shared components: 833
+- Web and shared component files with stories: 324 of 324
+- Web and shared components: 835
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 126 in 67 files, native story pending
 
@@ -281,6 +281,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | TileName, CryptoTile, AlchemyTile, ExchangeTile, FinanceSection | [apps/web/src/components/integrations/FinanceSection.tsx](../../apps/web/src/components/integrations/FinanceSection.tsx) | [FinanceSection.stories.tsx](../../apps/web/src/components/integrations/FinanceSection.stories.tsx) | web |
 | GranolaStatusLine, GranolaMeetingsCard | [apps/web/src/components/integrations/GranolaMeetingsCard.tsx](../../apps/web/src/components/integrations/GranolaMeetingsCard.tsx) | [GranolaMeetingsCard.stories.tsx](../../apps/web/src/components/integrations/GranolaMeetingsCard.stories.tsx) | web |
 | GranolaPage | [apps/web/src/components/integrations/GranolaPage.tsx](../../apps/web/src/components/integrations/GranolaPage.tsx) | [GranolaPage.stories.tsx](../../apps/web/src/components/integrations/GranolaPage.stories.tsx) | web |
+| Line, HexCard | [apps/web/src/components/integrations/HexCard.tsx](../../apps/web/src/components/integrations/HexCard.tsx) | [HexCard.stories.tsx](../../apps/web/src/components/integrations/HexCard.stories.tsx) | web |
 | Labeled, SetupDialog, IMessageSection | [apps/web/src/components/integrations/IMessageSection.tsx](../../apps/web/src/components/integrations/IMessageSection.tsx) | [IMessageSection.stories.tsx](../../apps/web/src/components/integrations/IMessageSection.stories.tsx) | web |
 | WritesSwitch, IntegrationAgentSection | [apps/web/src/components/integrations/IntegrationAgentSection.tsx](../../apps/web/src/components/integrations/IntegrationAgentSection.tsx) | [IntegrationAgentSection.stories.tsx](../../apps/web/src/components/integrations/IntegrationAgentSection.stories.tsx) | web |
 | IntegrationSetup | [apps/web/src/components/integrations/IntegrationSetup.tsx](../../apps/web/src/components/integrations/IntegrationSetup.tsx) | [IntegrationSetup.stories.tsx](../../apps/web/src/components/integrations/IntegrationSetup.stories.tsx) | web |

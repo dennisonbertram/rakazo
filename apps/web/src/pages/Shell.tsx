@@ -206,6 +206,7 @@ import { desktopBridge } from "../lib/desktop";
 import { setDockedAgentBotId } from "../lib/docked-agent";
 import { financeAgentSuggestions, findFinanceAgent } from "../lib/finance-agent";
 import { findGtmAgent } from "../lib/gtm-agent";
+import { useHexSync } from "../lib/hex/useHexSync";
 import {
   maskCurrencyWhenHidden,
   setHideAmounts,
@@ -633,6 +634,8 @@ export function ShellPage() {
   searchParamsRef.current = searchParams;
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  // Pulls Hex meetings in the macOS desktop app once the user connected Hex.
+  useHexSync();
   const [groups, setGroups] = useState<Group[]>([]);
   const [bots, setBots] = useState<Bot[]>([]);
   const sendToAgentTargets = useMemo(() => sendTargets(bots), [bots]);
