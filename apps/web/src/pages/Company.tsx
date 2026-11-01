@@ -341,21 +341,22 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
               ["paused", "budget_reached", "partial", "failed"].includes(
                 data.latestRun.status,
               )) && (
-              <Link
-                role="status"
-                to={`/app/company/import?runId=${data.latestRun.id}`}
-                className="block text-sm text-muted-foreground hover:underline"
-              >
-                {running ? (
-                  <Trans>Import in progress</Trans>
-                ) : ["paused", "budget_reached"].includes(data.latestRun.status) ? (
-                  <Trans>Import paused</Trans>
-                ) : data.latestRun.status === "failed" ? (
-                  <Trans>Import failed</Trans>
-                ) : (
-                  <Trans>Partial import</Trans>
-                )}
-              </Link>
+              <p role="status" className="text-sm text-muted-foreground">
+                <Link
+                  to={`/app/company/import?runId=${data.latestRun.id}`}
+                  className="hover:underline"
+                >
+                  {running ? (
+                    <Trans>Import in progress</Trans>
+                  ) : ["paused", "budget_reached"].includes(data.latestRun.status) ? (
+                    <Trans>Import paused</Trans>
+                  ) : data.latestRun.status === "failed" ? (
+                    <Trans>Import failed</Trans>
+                  ) : (
+                    <Trans>Partial import</Trans>
+                  )}
+                </Link>
+              </p>
             )}
           {view === "overview" && data.entities.length === 0 && data.events.length === 0 && (
             <PageEmptyState

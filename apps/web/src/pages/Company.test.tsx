@@ -107,7 +107,7 @@ it("links a failed import to its run", async () => {
   await show("overview", companyFixture.entities, {
     latestRun: { id: "r1", status: "failed" } as never,
   });
-  const link = container.querySelector('a[role="status"]');
+  const link = container.querySelector('[role="status"] a');
   expect(link?.textContent).toBe("Import failed");
   expect(link?.getAttribute("href")).toBe("/app/company/import?runId=r1");
   expect(container.textContent).not.toContain("Partial import");
