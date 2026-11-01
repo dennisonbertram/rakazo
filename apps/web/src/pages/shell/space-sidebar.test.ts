@@ -1063,3 +1063,48 @@ it("shows the +N more bar slim, at the bottom of the list", async () => {
     vi.unstubAllGlobals();
   }
 });
+
+describe("bot row click", () => {
+  async function clickRow(detail: number, coarse = false) {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: coarse && q === "(pointer: coarse)",
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    stubSidebarObservers();
+    Element.prototype.scrollIntoView ??= () => undefined;
+    const onFocusComposer = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            MemoryRouter,
+            null,
+            createElement(SidebarFixture, { mode: "expanded", onFocusComposer }),
+          ),
+        );
+      });
+      const row = container.querySelector<HTMLElement>('[data-roster-row="bot_ada"]');
+      await act(async () => {
+        row?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail }));
+      });
+      return onFocusComposer;
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  }
+
+  it("asks for the message box after a mouse click", async () => {
+    expect(await clickRow(1)).toHaveBeenCalledWith("bot_ada");
+  });
+
+  it("leaves focus on the row after a keyboard activation or on a touch screen", async () => {
+    expect(await clickRow(0)).not.toHaveBeenCalled();
+    expect(await clickRow(1, true)).not.toHaveBeenCalled();
+  });
+});

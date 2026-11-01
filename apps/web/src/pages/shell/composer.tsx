@@ -447,6 +447,8 @@ export const Composer = memo(function Composer({
     const text = serializeComposerPrompt(draft, selectedSkill, selectedMentions);
     historyIndex.current = null;
     setDraft("");
+    // Send disables or disappears once the draft is empty, which would drop focus to the page.
+    if (!isCoarsePointer()) textareaRef.current?.focus();
     setMentionQuery(null);
     setMentionHighlightKey(null);
     setSlashQuery(null);
