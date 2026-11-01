@@ -39,7 +39,6 @@ import { useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 
-const HOUR_MS = 3_600_000;
 const HOUR_PX = 48;
 const SCHEDULE_DAYS = 30;
 /** Bot items have no end; they get this much room in a time grid. */
@@ -188,6 +187,17 @@ type Block = {
   end: number;
   col: number;
   cols: number;
+};
+
+/**
+ * Minutes on the wall clock since the day's first midnight. The grid has 24 hour rows, so on a
+ * 23- or 25-hour daylight-saving day elapsed time would drift an hour. A time at or after the
+ * day's end counts as the bottom of the grid.
+ */
+const wallMinutes = (ms: number, dayEnd: number) => {
+  if (ms >= dayEnd) return 24 * 60;
+  const date = new Date(ms);
+  return date.getHours() * 60 + date.getMinutes();
 };
 
 /** Timed items of one day with side-by-side columns for the ones that overlap. */
@@ -778,7 +788,8 @@ export function CalendarPage({
             ))}
           </div>
           {days.map((day) => {
-            const dayStart = startOf(day).getTime();
+            const dayEnd = startOf(addDays(day, 1)).getTime();
+            const px = (ms: number) => (wallMinutes(ms, dayEnd) / 60) * HOUR_PX;
             return (
               <div
                 key={day}
@@ -789,8 +800,8 @@ export function CalendarPage({
                   block(
                     entry.item,
                     {
-                      top: ((entry.start - dayStart) / HOUR_MS) * HOUR_PX,
-                      height: ((entry.end - entry.start) / HOUR_MS) * HOUR_PX,
+                      top: px(entry.start),
+                      height: px(entry.end) - px(entry.start),
                       // Cascade like Google: each overlapping item starts a share further right and
                       // is drawn over the one before it, so every title keeps some width.
                       left: `${(entry.col / entry.cols) * 100}%`,
@@ -805,7 +816,7 @@ export function CalendarPage({
                     role="presentation"
                     data-now-line
                     className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-destructive"
-                    style={{ top: ((now - dayStart) / HOUR_MS) * HOUR_PX }}
+                    style={{ top: px(now) }}
                   />
                 ) : null}
               </div>

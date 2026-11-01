@@ -350,3 +350,34 @@ it("lists a meeting before a routine in a month cell, whatever the time", async 
   expect(cell.indexOf("Board call")).toBeGreaterThan(-1);
   expect(cell.indexOf("Board call")).toBeLessThan(cell.indexOf("Morning briefing"));
 });
+
+it("draws timed items and the now line by wall-clock time on a daylight-saving day", async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "America/New_York";
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    // Clocks go back at 2:00 AM on Sun 2026-11-01, so that day has 25 hours.
+    vi.setSystemTime(new Date(2026, 10, 1, 14, 0));
+    const hourFrom = (day: number) => ({ end: new Date(2026, 10, day, 15, 0).toISOString() });
+    const items = [
+      local("d1", "Switch day", new Date(2026, 10, 1, 14, 0), hourFrom(1)),
+      local("d2", "Normal day", new Date(2026, 10, 2, 14, 0), hourFrom(2)),
+    ];
+    agendaMock.mockImplementation(answer(agenda({ items })));
+    await mount();
+    const styleOf = (day: string, title: string) =>
+      Array.from(column(day).querySelectorAll<HTMLElement>("*")).find(
+        (el) => el.style.top && el.textContent?.includes(title),
+      )!.style;
+    expect(styleOf("2026-11-01", "Switch day").top).toBe("672px");
+    expect(styleOf("2026-11-01", "Switch day").height).toBe("48px");
+    expect(styleOf("2026-11-02", "Normal day").top).toBe("672px");
+    expect((column("2026-11-01").querySelector("[data-now-line]") as HTMLElement).style.top).toBe(
+      "672px",
+    );
+  } finally {
+    vi.useRealTimers();
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
