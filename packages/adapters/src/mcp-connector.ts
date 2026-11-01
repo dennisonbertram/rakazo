@@ -188,7 +188,12 @@ export function integrationAgentDenial(
     isServerAgent(assignment);
   if (preset?.requiresAgent && !isIntegrationAgentForServer(server, server.agentBot))
     return "belongs-to-agent";
-  if (!server.agentBotId && !server.agentExclusive && !botIsIntegrationAgent) return null;
+  if (!server.agentBotId && !server.agentExclusive && !botIsIntegrationAgent) {
+    // A released bank server (its agent was archived) must not hand payment tools to ordinary bots.
+    return financeProviderForEndpoint(server.endpoint) && !isReadTool(tool, preset)
+      ? "belongs-to-agent"
+      : null;
+  }
   if (isServerAgent(assignment)) {
     return isReadTool(tool, preset) || server.writesEnabled === true ? null : "writes-off";
   }
