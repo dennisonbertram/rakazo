@@ -1699,6 +1699,7 @@ describe("computer execution leases", () => {
     const create = vi.fn().mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002" }));
     const client = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       thread: {
         update: vi
           .fn()
