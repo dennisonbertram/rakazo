@@ -121,6 +121,9 @@ export function ContactDialog({
       )
     : undefined;
 
+  // Shown as soon as the email matches, before any submit; the server error is the backstop.
+  const message = error || (sameEmail ? t`Another contact already has this email.` : "");
+
   async function run<T>(
     action: () => Promise<T>,
     done: (result: T) => void,
@@ -187,9 +190,9 @@ export function ContactDialog({
 
   // An email another contact already has is reported under the Email field, anything else at the end.
   const errorBlock = (id?: string) =>
-    error ? (
+    message ? (
       <div id={id} role="alert" className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="min-w-0 text-destructive">{error}</span>
+        <span className="min-w-0 text-destructive">{message}</span>
         {sameEmail && onOpenContact ? (
           <Button
             type="button"
@@ -205,7 +208,7 @@ export function ContactDialog({
         ) : null}
       </div>
     ) : null;
-  const emailProblem = emailError || (sameEmail && error);
+  const emailProblem = emailError || (sameEmail && message);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -387,7 +390,7 @@ export function ContactDialog({
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
               <Trans>Cancel</Trans>
             </Button>
-            <Button type="submit" disabled={busy || !name.trim()}>
+            <Button type="submit" disabled={busy || !name.trim() || !!sameEmail}>
               <Trans>Save</Trans>
             </Button>
           </DialogFooter>

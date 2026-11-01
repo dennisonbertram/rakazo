@@ -197,18 +197,16 @@ it("offers the other contact on a duplicate email, and clears the error when the
   expect(document.body.textContent).not.toContain("Another contact already has this email.");
 });
 
-it("marks the Email invalid and focuses it when another contact has it", async () => {
+it("marks the Email invalid while typing an email another contact has", async () => {
   detail.mockResolvedValue(empty);
   rpcMock.list.mockResolvedValue([contact, cy]);
-  rpcMock.save.mockRejectedValue(new Error("Another contact already has this email."));
   await show();
   await edit();
   const email = document.getElementById("contact-email") as HTMLInputElement;
   await typeInto(email, "cy@example.test");
-  await click(button("Save"));
   expect(email.getAttribute("aria-invalid")).toBe("true");
   expect(
     document.getElementById(email.getAttribute("aria-describedby") ?? "")?.textContent,
   ).toContain("Another contact already has this email.");
-  expect(document.activeElement).toBe(email);
+  expect(rpcMock.save).not.toHaveBeenCalled();
 });
