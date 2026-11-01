@@ -49,18 +49,25 @@ function Devin({ onConnect, onReconnect }: { onConnect?: () => void; onReconnect
   reload.current = query.reload;
 
   // Session state changes in Devin, not here: re-read every minute while visible, and when the
-  // person comes back to the tab.
+  // person comes back to the tab. A browser fires visibilitychange and then focus on return, and
+  // a second read would discard the first one's answer, so the return events share one read.
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== "hidden") reload.current();
     };
+    let lastReturn = 0;
+    const onReturn = () => {
+      if (document.visibilityState === "hidden" || Date.now() - lastReturn < 1000) return;
+      lastReturn = Date.now();
+      reload.current();
+    };
     const timer = setInterval(refresh, REFRESH_MS);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
     return () => {
       clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
     };
   }, []);
   // The sidebar count reads the same rows; tell it each time they were read.
@@ -122,10 +129,10 @@ function Devin({ onConnect, onReconnect }: { onConnect?: () => void; onReconnect
 
   const needsYou = sessions.filter((s) => kindSection(s.kind) === "needs_you").length;
   const working = sessions.filter((s) => s.kind === "working").length;
-  // A rate limit with rows on screen is already said by "Updated …"; everything else says so.
+  // Unreachable or rate limited with rows on screen is already said by "Updated …"; with none, say so.
   const failed =
-    connection.status === "unreachable" ||
-    (connection.status === "rate_limited" && sessions.length === 0);
+    (connection.status === "unreachable" || connection.status === "rate_limited") &&
+    sessions.length === 0;
   const reconnect =
     connection.manage && onReconnect ? { label: t`Reconnect`, onClick: onReconnect } : undefined;
   return (
