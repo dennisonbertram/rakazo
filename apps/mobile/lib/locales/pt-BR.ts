@@ -962,4 +962,7 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   "Source not found": "Fonte não encontrada",
   "No data yet": "Ainda sem dados",
   "Source failed": "Falha na fonte",
+  "Connected.": "Conectado.",
+  "Disconnected {provider}. Bots now use {model}.": "{provider} desconectado. Os bots agora usam {model}.",
+  "Source paused": "Fonte pausada",
 };
