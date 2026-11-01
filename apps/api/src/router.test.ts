@@ -2277,7 +2277,7 @@ describe("model credential persistence", () => {
   } satisfies Actor;
 
   function persistDeps(options?: { envDefaultModel?: string }) {
-    const upsert = vi.fn().mockResolvedValue({ id: "preference" });
+    const upsert = vi.fn().mockResolvedValue({ id: "preference", isDefault: true });
     const finish = vi.fn();
     // Connect loads any previous credential on the root client before the write transaction.
     const userModelCredential = {
