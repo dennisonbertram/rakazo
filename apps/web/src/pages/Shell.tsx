@@ -5106,7 +5106,7 @@ export function ShellPage() {
               <IntegrationsPage
                 activeBotId={activeBotId.current}
                 onOpenMessaging={() => setMessagingSettingsOpen(true)}
-                onOpenAiDataSharing={() => openSettings("general")}
+                onOpenAiDataSharing={() => openSettings("privacy")}
                 onOpenVoiceSettings={() => openSettings("voice")}
               />
             </ErrorBoundary>
