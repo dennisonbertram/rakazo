@@ -1556,6 +1556,11 @@ msgstr ""
 msgid "Anyone who can reach this address can talk to your Mac's server. Use a private network or a tunnel."
 msgstr ""
 
+#. placeholder {0}: i18n.date(new Date(expiresAt), { dateStyle: "medium" })
+#: src/components/ArtifactShareDialog.tsx
+msgid "Anyone with this link can view this version until {0}."
+msgstr ""
+
 #: src/components/ArtifactShareDialog.tsx
 msgid "Anyone with this link can view this version until you stop sharing or for 30 days."
 msgstr ""
@@ -7145,6 +7150,10 @@ msgstr ""
 msgid "Link SSO"
 msgstr "关联 SSO"
 
+#: src/components/ArtifactShareDialog.tsx
+msgid "Links are shown once. Replacing this one stops the old link."
+msgstr ""
+
 #: src/components/finance/ui.tsx
 #: src/pages/Shell.tsx
 msgid "List"
@@ -10593,6 +10602,10 @@ msgstr ""
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Replace key"
 msgstr "替换密钥"
+
+#: src/components/ArtifactShareDialog.tsx
+msgid "Replace link"
+msgstr ""
 
 #: src/components/integrations/BrexCardsConnectDialog.tsx
 #: src/components/integrations/McpDetail.tsx

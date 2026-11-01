@@ -9,8 +9,10 @@ const meta = {
   args: {
     name: "Weekly dashboard",
     url: "https://app.example.test/s#example-token",
+    expiresAt: "2030-02-10T12:00:00.000Z",
     busy: false,
     error: null,
+    onReplace: () => {},
     onStop: () => {},
     onClose: () => {},
   },
@@ -20,5 +22,5 @@ type Story = StoryObj<typeof meta>;
 
 /** Right after the link was made: the only time it can be copied. */
 export const NewLink: Story = {};
-/** Reopening an existing share: the link is not stored, so only Stop sharing remains. */
+/** Reopening an existing share: the link is not stored, so Replace link and Stop sharing remain. */
 export const ExistingShare: Story = { args: { url: null } };
