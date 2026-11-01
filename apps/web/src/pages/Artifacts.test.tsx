@@ -684,6 +684,32 @@ it("shows a failed replace inside the share dialog", async () => {
   }
 });
 
+it("names the icon-only Share and Download header buttons", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  api.listSpace.mockResolvedValue({
+    items: [artifact("Page.html", "artifact-1")],
+    nextCursor: null,
+  });
+  api.listVersions.mockRejectedValueOnce(new Error("no versions"));
+  api.getById.mockResolvedValue({
+    ...artifact("Page.html", "artifact-1"),
+    mimeType: "text/html",
+    contentBase64: "",
+  });
+  shares.get.mockResolvedValueOnce(null);
+  const page = await renderArtifacts("/app/artifacts/artifact-1");
+  try {
+    const labels = [...page.container.querySelectorAll("header button")].map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    expect(labels).toContain("Share");
+    expect(labels).toContain("Download");
+  } finally {
+    await page.cleanup();
+    vi.unstubAllGlobals();
+  }
+});
+
 it("offers the sort control in list view without an open artifact", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   window.localStorage.setItem("rakazo:artifacts-view-mode", "list");

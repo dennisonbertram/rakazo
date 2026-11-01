@@ -1327,6 +1327,9 @@ function PreviewPane({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label={
+                    share && share.artifactId !== state.artifact.id ? t`Update link` : t`Share`
+                  }
                   disabled={shareBusy}
                   onClick={() =>
                     share && share.artifactId === state.artifact.id
