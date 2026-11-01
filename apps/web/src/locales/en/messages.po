@@ -175,6 +175,11 @@ msgstr "{0, plural, one {Show # finished run} other {Show # finished runs}}"
 msgid "{0, plural, one {Sorted # item} other {Sorted # items}}"
 msgstr "{0, plural, one {Sorted # item} other {Sorted # items}}"
 
+#. placeholder {0}: linked.safes
+#: src/components/ContactDeleteConfirm.tsx
+msgid "{0, plural, one {the link to # SAFE} other {the links to # SAFEs}}"
+msgstr "{0, plural, one {the link to # SAFE} other {the links to # SAFEs}}"
+
 #. placeholder {0}: Math.ceil(oauth.expiresInSeconds / 60)
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -1514,6 +1519,10 @@ msgstr "Anniversaries"
 #: src/pages/CompanyCalendar.tsx
 msgid "Anniversary"
 msgstr "Anniversary"
+
+#: src/components/ContactDialog.tsx
+msgid "Another contact already has this email."
+msgstr "Another contact already has this email."
 
 #: src/components/AskCard.tsx
 msgid "Answer"
@@ -3806,6 +3815,8 @@ msgid "Could not create your bot"
 msgstr "Could not create your bot"
 
 #. placeholder {0}: contact.name
+#. placeholder {0}: gone.name
+#: src/lib/use-contact-notices.ts
 #: src/pages/Investors.tsx
 msgid "Could not delete {0}"
 msgstr "Could not delete {0}"
@@ -4201,10 +4212,6 @@ msgstr "Could not reopen the round"
 #: src/pages/Auth.tsx
 msgid "Could not reset password"
 msgstr "Could not reset password"
-
-#: src/lib/use-contact-notices.ts
-msgid "Could not restore {name}"
-msgstr "Could not restore {name}"
 
 #: src/pages/Investors.tsx
 msgid "Could not retry"
@@ -13272,7 +13279,6 @@ msgstr "Try {name} again"
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
 #: src/components/ShellSkeleton.tsx
-#: src/lib/use-contact-notices.ts
 #: src/pages/ActivityList.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/ContactDetail.tsx

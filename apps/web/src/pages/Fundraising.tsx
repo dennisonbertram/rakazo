@@ -41,7 +41,7 @@ import { isoFromDay, todayDay } from "../lib/day-input";
 import { connectFinanceProvider } from "../lib/finance-connect";
 import { usdFigure } from "../lib/finance-format";
 import { rpc } from "../lib/rpc";
-import { useContactNotices } from "../lib/use-contact-notices";
+import { useContactNotices, useWithoutDeleted } from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
 
 const usd = (cents: number) => usdFigure(cents / 100, 0, i18n.locale || "en");
@@ -70,7 +70,8 @@ export function FundraisingPage({
   agentBusy?: boolean;
 }) {
   const [overview, setOverview] = useState<FundraisingOverview | null>(null);
-  const [contacts, setContacts] = useState<Contact[] | null>(null);
+  const [fetched, setContacts] = useState<Contact[] | null>(null);
+  const contacts = useWithoutDeleted(fetched);
   const [error, setError] = useState("");
   // SAFEs the Legal agent found in the Data room: a hint only, never counted as raised.
   const [legalSafes, setLegalSafes] = useState(0);
