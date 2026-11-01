@@ -18,13 +18,14 @@ import {
   TabsList,
   TabsTrigger,
 } from "@rakazo/ui-web";
-import { Ellipsis } from "lucide-react";
+import { Building2, Ellipsis } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { useFinanceQuery } from "../components/finance/ui";
 import { PickFilter, SearchField } from "../components/ListControls";
+import { PageEmptyState } from "../components/PageEmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { downloadArtifactBytes } from "../lib/artifact-open";
 import { companyDate, companyDateEnd } from "../lib/company-format";
@@ -338,9 +339,17 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
               </p>
             )}
           {view === "overview" && data.entities.length === 0 && data.events.length === 0 && (
-            <div className="py-16 text-center text-muted-foreground">
-              <Trans>No company facts yet</Trans>
-            </div>
+            <PageEmptyState
+              icon={<Building2 className="size-8" strokeWidth={1.6} aria-hidden="true" />}
+              title={<Trans>No company facts yet</Trans>}
+              description={<Trans>Import from your mail and files to fill this page.</Trans>}
+            >
+              {!running && (
+                <Button render={<Link to="/app/company/import" />}>
+                  <Trans>Import</Trans>
+                </Button>
+              )}
+            </PageEmptyState>
           )}
           {view === "overview" && (data.entities.length > 0 || data.events.length > 0) && (
             <>

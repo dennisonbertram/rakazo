@@ -6595,6 +6595,10 @@ msgid "Import from Google Drive"
 msgstr ""
 
 #: src/pages/Company.tsx
+msgid "Import from your mail and files to fill this page."
+msgstr ""
+
+#: src/pages/Company.tsx
 msgid "Import in progress"
 msgstr ""
 
@@ -11365,10 +11369,6 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "See all in Data room"
-msgstr ""
-
-#: src/pages/shell/composer.tsx
-msgid "See usage"
 msgstr ""
 
 #: src/components/tour/FirstRunTour.tsx

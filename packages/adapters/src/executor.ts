@@ -2829,7 +2829,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             request,
           );
           if (recorded.duplicate && recorded.effect.status !== "intended") {
-            await failRunBeforeModel(CHAT_CONSENT_DECLINED_MESSAGE);
+            await failRunBeforeModel(CHAT_CONSENT_NOT_NOW_MESSAGE);
             return;
           }
           const paused = await deps.events.pauseRunForInput({
@@ -11410,10 +11410,13 @@ function redactBlocks(blocks: MessageBlock[], secrets: string[]): MessageBlock[]
   });
 }
 
-/** What the agent is told when the owner declined the consent card in this chat. */
-/** The run error after Not now on a chat's consent card; Settings has the switch. */
+/** The run error for a delegated chat with no consent; nobody there can be asked, Settings has the switch. */
 const CHAT_CONSENT_DECLINED_MESSAGE =
   "Chat is off until you allow AI models in Settings under Privacy and approvals.";
+
+/** The run error after the owner chose Not now; their next message asks again. The prefix is matched by roster-status. */
+const CHAT_CONSENT_NOT_NOW_MESSAGE =
+  "Chat is off until you allow AI models. Send a message to be asked again.";
 
 export const MAIL_CONSENT_DECLINED =
   "The user chose not to allow AI data sharing for mail, so mail cannot be read. Tell them you can't read their mail, and don't send them to another page.";
