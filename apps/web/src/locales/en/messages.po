@@ -7025,6 +7025,10 @@ msgstr "Last read failed · Try again"
 msgid "Last run {0}"
 msgstr "Last run {0}"
 
+#: src/pages/RoutineEditor.tsx
+msgid "Last run failed"
+msgstr "Last run failed"
+
 #: src/pages/shell/transcript.tsx
 msgid "Last run failed: {failedNote}"
 msgstr "Last run failed: {failedNote}"

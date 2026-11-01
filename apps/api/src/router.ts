@@ -5011,7 +5011,7 @@ export function createRouter(deps: RouterDeps) {
             await deps.jobs.cancel(routineJobKey(row.id));
           }
         }
-        return mapRoutine(row);
+        return mapRoutine(row, await routineLastRunFailed(deps, row.id));
       }),
       remove: authed.routines.remove.handler(async ({ context, input }) => {
         const existing = await deps.prisma.routine.findFirst({
@@ -10605,35 +10605,38 @@ async function assertRoutineTaughtSkill(
   }
 }
 
-function mapRoutine(row: {
-  id: string;
-  botId: string;
-  name: string;
-  prompt: string;
-  crons: string[];
-  timezone: string;
-  active: boolean;
-  notify: boolean;
-  webhookEnabled: boolean;
-  githubEnabled: boolean;
-  messageProvider: string | null;
-  modelProvider: string | null;
-  modelId: string | null;
-  modelCredentialId?: string | null;
-  thinkingLevel: string | null;
-  lastRunAt: Date | null;
-  nextRunAt: Date | null;
-  quiet: boolean;
-  watch: unknown;
-  managedKind: string | null;
-  taughtSkill?: { id: string; name: string } | null;
-  watchState?: {
-    lastCheckedAt: Date | null;
-    lastChangedAt: Date | null;
-    pausedReason: string | null;
-  } | null;
-  createdAt: Date;
-}): Routine {
+function mapRoutine(
+  row: {
+    id: string;
+    botId: string;
+    name: string;
+    prompt: string;
+    crons: string[];
+    timezone: string;
+    active: boolean;
+    notify: boolean;
+    webhookEnabled: boolean;
+    githubEnabled: boolean;
+    messageProvider: string | null;
+    modelProvider: string | null;
+    modelId: string | null;
+    modelCredentialId?: string | null;
+    thinkingLevel: string | null;
+    lastRunAt: Date | null;
+    nextRunAt: Date | null;
+    quiet: boolean;
+    watch: unknown;
+    managedKind: string | null;
+    taughtSkill?: { id: string; name: string } | null;
+    watchState?: {
+      lastCheckedAt: Date | null;
+      lastChangedAt: Date | null;
+      pausedReason: string | null;
+    } | null;
+    createdAt: Date;
+  },
+  lastRunFailed = false,
+): Routine {
   const watch = WatchSpecSchema.safeParse(row.watch);
   return {
     id: row.id,
@@ -10663,9 +10666,24 @@ function mapRoutine(row: {
       lastCheckedAt: row.watchState?.lastCheckedAt?.toISOString() ?? null,
       lastChangedAt: row.watchState?.lastChangedAt?.toISOString() ?? null,
       pausedReason: (row.watchState?.pausedReason as WatchPausedReason | null) ?? null,
+      lastRunFailed,
     },
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * Whether the routine's newest finished run failed (cancelled counts as finished). Ordered by
+ * createdAt, not completedAt, which is null for some finished runs.
+ */
+// ponytail: one findFirst per routine; a nested `include ... take: 1` loads every run in Prisma 7.
+async function routineLastRunFailed(deps: RouterDeps, routineId: string) {
+  const last = await deps.prisma.run.findFirst({
+    where: { routineId, status: { in: ["completed", "failed", "cancelled"] } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { status: true },
+  });
+  return last?.status === "failed";
 }
 
 async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
@@ -10673,7 +10691,9 @@ async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
     where: { botId, spaceId: actor.spaceId },
     include: routineInclude,
   });
-  return rows.map(mapRoutine);
+  return Promise.all(
+    rows.map(async (row) => mapRoutine(row, await routineLastRunFailed(deps, row.id))),
+  );
 }
 
 /**

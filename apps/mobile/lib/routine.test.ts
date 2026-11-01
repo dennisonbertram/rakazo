@@ -83,6 +83,18 @@ describe("routineActivityLine", () => {
     expect(routineActivityLine(watch, now)).toBe("Checked 4 minutes ago");
     expect(routineStatusLine(watch)).toBe("Active · Watches example.com · UTC");
   });
+  it("says when the last run failed, unless the routine is paused", () => {
+    const base = routine({ crons: ["0 8 * * *"], nextRunAt: null });
+    const status = { ...base.status, nextRunAt: "2026-02-03T08:00:00Z", lastRunFailed: true };
+    expect(routineActivityLine(routine({ status }), now)).toMatch(/^Last run failed · Next /);
+    const watch = routine({
+      watch: { kind: "page", url: "https://example.com/pricing", intervalMinutes: 60 },
+      status: { ...status, lastCheckedAt: "2026-02-02T11:56:00Z" },
+    });
+    expect(routineActivityLine(watch, now)).toBe("Last run failed · Checked 4 minutes ago");
+    const paused = routine({ status: { ...status, pausedReason: "noisy" } });
+    expect(routineActivityLine(paused, now)).toBe("Paused: the page changes too often");
+  });
   it("says why a watch is paused and has nothing to say for a new routine", () => {
     const paused = routine({
       status: { ...routine({}).status, pausedReason: "noisy" },
