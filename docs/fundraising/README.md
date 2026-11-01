@@ -728,7 +728,7 @@ Failed or Unknown recipient, confirmed by the founder, starts attempt n+1 with a
 attempt is ever started automatically. A recipient
 row shows Sent, Sending or Failed with a Retry button (its slot is reserved so rows
 do not shift), the header chip reads Sending, the button reads "Sending" and is
-disabled, and a second click does nothing. If the process restarts, nothing resumes by itself: an update left in sending with no
+disabled, and a second click does nothing. The first Send is held for 5 seconds ("Sending…" with Undo, fields locked); leaving the page during the hold sends at once, closing the tab sends nothing, and Retry and Post to portal are not held. If the process restarts, nothing resumes by itself: an update left in sending with no
 activity for 10 minutes is shown as Partly sent, recipients with a recorded result keep it,
 recipients never attempted show Failed with Retry, and a recipient attempted with no recorded
 result is shown as "Unknown — check Sent mail" with Retry, which asks once "May already
