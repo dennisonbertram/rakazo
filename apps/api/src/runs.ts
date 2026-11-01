@@ -9,6 +9,8 @@ import {
 import type { PrismaClient } from "@rakazo/db";
 
 const RECENT_LIMIT = 20;
+const QUIET_LIMIT = 5;
+const RECENT_SCAN_LIMIT = 200;
 const TERMINAL_STATUSES = ["completed", "failed", "cancelled"] as const;
 
 function promptSnippet(prompt: string, max = 120): string {
@@ -77,19 +79,68 @@ export async function listSpaceRuns(
   actor: Actor,
   filter: "active" | "recent",
 ): Promise<RunActivityRow[]> {
-  const rows = await prisma.run.findMany({
-    where: {
-      spaceId: actor.spaceId,
-      userId: actor.userId,
-      bot: { archivedAt: null },
-      // Background ticket work belongs on the board, not in the activity list.
-      trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] },
-      ...(filter === "active"
-        ? { status: { in: [...ACTIVE_RUN_STATUSES] } }
-        : { status: { in: [...TERMINAL_STATUSES] } }),
-    },
+  const where = {
+    spaceId: actor.spaceId,
+    userId: actor.userId,
+    bot: { archivedAt: null },
+    // Background ticket work belongs on the board, not in the activity list.
+    trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] },
+    ...(filter === "active"
+      ? { status: { in: [...ACTIVE_RUN_STATUSES] } }
+      : { status: { in: [...TERMINAL_STATUSES] } }),
+  };
+  const orderBy =
+    filter === "active"
+      ? [{ updatedAt: "desc" as const }, { id: "desc" as const }]
+      : [{ completedAt: "desc" as const }, { updatedAt: "desc" as const }, { id: "desc" as const }];
+
+  // A routine run that completed without posting a message ended silently.
+  const findSpoke = async (runIds: string[]) =>
+    new Set(
+      runIds.length
+        ? (
+            await prisma.message.findMany({
+              where: {
+                runId: { in: runIds },
+                role: "bot",
+                thread: { spaceId: actor.spaceId, userId: actor.userId },
+              },
+              select: { runId: true },
+            })
+          ).map((message) => message.runId)
+        : [],
+    );
+  const isQuietCandidate = (row: { trigger: string; status: string }) =>
+    row.trigger === "routine" && row.status === "completed";
+
+  // Finished runs: quiet routine runs get their own small cap so they cannot crowd out real results.
+  // ponytail: 200-row scan; if the newest 200 finished runs are all quiet, Finished shows fewer than 20. Add server paging when that happens.
+  let ids: string[] | undefined;
+  const silentIds = new Set<string>();
+  if (filter === "recent") {
+    const scan = await prisma.run.findMany({
+      where,
+      orderBy,
+      take: RECENT_SCAN_LIMIT,
+      select: { id: true, trigger: true, status: true },
+    });
+    const spoke = await findSpoke(scan.filter(isQuietCandidate).map((row) => row.id));
+    ids = [];
+    let loud = 0;
+    for (const row of scan) {
+      const silent = isQuietCandidate(row) && !spoke.has(row.id);
+      if (silent ? silentIds.size < QUIET_LIMIT : loud < RECENT_LIMIT) {
+        ids.push(row.id);
+        if (silent) silentIds.add(row.id);
+        else loud += 1;
+      }
+    }
+  }
+  const found = await prisma.run.findMany({
+    where: ids ? { id: { in: ids } } : where,
     include: {
       bot: { select: { name: true, archivedAt: true, notifyOnFinish: true } },
+      routine: { select: { name: true } },
       task: { select: { prompt: true } },
       sourceMessage: { select: { blocks: true } },
       thread: {
@@ -99,12 +150,9 @@ export async function listSpaceRuns(
         },
       },
     },
-    orderBy:
-      filter === "active"
-        ? [{ updatedAt: "desc" }, { id: "desc" }]
-        : [{ completedAt: "desc" }, { updatedAt: "desc" }, { id: "desc" }],
-    take: filter === "recent" ? RECENT_LIMIT : undefined,
+    orderBy,
   });
+  const rows = ids ? ids.map((id) => found.find((row) => row.id === id)!) : found;
 
   // A held run previews its own question or approval instead of the prompt that started it.
   const heldRunIds = rows.filter((row) => row.status === "waiting_input").map((row) => row.id);
@@ -116,27 +164,8 @@ export async function listSpaceRuns(
       })
     : [];
 
-  // A routine run that completed without posting a message ended silently.
-  const quietCandidates = rows
-    .filter((row) => row.trigger === "routine" && row.status === "completed")
-    .map((row) => row.id);
-  const spoke = new Set(
-    quietCandidates.length
-      ? (
-          await prisma.message.findMany({
-            where: {
-              runId: { in: quietCandidates },
-              role: "bot",
-              thread: { spaceId: actor.spaceId, userId: actor.userId },
-            },
-            select: { runId: true },
-          })
-        ).map((message) => message.runId)
-      : [],
-  );
-
   return rows.map((row) => ({
-    silent: quietCandidates.includes(row.id) && !spoke.has(row.id) ? true : undefined,
+    silent: silentIds.has(row.id) ? true : undefined,
     needsApproval:
       row.status === "waiting_input" &&
       pendingAskIsApproval(askMessages.filter((message) => message.runId === row.id)),
@@ -151,6 +180,9 @@ export async function listSpaceRuns(
     notificationsEnabled: activityNotificationsEnabled(row.thread.groupId, row.bot.notifyOnFinish),
     promptSnippet:
       pendingAskSnippet(askMessages.filter((message) => message.runId === row.id)) ??
+      (row.trigger === "routine" && row.routine?.name.trim()
+        ? promptSnippet(row.routine.name)
+        : undefined) ??
       activityPromptSnippet({
         trigger: row.trigger,
         prompt: row.task.prompt,
