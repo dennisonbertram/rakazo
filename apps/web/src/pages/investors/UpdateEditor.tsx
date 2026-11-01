@@ -87,6 +87,8 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
   const held = useRef<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
   const live = useRef(true);
   const loadedId = useRef<string | null>(null);
+  // Set in the same batch as the fields, so autosave never sees them half taken.
+  const [fieldsFor, setFieldsFor] = useState<string | null>(null);
   // The fields as the server last held them, so opening an update does not save it again.
   const saved = useRef("");
   const saving = useRef<Promise<unknown>>(Promise.resolve());
@@ -198,6 +200,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
     setBody(update.body);
     setTicked(update.recipientContactIds);
     setFrom(update.fromConnectionId);
+    setFieldsFor(update.id);
     saved.current = fieldsKey(
       update.subject,
       update.body,
@@ -216,7 +219,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
   // Autosave when a field differs from what the server holds.
   useEffect(() => {
     const key = fieldsKey(subject, body, recipients, from);
-    if (!draft || loadedId.current !== updateId || key === saved.current) return;
+    if (!draft || fieldsFor !== updateId || key === saved.current) return;
     setSaveState("saving");
     pending.current = { subject, body, ticked: recipients, from, key };
     const timer = setTimeout(() => {
@@ -239,7 +242,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
         .catch(() => setSaveState("failed"));
     }, SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [subject, body, recipients, from, draft, updateId]);
+  }, [subject, body, recipients, from, draft, updateId, fieldsFor]);
 
   // While a send runs, read it again until it ends.
   const sending = update?.status === "sending";
