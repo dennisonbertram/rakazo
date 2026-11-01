@@ -97,6 +97,10 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
   const people = data?.entities.filter((row) => row.kind === "person") ?? [];
   const organisations = data?.entities.filter((row) => row.kind === "organisation") ?? [];
   const profile = data?.entities.find((row) => row.kind === "company");
+  const names = new Map(
+    (data?.entities ?? []).filter((row) => row !== profile).map((row) => [row.id, row.displayName]),
+  );
+  const nameOf = (id: string) => names.get(id);
   const roles = (id: string) =>
     data?.edges.filter((row) => row.fromId === id && row.relation === "works_at") ?? [];
   const past = (row: CompanyEntityRecord) =>
@@ -312,6 +316,7 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
               {!review.data && !review.error && <Skeleton className="h-32 w-full" />}
               {review.data && (
                 <CompanyReview
+                  nameOf={nameOf}
                   items={review.data.items}
                   onOpen={(next, editing = false) => {
                     setFactEditing(editing);

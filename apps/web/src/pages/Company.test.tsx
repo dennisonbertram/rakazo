@@ -34,9 +34,10 @@ const show = async (
   view: string,
   entities = companyFixture.entities,
   extra: Partial<typeof companyFixture> = {},
+  reviewItems: unknown[] = [],
 ) => {
   rpcMock.company.page.mockResolvedValue({ ...companyFixture, entities, ...extra });
-  rpcMock.company.review.mockResolvedValue({ items: [] });
+  rpcMock.company.review.mockResolvedValue({ items: reviewItems });
   rpcMock.finance.overview.mockResolvedValue(null);
   rpcMock.investors.capTable.mockResolvedValue({ snapshot: null, syncing: false });
   await act(async () =>
@@ -117,4 +118,17 @@ it("shows no status line for a cancelled import", async () => {
     latestRun: { id: "r1", status: "cancelled" } as never,
   });
   expect(container.querySelector('[role="status"]')).toBeNull();
+});
+
+it("names the person on a Review edge card", async () => {
+  const edge = companyFixture.edges[0]!;
+  await show("review", companyFixture.entities, {}, [
+    {
+      kind: "fact",
+      id: "edge:employment",
+      reason: "contradiction",
+      fact: { kind: "edge", record: edge },
+    },
+  ]);
+  expect(container.textContent).toContain("Alex Reed · Engineer");
 });
