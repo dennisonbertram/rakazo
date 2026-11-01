@@ -125,6 +125,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "BotSkillSetting",
   "BotPage",
   "PageSource",
+  "AppControlSnapshot",
   "PageSourceSnapshot",
   "BotPins",
   "TeachHeldValue",

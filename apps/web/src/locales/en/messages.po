@@ -1072,6 +1072,10 @@ msgstr "Add another account"
 msgid "Add API key"
 msgstr "Add API key"
 
+#: src/components/BotAppControlSection.tsx
+msgid "Add app"
+msgstr "Add app"
+
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/components/cap-table/HoldingsTable.tsx
 msgid "Add as contact"
@@ -1402,12 +1406,20 @@ msgid "Allow cross-space bot communication"
 msgstr "Allow cross-space bot communication"
 
 #: src/components/AskCard.tsx
+msgid "Allow for this run"
+msgstr "Allow for this run"
+
+#: src/components/AskCard.tsx
 msgid "Allow once"
 msgstr "Allow once"
 
 #: src/components/integrations/SignInStep.tsx
 msgid "Allow pop-ups for this site, or open the sign-in page directly."
 msgstr "Allow pop-ups for this site, or open the sign-in page directly."
+
+#: src/components/BotAppControlSection.tsx
+msgid "Allow Praci in System Settings > Privacy & Security > Accessibility."
+msgstr "Allow Praci in System Settings > Privacy & Security > Accessibility."
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Allow writing"
@@ -3876,6 +3888,10 @@ msgstr "Could not draft with the agent"
 #: src/pages/Investors.tsx
 msgid "Could not duplicate"
 msgstr "Could not duplicate"
+
+#: src/components/BotAppControlSection.tsx
+msgid "Could not list apps"
+msgstr "Could not list apps"
 
 #: src/components/computer/FilesApp.tsx
 msgid "Could not list files"
@@ -7921,6 +7937,10 @@ msgstr "Moved {0} to trash"
 msgid "Moved {n} to trash"
 msgstr "Moved {n} to trash"
 
+#: src/components/BotAppControlSection.tsx
+msgid "Moves your pointer and takes focus."
+msgstr "Moves your pointer and takes focus."
+
 #: src/components/SecretRequestDialog.tsx
 msgid "Multi line"
 msgstr "Multi line"
@@ -7979,6 +7999,10 @@ msgstr "Needs a monthly burn"
 #: src/components/integrations/IMessageSection.tsx
 msgid "Needs a server restart"
 msgstr "Needs a server restart"
+
+#: src/components/BotAppControlSection.tsx
+msgid "Needs agent-desktop: <0>npm install -g agent-desktop</0>"
+msgstr "Needs agent-desktop: <0>npm install -g agent-desktop</0>"
 
 #: src/components/MailApprovalCard.tsx
 #: src/pages/ActivityList.tsx
@@ -8473,6 +8497,10 @@ msgstr "No open deadlines."
 #: src/pages/Company.tsx
 msgid "No organisations yet"
 msgstr "No organisations yet"
+
+#: src/components/BotAppControlSection.tsx
+msgid "No other open apps"
+msgstr "No other open apps"
 
 #: src/pages/Company.tsx
 msgid "No people yet"
@@ -10315,9 +10343,10 @@ msgstr "Reminder"
 msgid "Remove"
 msgstr "Remove"
 
+#. placeholder {0}: app.name
 #. placeholder {0}: attachment.file.name
 #. placeholder {0}: file.filename
-#. placeholder {0}: file.name
+#: src/components/BotAppControlSection.tsx
 #: src/components/compose/RecipientField.tsx
 #: src/components/ComposeEmail.tsx
 #: src/components/integrations/AppDetail.tsx
@@ -10817,7 +10846,6 @@ msgid "Round actions"
 msgstr "Round actions"
 
 #: src/pages/RoutineEditor.tsx
-#: src/pages/Shell.tsx
 msgid "Routine"
 msgstr "Routine"
 
@@ -13619,6 +13647,14 @@ msgstr "Use an API key instead"
 msgid "Use API key"
 msgstr "Use API key"
 
+#: src/components/BotAppControlSection.tsx
+msgid "Use apps on this computer"
+msgstr "Use apps on this computer"
+
+#: src/components/BotAppControlSection.tsx
+msgid "Use apps on this Mac"
+msgstr "Use apps on this Mac"
+
 #: src/components/integrations/OmiPage.tsx
 msgid "Use Chrome, Edge or the desktop app"
 msgstr "Use Chrome, Edge or the desktop app"
@@ -13642,6 +13678,10 @@ msgstr "Use OAuth"
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Use Protected input for passwords."
 msgstr "Use Protected input for passwords."
+
+#: src/components/BotAppControlSection.tsx
+msgid "Use real mouse and keyboard"
+msgstr "Use real mouse and keyboard"
 
 #: src/components/ApprovalActionsTable.tsx
 msgid "Use saved credentials"

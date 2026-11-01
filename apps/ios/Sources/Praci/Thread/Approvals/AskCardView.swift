@@ -181,7 +181,9 @@ enum AskOutcomeText {
     guard ask.isApproval, action.outcome == nil else { return Text(verbatim: action.label) }
     switch action.id {
     // A payment's label already carries the amount ("Send $300.00"): keep it.
-    case "allow": return action.label.hasPrefix("Send ") ? Text(verbatim: action.label) : Text("Allow once")
+    case "allow":
+      if action.label == "Allow for this run" { return Text("Allow for this run") }
+      return action.label.hasPrefix("Send ") ? Text(verbatim: action.label) : Text("Allow once")
     case "always": return Text("Always allow")
     case "deny": return Text("Deny")
     default: return Text(verbatim: action.label)

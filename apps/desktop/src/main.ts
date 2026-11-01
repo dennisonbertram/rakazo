@@ -6,6 +6,7 @@ import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { LOCAL_SETTINGS_PAGE } from "@rakazo/contracts/local-settings";
 import type { Session } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } from "electron";
+import { startAppControlBridge } from "./app-control-bridge.js";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -933,6 +934,7 @@ app.whenReady().then(async () => {
     images: stackImages,
     probe: (url, signal, token) => probeManagedStack(url, token, signal),
     randomHex: (bytes) => randomBytes(bytes).toString("hex"),
+    startAppControl: (saved) => startAppControlBridge({ userDataDir, ...saved }),
     onState: (state) => {
       if (setupWindow !== null && !setupWindow.isDestroyed()) {
         setupWindow.webContents.send("desktop.setup.stack.changed", state);
@@ -1280,4 +1282,5 @@ app.on("before-quit", () => {
   clearTimeout(warmWindowTimer);
   // Containers keep running; only an in-flight pull/up is cut short.
   localStack?.abort();
+  void localStack?.closeAppControl();
 });

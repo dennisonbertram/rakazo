@@ -72,6 +72,13 @@ export async function expireStuckRun(
     where: { id: input.runId },
     select: { spaceId: true, userId: true, threadId: true, botId: true, taskId: true },
   });
+  await tx.appControlSnapshot.deleteMany({
+    where: {
+      runId: input.runId,
+      spaceId: run.spaceId,
+      userId: run.userId,
+    },
+  });
   const sibling = await tx.run.findFirst({
     where: {
       taskId: run.taskId,

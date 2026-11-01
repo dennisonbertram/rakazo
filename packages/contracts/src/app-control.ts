@@ -15,6 +15,34 @@ export type AppControlApp = z.infer<typeof AppControlAppSchema>;
 
 export const APP_CONTROL_MAX_APPS = 20;
 
+/** The effect a person approves to let one run use one app; only the run's owner may answer it. */
+export const DESKTOP_APP_USE_EFFECT_KIND = "desktop_app_use";
+
+/** A bot's app control settings, as the owner sees them. */
+export const BotAppControlSchema = z.object({
+  enabled: z.boolean(),
+  apps: z.array(AppControlAppSchema).max(APP_CONTROL_MAX_APPS),
+  /** Real pointer and keyboard instead of accessibility actions. */
+  headed: z.boolean(),
+});
+export type BotAppControl = z.infer<typeof BotAppControlSchema>;
+
+export const UpdateBotAppControlSchema = z.object({
+  enabled: z.boolean().optional(),
+  apps: z.array(AppControlAppSchema).max(APP_CONTROL_MAX_APPS).optional(),
+  headed: z.boolean().optional(),
+});
+
+export type UpdateBotAppControl = z.infer<typeof UpdateBotAppControlSchema>;
+
+export const AppControlStatusOutputSchema = z.object({
+  available: z.boolean(),
+  accessibility: z.enum(["granted", "denied", "unknown"]),
+  platform: z.enum(["macos", "windows", "linux"]).nullable(),
+  /** True only for the deployment owner when the agent-desktop binary is known to be missing. */
+  needsInstall: z.boolean().optional(),
+});
+
 /** The only keys a bot may press: unmodified navigation keys, so no paste or shortcut. */
 export const APP_CONTROL_KEYS = [
   "return",
