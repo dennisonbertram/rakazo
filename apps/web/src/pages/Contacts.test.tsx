@@ -23,7 +23,7 @@ const rpcMock = vi.hoisted(() => ({
   list: vi.fn(),
   save: vi.fn(),
   remove: vi.fn(),
-  linked: vi.fn(async () => ({ portal: false, documents: [] })),
+  linked: vi.fn(async () => ({ portal: false, documents: [], safes: 0 })),
 }));
 vi.mock("../lib/rpc", () => ({
   rpc: {

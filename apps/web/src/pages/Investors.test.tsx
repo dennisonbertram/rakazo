@@ -7,6 +7,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { resetDeletedContacts } from "../lib/use-contact-notices";
 
 const text = vi.hoisted(
   () =>
@@ -25,9 +26,10 @@ vi.mock("@lingui/react/macro", () => ({
 
 const rpcMock = vi.hoisted(() => ({
   linked: vi.fn(
-    async (): Promise<{ portal: boolean; documents: string[] }> => ({
+    async (): Promise<{ portal: boolean; documents: string[]; safes: number }> => ({
       portal: false,
       documents: [],
+      safes: 0,
     }),
   ),
   portalResend: vi.fn(),
@@ -222,6 +224,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => notificationToastManager.close());
+  resetDeletedContacts();
   setHideAmounts(false);
   vi.useRealTimers();
   act(() => root.unmount());
@@ -346,7 +349,6 @@ it("edits and deletes a contact from its row menu", async () => {
   await click(button("Cancel"));
   await click(rowActions("Ada"));
   await click(menuItem("Delete"));
-  expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c1" });
   expect(document.body.textContent).toContain("Deleted Ada");
 });
 
@@ -459,7 +461,7 @@ it("Revoke and Unblock call the portal and reload with no confirmation", async (
 });
 
 it("asks before deleting a contact with portal access and gives no Undo for it", async () => {
-  rpcMock.linked.mockResolvedValue({ portal: true, documents: ["Deck.pdf"] });
+  rpcMock.linked.mockResolvedValue({ portal: true, documents: ["Deck.pdf"], safes: 0 });
   rpcMock.remove.mockResolvedValue({ ok: true });
   await show("/app/investors?tab=contacts");
   await click(rowActions("Ada"));
@@ -533,53 +535,97 @@ const editRow = async (name: string) => {
   await click(menuItem("Edit"));
 };
 
-it("deletes a contact with an Undo that restores it", async () => {
-  rpcMock.remove.mockResolvedValue({ ok: true });
-  rpcMock.save.mockResolvedValue({});
-  await show("/app/investors?kind=board&tab=contacts");
-  await editRow("Bo");
-  await click(button("Delete"));
-  expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c2" });
-  expect(document.body.textContent).toContain("Deleted Bo");
-  await click(button("Undo"));
-  expect(rpcMock.save).toHaveBeenCalledWith({
-    name: "Bo",
-    email: "bo@example.test",
-    organization: null,
-    kind: "board",
-    notes: null,
-  });
-  expect(document.body.textContent).not.toContain("Deleted Bo");
+/** Runs `body` with fake timers, so the Undo window can be crossed without waiting. */
+const withClock = async (body: () => Promise<void>) => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    await body();
+  } finally {
+    vi.useRealTimers();
+  }
+};
+const passUndoWindow = () => act(async () => vi.advanceTimersByTime(5001));
+
+it("holds the delete for the Undo window, hides the row, then deletes once", () =>
+  withClock(async () => {
+    rpcMock.remove.mockResolvedValue({ ok: true });
+    await show("/app/investors?kind=board&tab=contacts");
+    await editRow("Bo");
+    await click(button("Delete"));
+    expect(document.body.textContent).toContain("Deleted Bo");
+    expect(container.querySelector('[data-contact-id="c2"]')).toBeNull();
+    expect(rpcMock.remove).not.toHaveBeenCalled();
+    await passUndoWindow();
+    expect(rpcMock.remove).toHaveBeenCalledTimes(1);
+    expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c2" });
+    expect(button("Undo")).toBeUndefined();
+  }));
+
+it("Undo inside the window makes no server call and brings the same row back", () =>
+  withClock(async () => {
+    rpcMock.remove.mockResolvedValue({ ok: true });
+    await show("/app/investors?kind=board&tab=contacts");
+    await editRow("Bo");
+    await click(button("Delete"));
+    await click(button("Undo"));
+    expect(document.body.textContent).toContain("Restored Bo");
+    expect(rpcMock.save).not.toHaveBeenCalled();
+    const row = container.querySelector('[data-contact-id="c2"]');
+    expect(row).not.toBeNull();
+    expect(document.activeElement).toBe(row?.querySelector("[data-row-open]"));
+    await passUndoWindow();
+    expect(rpcMock.remove).not.toHaveBeenCalled();
+  }));
+
+it("puts the row back and shows the error when the held delete fails", () =>
+  withClock(async () => {
+    rpcMock.remove.mockRejectedValue(new Error("Contact is busy"));
+    await show("/app/investors?kind=board&tab=contacts");
+    await editRow("Bo");
+    await click(button("Delete"));
+    await passUndoWindow();
+    expect(container.querySelector('[data-contact-id="c2"]')).not.toBeNull();
+    expect(document.body.textContent).toContain("Contact is busy");
+  }));
+
+it("still deletes when the page unmounts inside the window", () =>
+  withClock(async () => {
+    rpcMock.remove.mockResolvedValue({ ok: true });
+    await show("/app/investors?kind=board&tab=contacts");
+    await editRow("Bo");
+    await click(button("Delete"));
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await passUndoWindow();
+    expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c2" });
+  }));
+
+it("asks first, with no Undo, for a contact whose portal access was revoked", async () => {
+  rpcMock.linked.mockResolvedValue({ portal: true, documents: [], safes: 0 });
+  await show("/app/investors?tab=contacts");
+  await click(rowActions("Ada"));
+  await click(menuItem("Delete"));
+  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain(
+    "This also removes their portal access.",
+  );
+  expect(rpcMock.remove).not.toHaveBeenCalled();
 });
 
-it("drops a deleted row and focuses the restored name after Undo, like Contacts", async () => {
-  const bo = contact("c2", "Bo", "board");
+it("asks before deleting a contact linked to a SAFE and gives no Undo for it", async () => {
+  rpcMock.linked.mockResolvedValue({ portal: false, documents: [], safes: 1 });
   rpcMock.remove.mockResolvedValue({ ok: true });
-  rpcMock.save.mockResolvedValue({ ...bo, id: "c9" });
-  await show("/app/investors?kind=board&tab=contacts");
-  await editRow("Bo");
-  rpcMock.list.mockResolvedValue([contact("c1", "Ada", "investor")]);
-  await click(button("Delete"));
-  expect(container.querySelector('[data-contact-id="c2"]')).toBeNull();
-  rpcMock.list.mockResolvedValue([contact("c1", "Ada", "investor"), { ...bo, id: "c9" }]);
-  await click(button("Undo"));
-  const row = container.querySelector('[data-contact-id="c9"]');
-  expect(row).not.toBeNull();
-  expect(document.activeElement).toBe(row?.querySelector("[data-row-open]"));
-});
-
-it("keeps the contact restorable when Undo fails, and restores it on Try again", async () => {
-  rpcMock.remove.mockResolvedValue({ ok: true });
-  rpcMock.save.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({});
-  await show("/app/investors?kind=board&tab=contacts");
-  await editRow("Bo");
-  await click(button("Delete"));
-  await click(button("Undo"));
-  expect(document.body.textContent).toContain("Could not restore Bo");
+  await show("/app/investors?tab=contacts");
+  await click(rowActions("Ada"));
+  await click(menuItem("Delete"));
+  const dialog = document.querySelector('[role="alertdialog"]');
+  expect(dialog?.textContent).toContain("This also removes the link to 1 SAFE.");
+  await click(
+    [...(dialog?.querySelectorAll("button") ?? [])].find((b) => b.textContent === "Delete") as
+      | HTMLElement
+      | undefined,
+  );
+  expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c1" });
   expect(button("Undo")).toBeUndefined();
-  await click(button("Try again"));
-  expect(rpcMock.save).toHaveBeenCalledTimes(2);
-  expect(document.body.textContent).toContain("Restored Bo");
 });
 
 it("confirms a save with a toast and highlights the saved row", async () => {
