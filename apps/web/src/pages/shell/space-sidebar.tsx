@@ -2054,7 +2054,12 @@ export function SpaceSidebar({
             role="menuitem"
             variant="ghost"
             className="w-full justify-start font-normal"
-            onClick={() => void signOutAndLeave(navigate, userId)}
+            onClick={() => {
+              // The toaster hides toasts while a menu or the drawer is open; close both so a failure shows.
+              setMenuOpen(false);
+              setMobileSidebarOpen(false);
+              void signOutAndLeave(navigate, userId);
+            }}
           >
             <LogOut className="text-muted-foreground" strokeWidth={1.75} />
             <Trans>Log out</Trans>
