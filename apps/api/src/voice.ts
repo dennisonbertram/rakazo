@@ -4,6 +4,7 @@ import {
   aiRecipient,
   createTranscriptionProvider,
   createVoiceProvider,
+  encodeOpenAiCompatibleTranscriptionSecret,
   findTranscriptionSelection,
   isFishSpeechModelId,
   isTranscriptionProviderId,
@@ -13,6 +14,7 @@ import {
   MAX_SPEAK_CHARS,
   MAX_TRANSCRIBE_BYTES,
   NoVoiceConfigured,
+  OPENAI_COMPATIBLE_TRANSCRIPTION_ID,
   persistPreparedSecret,
   selectTranscriptionTarget,
   voiceCatalogEntry,
@@ -82,7 +84,13 @@ export function toVoiceStatus(
 export async function setTranscription(
   deps: VoiceDeps,
   actor: Actor,
-  input: { provider: string; apiKey: string; signal?: AbortSignal },
+  input: {
+    provider: string;
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+    signal?: AbortSignal;
+  },
 ): Promise<{ provider: string }> {
   const provider = isTranscriptionProviderId(input.provider)
     ? createTranscriptionProvider(input.provider)
@@ -90,13 +98,31 @@ export async function setTranscription(
   if (!provider) {
     throw new ORPCError("BAD_REQUEST", { message: "Unknown transcription provider." });
   }
-  const verified = await provider.verify(input.apiKey, voiceContext(actor, input.signal));
+  // An OpenAI-compatible server keeps its URL, key and model in the one stored secret.
+  let plaintext: string;
+  if (input.provider === OPENAI_COMPATIBLE_TRANSCRIPTION_ID) {
+    const baseUrl = input.baseUrl?.trim();
+    const model = input.model?.trim();
+    if (!baseUrl || !model) {
+      throw new ORPCError("BAD_REQUEST", { message: "Enter a base URL and a model." });
+    }
+    plaintext = encodeOpenAiCompatibleTranscriptionSecret({
+      baseUrl,
+      model,
+      apiKey: input.apiKey?.trim() || undefined,
+    });
+  } else if (input.apiKey) {
+    plaintext = input.apiKey;
+  } else {
+    throw new ORPCError("BAD_REQUEST", { message: "Enter an API key." });
+  }
+  const verified = await provider.verify(plaintext, voiceContext(actor, input.signal));
   if (!verified.ok) {
     throw new ORPCError("BAD_REQUEST", { message: verified.message ?? "That key was rejected." });
   }
   // Each attempt prepares its own secret: a rolled-back attempt cleans up the reference it wrote.
   await withSerializableRetry(async () => {
-    const stored = await deps.secrets.put(input.apiKey, voiceContext(actor, input.signal));
+    const stored = await deps.secrets.put(plaintext, voiceContext(actor, input.signal));
     await persistPreparedSecret(deps.prisma, deps.secrets, stored, () =>
       deps.prisma.$transaction(
         async (tx) => {

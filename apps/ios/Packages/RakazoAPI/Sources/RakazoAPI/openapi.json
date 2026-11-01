@@ -128884,11 +128884,18 @@
                       "apiKey": {
                         "type": "string",
                         "minLength": 8
+                      },
+                      "baseUrl": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "model": {
+                        "type": "string",
+                        "maxLength": 120
                       }
                     },
                     "required": [
-                      "provider",
-                      "apiKey"
+                      "provider"
                     ]
                   }
                 },
