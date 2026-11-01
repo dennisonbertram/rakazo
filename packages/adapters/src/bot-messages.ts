@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { runContinueJob } from "@rakazo/adapter-kit";
 import type { BotMessageIntent, MessageBlock } from "@rakazo/contracts";
 import {
+  approvalTitle,
   BOT_SHARE_DECLINED_MESSAGE,
   BOT_SHARE_EFFECT_KIND,
   BOT_SHARE_HELD_MESSAGE,
@@ -730,7 +731,7 @@ async function holdShare(
         { ...run, botId: run.botId },
         {
           kind: "help",
-          title: `${sender.name} needs approval`,
+          title: approvalTitle(sender.name),
           body: `Share with ${target.name}?`,
           botId: run.botId,
           threadId: run.threadId,

@@ -1,5 +1,5 @@
 import type { Actor, RunActivityRow } from "@rakazo/contracts";
-import { MessageBlock } from "@rakazo/contracts";
+import { APPROVAL_TITLE_SUFFIX, MessageBlock } from "@rakazo/contracts";
 import {
   ACTIVE_RUN_STATUSES,
   BACKGROUND_RUN_TRIGGERS,
@@ -199,7 +199,7 @@ export async function listPendingApprovalNotifications(prisma: PrismaClient, act
       runId: { in: runIds },
       importance: "attention",
       kind: "needs_input",
-      title: { endsWith: " needs approval" },
+      title: { endsWith: APPROVAL_TITLE_SUFFIX },
       dismissedAt: null,
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
