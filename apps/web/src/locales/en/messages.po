@@ -2583,6 +2583,10 @@ msgstr "Changed {changed}"
 msgid "Changed elsewhere"
 msgstr "Changed elsewhere"
 
+#: src/pages/KnowledgeSection.tsx
+msgid "Changed since you opened it"
+msgstr "Changed since you opened it"
+
 #: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Changed, review again"
@@ -3816,6 +3820,10 @@ msgstr "Could not create the token"
 msgid "Could not create your bot"
 msgstr "Could not create your bot"
 
+#: src/pages/KnowledgeSection.tsx
+msgid "Could not delete"
+msgstr "Could not delete"
+
 #. placeholder {0}: contact.name
 #. placeholder {0}: gone.name
 #: src/lib/use-contact-notices.ts
@@ -4821,6 +4829,7 @@ msgstr "Default ({0})"
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
+#: src/pages/KnowledgeSection.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
@@ -6951,6 +6960,10 @@ msgstr "Keep this deadline"
 msgid "Keep your contracts here and see which are due soon."
 msgstr "Keep your contracts here and see which are due soon."
 
+#: src/pages/memory-providers/registry.ts
+msgid "Keeps bot memory in Serenity, hosted for you or on your own server."
+msgstr "Keeps bot memory in Serenity, hosted for you or on your own server."
+
 #: src/pages/RoutineEditor.tsx
 msgid "key"
 msgstr "key"
@@ -7157,6 +7170,10 @@ msgstr "Let Praci read your documents"
 msgid "Let Praci sort your mail"
 msgstr "Let Praci sort your mail"
 
+#: src/pages/memory-providers/registry.ts
+msgid "Lets bots search everything they have learned, on top of built-in memory."
+msgstr "Lets bots search everything they have learned, on top of built-in memory."
+
 #: src/components/data-room/format.ts
 msgid "Letter or email"
 msgstr "Letter or email"
@@ -7332,6 +7349,11 @@ msgstr "Loading…"
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Local"
 msgstr "Local"
+
+#. placeholder {0}: config.settings.baseUrl ?? ""
+#: src/pages/memory-providers/registry.ts
+msgid "Local · {0}"
+msgstr "Local · {0}"
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Local command"
@@ -7673,6 +7695,10 @@ msgstr "memory"
 #: src/pages/SettingsOverlay.tsx
 msgid "Memory"
 msgstr "Memory"
+
+#: src/pages/KnowledgeSection.tsx
+msgid "Memory deleted"
+msgstr "Memory deleted"
 
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Memory provider"
@@ -10118,6 +10144,10 @@ msgstr "Read-only {0}"
 msgid "Read-only API key"
 msgstr "Read-only API key"
 
+#: src/pages/memory-providers/registry.ts
+msgid "read/write"
+msgstr "read/write"
+
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/format.ts
 #: src/components/data-room/ProcessingStrip.tsx
@@ -10221,6 +10251,10 @@ msgstr "Reasoning effort"
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Recall and write"
 msgstr "Recall and write"
+
+#: src/pages/memory-providers/registry.ts
+msgid "recall only"
+msgstr "recall only"
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Recall only"
@@ -11673,6 +11707,14 @@ msgstr "Sent to {forwardedName}"
 #: src/pages/Inbox.tsx
 msgid "Sent. Moved out of Needs reply"
 msgstr "Sent. Moved out of Needs reply"
+
+#: src/pages/memory-providers/registry.ts
+msgid "Serenity · {endpoint} · {mode}"
+msgstr "Serenity · {endpoint} · {mode}"
+
+#: src/pages/memory-providers/registry.ts
+msgid "Serenity · {label} · {mode}"
+msgstr "Serenity · {label} · {mode}"
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Serenity endpoint is required."
@@ -13487,6 +13529,7 @@ msgstr "Undid {restored}, skipped {skipped}"
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
+#: src/pages/KnowledgeSection.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Undo"
