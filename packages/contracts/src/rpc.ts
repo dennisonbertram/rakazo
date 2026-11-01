@@ -939,6 +939,9 @@ export const appContract = {
     data: oc.input(PageDataInputSchema).output(PageDataSchema.nullable()),
     refresh: oc.input(PageRefreshInputSchema).output(PageDataSchema.nullable()),
     share: oc.input(PageShareInputSchema).output(PageShareOutputSchema.nullable()),
+    shareStatus: oc
+      .input(PageShareInputSchema)
+      .output(z.object({ artifactId: z.string(), expiresAt: z.string() }).nullable()),
     sources: oc.input(PageSourcesListInputSchema).output(z.array(PageSourceSchema)),
     removeSource: oc.input(PageSourceRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
     setSourceSchedule: oc.input(PageSourceScheduleInputSchema).output(PageSourceSchema),
