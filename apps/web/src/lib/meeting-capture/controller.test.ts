@@ -501,3 +501,25 @@ it("a recorder failure while resuming releases the microphone", async () => {
   expect(rpc.meetingCaptures.finish).toHaveBeenCalledTimes(1);
   expect(c.captureView().phase).toBe("stored");
 });
+
+// Another person's capture in this browser is never shown or deleted.
+it("does not show another person's capture that a tab holds", async () => {
+  await shared.store.putRecord(record({ userId: "u2" }));
+  void locks.request("meeting-capture:c1", {}, () => new Promise(() => {}));
+  await settle(0);
+  await c.recoverCapture();
+  expect(c.captureView().phase).toBe("idle");
+});
+
+it("keeps another person's capture when its space refuses this user", async () => {
+  await shared.store.putRecord(record({ userId: "u2" }));
+  await shared.store.put(seeded(1));
+  rpc.me.mockImplementation(async (_input: unknown, options?: unknown) => {
+    if (options) throw new ORPCError("FORBIDDEN");
+    return { userId: "u1", spaceId: "sA" };
+  });
+  await c.recoverCapture();
+  expect(await shared.store.records()).toHaveLength(1);
+  expect(await shared.store.all()).toHaveLength(1);
+  expect(c.captureView().phase).toBe("idle");
+});

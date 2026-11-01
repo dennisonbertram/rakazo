@@ -546,7 +546,7 @@ function scheduleRecover() {
 }
 
 /** Shows a capture another tab owns, and carries it on if that tab lets go without ending it. */
-function observe(captureRecord: CaptureRecord, gen: number) {
+function observe(captureRecord: CaptureRecord, userId: string, gen: number) {
   const s = newSession(captureRecord, null, true);
   session = s;
   set(captureRecord.stopped ? transcribingView(s) : recordingView(s));
@@ -556,7 +556,7 @@ function observe(captureRecord: CaptureRecord, gen: number) {
     // The owner tab closed or crashed: continue from its record.
     s.ended = true;
     session = null;
-    if (!(await adopt(captureRecord.captureId, release, gen)) && gen === generation)
+    if (!(await adopt(captureRecord.captureId, userId, release, gen)) && gen === generation)
       set({ phase: "idle" });
   });
 }
@@ -566,14 +566,19 @@ function observe(captureRecord: CaptureRecord, gen: number) {
  * and nobody pressed Stop; otherwise uploads what is left and finishes. Every question is asked in
  * the capture's own space. False when the capture was left alone (the lock is then released).
  */
-async function adopt(captureId: string, release: () => void, gen: number): Promise<boolean> {
+async function adopt(
+  captureId: string,
+  userId: string,
+  release: () => void,
+  gen: number,
+): Promise<boolean> {
   const stale = () => gen !== generation || session !== null || starting;
   const giveUp = () => {
     release();
     return false;
   };
   const captureRecord = (await chunkStore.records()).find((item) => item.captureId === captureId);
-  if (!captureRecord || stale()) return giveUp();
+  if (!captureRecord || captureRecord.userId !== userId || stale()) return giveUp();
   const scope = { context: { spaceId: captureRecord.spaceId } };
   let me: Awaited<ReturnType<typeof rpc.me>>;
   let active: Awaited<ReturnType<typeof rpc.meetingCaptures.active>>;
@@ -643,12 +648,22 @@ export async function recoverCapture(): Promise<void> {
   recovering = true;
   const gen = generation;
   try {
-    for (const captureRecord of await chunkStore.records()) {
+    const records = await chunkStore.records();
+    if (records.length === 0) return;
+    let userId: string;
+    try {
+      ({ userId } = await rpc.me());
+    } catch {
+      scheduleRecover();
+      return;
+    }
+    // Another person's captures in this browser are never shown, continued or deleted here.
+    for (const captureRecord of records.filter((item) => item.userId === userId)) {
       if (gen !== generation || session || starting) return;
       const release = await lock(captureRecord.captureId, false);
       if (gen !== generation || session || starting) return release?.();
-      if (!release) return observe(captureRecord, gen);
-      if (await adopt(captureRecord.captureId, release, gen)) return;
+      if (!release) return observe(captureRecord, userId, gen);
+      if (await adopt(captureRecord.captureId, userId, release, gen)) return;
     }
   } finally {
     recovering = false;
