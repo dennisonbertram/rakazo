@@ -1379,6 +1379,7 @@ export function SpaceSidebar({
                           return (
                             <PageAgentsRow
                               key={displayRow.foldHeader}
+                              rosterId={`${group.key}:${displayRow.foldHeader}`}
                               actions={
                                 email ? (
                                   <>
@@ -1842,6 +1843,7 @@ export function SpaceSidebar({
             <div className="mt-2 border-t border-border pt-2">
               <button
                 type="button"
+                data-roster-row="archived"
                 aria-expanded={archivedOpen}
                 onClick={() => setArchivedOpen((open) => !open)}
                 className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[13.5px] text-muted-foreground hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
