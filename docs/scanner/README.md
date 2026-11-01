@@ -1,6 +1,6 @@
 # Document scanner: paper in, PDF in the Data room
 
-Status: plan only, no product code. File references were read at `origin/main` (c2be84f24). Format follows `docs/omi/README.md`. Mockup: `docs/scanner/mockup.html`.
+Status: plan only, no product code. Epic #1051 (#1045–#1050). File references were read at `origin/main` (c2be84f24). Format follows `docs/omi/README.md`. Mockup: `docs/scanner/mockup.html`.
 
 ## Decisions
 
