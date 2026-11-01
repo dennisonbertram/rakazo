@@ -242,13 +242,13 @@ S1 is first because it is the smallest useful change: the backend, the provider 
 
 | # | Question | Recommended default |
 |---|---|---|
-| D1 | Meetings get a page in the sidebar with list and detail? (Granola said agent-only; native capture makes meetings something the user starts) | **Yes**, list and detail as above. **Needs the owner's OK** before S4 |
-| D2 | Default recording policy for a space | **Remind** (one line, no checkbox). Owners and admins can switch to Confirm or Off |
+| D1 | Meetings get a page in the sidebar with list and detail? (Granola said agent-only; native capture makes meetings something the user starts) | **Decided (owner, 2026-11-01): yes.** One Meetings page fed by every recorder (Praci recordings, Hex, Granola, Omi and future sources), each row showing its source |
+| D2 | Default recording policy for a space | **Decided (owner): Remind** (one line, no checkbox). Owners and admins can switch to Confirm or Off |
 | D3 | Keep meeting audio? | **No.** Deleted after transcription; no "keep audio" switch in v1 |
 | D4 | How long are transcripts kept? | **Until the user deletes them**, like Granola. No automatic expiry |
-| D5 | On-device engine on the desktop | **Use the installed Hex** through `@kitlangton/hex` (new MIT dependency, pinned). Bundling our own Whisper engine is later work if users without Hex need on-device |
+| D5 | On-device engine on the desktop | **Decided (owner): both, Hex first.** Ship the installed-Hex engine through `@kitlangton/hex` (new MIT dependency, pinned); add a bundled Whisper engine as a later slice for users without Hex |
 | D6 | Which agent reads Hex and recorded meetings | **One Meetings agent** for both, read-only tools, meeting-tainted |
-| D7 | Composer mic when no engine is set up | **Hidden**; Settings → Voice is where it is turned on. Alternative: always show it and open setup on click |
+| D7 | Composer mic when no engine is set up | **Decided (owner): hidden** until an engine is set up; Settings → Voice is where it is turned on |
 | D8 | Use browser Web Speech for the composer | **No** (audio goes to the browser vendor without a Praci setting) |
 | D9 | Duplicate Hex and Praci recordings of one call | **First stored wins**, by time overlap |
 | D10 | Expo capture | **Not now.** Desktop, web and native iOS cover it; Expo shows meetings read-only (S8b) |
