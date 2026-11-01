@@ -1636,7 +1636,6 @@ msgstr "审批边界"
 msgid "Approvals"
 msgstr ""
 
-#: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/McpActionCard.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -5579,6 +5578,10 @@ msgstr ""
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Enter a username and password"
+msgstr ""
+
+#: src/pages/gtm/GtmPlan.tsx
+msgid "Enter a valid date and time."
 msgstr ""
 
 #: src/components/ContactDialog.tsx
@@ -11203,7 +11206,7 @@ msgid "Scheduled run failed."
 msgstr ""
 
 #: src/pages/gtm/GtmPlan.tsx
-msgid "Scheduled time (ISO)"
+msgid "Scheduled time"
 msgstr ""
 
 #: src/pages/Inbox.tsx
@@ -11422,6 +11425,7 @@ msgid "Self-custody"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
+#: src/components/gtm/EmailItemCard.tsx
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/inbox/InboxCleanup.tsx
 #: src/components/inbox/InboxShortcuts.tsx

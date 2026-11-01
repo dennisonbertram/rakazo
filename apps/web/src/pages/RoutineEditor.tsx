@@ -55,6 +55,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { toDatetimeLocalValue } from "../lib/datetime-local";
 import { timezoneLabel } from "../lib/local-timezone";
 import {
   connectedModelOptions,
@@ -67,11 +68,6 @@ import { rpc } from "../lib/rpc";
 import { isHiddenBuiltinSkill, slashSkillLabel } from "../lib/slash-skills";
 import { RoutineRunHistory } from "./RoutineRunHistory";
 import { RoutineSchedule } from "./RoutineSchedule";
-
-function toDatetimeLocalValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 function defaultArmRunAtLocal(): string {
   return toDatetimeLocalValue(new Date(Date.now() + 60 * 60 * 1000));

@@ -282,13 +282,13 @@ export function GtmPage({
                 ) : null}
                 {!agentLayout && !bare ? (
                   <>
-                    <GtmChannels overview={data} />
                     <GtmPlan
                       title={t`Needs you`}
                       items={data.groups.needs_you}
                       overview={data}
                       onChange={changed}
                     />
+                    <GtmChannels overview={data} />
                     <GtmPlan
                       title={t`In progress`}
                       items={data.groups.in_progress}

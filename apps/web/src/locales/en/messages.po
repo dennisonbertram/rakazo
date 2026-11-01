@@ -1636,7 +1636,6 @@ msgstr "Approval boundaries"
 msgid "Approvals"
 msgstr "Approvals"
 
-#: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/McpActionCard.tsx
 #: src/pages/MessagingSettingsOverlay.tsx
@@ -5580,6 +5579,10 @@ msgstr "Enter a post-money cap"
 #: src/pages/shell/bot-credentials.tsx
 msgid "Enter a username and password"
 msgstr "Enter a username and password"
+
+#: src/pages/gtm/GtmPlan.tsx
+msgid "Enter a valid date and time."
+msgstr "Enter a valid date and time."
 
 #: src/components/ContactDialog.tsx
 #: src/lib/user-error.ts
@@ -11203,8 +11206,8 @@ msgid "Scheduled run failed."
 msgstr "Scheduled run failed."
 
 #: src/pages/gtm/GtmPlan.tsx
-msgid "Scheduled time (ISO)"
-msgstr "Scheduled time (ISO)"
+msgid "Scheduled time"
+msgstr "Scheduled time"
 
 #: src/pages/Inbox.tsx
 msgid "Scheduling"
@@ -11422,6 +11425,7 @@ msgid "Self-custody"
 msgstr "Self-custody"
 
 #: src/components/ComposeEmail.tsx
+#: src/components/gtm/EmailItemCard.tsx
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/inbox/InboxCleanup.tsx
 #: src/components/inbox/InboxShortcuts.tsx
