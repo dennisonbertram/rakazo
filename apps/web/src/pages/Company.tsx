@@ -97,6 +97,16 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
   const people = data?.entities.filter((row) => row.kind === "person") ?? [];
   const organisations = data?.entities.filter((row) => row.kind === "organisation") ?? [];
   const profile = data?.entities.find((row) => row.kind === "company");
+  // Unconfirmed low-confidence people are not in the page data, but they are in Review.
+  const reviewed = (review.data?.items ?? []).flatMap((item) =>
+    item.kind === "fact" && item.fact.kind === "entity" ? [item.fact.record] : [],
+  );
+  const names = new Map(
+    [...(data?.entities ?? []), ...reviewed]
+      .filter((row) => row.id !== profile?.id)
+      .map((row) => [row.id, row.displayName]),
+  );
+  const nameOf = (id: string) => names.get(id);
   const roles = (id: string) =>
     data?.edges.filter((row) => row.fromId === id && row.relation === "works_at") ?? [];
   const past = (row: CompanyEntityRecord) =>
@@ -312,6 +322,7 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
               {!review.data && !review.error && <Skeleton className="h-32 w-full" />}
               {review.data && (
                 <CompanyReview
+                  nameOf={nameOf}
                   items={review.data.items}
                   onOpen={(next, editing = false) => {
                     setFactEditing(editing);
@@ -325,17 +336,26 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           {view === "calendar" && (
             <CompanyCalendar onOpen={setFact} refreshRevision={calendarRevision} />
           )}
-          {running && (
-            <p role="status" className="text-sm text-muted-foreground">
-              <Trans>Import in progress</Trans>
-            </p>
-          )}
           {data.latestRun &&
-            ["partial", "paused", "budget_reached", "cancelled", "failed"].includes(
-              data.latestRun.status,
-            ) && (
+            (running ||
+              ["paused", "budget_reached", "partial", "failed"].includes(
+                data.latestRun.status,
+              )) && (
               <p role="status" className="text-sm text-muted-foreground">
-                <Trans>Partial import</Trans>
+                <Link
+                  to={`/app/company/import?runId=${data.latestRun.id}`}
+                  className="hover:underline"
+                >
+                  {running ? (
+                    <Trans>Import in progress</Trans>
+                  ) : ["paused", "budget_reached"].includes(data.latestRun.status) ? (
+                    <Trans>Import paused</Trans>
+                  ) : data.latestRun.status === "failed" ? (
+                    <Trans>Import failed</Trans>
+                  ) : (
+                    <Trans>Partial import</Trans>
+                  )}
+                </Link>
               </p>
             )}
           {view === "overview" && data.entities.length === 0 && data.events.length === 0 && (

@@ -34,9 +34,10 @@ const show = async (
   view: string,
   entities = companyFixture.entities,
   extra: Partial<typeof companyFixture> = {},
+  reviewItems: unknown[] = [],
 ) => {
   rpcMock.company.page.mockResolvedValue({ ...companyFixture, entities, ...extra });
-  rpcMock.company.review.mockResolvedValue({ items: [] });
+  rpcMock.company.review.mockResolvedValue({ items: reviewItems });
   rpcMock.finance.overview.mockResolvedValue(null);
   rpcMock.investors.capTable.mockResolvedValue({ snapshot: null, syncing: false });
   await act(async () =>
@@ -100,4 +101,54 @@ it("shows no Import action in the empty state while an import runs", async () =>
       (a) => a.getAttribute("href") === "/app/company/import" && a.textContent === "Import",
     ),
   ).toHaveLength(1);
+});
+
+it("links a failed import to its run", async () => {
+  await show("overview", companyFixture.entities, {
+    latestRun: { id: "r1", status: "failed" } as never,
+  });
+  const link = container.querySelector('[role="status"] a');
+  expect(link?.textContent).toBe("Import failed");
+  expect(link?.getAttribute("href")).toBe("/app/company/import?runId=r1");
+  expect(container.textContent).not.toContain("Partial import");
+});
+
+it("shows no status line for a cancelled import", async () => {
+  await show("overview", companyFixture.entities, {
+    latestRun: { id: "r1", status: "cancelled" } as never,
+  });
+  expect(container.querySelector('[role="status"]')).toBeNull();
+});
+
+it("names the person on a Review edge card", async () => {
+  const edge = companyFixture.edges[0]!;
+  await show("review", companyFixture.entities, {}, [
+    {
+      kind: "fact",
+      id: "edge:employment",
+      reason: "contradiction",
+      fact: { kind: "edge", record: edge },
+    },
+  ]);
+  expect(container.textContent).toContain("Alex Reed · Engineer");
+});
+
+it("names a person who is only in Review", async () => {
+  const [person] = companyFixture.entities.filter((row) => row.kind === "person");
+  const edge = companyFixture.edges[0]!;
+  await show("review", [], {}, [
+    {
+      kind: "fact",
+      id: "entity:person",
+      reason: "contradiction",
+      fact: { kind: "entity", record: person },
+    },
+    {
+      kind: "fact",
+      id: "edge:employment",
+      reason: "contradiction",
+      fact: { kind: "edge", record: edge },
+    },
+  ]);
+  expect(container.textContent).toContain("Alex Reed · Engineer");
 });
