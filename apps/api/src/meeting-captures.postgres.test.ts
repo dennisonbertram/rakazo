@@ -441,4 +441,151 @@ describePostgres("Meeting captures (PostgreSQL)", () => {
     expect(await client(a).meetingCaptures.active()).toBeNull();
     await client(a).meetingCaptures.discard({ captureId });
   });
+
+  const blobDeletes = () =>
+    jobsNamed("dataroom.blob.delete").map((j) => (j.payload as { storageKey: string }).storageKey);
+  const keysOf = async (captureId: string) =>
+    (await prisma.meetingCaptureChunk.findMany({ where: { captureId } })).flatMap((c) =>
+      c.blobKey ? [c.blobKey] : [],
+    );
+
+  it("leaves a discarded capture discarded when finalize runs afterwards, and queues the audio's deletion", async () => {
+    const a = actors.a as Actor;
+    const { captureId } = await start(a, "discard-final");
+    await upload("a", captureId, "microphone", 0, 0, text("kept?"));
+    const keys = await keysOf(captureId);
+    await client(a).meetingCaptures.finish({ captureId, endedAt: new Date().toISOString() });
+    await client(a).meetingCaptures.discard({ captureId });
+    expect(blobDeletes()).toEqual(expect.arrayContaining(keys));
+    await runCaptureFinalize(deps(), finalizePayload(captureId, a));
+    expect(
+      (await prisma.meetingCapture.findUniqueOrThrow({ where: { id: captureId } })).status,
+    ).toBe("discarded");
+    expect(await meetingOf(captureId)).toBeNull();
+  });
+
+  it("refuses an append after finalize, and clears chunk text once the meeting holds it", async () => {
+    const a = actors.a as Actor;
+    const { captureId } = await start(a, "late", "device");
+    const append = (seq: number, said: string) =>
+      client(a).meetingCaptures.appendText({
+        captureId,
+        track: "microphone",
+        seq,
+        startMs: seq * 1000,
+        endMs: seq * 1000 + 500,
+        text: said,
+      });
+    await append(0, "first");
+    await client(a).meetingCaptures.finish({ captureId, endedAt: new Date().toISOString() });
+    await runCaptureFinalize(deps(), finalizePayload(captureId, a));
+    await expect(append(1, "too late")).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await meetingOf(captureId))?.transcript).toBe("User a: first");
+    expect(
+      await prisma.meetingCaptureChunk.findMany({
+        where: { captureId },
+        select: { text: true, status: true },
+      }),
+    ).toEqual([{ text: null, status: "done" }]);
+  });
+
+  it("does not overwrite a chunk another worker already settled", async () => {
+    const a = actors.a as Actor;
+    const { captureId } = await start(a, "two-workers");
+    await upload("a", captureId, "microphone", 0, 0, text("real words"));
+    const chunk = await prisma.meetingCaptureChunk.findFirstOrThrow({ where: { captureId } });
+    await prisma.meetingCaptureChunk.update({ where: { id: chunk.id }, data: { attempts: 2 } });
+    const payload = { spaceId: a.spaceId, userId: a.userId, chunkId: chunk.id };
+    // While the first worker is inside the provider, a second worker settles the chunk.
+    const racing = () =>
+      ({
+        transcribe: async () => {
+          await runCaptureTranscribe(deps(), payload);
+          throw new Error("provider down");
+        },
+      }) as unknown as TranscriptionProvider;
+    await runCaptureTranscribe({ ...deps(), createProvider: racing }, payload);
+    expect(
+      await prisma.meetingCaptureChunk.findUniqueOrThrow({ where: { id: chunk.id } }),
+    ).toMatchObject({
+      status: "done",
+      text: "real words",
+      blobKey: null,
+    });
+    await client(a).meetingCaptures.discard({ captureId });
+  });
+
+  it("refuses a concurrent chunk with other bytes and deletes the surplus audio", async () => {
+    const a = actors.a as Actor;
+    const { captureId } = await start(a, "conflict");
+    // The rival chunk lands between the route's first check and its locked insert.
+    const racing = Object.create(artifacts) as LocalArtifactStore;
+    racing.put = async (...args: Parameters<LocalArtifactStore["put"]>) => {
+      const stored = await artifacts.put(...args);
+      await prisma.meetingCaptureChunk.create({
+        data: {
+          spaceId: a.spaceId,
+          userId: a.userId,
+          captureId,
+          track: "microphone",
+          seq: 0,
+          startMs: 0,
+          endMs: 1,
+          sha256: "rival",
+          status: "done",
+          text: "rival",
+        },
+      });
+      return stored;
+    };
+    const racingApp = new Hono();
+    mountMeetingCaptureRoutes(racingApp, { prisma, artifacts: racing, jobs }, async () => a);
+    const response = await racingApp.request(
+      `/api/meeting-captures/${captureId}/chunks?track=microphone&seq=0&startMs=0&endMs=1000`,
+      {
+        method: "POST",
+        body: text("ours") as BodyInit,
+        headers: { "content-type": "application/octet-stream" },
+      },
+    );
+    expect(response.status).toBe(409);
+    expect(await prisma.meetingCaptureChunk.count({ where: { captureId } })).toBe(1);
+    expect(blobDeletes()).toHaveLength(1);
+    await client(a).meetingCaptures.discard({ captureId });
+  });
+
+  it("queues the digest on a finalize retry after the first attempt could not", async () => {
+    const a = actors.a as Actor;
+    const { captureId } = await start(a, "digest-retry", "device");
+    await client(a).meetingCaptures.appendText({
+      captureId,
+      track: "system",
+      seq: 0,
+      startMs: 0,
+      endMs: 1,
+      text: "hi",
+    });
+    await client(a).meetingCaptures.finish({ captureId, endedAt: new Date().toISOString() });
+    let failing = true;
+    const flaky = {
+      enqueue: async (job: BackgroundJob) => {
+        if (job.name === "meetings.digest" && failing) throw new Error("queue down");
+        enqueued.push(job);
+      },
+    };
+    await expect(
+      runCaptureFinalize({ ...deps(), jobs: flaky }, finalizePayload(captureId, a)),
+    ).rejects.toThrow();
+    // Nothing was marked done, and no half-stored meeting is left.
+    expect(
+      (await prisma.meetingCapture.findUniqueOrThrow({ where: { id: captureId } })).status,
+    ).toBe("finishing");
+    expect(await meetingOf(captureId)).toBeNull();
+    failing = false;
+    await runCaptureFinalize({ ...deps(), jobs: flaky }, finalizePayload(captureId, a));
+    expect(jobsNamed("meetings.digest")).toHaveLength(1);
+    expect(
+      (await prisma.meetingCapture.findUniqueOrThrow({ where: { id: captureId } })).status,
+    ).toBe("done");
+  });
 });

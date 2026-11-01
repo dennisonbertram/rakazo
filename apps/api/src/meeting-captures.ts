@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import type { ArtifactStore, JobPublisher } from "@rakazo/adapter-kit";
 import { meetingsCaptureFinalizeJob, meetingsCaptureTranscribeJob } from "@rakazo/adapter-kit";
-import { dataRoomBlobContext, removeCaptureBlob } from "@rakazo/adapters";
+import {
+  dataRoomBlobContext,
+  lockCapture,
+  queueCaptureBlobDelete,
+  removeCaptureBlobNow,
+} from "@rakazo/adapters";
 import type {
   Actor,
   MeetingCaptureActive,
@@ -126,21 +131,24 @@ export async function appendCaptureText(
     throw new ORPCError("BAD_REQUEST", {
       message: "This capture does not take text for this track",
     });
-  if (capture.status !== "recording" && capture.status !== "finishing")
-    throw new ORPCError("CONFLICT", { message: "Capture is closed" });
   const sha256 = sha256Of(input.text);
   const key = { captureId: capture.id, track: input.track, seq: input.seq };
-  const known = await deps.prisma.meetingCaptureChunk.findUnique({
-    where: { captureId_track_seq: key },
-    select: { sha256: true },
-  });
-  if (known) {
-    if (known.sha256 !== sha256)
-      throw new ORPCError("CONFLICT", { message: "Chunk already stored with other content" });
-    return { ok: true };
-  }
-  try {
-    await deps.prisma.meetingCaptureChunk.create({
+  await deps.prisma.$transaction(async (tx) => {
+    // Under the capture's lock, so a finalize or discard is either before this or after it.
+    const status = await lockCapture(tx, owner(actor), capture.id);
+    if (status === null || status === "discarded") throw notFound();
+    if (status !== "recording" && status !== "finishing")
+      throw new ORPCError("CONFLICT", { message: "Capture is closed" });
+    const known = await tx.meetingCaptureChunk.findUnique({
+      where: { captureId_track_seq: key },
+      select: { sha256: true },
+    });
+    if (known) {
+      if (known.sha256 !== sha256)
+        throw new ORPCError("CONFLICT", { message: "Chunk already stored with other content" });
+      return;
+    }
+    await tx.meetingCaptureChunk.create({
       data: {
         ...owner(actor),
         ...key,
@@ -151,13 +159,10 @@ export async function appendCaptureText(
         status: "done",
       },
     });
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
-    return { ok: true };
-  }
-  await deps.prisma.meetingCapture.updateMany({
-    where: { id: capture.id, ...owner(actor) },
-    data: { lastChunkAt: new Date() },
+    await tx.meetingCapture.updateMany({
+      where: { id: capture.id, ...owner(actor) },
+      data: { lastChunkAt: new Date() },
+    });
   });
   return { ok: true };
 }
@@ -167,43 +172,53 @@ export async function finishCapture(
   actor: Actor,
   input: { captureId: string; endedAt: string },
 ): Promise<{ ok: true }> {
-  const capture = await openCapture(deps, actor, input.captureId);
-  if (capture.status === "recording") {
-    await deps.prisma.meetingCapture.updateMany({
-      where: { id: capture.id, ...owner(actor), status: "recording" },
-      data: { status: "finishing", endedAt: new Date(input.endedAt) },
-    });
-  }
+  await deps.prisma.$transaction(async (tx) => {
+    const status = await lockCapture(tx, owner(actor), input.captureId);
+    if (status === null || status === "discarded") throw notFound();
+    if (status === "recording") {
+      await tx.meetingCapture.updateMany({
+        where: { id: input.captureId, ...owner(actor) },
+        data: { status: "finishing", endedAt: new Date(input.endedAt) },
+      });
+    }
+  });
   // Safe to repeat: one queued job per capture, and finalizing twice stores one meeting.
-  await deps.jobs.enqueue(meetingsCaptureFinalizeJob({ ...owner(actor), captureId: capture.id }));
+  await deps.jobs.enqueue(
+    meetingsCaptureFinalizeJob({ ...owner(actor), captureId: input.captureId }),
+  );
   return { ok: true };
 }
 
-/** Deletes the chunks and their audio. The capture row stays as "discarded" so a retry is a no-op. */
+/**
+ * Deletes the chunks and their audio. The capture row stays as "discarded" so a retry is a no-op.
+ * One transaction: the audio's delete jobs are queued inside it, so an interrupted discard
+ * changes nothing and a retry does it all.
+ */
 export async function discardCapture(
   deps: MeetingCaptureDeps,
   actor: Actor,
   captureId: string,
 ): Promise<{ ok: true }> {
-  const capture = await deps.prisma.meetingCapture.findFirst({
-    where: { id: captureId, ...owner(actor) },
+  const keys = await deps.prisma.$transaction(async (tx) => {
+    const status = await lockCapture(tx, owner(actor), captureId);
+    if (status === null) throw notFound();
+    if (status === "discarded") return [];
+    if (status === "done" || status === "failed")
+      throw new ORPCError("CONFLICT", { message: "Capture is already stored" });
+    const chunks = await tx.meetingCaptureChunk.findMany({
+      where: { captureId, ...owner(actor) },
+      select: { blobKey: true },
+    });
+    const blobKeys = chunks.flatMap(({ blobKey }) => (blobKey ? [blobKey] : []));
+    for (const key of blobKeys) await queueCaptureBlobDelete(deps.jobs, actor.spaceId, key);
+    await tx.meetingCapture.updateMany({
+      where: { id: captureId, ...owner(actor) },
+      data: { status: "discarded" },
+    });
+    await tx.meetingCaptureChunk.deleteMany({ where: { captureId, ...owner(actor) } });
+    return blobKeys;
   });
-  if (!capture) throw notFound();
-  if (capture.status === "discarded") return { ok: true };
-  if (capture.status === "done" || capture.status === "failed")
-    throw new ORPCError("CONFLICT", { message: "Capture is already stored" });
-  await deps.prisma.meetingCapture.updateMany({
-    where: { id: capture.id, ...owner(actor) },
-    data: { status: "discarded" },
-  });
-  const chunks = await deps.prisma.meetingCaptureChunk.findMany({
-    where: { captureId: capture.id, ...owner(actor) },
-    select: { blobKey: true },
-  });
-  await deps.prisma.meetingCaptureChunk.deleteMany({
-    where: { captureId: capture.id, ...owner(actor) },
-  });
-  for (const { blobKey } of chunks) if (blobKey) await removeCaptureBlob(deps, actor, blobKey);
+  for (const key of keys) await removeCaptureBlobNow(deps.artifacts, actor, key);
   return { ok: true };
 }
 
@@ -287,32 +302,52 @@ export function mountMeetingCaptureRoutes(
       { name: `capture-${seq}.bin`, mimeType: "application/octet-stream", bytes: body },
       context,
     );
-    let chunkId: string;
+    // Our blob is dropped durably when this upload does not become the chunk's audio.
+    const dropBlob = async () => {
+      await queueCaptureBlobDelete(jobs, actor.spaceId, blob.id);
+      await removeCaptureBlobNow(artifacts, actor, blob.id);
+    };
+    let outcome:
+      | { kind: "created"; id: string }
+      | { kind: "known"; id: string; sha256: string; status: string }
+      | { kind: "closed" };
     try {
-      ({ id: chunkId } = await prisma.meetingCaptureChunk.create({
-        data: { ...owner(actor), ...key, startMs, endMs, sha256, blobKey: blob.id },
-        select: { id: true },
-      }));
+      // Under the capture's lock: a discard or finalize is either before this or after it.
+      outcome = await prisma.$transaction(async (tx) => {
+        const status = await lockCapture(tx, owner(actor), capture.id);
+        if (status !== "recording" && status !== "finishing") return { kind: "closed" as const };
+        const winner = await tx.meetingCaptureChunk.findUnique({
+          where: { captureId_track_seq: key },
+          select: { id: true, sha256: true, status: true },
+        });
+        if (winner) return { kind: "known" as const, ...winner };
+        const created = await tx.meetingCaptureChunk.create({
+          data: { ...owner(actor), ...key, startMs, endMs, sha256, blobKey: blob.id },
+          select: { id: true },
+        });
+        await tx.meetingCapture.updateMany({
+          where: { id: capture.id, ...owner(actor) },
+          data: { lastChunkAt: new Date() },
+        });
+        return { kind: "created" as const, id: created.id };
+      });
     } catch (error) {
-      await artifacts.remove(blob.id, context).catch(() => undefined);
-      // A concurrent identical retry won the insert.
-      if (isUniqueViolation(error)) return c.json({ stored: true }, 200);
+      await dropBlob();
       throw error;
     }
-    await prisma.meetingCapture.updateMany({
-      where: { id: capture.id, ...owner(actor) },
-      data: { lastChunkAt: new Date() },
-    });
-    // Discard may have run between the check above and the insert; do not keep that audio.
-    const still = await prisma.meetingCapture.findFirst({
-      where: { id: capture.id, ...owner(actor) },
-      select: { status: true },
-    });
-    if (still?.status === "discarded") {
-      await prisma.meetingCaptureChunk.deleteMany({ where: { id: chunkId, ...owner(actor) } });
-      await removeCaptureBlob(deps, actor, blob.id);
-      return c.json({ error: "Capture not found" }, 404);
+    if (outcome.kind === "closed") {
+      await dropBlob();
+      return c.json({ error: "Capture is closed" }, 409);
     }
+    if (outcome.kind === "known") {
+      // A concurrent upload won the position; ours is surplus either way.
+      await dropBlob();
+      if (outcome.sha256 !== sha256)
+        return c.json({ error: "Chunk already stored with other bytes" }, 409);
+      if (outcome.status === "pending") await queue(outcome.id);
+      return c.json({ stored: true }, 200);
+    }
+    const chunkId = outcome.id;
     await queue(chunkId);
     return c.json({ stored: true }, 201);
   });

@@ -6,7 +6,7 @@ import {
 } from "@rakazo/adapter-kit";
 import type { Actor, MeetingTranscriptLine, SourceMeeting } from "@rakazo/contracts";
 import { MEETING_TRANSCRIPT_MAX_BYTES, MEETING_TRUNCATION_MARKER } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Prisma, PrismaClient } from "@rakazo/db";
 import { upsertMeeting } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { dataRoomBlobContext } from "./data-room-files.js";
@@ -32,22 +32,45 @@ export function sniffAudioMime(bytes: Uint8Array): string {
   return "audio/webm";
 }
 
-/** Removes a blob now, or queues its removal. Never throws. */
-export async function removeCaptureBlob(
-  deps: { artifacts: ArtifactStore; jobs: JobPublisher },
+/**
+ * Queues the blob's deletion. Call it before the last reference to the blob is dropped, so an
+ * interruption leaves a delete job and a harmless duplicate, never an orphan. Throws if not queued.
+ */
+export function queueCaptureBlobDelete(
+  jobs: JobPublisher,
+  spaceId: string,
+  key: string,
+): Promise<void> {
+  return jobs.enqueue(dataRoomBlobDeleteJob(spaceId, key));
+}
+
+/** Best-effort immediate removal after the delete job is queued; the job is the guarantee. */
+export async function removeCaptureBlobNow(
+  artifacts: ArtifactStore,
   actor: Pick<Actor, "spaceId" | "userId">,
   key: string,
 ): Promise<void> {
-  try {
-    await deps.artifacts.remove(
-      key,
-      dataRoomBlobContext(actor as Actor, "meeting-capture.cleanup"),
-    );
-  } catch {
-    await deps.jobs
-      .enqueue(dataRoomBlobDeleteJob(actor.spaceId, key))
-      .catch((error: unknown) => getLogger().error("capture blob cleanup enqueue failed", error));
-  }
+  await artifacts
+    .remove(key, dataRoomBlobContext(actor as Actor, "meeting-capture.cleanup"))
+    .catch(() => undefined);
+}
+
+type Tx = Pick<Prisma.TransactionClient, "$queryRaw">;
+
+/**
+ * Locks the caller's capture row until the transaction ends and returns its status, or null when
+ * it is not theirs. Every path that changes a capture or its chunks starts with this.
+ */
+export async function lockCapture(
+  tx: Tx,
+  owner: { spaceId: string; userId: string },
+  captureId: string,
+): Promise<string | null> {
+  const rows = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+    SELECT id, status FROM meeting_captures
+    WHERE id = ${captureId} AND "spaceId" = ${owner.spaceId} AND "userId" = ${owner.userId}
+    FOR UPDATE`;
+  return rows[0]?.status ?? null;
 }
 
 export interface CaptureTranscribeDeps {
@@ -92,13 +115,16 @@ export async function runCaptureTranscribe(
   if (!chunk?.blobKey) return;
   const actor: Actor = { ...owner, email: "", isDeploymentOwner: false };
 
+  // Only a pending chunk is settled, so a second worker never overwrites a finished one. The
+  // delete job is queued first: the blob key is dropped only once its deletion is durable.
   const settle = async (data: { status: "done" | "failed"; text?: string }) => {
-    await prisma.meetingCaptureChunk.updateMany({
-      where: { id: chunk.id, ...owner },
+    await queueCaptureBlobDelete(deps.jobs, owner.spaceId, chunk.blobKey as string);
+    const { count } = await prisma.meetingCaptureChunk.updateMany({
+      where: { id: chunk.id, ...owner, status: "pending" },
       data: { ...data, blobKey: null },
     });
-    await removeCaptureBlob(deps, owner, chunk.blobKey as string);
-    await finalizeIfSettled(deps, owner, chunk.captureId);
+    await removeCaptureBlobNow(deps.artifacts, owner, chunk.blobKey as string);
+    if (count) await finalizeIfSettled(deps, owner, chunk.captureId);
   };
 
   const { target, consented } = await selectTranscriptionTarget(deps, actor);
@@ -129,7 +155,7 @@ export async function runCaptureTranscribe(
     const attempts = chunk.attempts + 1;
     if (attempts >= MAX_ATTEMPTS) return void (await settle({ status: "failed" }));
     await prisma.meetingCaptureChunk.updateMany({
-      where: { id: chunk.id, ...owner },
+      where: { id: chunk.id, ...owner, status: "pending" },
       data: { attempts },
     });
     throw new Error("Transcription failed");
@@ -177,9 +203,12 @@ function transcriptOf(
 }
 
 /**
- * Stores a finishing capture as one meeting and queues its digest. Waits (returns) while chunks
- * are pending; the last transcription queues it again. A pending chunk older than the abandon
- * window counts as failed. A repeat finds `meetingId` set and does nothing.
+ * Stores a finishing capture as one meeting and queues its digest, all under the capture's lock:
+ * a late append is either already in the chunks read here or is refused afterwards. Waits
+ * (returns) while chunks are pending; the last transcription queues it again. A pending chunk
+ * idle past the abandon window counts as failed. The meeting's text is the only copy kept: chunk
+ * text is cleared. Only a `finishing` capture is finalized, so a discarded or stored one is left
+ * alone and a repeat does nothing.
  */
 export async function runCaptureFinalize(
   deps: { prisma: PrismaClient; jobs: JobPublisher; artifacts?: ArtifactStore },
@@ -188,85 +217,89 @@ export async function runCaptureFinalize(
 ): Promise<void> {
   const { prisma } = deps;
   const owner = { spaceId: payload.spaceId, userId: payload.userId };
-  const capture = await prisma.meetingCapture.findFirst({
-    where: { id: payload.captureId, ...owner },
-  });
-  if (!capture || capture.meetingId || capture.status === "done" || capture.status === "discarded")
-    return;
-
-  let chunks = await prisma.meetingCaptureChunk.findMany({
-    where: { captureId: capture.id, ...owner },
-  });
-  const pending = chunks.filter((chunk) => chunk.status === "pending");
-  if (pending.length > 0) {
-    if (now.getTime() - capture.updatedAt.getTime() < CAPTURE_ABANDONED_MS) return;
-    await prisma.meetingCaptureChunk.updateMany({
-      where: { captureId: capture.id, ...owner, status: "pending" },
-      data: { status: "failed", blobKey: null },
-    });
-    if (deps.artifacts) {
-      for (const chunk of pending)
-        if (chunk.blobKey)
-          await removeCaptureBlob(
-            { artifacts: deps.artifacts, jobs: deps.jobs },
-            owner,
-            chunk.blobKey,
-          );
-    }
-    chunks = chunks.map((chunk) =>
-      chunk.status === "pending" ? { ...chunk, status: "failed" } : chunk,
-    );
-  }
-
-  if (chunks.length === 0) {
-    await prisma.meetingCapture.updateMany({
-      where: { id: capture.id, ...owner },
-      data: { status: "done" },
-    });
-    return;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: owner.userId },
-    select: { name: true, email: true, emailVerified: true },
-  });
-  if (!user) throw new Error("Capture owner not found");
-  const endedAt = capture.endedAt ?? capture.lastChunkAt ?? now;
-  const failed = chunks.some((chunk) => chunk.status === "failed");
-  const meeting: SourceMeeting = {
-    externalId: capture.id,
-    title: capture.title?.trim() || timeLabel(capture.startedAt),
-    startedAt: capture.startedAt.toISOString(),
-    endedAt: endedAt.toISOString(),
-    attendees: [{ name: user.name, ...(user.emailVerified ? { email: user.email } : {}) }],
-    organizerEmail: null,
-    sourceUrl: null,
-    folders: [],
-    summary: "",
-    privateNotes: "",
-    transcript: transcriptOf(chunks, capture.startedAt, user.name),
-    updatedAt: now.toISOString(),
-  };
-  const outcome = await upsertMeeting(prisma, owner, null, CAPTURE_PROVIDER, meeting);
-  const stored =
-    outcome === "tombstoned"
-      ? null
-      : await prisma.meeting.findFirst({
-          where: { ...owner, provider: CAPTURE_PROVIDER, externalId: capture.id },
-          select: { id: true },
+  const removed: string[] = [];
+  await prisma.$transaction(
+    async (tx) => {
+      if ((await lockCapture(tx, owner, payload.captureId)) !== "finishing") return;
+      const capture = await tx.meetingCapture.findFirstOrThrow({
+        where: { id: payload.captureId, ...owner },
+      });
+      const chunks = await tx.meetingCaptureChunk.findMany({
+        where: { captureId: capture.id, ...owner },
+      });
+      const pending = chunks.filter((chunk) => chunk.status === "pending");
+      if (pending.length > 0) {
+        if (now.getTime() - capture.updatedAt.getTime() < CAPTURE_ABANDONED_MS) return;
+        for (const chunk of pending) {
+          if (chunk.blobKey) {
+            await queueCaptureBlobDelete(deps.jobs, owner.spaceId, chunk.blobKey);
+            removed.push(chunk.blobKey);
+          }
+        }
+        await tx.meetingCaptureChunk.updateMany({
+          where: { captureId: capture.id, ...owner, status: "pending" },
+          data: { status: "failed", blobKey: null },
         });
-  // Queued before the capture is marked, so a failure here retries instead of losing the digest.
-  if (stored && outcome === "created")
-    await deps.jobs.enqueue(meetingsDigestJob({ ...owner, meetingId: stored.id }));
-  await prisma.meetingCapture.updateMany({
-    where: { id: capture.id, ...owner },
-    data: {
-      status: "done",
-      meetingId: stored?.id ?? null,
-      endedAt,
-      ...(failed ? { error: "part_not_transcribed" } : {}),
+        for (const chunk of chunks)
+          if (chunk.status === "pending") Object.assign(chunk, { status: "failed" });
+      }
+
+      const endedAt = capture.endedAt ?? capture.lastChunkAt ?? now;
+      let meetingId: string | null = null;
+      if (chunks.length > 0) {
+        const user = await tx.user.findUnique({
+          where: { id: owner.userId },
+          select: { name: true, email: true, emailVerified: true },
+        });
+        if (!user) throw new Error("Capture owner not found");
+        const meeting: SourceMeeting = {
+          externalId: capture.id,
+          title: capture.title?.trim() || timeLabel(capture.startedAt),
+          startedAt: capture.startedAt.toISOString(),
+          endedAt: endedAt.toISOString(),
+          attendees: [{ name: user.name, ...(user.emailVerified ? { email: user.email } : {}) }],
+          organizerEmail: null,
+          sourceUrl: null,
+          folders: [],
+          summary: "",
+          privateNotes: "",
+          transcript: transcriptOf(chunks, capture.startedAt, user.name),
+          updatedAt: now.toISOString(),
+        };
+        const outcome = await upsertMeeting(tx, owner, null, CAPTURE_PROVIDER, meeting);
+        if (outcome !== "tombstoned") {
+          meetingId =
+            (
+              await tx.meeting.findFirst({
+                where: { ...owner, provider: CAPTURE_PROVIDER, externalId: capture.id },
+                select: { id: true },
+              })
+            )?.id ?? null;
+        }
+      }
+      // Queued inside the transaction: if it fails, nothing is marked done and a retry redoes it.
+      if (meetingId) await deps.jobs.enqueue(meetingsDigestJob({ ...owner, meetingId }));
+      // The meeting holds the text now; chunks keep status and offsets for `partial`.
+      await tx.meetingCaptureChunk.updateMany({
+        where: { captureId: capture.id, ...owner },
+        data: { text: null },
+      });
+      await tx.meetingCapture.updateMany({
+        where: { id: capture.id, ...owner },
+        data: {
+          status: "done",
+          meetingId,
+          endedAt,
+          ...(chunks.some((chunk) => chunk.status === "failed")
+            ? { error: "part_not_transcribed" }
+            : {}),
+        },
+      });
     },
-  });
+    { timeout: 30_000 },
+  );
+  if (deps.artifacts)
+    for (const key of removed) await removeCaptureBlobNow(deps.artifacts, owner, key);
 }
 
 /**
