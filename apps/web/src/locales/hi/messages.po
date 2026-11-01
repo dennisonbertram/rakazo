@@ -5867,7 +5867,15 @@ msgid "Failed"
 msgstr "विफल"
 
 #: src/pages/Shell.tsx
+msgid "Failed to archive"
+msgstr ""
+
+#: src/pages/Shell.tsx
 msgid "Failed to create bot"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Failed to duplicate"
 msgstr ""
 
 #: src/pages/Shell.tsx
@@ -10810,6 +10818,12 @@ msgstr ""
 #: src/pages/shell/space-sidebar.tsx
 msgid "Restore"
 msgstr "बहाल करें"
+
+#. placeholder {0}: bot.name
+#. placeholder {0}: group.name
+#: src/pages/shell/space-sidebar.tsx
+msgid "Restore {0}"
+msgstr ""
 
 #: src/components/ComputerMaintenanceActions.tsx
 msgid "Restore the last saved workspace."

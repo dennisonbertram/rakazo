@@ -2177,14 +2177,15 @@ export function ShellPage() {
     document.querySelector("[data-sidebar-current]")?.scrollIntoView?.({ block: "nearest" });
   }, [bootstrapMe?.spaceId]);
 
-  // A bot just made or opened from elsewhere can sit under "+N more"; bring its row into view.
+  // A bot or group just made or opened from elsewhere can sit under "+N more"; bring its row into view.
   // biome-ignore lint/correctness/useExhaustiveDependencies: also when the row first appears
   useEffect(() => {
-    if (!botId) return;
+    const chatId = botId ?? groupId;
+    if (!chatId) return;
     sidebarRef.current
-      ?.querySelector(`[data-roster-bot-id="${CSS.escape(botId)}"]`)
+      ?.querySelector(`[data-roster-chat][data-roster-row="${CSS.escape(chatId)}"]`)
       ?.scrollIntoView?.({ block: "nearest" });
-  }, [botId, listedBots.length]);
+  }, [botId, groupId, listedBots.length, groups.length]);
 
   const openSpaceChat = useCallback(
     (spaceId: string, path: string) => {
@@ -6025,10 +6026,14 @@ export function ShellPage() {
               const request = contextBot
                 ? rpc.bots.duplicate({ botId: contextBot.id })
                 : rpc.groups.duplicate({ groupId: contextGroup!.id });
-              void request.then(async (chat) => {
-                await refreshBots();
-                navigate(contextBot ? `/app/${chat.id}` : `/app/g/${chat.id}`);
-              });
+              void request
+                .then(async (chat) => {
+                  await refreshBots();
+                  navigate(contextBot ? `/app/${chat.id}` : `/app/g/${chat.id}`);
+                })
+                .catch((error: unknown) =>
+                  setSendError(errorText(error, t`Failed to duplicate`)),
+                );
             }}
             onClear={
               contextBot
@@ -6058,7 +6063,9 @@ export function ShellPage() {
               const request = contextBot
                 ? rpc.bots.archive({ botId: contextBot.id })
                 : rpc.groups.archive({ groupId: contextGroup!.id });
-              void request.then(() => refreshBots(true));
+              void request
+                .then(() => refreshBots(true))
+                .catch((error: unknown) => setSendError(errorText(error, t`Failed to archive`)));
             }}
             onDelete={() => {
               if (contextBot) setDeleteTarget(contextBot);
