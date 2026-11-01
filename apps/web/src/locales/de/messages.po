@@ -4359,6 +4359,10 @@ msgstr "Senden fehlgeschlagen"
 msgid "Could not share"
 msgstr ""
 
+#: src/lib/sign-out.ts
+msgid "Could not sign out. Try again."
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Could not start an update"
 msgstr ""

@@ -4359,6 +4359,10 @@ msgstr "메시지를 보내지 못했습니다."
 msgid "Could not share"
 msgstr ""
 
+#: src/lib/sign-out.ts
+msgid "Could not sign out. Try again."
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Could not start an update"
 msgstr ""
