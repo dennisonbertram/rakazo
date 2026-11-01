@@ -5,7 +5,11 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import type { NotificationToastData } from "./notification-toaster.js";
-import { enqueueNotificationToast, NotificationToaster, OPEN_DIALOG_SELECTOR } from "./notification-toaster.js";
+import {
+  enqueueNotificationToast,
+  NotificationToaster,
+  OPEN_DIALOG_SELECTOR,
+} from "./notification-toaster.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -472,3 +476,57 @@ it("on a phone, pads an open side panel by the toast height when a composer lift
     vi.unstubAllGlobals();
   }
 });
+
+const openDialog = () =>
+  act(async () => {
+    const d = document.createElement("div");
+    d.setAttribute("role", "dialog");
+    d.setAttribute("data-open", "");
+    d.id = "covering-dialog";
+    document.body.append(d);
+  });
+const closeDialog = () => act(async () => document.getElementById("covering-dialog")?.remove());
+
+it("keeps a toast's full time while a dialog covers it", () =>
+  withFakeTimers(async () => {
+    const onSeen = vi.fn();
+    await mount();
+    await add(1, { onSeen });
+    await openDialog();
+    await advance(10_000);
+    expect(cards()).toHaveLength(1);
+    await closeDialog();
+    await advance(500);
+    expect(cards()).toHaveLength(1);
+    await advance(5_000);
+    expect(cards()).toHaveLength(1);
+    await advance(1_500);
+    expect(cards()).toHaveLength(0);
+    expect(onSeen).not.toHaveBeenCalled();
+  }));
+
+it("keeps a toast raised while a dialog is open until the dialog closes", () =>
+  withFakeTimers(async () => {
+    await mount();
+    await openDialog();
+    await add(1);
+    await advance(10_000);
+    expect(cards()).toHaveLength(1);
+    await closeDialog();
+    await advance(500);
+    await advance(5_000);
+    expect(cards()).toHaveLength(1);
+    await advance(1_500);
+    expect(cards()).toHaveLength(0);
+  }));
+
+it("leaves a toast with timeout 0 in place after a dialog opens and closes", () =>
+  withFakeTimers(async () => {
+    await mount();
+    await add(1, { timeout: 0 });
+    await openDialog();
+    await advance(10_000);
+    await closeDialog();
+    await advance(20_000);
+    expect(cards()).toHaveLength(1);
+  }));

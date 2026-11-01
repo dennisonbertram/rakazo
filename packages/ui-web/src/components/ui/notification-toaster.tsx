@@ -149,6 +149,10 @@ const TOAST_GUTTER_PX = 16;
 /** The chat column's side padding; beside a docked panel the toasts stay inside it. */
 const COLUMN_GUTTER_PX = 28;
 
+/** The same overlays as `COVERED_BY_OVERLAY` below, for JS. The two must match. */
+const OVERLAY_OPEN_SELECTOR =
+  "[role=dialog][data-open],[role=alertdialog][data-open],[role=menu][data-open],[data-drawer-open]";
+
 /** Hides the toasts while an open dialog, menu or navigation drawer would sit under them. */
 const COVERED_BY_OVERLAY =
   "[body:has([role=dialog][data-open],[role=alertdialog][data-open],[role=menu][data-open],[data-drawer-open])_&]:invisible";
@@ -195,12 +199,33 @@ function ToastList({
   formatTime?: (iso: string) => string;
   viewportRef: RefObject<HTMLDivElement | null>;
 }) {
-  const { toasts, close } = Toast.useToastManager<NotificationToastData>();
+  const { toasts, close, update } = Toast.useToastManager<NotificationToastData>();
   const shownCount = toasts.length;
+  // While an overlay hides the toasts their timers are stopped (timeout 0), so none expires unseen.
+  // The original timeouts are kept here and restored, giving each toast its full time, on uncover.
+  const paused = useRef(new Map<string, number | undefined>());
+  const syncPause = () => {
+    const covered = document.querySelector(OVERLAY_OPEN_SELECTOR) !== null;
+    for (const t of toasts) {
+      if (covered && t.timeout !== 0 && !paused.current.has(t.id)) {
+        paused.current.set(t.id, t.timeout);
+        update(t.id, { timeout: 0 });
+      } else if (!covered && paused.current.has(t.id)) {
+        update(t.id, { timeout: paused.current.get(t.id) });
+        paused.current.delete(t.id);
+      }
+    }
+    for (const id of paused.current.keys())
+      if (!toasts.some((t) => t.id === id)) paused.current.delete(id);
+  };
+  const syncPauseRef = useRef(syncPause);
+  syncPauseRef.current = syncPause;
+  useEffect(() => syncPauseRef.current(), [toasts]);
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport || shownCount === 0) return;
     const place = () => {
+      syncPauseRef.current();
       const lift = liftAbove(viewport);
       viewport.style.setProperty("--toast-lift", `${lift}px`);
       // A phone screen with no composer (a settings sheet, a detail page) has nothing to dock above:
