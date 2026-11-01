@@ -7948,6 +7948,12 @@ msgstr "Move up"
 msgid "Moved \"{0}\" to Inbox"
 msgstr "Moved \"{0}\" to Inbox"
 
+#. placeholder {0}: prospect.name
+#. placeholder {1}: contactStageNames()[stage]
+#: src/pages/Fundraising.tsx
+msgid "Moved {0} to {1}"
+msgstr "Moved {0} to {1}"
+
 #. placeholder {0}: status.count
 #: src/pages/Inbox.tsx
 msgid "Moved {0} to trash"
@@ -8707,6 +8713,11 @@ msgstr "Not enough history"
 #: src/pages/finance/FinanceNotFound.tsx
 msgid "Not found"
 msgstr "Not found"
+
+#. placeholder {0}: round.name
+#: src/components/fundraising/SafeList.tsx
+msgid "Not in {0}"
+msgstr "Not in {0}"
 
 #: src/pages/finance/FinanceBurn.tsx
 msgid "not in runway"

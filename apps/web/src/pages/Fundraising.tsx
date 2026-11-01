@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import type { ContactPrefill as Prefill } from "../components/ContactDialog";
-import { ContactDialog } from "../components/ContactDialog";
+import { ContactDialog, contactStageNames } from "../components/ContactDialog";
 import { AssignSafeDialog, InvestorEmailDialog } from "../components/fundraising/MercuryDialogs";
 import { MercuryLine } from "../components/fundraising/MercuryLine";
 import { Pipeline } from "../components/fundraising/Pipeline";
@@ -119,6 +119,29 @@ export function FundraisingPage({
     wasBusy.current = agentBusy;
   }, [agentBusy, load]);
 
+  // Coming back from Mercury after sending a SAFE: pick up the new SAFE, at most once a minute.
+  const lastRefresh = useRef(0);
+  const waitingOnMercury =
+    overview?.mercury.status === "ok" && overview.prospects.some((p) => p.mercurySentAt);
+  useEffect(() => {
+    if (!waitingOnMercury) return;
+    const refresh = () => {
+      if (Date.now() - lastRefresh.current < 60_000) return;
+      lastRefresh.current = Date.now();
+      rpc.fundraising
+        .refresh()
+        .then(load)
+        .catch(() => undefined);
+    };
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [waitingOnMercury, load]);
+
   const round = overview?.round ?? null;
   const open = round && !round.closedAt ? round : null;
 
@@ -127,10 +150,34 @@ export function FundraisingPage({
       .then(load)
       .catch((cause) => notify(errorText(cause, failure)));
   const move = (prospect: Contact, stage: ContactStage) =>
-    run(
-      () => rpc.fundraising.prospects.save({ id: prospect.id, stage }),
-      t`Could not move ${prospect.name}`,
-    );
+    rpc.fundraising.prospects
+      .save({ id: prospect.id, stage })
+      .then(() => {
+        load();
+        // Restoring a commitment from an earlier round would attach it to the open round instead.
+        const canUndo = !(
+          prospect.stage === "committed" && prospect.roundId !== (open?.id ?? null)
+        );
+        enqueueNotificationToast({
+          id: `prospect-${prospect.id}-${Date.now()}`,
+          title: t`Moved ${prospect.name} to ${contactStageNames()[stage]}`,
+          action: canUndo
+            ? {
+                label: t`Undo`,
+                onClick: () =>
+                  void run(
+                    () =>
+                      rpc.fundraising.prospects.save({
+                        id: prospect.id,
+                        stage: prospect.stage ?? "target",
+                      }),
+                    t`Could not undo`,
+                  ),
+              }
+            : undefined,
+        });
+      })
+      .catch((cause) => notify(errorText(cause, t`Could not move ${prospect.name}`)));
 
   const mercuryConnected = overview ? overview.mercury.status !== "not_connected" : false;
   // With Mercury the SAFE is made there: open it, then mark the prospect Waiting for Mercury.

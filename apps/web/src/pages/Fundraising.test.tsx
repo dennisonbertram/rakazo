@@ -351,6 +351,32 @@ it("moves a prospect to another stage from its row menu", async () => {
   expect(rpcMock.prospectSave).toHaveBeenCalledWith({ id: "p1", stage: "committed" });
 });
 
+it("offers Undo after a stage move and restores the old stage", async () => {
+  rpcMock.overview.mockResolvedValue(overview(openRound, [prospect("p1", "Ada Fund")]));
+  await show();
+  await click(container.querySelector('button[aria-label="Actions for Ada Fund"]'));
+  await click(menuItem("Move to"));
+  rpcMock.prospectSave.mockResolvedValue(prospect("p1", "Ada Fund", { stage: "committed" }));
+  await click(menuItem("Committed"));
+  await flush();
+  expect(document.body.textContent).toContain("Moved Ada Fund to Committed");
+  await click(button("Undo"));
+  expect(rpcMock.prospectSave).toHaveBeenLastCalledWith({ id: "p1", stage: "target" });
+});
+
+it("offers no Undo when restoring would move a commitment into another round", async () => {
+  const old = prospect("p1", "Ada Fund", { stage: "committed", roundId: "r0" });
+  rpcMock.overview.mockResolvedValue(overview(openRound, [old]));
+  await show();
+  await click(container.querySelector('button[aria-label="Actions for Ada Fund"]'));
+  await click(menuItem("Move to"));
+  rpcMock.prospectSave.mockResolvedValue({ ...old, stage: "passed" });
+  await click(menuItem("Passed"));
+  await flush();
+  expect(document.body.textContent).toContain("Moved Ada Fund to Passed");
+  expect(button("Undo")).toBeUndefined();
+});
+
 it("opens the contact that already has the typed email instead of failing", async () => {
   const existing = { ...prospect("c7", "Dee Existing"), kind: "investor" as const, stage: null };
   rpcMock.overview.mockResolvedValue(overview(null, []));
@@ -737,5 +763,42 @@ describe("Mercury", () => {
       (a) => a.textContent === "Deposit in Finance",
     );
     expect(link?.getAttribute("href")).toBe("/app/finance");
+  });
+});
+
+describe("refresh Mercury on return", () => {
+  const waiting = prospect("p1", "Ada Fund", {
+    stage: "committed",
+    mercurySentAt: "2026-10-30T00:00:00.000Z",
+  });
+  const mercury = (status: "ok" | "needs_reconnect") =>
+    ({ status, lastSyncedAt: null, unreadable: 0 }) as const;
+  const focusWindow = () => act(async () => void window.dispatchEvent(new Event("focus")));
+
+  it("refreshes once on focus, then not again within a minute", async () => {
+    rpcMock.overview.mockResolvedValue(overview(openRound, [waiting], 0, [], mercury("ok")));
+    rpcMock.refresh.mockResolvedValue(undefined);
+    await show();
+    const loads = rpcMock.overview.mock.calls.length;
+    await focusWindow();
+    await flush();
+    expect(rpcMock.refresh).toHaveBeenCalledTimes(1);
+    expect(rpcMock.overview.mock.calls.length).toBeGreaterThan(loads);
+    await focusWindow();
+    expect(rpcMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refresh without a waiting prospect or when Mercury needs reconnecting", async () => {
+    rpcMock.overview.mockResolvedValue(
+      overview(openRound, [prospect("p1", "Ada Fund")], 0, [], mercury("ok")),
+    );
+    await show();
+    await focusWindow();
+    rpcMock.overview.mockResolvedValue(
+      overview(openRound, [waiting], 0, [], mercury("needs_reconnect")),
+    );
+    await show();
+    await focusWindow();
+    expect(rpcMock.refresh).not.toHaveBeenCalled();
   });
 });
