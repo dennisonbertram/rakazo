@@ -517,7 +517,7 @@ export class McpConnector implements ConnectorProvider {
     // cached read hints must never authorize a tool that has become a write since discovery.
     let annotations: ToolAnnotations;
     let listedSession: McpSession | undefined;
-    if (assignment.server.agentBotId) {
+    if (assignment.server.agentBotId || financeProviderForEndpoint(assignment.server.endpoint)) {
       const { endpoint, secretId, revision } = assignment.server;
       const listedFor = { endpoint, secretId, revision };
       try {
