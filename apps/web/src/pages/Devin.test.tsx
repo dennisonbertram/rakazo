@@ -218,6 +218,32 @@ it("re-reads every minute while visible and on focus, and tells the sidebar afte
   window.removeEventListener("rakazo:notifications-changed", changed);
 });
 
+it("reads once when visibilitychange and focus arrive together on return to the tab", async () => {
+  await show(overview);
+  expect(rpcMock.sessions).toHaveBeenCalledTimes(1);
+  // Separate tasks, as in a browser: the second event must not start a second read.
+  await act(async () => void document.dispatchEvent(new Event("visibilitychange")));
+  await act(async () => void window.dispatchEvent(new Event("focus")));
+  expect(rpcMock.sessions).toHaveBeenCalledTimes(2);
+});
+
+it("keeps the rows without an error notice when Devin is unreachable", async () => {
+  await show({
+    ...overview,
+    stale: true,
+    connection: { ...overview.connection, status: "unreachable" },
+  });
+  expect(table()).toBeTruthy();
+  expect(container.textContent).not.toContain("Could not load Devin sessions.");
+  expect(container.textContent).toContain("Updated");
+  await show({
+    ...emptyOverview,
+    stale: true,
+    connection: { ...emptyOverview.connection, status: "unreachable" },
+  });
+  expect(container.textContent).toContain("Could not load Devin sessions.");
+});
+
 it("does not call a partly read, empty listing an empty organization", async () => {
   await show({ ...emptyOverview, partial: true });
   expect(container.textContent).toContain("Some sessions could not be read.");
