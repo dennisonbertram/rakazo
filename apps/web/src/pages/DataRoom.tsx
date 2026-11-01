@@ -823,6 +823,7 @@ export function DataRoomPage({
             onNewFolder={() => setCreatingFolder(true)}
             onAutoSort={() => setAutoSorting(true)}
             statsView={showStats}
+            previewBeside={!!shown && !narrow && !showStats}
             trailing={viewToggles("@min-[640px]/bd:hidden")}
             leading={
               filters.status ? null : (
