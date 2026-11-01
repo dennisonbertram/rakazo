@@ -15,6 +15,9 @@ import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 import { formatMeetingDate } from "./Meetings";
 
+/** How long after it ends a recording may still be waiting for its summary. */
+const SUMMARIZING_WINDOW_MS = 10 * 60 * 1000;
+
 function Section({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
     <section className="mt-6 max-w-3xl">
@@ -97,6 +100,22 @@ export function MeetingDetailPage({
 
   const minutes = meeting ? meetingMinutes(meeting) : null;
   const now = new Date();
+  // A recording is summarized a little after it is stored; until then it has only its transcript.
+  // ponytail: no "digest done" field exists, so this guesses from age and emptiness.
+  const summarizing =
+    meeting !== null &&
+    meeting.provider === "praci" &&
+    !meeting.summary &&
+    meeting.decisions.length === 0 &&
+    meeting.followUps.length === 0 &&
+    meeting.todos.length === 0 &&
+    meeting.endedAt !== null &&
+    now.getTime() - Date.parse(meeting.endedAt) < SUMMARIZING_WINDOW_MS;
+  useEffect(() => {
+    if (!summarizing) return;
+    const timer = setTimeout(load, 5000);
+    return () => clearTimeout(timer);
+  }, [summarizing, load]);
   return (
     <div className="@container/bd flex min-h-0 min-w-0 flex-1 flex-col">
       <div className={`${PAGE_GUTTER_X} pt-2`}>
@@ -142,6 +161,16 @@ export function MeetingDetailPage({
           )
         ) : (
           <>
+            {meeting.partial ? (
+              <p role="status" className="mt-2 text-sm text-destructive">
+                <Trans>Part of this meeting could not be transcribed.</Trans>
+              </p>
+            ) : null}
+            {summarizing ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                <Trans>Summarizing…</Trans>
+              </p>
+            ) : null}
             {meeting.summary ? <p className="mt-2 max-w-3xl text-sm">{meeting.summary}</p> : null}
             {meeting.decisions.length > 0 ? (
               <Section title={<Trans>Decisions</Trans>}>

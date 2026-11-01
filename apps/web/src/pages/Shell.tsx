@@ -146,6 +146,7 @@ import type { SendTarget } from "../components/data-room/SendToAgent";
 import { ErrorBoundary, lazyOverlay, SectionLoadFailed } from "../components/ErrorBoundary";
 import { AgentAvatar } from "../components/integrations/AgentAvatar";
 import { DevinConnectDialog } from "../components/integrations/DevinConnectDialog";
+import { RecordingPillHost } from "../components/meeting-capture/RecordingPillHost";
 import { PageAgentIntro, pageAgentKind } from "../components/PageAgentIntro";
 import { PageNavContext } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
@@ -5017,6 +5018,7 @@ export function ShellPage() {
             paneDraggingFiles ? "ring-2 ring-inset ring-ring" : ""
           }`}
         >
+          <RecordingPillHost />
           {/* Pages carry their own h1; a chat's title is inside a button, so it is named here. */}
           {pageMode ? null : (
             <h1 className="sr-only">
@@ -5194,7 +5196,7 @@ export function ShellPage() {
               spaceName={pageSpaceName}
             />
           ) : meetingsMode ? (
-            <MeetingsPage spaceName={pageSpaceName} />
+            <MeetingsPage spaceName={pageSpaceName} onAddSpeech={() => openSettings("voice")} />
           ) : contactMatch?.params.contactId ? (
             <ContactDetailPage id={contactMatch.params.contactId} spaceName={pageSpaceName} />
           ) : botPageMatch?.params.botId && botPageMatch.params.pageId ? (

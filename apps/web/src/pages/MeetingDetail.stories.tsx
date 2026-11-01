@@ -29,3 +29,24 @@ export const NoDigest: Story = {
       "meetings.get": { ...detail, summary: "", decisions: [], followUps: [], todos: [] },
     }),
 };
+
+/** A chunk failed, so part of the recording is missing. */
+export const Partial: Story = {
+  beforeEach: () => mockRpc({ "meetings.get": { ...detail, provider: "praci", partial: true } }),
+};
+
+/** Just stored: the transcript is there, the summary is on its way. */
+export const Summarizing: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "meetings.get": {
+        ...detail,
+        provider: "praci",
+        endedAt: new Date().toISOString(),
+        summary: "",
+        decisions: [],
+        followUps: [],
+        todos: [],
+      },
+    }),
+};

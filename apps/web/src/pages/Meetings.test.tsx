@@ -132,3 +132,37 @@ it("shows the meeting the page is on when an earlier one answers last", async ()
   expect(container.textContent).toContain("Meeting B");
   expect(container.textContent).not.toContain("Meeting A");
 });
+
+it("says part of a recording could not be transcribed", async () => {
+  const full = {
+    ...rows[1],
+    provider: "praci",
+    summary: "",
+    decisions: ["Ship on Friday"],
+    followUps: [],
+    todos: [],
+    transcript: "Ada: hello",
+  };
+  rpc.meetings.get.mockResolvedValue({ ...full, partial: true });
+  const partial = await mount(<MeetingDetailPage meetingId="m2" />, "/app/meetings/m2");
+  expect(partial.textContent).toContain("Part of this meeting could not be transcribed.");
+  rpc.meetings.get.mockResolvedValue({ ...full, partial: false });
+  const whole = await mount(<MeetingDetailPage meetingId="m2" />, "/app/meetings/m2");
+  expect(whole.textContent).not.toContain("could not be transcribed");
+});
+
+it("shows Summarizing while a fresh recording has only its transcript", async () => {
+  rpc.meetings.get.mockResolvedValue({
+    ...rows[1],
+    provider: "praci",
+    endedAt: new Date().toISOString(),
+    summary: "",
+    decisions: [],
+    followUps: [],
+    todos: [],
+    transcript: "Ada: hello",
+    partial: false,
+  });
+  const page = await mount(<MeetingDetailPage meetingId="m2" />, "/app/meetings/m2");
+  expect(page.textContent).toContain("Summarizing…");
+});

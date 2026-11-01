@@ -880,6 +880,10 @@ msgstr ""
 msgid "A folder with that name already exists"
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "A recording is already running."
+msgstr ""
+
 #: src/components/finance/WalletDialog.tsx
 msgid "A Safe multisig. Its owners and threshold are shown."
 msgstr ""
@@ -1191,6 +1195,10 @@ msgstr ""
 msgid "Add skill"
 msgstr ""
 
+#: src/components/meeting-capture/RecordButton.tsx
+msgid "Add speech to text"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add the header name."
 msgstr ""
@@ -1486,6 +1494,10 @@ msgstr ""
 
 #: src/components/inbox/InboxCleanup.tsx
 msgid "Also in Gmail"
+msgstr ""
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Also record a browser tab"
 msgstr ""
 
 #: src/pages/ExternalConversationSettings.tsx
@@ -3262,6 +3274,7 @@ msgstr "Computer sind aus. Setze SANDBOX_PROVIDER=docker mit SANDBOX_SUPERVISOR_
 msgid "Configure API key"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyReview.tsx
 msgid "Confirm"
@@ -4347,6 +4360,10 @@ msgstr ""
 
 #: src/pages/shell/bot-page-panel.tsx
 msgid "Could not save the page."
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Could not save the recording setting"
 msgstr ""
 
 #: src/components/fundraising/RoundCard.tsx
@@ -5528,6 +5545,10 @@ msgstr ""
 msgid "Each bot keeps its own"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Each recording needs “Everyone agreed to be recorded” to be ticked."
+msgstr ""
+
 #: src/pages/devin/DevinSessions.tsx
 #: src/pages/Inbox.tsx
 msgid "Earlier"
@@ -5841,6 +5862,10 @@ msgstr ""
 #: src/pages/RoutineSchedule.tsx
 msgid "Every week"
 msgstr "Jede Woche"
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Everyone agreed to be recorded"
+msgstr ""
 
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Exact text"
@@ -7757,12 +7782,20 @@ msgstr "Mittel"
 msgid "Meeting"
 msgstr ""
 
+#: src/lib/meeting-capture/title.ts
+msgid "Meeting {time}"
+msgstr ""
+
 #: src/lib/slash-skills.ts
 msgid "Meeting notes"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Meeting notes and transcripts"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Meeting recording"
 msgstr ""
 
 #: src/pages/ContactDetail.tsx
@@ -7901,6 +7934,10 @@ msgstr ""
 
 #: src/components/fundraising/SafeDialog.tsx
 msgid "MFN"
+msgstr ""
+
+#: src/lib/meeting-capture/controller.ts
+msgid "Microphone access is blocked. Allow it in your browser and try again."
 msgstr ""
 
 #: src/lib/call-session.ts
@@ -8533,6 +8570,10 @@ msgstr ""
 msgid "No bots yet"
 msgstr ""
 
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "No call audio"
+msgstr ""
+
 #: src/pages/McpConnectionActivity.tsx
 msgid "No calls yet"
 msgstr ""
@@ -8736,6 +8777,10 @@ msgstr ""
 msgid "No newsletters in the last 7 days"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
+msgid "No one can record meetings in this space."
+msgstr ""
+
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "No open deadlines."
 msgstr ""
@@ -8821,6 +8866,10 @@ msgstr ""
 
 #: src/pages/Finance.tsx
 msgid "No spend in this period"
+msgstr ""
+
+#: src/lib/meeting-capture/controller.ts
+msgid "No tab was shared. Start again to pick one."
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -9137,6 +9186,7 @@ msgstr ""
 msgid "Obligation"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
 #: src/pages/Investors.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Off"
@@ -9144,6 +9194,10 @@ msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Off in Settings"
+msgstr ""
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Offline, saved here"
 msgstr ""
 
 #: src/components/pages/PageSourcesDialog.tsx
@@ -9551,6 +9605,10 @@ msgstr "Zurückstellen"
 
 #: src/components/UiArtifactView.tsx
 msgid "Part of this can't be shown."
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Part of this meeting could not be transcribed."
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -10448,6 +10506,14 @@ msgstr "Verbindung wird wiederhergestellt"
 msgid "Reconstructed"
 msgstr ""
 
+#: src/components/meeting-capture/RecordButton.tsx
+msgid "Record"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Recording"
+msgstr ""
+
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Recording may have started, but the view could not refresh"
 msgstr ""
@@ -10585,6 +10651,10 @@ msgstr ""
 
 #: src/pages/shell/transcript.tsx
 msgid "Remembered"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Remind"
 msgstr ""
 
 #: src/pages/Investors.tsx
@@ -12068,6 +12138,10 @@ msgstr ""
 msgid "Showing the emails it found"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Shows “Tell everyone you're recording.” before each recording."
+msgstr ""
+
 #: src/pages/shell/space-sidebar.tsx
 msgid "Sidebar"
 msgstr ""
@@ -12497,6 +12571,10 @@ msgstr ""
 msgid "Starred"
 msgstr ""
 
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Start"
+msgstr ""
+
 #: src/pages/Paywall.tsx
 msgid "Start {trialDays}-day free trial"
 msgstr ""
@@ -12611,6 +12689,7 @@ msgstr ""
 
 #: src/components/ai/primitives.tsx
 #: src/components/inbox/CleanupSenderRow.tsx
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/composer.tsx
 #: src/pages/shell/transcript.tsx
@@ -12720,6 +12799,10 @@ msgstr ""
 
 #: src/components/inbox/ContextPanel.tsx
 msgid "Summarizing"
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Summarizing…"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -12863,6 +12946,10 @@ msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Teams message"
+msgstr ""
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Tell everyone you're recording."
 msgstr ""
 
 #: src/pages/legal/LegalContracts.tsx
@@ -13313,6 +13400,7 @@ msgstr ""
 msgid "Time zone updated"
 msgstr ""
 
+#: src/components/meeting-capture/RecordForm.tsx
 #: src/pages/Board.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/Meetings.tsx
@@ -13482,6 +13570,7 @@ msgstr ""
 msgid "Transcribe"
 msgstr ""
 
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/pages/shell/dictation-button.tsx
 msgid "Transcribing…"
 msgstr ""

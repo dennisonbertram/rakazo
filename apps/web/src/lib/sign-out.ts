@@ -3,6 +3,7 @@ import { enqueueNotificationToast } from "@rakazo/ui-web";
 import { clearTourStep } from "../components/tour/TourPopover";
 import { clearAgentAppCache } from "./agent-app";
 import { authClient } from "./auth";
+import { clearCaptureOnSignOut } from "./meeting-capture/controller";
 import { clearSpaceSelection } from "./rpc";
 
 /**
@@ -24,5 +25,6 @@ export async function signOutAndLeave(
   clearTourStep(userId);
   clearAgentAppCache();
   clearSpaceSelection();
+  await clearCaptureOnSignOut();
   navigate("/");
 }

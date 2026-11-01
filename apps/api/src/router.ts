@@ -171,6 +171,7 @@ import type {
   ExportManifest,
   McpServer,
   Me,
+  MeetingRecordingPolicy,
   NotificationDto,
   Routine,
   SpaceNavigation,
@@ -9861,6 +9862,7 @@ async function memberSpaceNavigation(
           name: true,
           isDefault: true,
           deletingAt: true,
+          meetingRecording: true,
           _count: { select: { memberships: true } },
         },
       },
@@ -9933,6 +9935,8 @@ async function memberSpaceNavigation(
         isDefault: membership.space.isDefault,
         hasContent: spacesWithContent.has(membership.spaceId),
         memberCount: membership.space._count.memberships,
+        meetingRecording: membership.space.meetingRecording as MeetingRecordingPolicy,
+        canSetMeetingRecording: membership.role === "owner" || membership.role === "admin",
         canRename: membership.role === "owner" && membership.space.deletingAt === null,
         canDelete:
           membership.role === "owner" &&

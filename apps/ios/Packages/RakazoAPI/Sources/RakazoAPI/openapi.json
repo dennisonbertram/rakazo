@@ -10658,6 +10658,17 @@
                                 "exclusiveMinimum": 0,
                                 "maximum": 9007199254740991
                               },
+                              "meetingRecording": {
+                                "type": "string",
+                                "enum": [
+                                  "remind",
+                                  "confirm",
+                                  "off"
+                                ]
+                              },
+                              "canSetMeetingRecording": {
+                                "type": "boolean"
+                              },
                               "bots": {
                                 "type": "array",
                                 "items": {
@@ -116871,6 +116882,17 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "meetingRecording": {
+                          "type": "string",
+                          "enum": [
+                            "remind",
+                            "confirm",
+                            "off"
+                          ]
+                        },
+                        "canSetMeetingRecording": {
+                          "type": "boolean"
+                        },
                         "bots": {
                           "type": "array",
                           "items": {
@@ -117801,6 +117823,17 @@
                                 "type": "integer",
                                 "exclusiveMinimum": 0,
                                 "maximum": 9007199254740991
+                              },
+                              "meetingRecording": {
+                                "type": "string",
+                                "enum": [
+                                  "remind",
+                                  "confirm",
+                                  "off"
+                                ]
+                              },
+                              "canSetMeetingRecording": {
+                                "type": "boolean"
                               },
                               "bots": {
                                 "type": "array",
