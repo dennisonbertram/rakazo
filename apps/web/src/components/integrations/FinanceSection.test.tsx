@@ -351,3 +351,27 @@ it("keeps a connected tile's status row under its name, not pushed to the bottom
   const row = (p: string) => tile(p)?.querySelector(".flex.items-center.gap-2");
   expect(row("coinbase")?.className).not.toContain("mt-auto");
 });
+
+it("links a lapsed bank's name to its page so it can be removed, but not an unconnected one", async () => {
+  await show([
+    { ...source("mercury", "needs_reconnect"), serverId: "srv_m" },
+    source("brex", "not_connected"),
+  ]);
+  expect(tile("mercury")?.querySelector('a[href="/app/integrations/mcp/srv_m"]')).not.toBeNull();
+  expect(tile("brex")?.querySelector("a")).toBeNull();
+});
+
+it("puts a connected bank's Used by line above its action row, which sits at the bottom", async () => {
+  await show([source("mercury", "ok"), source("brex", "not_connected")], vi.fn(), {
+    mercury: <span>Used by Finance agent</span>,
+  });
+  const t = tile("mercury");
+  const extras = [...(t?.querySelectorAll("span") ?? [])].find((s) =>
+    s.textContent?.includes("Used by"),
+  );
+  const open = t?.querySelector('a[href="/app/finance"]');
+  expect(
+    extras!.compareDocumentPosition(open!) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(open?.parentElement?.className).toContain("mt-auto");
+});
