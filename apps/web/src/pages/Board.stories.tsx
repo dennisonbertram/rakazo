@@ -40,7 +40,7 @@ const ticket = (n: number, over: Partial<Ticket> = {}): Ticket => ({
 });
 
 const tickets = [
-  ticket(1),
+  ticket(1, { priority: "urgent" }),
   ticket(2, {
     status: "doing",
     assigneeBotId: "bot_b",
