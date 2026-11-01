@@ -73,6 +73,7 @@ export const StoredMeetingSchema = z.object({
   id: z.string(),
   title: z.string(),
   startedAt: IsoDate,
+  endedAt: IsoDate.nullable(),
   provider: z.string(),
 });
 export type StoredMeeting = z.infer<typeof StoredMeetingSchema>;
@@ -84,3 +85,21 @@ export const StoredMeetingsPageSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 export type StoredMeetingsPage = z.infer<typeof StoredMeetingsPageSchema>;
+
+/** One stored meeting for its page: what the digest found, the user's to-dos from it, and the transcript. */
+export const StoredMeetingDetailSchema = StoredMeetingSchema.extend({
+  summary: z.string(),
+  decisions: z.array(z.string()),
+  followUps: z.array(z.string()),
+  todos: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+      /** YYYY-MM-DD */
+      dueOn: z.string().nullable(),
+      doneAt: IsoDate.nullable(),
+    }),
+  ),
+  transcript: z.string().nullable(),
+});
+export type StoredMeetingDetail = z.infer<typeof StoredMeetingDetailSchema>;

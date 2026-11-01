@@ -625,6 +625,11 @@ msgstr "{late, plural, one {Overdue by # day} other {Overdue by # days}}"
 msgid "{legalSafes} SAFEs found in Legal"
 msgstr "{legalSafes} SAFEs found in Legal"
 
+#: src/pages/MeetingDetail.tsx
+#: src/pages/Meetings.tsx
+msgid "{minutes} min"
+msgstr "{minutes} min"
+
 #: src/lib/relative-time.ts
 msgid "{minutes}m ago"
 msgstr "{minutes}m ago"
@@ -2906,6 +2911,7 @@ msgstr "Clear filter"
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/Meetings.tsx
 msgid "Clear filters"
 msgstr "Clear filters"
 
@@ -4025,6 +4031,14 @@ msgstr "Could not load integrations"
 msgid "Could not load investors"
 msgstr "Could not load investors"
 
+#: src/pages/MeetingDetail.tsx
+msgid "Could not load meeting"
+msgstr "Could not load meeting"
+
+#: src/pages/Meetings.tsx
+msgid "Could not load meetings"
+msgstr "Could not load meetings"
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not load model settings"
 msgstr "Could not load model settings"
@@ -4799,6 +4813,7 @@ msgstr "Data room search model"
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
+#: src/pages/Meetings.tsx
 msgid "Date"
 msgstr "Date"
 
@@ -4835,6 +4850,10 @@ msgstr "days"
 msgid "Deadlines"
 msgstr "Deadlines"
 
+#: src/pages/MeetingDetail.tsx
+msgid "Decisions"
+msgstr "Decisions"
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Decline"
 msgstr "Decline"
@@ -4865,12 +4884,12 @@ msgstr "Default ({0})"
 #: src/components/data-room/Preview.tsx
 #: src/components/fundraising/SafeList.tsx
 #: src/components/integrations/OmiPage.tsx
-#: src/components/integrations/StoredMeetingsList.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
 #: src/pages/KnowledgeSection.tsx
+#: src/pages/MeetingDetail.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
@@ -4879,8 +4898,8 @@ msgstr "Default ({0})"
 msgid "Delete"
 msgstr "Delete"
 
-#. placeholder {0}: deleting?.title ?? ""
-#: src/components/integrations/StoredMeetingsList.tsx
+#. placeholder {0}: meeting?.title ?? ""
+#: src/pages/MeetingDetail.tsx
 msgid "Delete \"{0}\"?"
 msgstr "Delete \"{0}\"?"
 
@@ -5501,6 +5520,10 @@ msgstr "Due tomorrow"
 msgid "Duplicate"
 msgstr "Duplicate"
 
+#: src/pages/Meetings.tsx
+msgid "Duration"
+msgstr "Duration"
+
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Each bot keeps its own"
 msgstr "Each bot keeps its own"
@@ -6118,6 +6141,10 @@ msgstr "Folder"
 #: src/pages/CompanyImportScope.tsx
 msgid "Folders"
 msgstr "Folders"
+
+#: src/pages/MeetingDetail.tsx
+msgid "Follow-ups"
+msgstr "Follow-ups"
 
 #: src/components/AiDataSharing.tsx
 msgid "For bots, mail, files and contracts"
@@ -7739,6 +7766,9 @@ msgid "Meeting notes and transcripts"
 msgstr "Meeting notes and transcripts"
 
 #: src/pages/ContactDetail.tsx
+#: src/pages/Meetings.tsx
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
 msgid "Meetings"
 msgstr "Meetings"
 
@@ -8651,6 +8681,7 @@ msgstr "No mail matches this filter"
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/Meetings.tsx
 msgid "No matches"
 msgstr "No matches"
 
@@ -8673,7 +8704,7 @@ msgstr "No matching artifacts on this page."
 msgid "No matching models"
 msgstr "No matching models"
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/Meetings.tsx
 msgid "No meetings"
 msgstr "No meetings"
 
@@ -10722,11 +10753,11 @@ msgstr "Removes the audio, transcripts and meetings from Praci."
 msgid "Removes the connection and bot access."
 msgstr "Removes the connection and bot access."
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Removes this meeting and its to-dos from Praci."
 msgstr "Removes this meeting and its to-dos from Praci."
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Removes this meeting and its to-dos from Praci. Your note in Granola is not changed."
 msgstr "Removes this meeting and its to-dos from Praci. Your note in Granola is not changed."
 
@@ -11442,6 +11473,7 @@ msgstr "Scroll sideways to see the whole graph."
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
+#: src/pages/Meetings.tsx
 #: src/pages/shell/command-palette.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Search"
@@ -11982,8 +12014,8 @@ msgid "Show list"
 msgstr "Show list"
 
 #: src/components/integrations/IntegrationsHome.tsx
-#: src/components/integrations/StoredMeetingsList.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/pages/Meetings.tsx
 msgid "Show more"
 msgstr "Show more"
 
@@ -12327,6 +12359,7 @@ msgstr "Sorting your mail…"
 #: src/pages/Company.tsx
 #: src/pages/devin/DevinSessions.tsx
 #: src/pages/finance/FinanceTransaction.tsx
+#: src/pages/Meetings.tsx
 msgid "Source"
 msgstr "Source"
 
@@ -13282,6 +13315,7 @@ msgstr "Time zone updated"
 
 #: src/pages/Board.tsx
 #: src/pages/gtm/GtmPlan.tsx
+#: src/pages/Meetings.tsx
 msgid "Title"
 msgstr "Title"
 
@@ -13453,6 +13487,7 @@ msgid "Transcribing…"
 msgstr "Transcribing…"
 
 #: src/components/call/CallCard.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Transcript"
 msgstr "Transcript"
 
@@ -13516,6 +13551,8 @@ msgstr "Try {name} again"
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
+#: src/pages/MeetingDetail.tsx
+#: src/pages/Meetings.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
@@ -14623,6 +14660,10 @@ msgstr "Your own tool server"
 #: src/components/ComposeEmail.tsx
 msgid "Your text is saved as a draft. Attachments are not kept."
 msgstr "Your text is saved as a draft. Attachments are not kept."
+
+#: src/pages/MeetingDetail.tsx
+msgid "Your to-dos"
+msgstr "Your to-dos"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Yours"

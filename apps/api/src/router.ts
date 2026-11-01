@@ -590,6 +590,7 @@ import {
   connectGranola,
   deleteStoredMeeting,
   disconnectGranola,
+  getStoredMeeting,
   granolaStatus,
   listStoredMeetings,
   refreshGranola,
@@ -8449,7 +8450,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
         refreshGranola(meetingsFor(context.actor), context.actor),
       ),
       list: authed.meetings.list.handler(({ context, input }) =>
-        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor),
+        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor, input),
+      ),
+      get: authed.meetings.get.handler(({ context, input }) =>
+        getStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
       ),
       delete: authed.meetings.delete.handler(({ context, input }) =>
         deleteStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),

@@ -92,6 +92,7 @@ import {
   Megaphone,
   Menu,
   MessageSquare,
+  Mic,
   PanelLeftOpen,
   PanelRightClose,
   Pencil,
@@ -302,6 +303,8 @@ import { IntegrationsPage } from "./Integrations";
 import { InvestorsPage } from "./Investors";
 import { UpdateEditor } from "./investors/UpdateEditor";
 import { LegalPage } from "./Legal";
+import { MeetingDetailPage } from "./MeetingDetail";
+import { MeetingsPage } from "./Meetings";
 import { NotFoundPage } from "./NotFound";
 import { ResizableSidePanel } from "./ResizableSidePanel";
 import type { RoutineDraftState } from "./RoutineEditor";
@@ -1187,6 +1190,8 @@ export function ShellPage() {
   const investorUpdateMatch = useMatch("/app/investors/updates/:id");
   const fundraisingMode = useMatch("/app/fundraising") != null;
   const calendarMode = useMatch("/app/calendar") != null;
+  const meetingMatch = useMatch("/app/meetings/:meetingId");
+  const meetingsMode = useMatch("/app/meetings") != null || meetingMatch != null;
   const contactMatch = useMatch("/app/contacts/:contactId");
   const contactsMode = useMatch("/app/contacts") != null || contactMatch != null;
   const botPageMatch = useMatch("/app/pages/:botId/:pageId");
@@ -1205,6 +1210,7 @@ export function ShellPage() {
     dataRoomMode ||
     artifactsMode ||
     contactsMode ||
+    meetingsMode ||
     calendarMode ||
     boardMode ||
     botPageMatch != null;
@@ -1243,6 +1249,7 @@ export function ShellPage() {
     integrationsMode ||
     artifactsMode ||
     contactsMode ||
+    meetingsMode ||
     calendarMode ||
     boardMode ||
     botPageMatch != null
@@ -2427,6 +2434,7 @@ export function ShellPage() {
       },
       { id: "company", label: t`Company`, icon: <Building2 {...icon} /> },
       { id: "calendar", label: t`Calendar`, icon: <CalendarDays {...icon} /> },
+      { id: "meetings", label: t`Meetings`, icon: <Mic {...icon} /> },
       { id: "contacts", label: t`Contacts`, icon: <BookUser {...icon} /> },
       { id: "data-room", label: t`Data room`, icon: <FolderOpen {...icon} /> },
       { id: "artifacts", label: t`Artifacts`, icon: <Files {...icon} /> },
@@ -4865,6 +4873,7 @@ export function ShellPage() {
         investorsMode={investorsMode}
         fundraisingMode={fundraisingMode}
         contactsMode={contactsMode}
+        meetingsMode={meetingsMode}
         calendarMode={calendarMode}
         companyMode={companyMode}
         dataRoomMode={dataRoomMode}
@@ -5179,6 +5188,13 @@ export function ShellPage() {
                   : undefined
               }
             />
+          ) : meetingMatch?.params.meetingId ? (
+            <MeetingDetailPage
+              meetingId={meetingMatch.params.meetingId}
+              spaceName={pageSpaceName}
+            />
+          ) : meetingsMode ? (
+            <MeetingsPage spaceName={pageSpaceName} />
           ) : contactMatch?.params.contactId ? (
             <ContactDetailPage id={contactMatch.params.contactId} spaceName={pageSpaceName} />
           ) : botPageMatch?.params.botId && botPageMatch.params.pageId ? (

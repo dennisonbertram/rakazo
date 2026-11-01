@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 324 of 324
-- Web and shared components: 835
+- Web and shared component files with stories: 326 of 326
+- Web and shared components: 840
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 126 in 67 files, native story pending
 
@@ -291,7 +291,6 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SegmentRow, OmiSegments, OmiTrash | [apps/web/src/components/integrations/OmiSegments.tsx](../../apps/web/src/components/integrations/OmiSegments.tsx) | [OmiPage.stories.tsx](../../apps/web/src/components/integrations/OmiPage.stories.tsx), [OmiSegments.stories.tsx](../../apps/web/src/components/integrations/OmiSegments.stories.tsx) | web |
 | IntegrationTile, StatusBadge, TileMenu, AgentStack, AgentToggleList, CardHead, SectionTitle, SourceBadge | [apps/web/src/components/integrations/parts.tsx](../../apps/web/src/components/integrations/parts.tsx) | [parts.stories.tsx](../../apps/web/src/components/integrations/parts.stories.tsx) | web |
 | SignInStep | [apps/web/src/components/integrations/SignInStep.tsx](../../apps/web/src/components/integrations/SignInStep.tsx) | [SignInStep.stories.tsx](../../apps/web/src/components/integrations/SignInStep.stories.tsx) | web |
-| StoredMeetingsList | [apps/web/src/components/integrations/StoredMeetingsList.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.tsx) | [StoredMeetingsList.stories.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.stories.tsx) | web |
 
 ## Web components/investors
 
@@ -397,6 +396,8 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | McpConsent, McpConsentPage | [apps/web/src/pages/McpConsent.tsx](../../apps/web/src/pages/McpConsent.tsx) | [McpConsent.stories.tsx](../../apps/web/src/pages/McpConsent.stories.tsx) | web |
 | McpOAuthCallbackPage | [apps/web/src/pages/McpOAuthCallback.tsx](../../apps/web/src/pages/McpOAuthCallback.tsx) | [McpOAuthCallback.stories.tsx](../../apps/web/src/pages/McpOAuthCallback.stories.tsx) | web |
 | CopyBox, McpTokenReveal, McpTokenDialog | [apps/web/src/pages/McpTokenDialog.tsx](../../apps/web/src/pages/McpTokenDialog.tsx) | [McpTokenDialog.stories.tsx](../../apps/web/src/pages/McpTokenDialog.stories.tsx) | web |
+| Section, Row, MeetingDetailPage | [apps/web/src/pages/MeetingDetail.tsx](../../apps/web/src/pages/MeetingDetail.tsx) | [MeetingDetail.stories.tsx](../../apps/web/src/pages/MeetingDetail.stories.tsx) | web |
+| MeetingsPage | [apps/web/src/pages/Meetings.tsx](../../apps/web/src/pages/Meetings.tsx) | [Meetings.stories.tsx](../../apps/web/src/pages/Meetings.stories.tsx) | web |
 | SerenitySettingsForm | [apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx) | [SerenitySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.stories.tsx) | web |
 | SupermemorySettingsForm | [apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx) | [SupermemorySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.stories.tsx) | web |
 | ScopePicker, MemorySettingsOverlay | [apps/web/src/pages/MemorySettingsOverlay.tsx](../../apps/web/src/pages/MemorySettingsOverlay.tsx) | [MemorySettingsOverlay.stories.tsx](../../apps/web/src/pages/MemorySettingsOverlay.stories.tsx) | web |
