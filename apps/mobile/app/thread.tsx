@@ -1673,10 +1673,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
       }
       return;
     }
-    router.push({
-      pathname: "/account",
-      params: action === "settings-usage" ? { focus: "usage" } : undefined,
-    });
+    router.push({ pathname: "/account" });
   }
 
   async function send() {

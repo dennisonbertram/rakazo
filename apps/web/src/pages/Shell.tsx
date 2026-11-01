@@ -4690,13 +4690,7 @@ export function ShellPage() {
                   if (pageMode && active) openBot(active.id);
                   return;
                 }
-                if (action === "settings-general") {
-                  openSettings("general");
-                  return;
-                }
-                if (action === "settings-usage") {
-                  openSettings("general");
-                }
+                openSettings("general");
               }}
             />
           ) : null}
