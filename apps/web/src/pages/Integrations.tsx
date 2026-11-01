@@ -5,7 +5,6 @@ import { IntegrationsHome } from "../components/integrations/IntegrationsHome";
 import { McpDetail } from "../components/integrations/McpDetail";
 import { OmiPage } from "../components/integrations/OmiPage";
 import { OmiTrash } from "../components/integrations/OmiSegments";
-import { StoredMeetingsList } from "../components/integrations/StoredMeetingsList";
 import { useIntegrations } from "../components/integrations/useIntegrations";
 import { IntegrationSetupPage } from "./IntegrationSetup";
 
@@ -32,7 +31,6 @@ export function IntegrationsPage({
         path="granola"
         element={<GranolaPage data={data} onOpenAiDataSharing={onOpenAiDataSharing} />}
       />
-      <Route path="granola/meetings" element={<StoredMeetingsList />} />
       <Route
         path="omi"
         element={<OmiPage data={data} onOpenVoiceSettings={onOpenVoiceSettings} />}

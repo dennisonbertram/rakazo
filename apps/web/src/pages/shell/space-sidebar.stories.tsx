@@ -281,6 +281,7 @@ export function SidebarFixture({
     investorsMode,
     fundraisingMode,
     contactsMode: false,
+    meetingsMode: false,
     calendarMode: false,
     companyMode: false,
     dataRoomMode: false,

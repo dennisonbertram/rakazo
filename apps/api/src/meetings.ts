@@ -9,7 +9,12 @@ import {
   requestMeetingSync,
   selectConfiguredModel,
 } from "@rakazo/adapters";
-import type { Actor, MeetingsStatus, StoredMeetingsPage } from "@rakazo/contracts";
+import type {
+  Actor,
+  MeetingsStatus,
+  StoredMeetingDetail,
+  StoredMeetingsPage,
+} from "@rakazo/contracts";
 import {
   AI_DISCLOSURE_VERSION,
   GRANOLA_API_CONNECTOR_ID,
@@ -17,11 +22,11 @@ import {
 } from "@rakazo/contracts";
 import {
   deleteMeeting,
-  findDefaultModelCredential,
   findBotModelCredential,
-  ignorePinnedConnectionLost,
+  findDefaultModelCredential,
   getMeetingSyncState,
   IsolationError,
+  ignorePinnedConnectionLost,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import type { ensureConnectedAppAgent } from "./integration-agent.js";
@@ -311,16 +316,61 @@ export async function listStoredMeetings(
       : {};
   const rows = await deps.router.prisma.meeting.findMany({
     where: { ...owner(actor), deletedAt: null, ...after },
-    select: { id: true, title: true, startedAt: true, provider: true },
+    select: { id: true, title: true, startedAt: true, endedAt: true, provider: true },
     orderBy: [{ startedAt: "desc" }, { id: "asc" }],
     take: STORED_MEETINGS_PAGE_SIZE + 1,
   });
   const page = rows.slice(0, STORED_MEETINGS_PAGE_SIZE);
   const last = page[page.length - 1];
   return {
-    items: page.map((row) => ({ ...row, startedAt: row.startedAt.toISOString() })),
+    items: page.map((row) => ({
+      ...row,
+      startedAt: row.startedAt.toISOString(),
+      endedAt: row.endedAt?.toISOString() ?? null,
+    })),
     nextCursor:
       rows.length > page.length && last ? `${last.startedAt.toISOString()}|${last.id}` : null,
+  };
+}
+
+const strings = (value: unknown) =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+
+/** One of the actor's meetings; anyone else's, in any space, is not found. */
+export async function getStoredMeeting(
+  deps: MeetingsDeps,
+  actor: Actor,
+  meetingId: string,
+): Promise<StoredMeetingDetail> {
+  const row = await deps.router.prisma.meeting.findFirst({
+    where: { id: meetingId, ...owner(actor), deletedAt: null },
+    include: {
+      inboxTodos: {
+        where: owner(actor),
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, text: true, dueOn: true, doneAt: true },
+      },
+    },
+  });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Meeting not found" });
+  const digest =
+    row.digestStatus === "done" ? (row.digest as Record<string, unknown> | null) : null;
+  return {
+    id: row.id,
+    title: row.title,
+    startedAt: row.startedAt.toISOString(),
+    endedAt: row.endedAt?.toISOString() ?? null,
+    provider: row.provider,
+    summary: row.summary,
+    decisions: strings(digest?.decisions),
+    followUps: strings(digest?.followUps),
+    todos: row.inboxTodos.map((todo) => ({
+      id: todo.id,
+      text: todo.text,
+      dueOn: todo.dueOn ? todo.dueOn.toISOString().slice(0, 10) : null,
+      doneAt: todo.doneAt?.toISOString() ?? null,
+    })),
+    transcript: row.transcript,
   };
 }
 

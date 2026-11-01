@@ -594,4 +594,47 @@ describePostgres("meetings.* (PostgreSQL)", () => {
       [],
     );
   });
+
+  it("returns one meeting with its digest and to-dos to its owner only", async () => {
+    const meeting = await prisma.meeting.create({
+      data: {
+        spaceId,
+        userId: userA,
+        provider: "hex",
+        externalId: id("get"),
+        title: "Invented sync",
+        startedAt: new Date("2026-01-02T10:00:00Z"),
+        endedAt: new Date("2026-01-02T10:30:00Z"),
+        sourceUpdatedAt: new Date(),
+        transcript: "Ada: hello",
+        digestStatus: "done",
+        digest: {
+          decisions: ["Ship it"],
+          followUps: ["Who books?"],
+          commitments: [],
+          identity: "x",
+        },
+      },
+    });
+    await prisma.inboxTodo.create({
+      data: { spaceId, userId: userA, meetingId: meeting.id, text: "Send the deck" },
+    });
+    const got = await client(a).meetings.get({ meetingId: meeting.id });
+    expect(got).toMatchObject({
+      title: "Invented sync",
+      provider: "hex",
+      endedAt: "2026-01-02T10:30:00.000Z",
+      decisions: ["Ship it"],
+      followUps: ["Who books?"],
+      transcript: "Ada: hello",
+    });
+    expect(got.todos.map((todo) => todo.text)).toEqual(["Send the deck"]);
+    // Another user in the same space, and the same user in another space, find nothing.
+    await expect(client(b).meetings.get({ meetingId: meeting.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    await expect(client(aOtherSpace).meetings.get({ meetingId: meeting.id })).rejects.toMatchObject(
+      { code: "NOT_FOUND" },
+    );
+  });
 });

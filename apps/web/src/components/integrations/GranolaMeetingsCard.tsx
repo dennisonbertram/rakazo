@@ -10,7 +10,7 @@ import { errorText } from "../../lib/user-error";
 import { Shimmer } from "../ai/primitives";
 import { IntegrationAgentSection } from "./IntegrationAgentSection";
 
-export const GRANOLA_MEETINGS_PATH = "/app/integrations/granola/meetings";
+export const GRANOLA_MEETINGS_PATH = "/app/meetings?source=granola";
 const KEY_HELP_URL = "https://docs.granola.ai/help-center/sharing/integrations/granola-api";
 
 type Line = "reconnect" | "consent" | "syncing" | "synced";

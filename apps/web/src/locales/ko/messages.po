@@ -625,6 +625,11 @@ msgstr ""
 msgid "{legalSafes} SAFEs found in Legal"
 msgstr ""
 
+#: src/pages/MeetingDetail.tsx
+#: src/pages/Meetings.tsx
+msgid "{minutes} min"
+msgstr ""
+
 #: src/lib/relative-time.ts
 msgid "{minutes}m ago"
 msgstr "{minutes}분 전"
@@ -2906,6 +2911,7 @@ msgstr ""
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/Meetings.tsx
 msgid "Clear filters"
 msgstr ""
 
@@ -4025,6 +4031,14 @@ msgstr "연동 목록을 불러오지 못했습니다."
 msgid "Could not load investors"
 msgstr ""
 
+#: src/pages/MeetingDetail.tsx
+msgid "Could not load meeting"
+msgstr ""
+
+#: src/pages/Meetings.tsx
+msgid "Could not load meetings"
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not load model settings"
 msgstr "AI 모델 설정을 불러오지 못했습니다."
@@ -4799,6 +4813,7 @@ msgstr ""
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
+#: src/pages/Meetings.tsx
 msgid "Date"
 msgstr ""
 
@@ -4835,6 +4850,10 @@ msgstr "일"
 msgid "Deadlines"
 msgstr ""
 
+#: src/pages/MeetingDetail.tsx
+msgid "Decisions"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Decline"
 msgstr "거절"
@@ -4865,12 +4884,12 @@ msgstr "기본값 ({0})"
 #: src/components/data-room/Preview.tsx
 #: src/components/fundraising/SafeList.tsx
 #: src/components/integrations/OmiPage.tsx
-#: src/components/integrations/StoredMeetingsList.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
 #: src/pages/KnowledgeSection.tsx
+#: src/pages/MeetingDetail.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
@@ -4879,8 +4898,8 @@ msgstr "기본값 ({0})"
 msgid "Delete"
 msgstr "삭제"
 
-#. placeholder {0}: deleting?.title ?? ""
-#: src/components/integrations/StoredMeetingsList.tsx
+#. placeholder {0}: meeting?.title ?? ""
+#: src/pages/MeetingDetail.tsx
 msgid "Delete \"{0}\"?"
 msgstr ""
 
@@ -5501,6 +5520,10 @@ msgstr ""
 msgid "Duplicate"
 msgstr "복제"
 
+#: src/pages/Meetings.tsx
+msgid "Duration"
+msgstr ""
+
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Each bot keeps its own"
 msgstr ""
@@ -6117,6 +6140,10 @@ msgstr ""
 #: src/components/data-room/FolderTree.tsx
 #: src/pages/CompanyImportScope.tsx
 msgid "Folders"
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Follow-ups"
 msgstr ""
 
 #: src/components/AiDataSharing.tsx
@@ -7739,6 +7766,9 @@ msgid "Meeting notes and transcripts"
 msgstr ""
 
 #: src/pages/ContactDetail.tsx
+#: src/pages/Meetings.tsx
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
 msgid "Meetings"
 msgstr ""
 
@@ -8651,6 +8681,7 @@ msgstr ""
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/Meetings.tsx
 msgid "No matches"
 msgstr ""
 
@@ -8673,7 +8704,7 @@ msgstr ""
 msgid "No matching models"
 msgstr "일치하는 모델 없음"
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/Meetings.tsx
 msgid "No meetings"
 msgstr ""
 
@@ -10722,11 +10753,11 @@ msgstr ""
 msgid "Removes the connection and bot access."
 msgstr ""
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Removes this meeting and its to-dos from Praci."
 msgstr ""
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Removes this meeting and its to-dos from Praci. Your note in Granola is not changed."
 msgstr ""
 
@@ -11442,6 +11473,7 @@ msgstr ""
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
+#: src/pages/Meetings.tsx
 #: src/pages/shell/command-palette.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Search"
@@ -11982,8 +12014,8 @@ msgid "Show list"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
-#: src/components/integrations/StoredMeetingsList.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/pages/Meetings.tsx
 msgid "Show more"
 msgstr "더 보기"
 
@@ -12327,6 +12359,7 @@ msgstr ""
 #: src/pages/Company.tsx
 #: src/pages/devin/DevinSessions.tsx
 #: src/pages/finance/FinanceTransaction.tsx
+#: src/pages/Meetings.tsx
 msgid "Source"
 msgstr ""
 
@@ -13282,6 +13315,7 @@ msgstr ""
 
 #: src/pages/Board.tsx
 #: src/pages/gtm/GtmPlan.tsx
+#: src/pages/Meetings.tsx
 msgid "Title"
 msgstr "역할"
 
@@ -13453,6 +13487,7 @@ msgid "Transcribing…"
 msgstr ""
 
 #: src/components/call/CallCard.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Transcript"
 msgstr "대화 기록"
 
@@ -13516,6 +13551,8 @@ msgstr ""
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
+#: src/pages/MeetingDetail.tsx
+#: src/pages/Meetings.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
@@ -14622,6 +14659,10 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 msgid "Your text is saved as a draft. Attachments are not kept."
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Your to-dos"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
