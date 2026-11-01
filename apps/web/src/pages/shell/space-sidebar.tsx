@@ -83,10 +83,7 @@ import {
 import { glanceBadge, rowStatusKind, StatusMark } from "../../components/sidebar-glance";
 import { STICKY_GROUP_HEADER } from "../../components/sticky-group-header";
 import { FirstRunTour } from "../../components/tour/FirstRunTour";
-import { clearTourStep } from "../../components/tour/TourPopover";
 import type { AgentApp } from "../../lib/agent-app";
-import { clearAgentAppCache } from "../../lib/agent-app";
-import { authClient } from "../../lib/auth";
 import { desktopBridge } from "../../lib/desktop";
 import { maskCurrencyWhenHidden } from "../../lib/hide-amounts-preference";
 import { LEGAL_DUE_SOON_PATH } from "../../lib/legal-format";
@@ -100,8 +97,9 @@ import {
   rosterWorkStatusLabel,
 } from "../../lib/roster-status";
 import { formatRosterTime } from "../../lib/roster-time";
-import { clearSpaceSelection, rpc } from "../../lib/rpc";
+import { rpc } from "../../lib/rpc";
 import { sidebarInert } from "../../lib/shell-layout";
+import { signOutAndLeave } from "../../lib/sign-out";
 import { isCoarsePointer } from "../../lib/visual-viewport";
 import { ActivityList } from "../ActivityList";
 import type { ContextMenuPosition } from "../BotContextMenu";
@@ -2056,14 +2054,12 @@ export function SpaceSidebar({
             role="menuitem"
             variant="ghost"
             className="w-full justify-start font-normal"
-            onClick={() =>
-              void authClient.signOut().then(() => {
-                clearTourStep(userId);
-                clearAgentAppCache();
-                clearSpaceSelection();
-                navigate("/");
-              })
-            }
+            onClick={() => {
+              // The toaster hides toasts while a menu or the drawer is open; close both so a failure shows.
+              setMenuOpen(false);
+              setMobileSidebarOpen(false);
+              void signOutAndLeave(navigate, userId);
+            }}
           >
             <LogOut className="text-muted-foreground" strokeWidth={1.75} />
             <Trans>Log out</Trans>
