@@ -97,8 +97,14 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
   const people = data?.entities.filter((row) => row.kind === "person") ?? [];
   const organisations = data?.entities.filter((row) => row.kind === "organisation") ?? [];
   const profile = data?.entities.find((row) => row.kind === "company");
+  // Unconfirmed low-confidence people are not in the page data, but they are in Review.
+  const reviewed = (review.data?.items ?? []).flatMap((item) =>
+    item.kind === "fact" && item.fact.kind === "entity" ? [item.fact.record] : [],
+  );
   const names = new Map(
-    (data?.entities ?? []).filter((row) => row !== profile).map((row) => [row.id, row.displayName]),
+    [...(data?.entities ?? []), ...reviewed]
+      .filter((row) => row.id !== profile?.id)
+      .map((row) => [row.id, row.displayName]),
   );
   const nameOf = (id: string) => names.get(id);
   const roles = (id: string) =>

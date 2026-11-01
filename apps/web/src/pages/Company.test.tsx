@@ -132,3 +132,23 @@ it("names the person on a Review edge card", async () => {
   ]);
   expect(container.textContent).toContain("Alex Reed · Engineer");
 });
+
+it("names a person who is only in Review", async () => {
+  const [person] = companyFixture.entities.filter((row) => row.kind === "person");
+  const edge = companyFixture.edges[0]!;
+  await show("review", [], {}, [
+    {
+      kind: "fact",
+      id: "entity:person",
+      reason: "contradiction",
+      fact: { kind: "entity", record: person },
+    },
+    {
+      kind: "fact",
+      id: "edge:employment",
+      reason: "contradiction",
+      fact: { kind: "edge", record: edge },
+    },
+  ]);
+  expect(container.textContent).toContain("Alex Reed · Engineer");
+});
