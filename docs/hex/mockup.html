@@ -4,471 +4,118 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hex meetings and dictation mockup</title>
-<!--
-Mockup for docs/hex/PLAN.md. Sample data is invented (Dana, Sam, Northwind, example.com).
-Colors are the semantic tokens from packages/ui-tokens/src/tokens.css (light and dark). Light/dark follow the OS; the button at the top right toggles.
-Layout classes follow docs/omi/mockup.html. Open a screen with mockup.html#screen-id. State pills switch one screen's states.
-Everything inside a window frame is product UI; notes under a frame are for reviewers only.
-Fields shown are only those the plan's data model stores: Meeting title, startedAt/endedAt, provider, digest decisions and followUps, InboxTodo rows, transcript, and the derived `partial` flag.
--->
 <style>
-:root{
-  --background:#fafaf8; --fg:#1a1a1a; --card:#fff; --muted:#f0f0ed; --muted-fg:#666669;
-  --primary:#1a1a1a; --primary-fg:#f1f1ef; --destructive:#dc2626; --border:#e8e8e4;
-  --sidebar:#ecece9; --sidebar-accent:#fff; --success:#228b3b; --warning:#b7791f; --bot:#b9501c; --field:#8a8a8a;
-  color-scheme:light;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --background:#1c1c1a; --fg:#ecebe6; --card:#252523; --muted:#2a2927; --muted-fg:#9c9a93;
-    --primary:#f1f0eb; --primary-fg:#1c1c1a; --destructive:#f46262; --border:#2e2d2a;
-    --sidebar:#222220; --sidebar-accent:#2a2927; --success:#4ecb71; --warning:#e9c46a; --bot:#bd4f23; --field:#6f6e69;
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --background:#1c1c1a; --fg:#ecebe6; --card:#252523; --muted:#2a2927; --muted-fg:#9c9a93;
-  --primary:#f1f0eb; --primary-fg:#1c1c1a; --destructive:#f46262; --border:#2e2d2a;
-  --sidebar:#222220; --sidebar-accent:#2a2927; --success:#4ecb71; --warning:#e9c46a; --bot:#bd4f23; --field:#6f6e69;
-  color-scheme:dark;
-}
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-html{scroll-behavior:smooth;scroll-padding-top:56px}
-body{margin:0;background:var(--background);color:var(--fg);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif}
-button,input,select{font:inherit;color:inherit}
-button{cursor:pointer}
-a{color:inherit}
-:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
-svg{flex:none}
-/* mockup chrome */
-.index{position:sticky;top:0;z-index:50;display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--card);overflow-x:auto;white-space:nowrap}
-.index b{font-size:11px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
-.index a,.pill{display:inline-flex;align-items:center;min-height:32px;padding:4px 12px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--muted-fg);font-size:12px;text-decoration:none}
-.index a:hover{background:var(--muted)}
-.index button{margin-left:auto}
-.pill.on{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
-.screens{max-width:1120px;margin:0 auto;padding:12px 16px 80px}
-.screen{padding-top:28px}
-.sh{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-.sh h2{margin:0;font-size:16px}
-.sh .sw{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
-.note{color:var(--muted-fg);font-size:12px;margin:8px 0 0;max-width:760px}
-/* app window */
-.win{position:relative;display:grid;grid-template-columns:200px 1fr;border:1px solid var(--border);border-radius:12px;overflow:hidden;min-height:320px;background:var(--background)}
-.win.nosb{grid-template-columns:1fr}
-.side{background:var(--sidebar);border-right:1px solid var(--border);padding:10px 8px;display:flex;flex-direction:column;gap:2px}
-.row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px}
-.row.active{background:var(--sidebar-accent);font-weight:600}
-.lbl{font-size:11px;color:var(--muted-fg);padding:12px 8px 4px}
-.av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;flex:none;background:var(--bot)}
-.main{display:flex;flex-direction:column;min-width:0}
-.pane{padding:22px 26px 30px;min-width:0;position:relative;flex:1}
-.pane h1{font-size:19px;margin:0}
-.ph{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.ph .r{margin-left:auto;display:flex;gap:8px;align-items:center}
-.sec{font-size:13px;margin:20px 0 8px;font-weight:600}
-.mut{color:var(--muted-fg)}.ok-t{color:var(--success)}.err-t{color:var(--destructive)}.warn-t{color:var(--warning)}
-.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 12px;font-weight:500;min-height:32px}
-.btn:hover{background:var(--muted)}
-.btn.pri{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
-.btn.sm{padding:4px 10px;font-size:12px;min-height:28px}
-.btn.bad{color:var(--destructive)}
-.btn.ghost{border-color:transparent;background:transparent;color:var(--muted-fg)}
-.btn[disabled]{opacity:.45;cursor:default}
-.panel{background:var(--card);border:1px solid var(--border);border-radius:12px}
-.pr{display:flex;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--border)}
-.pr:first-child{border-top:0}.pr .grow{flex:1;min-width:0}.pr small{color:var(--muted-fg);display:block;font-size:12px}
-.pr .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-a.pr{text-decoration:none;color:inherit}a.pr:hover{background:var(--muted)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--destructive);flex:none;animation:pulse 1.4s ease-in-out infinite}
-@keyframes pulse{50%{opacity:.35}}
-@media (prefers-reduced-motion:reduce){.dot,.shim,.bars i{animation:none}}
-input.f{width:100%;padding:8px 10px;border:1px solid var(--field);border-radius:8px;background:var(--card)}
-.fld{display:block;margin:0 0 12px}.fld>span{display:block;font-size:12px;color:var(--muted-fg);margin-bottom:4px}
-.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid currentColor}
-.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.badge.ok{color:var(--success)}.badge.warn{color:var(--warning)}.badge.err{color:var(--destructive)}.badge.pend{color:var(--muted-fg)}
-/* recording pill (shell) */
-.recbar{display:flex;justify-content:center;padding:8px 12px 0}
-.rec{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--card);border-radius:999px;padding:4px 4px 4px 12px;box-shadow:0 2px 10px rgba(0,0,0,.08);max-width:100%}
-.rec .ti{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-.rec .tm{font-variant-numeric:tabular-nums;color:var(--muted-fg)}
-.rec .btn{border-radius:999px}
-/* composer */
-.thread{display:flex;flex-direction:column;gap:12px;max-width:640px;margin:0 auto;width:100%}
-.me{align-self:flex-end;background:var(--muted);padding:8px 12px;border-radius:14px;max-width:85%}
-.composer{max-width:640px;margin:18px auto 0;width:100%;border:1px solid var(--border);border-radius:20px;background:var(--card);padding:10px 10px 10px 14px;display:flex;align-items:flex-end;gap:8px}
-.composer .txt{flex:1;min-height:24px;font-size:15px;line-height:24px;color:var(--fg);white-space:pre-wrap}
-.composer .ph-t{color:var(--muted-fg)}
-.ic{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--border);background:transparent;color:var(--muted-fg);flex:none}
-.ic.send{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
-.ic.send[disabled]{background:var(--muted);color:var(--muted-fg);border-color:var(--muted)}
-.ic.live{background:var(--destructive);border-color:var(--destructive);color:#fff}
-.bars{display:inline-flex;gap:2px;align-items:center;height:16px}
-.bars i{display:block;width:3px;border-radius:2px;background:var(--destructive);animation:bar 1s ease-in-out infinite}
-.bars i:nth-child(2){animation-delay:.15s}.bars i:nth-child(3){animation-delay:.3s}.bars i:nth-child(4){animation-delay:.45s}.bars i:nth-child(5){animation-delay:.6s}
-@keyframes bar{0%,100%{height:4px}50%{height:14px}}
-.shim{background:linear-gradient(90deg,var(--muted-fg) 0%,var(--fg) 50%,var(--muted-fg) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sh 1.6s linear infinite}
-@keyframes sh{to{background-position:-200% 0}}
-.cerr{max-width:640px;margin:6px auto 0;font-size:12px;color:var(--destructive);width:100%}
-/* popover / dialog */
-.pop{position:absolute;right:26px;top:62px;z-index:3;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.16);width:300px;max-width:calc(100% - 32px);display:flex;flex-direction:column;gap:10px}
-.chk{display:flex;gap:8px;align-items:flex-start;min-height:32px}
-.chk input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--primary)}
-/* detail */
-.meta{color:var(--muted-fg);margin:4px 0 0}
-ul.plain{margin:0;padding-left:18px}ul.plain li{margin:3px 0}
-.todo{list-style:none;margin:0;padding:0}
-.todo li{display:flex;gap:10px;align-items:flex-start;padding:8px 14px;border-top:1px solid var(--border)}
-.todo li:first-child{border-top:0}
-.todo input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--primary)}
-.todo .due{margin-left:auto;font-size:12px;color:var(--muted-fg);white-space:nowrap}
-details.tr{margin-top:20px}
-details.tr summary{font-weight:600;cursor:pointer;min-height:32px;display:flex;align-items:center}
-.lines{display:flex;flex-direction:column;gap:8px;padding:6px 0 0}
-.lines p{margin:0}.lines b{font-weight:600}.lines .them b{color:var(--muted-fg)}
-.lines time{color:var(--muted-fg);font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
-.alert{border:1px solid var(--border);background:var(--muted);border-radius:10px;padding:8px 12px;margin:12px 0 0}
-/* integrations */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.card .top{display:flex;gap:12px;align-items:center}
-.logo{width:40px;height:40px;border-radius:10px;border:1px solid var(--border);background:var(--muted);color:var(--muted-fg);display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
-.card .nm{font-weight:600}.card .ds{color:var(--muted-fg);font-size:12px}
-/* settings dialog */
-.dlg{border:1px solid var(--border);border-radius:14px;background:var(--card);overflow:hidden}
-.dlg .hd{display:flex;align-items:center;padding:18px 22px 0}.dlg .hd h1{font-size:20px;font-weight:500;margin:0}
-.dlg .bd{display:flex;gap:22px;padding:18px 22px 22px;flex-wrap:wrap}
-.plist{width:260px;max-width:100%;flex:none}
-.plist .list{border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.plist button{display:flex;width:100%;align-items:center;gap:10px;border:0;border-bottom:1px solid var(--border);background:transparent;padding:10px 12px;text-align:left}
-.plist button:last-child{border-bottom:0}
-.plist button.cur{background:var(--muted)}
-.plist .n{display:block;font-size:14px}.plist .k{display:block;font-size:12px;color:var(--muted-fg)}
-.plist .c{margin-left:auto;font-size:12px;color:var(--success)}
-.pdet{flex:1;min-width:240px}
-.prog{height:6px;border-radius:3px;background:var(--muted);overflow:hidden;margin:8px 0}.prog i{display:block;height:100%;width:42%;background:var(--primary)}
-.radio{display:flex;flex-direction:column;gap:4px}
-.radio label{display:flex;gap:10px;align-items:flex-start;padding:8px 0;min-height:32px}
-.radio input{margin:3px 0 0;accent-color:var(--primary)}
-.radio small{display:block;color:var(--muted-fg)}
-@media (max-width:720px){
-  .win{grid-template-columns:1fr}.side{display:none}
-  .pane{padding:18px 16px 24px}
-  .pop{right:16px}
-}
+  :root { --bg:#fafaf9; --fg:#1a1a1a; --mut:#6b6b66; --bd:#dcdcd6; --card:#fff; --on:#1a1a1a; --onfg:#fff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#161616; --fg:#ececea; --mut:#9a9a94; --bd:#333; --card:#1f1f1f; --on:#ececea; --onfg:#161616; } }
+  :root[data-theme="dark"] { --bg:#161616; --fg:#ececea; --mut:#9a9a94; --bd:#333; --card:#1f1f1f; --on:#ececea; --onfg:#161616; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
+  header { position:sticky; top:0; z-index:2; background:var(--bg); border-bottom:1px solid var(--bd); padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  header h1 { font-size:15px; margin:0 12px 0 0; }
+  nav { display:flex; flex-wrap:wrap; gap:6px; flex:1; }
+  button { font:inherit; font-size:13px; border:1px solid var(--bd); background:var(--card); color:var(--fg); border-radius:999px; padding:3px 12px; cursor:pointer; }
+  button[aria-pressed="true"] { background:var(--on); color:var(--onfg); border-color:var(--on); }
+  main { max-width:1320px; margin:0 auto; padding:16px; }
+  section { display:none; } section.show { display:block; }
+  .states { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
+  figure { margin:0; }
+  img { display:block; max-width:100%; height:auto; border:1px solid var(--bd); border-radius:10px; }
+  img.phone { max-width:390px; }
+  figcaption { margin:8px 0 0; color:var(--mut); font-size:13px; }
+  .tag { display:inline-block; border:1px solid var(--bd); border-radius:999px; padding:0 8px; margin-right:6px; font-size:12px; color:var(--fg); }
+  .note { color:var(--mut); font-size:13px; max-width:900px; margin:14px 0 0; }
+  code { font-size:12px; }
 </style>
 </head>
 <body>
-<nav class="index" aria-label="Screens">
-  <b>Screens</b>
-  <a href="#composer">Composer dictation</a>
-  <a href="#meetings">Meetings + Record</a>
-  <a href="#recording">Recording</a>
-  <a href="#detail">Meeting</a>
-  <a href="#hex">Integrations: Hex</a>
-  <a href="#voice">Settings: Voice</a>
-  <a href="#policy">Space: recording</a>
-  <button class="pill" id="theme" type="button">Theme</button>
-</nav>
-
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></g></symbol>
-  <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="sq" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/></symbol>
-  <symbol id="clip" viewBox="0 0 24 24"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15.5 7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-  <symbol id="wave" viewBox="0 0 24 24"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-  <symbol id="rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="currentColor"/></symbol>
-  <symbol id="back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-</svg>
-
-<template id="sidebar">
-  <aside class="side" aria-label="Sidebar">
-    <div class="row" style="font-weight:600">Northwind</div>
-    <div class="row"><span class="av">E</span>Elio</div>
-    <div class="lbl">Pages</div>
-    <div class="row">Inbox</div>
-    <div class="row">Calendar</div>
-    <div class="row" data-nav="meetings">Meetings</div>
-    <div class="row">Contacts</div>
-    <div class="row">Data room</div>
-    <div class="lbl">Agents</div>
-    <div class="row"><span class="av">M</span>Meetings</div>
-    <div class="row"><span class="av" style="background:#3d6b8f">G</span>Granola</div>
-    <div style="flex:1"></div>
-    <div class="row" data-nav="integrations">Integrations</div>
-  </aside>
-</template>
-
-<main class="screens">
-
-<!-- 1. Composer -->
-<section class="screen" id="composer">
-  <div class="sh"><h2>Composer dictation</h2>
-    <div class="sw" role="group" aria-label="Composer state" data-states="composer">
-      <button class="pill on" data-s="idle">Idle</button><button class="pill" data-s="listening">Listening</button><button class="pill" data-s="transcribing">Transcribing</button><button class="pill" data-s="done">Inserted</button><button class="pill" data-s="error">Error</button><button class="pill" data-s="none">No engine</button>
-    </div>
-  </div>
-  <div class="win" data-sb>
-    <div class="main"><div class="pane" style="display:flex;flex-direction:column;justify-content:flex-end">
-      <div class="thread">
-        <div class="me">Can you draft the follow-up to Dana?</div>
-        <div style="display:flex;gap:10px"><span class="av">E</span><div>Here's a draft. Want me to add the revised pricing?</div></div>
-      </div>
-      <div class="composer" data-c="composer">
-        <span class="ic" aria-hidden="true" style="border:0"><svg width="16" height="16"><use href="#clip"/></svg></span>
-        <div class="txt" data-show="idle none"><span class="ph-t">Message Elio</span></div>
-        <div class="txt" data-show="listening" style="display:flex;align-items:center;gap:10px"><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="mut" style="font-variant-numeric:tabular-nums">0:07</span></div>
-        <div class="txt" data-show="transcribing"><span class="shim">Transcribing…</span></div>
-        <div class="txt" data-show="done">Yes, add the revised pricing and say we can start on the 14th.</div>
-        <div class="txt" data-show="error"><span class="ph-t">Message Elio</span></div>
-        <button class="ic" aria-label="Dictate" title="Dictate" data-show="idle error"><svg width="16" height="16"><use href="#mic"/></svg></button>
-        <button class="ic live" aria-label="Stop dictation" title="Stop dictation" data-show="listening"><svg width="12" height="12"><use href="#sq"/></svg></button>
-        <button class="ic" aria-label="Call Elio" title="Call Elio" data-show="idle none error"><svg width="16" height="16"><use href="#wave"/></svg></button>
-        <button class="ic send" aria-label="Send" data-show="idle none listening transcribing error" disabled><svg width="16" height="16"><use href="#up"/></svg></button>
-        <button class="ic send" aria-label="Send" data-show="done"><svg width="16" height="16"><use href="#up"/></svg></button>
-      </div>
-      <p class="cerr" data-show="error" role="alert">Couldn't transcribe. Try again.</p>
-    </div></div>
-  </div>
-  <p class="note">Mic sits before Call Elio while the draft is empty; after text is inserted it stays hidden like Call Elio, and the user edits then sends. Tap to start; tap again or pause 1.2 s to stop (existing <code>Dictation</code> endpoint mode). "No engine" shows the composer exactly as today (D7). Native iOS already has its own on-device mic; Expo uses the keyboard's mic.</p>
-</section>
-
-<!-- 2. Meetings list + Record popover -->
-<section class="screen" id="meetings">
-  <div class="sh"><h2>Meetings page and Record</h2>
-    <div class="sw" role="group" aria-label="Record state" data-states="meet">
-      <button class="pill on" data-s="list">List</button><button class="pill" data-s="remind">Record: Remind</button><button class="pill" data-s="confirm">Record: Confirm</button><button class="pill" data-s="empty">Empty</button><button class="pill" data-s="norec">Can't record here</button>
-    </div>
-  </div>
-  <div class="win" data-sb data-active="meetings">
-    <div class="main"><div class="pane">
-      <div class="ph"><h1>Meetings</h1>
-        <div class="r"><button class="btn pri" data-hide="norec"><svg width="12" height="12" style="color:var(--destructive)"><use href="#rec"/></svg>Record</button></div>
-      </div>
-      <div class="panel" data-hide="empty">
-        <a class="pr" href="#detail"><div class="grow"><div class="t">Pricing review with Dana</div><small>Recorded · 38 min</small></div><span class="mut">Today</span></a>
-        <a class="pr" href="#detail"><div class="grow"><div class="t">Zoom call — 2:30 PM</div><small>Hex · 24 min</small></div><span class="mut">Yesterday</span></a>
-        <a class="pr" href="#detail"><div class="grow"><div class="t">Weekly sync</div><small>Granola · 45 min</small></div><span class="mut">Oct 28</span></a>
-      </div>
-      <p class="mut" data-show="empty">No meetings</p>
-
-      <div class="pop" data-show="remind" role="dialog" aria-label="Record a meeting">
-        <label class="fld" style="margin:0"><span>Title</span><input class="f" placeholder="Meeting 2:30 PM"></label>
-        <p class="mut" style="margin:0">Tell everyone you're recording.</p>
-        <button class="btn pri" style="justify-content:center">Start</button>
-      </div>
-      <div class="pop" data-show="confirm" role="dialog" aria-label="Record a meeting">
-        <label class="fld" style="margin:0"><span>Title</span><input class="f" placeholder="Meeting 2:30 PM"></label>
-        <label class="chk"><input type="checkbox">Everyone agreed to be recorded</label>
-        <button class="btn pri" style="justify-content:center" disabled>Start</button>
-      </div>
-    </div></div>
-  </div>
-  <p class="note">Source on each row is <code>Meeting.provider</code> (Recorded = <code>praci</code>, Hex, Granola, Omi) plus duration from startedAt/endedAt. Record appears where the surface can record and the space policy is not Off ("Can't record here": Expo, or policy Off). The popover is the only consent UI; its line or checkbox follows the space policy (D2). On web, Start asks for the microphone, then offers the browser's tab-share dialog for call audio; skipping it records the microphone only.</p>
-</section>
-
-<!-- 3. Recording pill -->
-<section class="screen" id="recording">
-  <div class="sh"><h2>Recording indicator</h2>
-    <div class="sw" role="group" aria-label="Recording state" data-states="rec">
-      <button class="pill on" data-s="rec">Recording</button><button class="pill" data-s="nocall">No call audio</button><button class="pill" data-s="offline">Upload paused</button><button class="pill" data-s="trans">Transcribing</button>
-    </div>
-  </div>
-  <div class="win" data-sb>
-    <div class="main">
-      <div class="recbar">
-        <div class="rec" role="status" data-show="rec nocall offline">
-          <span class="dot" aria-hidden="true"></span>
-          <span class="ti">Pricing review with Dana</span>
-          <span class="tm">12:34</span>
-          <span class="warn-t" data-show="nocall">No call audio</span>
-          <span class="warn-t" data-show="offline">Offline · saved here</span>
-          <button class="btn sm">Stop</button>
-        </div>
-        <div class="rec" role="status" data-show="trans" style="padding-right:12px"><span class="shim">Transcribing…</span></div>
-      </div>
-      <div class="pane">
-        <div class="ph"><h1>Inbox</h1></div>
-        <div class="panel"><div class="pr"><div class="grow"><div class="t">Send Sam the signed MSA</div><small>Northwind kickoff, Oct 30</small></div></div><div class="pr"><div class="grow"><div class="t">Re: Q4 board deck</div><small>Dana Reyes</small></div></div></div>
-      </div>
-    </div>
-  </div>
-  <p class="note">The pill stays at the top of every page while recording and cannot be dismissed. "No call audio": the system track stayed silent for 10 s (missing macOS permission, or no tab shared). "Offline": chunks are kept in IndexedDB and sent when the connection returns. Discard is in the Meetings page's row menu for the in-progress capture, not on the pill. Electron also badges the dock and asks before quitting.</p>
-</section>
-
-<!-- 4. Meeting detail -->
-<section class="screen" id="detail">
-  <div class="sh"><h2>Meeting</h2>
-    <div class="sw" role="group" aria-label="Meeting state" data-states="det">
-      <button class="pill on" data-s="full">Recorded</button><button class="pill" data-s="hex">Hex import</button><button class="pill" data-s="partial">Partial</button><button class="pill" data-s="pending">Summary pending</button>
-    </div>
-  </div>
-  <div class="win" data-sb data-active="meetings">
-    <div class="main"><div class="pane">
-      <button class="btn ghost" style="padding-left:0"><svg width="16" height="16"><use href="#back"/></svg>Meetings</button>
-      <div class="ph" style="margin:6px 0 0">
-        <h1 data-hide="hex">Pricing review with Dana</h1><h1 data-show="hex">Zoom call — 2:30 PM</h1>
-        <div class="r"><button class="btn sm bad">Delete</button></div>
-      </div>
-      <p class="meta" data-hide="hex">Nov 1, 10:00 – 10:38 · Recorded</p>
-      <p class="meta" data-show="hex">Oct 31, 14:30 – 14:54 · Hex</p>
-      <p class="alert" data-show="partial">Part of this meeting could not be transcribed.</p>
-      <p data-show="hex" style="margin:14px 0 0">Walked through the renewal terms and agreed to send a revised quote this week.</p>
-
-      <div data-hide="pending">
-        <h3 class="sec">Decisions</h3>
-        <ul class="plain"><li>Annual plan at the revised price, starting Nov 14.</li><li>Pilot extended by two weeks.</li></ul>
-        <h3 class="sec">Follow-ups</h3>
-        <ul class="plain"><li>Who confirms the security review date?</li></ul>
-        <h3 class="sec">Your to-dos</h3>
-        <ul class="todo panel"><li><input type="checkbox" aria-label="Done"><span>Send Dana the revised pricing</span><span class="due">Nov 4</span></li><li><input type="checkbox" aria-label="Done"><span>Share the pilot report</span></li></ul>
-      </div>
-      <p class="mut" data-show="pending" style="margin-top:14px"><span class="shim">Summarizing…</span></p>
-
-      <details class="tr"><summary>Transcript</summary>
-        <div class="lines">
-          <p><time>0:04</time><b>Alex Kim:</b> Thanks for making time. I wanted to go over the renewal.</p>
-          <p class="them"><time>0:11</time><b>Them:</b> Sure. We looked at the annual option and it works if the price comes down a bit.</p>
-          <p><time>0:26</time><b>Alex Kim:</b> I'll send you the revised pricing by Monday.</p>
-        </div>
-      </details>
-    </div></div>
-  </div>
-  <p class="note">Only stored fields: title, startedAt–endedAt, provider, Hex's own two-sentence summary when imported (<code>summary</code>), digest decisions and followUps, the user's InboxTodo rows for this meeting, transcript ("You" lines carry the user's name so to-dos match; the other side is "Them" because remote speakers are not separated). No attendee list is shown: only the user is stored.</p>
-</section>
-
-<!-- 5. Integrations: Hex -->
-<section class="screen" id="hex">
-  <div class="sh"><h2>Integrations: Hex</h2>
-    <div class="sw" role="group" aria-label="Hex state" data-states="hex">
-      <button class="pill" data-s="off">Not connected</button><button class="pill on" data-s="on">Connected</button><button class="pill" data-s="nf">Not found</button><button class="pill" data-s="old">Update Hex</button><button class="pill" data-s="fail">Couldn't read</button><button class="pill" data-s="web">On web</button>
-    </div>
-  </div>
-  <div class="win" data-sb data-active="integrations">
-    <div class="main"><div class="pane">
-      <div class="ph"><h1>Integrations</h1></div>
-      <div class="grid">
-        <div class="card">
-          <div class="top"><span class="logo">H</span><div><div class="nm">Hex</div><div class="ds">Meetings recorded on this Mac</div></div></div>
-          <div data-show="off"><button class="btn pri sm">Connect</button></div>
-          <div data-show="on" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ok">Synced</span><span class="mut">12 meetings · 2 min ago</span></div>
-          <div data-show="nf" style="display:flex;align-items:center;gap:8px"><span class="badge pend">Install Hex</span></div>
-          <div data-show="old" style="display:flex;align-items:center;gap:8px"><span class="badge warn">Update Hex</span></div>
-          <div data-show="fail" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge err">Couldn't read Hex</span><button class="btn sm">Retry</button></div>
-          <div data-show="web" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge pend">Desktop app</span><span class="mut">Last sync Oct 31</span></div>
-          <div data-show="on fail web" style="display:flex;gap:8px"><a class="btn sm" href="#meetings" style="text-decoration:none">Open Meetings</a><button class="btn sm ghost">Disconnect</button></div>
-        </div>
-        <div class="card">
-          <div class="top"><span class="logo">G</span><div><div class="nm">Granola</div><div class="ds">Meeting notes</div></div></div>
-          <div style="display:flex;align-items:center;gap:8px"><span class="badge ok">Synced</span><span class="mut">48 meetings</span></div>
-        </div>
-        <div class="card">
-          <div class="top"><span class="logo">O</span><div><div class="nm">Omi</div><div class="ds">Pendant</div></div></div>
-          <div><button class="btn sm">Connect</button></div>
-        </div>
-      </div>
-    </div></div>
-  </div>
-  <p class="note">The Hex tile shows only in the macOS desktop app, or on any surface once a Hex connection exists ("On web": read-only status, no actions but Disconnect). Disconnect opens the existing confirm dialog with "Delete imported meetings too". "Meetings off in Hex" cannot be told apart from zero meetings, so it has no state. Hex has no account, so there is no key field.</p>
-</section>
-
-<!-- 6. Settings: Voice -->
-<section class="screen" id="voice">
-  <div class="sh"><h2>Settings → Voice</h2>
-    <div class="sw" role="group" aria-label="Provider" data-states="voice">
-      <button class="pill on" data-s="dev">On this device</button><button class="pill" data-s="devprep">Preparing</button><button class="pill" data-s="compat">OpenAI-compatible</button><button class="pill" data-s="openai">OpenAI (existing)</button>
-    </div>
-  </div>
-  <div class="win nosb" style="background:transparent;border:0">
-    <div class="dlg">
-      <div class="hd"><h1>Voice</h1></div>
-      <div class="bd">
-        <div class="plist">
-          <div class="mut" style="margin-bottom:8px">Providers</div>
-          <div class="list">
-            <button data-cur="dev devprep"><span><span class="n">On this device</span><span class="k">Transcribe · Hex</span></span><span class="c" data-show="dev">Ready</span></button>
-            <button data-cur="compat"><span><span class="n">OpenAI-compatible</span><span class="k">Transcribe</span></span></button>
-            <button data-cur="openai"><span><span class="n">OpenAI</span><span class="k">Speak + transcribe</span></span><span class="c">Connected</span></button>
-            <button><span><span class="n">ElevenLabs</span><span class="k">Speak + transcribe</span></span></button>
-            <button><span><span class="n">Cartesia</span><span class="k">Speak only</span></span></button>
-          </div>
-        </div>
-        <div class="pdet">
-          <div data-show="dev devprep">
-            <label class="fld"><span>Model</span><select class="f" style="width:100%;padding:8px 10px;border:1px solid var(--field);border-radius:8px;background:var(--card)"><option>Parakeet (English)</option><option>Whisper (multilingual)</option></select></label>
-            <div data-show="devprep"><div class="prog" role="progressbar" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100" aria-label="Downloading model"><i></i></div><p class="mut" style="margin:0 0 12px">Downloading · 42%</p></div>
-            <button class="btn pri" data-show="dev">Use for dictation and meetings</button>
-            <button class="btn" data-show="devprep">Cancel</button>
-          </div>
-          <div data-show="compat">
-            <label class="fld"><span>Base URL</span><input class="f" value="https://stt.example.com/v1"></label>
-            <label class="fld"><span>API key (optional)</span><input class="f" type="password" placeholder="Paste your API key"></label>
-            <label class="fld"><span>Model</span><input class="f" value="whisper-large-v3"></label>
-            <button class="btn pri">Connect</button>
-          </div>
-          <div data-show="openai">
-            <label class="fld"><span>OpenAI API key</span><input class="f" type="password" placeholder="Paste a replacement key"></label>
-            <div style="display:flex;gap:8px"><button class="btn">Replace key</button><button class="btn sm">Disconnect</button></div>
-            <label class="fld" style="margin-top:18px"><span>Voice</span><select class="f" style="width:100%;padding:8px 10px;border:1px solid var(--field);border-radius:8px;background:var(--card)"><option>Alloy</option></select></label>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <p class="note">Extends the existing <code>VoiceSettingsOverlay</code> provider list with two entries. "On this device" appears only in the macOS desktop app when the Hex executable is found; its model list comes from Hex's <code>models.list()</code> (names here are examples). Preparing a model is the only download, and it is explicit. "OpenAI-compatible" stores base URL, key and model in the user's voice credential (no environment variable). The selected transcription provider is used for dictation and server-side meeting transcription; there is no separate meeting setting.</p>
-</section>
-
-<!-- 7. Space recording policy -->
-<section class="screen" id="policy">
-  <div class="sh"><h2>Space settings → Meeting recording</h2></div>
-  <div class="win nosb" style="background:transparent;border:0">
-    <div class="dlg">
-      <div class="hd"><h1>Northwind</h1></div>
-      <div class="bd" style="display:block">
-        <h3 class="sec" style="margin-top:0">Meeting recording</h3>
-        <div class="radio" role="radiogroup" aria-label="Meeting recording">
-          <label><input type="radio" name="pol" checked><span>Remind<small>Shows "Tell everyone you're recording." before each recording</small></span></label>
-          <label><input type="radio" name="pol"><span>Confirm<small>Each recording needs "Everyone agreed to be recorded"</small></span></label>
-          <label><input type="radio" name="pol"><span>Off<small>No one can record meetings in this space</small></span></label>
-        </div>
-      </div>
-    </div>
-  </div>
-  <p class="note">Owners and admins only; members see nothing here. Stored as <code>spaces.meeting_recording</code> and enforced by <code>meetingCaptures.start</code>. Does not apply to Hex imports (recorded outside Praci). Default is Remind (D2), pending the owner's choice.</p>
-</section>
-
-</main>
-
+<header>
+  <h1>Hex meetings and dictation</h1>
+  <nav id="screens" aria-label="Screens"></nav>
+  <button id="theme" type="button">Theme</button>
+</header>
+<main id="root"></main>
 <script>
-// Mockup-only behavior: sidebar injection, theme toggle, state pills.
-const tpl = document.getElementById('sidebar');
-document.querySelectorAll('.win[data-sb]').forEach(win => {
-  const side = tpl.content.firstElementChild.cloneNode(true);
-  const active = win.dataset.active;
-  if (active) side.querySelector(`[data-nav="${active}"]`)?.classList.add('active');
-  win.prepend(side);
+const R = "Real app", B = "Real app, extended in the page";
+const S = [
+ { id:"composer", name:"Composer dictation", note:"Real app running the dictation build, with a local fixture server connected as the OpenAI-compatible provider and a fake microphone. The mic is hidden until a speech-to-text engine is set up (D7). The inserted text is the fixture's reply. Phone is 390 px wide.",
+   states:[
+  ["No engine","composer-desk-0-hidden",R,"No speech-to-text set up: no mic in the composer."],
+  ["Idle","composer-desk-1-idle",R,"Engine set up: mic next to the call and send buttons."],
+  ["Listening","composer-desk-2-listening",R,"Recording; the mic button becomes Stop dictation."],
+  ["Transcribing","composer-desk-3-transcribing",R,"Audio sent; spinner while the provider answers."],
+  ["Inserted","composer-desk-4-inserted",R,"Text lands in the composer; nothing is sent."],
+  ["Error","composer-desk-5-error",R,"Provider failed; message above the composer."],
+  ["Phone: listening","composer-phone-2-listening",R,"390 px.",1],
+  ["Phone: inserted","composer-phone-4-inserted",R,"390 px.",1]]},
+ { id:"meetings", name:"Meetings page", note:"Built from the real Contacts page (header, search, filter button, table, badge). Source is Meeting.provider (Praci, Hex, Granola, Omi); duration is endedAt minus startedAt. Titles are invented. The Record popover is the app's own popover with its content replaced; Remind and Confirm follow the space policy. The Meetings sidebar row is a clone of the Contacts row.",
+   states:[
+  ["Today (Granola only)","stored-meetings-today",R,"Today: stored meetings are reachable only from the Granola page."],
+  ["List","meetings-list",B,"One page for every source, newest first."],
+  ["Record: Remind","meetings-record-remind",B,"Default policy: one line, then Start."],
+  ["Record: Confirm","meetings-record-confirm",B,"Start stays disabled until everyone agreed is ticked."],
+  ["Recording row","meetings-recording-row",B,"An in-progress capture shows Recording instead of a duration."],
+  ["Empty","meetings-empty",B,"No meetings yet."],
+  ["Can't record here","meetings-no-record",B,"Space policy is Off: no Record button."],
+  ["Phone: list","phone-meetings-list",B,"390 px; date and duration move under the title.",1],
+  ["Phone: Record","phone-meetings-record",B,"390 px.",1]]},
+ { id:"pill", name:"Recording pill", note:"A strip row at the top of the app shell, shown on every page, built from the app's card tokens and the working indicator's shimmer and mono timer. It cannot be dismissed. No call audio: the system track stayed silent for 10 s. Offline: chunks are kept in the browser and sent later.",
+   states:[
+  ["Recording","pill-recording",B,"Red dot, title, elapsed time, Stop."],
+  ["No call audio","pill-nocall",B,"Warning text when the call track is silent."],
+  ["Upload paused","pill-offline",B,"Offline; audio is saved here."],
+  ["Transcribing","pill-transcribing",B,"After Stop, until the meeting is stored."],
+  ["Phone","phone-pill-recording",B,"390 px.",1]]},
+ { id:"detail", name:"Meeting detail", note:"Laid out with the app's page header, list cards and checkbox. Only stored fields: title, times, source, Hex's own summary when imported, digest decisions and follow-ups, the user's to-dos from this meeting, transcript (collapsed). No attendee list. Transcript lines use the user's name for the microphone and Them for the call.",
+   states:[
+  ["Recorded","detail-recorded",B,"Praci recording with summary parts and to-dos."],
+  ["Transcript open","detail-transcript",B,"Transcript expanded."],
+  ["Hex import","detail-hex",B,"Hex's two-sentence summary appears first."],
+  ["Partial","detail-partial",B,"Some chunks failed; the rest is kept."],
+  ["Summary pending","detail-pending",B,"Digest not finished yet."],
+  ["Phone","phone-detail",B,"390 px.",1]]},
+ { id:"integrations", name:"Integrations: Hex", note:"The Hex tile is a clone of the Granola tile (connected) or the Slack tile (not connected); the logo is a letter placeholder like Founder calendar. Shown in the macOS desktop app, or on any surface once a Hex connection exists (On web: read-only status). Hex has no account, so there is no key field. Disconnect keeps the existing confirm dialog.",
+   states:[
+  ["Today","integrations-today",R,"Granola tile for reference."],
+  ["Connected","hex-tile-on",B,"Synced N meetings."],
+  ["Not connected","hex-tile-off",B,"Connect button in Popular."],
+  ["Install Hex","hex-tile-nf",B,"Executable not found."],
+  ["Update Hex","hex-tile-old",B,"Too old or contract changed."],
+  ["Couldn't read","hex-tile-fail",B,"Read failed; retried on the next pass; Retry."],
+  ["On web","hex-tile-web",B,"Last sync only."],
+  ["Hex page","hex-page",B,"Clone of the Granola page."]]},
+ { id:"voice", name:"Settings: Voice", note:"Settings, Models, Voice. OpenAI-compatible is the real new provider row and form (base URL, model, optional key); the saved URL shown is an example host while the demo points at a local fixture. On this device appears only in the macOS desktop app when an engine is available; model names are examples.",
+   states:[
+  ["OpenAI-compatible","voice-compat",R,"New provider form."],
+  ["Connected","voice-compat-connected",R,"Saved; the row shows Connected."],
+  ["On this device: ready","voice-device-ready",B,"Row cloned from a provider row; model select."],
+  ["On this device: preparing","voice-device-preparing",B,"The model download is explicit and shows progress."]]},
+ { id:"policy", name:"Meeting recording policy", note:"A second card in Settings, Privacy and approvals, cloned from the Approvals card. Owners and admins only; stored as spaces.meeting_recording and enforced by the API. Default Remind. Does not apply to Hex imports.",
+   states:[
+  ["Remind","policy-remind",B,"Default."],
+  ["Confirm","policy-confirm",B,"Needs the checkbox."],
+  ["Off","policy-off",B,"No recording in this space."]]}
+];
+const root = document.getElementById("root"), nav = document.getElementById("screens");
+let theme = (document.documentElement.dataset.theme) || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+const imgs = [];
+S.forEach((s, i) => {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = s.name; b.dataset.id = s.id; nav.append(b);
+  const sec = document.createElement("section"); sec.id = s.id;
+  const row = document.createElement("div"); row.className = "states";
+  const fig = document.createElement("figure"); const img = document.createElement("img"); img.alt = s.name; const cap = document.createElement("figcaption");
+  fig.append(img, cap);
+  s.states.forEach((st, j) => {
+    const sb = document.createElement("button"); sb.type = "button"; sb.textContent = st[0]; row.append(sb);
+    sb.onclick = () => { row.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === sb)); img.dataset.base = st[1]; img.className = st[4] ? "phone" : ""; img.alt = s.name + ": " + st[0]; cap.innerHTML = '<span class="tag">' + st[2] + "</span>" + st[3]; img.src = "mockup/" + st[1] + "-" + theme + ".png"; };
+    if (j === 0) setTimeout(() => sb.click());
+  });
+  const note = document.createElement("p"); note.className = "note"; note.textContent = s.note;
+  sec.append(row, fig, note); root.append(sec); imgs.push(img);
 });
-document.getElementById('theme').addEventListener('click', () => {
-  const root = document.documentElement;
-  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  root.dataset.theme = dark ? 'light' : 'dark';
-});
-function apply(screen, state) {
-  screen.querySelectorAll('[data-show]').forEach(el => { el.hidden = !el.dataset.show.split(' ').includes(state); });
-  screen.querySelectorAll('[data-hide]').forEach(el => { el.hidden = el.dataset.hide.split(' ').includes(state); });
-  screen.querySelectorAll('[data-cur]').forEach(el => el.classList.toggle('cur', el.dataset.cur.split(' ').includes(state)));
-}
-document.querySelectorAll('[data-states]').forEach(group => {
-  const screen = group.closest('.screen');
-  const pills = group.querySelectorAll('.pill');
-  pills.forEach(p => p.addEventListener('click', () => {
-    pills.forEach(q => q.classList.toggle('on', q === p));
-    apply(screen, p.dataset.s);
-  }));
-  apply(screen, group.querySelector('.pill.on').dataset.s);
-});
+function show(id) { document.querySelectorAll("section").forEach(x => x.classList.toggle("show", x.id === id)); nav.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.id === id)); history.replaceState(null, "", "#" + id); }
+nav.onclick = e => { if (e.target.dataset.id) show(e.target.dataset.id); };
+document.getElementById("theme").onclick = () => { theme = theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = theme; imgs.forEach(i => { if (i.dataset.base) i.src = "mockup/" + i.dataset.base + "-" + theme + ".png"; }); };
+show(location.hash.slice(1) || S[0].id);
 </script>
 </body>
 </html>
