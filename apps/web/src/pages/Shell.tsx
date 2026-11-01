@@ -2328,11 +2328,13 @@ export function ShellPage() {
     async (sectionId: string) => {
       try {
         await rpc.botSections.remove({ sectionId });
+      } catch (error) {
+        setSendError(errorText(error, t`Failed to delete folder`));
       } finally {
         await refreshBots().catch(() => undefined);
       }
     },
-    [refreshBots],
+    [refreshBots, t],
   );
   const autoGroupSidebar = useCallback(async () => {
     try {

@@ -1,5 +1,10 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@rakazo/ui-web";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@rakazo/ui-web";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
@@ -13,6 +18,7 @@ import { STICKY_GROUP_HEADER } from "./sticky-group-header";
 export function PageAgentsRow({
   label,
   testId = "sidebar-page-agents",
+  rosterId,
   open,
   count,
   needsYou,
@@ -24,6 +30,8 @@ export function PageAgentsRow({
   /** The row's name; defaults to "Page agents". */
   label?: string;
   testId?: string;
+  /** Unique across the sidebar; makes the row an arrow-key stop like chats. */
+  rosterId?: string;
   open: boolean;
   count: number;
   needsYou: boolean;
@@ -42,12 +50,14 @@ export function PageAgentsRow({
   const menuLabel = t`Actions for ${name}`;
   return (
     <div
+      data-roster-item={rosterId}
       className={`group/fold relative mb-1 ${open ? `${STICKY_GROUP_HEADER} ${belowHeading ? "top-10.5" : "top-0"}` : ""}`}
     >
       <button
         type="button"
         data-testid={testId}
         data-roster-fold=""
+        data-roster-row={rosterId}
         aria-expanded={open}
         ref={rowRef}
         onClick={() => {
@@ -99,6 +109,7 @@ export function PageAgentsRow({
             render={
               <Button
                 type="button"
+                data-roster-actions=""
                 variant="ghost"
                 size="icon-sm"
                 aria-label={menuLabel}
@@ -110,7 +121,11 @@ export function PageAgentsRow({
           >
             <MoreHorizontal size={14} aria-hidden="true" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" aria-label={menuLabel} className="w-[220px]">
+          <DropdownMenuContent
+            align="end"
+            aria-label={menuLabel}
+            className="w-[220px]"
+          >
             {actions}
           </DropdownMenuContent>
         </DropdownMenu>
