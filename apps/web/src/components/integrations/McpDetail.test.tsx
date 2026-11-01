@@ -221,7 +221,7 @@ it("has no Create agent button on Carta or once an agent exists", async () => {
   expect(container.textContent).not.toContain("Create agent");
   expect(container.textContent).toContain("Let other agents use");
   expect(container.querySelector<HTMLAnchorElement>('a[href="/app/bot_ada"]')?.textContent).toBe(
-    "Ada",
+    "Open Ada",
   );
 });
 
