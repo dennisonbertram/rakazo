@@ -6,6 +6,8 @@ import { meetings } from "./meetings-fixtures";
 
 /** What Record needs to show: a transcription engine the person agreed to, and a space that allows recording. */
 const recordMocks = {
+  me: { userId: "u1", spaceId: "s1" },
+  "meetingCaptures.start": { captureId: "capture-1" },
   "voice.status": { transcribe: false, transcriptionReady: true, transcriptionConsented: true },
   "spaces.list": {
     current: { id: "s1" },

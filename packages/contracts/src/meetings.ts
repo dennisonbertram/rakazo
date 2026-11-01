@@ -145,6 +145,8 @@ export const MeetingCaptureAppendTextInputSchema = z.object({
 export const MeetingCaptureFinishInputSchema = z.object({
   captureId: CaptureId,
   endedAt: IsoDate,
+  /** Pieces the server refused for good; any marks the meeting partial. */
+  lostChunks: z.number().int().min(0).max(1_000_000).optional(),
 });
 
 /** The caller's capture that is recording or waiting to be stored; null when there is none. */

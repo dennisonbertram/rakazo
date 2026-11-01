@@ -1,4 +1,4 @@
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@rakazo/ui-web";
 import { cn } from "@rakazo/ui-web/lib/utils";
 
@@ -30,13 +30,17 @@ export function RecordingPill({
   state,
   onStop,
   onDismiss,
+  onShareTab,
   className,
 }: {
   state: RecordingPillState;
   onStop: () => void;
   onDismiss?: () => void;
+  /** Shown on "No call audio" when the call tab can be shared again. */
+  onShareTab?: () => void;
   className?: string;
 }) {
+  const { t } = useLingui();
   return (
     <div
       role="status"
@@ -74,6 +78,15 @@ export function RecordingPill({
             <span className="shrink-0 text-xs text-muted-foreground">
               <Trans>Offline, saved here</Trans>
             </span>
+          ) : state.noCallAudio && onShareTab ? (
+            <button
+              type="button"
+              className="shrink-0 text-xs text-warning underline-offset-2 hover:underline"
+              title={t`Share the call tab again`}
+              onClick={onShareTab}
+            >
+              <Trans>No call audio</Trans>
+            </button>
           ) : state.noCallAudio ? (
             <span className="shrink-0 text-xs text-warning">
               <Trans>No call audio</Trans>

@@ -24,6 +24,8 @@ export type CaptureRecord = {
   /** Epoch ms of the capture's start. */
   startedAt: number;
   stopped: boolean;
+  /** Pieces the server refused for good; sent with finish so the meeting shows as partial. */
+  lostChunks: number;
 };
 
 export type CaptureOwner = { userId: string; spaceId: string; captureId: string };
@@ -56,7 +58,8 @@ export function memoryChunkStore(): ChunkStore {
   };
 }
 
-const DB_NAME = "praci-meeting-capture";
+// One schema version; the name is new so no browser holds an older shape of this database.
+const DB_NAME = "praci-meeting-capture-buffer";
 const CHUNKS = "chunks";
 const RECORDS = "records";
 
@@ -78,12 +81,10 @@ function done(tx: IDBTransaction): Promise<void> {
 /** Chunks and capture records in IndexedDB, so a closed tab does not lose audio that was not uploaded yet. */
 export function indexedDbChunkStore(): ChunkStore {
   const open = new Promise<IDBDatabase>((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 2);
+    const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(CHUNKS)) db.createObjectStore(CHUNKS, { keyPath: "key" });
-      if (!db.objectStoreNames.contains(RECORDS))
-        db.createObjectStore(RECORDS, { keyPath: "captureId" });
+      req.result.createObjectStore(CHUNKS, { keyPath: "key" });
+      req.result.createObjectStore(RECORDS, { keyPath: "captureId" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

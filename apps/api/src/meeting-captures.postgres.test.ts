@@ -57,6 +57,7 @@ describePostgres("Meeting captures (PostgreSQL)", () => {
         env: { webOrigin: "https://app.example.com" },
         jobs,
         artifacts,
+        secrets,
       } as unknown as RouterDeps),
       { context: { actor: who } as never },
     );
@@ -370,6 +371,47 @@ describePostgres("Meeting captures (PostgreSQL)", () => {
     expect(await client(a).meetings.get({ meetingId: meeting?.id as string })).toMatchObject({
       partial: true,
     });
+  });
+
+  it("marks the meeting partial when the client reports pieces the server refused", async () => {
+    const a = actors.a as Actor;
+    const { captureId } = await start(a, "lost");
+    await upload("a", captureId, "microphone", 0, 0, text("kept"));
+    await client(a).meetingCaptures.finish({
+      captureId,
+      endedAt: new Date().toISOString(),
+      lostChunks: 2,
+    });
+    await drainTranscribe();
+    await runCaptureFinalize(deps(), finalizePayload(captureId, a));
+    const meeting = await meetingOf(captureId);
+    expect(meeting?.transcript).toBe("User a: kept");
+    expect(await client(a).meetings.get({ meetingId: meeting?.id as string })).toMatchObject({
+      partial: true,
+    });
+  });
+
+  it("reports transcription consent for the provider transcription would actually use", async () => {
+    expect(await client(actors.a as Actor).voice.status()).toMatchObject({
+      transcriptionConsented: true,
+    });
+    expect(await client(actors.b as Actor).voice.status()).toMatchObject({
+      transcriptionConsented: false,
+    });
+    // Consent for the selected provider, but its key is gone: transcription would not use it.
+    const m = actors.m as Actor;
+    await prisma.transcriptionSelection.create({
+      data: { userId: m.userId, provider: "openai", secretId: `missing-${run}` },
+    });
+    await prisma.aiDataConsent.create({
+      data: {
+        userId: m.userId,
+        spaceId: m.spaceId,
+        recipientKey: (aiRecipient({ provider: "openai", use: "voice" }) as { key: string }).key,
+        version: AI_DISCLOSURE_VERSION,
+      },
+    });
+    expect(await client(m).voice.status()).toMatchObject({ transcriptionConsented: false });
   });
 
   it("fails chunks without consent instead of sending audio", async () => {

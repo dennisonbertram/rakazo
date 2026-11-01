@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { ORPCError } from "@orpc/client";
 import type { MeetingCaptureTrack } from "@rakazo/contracts";
 import { rpc, withSpaceHeaders } from "../rpc";
 import type { BufferedChunk, CaptureOwner, CaptureRecord } from "./buffer";
@@ -25,6 +26,8 @@ export type CaptureView =
       noCallAudio: boolean;
       /** Chunks are waiting in this browser because an upload failed. */
       offline: boolean;
+      /** The call tab can be shared again (after a reload, sharing needs a click). */
+      canShareTab?: boolean;
     }
   | {
       phase: "transcribing";
@@ -51,7 +54,11 @@ const POLL_MS = 2_000;
 const RECOVER_RETRY_MS = 10_000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** One recording run in this tab. Every async continuation checks `live(s)` before it acts. */
+/**
+ * One capture as this tab sees it. The tab holding the capture's Web Lock owns it: only that tab
+ * records, uploads and finishes. Another tab is an observer: it shows the pill, sends Stop to the
+ * owner, and takes the capture over when the owner lets go of the lock without ending it.
+ */
 type Session = {
   owner: CaptureOwner;
   record: CaptureRecord;
@@ -65,21 +72,28 @@ type Session = {
   stopping: boolean;
   /** Sign-out, a closed capture or the end: nothing more may happen for this session. */
   ended: boolean;
-  /** Another tab of this browser owns the recording; this one can only Stop. */
   observer: boolean;
   releaseLock: (() => void) | null;
 };
 
+type Message =
+  | { type: "stop"; captureId: string }
+  | { type: "closed"; captureId: string; view: CaptureView };
+
 let view: CaptureView = { phase: "idle" };
 let session: Session | null = null;
 let starting = false;
-/** Grows on sign-out, so a startup or recovery that was waiting knows it is out of date. */
+let recovering = false;
+/** Grows on sign-out, so anything that was waiting knows it is out of date. */
 let generation = 0;
+/** Stop was asked for this capture, here or in another tab, maybe before this tab could act on it. */
+let stopRequested: string | null = null;
 let flushQueue: Promise<unknown> = Promise.resolve();
 let silenceTimer: ReturnType<typeof setInterval> | null = null;
 let recoverTimer: ReturnType<typeof setTimeout> | null = null;
 let lastUserId: string | null = null;
 let storedCount = 0;
+let channel: BroadcastChannel | null = null;
 /** Exposed for tests. */
 export const chunkStore = createChunkStore();
 const listeners = new Set<() => void>();
@@ -99,6 +113,45 @@ export const storedCaptures = () => storedCount;
 
 const live = (s: Session) => session === s && !s.ended;
 const context = (s: Session) => ({ context: { spaceId: s.owner.spaceId } });
+/** A refusal that retrying cannot change. Signed out (401) is not one: the person signs in again. */
+const refused = (error: unknown) =>
+  error instanceof ORPCError && error.status >= 400 && error.status < 500 && error.status !== 401;
+const closedMessage = () => t`This recording was closed and could not be saved.`;
+
+/** One owner tab per capture needs Web Locks and BroadcastChannel, which every current browser has. */
+const supported = () =>
+  typeof navigator !== "undefined" &&
+  Boolean(navigator.locks) &&
+  typeof BroadcastChannel !== "undefined";
+
+/** Resolves with a release function once this tab holds the capture's lock; null when another tab holds it and `wait` is false. */
+function lock(captureId: string, wait: boolean): Promise<(() => void) | null> {
+  return new Promise((resolve) => {
+    navigator.locks
+      .request(`meeting-capture:${captureId}`, { ifAvailable: !wait }, (held) => {
+        if (!held) return resolve(null);
+        // The lock is held while this promise is pending.
+        return new Promise<void>((release) => resolve(() => release()));
+      })
+      .catch(() => resolve(null));
+  });
+}
+
+function listen() {
+  if (channel) return;
+  channel = new BroadcastChannel("praci-meeting-capture");
+  channel.onmessage = ({ data }: MessageEvent<Message>) => {
+    const s = session;
+    const mine = s !== null && !s.ended && s.owner.captureId === data.captureId;
+    if (data.type === "stop") {
+      if (mine && !s.observer) void stopCapture();
+      else stopRequested = data.captureId;
+    } else if (mine && s.observer) {
+      if (data.view.phase === "stored") storedCount += 1;
+      void close(s, data.view, false);
+    }
+  };
+}
 
 const onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
 function watch(on: boolean) {
@@ -107,19 +160,33 @@ function watch(on: boolean) {
   else window.removeEventListener("beforeunload", onBeforeUnload);
 }
 
-/** Only one tab may record a capture: the Web Locks owner. Null when another tab holds it. */
-async function acquireLock(captureId: string): Promise<(() => void) | null> {
-  if (typeof navigator === "undefined" || !navigator.locks) return () => undefined;
-  return new Promise((resolve) => {
-    void navigator.locks.request(`meeting-capture:${captureId}`, { ifAvailable: true }, (lock) => {
-      if (!lock) {
-        resolve(null);
-        return;
-      }
-      // Holding the lock means keeping this promise pending until the session is over.
-      return new Promise<void>((release) => resolve(() => release()));
-    });
-  });
+/** Timers and the leave prompt; the lock stays until the session is over. */
+function quiet(s: Session) {
+  if (silenceTimer) clearInterval(silenceTimer);
+  silenceTimer = null;
+  if (s.retry) clearTimeout(s.retry);
+  s.retry = null;
+  watch(false);
+}
+
+/**
+ * Ends a session. The buffer is dropped before the lock is released, so a tab that takes the lock
+ * next never finds a finished capture's record. Observer tabs hear how it ended.
+ */
+async function close(s: Session, next: CaptureView, drop: boolean) {
+  if (s.ended) return;
+  const gen = generation;
+  s.ended = true;
+  if (session === s) session = null;
+  for (const recorder of s.recorders.values()) recorder.abandon();
+  quiet(s);
+  if (drop) await dropCapture(chunkStore, s.owner).catch(() => undefined);
+  if (!s.observer)
+    channel?.postMessage({ type: "closed", captureId: s.owner.captureId, view: next });
+  s.releaseLock?.();
+  s.releaseLock = null;
+  // Sign-out during the drop already set the view.
+  if (gen === generation) set(next);
 }
 
 async function upload(chunk: BufferedChunk) {
@@ -145,16 +212,6 @@ async function upload(chunk: BufferedChunk) {
   );
 }
 
-/** Ends the session because the server closed the capture. The pill says so until dismissed. */
-async function endLocal(s: Session, message: string) {
-  if (!live(s)) return;
-  s.ended = true;
-  session = null;
-  teardown(s);
-  await dropCapture(chunkStore, s.owner);
-  set({ phase: "failed", message });
-}
-
 /** One upload pass over this capture's chunks, after any pass already running. */
 function flush(s: Session): Promise<{ failed: boolean }> {
   const run = flushQueue.then(() => pass(s));
@@ -167,8 +224,14 @@ async function pass(s: Session): Promise<{ failed: boolean }> {
   const { failed, rejected } = await flushChunks(chunkStore, s.owner, upload);
   if (!live(s)) return { failed: false };
   if (rejected.some((r) => r.endsCapture)) {
-    await endLocal(s, t`This recording was closed and could not be saved.`);
+    await close(s, { phase: "failed", message: closedMessage() }, true);
     return { failed: false };
+  }
+  if (rejected.length > 0) {
+    // Kept in the record, so a reload still tells finish that the meeting is partial.
+    s.record = { ...s.record, lostChunks: s.record.lostChunks + rejected.length };
+    await chunkStore.putRecord(s.record);
+    if (!live(s)) return { failed: false };
   }
   if (view.phase === "recording" && view.offline !== failed) set({ ...view, offline: failed });
   if (failed && !s.stopping && !s.retry) {
@@ -199,43 +262,34 @@ function watchSilence(s: Session) {
     const missing = s.expectsTabAudio
       ? !system || callAudioMissing(system.peak, Date.now() - s.startedAt)
       : false;
-    if (missing !== view.noCallAudio) set({ ...view, noCallAudio: missing });
+    const canShareTab = s.expectsTabAudio && !system;
+    if (missing !== view.noCallAudio || canShareTab !== Boolean(view.canShareTab))
+      set({ ...view, noCallAudio: missing, canShareTab });
   }, 1_000);
 }
 
+function addRecorder(s: Session, track: MeetingCaptureTrack, stream: MediaStream, seqBase: number) {
+  const recorder = new TrackRecorder({
+    stream,
+    track,
+    owner: s.owner,
+    startedAt: s.startedAt,
+    seqBase,
+    onChunk: (chunk) => accept(s, chunk),
+    ...(track === "microphone" ? { onEnded: () => void stopCapture({ micStopped: true }) } : {}),
+  });
+  s.recorders.set(track, recorder);
+  recorder.start();
+}
+
 function begin(s: Session, streams: Map<MeetingCaptureTrack, MediaStream>, seqBase: number) {
-  for (const [track, stream] of streams) {
-    const recorder = new TrackRecorder({
-      stream,
-      track,
-      owner: s.owner,
-      startedAt: s.startedAt,
-      seqBase,
-      onChunk: (chunk) => accept(s, chunk),
-      ...(track === "microphone" ? { onEnded: () => void stopCapture({ micStopped: true }) } : {}),
-    });
-    s.recorders.set(track, recorder);
-    recorder.start();
-  }
+  for (const [track, stream] of streams) addRecorder(s, track, stream, seqBase);
   watchSilence(s);
   watch(true);
 }
 
-/** Timers and the leave prompt; the lock stays until the session is over. */
-function quiet(s: Session) {
-  if (silenceTimer) clearInterval(silenceTimer);
-  silenceTimer = null;
-  if (s.retry) clearTimeout(s.retry);
-  s.retry = null;
-  watch(false);
-}
-
-function teardown(s: Session) {
-  for (const recorder of s.recorders.values()) recorder.abandon();
-  quiet(s);
-  s.releaseLock?.();
-  s.releaseLock = null;
-}
+/** Unique among a resumed capture's earlier chunks, which cannot be more than one per second. */
+const resumeSeq = (s: Session) => Math.floor((Date.now() - s.startedAt) / 1000);
 
 async function microphone(): Promise<MediaStream> {
   try {
@@ -261,31 +315,69 @@ const stopTracks = (streams: Iterable<MediaStream>) => {
   for (const stream of streams) for (const track of stream.getTracks()) track.stop();
 };
 
+const recordingView = (s: Session, noCallAudio = false): CaptureView => ({
+  phase: "recording",
+  captureId: s.owner.captureId,
+  title: s.record.title,
+  startedAt: s.startedAt,
+  noCallAudio,
+  offline: false,
+  ...(noCallAudio ? { canShareTab: true } : {}),
+});
+
+const transcribingView = (s: Session, micStopped?: boolean): CaptureView => ({
+  phase: "transcribing",
+  captureId: s.owner.captureId,
+  title: s.record.title,
+  startedAt: s.startedAt,
+  ...(micStopped ? { micStopped: true } : {}),
+});
+
+const newSession = (
+  record: CaptureRecord,
+  releaseLock: (() => void) | null,
+  observer: boolean,
+): Session => ({
+  owner: { userId: record.userId, spaceId: record.spaceId, captureId: record.captureId },
+  record,
+  startedAt: record.startedAt,
+  recorders: new Map(),
+  expectsTabAudio: record.tracks.includes("system"),
+  retry: null,
+  accepting: false,
+  stopping: false,
+  ended: false,
+  observer,
+  releaseLock,
+});
+
 /** Starts a recording from the Record popover. Throws a readable message when it cannot. */
 export async function startCapture(options: StartOptions): Promise<void> {
-  if (session || starting) throw new Error(t`A recording is already running.`);
+  if (session || starting || recovering) throw new Error(t`A recording is already running.`);
+  if (!supported()) throw new Error(t`This browser cannot record meetings.`);
+  listen();
   starting = true;
   const gen = generation;
-  const streams = new Map<MeetingCaptureTrack, MediaStream>();
-  let s: Session | null = null;
-  let captureId: string | null = null;
-  let spaceId = "";
-  const outdated = () => {
+  const check = () => {
     if (gen !== generation) throw new Error(t`You were signed out.`);
   };
+  const streams = new Map<MeetingCaptureTrack, MediaStream>();
+  let s: Session | null = null;
+  let owner: CaptureOwner | null = null;
+  let release: (() => void) | null = null;
   try {
     const me = await rpc.me();
-    spaceId = me.spaceId;
+    check();
     lastUserId = me.userId;
     streams.set("microphone", await microphone());
-    outdated();
+    check();
     if (options.tabAudio) {
       const tab = await tabAudio();
       if (tab) streams.set("system", tab);
-      outdated();
+      check();
     }
     const title = options.title?.trim() || undefined;
-    const started = await rpc.meetingCaptures.start(
+    const { captureId } = await rpc.meetingCaptures.start(
       {
         clientId: crypto.randomUUID(),
         engine: "server",
@@ -293,61 +385,52 @@ export async function startCapture(options: StartOptions): Promise<void> {
         ...(title ? { title } : {}),
         ...(options.consentConfirmed ? { consentConfirmed: true } : {}),
       },
-      { context: { spaceId } },
+      { context: { spaceId: me.spaceId } },
     );
-    captureId = started.captureId;
-    outdated();
-    const owner = { userId: me.userId, spaceId, captureId };
-    const startedAt = Date.now();
-    const record: CaptureRecord = {
+    owner = { userId: me.userId, spaceId: me.spaceId, captureId };
+    check();
+    // The lock comes before the record: a record whose lock is free belongs to no open tab.
+    release = await lock(captureId, false);
+    check();
+    if (!release) throw new Error(t`A recording is already running.`);
+    const captureRecord: CaptureRecord = {
       ...owner,
       tracks: [...streams.keys()],
       title: title ?? null,
-      startedAt,
+      startedAt: Date.now(),
       stopped: false,
+      lostChunks: 0,
     };
-    s = {
-      owner,
-      record,
-      startedAt,
-      recorders: new Map(),
-      expectsTabAudio: Boolean(options.tabAudio),
-      retry: null,
-      accepting: true,
-      stopping: false,
-      ended: false,
-      observer: false,
-      releaseLock: await acquireLock(captureId),
-    };
+    await chunkStore.putRecord(captureRecord);
+    check();
+    s = newSession(captureRecord, release, false);
+    s.expectsTabAudio = Boolean(options.tabAudio);
+    s.accepting = true;
     session = s;
-    await chunkStore.putRecord(record);
-    set({
-      phase: "recording",
-      captureId,
-      title: title ?? null,
-      startedAt,
-      noCallAudio: false,
-      offline: false,
-    });
+    set(recordingView(s));
     begin(s, streams, 0);
   } catch (error) {
-    // Roll everything back: no phantom session, no open microphone, no half-made capture.
+    // Roll everything back: no session, no open microphone, no record, no half-made capture.
     stopTracks(streams.values());
     if (s) {
       s.ended = true;
       if (session === s) session = null;
-      teardown(s);
-      await dropCapture(chunkStore, s.owner).catch(() => undefined);
-      set({ phase: "idle" });
+      for (const recorder of s.recorders.values()) recorder.abandon();
+      quiet(s);
     }
-    if (captureId)
+    if (owner) await dropCapture(chunkStore, owner).catch(() => undefined);
+    release?.();
+    if (s && gen === generation) set({ phase: "idle" });
+    if (owner)
       await rpc.meetingCaptures
-        .discard({ captureId }, { context: { spaceId } })
+        .discard({ captureId: owner.captureId }, { context: { spaceId: owner.spaceId } })
         .catch(() => undefined);
     throw error;
   } finally {
     starting = false;
   }
+  // Stop was pressed in another tab before this one was listening for it.
+  if (stopRequested === owner?.captureId) void stopCapture();
 }
 
 /** Finds the stored meeting once the capture has left `active`. */
@@ -362,7 +445,9 @@ async function waitForStored(s: Session) {
       continue;
     }
     if (!live(s)) return;
-    if (active) continue;
+    // ponytail: `active` names only the newest open capture, so an older one counts as stored once
+    // a newer one is open; its meeting is then found by time or not opened automatically.
+    if (active?.captureId === s.owner.captureId) continue;
     let meetingId: string | null = null;
     try {
       const page = await rpc.meetings.list({}, context(s));
@@ -375,28 +460,35 @@ async function waitForStored(s: Session) {
       // The list refreshes on its own; only the automatic open is lost.
     }
     if (!live(s)) return;
-    s.ended = true;
-    session = null;
-    teardown(s);
-    await dropCapture(chunkStore, s.owner);
     storedCount += 1;
-    set({ phase: "stored", meetingId });
+    await close(s, { phase: "stored", meetingId }, true);
     return;
   }
 }
 
-async function finishRpc(s: Session) {
+/** Tells the server the recording is over. False when the session ended instead. */
+async function finishRpc(s: Session): Promise<boolean> {
   while (live(s)) {
     try {
       await rpc.meetingCaptures.finish(
-        { captureId: s.owner.captureId, endedAt: new Date().toISOString() },
+        {
+          captureId: s.owner.captureId,
+          endedAt: new Date().toISOString(),
+          ...(s.record.lostChunks ? { lostChunks: s.record.lostChunks } : {}),
+        },
         context(s),
       );
-      return;
-    } catch {
+      return live(s);
+    } catch (error) {
+      if (!live(s)) return false;
+      if (refused(error)) {
+        await close(s, { phase: "failed", message: closedMessage() }, true);
+        return false;
+      }
       await sleep(RETRY_MS);
     }
   }
+  return false;
 }
 
 /** Uploads what is left, tells the server the recording is over, and waits for the meeting. */
@@ -409,10 +501,7 @@ async function finishFlow(s: Session) {
     if (!failed && (await pendingChunks(chunkStore, s.owner)).length === 0) break;
     await sleep(RETRY_MS);
   }
-  await finishRpc(s);
-  if (!live(s)) return;
-  await dropCapture(chunkStore, s.owner);
-  await waitForStored(s);
+  if (await finishRpc(s)) await waitForStored(s);
 }
 
 /** Stops recording, uploads what is left, and waits for the meeting to be stored. */
@@ -420,26 +509,32 @@ export async function stopCapture(options: { micStopped?: boolean } = {}): Promi
   const s = session;
   if (!s || s.stopping || s.ended) return;
   s.stopping = true;
-  set({
-    phase: "transcribing",
-    captureId: s.owner.captureId,
-    title: s.record.title,
-    startedAt: s.startedAt,
-    ...(options.micStopped ? { micStopped: true } : {}),
-  });
+  stopRequested = s.owner.captureId;
+  set(transcribingView(s, options.micStopped));
   if (s.observer) {
-    // The other tab owns the audio; it will see the capture close and end itself.
-    await finishRpc(s);
-    await waitForStored(s);
+    // The owner tab stops. If it is gone, this tab gets the lock and finishes (see `observe`).
+    channel?.postMessage({ type: "stop", captureId: s.owner.captureId } satisfies Message);
     return;
   }
   // Written before anything else, so a reload at any point after this finishes instead of recording.
   s.record = { ...s.record, stopped: true };
   await chunkStore.putRecord(s.record);
+  if (!live(s)) return;
   await Promise.all([...s.recorders.values()].map((recorder) => recorder.stop()));
   s.accepting = false;
   quiet(s);
   await finishFlow(s);
+}
+
+/** Records the call tab again after a reload; must run from the click that asks for it. */
+export async function shareTabAudio(): Promise<void> {
+  const s = session;
+  if (!s || !live(s) || s.observer || s.stopping || !s.expectsTabAudio) return;
+  if (s.recorders.has("system")) return;
+  const stream = await tabAudio().catch(() => null);
+  if (!stream) return;
+  if (!live(s) || s.stopping || s.recorders.has("system")) return stopTracks([stream]);
+  addRecorder(s, "system", stream, resumeSeq(s));
 }
 
 function scheduleRecover() {
@@ -450,92 +545,69 @@ function scheduleRecover() {
   }, RECOVER_RETRY_MS);
 }
 
+/** Shows a capture another tab owns, and carries it on if that tab lets go without ending it. */
+function observe(captureRecord: CaptureRecord, gen: number) {
+  const s = newSession(captureRecord, null, true);
+  session = s;
+  set(captureRecord.stopped ? transcribingView(s) : recordingView(s));
+  void lock(captureRecord.captureId, true).then(async (release) => {
+    if (!release) return;
+    if (!live(s) || gen !== generation) return release();
+    // The owner tab closed or crashed: continue from its record.
+    s.ended = true;
+    session = null;
+    if (!(await adopt(captureRecord.captureId, release, gen)) && gen === generation)
+      set({ phase: "idle" });
+  });
+}
+
 /**
- * Picks up a capture this browser started and lost track of (reload, crash). Only a capture with a
- * local record is adopted. When the server cannot be reached nothing is cleared; it asks again later.
+ * Continues a capture whose lock this tab holds: records again when the server still records it
+ * and nobody pressed Stop; otherwise uploads what is left and finishes. Every question is asked in
+ * the capture's own space. False when the capture was left alone (the lock is then released).
  */
-export async function recoverCapture(): Promise<void> {
-  if (session || starting) return;
-  const gen = generation;
+async function adopt(captureId: string, release: () => void, gen: number): Promise<boolean> {
+  const stale = () => gen !== generation || session !== null || starting;
+  const giveUp = () => {
+    release();
+    return false;
+  };
+  const captureRecord = (await chunkStore.records()).find((item) => item.captureId === captureId);
+  if (!captureRecord || stale()) return giveUp();
+  const scope = { context: { spaceId: captureRecord.spaceId } };
   let me: Awaited<ReturnType<typeof rpc.me>>;
   let active: Awaited<ReturnType<typeof rpc.meetingCaptures.active>>;
   try {
-    me = await rpc.me();
-    active = await rpc.meetingCaptures.active();
-  } catch {
-    if ((await chunkStore.records()).length > 0) scheduleRecover();
-    return;
+    me = await rpc.me(undefined, scope);
+    active = await rpc.meetingCaptures.active(undefined, scope);
+  } catch (error) {
+    // Not a member of that space any more: nothing here can finish the capture.
+    if (refused(error)) {
+      if (!stale()) await dropCapture(chunkStore, captureRecord);
+    } else scheduleRecover();
+    return giveUp();
   }
-  if (!me || gen !== generation || session || starting) return;
+  // Another person's capture stays for them; it is finished when they sign in here again.
+  if (stale() || me.userId !== captureRecord.userId || me.spaceId !== captureRecord.spaceId)
+    return giveUp();
   lastUserId = me.userId;
-  // The server answered: a record for a capture of this space that is not active is finished business.
-  const mine = (await chunkStore.records()).filter(
-    (record) => record.userId === me.userId && record.spaceId === me.spaceId,
-  );
-  for (const record of mine)
-    if (record.captureId !== active?.captureId) await dropCapture(chunkStore, record);
-  const record = mine.find((item) => item.captureId === active?.captureId);
-  if (!active || !record || gen !== generation || session) return;
-
-  const owner = { userId: me.userId, spaceId: me.spaceId, captureId: active.captureId };
-  const s: Session = {
-    owner,
-    record,
-    startedAt: Date.parse(active.startedAt),
-    recorders: new Map(),
-    expectsTabAudio: record.tracks.includes("system"),
-    retry: null,
-    accepting: false,
-    stopping: false,
-    ended: false,
-    observer: false,
-    releaseLock: null,
-  };
+  const s = newSession(captureRecord, release, false);
   session = s;
-  const transcribing = () =>
-    set({
-      phase: "transcribing",
-      captureId: owner.captureId,
-      title: active.title,
-      startedAt: s.startedAt,
-    });
-  if (active.status === "finishing") {
+  const recording =
+    active?.captureId === captureId &&
+    active.status === "recording" &&
+    !captureRecord.stopped &&
+    stopRequested !== captureId;
+  if (!recording) {
+    // Stopped, finishing, or no longer the open capture: store what is here.
     s.stopping = true;
-    transcribing();
-    await flush(s);
-    await waitForStored(s);
-    return;
-  }
-  if (record.stopped) {
-    // Stop was pressed before the page closed: finish, never record again.
-    s.stopping = true;
-    transcribing();
+    set(transcribingView(s));
     await finishFlow(s);
-    return;
+    return true;
   }
-  const release = await acquireLock(owner.captureId);
-  if (!live(s) || s.stopping) {
-    release?.();
-    return;
-  }
-  const recording = {
-    phase: "recording" as const,
-    captureId: owner.captureId,
-    title: active.title,
-    startedAt: s.startedAt,
-    // Sharing a tab again needs a click, so a recovered call recording has no call audio until then.
-    noCallAudio: s.expectsTabAudio,
-    offline: false,
-  };
-  if (!release) {
-    // Another tab records it: this one shows the pill and can Stop.
-    s.observer = true;
-    set(recording);
-    return;
-  }
-  s.releaseLock = release;
   s.accepting = true;
-  set(recording);
+  // Sharing a tab again needs a click, so a resumed call recording has no call audio until then.
+  set(recordingView(s, s.expectsTabAudio));
   void flush(s);
   let mic: MediaStream;
   try {
@@ -543,14 +615,44 @@ export async function recoverCapture(): Promise<void> {
   } catch {
     // The microphone is not available any more: store what arrived.
     await stopCapture();
-    return;
+    return true;
   }
   if (!live(s) || s.stopping) {
     stopTracks([mic]);
-    return;
+    return true;
   }
-  // Unique among the earlier chunks, which cannot be more than one per second.
-  begin(s, new Map([["microphone", mic]]), Math.floor((Date.now() - s.startedAt) / 1000));
+  try {
+    begin(s, new Map([["microphone", mic]]), resumeSeq(s));
+  } catch {
+    // The recorder could not start: let go of the microphone and store what arrived.
+    for (const recorder of s.recorders.values()) recorder.abandon();
+    s.recorders.clear();
+    stopTracks([mic]);
+    await stopCapture();
+  }
+  return true;
+}
+
+/**
+ * Picks up captures this browser started and lost track of (reload, crash, closed tab). A capture
+ * another tab holds is shown read-only. Only captures with a local record are touched.
+ */
+export async function recoverCapture(): Promise<void> {
+  if (session || starting || recovering || !supported()) return;
+  listen();
+  recovering = true;
+  const gen = generation;
+  try {
+    for (const captureRecord of await chunkStore.records()) {
+      if (gen !== generation || session || starting) return;
+      const release = await lock(captureRecord.captureId, false);
+      if (gen !== generation || session || starting) return release?.();
+      if (!release) return observe(captureRecord, gen);
+      if (await adopt(captureRecord.captureId, release, gen)) return;
+    }
+  } finally {
+    recovering = false;
+  }
 }
 
 /** The pill goes once the meeting is stored (and opened, when the user was on the list) or the error is read. */
@@ -561,14 +663,17 @@ export function dismissStored() {
 /** Sign-out: end the session first, then drop everything this user buffered. */
 export async function clearCaptureOnSignOut(userId?: string | null): Promise<void> {
   generation += 1;
+  stopRequested = null;
   if (recoverTimer) clearTimeout(recoverTimer);
   recoverTimer = null;
   const s = session;
   if (s) {
     s.ended = true;
     session = null;
-    teardown(s);
+    for (const recorder of s.recorders.values()) recorder.abandon();
+    quiet(s);
   }
-  await dropUser(chunkStore, userId ?? s?.owner.userId ?? lastUserId);
   set({ phase: "idle" });
+  await dropUser(chunkStore, userId ?? s?.owner.userId ?? lastUserId);
+  s?.releaseLock?.();
 }

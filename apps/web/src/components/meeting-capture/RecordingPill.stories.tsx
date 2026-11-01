@@ -31,6 +31,19 @@ export const NoCallAudio: Story = {
   },
 };
 
+/** After a reload: the call tab can be shared again from the warning. */
+export const ShareTabAgain: Story = {
+  args: {
+    state: {
+      kind: "recording",
+      title: "Pricing review with Dana",
+      elapsedMs: 754_000,
+      noCallAudio: true,
+    },
+    onShareTab: () => undefined,
+  },
+};
+
 export const Offline: Story = {
   args: {
     state: {

@@ -4,6 +4,7 @@ import {
   captureView,
   dismissStored,
   recoverCapture,
+  shareTabAudio,
   stopCapture,
   subscribeCapture,
 } from "../../lib/meeting-capture/controller";
@@ -56,6 +57,7 @@ export function RecordingPillHost() {
             offline: view.offline,
           }}
           onStop={() => void stopCapture()}
+          onShareTab={view.canShareTab ? () => void shareTabAudio() : undefined}
         />
       )}
     </div>

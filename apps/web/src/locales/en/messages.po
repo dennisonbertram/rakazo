@@ -11984,6 +11984,10 @@ msgstr "Share {0}"
 msgid "Share link"
 msgstr "Share link"
 
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Share the call tab again"
+msgstr "Share the call tab again"
+
 #: src/pages/CompanyFactDetail.tsx
 msgid "Share with team"
 msgstr "Share with team"
@@ -13231,6 +13235,10 @@ msgstr "This also stops its link."
 #: src/pages/Shell.tsx
 msgid "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
 msgstr "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
+
+#: src/lib/meeting-capture/controller.ts
+msgid "This browser cannot record meetings."
+msgstr "This browser cannot record meetings."
 
 #: src/components/data-room/ItemDialogs.tsx
 #: src/pages/Artifacts.tsx

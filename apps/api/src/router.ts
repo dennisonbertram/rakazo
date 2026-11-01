@@ -74,7 +74,6 @@ import {
   getBotPage,
   getBotPins,
   hasActiveComputerControl,
-  hasVoiceConsent,
   hostCredentialSource,
   isAutoReviewCheckerConfigured,
   isComputerScreenUnavailable,
@@ -143,6 +142,7 @@ import {
   screenLeaseIdForRun,
   scriptedCatalogEntry,
   selectDefaultCredentialId,
+  selectTranscriptionTarget,
   serializeModelSecret,
   sharePageSnapshot,
   startAuditDraftRun,
@@ -9725,15 +9725,11 @@ export function createRouter(deps: RouterDeps): AppRouter {
       status: authed.voice.status.handler(async ({ context }) => {
         const cred = await findDefaultVoiceCredential(deps.prisma, context.actor);
         const selection = await findTranscriptionSelection(deps, context.actor);
-        const status = toVoiceStatus(cred, selection?.provider ?? null);
-        // The provider audio would go to: the selection, else the voice credential if it transcribes.
-        const provider =
-          selection?.provider ?? (status.transcribe ? (cred?.provider ?? null) : null);
+        // The same choice server transcription makes, so Record shows only when audio would be sent.
+        const { target, consented } = await selectTranscriptionTarget(deps, context.actor);
         return {
-          ...status,
-          transcriptionConsented: provider
-            ? await hasVoiceConsent(deps.prisma, context.actor, provider)
-            : false,
+          ...toVoiceStatus(cred, selection?.provider ?? null),
+          transcriptionConsented: Boolean(target && consented),
         };
       }),
       setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) => {
