@@ -14,6 +14,8 @@ const voice = vi.hoisted(() => ({
   disconnect: vi.fn(),
   setVoice: vi.fn(),
   setSpeechModel: vi.fn(),
+  setTranscription: vi.fn(),
+  clearTranscription: vi.fn(),
 }));
 
 vi.mock("../lib/rpc", () => ({ rpc: { voice } }));
@@ -147,6 +149,84 @@ it("saves a Fish speech model on the existing provider pane", async () => {
       provider: "fish-audio",
       speechModel: "s1",
     });
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("saves an OpenAI-compatible server's base URL and model, and never shows the key back", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  voice.catalog.mockResolvedValue([
+    {
+      id: "openai-compatible",
+      name: "OpenAI-compatible",
+      description: "",
+      transcribe: true,
+      speech: false,
+    },
+  ]);
+  voice.credentials.mockResolvedValue([]);
+  let connected: string | null = null;
+  voice.status.mockImplementation(async () => ({
+    configured: false,
+    ready: false,
+    transcribe: false,
+    provider: null,
+    voiceId: "",
+    transcriptionProvider: connected,
+    transcriptionReady: false,
+  }));
+  voice.setTranscription.mockImplementation(async ({ provider }: { provider: string }) => {
+    connected = provider;
+    return { provider };
+  });
+
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const field = (label: string) => {
+    const found = [...container.querySelectorAll("input")].find(
+      (input) => container.querySelector(`label[for="${input.id}"]`)?.textContent === label,
+    );
+    if (!found) throw new Error(`Missing field: ${label}`);
+    return found;
+  };
+  const type = async (input: HTMLInputElement, value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  try {
+    await act(async () => {
+      root.render(<VoiceSettingsOverlay embedded onClose={() => undefined} />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const connect = () =>
+      [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Connect "))!;
+    expect(connect().disabled).toBe(true);
+    await type(field("Base URL"), "http://localhost:8000");
+    await type(field("Model"), "whisper-large-v3");
+    expect(field("API key (optional)").type).toBe("password");
+    await type(field("API key (optional)"), "secret-key-value");
+    await act(async () => {
+      connect().click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(voice.setTranscription).toHaveBeenCalledWith({
+      provider: "openai-compatible",
+      baseUrl: "http://localhost:8000",
+      model: "whisper-large-v3",
+      apiKey: "secret-key-value",
+    });
+    expect(field("API key (optional)").value).toBe("");
+    expect(container.innerHTML).not.toContain("secret-key-value");
+    expect(container.textContent).toContain("Disconnect");
   } finally {
     await act(async () => root.unmount());
     container.remove();

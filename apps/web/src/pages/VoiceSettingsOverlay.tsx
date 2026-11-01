@@ -31,6 +31,8 @@ export function VoiceSettingsOverlay({
   const apiKeyId = useId();
   const voiceSelectId = useId();
   const speechModelId = useId();
+  const baseUrlId = useId();
+  const compatModelId = useId();
   const [catalog, setCatalog] = useState<VoiceCatalogEntry[]>([]);
   const [credentials, setCredentials] = useState<VoiceCredential[]>([]);
   const [status, setStatus] = useState<VoiceStatus | null>(null);
@@ -39,6 +41,8 @@ export function VoiceSettingsOverlay({
   const [apiKey, setApiKey] = useState("");
   const [voiceId, setVoiceId] = useState("");
   const [speechModel, setSpeechModel] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [compatModel, setCompatModel] = useState("");
   const speechModelSave = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<"connect" | "disconnect" | "voice" | "test" | null>(null);
@@ -88,23 +92,39 @@ export function VoiceSettingsOverlay({
 
   const selected = catalog.find((entry) => entry.id === provider) ?? catalog[0];
   const credential = credentials.find((entry) => entry.provider === provider);
+  const isCompat = selected?.id === "openai-compatible";
+  const compatConnected = isCompat && status?.transcriptionProvider === selected?.id;
+  const connectDisabled = isCompat
+    ? !baseUrl.trim() ||
+      !compatModel.trim() ||
+      (apiKey.trim().length > 0 && apiKey.trim().length < 8)
+    : apiKey.trim().length < 8;
   const voiceOptions = useMemo(
     () => (voices.length ? voices : voiceId ? [{ id: voiceId, label: voiceId }] : []),
     [voices, voiceId],
   );
 
   async function connectKey() {
-    if (!selected || !apiKey.trim()) return;
+    if (!selected || connectDisabled) return;
     setError(null);
     setNotice(null);
     markPending("connect");
     try {
-      await rpc.voice.connect({
-        provider: selected.id,
-        apiKey: apiKey.trim(),
-        voiceId: voiceId || undefined,
-        ...(selected.id === "fish-audio" ? { speechModel: speechModel.trim() } : {}),
-      });
+      if (isCompat) {
+        await rpc.voice.setTranscription({
+          provider: selected.id,
+          baseUrl: baseUrl.trim(),
+          model: compatModel.trim(),
+          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+        });
+      } else {
+        await rpc.voice.connect({
+          provider: selected.id,
+          apiKey: apiKey.trim(),
+          voiceId: voiceId || undefined,
+          ...(selected.id === "fish-audio" ? { speechModel: speechModel.trim() } : {}),
+        });
+      }
       setApiKey("");
       await refresh(selected.id);
       setNotice(t`Connected ${selected.name}.`);
@@ -116,14 +136,17 @@ export function VoiceSettingsOverlay({
   }
 
   async function disconnectProvider() {
-    if (!credential) return;
+    if (!credential && !compatConnected) return;
     setError(null);
     setNotice(null);
     markPending("disconnect");
     try {
-      await rpc.voice.disconnect({ provider: credential.provider });
+      if (compatConnected) await rpc.voice.clearTranscription();
+      else if (credential) await rpc.voice.disconnect({ provider: credential.provider });
       setApiKey("");
-      await refresh(credential.provider);
+      setBaseUrl("");
+      setCompatModel("");
+      await refresh(selected?.id);
     } catch (err) {
       setError(errorText(err, t`Could not disconnect this voice provider`));
     } finally {
@@ -211,7 +234,9 @@ export function VoiceSettingsOverlay({
           </div>
           <div className="rk-scroll overflow-y-auto rounded-xl border border-border">
             {catalog.map((entry) => {
-              const connected = credentials.some((cred) => cred.provider === entry.id);
+              const connected =
+                credentials.some((cred) => cred.provider === entry.id) ||
+                status?.transcriptionProvider === entry.id;
               return (
                 <button
                   key={entry.id}
@@ -237,7 +262,9 @@ export function VoiceSettingsOverlay({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] text-foreground">{entry.name}</span>
                     <span className="mt-0.5 block text-[12px] text-muted-foreground/80">
-                      {entry.transcribe ? (
+                      {entry.speech === false ? (
+                        <Trans>Transcribe</Trans>
+                      ) : entry.transcribe ? (
                         <Trans>Speak + transcribe</Trans>
                       ) : (
                         <Trans>Speak only</Trans>
@@ -265,9 +292,45 @@ export function VoiceSettingsOverlay({
           {notice ? <p className="mb-4 text-sm text-success">{notice}</p> : null}
           {selected ? (
             <>
+              {isCompat ? (
+                <>
+                  <Field className="mt-5">
+                    <FieldLabel htmlFor={baseUrlId}>
+                      <Trans>Base URL</Trans>
+                    </FieldLabel>
+                    <Input
+                      id={baseUrlId}
+                      value={baseUrl}
+                      maxLength={2048}
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder="http://localhost:8000"
+                      onChange={(event) => setBaseUrl(event.target.value)}
+                    />
+                  </Field>
+                  <Field className="mt-5">
+                    <FieldLabel htmlFor={compatModelId}>
+                      <Trans>Model</Trans>
+                    </FieldLabel>
+                    <Input
+                      id={compatModelId}
+                      value={compatModel}
+                      maxLength={120}
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder="whisper-large-v3"
+                      onChange={(event) => setCompatModel(event.target.value)}
+                    />
+                  </Field>
+                </>
+              ) : null}
               <Field className="mt-5">
                 <FieldLabel htmlFor={apiKeyId}>
-                  <Trans>{selected.name} API key</Trans>
+                  {isCompat ? (
+                    <Trans>API key (optional)</Trans>
+                  ) : (
+                    <Trans>{selected.name} API key</Trans>
+                  )}
                 </FieldLabel>
                 <Input
                   id={apiKeyId}
@@ -281,7 +344,7 @@ export function VoiceSettingsOverlay({
               <Button
                 type="button"
                 className="mt-3"
-                disabled={busy || apiKey.trim().length < 8}
+                disabled={busy || connectDisabled}
                 onClick={() => void connectKey()}
               >
                 {pending === "connect" ? (
@@ -292,7 +355,7 @@ export function VoiceSettingsOverlay({
                   <Trans>Connect {selected.name}</Trans>
                 )}
               </Button>
-              {credential ? (
+              {credential || compatConnected ? (
                 <Button
                   type="button"
                   variant="outline"
