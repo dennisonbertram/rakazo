@@ -1965,7 +1965,7 @@ export const appContract = {
     agent: oc.output(BotSchema),
   },
   calendar: {
-    /** One time-sorted list for the range: Google events from every connected account, bot to-dos, check-backs and the next run of repeating routines. */
+    /** One time-sorted list for the range: Google events from every connected account, bot to-dos, check-backs and each run of repeating routines in the range. */
     agenda: oc.input(CalendarAgendaInputSchema).output(CalendarAgendaSchema),
   },
   contacts: {
