@@ -14,7 +14,7 @@ import {
   truncateSlashDescription,
 } from "@rakazo/core";
 import { Button } from "@rakazo/ui-web";
-import { ArrowUp, Box, Mic, Paperclip, Plus, Settings, Square, X } from "lucide-react";
+import { ArrowUp, AudioLines, Box, Paperclip, Plus, Settings, Square, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent, RefObject } from "react";
 import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fileIcon } from "../../components/data-room/ItemRows";
@@ -447,6 +447,8 @@ export const Composer = memo(function Composer({
     const text = serializeComposerPrompt(draft, selectedSkill, selectedMentions);
     historyIndex.current = null;
     setDraft("");
+    // Send disables or disappears once the draft is empty, which would drop focus to the page.
+    if (!isCoarsePointer()) textareaRef.current?.focus();
     setMentionQuery(null);
     setMentionHighlightKey(null);
     setSlashQuery(null);
@@ -1159,7 +1161,7 @@ export const Composer = memo(function Composer({
               onClick={onVoice}
               className="size-8 shrink-0 rounded-full text-foreground/75"
             >
-              <Mic size={16} strokeWidth={1.8} />
+              <AudioLines size={16} strokeWidth={1.8} />
             </Button>
           ) : null}
           {running ? (
