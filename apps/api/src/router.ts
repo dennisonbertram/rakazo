@@ -210,6 +210,7 @@ import {
   isShareableArtifactMimeType,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
+  NOTIFICATION_CATCH_UP_ID,
   NOTIFICATION_HEARTBEAT_ID,
   notificationKindOf,
   OMI_CONNECTOR_ID,
@@ -740,6 +741,14 @@ async function reconcilePendingConnections(
 
 /** A provider saying the remote account does not exist: it is already gone, so revoke is done. */
 /** Page validation and duplicate-title errors become 400 and 409; anything else is rethrown. */
+/** Tells the owner's other tabs and devices a chat's read state changed, so they reload their lists. */
+function notifyThreadReadChanged(deps: RouterDeps, actor: Actor) {
+  return deps.notificationEvents.notify(
+    { spaceId: actor.spaceId, userId: actor.userId },
+    { id: NOTIFICATION_CATCH_UP_ID, surface: "threads", importance: "info" },
+  );
+}
+
 function pageError(error: unknown): unknown {
   if (error instanceof PageValidationError) {
     return new ORPCError("BAD_REQUEST", { message: error.message });
@@ -3635,19 +3644,19 @@ export function createRouter(deps: RouterDeps) {
       }),
       markRead: authed.threads.markRead.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        await setThreadUnreadState(deps.prisma, context.actor, target, false, {
+        const changed = await setThreadUnreadState(deps.prisma, context.actor, target, false, {
           upToMessageId: input.upToMessageId,
           toEnd: input.toEnd,
         });
+        if (changed) await notifyThreadReadChanged(deps, context.actor);
         return { ok: true as const };
       }),
       markUnread: authed.threads.markUnread.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        if (input.messageId) {
-          await markThreadUnreadFrom(deps.prisma, context.actor, target, input.messageId);
-        } else {
-          await setThreadUnreadState(deps.prisma, context.actor, target, true);
-        }
+        const changed = input.messageId
+          ? await markThreadUnreadFrom(deps.prisma, context.actor, target, input.messageId)
+          : await setThreadUnreadState(deps.prisma, context.actor, target, true);
+        if (changed) await notifyThreadReadChanged(deps, context.actor);
         return { ok: true as const };
       }),
     },

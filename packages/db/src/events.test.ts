@@ -100,6 +100,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: { updateMany: vi.fn(async () => ({ count: 1 })) },
@@ -153,6 +154,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
@@ -222,6 +224,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
@@ -303,6 +306,7 @@ describe("finalizeRun", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
@@ -610,6 +614,7 @@ describe("pauseRunForInput", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -684,6 +689,7 @@ describe("pauseRunForInput", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 9 }) },
       message: {
@@ -762,6 +768,7 @@ describe("pauseRunForInput", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -846,6 +853,7 @@ describe("pauseRunForTakeover", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -937,6 +945,7 @@ describe("pauseRunForTakeover", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -997,6 +1006,7 @@ describe("pauseRunForTakeover", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -3268,6 +3278,7 @@ describe("clearThread", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
@@ -3334,6 +3345,7 @@ describe("clearThread", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },

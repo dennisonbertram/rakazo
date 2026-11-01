@@ -280,7 +280,7 @@ import { useNotificationsOff } from "../lib/use-notifications-off";
 import { useRefetchWhileOpen } from "../lib/use-refetch-while-open";
 import { useRememberedMessages } from "../lib/use-remembered-messages";
 import { useRunResumedAt } from "../lib/use-run-resumed-at";
-import { useSidebarGlance } from "../lib/use-sidebar-glance";
+import { NOTIFICATIONS_CHANGED_EVENT, useSidebarGlance } from "../lib/use-sidebar-glance";
 import { errorText } from "../lib/user-error";
 import { workingActivity } from "../lib/working-activity";
 import type { ContextMenuPosition } from "./BotContextMenu";
@@ -1790,6 +1790,7 @@ export function ShellPage() {
     };
     window.addEventListener("focus", refreshVisibleBots);
     document.addEventListener("visibilitychange", refreshVisibleBots);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshVisibleBots);
     // Poll skips while a refresh is in flight; focus/visibility and event-driven
     // callers still bump botsRefreshEpoch so only the latest response applies.
     const poll = window.setInterval(() => {
@@ -1802,6 +1803,7 @@ export function ShellPage() {
       window.clearInterval(poll);
       window.removeEventListener("focus", refreshVisibleBots);
       document.removeEventListener("visibilitychange", refreshVisibleBots);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshVisibleBots);
     };
   }, []);
 
