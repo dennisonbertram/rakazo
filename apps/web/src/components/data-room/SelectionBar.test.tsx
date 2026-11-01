@@ -51,3 +51,42 @@ it("says how many of the total are ticked, offers Select all N and does not take
   expect(el.textContent).not.toContain("Select all");
   act(() => root.unmount());
 });
+
+it("offers Move first, only when onMove is passed, and disables it while busy", () => {
+  const el = document.createElement("div");
+  const root = createRoot(el);
+  const props = { count: 2, onDownload: vi.fn(), onClear: vi.fn() };
+  act(() => root.render(<SelectionBar {...props} />));
+  expect([...el.querySelectorAll("button")].some((b) => b.textContent === "Move")).toBe(false);
+  const onMove = vi.fn();
+  act(() => root.render(<SelectionBar {...props} onMove={onMove} />));
+  const buttons = [...el.querySelectorAll("button")];
+  expect(buttons[0]?.textContent).toBe("Move");
+  act(() => buttons[0]?.click());
+  expect(onMove).toHaveBeenCalledTimes(1);
+  act(() => root.render(<SelectionBar {...props} onMove={onMove} busy />));
+  expect(el.querySelector("button")?.disabled).toBe(true);
+  act(() => root.unmount());
+});
+
+it("keeps every control on one row so a narrow window does not wrap the bar", () => {
+  const el = document.createElement("div");
+  const root = createRoot(el);
+  act(() =>
+    root.render(
+      <SelectionBar
+        count={1}
+        total={67}
+        onSelectAll={vi.fn()}
+        onMove={vi.fn()}
+        onDownload={vi.fn()}
+        onClear={vi.fn()}
+      />,
+    ),
+  );
+  expect(el.querySelector('[role="toolbar"]')?.className).toContain("flex-nowrap");
+  const all = [...el.querySelectorAll("button")].find((b) => b.textContent === "Select all 67");
+  expect(all).toBeTruthy();
+  expect(all?.closest("span.truncate")).toBeNull();
+  act(() => root.unmount());
+});

@@ -37,7 +37,7 @@ vi.mock("./upload-toasts", () => ({ showNoticeToast: notice, uploadScopeToken: s
 
 import { resetHideAmountsMemory, setHideAmounts } from "../../lib/hide-amounts-preference";
 import { folderNodes } from "./folders";
-import { ItemDialog } from "./ItemDialogs";
+import { ItemDialog, MoveFilesDialog } from "./ItemDialogs";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -429,5 +429,86 @@ describe("Share with investors", () => {
     investors.shares.mockResolvedValue([]);
     await open();
     expect(dialog()?.textContent).toContain("No investors yet");
+  });
+});
+
+describe("MoveFilesDialog", () => {
+  const file = (id: string, folderId: string | null) =>
+    ({ ...item, id, name: `${id}.pdf`, folderId }) as DataRoomApiItem;
+  const nodes = folderNodes([
+    { id: "fa", name: "A", parentId: null },
+    { id: "fb", name: "B", parentId: null },
+  ] as never);
+  const select = () => {
+    const el = document.querySelector<HTMLSelectElement>('select[name="folder"]');
+    if (!el) throw new Error("no folder select");
+    return el;
+  };
+  const save = () =>
+    [...document.querySelectorAll("button")].find(
+      (b) => b.textContent === "Save",
+    ) as HTMLButtonElement;
+
+  it("skips files already in the target and reports the ones that fail", async () => {
+    rpc.itemMove.mockImplementation(async ({ id }: { id: string }) => {
+      if (id === "b") throw new Error("gone");
+      return file(id, "fb");
+    });
+    const onDone = vi.fn();
+    const onClose = vi.fn();
+    const items = [file("a", "fa"), file("b", "fa"), file("c", "fb")];
+    await act(async () =>
+      root.render(
+        <MoveFilesDialog items={items} folders={nodes} onClose={onClose} onDone={onDone} />,
+      ),
+    );
+    expect(document.body.textContent).toContain("Move 3 files to");
+    await act(async () => setValue(select(), "fb"));
+    await act(async () => select().form?.requestSubmit());
+    expect(rpc.itemMove).toHaveBeenCalledTimes(2);
+    expect(onDone).toHaveBeenCalledWith({ moved: ["a"], failed: ["b"], folderId: "fb" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("keeps Save disabled for files from different folders until a folder is chosen", async () => {
+    await act(async () =>
+      root.render(
+        <MoveFilesDialog
+          items={[file("a", "fa"), file("b", "fb")]}
+          folders={nodes}
+          onClose={vi.fn()}
+          onDone={vi.fn()}
+        />,
+      ),
+    );
+    expect(select().value).toBe("__choose__");
+    expect(save().disabled).toBe(true);
+    await act(async () => setValue(select(), ""));
+    expect(save().disabled).toBe(false);
+  });
+
+  it("preselects the shared folder and creates a new folder once", async () => {
+    rpc.folderCreate.mockResolvedValue({ id: "f-new", name: "N", parentId: null });
+    rpc.itemMove.mockImplementation(async ({ id }: { id: string }) => file(id, "f-new"));
+    const onDone = vi.fn();
+    await act(async () =>
+      root.render(
+        <MoveFilesDialog
+          items={[file("a", "fa"), file("b", "fa")]}
+          folders={nodes}
+          onClose={vi.fn()}
+          onDone={onDone}
+        />,
+      ),
+    );
+    expect(select().value).toBe("fa");
+    await act(async () => setValue(select(), "__new__"));
+    const name = document.querySelector<HTMLInputElement>('input[name="folderName"]');
+    if (!name) throw new Error("no folder name field");
+    await act(async () => setValue(name, "N"));
+    await act(async () => name.form?.requestSubmit());
+    expect(rpc.folderCreate).toHaveBeenCalledTimes(1);
+    expect(rpc.itemMove).toHaveBeenCalledTimes(2);
+    expect(onDone).toHaveBeenCalledWith({ moved: ["a", "b"], failed: [], folderId: "f-new" });
   });
 });

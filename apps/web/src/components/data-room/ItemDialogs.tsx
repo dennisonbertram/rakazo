@@ -92,6 +92,132 @@ function FolderOptions({
   );
 }
 
+/** The select value before a folder is chosen for files that sit in different folders. */
+const CHOOSE_FOLDER = "__choose__";
+
+/**
+ * Moves the ticked files into one folder (optionally a new one). Files already there are skipped;
+ * `onDone` gets the ids that moved, the ones that failed and the target, and the dialog closes either way.
+ */
+export function MoveFilesDialog({
+  items,
+  folders,
+  onClose,
+  onDone,
+}: {
+  items: DataRoomApiItem[];
+  folders: FolderNode[];
+  onClose: () => void;
+  onDone: (result: { moved: string[]; failed: string[]; folderId: string | null }) => void;
+}) {
+  const parentField = useId();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const first = items[0]?.folderId ?? "";
+  // Mixed folders get no default: "No folder" would silently unfile everything on one Save.
+  const same = items.every((item) => (item.folderId ?? "") === first);
+  const [target, setTarget] = useState(same ? first : CHOOSE_FOLDER);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setBusy(true);
+    setError("");
+    let folderId: string | null = target || null;
+    if (target === NEW_FOLDER) {
+      const typed = String(data.get("folderName") ?? "").trim();
+      const name = DataRoomApiName.safeParse(typed);
+      if (!name.success) {
+        setBusy(false);
+        return setError(typed ? t`Enter a folder name without slashes` : t`Enter a folder name`);
+      }
+      try {
+        const parentId = String(data.get("parent") ?? "") || null;
+        folderId = (await rpc.dataRoom.folderCreate({ name: name.data, parentId })).id;
+      } catch (cause) {
+        setBusy(false);
+        return setError(errorText(cause));
+      }
+    }
+    const moved: string[] = [];
+    const failed: string[] = [];
+    // ponytail: one request per file; a batch RPC if Select all of hundreds is slow
+    for (const item of items) {
+      if ((item.folderId ?? null) === folderId) continue;
+      try {
+        await rpc.dataRoom.itemMove({ id: item.id, folderId });
+        moved.push(item.id);
+      } catch {
+        failed.push(item.id);
+      }
+    }
+    onDone({ moved, failed, folderId });
+    onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent showCloseButton={false}>
+        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle className="break-words leading-snug">
+              {t`Move ${items.length} files to`}
+            </DialogTitle>
+          </DialogHeader>
+          <NativeSelect
+            name="folder"
+            aria-label={t`Folder`}
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            className="w-full"
+          >
+            {target === CHOOSE_FOLDER ? (
+              <NativeSelectOption value={CHOOSE_FOLDER} disabled>
+                {t`Choose a folder…`}
+              </NativeSelectOption>
+            ) : null}
+            <FolderOptions folders={folders} topLabel={t`No folder`} />
+            <NativeSelectOption value={NEW_FOLDER}>{t`New folder…`}</NativeSelectOption>
+          </NativeSelect>
+          {target === NEW_FOLDER ? (
+            <>
+              <Input
+                name="folderName"
+                aria-label={t`New folder name`}
+                placeholder={t`New folder name`}
+                aria-invalid={error ? true : undefined}
+                autoFocus
+              />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={parentField}>
+                  <Trans>Inside</Trans>
+                </Label>
+                <NativeSelect
+                  id={parentField}
+                  name="parent"
+                  defaultValue={same ? first : ""}
+                  className="w-full"
+                >
+                  <FolderOptions folders={folders} topLabel={t`All items`} />
+                </NativeSelect>
+              </div>
+            </>
+          ) : null}
+          {error ? <p className="text-[13px] text-destructive">{error}</p> : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              <Trans>Cancel</Trans>
+            </Button>
+            <Button type="submit" disabled={busy || target === CHOOSE_FOLDER}>
+              <Trans>Save</Trans>
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Creates a folder inside the one chosen (the open folder to start with). */
 export function NewFolderDialog({
   folders,

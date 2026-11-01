@@ -2739,6 +2739,10 @@ msgstr "Bot 선택…"
 msgid "Choose a contact"
 msgstr ""
 
+#: src/components/data-room/ItemDialogs.tsx
+msgid "Choose a folder…"
+msgstr ""
+
 #: src/components/data-room/ImportFromDrive.tsx
 msgid "Choose a Google Sheet"
 msgstr ""
@@ -4060,7 +4064,9 @@ msgstr ""
 msgid "Could not mark sent"
 msgstr ""
 
+#. placeholder {0}: names.join(", ")
 #. placeholder {0}: prospect.name
+#: src/pages/DataRoom.tsx
 #: src/pages/Fundraising.tsx
 msgid "Could not move {0}"
 msgstr ""
@@ -7871,8 +7877,14 @@ msgstr ""
 
 #: src/components/data-room/AutoSortDialog.tsx
 #: src/components/data-room/ItemMenu.tsx
+#: src/components/data-room/SelectionBar.tsx
 #: src/pages/shell/command-palette.tsx
 msgid "Move"
+msgstr ""
+
+#. placeholder {0}: items.length
+#: src/components/data-room/ItemDialogs.tsx
+msgid "Move {0} files to"
 msgstr ""
 
 #. placeholder {0}: item.name
