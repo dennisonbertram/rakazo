@@ -62,6 +62,7 @@ export function FolderHeader({
     <div
       ref={dnd?.setNodeRef}
       data-sidebar-folder={id}
+      data-roster-item={`folder:${id}`}
       data-drop-into={dnd?.dropsInto ? "" : undefined}
       className={`group/folder ${collapsed ? "relative" : `${STICKY_GROUP_HEADER} top-0`} mt-1 flex items-center rounded-lg ${
         dnd?.isDragging ? "opacity-50" : ""
@@ -77,6 +78,7 @@ export function FolderHeader({
       ) : (
         <button
           type="button"
+          data-roster-row={`folder:${id}`}
           aria-expanded={!collapsed}
           aria-label={collapsed ? t`Expand ${name}` : t`Collapse ${name}`}
           className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-start text-[13px] font-medium text-foreground/80 hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
@@ -117,6 +119,7 @@ export function FolderHeader({
             render={
               <Button
                 type="button"
+                data-roster-actions=""
                 variant="ghost"
                 size="icon-sm"
                 aria-label={actions}

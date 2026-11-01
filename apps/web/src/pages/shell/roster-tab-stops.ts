@@ -2,11 +2,13 @@ import type { KeyboardEvent } from "react";
 
 // The sidebar's page rows and chat rows are one tab stop, like a listbox: Tab enters it once and
 // leaves it (plus the first row, so Tab reaches the pages), and the arrow keys move between rows. Without this a long list puts dozens of Tab
-// presses before the page. Rows (pages, chats, space headings) carry `data-roster-row`; a row's
+// presses before the page. Rows (pages, chats, space headings, folders, folds) carry `data-roster-row`; a row's
 // wrapper (`data-roster-item`) holds its Actions button (`data-roster-actions`), which is a tab
 // stop only while its row is.
 
-const rowsIn = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>("[data-roster-row]")];
+const rowsIn = (root: HTMLElement) => [
+  ...root.querySelectorAll<HTMLElement>("[data-roster-row]"),
+];
 
 /** The row a focused element belongs to: the row itself, or the Actions button beside it. */
 export const rosterRowId = (target: HTMLElement) =>
@@ -14,7 +16,10 @@ export const rosterRowId = (target: HTMLElement) =>
   target.closest<HTMLElement>("[data-roster-item]")?.dataset.rosterItem;
 
 /** Makes one row (and its Actions button) tabbable: the last focused, else the open chat, else the first. */
-export function syncRosterTabStops(root: HTMLElement | null, stopId: string | null) {
+export function syncRosterTabStops(
+  root: HTMLElement | null,
+  stopId: string | null,
+) {
   if (!root) return;
   const rows = rowsIn(root);
   const stop =
@@ -33,10 +38,23 @@ export function syncRosterTabStops(root: HTMLElement | null, stopId: string | nu
 }
 
 /** Up, Down, Home and End move focus between rows. Alt+Arrow (reorder) and a lift in progress are left alone. */
-export function moveRosterFocus(root: HTMLElement | null, event: KeyboardEvent) {
+export function moveRosterFocus(
+  root: HTMLElement | null,
+  event: KeyboardEvent,
+) {
   const target = event.target as HTMLElement;
-  if (!root || event.altKey || event.ctrlKey || event.metaKey || event.defaultPrevented) return;
-  if (!target.hasAttribute("data-roster-row") || target.getAttribute("aria-pressed") === "true")
+  if (
+    !root ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.defaultPrevented
+  )
+    return;
+  if (
+    !target.hasAttribute("data-roster-row") ||
+    target.getAttribute("aria-pressed") === "true"
+  )
     return;
   const rows = rowsIn(root);
   const index = rows.indexOf(target);
