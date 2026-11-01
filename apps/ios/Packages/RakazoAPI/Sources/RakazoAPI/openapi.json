@@ -35530,11 +35530,17 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "safes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
                         }
                       },
                       "required": [
                         "portal",
-                        "documents"
+                        "documents",
+                        "safes"
                       ],
                       "additionalProperties": false
                     }

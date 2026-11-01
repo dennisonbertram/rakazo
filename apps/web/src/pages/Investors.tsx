@@ -82,7 +82,7 @@ import { useHideAmounts } from "../lib/hide-amounts-preference";
 import { FIRST_PARTY_MCP } from "../lib/integrations";
 import { sortBy, useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
-import { SAVED_ROW_CLASS, useContactNotices } from "../lib/use-contact-notices";
+import { SAVED_ROW_CLASS, useContactNotices, useWithoutDeleted } from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
 
 /** The Data room folder the cap table's documents are filed into. */
@@ -595,7 +595,8 @@ export function InvestorsPage({
   agentBusy?: boolean;
 }) {
   useHideAmounts();
-  const [contacts, setContacts] = useState<Contact[] | null>(null);
+  const [fetched, setContacts] = useState<Contact[] | null>(null);
+  const contacts = useWithoutDeleted(fetched);
   const [error, setError] = useState("");
   const [cartaConnected, setCartaConnected] = useState(true);
   // The connection check failed, so whether Carta is connected is unknown.
@@ -1102,7 +1103,6 @@ export function InvestorsPage({
     try {
       const linked = await rpc.contacts.linked({ id: contact.id });
       if (hasLinks(linked)) return setConfirmDelete({ contact, linked });
-      await rpc.contacts.delete({ id: contact.id });
       deleted(contact);
     } catch (cause) {
       notify(errorText(cause, t`Could not delete ${contact.name}`));

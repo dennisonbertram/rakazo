@@ -147,10 +147,10 @@ export function ContactDialog({
       async () => {
         const linked = await rpc.contacts.linked({ id: target.id });
         if (hasLinks(linked)) return linked;
-        await rpc.contacts.delete({ id: target.id });
         return null;
       },
       (linked) => {
+        // The page holds the delete for the Undo window and sends it then.
         if (linked) setConfirming(linked);
         else onDeleted?.(target);
       },

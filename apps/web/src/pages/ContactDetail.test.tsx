@@ -7,6 +7,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { resetDeletedContacts } from "../lib/use-contact-notices";
 
 const text = vi.hoisted(
   () =>
@@ -27,7 +28,7 @@ const rpcMock = vi.hoisted(() => ({
   list: vi.fn(),
   save: vi.fn(),
   remove: vi.fn(),
-  linked: vi.fn(async () => ({ portal: false, documents: [] })),
+  linked: vi.fn(async () => ({ portal: false, documents: [], safes: 0 })),
 }));
 const detail = rpcMock.detail;
 vi.mock("../lib/rpc", () => ({
@@ -96,6 +97,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => notificationToastManager.close());
+  resetDeletedContacts();
   act(() => root.unmount());
   container.remove();
   vi.resetAllMocks();
@@ -143,25 +145,30 @@ it("shows an error with Try again", async () => {
 const cy: Contact = { ...contact, id: "c2", name: "Cy", email: "cy@example.test" };
 const edit = async () => click(button("Edit"));
 
-it("deletes with an Undo that restores, then focuses the restored row on the list", async () => {
-  detail.mockResolvedValue({ ...empty, contact: { ...contact, kind: "other" } });
-  rpcMock.remove.mockResolvedValue({ ok: true });
-  rpcMock.save.mockResolvedValue({ ...contact, id: "c9" });
-  await show();
-  await edit();
-  await click(button("Delete"));
-  expect(document.body.textContent).toContain("Deleted Ada Example");
-  // Back on the list.
-  expect(container.textContent).toContain("Contacts");
-  rpcMock.list.mockResolvedValue([{ ...contact, id: "c9" }]);
-  await click(button("Undo"));
-  await flush();
-  expect(rpcMock.save).toHaveBeenCalledWith(
-    expect.objectContaining({ name: "Ada Example", kind: "other" }),
-  );
-  expect(document.body.textContent).toContain("Restored Ada Example");
-  expect(document.activeElement?.textContent).toBe("Ada Example");
-  expect(document.activeElement?.closest("tr")?.getAttribute("data-contact-id")).toBe("c9");
+it("deletes with an Undo that needs no server call, then focuses the row on the list", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    detail.mockResolvedValue({ ...empty, contact: { ...contact, kind: "other" } });
+    rpcMock.remove.mockResolvedValue({ ok: true });
+    await show();
+    await edit();
+    await click(button("Delete"));
+    expect(document.body.textContent).toContain("Deleted Ada Example");
+    // Back on the list, with the delete still held.
+    expect(container.textContent).toContain("Contacts");
+    expect(rpcMock.remove).not.toHaveBeenCalled();
+    rpcMock.list.mockResolvedValue([contact]);
+    await click(button("Undo"));
+    await flush();
+    expect(rpcMock.remove).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("Restored Ada Example");
+    expect(document.activeElement?.textContent).toBe("Ada Example");
+    expect(document.activeElement?.closest("tr")?.getAttribute("data-contact-id")).toBe(contact.id);
+    await act(async () => vi.advanceTimersByTime(5001));
+    expect(rpcMock.remove).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("sends null when Notes is cleared, and names the agent that added the contact", async () => {

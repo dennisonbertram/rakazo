@@ -175,6 +175,11 @@ msgstr ""
 msgid "{0, plural, one {Sorted # item} other {Sorted # items}}"
 msgstr ""
 
+#. placeholder {0}: linked.safes
+#: src/components/ContactDeleteConfirm.tsx
+msgid "{0, plural, one {the link to # SAFE} other {the links to # SAFEs}}"
+msgstr ""
+
 #. placeholder {0}: Math.ceil(oauth.expiresInSeconds / 60)
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -3806,6 +3811,8 @@ msgid "Could not create your bot"
 msgstr "Botun oluşturulamadı"
 
 #. placeholder {0}: contact.name
+#. placeholder {0}: gone.name
+#: src/lib/use-contact-notices.ts
 #: src/pages/Investors.tsx
 msgid "Could not delete {0}"
 msgstr ""
@@ -4201,10 +4208,6 @@ msgstr ""
 #: src/pages/Auth.tsx
 msgid "Could not reset password"
 msgstr "Parola sıfırlanamadı"
-
-#: src/lib/use-contact-notices.ts
-msgid "Could not restore {name}"
-msgstr ""
 
 #: src/pages/Investors.tsx
 msgid "Could not retry"
@@ -13272,7 +13275,6 @@ msgstr ""
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
 #: src/components/ShellSkeleton.tsx
-#: src/lib/use-contact-notices.ts
 #: src/pages/ActivityList.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/ContactDetail.tsx

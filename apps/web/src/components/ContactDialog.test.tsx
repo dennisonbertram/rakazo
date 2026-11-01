@@ -70,19 +70,23 @@ function show() {
   return { onDeleted, onClose };
 }
 
-it("deletes a plain contact at once, keeping the Undo path", async () => {
-  rpcMock.linked.mockResolvedValue({ portal: false, documents: [] });
+it("hands a plain contact to the page to delete after the Undo window", async () => {
+  rpcMock.linked.mockResolvedValue({ portal: false, documents: [], safes: 0 });
   rpcMock.remove.mockResolvedValue({ ok: true });
   const { onDeleted, onClose } = show();
   await click(button("Delete"));
   await flush();
-  expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c1" });
+  expect(rpcMock.remove).not.toHaveBeenCalled();
   expect(onDeleted).toHaveBeenCalledWith(ada);
   expect(onClose).toHaveBeenCalled();
 });
 
 it("asks first when the contact has linked data, names what goes, and offers no Undo", async () => {
-  rpcMock.linked.mockResolvedValue({ portal: true, documents: ["Deck.pdf", "Terms.pdf"] });
+  rpcMock.linked.mockResolvedValue({
+    portal: true,
+    documents: ["Deck.pdf", "Terms.pdf"],
+    safes: 0,
+  });
   rpcMock.remove.mockResolvedValue({ ok: true });
   const { onDeleted, onClose } = show();
   await click(button("Delete"));
@@ -105,7 +109,7 @@ it("asks first when the contact has linked data, names what goes, and offers no 
 });
 
 it("Cancel on the question deletes nothing", async () => {
-  rpcMock.linked.mockResolvedValue({ portal: false, documents: ["Deck.pdf"] });
+  rpcMock.linked.mockResolvedValue({ portal: false, documents: ["Deck.pdf"], safes: 0 });
   const { onDeleted } = show();
   await click(button("Delete"));
   await flush();
