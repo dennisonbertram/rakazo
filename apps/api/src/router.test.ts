@@ -4093,6 +4093,7 @@ describe("routines.update", () => {
           },
         ]),
       },
+      run: { findFirst: vi.fn(async () => null) },
       routine: {
         findFirst: vi.fn(async (args: { where: { bot?: { archivedAt: null } } }) =>
           botArchived && args.where.bot?.archivedAt === null ? null : savedRoutine,
