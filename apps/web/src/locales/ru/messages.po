@@ -880,6 +880,10 @@ msgstr ""
 msgid "A folder with that name already exists"
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "A recording is already running."
+msgstr ""
+
 #: src/components/finance/WalletDialog.tsx
 msgid "A Safe multisig. Its owners and threshold are shown."
 msgstr ""
@@ -1191,6 +1195,10 @@ msgstr "Добавьте URL сервера"
 msgid "Add skill"
 msgstr ""
 
+#: src/components/meeting-capture/RecordButton.tsx
+msgid "Add speech to text"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add the header name."
 msgstr ""
@@ -1486,6 +1494,10 @@ msgstr ""
 
 #: src/components/inbox/InboxCleanup.tsx
 msgid "Also in Gmail"
+msgstr ""
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Also record a browser tab"
 msgstr ""
 
 #: src/pages/ExternalConversationSettings.tsx
@@ -3262,6 +3274,7 @@ msgstr "Компьютеры выключены. Установите SANDBOX_PR
 msgid "Configure API key"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyReview.tsx
 msgid "Confirm"
@@ -4349,6 +4362,10 @@ msgstr ""
 msgid "Could not save the page."
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Could not save the recording setting"
+msgstr ""
+
 #: src/components/fundraising/RoundCard.tsx
 msgid "Could not save the round"
 msgstr ""
@@ -5222,6 +5239,7 @@ msgstr ""
 #: src/components/data-room/ImportActivity.tsx
 #: src/components/finance/StatementImport.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Legal.tsx
 #: src/pages/legal/LegalDeadlines.tsx
@@ -5526,6 +5544,10 @@ msgstr ""
 
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Each bot keeps its own"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Each recording needs “Everyone agreed to be recorded” to be ticked."
 msgstr ""
 
 #: src/pages/devin/DevinSessions.tsx
@@ -5841,6 +5863,10 @@ msgstr ""
 #: src/pages/RoutineSchedule.tsx
 msgid "Every week"
 msgstr "Каждую неделю"
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Everyone agreed to be recorded"
+msgstr ""
 
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Exact text"
@@ -7757,12 +7783,20 @@ msgstr "Средний"
 msgid "Meeting"
 msgstr ""
 
+#: src/lib/meeting-capture/title.ts
+msgid "Meeting {time}"
+msgstr ""
+
 #: src/lib/slash-skills.ts
 msgid "Meeting notes"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Meeting notes and transcripts"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Meeting recording"
 msgstr ""
 
 #: src/pages/ContactDetail.tsx
@@ -7903,9 +7937,17 @@ msgstr ""
 msgid "MFN"
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "Microphone access is blocked. Allow it in your browser and try again."
+msgstr ""
+
 #: src/lib/call-session.ts
 msgid "Microphone failed"
 msgstr "Ошибка микрофона"
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Microphone stopped"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Minimal"
@@ -8533,6 +8575,10 @@ msgstr ""
 msgid "No bots yet"
 msgstr ""
 
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "No call audio"
+msgstr ""
+
 #: src/pages/McpConnectionActivity.tsx
 msgid "No calls yet"
 msgstr ""
@@ -8736,6 +8782,10 @@ msgstr ""
 msgid "No newsletters in the last 7 days"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
+msgid "No one can record meetings in this space."
+msgstr ""
+
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "No open deadlines."
 msgstr ""
@@ -8821,6 +8871,10 @@ msgstr ""
 
 #: src/pages/Finance.tsx
 msgid "No spend in this period"
+msgstr ""
+
+#: src/lib/meeting-capture/controller.ts
+msgid "No tab was shared. Start again to pick one."
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -9137,6 +9191,7 @@ msgstr ""
 msgid "Obligation"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
 #: src/pages/Investors.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Off"
@@ -9144,6 +9199,10 @@ msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Off in Settings"
+msgstr ""
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Offline, saved here"
 msgstr ""
 
 #: src/components/pages/PageSourcesDialog.tsx
@@ -9551,6 +9610,10 @@ msgstr "Приостановить"
 
 #: src/components/UiArtifactView.tsx
 msgid "Part of this can't be shown."
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Part of this meeting could not be transcribed."
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -10448,6 +10511,14 @@ msgstr "Повторное подключение"
 msgid "Reconstructed"
 msgstr ""
 
+#: src/components/meeting-capture/RecordButton.tsx
+msgid "Record"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Recording"
+msgstr ""
+
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Recording may have started, but the view could not refresh"
 msgstr "Возможно, запись началась, но не удалось обновить представление."
@@ -10585,6 +10656,10 @@ msgstr ""
 
 #: src/pages/shell/transcript.tsx
 msgid "Remembered"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Remind"
 msgstr ""
 
 #: src/pages/Investors.tsx
@@ -11909,6 +11984,10 @@ msgstr ""
 msgid "Share link"
 msgstr ""
 
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Share the call tab again"
+msgstr ""
+
 #: src/pages/CompanyFactDetail.tsx
 msgid "Share with team"
 msgstr ""
@@ -12066,6 +12145,10 @@ msgstr ""
 
 #: src/pages/shell/working-label.ts
 msgid "Showing the emails it found"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Shows “Tell everyone you're recording.” before each recording."
 msgstr ""
 
 #: src/pages/shell/space-sidebar.tsx
@@ -12497,6 +12580,10 @@ msgstr ""
 msgid "Starred"
 msgstr ""
 
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Start"
+msgstr ""
+
 #: src/pages/Paywall.tsx
 msgid "Start {trialDays}-day free trial"
 msgstr ""
@@ -12611,6 +12698,7 @@ msgstr ""
 
 #: src/components/ai/primitives.tsx
 #: src/components/inbox/CleanupSenderRow.tsx
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/composer.tsx
 #: src/pages/shell/transcript.tsx
@@ -12720,6 +12808,10 @@ msgstr ""
 
 #: src/components/inbox/ContextPanel.tsx
 msgid "Summarizing"
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Summarizing…"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -12864,6 +12956,10 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 msgid "Teams message"
 msgstr "Сообщение Teams"
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Tell everyone you're recording."
+msgstr ""
 
 #: src/pages/legal/LegalContracts.tsx
 msgid "Term"
@@ -13140,6 +13236,10 @@ msgstr ""
 msgid "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
 msgstr "Этот бот работает на этом компьютере, а не на рабочем столе Linux. Оболочка и файлы используют вашу домашнюю папку."
 
+#: src/lib/meeting-capture/controller.ts
+msgid "This browser cannot record meetings."
+msgstr ""
+
 #: src/components/data-room/ItemDialogs.tsx
 #: src/pages/Artifacts.tsx
 msgid "This can't be undone."
@@ -13239,6 +13339,10 @@ msgstr "Этот поставщик еще не подключен."
 msgid "This reader has no verified incremental change feed."
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "This recording was closed and could not be saved."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "This removes the connection from every space."
 msgstr ""
@@ -13313,6 +13417,7 @@ msgstr ""
 msgid "Time zone updated"
 msgstr ""
 
+#: src/components/meeting-capture/RecordForm.tsx
 #: src/pages/Board.tsx
 #: src/pages/gtm/GtmPlan.tsx
 #: src/pages/Meetings.tsx
@@ -13482,6 +13587,7 @@ msgstr ""
 msgid "Transcribe"
 msgstr ""
 
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/pages/shell/dictation-button.tsx
 msgid "Transcribing…"
 msgstr ""
@@ -14600,6 +14706,10 @@ msgstr "Вы управляете"
 
 #: src/components/inbox/CleanupSenderRow.tsx
 msgid "You read most of these, so keep them unless you are sure"
+msgstr ""
+
+#: src/lib/meeting-capture/controller.ts
+msgid "You were signed out."
 msgstr ""
 
 #: src/pages/McpTokenDialog.tsx

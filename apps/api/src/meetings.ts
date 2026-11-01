@@ -382,6 +382,9 @@ export async function getStoredMeeting(
     partial:
       (await deps.router.prisma.meetingCaptureChunk.count({
         where: { ...owner(actor), status: "failed", capture: { meetingId: row.id } },
+      })) > 0 ||
+      (await deps.router.prisma.meetingCapture.count({
+        where: { ...owner(actor), meetingId: row.id, error: "part_not_transcribed" },
       })) > 0,
   };
 }

@@ -170,15 +170,22 @@ export async function appendCaptureText(
 export async function finishCapture(
   deps: MeetingCaptureDeps,
   actor: Actor,
-  input: { captureId: string; endedAt: string },
+  input: { captureId: string; endedAt: string; lostChunks?: number },
 ): Promise<{ ok: true }> {
   await deps.prisma.$transaction(async (tx) => {
     const status = await lockCapture(tx, owner(actor), input.captureId);
     if (status === null || status === "discarded") throw notFound();
-    if (status === "recording") {
+    // Audio the client could not deliver makes the meeting partial; finalize keeps this error.
+    const lost = input.lostChunks && status !== "done" && status !== "failed";
+    if (status === "recording" || lost) {
       await tx.meetingCapture.updateMany({
         where: { id: input.captureId, ...owner(actor) },
-        data: { status: "finishing", endedAt: new Date(input.endedAt) },
+        data: {
+          ...(status === "recording"
+            ? { status: "finishing", endedAt: new Date(input.endedAt) }
+            : {}),
+          ...(lost ? { error: "part_not_transcribed" } : {}),
+        },
       });
     }
   });

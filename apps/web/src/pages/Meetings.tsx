@@ -12,12 +12,14 @@ import {
   TableHeadRow,
   TableRow,
 } from "@rakazo/ui-web";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PickFilter, SearchField } from "../components/ListControls";
+import { RecordButton } from "../components/meeting-capture/RecordButton";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
 import { sortBy, useListParams } from "../lib/list-params";
+import { storedCaptures, subscribeCapture } from "../lib/meeting-capture/controller";
 import { MEETING_SOURCES, meetingMinutes, meetingSourceName } from "../lib/meeting-source";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
@@ -33,7 +35,14 @@ export const formatMeetingDate = (iso: string) =>
   });
 
 /** Every meeting the user has stored, from every source, newest first. */
-export function MeetingsPage({ spaceName }: { spaceName?: string }) {
+export function MeetingsPage({
+  spaceName,
+  onAddSpeech,
+}: {
+  spaceName?: string;
+  /** Opens Settings → Voice, for Record when no speech-to-text engine is set up. */
+  onAddSpeech?: () => void;
+}) {
   const [rows, setRows] = useState<StoredMeeting[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -71,9 +80,11 @@ export function MeetingsPage({ spaceName }: { spaceName?: string }) {
     },
     [needle, source],
   );
+  // A recording that was just stored joins the list without a reload.
+  const stored = useSyncExternalStore(subscribeCapture, storedCaptures);
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, stored]);
 
   const found = rows ?? [];
   const { field, dir } = list.sort;
@@ -102,6 +113,7 @@ export function MeetingsPage({ spaceName }: { spaceName?: string }) {
           className="max-sm:[&_[data-page-header-meta]]:hidden"
           title={<Trans>Meetings</Trans>}
           spaceName={spaceName}
+          actions={<RecordButton onAddSpeech={onAddSpeech} />}
         />
       </div>
       <div className={`rk-scroll flex-1 overflow-y-auto ${PAGE_GUTTER_X} pb-6`}>

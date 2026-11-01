@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 326 of 326
-- Web and shared components: 840
+- Web and shared component files with stories: 331 of 331
+- Web and shared components: 847
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 126 in 67 files, native story pending
 
@@ -105,6 +105,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | MailOutbox | [apps/web/src/components/MailOutbox.tsx](../../apps/web/src/components/MailOutbox.tsx) | [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
 | MailThreadCard | [apps/web/src/components/MailThreadCard.tsx](../../apps/web/src/components/MailThreadCard.tsx) | [MailThreadCard.stories.tsx](../../apps/web/src/components/MailThreadCard.stories.tsx) | web |
 | MarkdownLinkPrompt | [apps/web/src/components/markdown-link-prompt.tsx](../../apps/web/src/components/markdown-link-prompt.tsx) | [markdown-link-prompt.stories.tsx](../../apps/web/src/components/markdown-link-prompt.stories.tsx) | web |
+| MeetingRecordingSettings | [apps/web/src/components/MeetingRecordingSettings.tsx](../../apps/web/src/components/MeetingRecordingSettings.tsx) | [MeetingRecordingSettings.stories.tsx](../../apps/web/src/components/MeetingRecordingSettings.stories.tsx) | web |
 | MessageHoverMetadata | [apps/web/src/components/MessageHoverMetadata.tsx](../../apps/web/src/components/MessageHoverMetadata.tsx) | [MessageHoverMetadata.stories.tsx](../../apps/web/src/components/MessageHoverMetadata.stories.tsx) | web |
 | ModelPreflightFeedback | [apps/web/src/components/ModelConnectionPreflightNotice.tsx](../../apps/web/src/components/ModelConnectionPreflightNotice.tsx) | [ModelConnectionPreflightNotice.stories.tsx](../../apps/web/src/components/ModelConnectionPreflightNotice.stories.tsx) | web |
 | NotificationSettingsSection | [apps/web/src/components/NotificationSettings.tsx](../../apps/web/src/components/NotificationSettings.tsx) | [NotificationSettings.stories.tsx](../../apps/web/src/components/NotificationSettings.stories.tsx) | web |
@@ -304,6 +305,15 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | --- | --- | --- | --- |
 | LegalConsentPrompt | [apps/web/src/components/legal/ConsentPrompt.tsx](../../apps/web/src/components/legal/ConsentPrompt.tsx) | [ConsentPrompt.stories.tsx](../../apps/web/src/components/legal/ConsentPrompt.stories.tsx) | web |
 | LegalGraphView | [apps/web/src/components/legal/LegalGraph.tsx](../../apps/web/src/components/legal/LegalGraph.tsx) | [LegalGraph.stories.tsx](../../apps/web/src/components/legal/LegalGraph.stories.tsx) | web |
+
+## Web components/meeting-capture
+
+| Component | File | Story file | Surface |
+| --- | --- | --- | --- |
+| Dot, RecordButton, RecordButtonView | [apps/web/src/components/meeting-capture/RecordButton.tsx](../../apps/web/src/components/meeting-capture/RecordButton.tsx) | [RecordButton.stories.tsx](../../apps/web/src/components/meeting-capture/RecordButton.stories.tsx) | web |
+| RecordForm | [apps/web/src/components/meeting-capture/RecordForm.tsx](../../apps/web/src/components/meeting-capture/RecordForm.tsx) | [RecordForm.stories.tsx](../../apps/web/src/components/meeting-capture/RecordForm.stories.tsx) | web |
+| RecordingPill | [apps/web/src/components/meeting-capture/RecordingPill.tsx](../../apps/web/src/components/meeting-capture/RecordingPill.tsx) | [RecordingPill.stories.tsx](../../apps/web/src/components/meeting-capture/RecordingPill.stories.tsx) | web |
+| RecordingPillHost | [apps/web/src/components/meeting-capture/RecordingPillHost.tsx](../../apps/web/src/components/meeting-capture/RecordingPillHost.tsx) | [RecordingPillHost.stories.tsx](../../apps/web/src/components/meeting-capture/RecordingPillHost.stories.tsx) | web |
 
 ## Web components/pages
 

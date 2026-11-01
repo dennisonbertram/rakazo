@@ -4,6 +4,17 @@ import { mockRpc } from "../lib/__mocks__/rpc";
 import { MeetingsPage } from "./Meetings";
 import { meetings } from "./meetings-fixtures";
 
+/** What Record needs to show: a transcription engine the person agreed to, and a space that allows recording. */
+const recordMocks = {
+  me: { userId: "u1", spaceId: "s1" },
+  "meetingCaptures.start": { captureId: "capture-1" },
+  "voice.status": { transcribe: false, transcriptionReady: true, transcriptionConsented: true },
+  "spaces.list": {
+    current: { id: "s1" },
+    spaces: [{ id: "s1", meetingRecording: "remind", canSetMeetingRecording: true }],
+  },
+};
+
 const meta = {
   title: "Pages/Meetings",
   component: MeetingsPage,
@@ -13,27 +24,31 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {
-  beforeEach: () => mockRpc({ "meetings.list": { items: meetings, nextCursor: null } }),
+  beforeEach: () =>
+    mockRpc({ ...recordMocks, "meetings.list": { items: meetings, nextCursor: null } }),
 };
 
 export const Phone: Story = {
-  beforeEach: () => mockRpc({ "meetings.list": { items: meetings, nextCursor: null } }),
+  beforeEach: () =>
+    mockRpc({ ...recordMocks, "meetings.list": { items: meetings, nextCursor: null } }),
   globals: { viewport: { value: "mobile1" } },
 };
 
 export const Empty: Story = {
-  beforeEach: () => mockRpc({ "meetings.list": { items: [], nextCursor: null } }),
+  beforeEach: () => mockRpc({ ...recordMocks, "meetings.list": { items: [], nextCursor: null } }),
 };
 
 export const Searched: Story = {
-  beforeEach: () => mockRpc({ "meetings.list": { items: meetings, nextCursor: null } }),
+  beforeEach: () =>
+    mockRpc({ ...recordMocks, "meetings.list": { items: meetings, nextCursor: null } }),
   play: async ({ canvasElement }) => {
     await userEvent.type(await within(canvasElement).findByRole("searchbox"), "sync");
   },
 };
 
 export const NoMatches: Story = {
-  beforeEach: () => mockRpc({ "meetings.list": { items: meetings, nextCursor: null } }),
+  beforeEach: () =>
+    mockRpc({ ...recordMocks, "meetings.list": { items: meetings, nextCursor: null } }),
   play: async ({ canvasElement }) => {
     await userEvent.type(await within(canvasElement).findByRole("searchbox"), "zzz");
   },
