@@ -311,7 +311,7 @@ export async function listStoredMeetings(
       : {};
   const rows = await deps.router.prisma.meeting.findMany({
     where: { ...owner(actor), deletedAt: null, ...after },
-    select: { id: true, title: true, startedAt: true },
+    select: { id: true, title: true, startedAt: true, provider: true },
     orderBy: [{ startedAt: "desc" }, { id: "asc" }],
     take: STORED_MEETINGS_PAGE_SIZE + 1,
   });

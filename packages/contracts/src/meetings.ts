@@ -68,11 +68,12 @@ export type MeetingsStatus = z.infer<typeof MeetingsStatusSchema>;
 
 export const MeetingConnectInputSchema = z.object({ apiKey: z.string().max(512) });
 
-/** One stored meeting in the plain list: title and date only. */
+/** One stored meeting in the plain list: title, date and source. */
 export const StoredMeetingSchema = z.object({
   id: z.string(),
   title: z.string(),
   startedAt: IsoDate,
+  provider: z.string(),
 });
 export type StoredMeeting = z.infer<typeof StoredMeetingSchema>;
 
