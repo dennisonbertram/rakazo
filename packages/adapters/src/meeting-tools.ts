@@ -1,5 +1,6 @@
 import {
   GRANOLA_API_CONNECTOR_ID,
+  HEX_CONNECTOR_ID,
   isGranolaEndpoint,
   isIntegrationAgentForServer,
   isIntegrationAgentSpawnKey,
@@ -253,6 +254,22 @@ export const omiAgent: MeetingAgentCheck = async (bot, deps) => {
   return Boolean(await omiConnectionOf(bot, deps)) && bot.archivedAt === null;
 };
 
+/** The agent of a Hex connection, found by the connection that names it. */
+export const hexAgent: MeetingAgentCheck = async (bot, deps) => {
+  if (!isIntegrationAgentSpawnKey(bot.spawnKey)) return false;
+  const row = await deps.prisma.connection.findFirst({
+    where: {
+      spaceId: bot.spaceId,
+      userId: bot.userId,
+      connectorId: HEX_CONNECTOR_ID,
+      agentBotId: bot.id,
+      status: { not: "revoked" },
+    },
+    select: { id: true },
+  });
+  return Boolean(row) && bot.archivedAt === null;
+};
+
 /** The live Omi connection this exact bot is the agent of, if any. */
 export const omiConnectionOf = async (
   bot: AgentBot,
@@ -274,7 +291,7 @@ export const omiConnectionOf = async (
  * Flow is absent until its MeetingSource is registered; the Granola API-key connection adds its
  * check here.
  */
-const meetingAgentChecks: MeetingAgentCheck[] = [granolaMcpAgent, granolaApiAgent, omiAgent];
+const meetingAgentChecks: MeetingAgentCheck[] = [granolaMcpAgent, granolaApiAgent, omiAgent, hexAgent];
 export function registerMeetingSourceAgentCheck(check: MeetingAgentCheck) {
   meetingAgentChecks.push(check);
 }

@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { Router } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
 import type {
   AdapterContext,
@@ -161,6 +162,7 @@ import {
 } from "@rakazo/adapters";
 import type {
   Actor,
+  AppContract,
   Bot,
   BotSecretMetadata,
   ComposeFields,
@@ -187,6 +189,7 @@ import {
   foldComputerCommands,
   GOOGLE_DESKTOP_REDIRECT_URI,
   GRANOLA_API_CONNECTOR_ID,
+  HEX_CONNECTOR_ID,
   IntegrationProviderIdSchema,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
@@ -591,6 +594,7 @@ import {
   listStoredMeetings,
   refreshGranola,
 } from "./meetings.js";
+import { connectLocal, disconnectLocal, importLocal, localStatus } from "./meetings-local.js";
 import {
   disconnectMemoryProvider,
   persistMemoryProviderConfig,
@@ -616,7 +620,7 @@ import {
 import { rememberedMessageIds, rememberThreadMessage } from "./remember-message.js";
 import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
-import type { RouterDeps } from "./routes/context.js";
+import type { RouteAuthContext, RouterDeps } from "./routes/context.js";
 import { asTenant, createRouteContext } from "./routes/context.js";
 import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
@@ -1361,7 +1365,10 @@ async function asMemberOf<T>(
   return runAsTenant({ spaceId, userId: actor.userId }, fn);
 }
 
-export function createRouter(deps: RouterDeps) {
+// Named so declaration emit does not spell out the whole router, which no longer fits.
+export type AppRouter = Router<AppContract, RouteAuthContext>;
+
+export function createRouter(deps: RouterDeps): AppRouter {
   const routeContext = createRouteContext(deps);
   const { os, authed } = routeContext;
   const repos = createRepos(deps.prisma);
@@ -6613,7 +6620,7 @@ export function createRouter(deps: RouterDeps) {
             status: { in: ["connected", "pending", "error"] },
             // The Granola key shows through meetings.status, never as a generic app.
             // Omi shows through omi.status.
-            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID] },
+            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID, HEX_CONNECTOR_ID] },
           },
           // Without an order Postgres returns rows in storage order, which changes when a row is
           // updated, so the accounts of one app swapped places between loads.
@@ -8446,6 +8453,18 @@ export function createRouter(deps: RouterDeps) {
       ),
       delete: authed.meetings.delete.handler(({ context, input }) =>
         deleteStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
+      ),
+      connectLocal: authed.meetings.connectLocal.handler(({ context }) =>
+        connectLocal(meetingsFor(context.actor), context.actor),
+      ),
+      localStatus: authed.meetings.localStatus.handler(({ context }) =>
+        localStatus(meetingsFor(context.actor), context.actor),
+      ),
+      importLocal: authed.meetings.importLocal.handler(({ context, input }) =>
+        importLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+      disconnectLocal: authed.meetings.disconnectLocal.handler(({ context, input }) =>
+        disconnectLocal(meetingsFor(context.actor), context.actor, input),
       ),
     },
     omi: {

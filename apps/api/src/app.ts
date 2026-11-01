@@ -175,6 +175,7 @@ import { mountOmiRoutes } from "./omi.js";
 import { mountApiRequestBodyLimits } from "./request-body-limit.js";
 import { mountSystemRoutes, mountTenantRoutes } from "./route-scope.js";
 import { createRouter } from "./router.js";
+import type { RouteAuthContext } from "./routes/context.js";
 import { mountScreenTarget } from "./screen-proxy.js";
 import { isDeferredReservationLost, TeamChatBridge } from "./team-chat-bridge.js";
 import { ModelTeamChatEngagementJudge } from "./team-chat-judge.js";
@@ -889,7 +890,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       mailWritesDisabled: env.mailWritesDisabled,
     },
   });
-  const rpc = new RPCHandler(router, {
+  const rpc = new RPCHandler<RouteAuthContext>(router, {
     clientInterceptors: [onError((error, { path }) => logUnexpectedRpcError(error, path))],
   });
   const app = new Hono();
