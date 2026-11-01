@@ -1,5 +1,6 @@
 import type { InvestorUpdate } from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { userEvent, within } from "storybook/test";
 import { mockRpc } from "../../lib/__mocks__/rpc";
 import { UpdateEditor } from "./UpdateEditor";
 
@@ -141,5 +142,27 @@ export const LoadError: Story = {
       "investors.updates.get": () => {
         throw new Error("Could not load this update");
       },
+    }),
+};
+
+/** After Send: the footer reads "Sending…" with Undo and the fields are locked for a few seconds. */
+export const Held: Story = {
+  beforeEach: setup(update({ body: "September went well." })),
+  play: async ({ canvasElement }) => {
+    const send = await within(canvasElement).findByRole("button", { name: "Send" });
+    await userEvent.click(send);
+  },
+};
+
+/** The recipients could not be loaded: the alert replaces the To list and Send is disabled. */
+export const RecipientsFailed: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "investors.updates.get": update(),
+      "investors.updates.accounts": accounts,
+      "contacts.list": () => {
+        throw new Error("Could not load recipients");
+      },
+      "investors.updates.save": update(),
     }),
 };
