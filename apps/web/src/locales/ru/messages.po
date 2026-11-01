@@ -1520,6 +1520,10 @@ msgstr ""
 msgid "Anniversary"
 msgstr ""
 
+#: src/components/ContactDialog.tsx
+msgid "Another contact already has this email."
+msgstr ""
+
 #: src/components/AskCard.tsx
 msgid "Answer"
 msgstr "Ответ"
