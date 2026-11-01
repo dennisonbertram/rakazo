@@ -76,8 +76,10 @@ export function toVoiceStatus(
     provider: cred?.provider ?? null,
     voiceId: cred?.voiceId ?? "",
     transcriptionProvider,
-    // ponytail: S3b turns this on when a selected provider can serve dictation.
-    transcriptionReady: false,
+    // A selected transcription provider serves dictation on its own, even with no speaking voice.
+    transcriptionReady: Boolean(
+      transcriptionProvider && isTranscriptionProviderId(transcriptionProvider),
+    ),
   };
 }
 
