@@ -62,8 +62,28 @@ it("keeps Always allow quiet, with its consequence beside it", () => {
   const always = button(container, "Always allow this");
   expect(always.className).toContain("underline");
   expect(button(container, "Allow once").className).not.toContain("underline");
-  expect(container.textContent).toContain("Won't ask again for this kind of action.");
+  expect(container.textContent).toContain("Won't ask again anywhere in this space.");
   expect(container.textContent).not.toContain("tool");
+});
+
+it("states the same scope on a site card", () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const block: AskBlock = {
+    ...pending,
+    site: "docs.example.test",
+    actions: [
+      { id: "allow", label: "Allow once" },
+      { id: "always", label: "Always allow docs.example.test" },
+      { id: "deny", label: "Deny" },
+    ],
+  };
+  act(() =>
+    createRoot(container).render(
+      <AskCard block={block} canAnswer onAnswer={async () => undefined} />,
+    ),
+  );
+  expect(container.textContent).toContain("Won't ask again anywhere in this space.");
 });
 
 it("moves focus to the composer once the answer is sent", async () => {
