@@ -3441,8 +3441,7 @@ msgstr "Connected {0}"
 msgid "Connected {0}."
 msgstr "Connected {0}."
 
-#. placeholder {0}: selected.label
-#. placeholder {0}: selectedLabelRef.current ?? "this model"
+#. placeholder {0}: label ?? "this model"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Connected and using {0}."
 msgstr "Connected and using {0}."
@@ -3454,6 +3453,10 @@ msgstr "Connected apps (write)"
 #: src/pages/CompanyRefresh.tsx
 msgid "Connected Data Room sources require manual re-import."
 msgstr "Connected Data Room sources require manual re-import."
+
+#: src/pages/ModelSettingsOverlay.tsx
+msgid "Connected."
+msgstr "Connected."
 
 #: src/pages/shell/message-cards.tsx
 msgid "Connected. Its tools are available from your next message."
@@ -5083,10 +5086,13 @@ msgstr "Disconnect source?"
 msgid "Disconnected"
 msgstr "Disconnected"
 
-#. placeholder {0}: selected.providerName ?? selected.provider
 #: src/pages/ModelSettingsOverlay.tsx
-msgid "Disconnected {0}."
-msgstr "Disconnected {0}."
+msgid "Disconnected {name}."
+msgstr "Disconnected {name}."
+
+#: src/pages/ModelSettingsOverlay.tsx
+msgid "Disconnected {name}. Bots now use {fallback}."
+msgstr "Disconnected {name}. Bots now use {fallback}."
 
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/ModelSettingsOverlay.tsx
