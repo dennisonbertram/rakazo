@@ -68,3 +68,22 @@ it("offers Move first, only when onMove is passed, and disables it while busy", 
   expect(el.querySelector("button")?.disabled).toBe(true);
   act(() => root.unmount());
 });
+
+it("keeps every control on one row so a narrow window does not wrap the bar", () => {
+  const el = document.createElement("div");
+  const root = createRoot(el);
+  act(() =>
+    root.render(
+      <SelectionBar
+        count={1}
+        total={67}
+        onSelectAll={vi.fn()}
+        onMove={vi.fn()}
+        onDownload={vi.fn()}
+        onClear={vi.fn()}
+      />,
+    ),
+  );
+  expect(el.querySelector('[role="toolbar"]')?.className).toContain("flex-nowrap");
+  act(() => root.unmount());
+});

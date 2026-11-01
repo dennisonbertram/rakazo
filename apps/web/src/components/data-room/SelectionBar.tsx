@@ -49,9 +49,9 @@ export function SelectionBar({
     <div
       role="toolbar"
       data-testid="data-room-selection"
-      className="absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-2 border-t border-border bg-background px-3 py-1.5 text-sm shadow-sm"
+      className="absolute inset-x-0 bottom-0 z-20 flex flex-nowrap items-center gap-2 border-t border-border bg-background px-3 py-1.5 text-sm shadow-sm"
     >
-      <span className="me-auto font-medium">
+      <span className="me-auto min-w-0 truncate font-medium">
         {more ? (
           <Trans>
             {count} of {total} selected
@@ -69,7 +69,7 @@ export function SelectionBar({
         <Button
           variant="outline"
           size="sm"
-          className={TOOLBAR_BUTTON}
+          className={`shrink-0 ${TOOLBAR_BUTTON}`}
           disabled={busy}
           onClick={onMove}
         >
@@ -82,7 +82,7 @@ export function SelectionBar({
       <Button
         variant="outline"
         size="sm"
-        className={TOOLBAR_BUTTON}
+        className={`shrink-0 ${TOOLBAR_BUTTON}`}
         disabled={busy}
         onClick={onDownload}
       >
@@ -95,7 +95,7 @@ export function SelectionBar({
         <Button
           variant="outline"
           size="sm"
-          className={TOOLBAR_BUTTON}
+          className={`shrink-0 ${TOOLBAR_BUTTON}`}
           disabled={busy}
           onClick={onSend}
         >
@@ -109,7 +109,12 @@ export function SelectionBar({
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" size="sm" className={TOOLBAR_BUTTON} disabled={busy}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`shrink-0 ${TOOLBAR_BUTTON}`}
+                disabled={busy}
+              >
                 <Send aria-hidden="true" />
                 <span className={TOOLBAR_LABEL}>
                   <Trans>Send to agent</Trans>
@@ -130,7 +135,13 @@ export function SelectionBar({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      <Button variant="ghost" size="icon-sm" aria-label={t`Clear selection`} onClick={onClear}>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="shrink-0"
+        aria-label={t`Clear selection`}
+        onClick={onClear}
+      >
         <X aria-hidden="true" />
       </Button>
     </div>
