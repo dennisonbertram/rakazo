@@ -9,7 +9,7 @@ export const DEFAULT_SESSION_SORT = { field: "updated", dir: "desc" } as const;
 
 export type SessionFilters = { q?: string; status?: string; source?: string };
 
-/** Sessions whose title or pull request contains the search text and that match every set filter. */
+/** Sessions whose title, question or pull request contains the search text and that match every set filter. */
 export function filterSessions(
   sessions: DevinSessionView[],
   { q, status, source }: SessionFilters,
@@ -18,7 +18,7 @@ export function filterSessions(
   return sessions.filter(
     (s) =>
       (!needle ||
-        [s.title, ...s.prs.map((pr) => prLabel(pr).ref)].some((text) =>
+        [s.title, s.question ?? "", ...s.prs.map((pr) => prLabel(pr).ref)].some((text) =>
           text.toLowerCase().includes(needle),
         )) &&
       (!status || s.kind === status) &&
@@ -34,7 +34,11 @@ export function sortSessions(
   return sortBy(
     sessions,
     (s) =>
-      sort.field === "title" ? s.title : sort.field === "status" ? statusName(s) : s.updatedAt,
+      sort.field === "title"
+        ? s.title || null
+        : sort.field === "status"
+          ? statusName(s)
+          : s.updatedAt,
     sort.dir,
   );
 }
