@@ -1491,6 +1491,7 @@ msgstr "Toujours autorisé"
 #: src/components/data-room/Preview.tsx
 #: src/components/finance/ui.tsx
 #: src/components/fundraising/SafeDialog.tsx
+#: src/pages/CompanyFactDetail.tsx
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Amount"
@@ -4737,6 +4738,7 @@ msgstr ""
 #: src/components/finance/ui.tsx
 #: src/components/fundraising/SafeDialog.tsx
 #: src/components/fundraising/SafeList.tsx
+#: src/pages/CompanyFactDetail.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Date"
@@ -5554,6 +5556,14 @@ msgstr ""
 
 #: src/components/data-room/folders.ts
 msgid "Empty"
+msgstr ""
+
+#: src/pages/CompanyFactDetail.tsx
+msgid "End date"
+msgstr ""
+
+#: src/pages/CompanyFactDetail.tsx
+msgid "End date is before the start date."
 msgstr ""
 
 #: src/pages/BillingSettingsPanel.tsx
@@ -12267,6 +12277,10 @@ msgstr ""
 
 #: src/components/fundraising/RoundCard.tsx
 msgid "Start a round"
+msgstr ""
+
+#: src/pages/CompanyFactDetail.tsx
+msgid "Start date"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
