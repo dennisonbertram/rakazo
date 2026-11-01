@@ -2399,6 +2399,7 @@ msgstr "No se puede alcanzar el servidor."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
+#: src/components/sidebar-folders/FolderHeader.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/components/teach/TeachRecordingChrome.tsx
@@ -4881,6 +4882,10 @@ msgstr "¿Eliminar {0}?"
 msgid "Delete {activeTitle}?"
 msgstr ""
 
+#: src/components/sidebar-folders/FolderHeader.tsx
+msgid "Delete {name}?"
+msgstr ""
+
 #: src/pages/Artifacts.tsx
 msgid "Delete {title}"
 msgstr "Eliminar {title}"
@@ -6909,6 +6914,10 @@ msgstr ""
 #: src/components/data-room/ItemRows.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Items"
+msgstr ""
+
+#: src/components/sidebar-folders/FolderHeader.tsx
+msgid "Its chats stay in the sidebar."
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx

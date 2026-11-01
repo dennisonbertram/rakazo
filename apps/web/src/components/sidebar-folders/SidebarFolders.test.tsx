@@ -133,6 +133,11 @@ describe("sidebar folders", () => {
     );
 
     await menu("Money", "Delete folder");
+    await act(async () => {
+      [...document.querySelectorAll<HTMLElement>("[role=alertdialog] button")]
+        .find((el) => el.textContent === "Delete folder")!
+        .click();
+    });
     expect(container.querySelector("[data-sidebar-folder=workspace]")).toBeNull();
     expect(rowIds()).toContain("ledger");
     expect(rowIds()).toContain("counsel");
