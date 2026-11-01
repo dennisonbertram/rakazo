@@ -1523,6 +1523,29 @@ it("asks before resending a delivery with an unknown result, and Mark delivered 
   expect(rpcMock.updatesRetry).toHaveBeenCalledWith({ id: "u2", resendUnknown: true });
 });
 
+it("tells the founder a sent investors update leaves the portal, but not for drafts or board updates", async () => {
+  const note = "Investors will no longer see it on the portal.";
+  rpcMock.updatesList.mockResolvedValue([
+    update({ id: "a", subject: "Sent inv", status: "sent", sentAt: "2026-10-02T09:00:00.000Z" }),
+    update({ id: "b", subject: "Draft inv" }),
+    update({ id: "c", subject: "Sent board", audience: "board", status: "sent" }),
+  ]);
+  await show("/app/investors?tab=updates");
+  for (const [subject, expected] of [
+    ["Sent inv", true],
+    ["Draft inv", false],
+    ["Sent board", false],
+  ] as const) {
+    await click(
+      container.querySelector<HTMLElement>(`button[aria-label='Actions for ${subject}']`) ??
+        undefined,
+    );
+    await click(menuItem("Delete"));
+    expect(document.body.textContent?.includes(note)).toBe(expected);
+    await click(button("Cancel"));
+  }
+});
+
 it("shows a Sending row with its menu disabled, and Duplicate and Delete on a sent one", async () => {
   rpcMock.updatesList.mockResolvedValue([
     update({ id: "s1", subject: "Running", status: "sending" }),

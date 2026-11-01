@@ -20,6 +20,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -1628,6 +1629,11 @@ export function InvestorsPage({
               <AlertDialogTitle>
                 <Trans>Delete this update?</Trans>
               </AlertDialogTitle>
+              {deletingUpdate?.audience === "investors" && deletingUpdate.status !== "draft" ? (
+                <AlertDialogDescription>
+                  <Trans>Investors will no longer see it on the portal.</Trans>
+                </AlertDialogDescription>
+              ) : null}
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>
