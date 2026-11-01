@@ -101,5 +101,61 @@ export const StoredMeetingDetailSchema = StoredMeetingSchema.extend({
     }),
   ),
   transcript: z.string().nullable(),
+  /** True when part of a recording could not be transcribed. */
+  partial: z.boolean(),
 });
 export type StoredMeetingDetail = z.infer<typeof StoredMeetingDetailSchema>;
+
+/** The most audio one chunk upload may carry. */
+export const MEETING_CAPTURE_CHUNK_MAX_BYTES = 4 * 1024 * 1024;
+/** The longest text one device chunk may carry. */
+export const MEETING_CAPTURE_TEXT_MAX_CHARS = 20_000;
+
+export const MeetingRecordingPolicySchema = z.enum(["remind", "confirm", "off"]);
+export type MeetingRecordingPolicy = z.infer<typeof MeetingRecordingPolicySchema>;
+
+export const MeetingCaptureTrackSchema = z.enum(["microphone", "system"]);
+export type MeetingCaptureTrack = z.infer<typeof MeetingCaptureTrackSchema>;
+
+const CaptureId = z.string().min(1).max(100);
+const ChunkPosition = {
+  track: MeetingCaptureTrackSchema,
+  seq: z.number().int().min(0).max(1_000_000),
+  startMs: z.number().int().min(0).max(86_400_000),
+  endMs: z.number().int().min(0).max(86_400_000),
+};
+
+export const MeetingCaptureStartInputSchema = z.object({
+  /** Chosen by the client for this recording; starting twice with it returns the same capture. */
+  clientId: z.string().min(1).max(100),
+  title: z.string().max(500).optional(),
+  engine: z.enum(["device", "server"]),
+  tracks: z.array(MeetingCaptureTrackSchema).min(1).max(2),
+  /** Required when the space's policy is "confirm". */
+  consentConfirmed: z.boolean().optional(),
+});
+export const MeetingCaptureStartOutputSchema = z.object({ captureId: CaptureId });
+
+export const MeetingCaptureAppendTextInputSchema = z.object({
+  captureId: CaptureId,
+  ...ChunkPosition,
+  text: z.string().max(MEETING_CAPTURE_TEXT_MAX_CHARS),
+});
+
+export const MeetingCaptureFinishInputSchema = z.object({
+  captureId: CaptureId,
+  endedAt: IsoDate,
+});
+
+/** The caller's capture that is recording or waiting to be stored; null when there is none. */
+export const MeetingCaptureActiveSchema = z
+  .object({
+    captureId: CaptureId,
+    title: z.string().nullable(),
+    engine: z.enum(["device", "server"]),
+    tracks: z.array(MeetingCaptureTrackSchema),
+    status: z.enum(["recording", "finishing"]),
+    startedAt: IsoDate,
+  })
+  .nullable();
+export type MeetingCaptureActive = z.infer<typeof MeetingCaptureActiveSchema>;

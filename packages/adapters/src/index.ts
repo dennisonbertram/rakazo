@@ -161,6 +161,7 @@ export * from "./mcp-oauth.js";
 export * from "./mcp-read-tools.js";
 export * from "./mcp-server-tool.js";
 export * from "./mcp-transport.js";
+export * from "./meeting-capture.js";
 export * from "./meeting-digest.js";
 export * from "./meeting-source-registry.js";
 export * from "./meeting-sync.js";

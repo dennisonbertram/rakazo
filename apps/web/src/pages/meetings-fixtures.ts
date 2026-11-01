@@ -32,4 +32,5 @@ export const detail: StoredMeetingDetail = {
     { id: "t2", text: "Share the pilot report", dueOn: null, doneAt: null },
   ],
   transcript: "Me: Thanks for joining.\nThem: Happy to be here.",
+  partial: false,
 };

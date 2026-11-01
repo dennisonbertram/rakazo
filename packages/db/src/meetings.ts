@@ -12,7 +12,9 @@ export type UpsertMeetingResult = "created" | "updated" | "stale" | "tombstoned"
 /** Only space and user: callers may pass a whole actor, which must not reach a query. */
 const ownerOf = ({ spaceId, userId }: Scope): Scope => ({ spaceId, userId });
 
-function sourceColumns(source: MeetingSourceRef) {
+/** `null` is a meeting Praci recorded itself: it has no source row. */
+function sourceColumns(source: MeetingSourceRef | null) {
+  if (!source) return { connectionId: null, mcpServerId: null };
   const connectionId = "connectionId" in source ? source.connectionId : null;
   const mcpServerId = "mcpServerId" in source ? source.mcpServerId : null;
   if ((connectionId === null) === (mcpServerId === null)) {
@@ -26,9 +28,9 @@ function sourceColumns(source: MeetingSourceRef) {
  * an older or equal one is ignored, and a meeting the user deleted stays deleted.
  */
 export async function upsertMeeting(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   scope: Scope,
-  source: MeetingSourceRef,
+  source: MeetingSourceRef | null,
   provider: string,
   meeting: SourceMeeting,
 ): Promise<UpsertMeetingResult> {
@@ -54,7 +56,10 @@ export async function upsertMeeting(
       ? { transcript: formatMeetingTranscript(meeting.transcript), transcriptIndexed: true }
       : {}),
   };
-  return prisma.$transaction(async (tx): Promise<UpsertMeetingResult> => {
+  // Inside a caller's transaction (a capture being finalized) it joins that one.
+  const inTransaction = (fn: (tx: Prisma.TransactionClient) => Promise<UpsertMeetingResult>) =>
+    "$transaction" in prisma ? prisma.$transaction(fn) : fn(prisma);
+  return inTransaction(async (tx) => {
     await lockMeeting(tx, key);
     if (
       await tx.meetingTombstone.findUnique({ where: { spaceId_userId_provider_externalId: key } })

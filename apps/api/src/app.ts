@@ -165,6 +165,7 @@ import { mountLocalSettings } from "./local-settings.js";
 import { mountMailPushRoute } from "./mail-push.js";
 import { mountRegisterLimit } from "./mcp-register-limit.js";
 import { mountMcpDiscovery, mountMcpServer } from "./mcp-server.js";
+import { mountMeetingCaptureRoutes } from "./meeting-captures.js";
 import {
   createMessagingInboundHandler,
   teamChatSenderCanWakeMessageRoutines,
@@ -1014,6 +1015,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   mountContactPhoto(app, { prisma, artifacts }, loggedActor);
   mountDataRoomRoutes(app, { prisma, artifacts, jobs }, loggedActor);
   mountOmiRoutes(app, { prisma, artifacts, jobs }, loggedActor);
+  mountMeetingCaptureRoutes(app, { prisma, artifacts, jobs }, loggedActor);
   mountInvestorPortal(app, {
     store: prismaPortalStore(prisma),
     artifacts,

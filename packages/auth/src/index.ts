@@ -407,6 +407,17 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
               },
               select: { spaceId: true, storageKey: true },
             });
+            // Audio of recordings still waiting to be transcribed cascades away too, not its blob.
+            const captureAudio = await tx.meetingCaptureChunk.findMany({
+              where: {
+                blobKey: { not: null },
+                OR: [
+                  { userId: user.id },
+                  { space: { organizationId: { in: personalOrganizationIds } } },
+                ],
+              },
+              select: { spaceId: true, blobKey: true },
+            });
             // Deleting the personal organizations cascades to their Computers, not to the
             // home snapshots in object storage.
             const homes = await tx.computer.findMany({
@@ -436,6 +447,9 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
                   storageKey ? [{ spaceId, storageKey }] : [],
                 ),
                 ...photos,
+                ...captureAudio.flatMap(({ spaceId, blobKey }) =>
+                  blobKey ? [{ spaceId, storageKey: blobKey }] : [],
+                ),
               ],
               homes,
             };

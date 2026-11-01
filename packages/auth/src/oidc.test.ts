@@ -62,6 +62,7 @@ function setup(options: Partial<AuthEnv> = {}) {
     member: { findMany: vi.fn(async () => []) },
     dataRoomItem: { findMany: vi.fn(async () => []) },
     contactPhoto: { findMany: vi.fn(async () => []) },
+    meetingCaptureChunk: { findMany: vi.fn(async () => []) },
     computer: { findMany: vi.fn(async () => []) },
     messagingIdentity: { deleteMany: vi.fn(async () => ({})) },
     organization: { deleteMany: vi.fn(async () => ({})) },

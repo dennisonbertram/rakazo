@@ -501,6 +501,12 @@ export async function deleteEmptySpaceForMember(
           select: { storageKey: true },
         });
         dataRoomStorageKeys.push(...photos.map((photo) => photo.storageKey));
+        // Audio of recordings still waiting to be transcribed.
+        const captureAudio = await tx.meetingCaptureChunk.findMany({
+          where: { spaceId: input.spaceId, blobKey: { not: null } },
+          select: { blobKey: true },
+        });
+        for (const { blobKey } of captureAudio) if (blobKey) dataRoomStorageKeys.push(blobKey);
         await tx.space.delete({ where: { id: input.spaceId } });
         if (input.spaceId !== input.currentSpaceId) {
           return { id: input.currentSpaceId, dataRoomStorageKeys };
