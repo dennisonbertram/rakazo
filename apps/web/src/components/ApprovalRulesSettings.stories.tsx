@@ -62,9 +62,6 @@ const meta = {
       </div>
     ),
   ],
-  parameters: {
-    docs: { description: { component: "Also shows: describeRule (the rule sentences)." } },
-  },
 } satisfies Meta<typeof ApprovalRulesSettings>;
 export default meta;
 type Story = StoryObj<typeof meta>;
