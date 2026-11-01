@@ -571,14 +571,30 @@ function findContacts(query: string): Promise<SearchLink[]> {
     .catch((): SearchLink[] => []);
 }
 
-/** Chats with a matching message, once per chat: the newest match and its date. */
-function findChats(query: string) {
+/**
+ * Chats with a matching message, once per chat: the newest match and its date. Routine hits are
+ * listed apart, once per routine. A group or a bot found only by its description is not a chat hit:
+ * Groups and Bots list those already.
+ */
+export function findChats(query: string) {
+  const needle = query.toLowerCase();
   return rpc.search
     .query({ q: query })
     .then(({ hits }) => {
       const seen = new Set<string>();
       const entries: PaletteEntry[] = [];
+      const routines: PaletteEntry[] = [];
       for (const hit of hits) {
+        if (hit.routineId && hit.botId) {
+          const id = `/app/${hit.botId}?routine=${hit.routineId}`;
+          if (!routines.some((entry) => entry.id === id)) {
+            routines.push({ id, label: hit.title, detail: hit.botName ?? undefined });
+          }
+          continue;
+        }
+        if (hit.kind === "conversation") {
+          if (hit.groupId || !hit.botName?.toLowerCase().includes(needle)) continue;
+        }
         const chatId = hit.groupId ?? hit.botId;
         const name = hit.groupName ?? hit.botName ?? hit.title;
         if (!chatId || seen.has(chatId)) continue;
@@ -600,9 +616,9 @@ function findChats(query: string) {
             : undefined,
         });
       }
-      return entries.slice(0, 5);
+      return { chats: entries.slice(0, 5), routines: routines.slice(0, 5) };
     })
-    .catch((): PaletteEntry[] => []);
+    .catch(() => ({ chats: [] as PaletteEntry[], routines: [] as PaletteEntry[] }));
 }
 
 export function ShellPage() {
@@ -2422,7 +2438,12 @@ export function ShellPage() {
         keywords: t`apps, connections`,
         icon: <LayoutGrid {...icon} />,
       },
-      { id: "settings", label: t`Settings`, icon: <Settings {...icon} /> },
+      {
+        id: "settings",
+        label: t`Settings`,
+        keywords: t`theme, dark mode, appearance, notifications, time zone`,
+        icon: <Settings {...icon} />,
+      },
     ];
   }, [t, bootstrapMe?.ticketBoardEnabled, glance.hasTickets, glance.devinConnected]);
   // A page hidden in Page options stays out of search and the command palette too.
@@ -2432,7 +2453,7 @@ export function ShellPage() {
   );
   const searchPaletteLinks = useCallback(
     async (q: string) => {
-      const [found, contacts, chats] = await Promise.all([
+      const [found, contacts, { chats, routines }] = await Promise.all([
         findDocumentsAndArtifacts(q),
         findContacts(q),
         findChats(q),
@@ -2465,6 +2486,11 @@ export function ShellPage() {
           heading: t`Chats`,
           icon: <MessageSquare size={16} strokeWidth={1.75} />,
           entries: chats,
+        },
+        {
+          heading: t`Routines`,
+          icon: <CalendarClock size={16} strokeWidth={1.75} />,
+          entries: routines,
         },
         {
           heading: t`Artifacts`,
@@ -2506,6 +2532,26 @@ export function ShellPage() {
     ],
     [paletteBots],
   );
+
+  // Settings tabs found only by typing; Computer and Connections are left out (see Integrations).
+  const settingsJumps = (
+    [
+      { label: t`Model settings`, keywords: t`models, providers, API key`, section: "models" },
+      { label: t`Voice settings`, keywords: t`voice, speech`, section: "voice" },
+      { label: t`Memory settings`, keywords: t`memory`, section: "memory" },
+      { label: t`Privacy and approvals`, keywords: t`privacy, approvals`, section: "privacy" },
+      ...(bootstrapMe?.billingEnabled === true
+        ? [{ label: t`Billing`, section: "billing" as const }]
+        : []),
+    ] satisfies { label: string; keywords?: string; section: SettingsSection }[]
+  ).map(({ label, keywords, section }) => ({
+    label,
+    keywords,
+    run: () => {
+      setMobileSidebarOpen(false);
+      openSettings(section);
+    },
+  }));
 
   function openSearchResult(path: string) {
     setMobileSidebarOpen(false);
@@ -6260,6 +6306,7 @@ export function ShellPage() {
           actions={[
             { label: t`New folder`, run: () => void createFolder() },
             { label: t`Group chats into folders`, run: () => void autoGroupSidebar() },
+            ...settingsJumps,
           ]}
           searchLinks={searchPaletteLinks}
           onOpenPath={openSearchResult}

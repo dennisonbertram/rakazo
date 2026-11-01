@@ -473,3 +473,53 @@ it("lists a search-only agent only once something is typed", async () => {
   // It has no number: the shortcuts follow the listed bots.
   expect(document.querySelector("[data-testid=command-palette-bot-b9] kbd")).toBeNull();
 });
+
+const wait300 = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  });
+const pressEnter = () =>
+  act(async () => {
+    document
+      .querySelector("[data-testid=command-palette-search]")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  });
+
+it("ranks an action matched by keyword above body-only chat hits, and Enter runs it", async () => {
+  const run = vi.fn();
+  await mount(
+    vi.fn(),
+    async () => [
+      {
+        heading: "Chats",
+        entries: [{ id: "/app/b1?m=x", label: "Data room agent", detail: "models we tried" }],
+      },
+    ],
+    [{ label: "Model settings", keywords: "models", run }],
+  );
+  await search("models");
+  await wait300();
+  const rows = [...document.querySelectorAll("[cmdk-item]")].map((n) => n.textContent ?? "");
+  expect(rows.findIndex((r) => r.includes("Model settings"))).toBeLessThan(
+    rows.findIndex((r) => r.includes("Data room agent")),
+  );
+  await pressEnter();
+  expect(run).toHaveBeenCalledOnce();
+});
+
+it("keeps a title-matching contact above an action and opens it on Enter", async () => {
+  const run = vi.fn();
+  await mount(
+    vi.fn(),
+    async () => [{ heading: "Contacts", entries: [{ id: "/c/1", label: "Models Inc" }] }],
+    [{ label: "Model settings", keywords: "models", run }],
+  );
+  await search("models");
+  await wait300();
+  const rows = [...document.querySelectorAll("[cmdk-item]")].map((n) => n.textContent ?? "");
+  const contactAt = rows.findIndex((r) => r.includes("Models Inc"));
+  expect(contactAt).toBeGreaterThanOrEqual(0);
+  expect(rows.findIndex((r) => r.includes("Model settings"))).toBeGreaterThan(contactAt);
+  await pressEnter();
+  expect(run).not.toHaveBeenCalled();
+});

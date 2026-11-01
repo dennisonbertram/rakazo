@@ -2134,6 +2134,7 @@ msgid "bill"
 msgstr "bill"
 
 #: src/pages/SettingsOverlay.tsx
+#: src/pages/Shell.tsx
 msgid "Billing"
 msgstr "Billing"
 
@@ -7655,6 +7656,10 @@ msgstr "Members and settings"
 msgid "Memo"
 msgstr "Memo"
 
+#: src/pages/Shell.tsx
+msgid "memory"
+msgstr "memory"
+
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/SettingsOverlay.tsx
@@ -7668,6 +7673,10 @@ msgstr "Memory provider"
 #: src/pages/shell/bot-panel.tsx
 msgid "Memory scope"
 msgstr "Memory scope"
+
+#: src/pages/Shell.tsx
+msgid "Memory settings"
+msgstr "Memory settings"
 
 #: src/pages/shell/composer.tsx
 msgid "Mentions"
@@ -7803,6 +7812,10 @@ msgstr "Model id"
 msgid "Model options"
 msgstr "Model options"
 
+#: src/pages/Shell.tsx
+msgid "Model settings"
+msgstr "Model settings"
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Model spend uses your provider keys."
 msgstr "Model spend uses your provider keys."
@@ -7829,6 +7842,10 @@ msgstr "Models from server"
 #: src/lib/model-connection-preflight.ts
 msgid "Models list OK. {modelCount, plural, one {# model} other {# models}} available. Chat was not tested."
 msgstr "Models list OK. {modelCount, plural, one {# model} other {# models}} available. Chat was not tested."
+
+#: src/pages/Shell.tsx
+msgid "models, providers, API key"
+msgstr "models, providers, API key"
 
 #: src/lib/billing.ts
 msgid "month"
@@ -9868,8 +9885,13 @@ msgid "Privacy"
 msgstr "Privacy"
 
 #: src/pages/SettingsOverlay.tsx
+#: src/pages/Shell.tsx
 msgid "Privacy and approvals"
 msgstr "Privacy and approvals"
+
+#: src/pages/Shell.tsx
+msgid "privacy, approvals"
+msgstr "privacy, approvals"
 
 #: src/pages/CompanyImportScope.tsx
 msgid "Private channels and DMs"
@@ -12897,6 +12919,10 @@ msgstr "their portal access"
 msgid "Theme"
 msgstr "Theme"
 
+#: src/pages/Shell.tsx
+msgid "theme, dark mode, appearance, notifications, time zone"
+msgstr "theme, dark mode, appearance, notifications, time zone"
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "These saved settings can't be read. Remove it and add it again."
 msgstr "These saved settings can't be read. Remove it and add it again."
@@ -13919,6 +13945,14 @@ msgstr "Voice"
 #: src/components/call/VoiceChatCard.tsx
 msgid "Voice chat"
 msgstr "Voice chat"
+
+#: src/pages/Shell.tsx
+msgid "Voice settings"
+msgstr "Voice settings"
+
+#: src/pages/Shell.tsx
+msgid "voice, speech"
+msgstr "voice, speech"
 
 #: src/pages/Finance.tsx
 msgid "vs {previousRange}"

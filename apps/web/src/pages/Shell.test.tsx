@@ -20,9 +20,12 @@ vi.mock("@lingui/react/macro", () => {
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
 
+const searchHits = vi.hoisted(() => ({ current: [] as Record<string, unknown>[] }));
+
 vi.mock("../lib/rpc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/rpc")>()),
   rpc: {
+    search: { query: async () => ({ hits: searchHits.current }) },
     dataRoom: {
       search: async () => ({
         results: [
@@ -60,6 +63,7 @@ import {
   Composer,
   chatIsOpening,
   findDocumentsAndArtifacts,
+  findChats,
   firstThreadRoute,
   isRoutinesOnlyPanel,
   retryAfterStop,
@@ -1294,5 +1298,43 @@ describe("showsComputerCaption", () => {
     expect(showsComputerCaption({ ...live, open: true })).toBe(false);
     expect(showsComputerCaption({ ...live, hasError: true })).toBe(false);
     expect(showsComputerCaption({ ...live, kind: "desktop" })).toBe(false);
+  });
+});
+
+describe("findChats", () => {
+  const hit = (extra: Record<string, unknown>) => ({
+    kind: "message",
+    snippet: "",
+    title: "",
+    createdAt: null,
+    ...extra,
+  });
+
+  it("lists a routine apart from chats, so it does not hide that bot's message hit", async () => {
+    searchHits.current = [
+      hit({
+        kind: "routine",
+        botId: "b1",
+        botName: "Finance agent",
+        routineId: "r1",
+        title: "Monday receipt chase",
+      }),
+      hit({ botId: "b1", botName: "Finance agent", messageId: "m1", snippet: "receipt sent" }),
+    ];
+    const { chats, routines } = await findChats("receipt");
+    expect(routines).toEqual([
+      { id: "/app/b1?routine=r1", label: "Monday receipt chase", detail: "Finance agent" },
+    ]);
+    expect(chats.map((c) => c.id)).toContain("/app/b1?m=m1");
+  });
+
+  it("drops groups and bots matched only by description, and keeps bots matched by name", async () => {
+    searchHits.current = [
+      hit({ kind: "conversation", botId: "b2", botName: "Inbox agent", snippet: "tracks finance" }),
+      hit({ kind: "conversation", groupId: "g1", groupName: "Fin team", snippet: "" }),
+      hit({ kind: "conversation", botId: "b3", botName: "Fin thread", snippet: "" }),
+    ];
+    const { chats } = await findChats("fin");
+    expect(chats.map((c) => c.label)).toEqual(["Fin thread"]);
   });
 });
