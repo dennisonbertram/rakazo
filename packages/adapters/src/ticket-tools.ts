@@ -291,7 +291,8 @@ export async function commentTicket(
     boardId: board.id,
     ticketId: ticket.id,
     assigneeBotId: ticket.assigneeBotId,
-    wakeAssignee: false,
+    // A person's comment wakes the owner; a bot's comment never wakes anyone.
+    wakeAssignee: input.botId === undefined,
   });
   return { comment: toTicketCommentDto(row) };
 }
