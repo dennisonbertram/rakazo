@@ -224,6 +224,7 @@ export function routineStatusLine(
     }
   }
   const parts: string[] = [];
+  if (status.lastRunFailed && routine.watch) parts.push(t`Last run failed`);
   if (routine.watch) {
     if (status.lastCheckedAt) {
       const checked = formatRelativeTime(status.lastCheckedAt, now);
@@ -235,7 +236,9 @@ export function routineStatusLine(
     }
   } else {
     const lastRunAt = status.lastRunAt ?? routine.lastRunAt;
-    if (lastRunAt) {
+    if (status.lastRunFailed) {
+      parts.push(t`Last run failed`);
+    } else if (lastRunAt) {
       const lastRan = formatRunTime(lastRunAt, routine.timezone, locale, now);
       parts.push(t`Last ran ${lastRan}`);
     }
@@ -331,7 +334,9 @@ export function RoutineListRow({
           {statusLine ? (
             <span
               data-testid="routine-status-line"
-              className="block text-[12.5px] text-muted-foreground/80"
+              className={`block text-[12.5px] ${
+                routine.status.lastRunFailed ? "text-destructive" : "text-muted-foreground/80"
+              }`}
             >
               {statusLine}
             </span>

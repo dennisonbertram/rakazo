@@ -71,6 +71,8 @@ export const RoutineStatusSchema = z.object({
   lastCheckedAt: z.string().nullable(),
   lastChangedAt: z.string().nullable(),
   pausedReason: WatchPausedReasonSchema.nullable(),
+  /** True when the routine's newest finished run failed. */
+  lastRunFailed: z.boolean().optional(),
 });
 export type RoutineStatus = z.infer<typeof RoutineStatusSchema>;
 

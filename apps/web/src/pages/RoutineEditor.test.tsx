@@ -351,6 +351,17 @@ it("describes a watch, a check-in and a pause in the row", () => {
   } as Routine;
   expect(routineStatusLine(schedule, "en", now)).toBe("Last ran 8:00 AM · Next Tue 8:00 AM");
   expect(routineStatusLine(baseRoutine, "en", now)).toBeNull();
+  const failed = { ...schedule, status: { ...schedule.status, lastRunFailed: true } } as Routine;
+  expect(routineStatusLine(failed, "en", now)).toBe("Last run failed · Next Tue 8:00 AM");
+  expect(routineStatusLine({ ...failed, active: false }, "en", now)).toBe("Last run failed");
+  const failedWatch = { ...watch, status: { ...watch.status, lastRunFailed: true } } as Routine;
+  expect(routineStatusLine(failedWatch, "en", now)).toBe(
+    "Last run failed · Checked 4m ago · Changed 1d ago",
+  );
+  const failedPaused = { ...failedWatch, status: { ...failedWatch.status, pausedReason: "noisy" } };
+  expect(routineStatusLine(failedPaused as Routine, "en", now)).toBe(
+    "Paused: the page changes too often",
+  );
 });
 
 it("describes a connected-app watch by its app, not a page", () => {

@@ -10586,6 +10586,9 @@
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "lastRunFailed": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -105874,6 +105877,9 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "lastRunFailed": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -106629,6 +106635,9 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "lastRunFailed": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -107460,6 +107469,9 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "lastRunFailed": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
