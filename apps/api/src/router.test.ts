@@ -2277,7 +2277,7 @@ describe("model credential persistence", () => {
   } satisfies Actor;
 
   function persistDeps(options?: { envDefaultModel?: string }) {
-    const upsert = vi.fn().mockResolvedValue({ id: "preference" });
+    const upsert = vi.fn().mockResolvedValue({ id: "preference", isDefault: true });
     const finish = vi.fn();
     // Connect loads any previous credential on the root client before the write transaction.
     const userModelCredential = {
@@ -4093,6 +4093,7 @@ describe("routines.update", () => {
           },
         ]),
       },
+      run: { findFirst: vi.fn(async () => null) },
       routine: {
         findFirst: vi.fn(async (args: { where: { bot?: { archivedAt: null } } }) =>
           botArchived && args.where.bot?.archivedAt === null ? null : savedRoutine,
@@ -4373,6 +4374,7 @@ describe("groups.archive", () => {
     // As in production: the run's computer is known only through its execution lease.
     const tx = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "group-1" }]),
       chatGroup: {
         findFirst: vi.fn().mockResolvedValue({
