@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 323 of 323
-- Web and shared components: 833
+- Web and shared component files with stories: 324 of 324
+- Web and shared components: 835
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 126 in 67 files, native story pending
 
@@ -430,6 +430,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Composer | [apps/web/src/pages/shell/composer.tsx](../../apps/web/src/pages/shell/composer.tsx) | [composer.stories.tsx](../../apps/web/src/pages/shell/composer.stories.tsx) | web |
 | DelegateWaitNotice | [apps/web/src/pages/shell/DelegateWaitNotice.tsx](../../apps/web/src/pages/shell/DelegateWaitNotice.tsx) | [DelegateWaitNotice.stories.tsx](../../apps/web/src/pages/shell/DelegateWaitNotice.stories.tsx) | web |
 | NewSpaceDialog, RenameSpaceDialog, PickerInfoDialog, NewBotSectionDialog, RenameBotSectionDialog, ClearConversationDialog, ArchiveBotsDialog, DeleteBotDialog, DeleteItemDialog | [apps/web/src/pages/shell/dialogs.tsx](../../apps/web/src/pages/shell/dialogs.tsx) | [dialogs.stories.tsx](../../apps/web/src/pages/shell/dialogs.stories.tsx) | web |
+| DictationButton, DictationError | [apps/web/src/pages/shell/dictation-button.tsx](../../apps/web/src/pages/shell/dictation-button.tsx) | [dictation-button.stories.tsx](../../apps/web/src/pages/shell/dictation-button.stories.tsx) | web |
 | GroupIntro | [apps/web/src/pages/shell/GroupIntro.tsx](../../apps/web/src/pages/shell/GroupIntro.tsx) | [GroupIntro.stories.tsx](../../apps/web/src/pages/shell/GroupIntro.stories.tsx) | web |
 | MentionIcon | [apps/web/src/pages/shell/mention-icon.tsx](../../apps/web/src/pages/shell/mention-icon.tsx) | [mention-icon.stories.tsx](../../apps/web/src/pages/shell/mention-icon.stories.tsx) | web |
 | ResultCard, ChoiceCard, OnboardingFocusQuestion, OnboardingFocusOptionHint, OnboardingFocusOptionLabel, AppConnectCard, ChartCanvas, ChartCanvasPlot, McpApprovalCard, ChartBlockView, ArtifactImage, ArtifactImageGrid | [apps/web/src/pages/shell/message-cards.tsx](../../apps/web/src/pages/shell/message-cards.tsx) | [message-cards.stories.tsx](../../apps/web/src/pages/shell/message-cards.stories.tsx) | web |
