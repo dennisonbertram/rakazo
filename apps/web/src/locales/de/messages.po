@@ -4464,6 +4464,10 @@ msgstr ""
 msgid "Couldn't load messaging settings"
 msgstr ""
 
+#: src/components/NotificationSettings.tsx
+msgid "Couldn't load notifications"
+msgstr ""
+
 #: src/components/inbox/InboxCleanup.tsx
 msgid "Couldn't load senders"
 msgstr ""
