@@ -30,8 +30,12 @@ import { companyFixture } from "./company-fixtures";
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
-const show = async (view: string, entities = companyFixture.entities) => {
-  rpcMock.company.page.mockResolvedValue({ ...companyFixture, entities });
+const show = async (
+  view: string,
+  entities = companyFixture.entities,
+  extra: Partial<typeof companyFixture> = {},
+) => {
+  rpcMock.company.page.mockResolvedValue({ ...companyFixture, entities, ...extra });
   rpcMock.company.review.mockResolvedValue({ items: [] });
   rpcMock.finance.overview.mockResolvedValue(null);
   rpcMock.investors.capTable.mockResolvedValue({ snapshot: null, syncing: false });
@@ -76,4 +80,24 @@ it("still lists people when there are some", async () => {
 it("keeps the title in the shared page header", async () => {
   await show("overview");
   expect(container.querySelector("[data-page-header] h1")?.textContent).toBe("Company");
+});
+
+it("offers Import from the empty overview", async () => {
+  await show("overview", [], { events: [], latestRun: null });
+  expect(container.textContent).toContain("No company facts yet");
+  const links = [...container.querySelectorAll("a")].filter(
+    (a) => a.getAttribute("href") === "/app/company/import" && a.textContent === "Import",
+  );
+  // One in the page header, one in the empty state.
+  expect(links).toHaveLength(2);
+});
+
+it("shows no Import action in the empty state while an import runs", async () => {
+  await show("overview", [], { events: [], latestRun: { id: "run", status: "running" } as never });
+  expect(container.textContent).toContain("Import in progress");
+  expect(
+    [...container.querySelectorAll("a")].filter(
+      (a) => a.getAttribute("href") === "/app/company/import" && a.textContent === "Import",
+    ),
+  ).toHaveLength(1);
 });
