@@ -2134,6 +2134,7 @@ msgid "bill"
 msgstr ""
 
 #: src/pages/SettingsOverlay.tsx
+#: src/pages/Shell.tsx
 msgid "Billing"
 msgstr ""
 
@@ -7647,6 +7648,10 @@ msgstr ""
 msgid "Memo"
 msgstr ""
 
+#: src/pages/Shell.tsx
+msgid "memory"
+msgstr ""
+
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/SettingsOverlay.tsx
@@ -7660,6 +7665,10 @@ msgstr ""
 #: src/pages/shell/bot-panel.tsx
 msgid "Memory scope"
 msgstr "Portée de la mémoire"
+
+#: src/pages/Shell.tsx
+msgid "Memory settings"
+msgstr ""
 
 #: src/pages/shell/composer.tsx
 msgid "Mentions"
@@ -7795,6 +7804,10 @@ msgstr "ID du modèle"
 msgid "Model options"
 msgstr ""
 
+#: src/pages/Shell.tsx
+msgid "Model settings"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Model spend uses your provider keys."
 msgstr "La consommation du modèle utilise vos clés de fournisseur."
@@ -7821,6 +7834,10 @@ msgstr "Modèles du serveur"
 #: src/lib/model-connection-preflight.ts
 msgid "Models list OK. {modelCount, plural, one {# model} other {# models}} available. Chat was not tested."
 msgstr "Liste des modèles correcte. {modelCount, plural, one {# modèle disponible} other {# modèles disponibles}}. La conversation n'a pas été testée."
+
+#: src/pages/Shell.tsx
+msgid "models, providers, API key"
+msgstr ""
 
 #: src/lib/billing.ts
 msgid "month"
@@ -9860,7 +9877,12 @@ msgid "Privacy"
 msgstr ""
 
 #: src/pages/SettingsOverlay.tsx
+#: src/pages/Shell.tsx
 msgid "Privacy and approvals"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "privacy, approvals"
 msgstr ""
 
 #: src/pages/CompanyImportScope.tsx
@@ -12888,6 +12910,10 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
+#: src/pages/Shell.tsx
+msgid "theme, dark mode, appearance, notifications, time zone"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "These saved settings can't be read. Remove it and add it again."
 msgstr ""
@@ -13909,6 +13935,14 @@ msgstr "Voix"
 #: src/components/call/VoiceChatCard.tsx
 msgid "Voice chat"
 msgstr "Chat vocal"
+
+#: src/pages/Shell.tsx
+msgid "Voice settings"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "voice, speech"
+msgstr ""
 
 #: src/pages/Finance.tsx
 msgid "vs {previousRange}"
