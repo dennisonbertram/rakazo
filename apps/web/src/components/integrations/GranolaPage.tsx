@@ -41,10 +41,10 @@ export function GranolaPage({
           <Button
             className="ms-auto"
             variant={key && key.status !== "disconnected" ? "outline" : "default"}
-            aria-label={t`Connect ${name}`}
+            aria-label={t`Sign in to ${name}`}
             onClick={() => setSigningIn(true)}
           >
-            <Trans>Connect</Trans>
+            <Trans>Sign in</Trans>
           </Button>
         </div>
         <div className="mt-6">
