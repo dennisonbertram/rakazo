@@ -325,18 +325,26 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           {view === "calendar" && (
             <CompanyCalendar onOpen={setFact} refreshRevision={calendarRevision} />
           )}
-          {running && (
-            <p role="status" className="text-sm text-muted-foreground">
-              <Trans>Import in progress</Trans>
-            </p>
-          )}
           {data.latestRun &&
-            ["partial", "paused", "budget_reached", "cancelled", "failed"].includes(
-              data.latestRun.status,
-            ) && (
-              <p role="status" className="text-sm text-muted-foreground">
-                <Trans>Partial import</Trans>
-              </p>
+            (running ||
+              ["paused", "budget_reached", "partial", "failed"].includes(
+                data.latestRun.status,
+              )) && (
+              <Link
+                role="status"
+                to={`/app/company/import?runId=${data.latestRun.id}`}
+                className="block text-sm text-muted-foreground hover:underline"
+              >
+                {running ? (
+                  <Trans>Import in progress</Trans>
+                ) : ["paused", "budget_reached"].includes(data.latestRun.status) ? (
+                  <Trans>Import paused</Trans>
+                ) : data.latestRun.status === "failed" ? (
+                  <Trans>Import failed</Trans>
+                ) : (
+                  <Trans>Partial import</Trans>
+                )}
+              </Link>
             )}
           {view === "overview" && data.entities.length === 0 && data.events.length === 0 && (
             <PageEmptyState

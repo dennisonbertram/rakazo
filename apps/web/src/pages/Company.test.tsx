@@ -101,3 +101,20 @@ it("shows no Import action in the empty state while an import runs", async () =>
     ),
   ).toHaveLength(1);
 });
+
+it("links a failed import to its run", async () => {
+  await show("overview", companyFixture.entities, {
+    latestRun: { id: "r1", status: "failed" } as never,
+  });
+  const link = container.querySelector('a[role="status"]');
+  expect(link?.textContent).toBe("Import failed");
+  expect(link?.getAttribute("href")).toBe("/app/company/import?runId=r1");
+  expect(container.textContent).not.toContain("Partial import");
+});
+
+it("shows no status line for a cancelled import", async () => {
+  await show("overview", companyFixture.entities, {
+    latestRun: { id: "r1", status: "cancelled" } as never,
+  });
+  expect(container.querySelector('[role="status"]')).toBeNull();
+});

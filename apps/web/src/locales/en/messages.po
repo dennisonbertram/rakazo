@@ -6597,6 +6597,10 @@ msgstr "Import anyway"
 msgid "Import company"
 msgstr "Import company"
 
+#: src/pages/Company.tsx
+msgid "Import failed"
+msgstr "Import failed"
+
 #: src/components/data-room/ImportFromDrive.tsx
 msgid "Import from Box"
 msgstr "Import from Box"
@@ -6616,6 +6620,10 @@ msgstr "Import from your mail and files to fill this page."
 #: src/pages/Company.tsx
 msgid "Import in progress"
 msgstr "Import in progress"
+
+#: src/pages/Company.tsx
+msgid "Import paused"
+msgstr "Import paused"
 
 #: src/pages/CompanyImport.tsx
 msgid "Import was interrupted"
