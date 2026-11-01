@@ -9,6 +9,7 @@ import type {
 import {
   computerControlExpireJobKey,
   dataRoomBlobDeleteJob,
+  MEMORY_REVISION_CONFLICT_ERROR,
   messagingDeliverJob,
   routineJobKey,
   routineWakeupJob,
@@ -4392,21 +4393,29 @@ export function createRouter(deps: RouterDeps) {
           },
         });
         if (!doc) throw new IsolationError();
-        const updated = await deps.memory.commit(
-          {
-            scope: doc.scope as "bot" | "user",
-            botId: doc.botId ?? undefined,
-            path: doc.path,
-            content: input.content,
-          },
-          {
-            operationId: "mem",
-            traceId: "mem",
-            spaceId: context.actor.spaceId,
-            userId: context.actor.userId,
-            signal: new AbortController().signal,
-          },
-        );
+        const updated = await deps.memory
+          .commit(
+            {
+              scope: doc.scope as "bot" | "user",
+              botId: doc.botId ?? undefined,
+              path: doc.path,
+              content: input.content,
+              expectedRevision: input.expectedRevision,
+            },
+            {
+              operationId: "mem",
+              traceId: "mem",
+              spaceId: context.actor.spaceId,
+              userId: context.actor.userId,
+              signal: new AbortController().signal,
+            },
+          )
+          .catch((error: unknown) => {
+            if (error instanceof Error && error.message === MEMORY_REVISION_CONFLICT_ERROR) {
+              throw new ORPCError("CONFLICT", { message: "Memory changed since it was opened" });
+            }
+            throw error;
+          });
         return {
           id: updated.id,
           scope: doc.scope as "bot" | "user",
@@ -4416,6 +4425,22 @@ export function createRouter(deps: RouterDeps) {
           revision: updated.revision,
           updatedAt: new Date().toISOString(),
         };
+      }),
+      remove: authed.memory.remove.handler(async ({ context, input }) => {
+        const where = {
+          id: input.documentId,
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+        };
+        // Revisions go with the document (ON DELETE CASCADE).
+        const { count } = await deps.prisma.memoryDocument.deleteMany({
+          where: { ...where, revision: input.revision },
+        });
+        if (count === 0) {
+          if (!(await deps.prisma.memoryDocument.findFirst({ where }))) throw new IsolationError();
+          throw new ORPCError("CONFLICT", { message: "Memory changed since it was opened" });
+        }
+        return { ok: true as const };
       }),
       exportMarkdown: authed.memory.exportMarkdown.handler(async ({ context, input }) => {
         const docs = await deps.prisma.memoryDocument.findMany({

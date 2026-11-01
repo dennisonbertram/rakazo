@@ -899,8 +899,19 @@ export const appContract = {
       .input(z.object({ botId: Id.optional(), scope: z.enum(["bot", "user"]).optional() }))
       .output(z.array(MemoryDocumentSchema)),
     update: oc
-      .input(z.object({ documentId: Id, content: z.string() }))
+      .input(
+        z.object({
+          documentId: Id,
+          content: z.string(),
+          /** When set, the update fails with CONFLICT unless the document is still at this revision. */
+          expectedRevision: z.number().int().optional(),
+        }),
+      )
       .output(MemoryDocumentSchema),
+    /** Deletes one memory and its history, only if it is still at `revision`. */
+    remove: oc
+      .input(z.object({ documentId: Id, revision: z.number().int() }))
+      .output(z.object({ ok: z.literal(true) })),
     exportMarkdown: oc.input(z.object({ botId: Id.optional() })).output(z.string()),
     providerConfig: oc.output(SpaceMemoryConfigSchema.nullable()),
     connectProvider: oc

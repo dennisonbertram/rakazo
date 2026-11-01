@@ -2583,6 +2583,10 @@ msgstr ""
 msgid "Changed elsewhere"
 msgstr ""
 
+#: src/pages/KnowledgeSection.tsx
+msgid "Changed since you opened it"
+msgstr ""
+
 #: src/components/gtm/EmailItemCard.tsx
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Changed, review again"
@@ -3816,6 +3820,10 @@ msgstr ""
 msgid "Could not create your bot"
 msgstr "Não foi possível criar o seu bot"
 
+#: src/pages/KnowledgeSection.tsx
+msgid "Could not delete"
+msgstr ""
+
 #. placeholder {0}: contact.name
 #. placeholder {0}: gone.name
 #: src/lib/use-contact-notices.ts
@@ -4821,6 +4829,7 @@ msgstr "Padrão ({0})"
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
+#: src/pages/KnowledgeSection.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
@@ -7665,6 +7674,10 @@ msgstr ""
 #: src/pages/SettingsOverlay.tsx
 msgid "Memory"
 msgstr "Memória"
+
+#: src/pages/KnowledgeSection.tsx
+msgid "Memory deleted"
+msgstr ""
 
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Memory provider"
@@ -13473,6 +13486,7 @@ msgstr ""
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
+#: src/pages/KnowledgeSection.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Undo"
