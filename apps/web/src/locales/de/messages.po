@@ -6952,6 +6952,10 @@ msgstr ""
 msgid "Keep your contracts here and see which are due soon."
 msgstr ""
 
+#: src/pages/memory-providers/registry.ts
+msgid "Keeps bot memory in Serenity, hosted for you or on your own server."
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "key"
 msgstr ""
@@ -7158,6 +7162,10 @@ msgstr ""
 msgid "Let Praci sort your mail"
 msgstr ""
 
+#: src/pages/memory-providers/registry.ts
+msgid "Lets bots search everything they have learned, on top of built-in memory."
+msgstr ""
+
 #: src/components/data-room/format.ts
 msgid "Letter or email"
 msgstr ""
@@ -7333,6 +7341,11 @@ msgstr "Wird geladen…"
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Local"
 msgstr "Lokal"
+
+#. placeholder {0}: config.settings.baseUrl ?? ""
+#: src/pages/memory-providers/registry.ts
+msgid "Local · {0}"
+msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Local command"
@@ -10123,6 +10136,10 @@ msgstr ""
 msgid "Read-only API key"
 msgstr ""
 
+#: src/pages/memory-providers/registry.ts
+msgid "read/write"
+msgstr ""
+
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/data-room/format.ts
 #: src/components/data-room/ProcessingStrip.tsx
@@ -10225,6 +10242,10 @@ msgstr "Denkaufwand"
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "Recall and write"
+msgstr ""
+
+#: src/pages/memory-providers/registry.ts
+msgid "recall only"
 msgstr ""
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
@@ -11671,6 +11692,14 @@ msgstr ""
 
 #: src/pages/Inbox.tsx
 msgid "Sent. Moved out of Needs reply"
+msgstr ""
+
+#: src/pages/memory-providers/registry.ts
+msgid "Serenity · {endpoint} · {mode}"
+msgstr ""
+
+#: src/pages/memory-providers/registry.ts
+msgid "Serenity · {label} · {mode}"
 msgstr ""
 
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
