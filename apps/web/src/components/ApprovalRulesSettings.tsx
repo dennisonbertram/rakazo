@@ -1,28 +1,24 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ActionApprovalRule, ApprovalChoice } from "@rakazo/contracts";
-import { actionTypeForTool, toolRuleAllowsAllow } from "@rakazo/core";
+import {
+  actionTypeForTool,
+  CHOICE_TO_EFFECT,
+  EFFECT_TO_CHOICE,
+  toolRuleAllowsAllow,
+  toolStepLabel,
+} from "@rakazo/core";
 import { Button, NativeSelect, NativeSelectOption } from "@rakazo/ui-web";
 import { useEffect, useState } from "react";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 import { ApprovalActionsTable, useActionTypeLabels } from "./ApprovalActionsTable";
 
-const EFFECT_TO_CHOICE: Record<ActionApprovalRule["effect"], ApprovalChoice> = {
-  always_allow: "allow",
-  require_approval: "ask",
-  block: "block",
-};
-const CHOICE_TO_EFFECT: Record<ApprovalChoice, ActionApprovalRule["effect"]> = {
-  allow: "always_allow",
-  ask: "require_approval",
-  block: "block",
-};
-
 export function ApprovalRulesSettings() {
   const { t } = useLingui();
   const labels = useActionTypeLabels();
   const [rules, setRules] = useState<ActionApprovalRule[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     rpc.approvalRules
@@ -32,6 +28,8 @@ export function ApprovalRulesSettings() {
   }, [t]);
 
   async function changeRule(rule: ActionApprovalRule, choice: ApprovalChoice) {
+    if (saving) return;
+    setSaving(rule.id);
     setError(null);
     try {
       const saved = await rpc.approvalRules.set({
@@ -42,16 +40,22 @@ export function ApprovalRulesSettings() {
       setRules((current) => current.map((item) => (item.id === rule.id ? saved : item)));
     } catch (err) {
       setError(errorText(err, t`Could not save rule`));
+    } finally {
+      setSaving(null);
     }
   }
 
   async function removeRule(id: string) {
+    if (saving) return;
+    setSaving(id);
     setError(null);
     try {
       await rpc.approvalRules.remove({ id });
       setRules((current) => current.filter((rule) => rule.id !== id));
     } catch (err) {
       setError(errorText(err, t`Could not remove rule`));
+    } finally {
+      setSaving(null);
     }
   }
 
@@ -75,13 +79,18 @@ export function ApprovalRulesSettings() {
           {listedRules.map((rule) => {
             const type =
               rule.matchKind === "tool" ? actionTypeForTool({ toolName: rule.matchValue }) : null;
+            const name =
+              rule.matchKind === "tool" ? toolStepLabel(rule.matchValue) : rule.matchValue;
             return (
               <li
                 key={rule.id}
                 className="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2"
               >
-                <span className="min-w-0 break-words text-[13.5px] text-foreground/75">
-                  {rule.matchValue}
+                <span
+                  className="min-w-0 break-words text-[13.5px] text-foreground/75"
+                  title={rule.matchValue}
+                >
+                  {name}
                   {type ? (
                     <span className="block text-[12px] text-muted-foreground">{labels[type]}</span>
                   ) : null}
@@ -89,7 +98,8 @@ export function ApprovalRulesSettings() {
                 <span className="flex shrink-0 items-center gap-1">
                   <NativeSelect
                     size="sm"
-                    aria-label={rule.matchValue}
+                    aria-label={name}
+                    disabled={saving === rule.id}
                     value={EFFECT_TO_CHOICE[rule.effect]}
                     onChange={(event) =>
                       void changeRule(rule, event.target.value as ApprovalChoice)
@@ -108,6 +118,7 @@ export function ApprovalRulesSettings() {
                     variant="ghost"
                     size="sm"
                     className="text-muted-foreground"
+                    disabled={saving === rule.id}
                     onClick={() => void removeRule(rule.id)}
                   >
                     <Trans>Remove</Trans>

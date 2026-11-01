@@ -57,6 +57,9 @@ export function McpActionCard({
           <Trans>Always allow this</Trans>
         </Button>
       </div>
+      <p className="mt-2 text-end text-[13px] text-muted-foreground">
+        <Trans>Won't ask again anywhere in this space.</Trans>
+      </p>
     </div>
   );
 }
