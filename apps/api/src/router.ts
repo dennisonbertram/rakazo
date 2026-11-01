@@ -585,6 +585,14 @@ import {
   revertConnectedMcpApprovals,
 } from "./mcp-approval.js";
 import { buildMcpUpdateMaterial, mcpOrigin } from "./mcp-material.js";
+import {
+  activeCapture,
+  appendCaptureText,
+  discardCapture,
+  finishCapture,
+  setMeetingRecording,
+  startCapture,
+} from "./meeting-captures.js";
 import type { MeetingsDeps } from "./meetings.js";
 import {
   connectGranola,
@@ -1831,6 +1839,9 @@ export function createRouter(deps: RouterDeps): AppRouter {
             throw error;
           }
         }),
+      ),
+      setMeetingRecording: authed.spaces.setMeetingRecording.handler(({ context, input }) =>
+        setMeetingRecording(deps, context.actor, input.policy),
       ),
       // Acts on the Space being deleted, not the current one, so its emptiness check and
       // teardown see that Space's rows. Membership is checked first.
@@ -8469,6 +8480,23 @@ export function createRouter(deps: RouterDeps): AppRouter {
       ),
       disconnectLocal: authed.meetings.disconnectLocal.handler(({ context, input }) =>
         disconnectLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+    },
+    meetingCaptures: {
+      start: authed.meetingCaptures.start.handler(({ context, input }) =>
+        startCapture(deps, context.actor, input),
+      ),
+      appendText: authed.meetingCaptures.appendText.handler(({ context, input }) =>
+        appendCaptureText(deps, context.actor, input),
+      ),
+      finish: authed.meetingCaptures.finish.handler(({ context, input }) =>
+        finishCapture(deps, context.actor, input),
+      ),
+      discard: authed.meetingCaptures.discard.handler(({ context, input }) =>
+        discardCapture(deps, context.actor, input.captureId),
+      ),
+      active: authed.meetingCaptures.active.handler(({ context }) =>
+        activeCapture(deps, context.actor),
       ),
     },
     omi: {

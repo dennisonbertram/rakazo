@@ -378,6 +378,11 @@ export async function getStoredMeeting(
       doneAt: todo.doneAt?.toISOString() ?? null,
     })),
     transcript: row.transcript,
+    // Read from the capture's chunks, so meetings has no column for it.
+    partial:
+      (await deps.router.prisma.meetingCaptureChunk.count({
+        where: { ...owner(actor), status: "failed", capture: { meetingId: row.id } },
+      })) > 0,
   };
 }
 

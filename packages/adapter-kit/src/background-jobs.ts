@@ -95,6 +95,17 @@ const payloadSchemas = {
   "pages.refresh.tick": z.object({}),
   "pages.snapshots.retention": z.object({}),
   "finance.sync": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
+  "meetings.capture_transcribe": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    chunkId: z.string().min(1),
+  }),
+  "meetings.capture_finalize": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    captureId: z.string().min(1),
+  }),
+  "meetings.capture_sweep": z.object({}),
   "omi.assemble": z.object({
     spaceId: z.string().min(1),
     userId: z.string().min(1),
@@ -459,6 +470,30 @@ export function meetingsDigestJob(
     replaceKey: `meetings.digest:${payload.meetingId}`,
     maxAttempts: 3,
     ...(availableAt ? { availableAt } : {}),
+  };
+}
+
+/** One queued transcription per chunk. */
+export function meetingsCaptureTranscribeJob(
+  payload: BackgroundJobPayloads["meetings.capture_transcribe"],
+): BackgroundJob {
+  return {
+    name: "meetings.capture_transcribe",
+    payload,
+    replaceKey: `meetings.capture_transcribe:${payload.chunkId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** One queued finalize per capture. */
+export function meetingsCaptureFinalizeJob(
+  payload: BackgroundJobPayloads["meetings.capture_finalize"],
+): BackgroundJob {
+  return {
+    name: "meetings.capture_finalize",
+    payload,
+    replaceKey: `meetings.capture_finalize:${payload.captureId}`,
+    maxAttempts: 3,
   };
 }
 

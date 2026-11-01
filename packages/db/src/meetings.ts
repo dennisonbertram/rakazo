@@ -12,7 +12,9 @@ export type UpsertMeetingResult = "created" | "updated" | "stale" | "tombstoned"
 /** Only space and user: callers may pass a whole actor, which must not reach a query. */
 const ownerOf = ({ spaceId, userId }: Scope): Scope => ({ spaceId, userId });
 
-function sourceColumns(source: MeetingSourceRef) {
+/** `null` is a meeting Praci recorded itself: it has no source row. */
+function sourceColumns(source: MeetingSourceRef | null) {
+  if (!source) return { connectionId: null, mcpServerId: null };
   const connectionId = "connectionId" in source ? source.connectionId : null;
   const mcpServerId = "mcpServerId" in source ? source.mcpServerId : null;
   if ((connectionId === null) === (mcpServerId === null)) {
@@ -28,7 +30,7 @@ function sourceColumns(source: MeetingSourceRef) {
 export async function upsertMeeting(
   prisma: PrismaClient,
   scope: Scope,
-  source: MeetingSourceRef,
+  source: MeetingSourceRef | null,
   provider: string,
   meeting: SourceMeeting,
 ): Promise<UpsertMeetingResult> {

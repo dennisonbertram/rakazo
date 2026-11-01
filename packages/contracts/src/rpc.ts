@@ -348,7 +348,13 @@ import {
   UpdateMcpConnectionInput,
 } from "./mcp-connections.js";
 import {
+  MeetingCaptureActiveSchema,
+  MeetingCaptureAppendTextInputSchema,
+  MeetingCaptureFinishInputSchema,
+  MeetingCaptureStartInputSchema,
+  MeetingCaptureStartOutputSchema,
   MeetingConnectInputSchema,
+  MeetingRecordingPolicySchema,
   MeetingsStatusSchema,
   StoredMeetingDetailSchema,
   StoredMeetingsPageSchema,
@@ -577,6 +583,10 @@ export const appContract = {
     remove: oc
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
+    /** Owners and admins set whether meetings may be recorded in the current space. Applies to new captures. FORBIDDEN for members. */
+    setMeetingRecording: oc
+      .input(z.object({ policy: MeetingRecordingPolicySchema }))
+      .output(z.object({ policy: MeetingRecordingPolicySchema })),
   },
   bootstrap: oc.input(z.object({ botId: Id.optional() })).output(AppBootstrapSchema),
   appControl: {
@@ -1856,6 +1866,20 @@ export const appContract = {
     disconnectLocal: oc
       .input(LocalMeetingsDisconnectInputSchema)
       .output(z.object({ ok: z.literal(true) })),
+  },
+  meetingCaptures: {
+    /** Starts a recording. Idempotent by `clientId`. FORBIDDEN when the space's policy is off; BAD_REQUEST without `consentConfirmed: true` when it is confirm. Audio goes to POST /api/meeting-captures/:id/chunks. */
+    start: oc.input(MeetingCaptureStartInputSchema).output(MeetingCaptureStartOutputSchema),
+    /** Device engine only: one chunk of text. Idempotent by (captureId, track, seq). NOT_FOUND for anyone else's capture. */
+    appendText: oc
+      .input(MeetingCaptureAppendTextInputSchema)
+      .output(z.object({ ok: z.literal(true) })),
+    /** Stops recording and queues the stored meeting. Idempotent. */
+    finish: oc.input(MeetingCaptureFinishInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** Deletes the capture's chunks and audio; no meeting is stored. */
+    discard: oc.input(z.object({ captureId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** The caller's recording or waiting capture, for the recording indicator. */
+    active: oc.output(MeetingCaptureActiveSchema),
   },
   omi: {
     /** Creates or reuses the caller's one Omi connection for this space and its agent. */
