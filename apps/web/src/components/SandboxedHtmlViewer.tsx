@@ -190,8 +190,8 @@ export function SandboxedHtmlViewer({
   const [documents, setDocuments] = useState(0);
   // A new document needs its own ready ping before it gets any data.
   useEffect(() => setDocuments(0), [preview]);
+  // Registered whether or not the data has arrived: a ready ping can come before the data request resolves.
   useEffect(() => {
-    if (data === undefined) return;
     const onReady = (event: MessageEvent) => {
       const message = event.data as { type?: unknown } | null;
       if (event.source === frame.current?.contentWindow && message?.type === VIEWER_READY_MESSAGE)
@@ -199,7 +199,7 @@ export function SandboxedHtmlViewer({
     };
     window.addEventListener("message", onReady);
     return () => window.removeEventListener("message", onReady);
-  }, [data === undefined]);
+  }, []);
   useEffect(() => {
     if (data === undefined || documents === 0) return;
     // Plain JSON only, so nothing but data crosses into the frame.
