@@ -134,3 +134,34 @@ it("disables Allow for a tool rule that always needs approval", async () => {
   expect(ruleSelect?.querySelector<HTMLOptionElement>("option[value=allow]")?.disabled).toBe(true);
   expect(ruleSelect?.querySelector<HTMLOptionElement>("option[value=block]")?.disabled).toBe(false);
 });
+
+const toolRule = {
+  id: "r2",
+  effect: "require_approval",
+  matchKind: "tool",
+  matchValue: "mcp__brex__lock_card",
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+it("names a tool rule readably and keeps the raw id in the title", async () => {
+  api.table.mockResolvedValue({ rows: rows() });
+  api.list.mockResolvedValue([toolRule]);
+  await act(async () => root.render(<ApprovalRulesSettings />));
+  await act(async () => {});
+  const item = container.querySelector("li");
+  const name = item?.querySelector<HTMLElement>("[title]");
+  expect(name?.getAttribute("title")).toBe("mcp__brex__lock_card");
+  expect(name?.textContent).not.toContain("mcp__");
+  expect(item?.querySelector("select")?.getAttribute("aria-label")).not.toContain("mcp__");
+});
+
+it("disables the row's select while its save is pending", async () => {
+  api.table.mockResolvedValue({ rows: rows() });
+  api.list.mockResolvedValue([toolRule]);
+  api.set.mockReturnValue(new Promise(() => {}));
+  await act(async () => root.render(<ApprovalRulesSettings />));
+  await act(async () => {});
+  await change(container.querySelector<HTMLSelectElement>("li select"), "block");
+  expect(api.set).toHaveBeenCalledTimes(1);
+  expect(container.querySelector<HTMLSelectElement>("li select")?.disabled).toBe(true);
+});

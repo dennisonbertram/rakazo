@@ -344,7 +344,7 @@ export function AskCard({
                     )}
                   </Button>
                   <span className="text-[13px] text-muted-foreground">
-                    <Trans>Won't ask again for this kind of action.</Trans>
+                    <Trans>Won't ask again anywhere in this space.</Trans>
                   </span>
                 </div>
               ) : (

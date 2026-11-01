@@ -45,6 +45,7 @@ import {
 } from "@rakazo/adapter-kit";
 import type { ComputerCommand, MessageBlock, RunPhase, RunStatus } from "@rakazo/contracts";
 import {
+  approvalTitle,
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
   ATTACHMENT_MAX_BYTES,
@@ -4152,7 +4153,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           await notifyRun(deps, run, {
             kind: "help",
-            title: `${bot.name} needs approval`,
+            title: approvalTitle(bot.name),
             body: notifyBody,
             botId: bot.id,
             threadId: thread.id,

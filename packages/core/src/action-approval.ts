@@ -414,17 +414,12 @@ export function actionTypeForTool(input: {
   return "connected_apps_write";
 }
 
-/** Rows always offer Allow. */
-export function actionTypeAllowsAllow(_id: ApprovalActionType): boolean {
-  return true;
-}
-
 /** A per-tool rule can never be Allow for a tool that always needs an explicit approval. */
 export function toolRuleAllowsAllow(toolName: string): boolean {
   return !toolRequiresExplicitApproval(toolName);
 }
 
-const EFFECT_TO_CHOICE: Record<StoredActionApprovalRule["effect"], ApprovalChoice> = {
+export const EFFECT_TO_CHOICE: Record<StoredActionApprovalRule["effect"], ApprovalChoice> = {
   always_allow: "allow",
   require_approval: "ask",
   block: "block",

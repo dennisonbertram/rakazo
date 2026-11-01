@@ -14161,7 +14161,8 @@ msgid "With 1 investor"
 msgstr ""
 
 #: src/components/AskCard.tsx
-msgid "Won't ask again for this kind of action."
+#: src/pages/McpActionCard.tsx
+msgid "Won't ask again anywhere in this space."
 msgstr ""
 
 #: src/components/data-room/ImportFromEmail.tsx
