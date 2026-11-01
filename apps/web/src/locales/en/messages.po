@@ -8710,6 +8710,11 @@ msgstr "Not enough history"
 msgid "Not found"
 msgstr "Not found"
 
+#. placeholder {0}: round.name
+#: src/components/fundraising/SafeList.tsx
+msgid "Not in {0}"
+msgstr "Not in {0}"
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "not in runway"
 msgstr "not in runway"
