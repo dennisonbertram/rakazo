@@ -1,8 +1,9 @@
 import { t } from "@lingui/core/macro";
 import type { MeetingCaptureTrack } from "@rakazo/contracts";
+import { enqueueNotificationToast } from "@rakazo/ui-web";
 import { rpc, selectedSpaceId, withSpaceHeaders } from "../rpc";
 import type { BufferedChunk } from "./buffer";
-import { createChunkStore, flushChunks } from "./buffer";
+import { classifyUpload, createChunkStore, flushChunks } from "./buffer";
 import { callAudioMissing } from "./chunker";
 import { TrackRecorder } from "./recorder";
 
@@ -94,13 +95,56 @@ async function upload(chunk: BufferedChunk, spaceId: string | null) {
       body: chunk.blob,
     },
   );
-  if (!response.ok) throw new Error(`Upload failed (${response.status})`);
+  if (response.ok) return;
+  const body = (await response.json().catch(() => null)) as { error?: string } | null;
+  throw (
+    classifyUpload(response.status, body?.error) ?? new Error(`Upload failed (${response.status})`)
+  );
+}
+
+const STOPPED_KEY = "praci-capture-stopped";
+/** Remembers that Stop was pressed, so a reload finishes the capture instead of resuming the microphone. */
+function markStopped(captureId: string | null) {
+  try {
+    if (captureId) localStorage.setItem(STOPPED_KEY, captureId);
+    else localStorage.removeItem(STOPPED_KEY);
+  } catch {
+    // Without storage a reload resumes the microphone; the person can press Stop again.
+  }
+}
+function stoppedMarker(): string | null {
+  try {
+    return localStorage.getItem(STOPPED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** The server no longer takes this capture's audio: end it here too. */
+async function endLocal(s: Session) {
+  if (session !== s) return;
+  session = null;
+  for (const recorder of s.recorders.values()) recorder.abandon();
+  release(s);
+  markStopped(null);
+  await store.clear();
+  set({ phase: "idle" });
+  enqueueNotificationToast({
+    id: "capture-ended",
+    title: t`This recording was closed and could not be saved.`,
+  });
 }
 
 /** Sends every buffered chunk of the capture; true when none is left. One pass at a time. */
 function flush(s: Session): Promise<boolean> {
   flushing ??= flushChunks(store, s.captureId, (chunk) => upload(chunk, s.spaceId))
-    .then(({ failed }) => {
+    .then(async ({ failed, rejected }) => {
+      if (rejected.some((r) => r.endsCapture)) await endLocal(s);
+      else if (rejected.length > 0)
+        enqueueNotificationToast({
+          id: "capture-chunk-dropped",
+          title: t`Part of the recording could not be saved.`,
+        });
       if (view.phase === "recording" && view.offline !== failed) set({ ...view, offline: failed });
       if (failed && !s.closing && session === s) {
         s.retry = setTimeout(() => void flush(s), RETRY_MS);
@@ -248,6 +292,7 @@ async function waitForStored(s: Session) {
       // The list refreshes on its own; only the automatic open is lost.
     }
     session = null;
+    markStopped(null);
     await store.clear();
     storedCount += 1;
     set({ phase: "stored", meetingId });
@@ -262,11 +307,18 @@ export async function stopCapture(): Promise<void> {
   s.closing = true;
   const title = view.phase === "recording" ? view.title : null;
   set({ phase: "transcribing", captureId: s.captureId, title, startedAt: s.startedAt });
+  markStopped(s.captureId);
   await Promise.all([...s.recorders.values()].map((recorder) => recorder.stop()));
   release(s);
+  await finishCapture(s);
+}
+
+/** Uploads what is left, tells the server the recording is over, and waits for the meeting. */
+async function finishCapture(s: Session) {
   // Finishing before the last chunk arrived would leave it out of the meeting.
   while (!(await flush(s))) await sleep(RETRY_MS);
   for (;;) {
+    if (session !== s) return; // the server closed it meanwhile
     try {
       await rpc.meetingCaptures.finish(
         { captureId: s.captureId, endedAt: new Date().toISOString() },
@@ -307,6 +359,18 @@ export async function recoverCapture(): Promise<void> {
       startedAt: s.startedAt,
     });
     await waitForStored(s);
+    return;
+  }
+  if (stoppedMarker() === s.captureId) {
+    // Stop was pressed before the page closed: finish, do not record again.
+    s.closing = true;
+    set({
+      phase: "transcribing",
+      captureId: s.captureId,
+      title: active.title,
+      startedAt: s.startedAt,
+    });
+    await finishCapture(s);
     return;
   }
   set({

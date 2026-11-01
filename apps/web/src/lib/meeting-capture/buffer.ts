@@ -105,28 +105,55 @@ export function createChunkStore(
   };
 }
 
+/** The server answered a chunk with a status that retrying cannot change. */
+export class UploadRejected extends Error {
+  constructor(
+    readonly status: number,
+    /** The capture itself is gone or closed, so nothing more can be uploaded for it. */
+    readonly endsCapture: boolean,
+  ) {
+    super(`Upload rejected (${status})`);
+  }
+}
+
+/** Decides what a failed chunk upload means. Null: retry later (offline, 5xx, 401). */
+export function classifyUpload(status: number, serverMessage = ""): UploadRejected | null {
+  if (status === 404) return new UploadRejected(status, true);
+  if (status === 409)
+    return new UploadRejected(status, !serverMessage.startsWith("Chunk already stored"));
+  if (status === 400 || status === 413) return new UploadRejected(status, false);
+  return null;
+}
+
 /**
  * Uploads stored chunks of one capture in time order. A chunk is deleted only after its upload
- * resolved (the caller resolves on a 2xx); the first failure stops the pass and leaves that chunk
- * and every later one in the store. Returns how many were uploaded and whether the pass failed.
+ * resolved (the caller resolves on a 2xx), or when the server refused it for good (`UploadRejected`),
+ * which is reported in `rejected`. Any other failure stops the pass and leaves that chunk and every
+ * later one in the store. A refusal that ends the capture stops the pass too.
  */
 export async function flushChunks(
   store: ChunkStore,
   captureId: string,
   upload: (chunk: BufferedChunk) => Promise<void>,
-): Promise<{ uploaded: number; failed: boolean }> {
+): Promise<{ uploaded: number; failed: boolean; rejected: UploadRejected[] }> {
   const chunks = (await store.all())
     .filter((chunk) => chunk.captureId === captureId)
     .sort((a, b) => a.startMs - b.startMs || a.seq - b.seq);
   let uploaded = 0;
+  const rejected: UploadRejected[] = [];
   for (const chunk of chunks) {
     try {
       await upload(chunk);
-    } catch {
-      return { uploaded, failed: true };
+      uploaded += 1;
+    } catch (error) {
+      if (!(error instanceof UploadRejected)) return { uploaded, failed: true, rejected };
+      rejected.push(error);
+      if (error.endsCapture) {
+        await store.remove(chunk.key);
+        return { uploaded, failed: false, rejected };
+      }
     }
     await store.remove(chunk.key);
-    uploaded += 1;
   }
-  return { uploaded, failed: false };
+  return { uploaded, failed: false, rejected };
 }
