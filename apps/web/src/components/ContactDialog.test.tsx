@@ -119,3 +119,51 @@ it("Cancel on the question deletes nothing", async () => {
   expect(onDeleted).not.toHaveBeenCalled();
   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 });
+
+const dana: Contact = { ...ada, id: "c2", name: "Dana Example", email: "dana@example.test" };
+
+function typeEmail(value: string) {
+  const input = document.getElementById("contact-email") as HTMLInputElement;
+  return act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    set?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+it("shows the duplicate email while typing and blocks Save", async () => {
+  const onOpenContact = vi.fn();
+  act(() =>
+    root.render(
+      <ContactDialog
+        contact={null}
+        contacts={[ada, dana]}
+        onClose={() => {}}
+        onSaved={() => {}}
+        onOpenContact={onOpenContact}
+      />,
+    ),
+  );
+  await typeEmail("Dana@Example.test");
+  const email = document.getElementById("contact-email");
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+    "Another contact already has this email.",
+  );
+  expect(email?.getAttribute("aria-invalid")).toBe("true");
+  expect(document.getElementById(email?.getAttribute("aria-describedby") ?? "")).not.toBeNull();
+  await click(button("Open Dana Example"));
+  expect(onOpenContact).toHaveBeenCalledWith(dana);
+  expect(button("Save")?.hasAttribute("disabled")).toBe(true);
+  expect(rpcMock.save).not.toHaveBeenCalled();
+});
+
+it("shows no duplicate error when editing the contact that owns the email", async () => {
+  act(() =>
+    root.render(
+      <ContactDialog contact={dana} contacts={[ada, dana]} onClose={() => {}} onSaved={() => {}} />,
+    ),
+  );
+  await typeEmail("DANA@example.test");
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+  expect(button("Save")?.hasAttribute("disabled")).toBe(false);
+});
