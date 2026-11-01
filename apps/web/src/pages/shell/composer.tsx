@@ -1249,7 +1249,5 @@ function slashActionLabel(id: SlashActionId) {
       return t`Chat settings`;
     case "settings-general":
       return t`Open Settings`;
-    case "settings-usage":
-      return t`See usage`;
   }
 }
