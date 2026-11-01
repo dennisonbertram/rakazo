@@ -6835,6 +6835,10 @@ msgstr "Investor email"
 msgid "Investors"
 msgstr "Investors"
 
+#: src/pages/Investors.tsx
+msgid "Investors will no longer see it on the portal."
+msgstr "Investors will no longer see it on the portal."
+
 #: src/pages/Contacts.tsx
 msgid "Investors, advisors and customers you add or your bots find appear here."
 msgstr "Investors, advisors and customers you add or your bots find appear here."
