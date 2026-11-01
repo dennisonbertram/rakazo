@@ -10,6 +10,7 @@ import {
 } from "@rakazo/contracts";
 import {
   gtmPageContentError,
+  historyChartRows,
   htmlPageDeclaration,
   isLiveSegment,
   splitPage,
@@ -70,7 +71,12 @@ async function newDocument(): Promise<Document> {
 
 /** The one place chart rows and spec become an SVG. A sourced chart passes its resolved rows. */
 function renderChart(chart: PageChart, document: Document, rows?: unknown[]): string {
-  return renderPlotSpecToSvg(chart.spec as PlotSpec, rows ?? chart.data, document);
+  const plotted = rows ?? chart.data;
+  return renderPlotSpecToSvg(
+    chart.spec as PlotSpec,
+    chart.over === "history" ? historyChartRows(plotted) : plotted,
+    document,
+  );
 }
 
 /** Render one chart for display. A chart that fails to render yields a small error SVG. */
