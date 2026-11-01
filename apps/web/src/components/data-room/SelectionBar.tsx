@@ -53,18 +53,25 @@ export function SelectionBar({
     >
       <span className="me-auto min-w-0 truncate font-medium">
         {more ? (
-          <Trans>
-            {count} of {total} selected
-          </Trans>
+          <>
+            <span className="max-sm:hidden">
+              <Trans>
+                {count} of {total} selected
+              </Trans>
+            </span>
+            <span className="sm:hidden">
+              {count}/{total}
+            </span>
+          </>
         ) : (
           <Trans>{count} selected</Trans>
         )}
-        {more ? (
-          <Button variant="link" size="xs" className="ms-2 h-auto p-0" onClick={onSelectAll}>
-            <Trans>Select all {total}</Trans>
-          </Button>
-        ) : null}
       </span>
+      {more ? (
+        <Button variant="link" size="xs" className="h-auto shrink-0 p-0" onClick={onSelectAll}>
+          <Trans>Select all {total}</Trans>
+        </Button>
+      ) : null}
       {onMove ? (
         <Button
           variant="outline"
