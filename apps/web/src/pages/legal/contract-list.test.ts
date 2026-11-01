@@ -1,6 +1,6 @@
 import type { LegalContract } from "@rakazo/contracts";
 import { expect, it } from "vitest";
-import { contractRows, filterContracts } from "./contract-list";
+import { contractRows, contractStatus, filterContracts } from "./contract-list";
 import { contracts as fixtures } from "./fixtures";
 
 const make = (n: number, over: Partial<LegalContract> = {}): LegalContract => ({
@@ -26,7 +26,7 @@ it("searches title and parties, filters type, party and status", () => {
   expect(filterContracts(fixtures, { party: "Acme Hosting Inc." }, today)).toEqual([msa]);
   expect(filterContracts(fixtures, { status: "expired" }, today)).toEqual([lease]);
   expect(filterContracts(fixtures, { status: "expiring" }, "2026-06-01")).toEqual([]);
-  expect(filterContracts([msa], { status: "expiring" }, today)).toHaveLength(1);
+  expect(filterContracts([msa], { status: "expiring" }, today)).toHaveLength(0);
 });
 
 const warrants = [
@@ -63,4 +63,32 @@ it("filters members: a partly matching group stays, a fully filtered one goes", 
 it("lists every contract on its own when grouping is off, value sorting with empties last", () => {
   const rows = contractRows(warrants, {}, { field: "value", dir: "desc" }, false, today);
   expect(titles(rows)).toEqual(["Warrant (Holder 2)", "Warrant (Holder 1)", "Warrant (Holder 3)"]);
+});
+
+const ids = (list: LegalContract[], status: string) =>
+  filterContracts(list, { status }, today).length;
+const active = (over: Partial<LegalContract>) =>
+  make(1, { status: "active", autoRenews: false, ...over });
+
+it("derives the status from the dates", () => {
+  const soon = active({ expirationDate: "2026-11-25" });
+  const lapsed = active({ expirationDate: "2026-10-25" });
+  expect([ids([soon], "expiring"), ids([soon], "active")]).toEqual([1, 1]);
+  expect([ids([lapsed], "expired"), ids([lapsed], "active"), ids([lapsed], "expiring")]).toEqual([
+    1, 0, 0,
+  ]);
+  expect(contractStatus(lapsed, today)).toBe("expired");
+  const renewed = active({ autoRenews: true, expirationDate: "2026-10-25" });
+  expect([ids([renewed], "active"), ids([renewed], "expired")]).toEqual([1, 0]);
+  const unknown = active({ autoRenews: null, expirationDate: "2026-10-25" });
+  expect(ids([unknown], "expired")).toBe(1);
+  const open = active({ expirationDate: null });
+  expect([ids([open], "active"), ids([open], "expired"), ids([open], "expiring")]).toEqual([
+    1, 0, 0,
+  ]);
+  const ends = active({ expirationDate: today });
+  expect([ids([ends], "expiring"), ids([ends], "expired")]).toEqual([1, 0]);
+  expect(contractStatus(active({ status: "draft", expirationDate: "2020-01-01" }), today)).toBe(
+    "draft",
+  );
 });

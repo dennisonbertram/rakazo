@@ -28,7 +28,9 @@ import {
   CONTRACT_SORTS,
   CONTRACT_STATUSES,
   contractRows,
+  contractStatus,
   DEFAULT_CONTRACT_SORT,
+  OPTIONAL_STATUSES,
 } from "./contract-list";
 
 const statusName = (status: LegalContractStatus): string =>
@@ -187,11 +189,22 @@ export function LegalContracts({
   const rows = contractRows(contracts, filters, list.sort, grouped, todayIso());
   const unique = (values: string[]): [string, string][] =>
     [...new Set(values)].sort((a, b) => a.localeCompare(b)).map((v) => [v, v]);
-  const statusNames: Record<(typeof CONTRACT_STATUSES)[number], string> = {
-    active: t`Active`,
+  const statusNames: Record<string, string> = {
+    ...Object.fromEntries(
+      (["active", "expired", "terminated", "draft", "unknown"] as const).map((s) => [
+        s,
+        statusName(s),
+      ]),
+    ),
     expiring: t`Expiring soon`,
-    expired: t`Expired`,
   };
+  // Terminated, Draft and Unknown are offered only when some contract has them or one is selected.
+  const statusOptions = [
+    ...CONTRACT_STATUSES,
+    ...OPTIONAL_STATUSES.filter(
+      (s) => s === filters.status || contracts.some((c) => c.status === s),
+    ),
+  ];
   const sortNames: Record<ContractSort, string> = {
     name: t`Contract`,
     term: t`Term`,
@@ -227,7 +240,7 @@ export function LegalContracts({
       <PickFilter
         label={t`Status`}
         value={filters.status}
-        options={CONTRACT_STATUSES.map((status) => [status, statusNames[status]])}
+        options={statusOptions.map((status) => [status, statusNames[status] ?? status])}
         onChange={(value) => list.setParam("status", value)}
       />
       <span className="ms-auto flex items-center gap-1">
@@ -272,7 +285,7 @@ export function LegalContracts({
       >
         <div className="flex items-center justify-between gap-3">
           <Title contract={contract} wrap />
-          <Status status={contract.status} />
+          <Status status={contractStatus(contract, todayIso())} />
         </div>
         {/* Only what the agent found: no labels, since the values say what they are. */}
         {names ? <p className="truncate text-xs text-muted-foreground">{names}</p> : null}
@@ -299,7 +312,7 @@ export function LegalContracts({
       <TableCell title={`${contract.title} (${contract.contractType})`}>
         <div className={cn("flex max-w-72 items-center gap-2", nested && "ps-4")}>
           <Title contract={contract} />
-          <Status status={contract.status} />
+          <Status status={contractStatus(contract, todayIso())} />
         </div>
       </TableCell>
       <TableCell>
