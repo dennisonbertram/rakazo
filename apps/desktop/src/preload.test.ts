@@ -36,6 +36,7 @@ describe("desktop preload bridge", () => {
       "localSettings",
       "oauth",
       "platform",
+      "speech",
       "update",
       "window",
     ]);
@@ -48,6 +49,13 @@ describe("desktop preload bridge", () => {
     ]);
     expect(Object.keys(bridge.update).sort()).toEqual(["check", "download", "install", "state"]);
     expect(Object.keys(bridge.hex ?? {}).sort()).toEqual(["available", "list", "show"]);
+    expect(Object.keys(bridge.speech ?? {}).sort()).toEqual([
+      "forget",
+      "onStatus",
+      "prepare",
+      "status",
+      "transcribe",
+    ]);
 
     await bridge.oauth.open?.("https://provider.example.com/authorize");
     await bridge.oauth.cancel?.("https://provider.example.com/authorize");
@@ -63,6 +71,10 @@ describe("desktop preload bridge", () => {
     await bridge.hex?.available();
     await bridge.hex?.list(1);
     await bridge.hex?.show("1-2");
+    await bridge.speech?.status();
+    await bridge.speech?.prepare();
+    await bridge.speech?.forget();
+    await bridge.speech?.transcribe(new Uint8Array(44));
     expect(invoke.mock.calls.map(([channel]) => channel)).toEqual([
       "desktop.oauth.open",
       "desktop.oauth.cancel",
@@ -78,7 +90,28 @@ describe("desktop preload bridge", () => {
       "desktop.hex.available",
       "desktop.hex.list",
       "desktop.hex.show",
+      "desktop.speech.status",
+      "desktop.speech.prepare",
+      "desktop.speech.forget",
+      "desktop.speech.transcribe",
     ]);
+  });
+
+  it("forwards speech status pushes without the IPC event and can unsubscribe", () => {
+    const listeners: Array<(event: unknown, status: unknown) => void> = [];
+    const on = vi.fn((_channel: string, handler: (event: unknown, status: unknown) => void) => {
+      listeners.push(handler);
+    });
+    const off = vi.fn();
+    const { exposeInMainWorld } = runPreload("preload.cjs", { on, off });
+    const [, bridge] = exposeInMainWorld.mock.calls[0] as [string, RakazoDesktop];
+    const received: unknown[] = [];
+    const unsubscribe = bridge.speech?.onStatus((status) => received.push(status));
+    expect(on.mock.calls[0]?.[0]).toBe("desktop.speech.status");
+    listeners[0]?.({ sender: "secret" }, { state: "ready" });
+    expect(received).toEqual([{ state: "ready" }]);
+    unsubscribe?.();
+    expect(off).toHaveBeenCalledWith("desktop.speech.status", listeners[0]);
   });
 
   it("keeps setup off the app bridge so a connected server cannot re-point the app", () => {
@@ -89,6 +122,7 @@ describe("desktop preload bridge", () => {
       "localSettings",
       "oauth",
       "platform",
+      "speech",
       "update",
       "window",
     ]);
