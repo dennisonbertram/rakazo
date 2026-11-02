@@ -90,6 +90,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@kitlangton/hex':
+        specifier: 0.3.1
+        version: 0.3.1
       '@rakazo/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -2922,6 +2925,15 @@ packages:
 
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
+
+  '@kitlangton/hex@0.3.1':
+    resolution: {integrity: sha512-jsj72A9Ipefn3MZZK1TuYpzUNB1kd7W9jBDKpk3qrTKmY1mR8kRvFfCll7MXFuExrLJ9rkNXzlrkrK4D+qAMxw==}
+    engines: {node: '>=20.3.0'}
+    peerDependencies:
+      effect: '>=4.0.0-rc.112 <5.0.0'
+    peerDependenciesMeta:
+      effect:
+        optional: true
 
   '@koromix/koffi-android-arm64@3.2.1':
     resolution: {integrity: sha512-1pJQ4jnZlUJduK9u9DC5CGy3aOgDUPvIXpNb6syV3+Dh5Q/ugezAIGCqvY+w+1mgXsve0pd0NVvJRjdZNHQ6MA==}
@@ -13404,6 +13416,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@js-sdsl/ordered-map@4.4.2': {}
+
+  '@kitlangton/hex@0.3.1': {}
 
   '@koromix/koffi-android-arm64@3.2.1':
     optional: true

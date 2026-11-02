@@ -42,6 +42,28 @@ export interface RakazoDesktopHex {
   show: (id: string) => Promise<HexResult<HexMeetingShow>>;
 }
 
+/** On-device speech to text through the installed Hex (Apple silicon). Only text leaves main. */
+export type DesktopSpeechStatus =
+  | { state: "unavailable" }
+  | { state: "not-prepared" }
+  /** `progress` is 0..1 while the model downloads, null while it verifies or loads. */
+  | { state: "preparing"; progress: number | null }
+  | { state: "ready" }
+  | { state: "error" };
+
+export type DesktopSpeechResult = { ok: true; text: string } | { ok: false; retry: boolean };
+
+export interface RakazoDesktopSpeech {
+  status: () => Promise<DesktopSpeechStatus>;
+  /** Downloads and loads the model once; the user's choice is remembered after it succeeds. */
+  prepare: () => Promise<DesktopSpeechStatus>;
+  /** Stops using on-device speech and closes the helper. Model files are kept. */
+  forget: () => Promise<DesktopSpeechStatus>;
+  /** PCM WAV bytes; never downloads a model. */
+  transcribe: (wav: Uint8Array) => Promise<DesktopSpeechResult>;
+  onStatus: (listener: (status: DesktopSpeechStatus) => void) => () => void;
+}
+
 export interface RakazoDesktopOAuthCallback {
   code: string;
   state?: string;
@@ -64,6 +86,8 @@ export interface RakazoDesktop {
   update: RakazoDesktopUpdate;
   /** Optional: older desktops and non-macOS builds do not have it. */
   hex?: RakazoDesktopHex;
+  /** Optional: older desktops and builds without on-device speech do not have it. */
+  speech?: RakazoDesktopSpeech;
   oauth: {
     /**
      * Open system-browser auth. A redirect_uri must be HTTP loopback with state;

@@ -1,15 +1,31 @@
 import type { MeetingRecordingPolicy } from "@rakazo/contracts";
 import { useEffect, useState } from "react";
 import { desktopBridge } from "../desktop";
+import { useDeviceSpeech } from "../device-speech";
 import { rpc } from "../rpc";
 
 export type RecordAvailability =
   | { loaded: false }
-  | { loaded: true; policy: MeetingRecordingPolicy; engine: boolean };
+  | { loaded: true; policy: MeetingRecordingPolicy; engine: boolean; device: boolean };
+
+/** The server transcribes only for a provider this person agreed to send audio to, here. */
+export function serverTranscribes(voice: {
+  transcribe?: boolean;
+  transcriptionReady?: boolean;
+  transcriptionConsented?: boolean;
+}): boolean {
+  return (
+    Boolean(voice.transcribe || voice.transcriptionReady) && voice.transcriptionConsented !== false
+  );
+}
 
 /** Whether this person may start a recording here: the space policy and a speech-to-text engine. */
 export function useRecordAvailability(): RecordAvailability {
-  const [state, setState] = useState<RecordAvailability>({ loaded: false });
+  const deviceReady = useDeviceSpeech()?.state === "ready";
+  const [state, setState] = useState<{
+    policy: MeetingRecordingPolicy;
+    server: boolean;
+  } | null>(null);
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -17,20 +33,24 @@ export function useRecordAvailability(): RecordAvailability {
       if (!live) return;
       const space = spaces.spaces.find((item) => item.id === spaces.current.id);
       setState({
-        loaded: true,
         // A server that does not report a policy is an older one: reminding is its behavior.
         policy: space?.meetingRecording ?? "remind",
         // The server transcribes only for a provider this person agreed to send audio to, here.
-        engine:
-          Boolean(voice.transcribe || voice.transcriptionReady) &&
-          voice.transcriptionConsented !== false,
+        server: serverTranscribes(voice),
       });
     })().catch(() => undefined); // Without an answer Record stays hidden; the page does not need it.
     return () => {
       live = false;
     };
   }, []);
-  return state;
+  if (!state) return { loaded: false };
+  // On-device speech sends no audio anywhere, so the transcription consent does not gate it.
+  return {
+    loaded: true,
+    policy: state.policy,
+    engine: state.server || deviceReady,
+    device: deviceReady,
+  };
 }
 
 /** Tab audio needs getDisplayMedia with audio, which only Chrome and Edge on a computer offer. */

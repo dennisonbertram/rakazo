@@ -233,3 +233,95 @@ it("saves an OpenAI-compatible server's base URL and model, and never shows the 
     vi.unstubAllGlobals();
   }
 });
+
+async function renderWithSpeech(speech?: unknown) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  voice.catalog.mockResolvedValue([
+    { id: "fish-audio", name: "Fish Audio", description: "", transcribe: true },
+  ]);
+  voice.credentials.mockResolvedValue([]);
+  voice.status.mockResolvedValue({ configured: false, ready: false, transcribe: false });
+  vi.stubGlobal(
+    "window",
+    Object.assign(window, { rakazoDesktop: speech ? { speech } : undefined }),
+  );
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(<VoiceSettingsOverlay embedded onClose={() => undefined} />);
+  });
+  await act(async () => {
+    await Promise.resolve();
+  });
+  const row = () =>
+    [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("On this device"),
+    );
+  const pane = () => container.querySelector("[data-testid=device-speech]");
+  return { container, row, pane };
+}
+const bridge = (state: object, extra: object = {}) => ({
+  status: async () => state,
+  onStatus: () => () => undefined,
+  prepare: vi.fn(),
+  forget: vi.fn(),
+  ...extra,
+});
+
+it("hides the On this device row without a bridge or when unavailable", async () => {
+  expect((await renderWithSpeech()).row()).toBeUndefined();
+  expect((await renderWithSpeech(bridge({ state: "unavailable" }))).row()).toBeUndefined();
+});
+
+it("selects the device by default when ready, with a Ready label on the row", async () => {
+  const { row, pane } = await renderWithSpeech(bridge({ state: "ready" }));
+  expect(row()?.textContent).toContain("Ready");
+  expect(pane()?.textContent).toContain("Ready. Audio stays on this Mac.");
+  expect(pane()?.textContent).toContain("Stop using");
+});
+
+it("shows each state's pane after selecting the row", async () => {
+  const cases: Array<[object, string]> = [
+    [{ state: "not-prepared" }, "Prepare"],
+    [{ state: "preparing", progress: 0.42 }, "Preparing… 42%"],
+    [{ state: "error" }, "Try again"],
+  ];
+  for (const [state, text] of cases) {
+    const { row, pane } = await renderWithSpeech(bridge(state));
+    expect(pane()).toBeNull();
+    await act(async () => row()?.click());
+    expect(pane()?.textContent).toContain(text);
+  }
+  const { row, pane } = await renderWithSpeech(bridge({ state: "preparing", progress: null }));
+  await act(async () => row()?.click());
+  expect(pane()?.textContent).not.toContain("%");
+});
+
+it("applies the status returned by prepare when nothing is pushed", async () => {
+  const { row, pane } = await renderWithSpeech(
+    bridge({ state: "not-prepared" }, { prepare: async () => ({ state: "ready" }) }),
+  );
+  await act(async () => row()?.click());
+  await act(async () => {
+    [...(pane()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent === "Prepare")
+      ?.click();
+  });
+  expect(pane()?.textContent).toContain("Ready. Audio stays on this Mac.");
+});
+
+it("cancels a running prepare with forget", async () => {
+  const forget = vi.fn(async () => ({ state: "not-prepared" }));
+  const { row, pane } = await renderWithSpeech(
+    bridge({ state: "preparing", progress: 0.42 }, { forget }),
+  );
+  await act(async () => row()?.click());
+  await act(async () => {
+    [...(pane()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent === "Cancel")
+      ?.click();
+  });
+  expect(forget).toHaveBeenCalledOnce();
+  expect(pane()?.textContent).toContain("Prepare");
+});

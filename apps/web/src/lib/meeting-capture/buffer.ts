@@ -24,6 +24,8 @@ export type CaptureRecord = {
   /** Epoch ms of the capture's start. */
   startedAt: number;
   stopped: boolean;
+  /** Where speech becomes text; a record from before on-device speech has none and means "server". */
+  engine?: "device" | "server";
   /** Pieces the server refused for good; sent with finish so the meeting shows as partial. */
   lostChunks: number;
 };

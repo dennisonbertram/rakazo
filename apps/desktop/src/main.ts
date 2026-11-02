@@ -24,8 +24,9 @@ import { buildApplicationMenuTemplate } from "./application-menu.js";
 import type { ElectronAutoUpdater } from "./auto-update.js";
 import { DesktopUpdateController, LAUNCH_CHECK_DELAY_MS } from "./auto-update.js";
 import { openBrowserAuth } from "./browser-auth.js";
+import { createDeviceSpeech } from "./device-speech.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
-import { createHexRunner } from "./hex-bridge.js";
+import { createHexRunner, findHex } from "./hex-bridge.js";
 import { requestLocalSettings } from "./local-settings.js";
 import {
   LocalStackController,
@@ -1108,6 +1109,34 @@ app.whenReady().then(async () => {
       ? hex.show(id)
       : { state: "not_found" },
   );
+  // On-device speech needs Hex's helper, so it is macOS on Apple silicon only.
+  const speech = createDeviceSpeech({
+    userDataDir: app.getPath("userData"),
+    supported: process.platform === "darwin" && process.arch === "arm64",
+    command: () => {
+      const hexPath = findHex();
+      return hexPath === undefined ? undefined : [hexPath, "service", "--embedded"];
+    },
+    onStatus: (status) => {
+      if (mainWindow !== null && !mainWindow.isDestroyed())
+        mainWindow.webContents.send("desktop.speech.status", status);
+    },
+  });
+  const unavailable = { state: "unavailable" } as const;
+  ipcMain.handle("desktop.speech.status", (event) =>
+    fromMainWindow(event) ? speech.status() : unavailable,
+  );
+  ipcMain.handle("desktop.speech.prepare", (event) =>
+    fromMainWindow(event) ? speech.prepare() : unavailable,
+  );
+  ipcMain.handle("desktop.speech.forget", (event) =>
+    fromMainWindow(event) ? speech.forget() : unavailable,
+  );
+  ipcMain.handle("desktop.speech.transcribe", (event, wav: unknown) =>
+    fromMainWindow(event) ? speech.transcribe(wav) : { ok: false, retry: false },
+  );
+  // will-quit, not before-quit: a capture can still cancel the quit while it is being confirmed.
+  app.on("will-quit", () => void speech.close());
   ipcMain.handle("desktop.update.state", () => desktopUpdater.state());
   ipcMain.handle("desktop.update.check", (event) =>
     fromMainWindow(event) ? desktopUpdater.check(true) : desktopUpdater.state(),

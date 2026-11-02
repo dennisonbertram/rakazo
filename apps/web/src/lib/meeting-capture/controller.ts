@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { ORPCError } from "@orpc/client";
 import type { MeetingCaptureTrack } from "@rakazo/contracts";
 import { desktopBridge } from "../desktop";
+import { transcribeOnDevice } from "../device-speech";
 import { rpc, withSpaceHeaders } from "../rpc";
 import type { BufferedChunk, CaptureOwner, CaptureRecord } from "./buffer";
 import {
@@ -11,6 +12,7 @@ import {
   dropUser,
   flushChunks,
   pendingChunks,
+  UploadRejected,
 } from "./buffer";
 import { callAudioMissing } from "./chunker";
 import { TrackRecorder } from "./recorder";
@@ -192,6 +194,28 @@ async function close(s: Session, next: CaptureView, drop: boolean) {
   if (gen === generation) set(next);
 }
 
+/** On-device capture: the chunk becomes text on this computer and only the text is sent. */
+async function uploadText(chunk: BufferedChunk) {
+  const result = await transcribeOnDevice(chunk.blob);
+  if (!result.ok)
+    throw result.retry ? new Error("Transcription failed") : new UploadRejected(422, false);
+  try {
+    await rpc.meetingCaptures.appendText(
+      {
+        captureId: chunk.captureId,
+        track: chunk.track,
+        seq: chunk.seq,
+        startMs: chunk.startMs,
+        endMs: chunk.endMs,
+        text: result.text,
+      },
+      { context: { spaceId: chunk.spaceId } },
+    );
+  } catch (error) {
+    throw (error instanceof ORPCError && classifyUpload(error.status, error.message)) || error;
+  }
+}
+
 async function upload(chunk: BufferedChunk) {
   const query = new URLSearchParams({
     track: chunk.track,
@@ -224,7 +248,11 @@ function flush(s: Session): Promise<{ failed: boolean }> {
 
 async function pass(s: Session): Promise<{ failed: boolean }> {
   if (!live(s) || s.observer) return { failed: false };
-  const { failed, rejected } = await flushChunks(chunkStore, s.owner, upload);
+  const { failed, rejected } = await flushChunks(
+    chunkStore,
+    s.owner,
+    s.record.engine === "device" ? uploadText : upload,
+  );
   if (!live(s)) return { failed: false };
   if (rejected.some((r) => r.endsCapture)) {
     await close(s, { phase: "failed", message: closedMessage() }, true);
@@ -406,10 +434,20 @@ export async function startCapture(options: StartOptions): Promise<void> {
       check();
     }
     const title = options.title?.trim() || undefined;
+    // Decided once: a capture never switches engine, and a device capture has no server fallback.
+    const engine =
+      (
+        await desktopBridge()
+          ?.speech?.status()
+          .catch(() => null)
+      )?.state === "ready"
+        ? "device"
+        : "server";
+    check();
     const { captureId } = await rpc.meetingCaptures.start(
       {
         clientId: crypto.randomUUID(),
-        engine: "server",
+        engine,
         tracks: [...streams.keys()],
         ...(title ? { title } : {}),
         ...(options.consentConfirmed ? { consentConfirmed: true } : {}),
@@ -429,6 +467,7 @@ export async function startCapture(options: StartOptions): Promise<void> {
       startedAt: Date.now(),
       stopped: false,
       lostChunks: 0,
+      engine,
     };
     await chunkStore.putRecord(captureRecord);
     check();
