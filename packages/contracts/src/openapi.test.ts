@@ -5,6 +5,12 @@ import { describe, expect, it } from "vitest";
 import * as z from "zod";
 import { createOpenAPIDocument, renderOpenAPIDocument } from "./openapi.js";
 import { startLocalHealthServer } from "./openapi-test-server.js";
+import {
+  MeetingCaptureActiveSchema,
+  MeetingCaptureStartOutputSchema,
+  StoredMeetingDetailSchema,
+  StoredMeetingsPageSchema,
+} from "./meetings.js";
 import { appContract } from "./rpc.js";
 
 type Operation = {
@@ -266,5 +272,31 @@ describe("OpenAPI export", () => {
     } finally {
       await server.close();
     }
+  });
+});
+
+describe("iOS meeting fixtures", () => {
+  const fixture = (name: string) =>
+    (
+      JSON.parse(
+        readFileSync(
+          fileURLToPath(
+            new URL(
+              `../../../apps/ios/Packages/RakazoAPI/Tests/RakazoAPITests/Fixtures/${name}.json`,
+              import.meta.url,
+            ),
+          ),
+          "utf8",
+        ),
+      ) as { json: unknown }
+    ).json;
+
+  it("match the contract schemas", () => {
+    expect(() => StoredMeetingsPageSchema.parse(fixture("meetings-list"))).not.toThrow();
+    expect(() => StoredMeetingDetailSchema.parse(fixture("meetings-get"))).not.toThrow();
+    expect(() => StoredMeetingDetailSchema.parse(fixture("meetings-get-partial"))).not.toThrow();
+    expect(() => MeetingCaptureStartOutputSchema.parse(fixture("capture-start"))).not.toThrow();
+    expect(() => MeetingCaptureActiveSchema.parse(fixture("capture-active"))).not.toThrow();
+    expect(MeetingCaptureActiveSchema.parse(fixture("capture-active-null"))).toBeNull();
   });
 });

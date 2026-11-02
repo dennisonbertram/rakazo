@@ -215,6 +215,12 @@ struct HomeScreen: View {
         }
         .accessibilityIdentifier("pageDataRoom")
       }
+      if !hidden.contains("meetings") {
+        NavigationLink(value: Route.meetings) {
+          PageRowView(title: "Meetings", systemImage: "waveform")
+        }
+        .accessibilityIdentifier("pageMeetings")
+      }
       if let first = boot.bots.first {
         NavigationLink(value: Route.computer(botID: first.id)) {
           PageRowView(title: "Team computer", systemImage: "desktopcomputer")
