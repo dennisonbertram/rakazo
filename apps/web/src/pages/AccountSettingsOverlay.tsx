@@ -29,6 +29,7 @@ import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint
 import { DataExportSection } from "../components/DataExport";
 import { DesktopUpdateSection } from "../components/DesktopUpdates";
 import { HiddenBotsList } from "../components/HiddenBotsList";
+import { MeetingRecordingSettings } from "../components/MeetingRecordingSettings";
 import { NotificationSettingsSection } from "../components/NotificationSettings";
 import { PasskeySettings } from "../components/PasskeySettings";
 import { DefaultRunsOnSection } from "../components/RunsOnPicker";
@@ -371,6 +372,7 @@ export function PrivacySettingsPanels() {
       <section className="rounded-xl border border-border px-4 py-4">
         <ApprovalRulesSettings />
       </section>
+      <MeetingRecordingSettings />
       <AiDataSharingSection />
     </div>
   );

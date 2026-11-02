@@ -100,3 +100,21 @@ export const LoadFailed: Story = {
       "voice.catalog": () => Promise.reject(new Error("Could not load voice settings")),
     }),
 };
+
+export const OpenAiCompatible: Story = {
+  beforeEach: () =>
+    mockRpc({
+      "voice.catalog": [
+        {
+          id: "openai-compatible",
+          name: "OpenAI-compatible",
+          description: "Demo provider",
+          transcribe: true,
+          speech: false,
+        },
+        ...catalog,
+      ],
+      "voice.credentials": [],
+      "voice.status": { ...status, configured: false, ready: false, provider: null, voiceId: "" },
+    }),
+};

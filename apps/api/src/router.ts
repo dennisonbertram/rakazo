@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { Router } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
 import type {
   AdapterContext,
@@ -142,6 +143,7 @@ import {
   screenLeaseIdForRun,
   scriptedCatalogEntry,
   selectDefaultCredentialId,
+  selectTranscriptionTarget,
   serializeModelSecret,
   sharePageSnapshot,
   startAuditDraftRun,
@@ -162,6 +164,7 @@ import {
 } from "@rakazo/adapters";
 import type {
   Actor,
+  AppContract,
   Bot,
   BotSecretMetadata,
   ComposeFields,
@@ -170,6 +173,7 @@ import type {
   ExportManifest,
   McpServer,
   Me,
+  MeetingRecordingPolicy,
   NotificationDto,
   Routine,
   SpaceNavigation,
@@ -188,6 +192,7 @@ import {
   foldComputerCommands,
   GOOGLE_DESKTOP_REDIRECT_URI,
   GRANOLA_API_CONNECTOR_ID,
+  HEX_CONNECTOR_ID,
   IntegrationProviderIdSchema,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
@@ -583,15 +588,25 @@ import {
   revertConnectedMcpApprovals,
 } from "./mcp-approval.js";
 import { buildMcpUpdateMaterial, mcpOrigin } from "./mcp-material.js";
+import {
+  activeCapture,
+  appendCaptureText,
+  discardCapture,
+  finishCapture,
+  setMeetingRecording,
+  startCapture,
+} from "./meeting-captures.js";
 import type { MeetingsDeps } from "./meetings.js";
 import {
   connectGranola,
   deleteStoredMeeting,
   disconnectGranola,
+  getStoredMeeting,
   granolaStatus,
   listStoredMeetings,
   refreshGranola,
 } from "./meetings.js";
+import { connectLocal, disconnectLocal, importLocal, localStatus } from "./meetings-local.js";
 import {
   disconnectMemoryProvider,
   persistMemoryProviderConfig,
@@ -617,7 +632,7 @@ import {
 import { rememberedMessageIds, rememberThreadMessage } from "./remember-message.js";
 import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
-import type { RouterDeps } from "./routes/context.js";
+import type { RouteAuthContext, RouterDeps } from "./routes/context.js";
 import { asTenant, createRouteContext } from "./routes/context.js";
 import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
@@ -1362,7 +1377,10 @@ async function asMemberOf<T>(
   return runAsTenant({ spaceId, userId: actor.userId }, fn);
 }
 
-export function createRouter(deps: RouterDeps) {
+// Named so declaration emit does not spell out the whole router, which no longer fits.
+export type AppRouter = Router<AppContract, RouteAuthContext>;
+
+export function createRouter(deps: RouterDeps): AppRouter {
   const routeContext = createRouteContext(deps);
   const { os, authed } = routeContext;
   const repos = createRepos(deps.prisma);
@@ -1824,6 +1842,9 @@ export function createRouter(deps: RouterDeps) {
             throw error;
           }
         }),
+      ),
+      setMeetingRecording: authed.spaces.setMeetingRecording.handler(({ context, input }) =>
+        setMeetingRecording(deps, context.actor, input.policy),
       ),
       // Acts on the Space being deleted, not the current one, so its emptiness check and
       // teardown see that Space's rows. Membership is checked first.
@@ -6629,7 +6650,7 @@ export function createRouter(deps: RouterDeps) {
             status: { in: ["connected", "pending", "error"] },
             // The Granola key shows through meetings.status, never as a generic app.
             // Omi shows through omi.status.
-            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID] },
+            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID, HEX_CONNECTOR_ID] },
           },
           // Without an order Postgres returns rows in storage order, which changes when a row is
           // updated, so the accounts of one app swapped places between loads.
@@ -8458,10 +8479,42 @@ export function createRouter(deps: RouterDeps) {
         refreshGranola(meetingsFor(context.actor), context.actor),
       ),
       list: authed.meetings.list.handler(({ context, input }) =>
-        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor),
+        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor, input),
+      ),
+      get: authed.meetings.get.handler(({ context, input }) =>
+        getStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
       ),
       delete: authed.meetings.delete.handler(({ context, input }) =>
         deleteStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
+      ),
+      connectLocal: authed.meetings.connectLocal.handler(({ context }) =>
+        connectLocal(meetingsFor(context.actor), context.actor),
+      ),
+      localStatus: authed.meetings.localStatus.handler(({ context }) =>
+        localStatus(meetingsFor(context.actor), context.actor),
+      ),
+      importLocal: authed.meetings.importLocal.handler(({ context, input }) =>
+        importLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+      disconnectLocal: authed.meetings.disconnectLocal.handler(({ context, input }) =>
+        disconnectLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+    },
+    meetingCaptures: {
+      start: authed.meetingCaptures.start.handler(({ context, input }) =>
+        startCapture(deps, context.actor, input),
+      ),
+      appendText: authed.meetingCaptures.appendText.handler(({ context, input }) =>
+        appendCaptureText(deps, context.actor, input),
+      ),
+      finish: authed.meetingCaptures.finish.handler(({ context, input }) =>
+        finishCapture(deps, context.actor, input),
+      ),
+      discard: authed.meetingCaptures.discard.handler(({ context, input }) =>
+        discardCapture(deps, context.actor, input.captureId),
+      ),
+      active: authed.meetingCaptures.active.handler(({ context }) =>
+        activeCapture(deps, context.actor),
       ),
     },
     omi: {
@@ -9688,7 +9741,12 @@ export function createRouter(deps: RouterDeps) {
       status: authed.voice.status.handler(async ({ context }) => {
         const cred = await findDefaultVoiceCredential(deps.prisma, context.actor);
         const selection = await findTranscriptionSelection(deps, context.actor);
-        return toVoiceStatus(cred, selection?.provider ?? null);
+        // The same choice server transcription makes, so Record shows only when audio would be sent.
+        const { target, consented } = await selectTranscriptionTarget(deps, context.actor);
+        return {
+          ...toVoiceStatus(cred, selection?.provider ?? null),
+          transcriptionConsented: Boolean(target && consented),
+        };
       }),
       setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) => {
         const result = await setTranscription(deps, context.actor, {
@@ -9826,6 +9884,7 @@ async function memberSpaceNavigation(
           name: true,
           isDefault: true,
           deletingAt: true,
+          meetingRecording: true,
           _count: { select: { memberships: true } },
         },
       },
@@ -9898,6 +9957,8 @@ async function memberSpaceNavigation(
         isDefault: membership.space.isDefault,
         hasContent: spacesWithContent.has(membership.spaceId),
         memberCount: membership.space._count.memberships,
+        meetingRecording: membership.space.meetingRecording as MeetingRecordingPolicy,
+        canSetMeetingRecording: membership.role === "owner" || membership.role === "admin",
         canRename: membership.role === "owner" && membership.space.deletingAt === null,
         canDelete:
           membership.role === "owner" &&

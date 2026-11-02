@@ -69,6 +69,7 @@ model User {
   mailActionLogs              MailActionLog[]
   inboxTodos                  InboxTodo[]
   meetings                    Meeting[]
+  meetingCaptures             MeetingCapture[]
   meetingSyncStates           MeetingSyncState[]
   meetingTombstones           MeetingTombstone[]
   inboxSenderFeedback         InboxSenderFeedback[]
@@ -527,6 +528,10 @@ model Space {
   externalActions             ExternalAction[]
   omiUploads                  OmiUpload[]
   omiSegments                 OmiSegment[]
+  meetingCaptures             MeetingCapture[]
+  meetingCaptureChunks        MeetingCaptureChunk[]
+  /// "remind", "confirm" or "off": whether and how meetings may be recorded here.
+  meetingRecording            String                       @default("remind")
   brexCardReservations        BrexCardReservation[]
   mcpConnections              McpConnection[]
   id                          String                       @id
@@ -3993,6 +3998,7 @@ model Meeting {
   tsv               Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, ((((title || ' '::text) || summary) || ' '::text) || COALESCE(transcript, ''::text)))"))
   inboxTodos        InboxTodo[]
   omiSegments       OmiSegment[]
+  captures          MeetingCapture[]
 
   @@unique([spaceId, userId, provider, externalId])
   @@index([spaceId, userId, startedAt])
@@ -4544,4 +4550,62 @@ model CompanyImportCall {
 
   @@index([spaceId, ownerUserId, runId, status])
   @@map("company_import_calls")
+}
+
+/// One recording in progress (or just finished) on a device. Holds no content once finalized.
+model MeetingCapture {
+  id                 String                @id @default(cuid())
+  spaceId            String
+  space              Space                 @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Chosen by the client; makes `start` idempotent per user.
+  clientId           String
+  title              String?
+  /// "device" (text from the client) or "server" (audio transcribed here).
+  engine             String
+  /// "microphone" and/or "system".
+  tracks             String[]
+  /// "recording", "finishing", "done", "failed" or "discarded".
+  status             String                @default("recording")
+  startedAt          DateTime              @default(now())
+  endedAt            DateTime?
+  lastChunkAt        DateTime?
+  consentConfirmedAt DateTime?
+  meetingId          String?
+  meeting            Meeting?              @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  /// Short reason only; never audio or text.
+  error              String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  chunks             MeetingCaptureChunk[]
+
+  @@unique([userId, clientId])
+  @@index([spaceId, userId, status])
+  @@map("meeting_captures")
+}
+
+/// One stretch of one track. Audio lives in the artifact store until it is transcribed.
+model MeetingCaptureChunk {
+  id        String         @id @default(cuid())
+  spaceId   String
+  space     Space          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId    String
+  captureId String
+  capture   MeetingCapture @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  /// "microphone" or "system".
+  track     String
+  seq       Int
+  startMs   Int
+  endMs     Int
+  sha256    String
+  blobKey   String?
+  text      String?
+  /// "pending", "done" or "failed".
+  status    String         @default("pending")
+  attempts  Int            @default(0)
+  createdAt DateTime       @default(now())
+
+  @@unique([captureId, track, seq])
+  @@map("meeting_capture_chunks")
 }

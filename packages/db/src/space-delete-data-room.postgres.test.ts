@@ -81,10 +81,44 @@ describePostgres("space deletion and Data room blobs (PostgreSQL)", () => {
       },
     });
 
+    const capture = await prisma.meetingCapture.create({
+      data: { spaceId, userId, clientId: `c-${suffix}`, engine: "server", tracks: ["microphone"] },
+    });
+    await prisma.meetingCaptureChunk.createMany({
+      data: [
+        {
+          spaceId,
+          userId,
+          captureId: capture.id,
+          track: "microphone",
+          seq: 0,
+          startMs: 0,
+          endMs: 1,
+          sha256: "x",
+          blobKey: `capture/a-${suffix}`,
+        },
+        {
+          spaceId,
+          userId,
+          captureId: capture.id,
+          track: "microphone",
+          seq: 1,
+          startMs: 1,
+          endMs: 2,
+          sha256: "y",
+          status: "done",
+        },
+      ],
+    });
+
     const input = { currentSpaceId: spaceId, userId, spaceId };
     const claim = await claimEmptySpaceDeletionForMember(prisma, input);
     const result = await deleteEmptySpaceForMember(prisma, { ...input, claimId: claim.claimId });
-    expect(result.dataRoomStorageKeys).toEqual([`blob/a-${suffix}`, `photo/a-${suffix}`]);
+    expect(result.dataRoomStorageKeys).toEqual([
+      `blob/a-${suffix}`,
+      `photo/a-${suffix}`,
+      `capture/a-${suffix}`,
+    ]);
     expect(await prisma.dataRoomItem.count({ where: { spaceId } })).toBe(0);
     expect(await prisma.contactPhoto.count({ where: { spaceId } })).toBe(0);
   });

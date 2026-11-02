@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 323 of 323
-- Web and shared components: 833
+- Web and shared component files with stories: 331 of 331
+- Web and shared components: 847
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 126 in 67 files, native story pending
 
@@ -105,6 +105,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | MailOutbox | [apps/web/src/components/MailOutbox.tsx](../../apps/web/src/components/MailOutbox.tsx) | [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
 | MailThreadCard | [apps/web/src/components/MailThreadCard.tsx](../../apps/web/src/components/MailThreadCard.tsx) | [MailThreadCard.stories.tsx](../../apps/web/src/components/MailThreadCard.stories.tsx) | web |
 | MarkdownLinkPrompt | [apps/web/src/components/markdown-link-prompt.tsx](../../apps/web/src/components/markdown-link-prompt.tsx) | [markdown-link-prompt.stories.tsx](../../apps/web/src/components/markdown-link-prompt.stories.tsx) | web |
+| MeetingRecordingSettings | [apps/web/src/components/MeetingRecordingSettings.tsx](../../apps/web/src/components/MeetingRecordingSettings.tsx) | [MeetingRecordingSettings.stories.tsx](../../apps/web/src/components/MeetingRecordingSettings.stories.tsx) | web |
 | MessageHoverMetadata | [apps/web/src/components/MessageHoverMetadata.tsx](../../apps/web/src/components/MessageHoverMetadata.tsx) | [MessageHoverMetadata.stories.tsx](../../apps/web/src/components/MessageHoverMetadata.stories.tsx) | web |
 | ModelPreflightFeedback | [apps/web/src/components/ModelConnectionPreflightNotice.tsx](../../apps/web/src/components/ModelConnectionPreflightNotice.tsx) | [ModelConnectionPreflightNotice.stories.tsx](../../apps/web/src/components/ModelConnectionPreflightNotice.stories.tsx) | web |
 | NotificationSettingsSection | [apps/web/src/components/NotificationSettings.tsx](../../apps/web/src/components/NotificationSettings.tsx) | [NotificationSettings.stories.tsx](../../apps/web/src/components/NotificationSettings.stories.tsx) | web |
@@ -281,6 +282,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | TileName, CryptoTile, AlchemyTile, ExchangeTile, FinanceSection | [apps/web/src/components/integrations/FinanceSection.tsx](../../apps/web/src/components/integrations/FinanceSection.tsx) | [FinanceSection.stories.tsx](../../apps/web/src/components/integrations/FinanceSection.stories.tsx) | web |
 | GranolaStatusLine, GranolaMeetingsCard | [apps/web/src/components/integrations/GranolaMeetingsCard.tsx](../../apps/web/src/components/integrations/GranolaMeetingsCard.tsx) | [GranolaMeetingsCard.stories.tsx](../../apps/web/src/components/integrations/GranolaMeetingsCard.stories.tsx) | web |
 | GranolaPage | [apps/web/src/components/integrations/GranolaPage.tsx](../../apps/web/src/components/integrations/GranolaPage.tsx) | [GranolaPage.stories.tsx](../../apps/web/src/components/integrations/GranolaPage.stories.tsx) | web |
+| Line, HexCard | [apps/web/src/components/integrations/HexCard.tsx](../../apps/web/src/components/integrations/HexCard.tsx) | [HexCard.stories.tsx](../../apps/web/src/components/integrations/HexCard.stories.tsx) | web |
 | Labeled, SetupDialog, IMessageSection | [apps/web/src/components/integrations/IMessageSection.tsx](../../apps/web/src/components/integrations/IMessageSection.tsx) | [IMessageSection.stories.tsx](../../apps/web/src/components/integrations/IMessageSection.stories.tsx) | web |
 | WritesSwitch, IntegrationAgentSection | [apps/web/src/components/integrations/IntegrationAgentSection.tsx](../../apps/web/src/components/integrations/IntegrationAgentSection.tsx) | [IntegrationAgentSection.stories.tsx](../../apps/web/src/components/integrations/IntegrationAgentSection.stories.tsx) | web |
 | IntegrationSetup | [apps/web/src/components/integrations/IntegrationSetup.tsx](../../apps/web/src/components/integrations/IntegrationSetup.tsx) | [IntegrationSetup.stories.tsx](../../apps/web/src/components/integrations/IntegrationSetup.stories.tsx) | web |
@@ -290,7 +292,6 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SegmentRow, OmiSegments, OmiTrash | [apps/web/src/components/integrations/OmiSegments.tsx](../../apps/web/src/components/integrations/OmiSegments.tsx) | [OmiPage.stories.tsx](../../apps/web/src/components/integrations/OmiPage.stories.tsx), [OmiSegments.stories.tsx](../../apps/web/src/components/integrations/OmiSegments.stories.tsx) | web |
 | IntegrationTile, StatusBadge, TileMenu, AgentStack, AgentToggleList, CardHead, SectionTitle, SourceBadge | [apps/web/src/components/integrations/parts.tsx](../../apps/web/src/components/integrations/parts.tsx) | [parts.stories.tsx](../../apps/web/src/components/integrations/parts.stories.tsx) | web |
 | SignInStep | [apps/web/src/components/integrations/SignInStep.tsx](../../apps/web/src/components/integrations/SignInStep.tsx) | [SignInStep.stories.tsx](../../apps/web/src/components/integrations/SignInStep.stories.tsx) | web |
-| StoredMeetingsList | [apps/web/src/components/integrations/StoredMeetingsList.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.tsx) | [StoredMeetingsList.stories.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.stories.tsx) | web |
 
 ## Web components/investors
 
@@ -304,6 +305,15 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | --- | --- | --- | --- |
 | LegalConsentPrompt | [apps/web/src/components/legal/ConsentPrompt.tsx](../../apps/web/src/components/legal/ConsentPrompt.tsx) | [ConsentPrompt.stories.tsx](../../apps/web/src/components/legal/ConsentPrompt.stories.tsx) | web |
 | LegalGraphView | [apps/web/src/components/legal/LegalGraph.tsx](../../apps/web/src/components/legal/LegalGraph.tsx) | [LegalGraph.stories.tsx](../../apps/web/src/components/legal/LegalGraph.stories.tsx) | web |
+
+## Web components/meeting-capture
+
+| Component | File | Story file | Surface |
+| --- | --- | --- | --- |
+| Dot, RecordButton, RecordButtonView | [apps/web/src/components/meeting-capture/RecordButton.tsx](../../apps/web/src/components/meeting-capture/RecordButton.tsx) | [RecordButton.stories.tsx](../../apps/web/src/components/meeting-capture/RecordButton.stories.tsx) | web |
+| RecordForm | [apps/web/src/components/meeting-capture/RecordForm.tsx](../../apps/web/src/components/meeting-capture/RecordForm.tsx) | [RecordForm.stories.tsx](../../apps/web/src/components/meeting-capture/RecordForm.stories.tsx) | web |
+| RecordingPill | [apps/web/src/components/meeting-capture/RecordingPill.tsx](../../apps/web/src/components/meeting-capture/RecordingPill.tsx) | [RecordingPill.stories.tsx](../../apps/web/src/components/meeting-capture/RecordingPill.stories.tsx) | web |
+| RecordingPillHost | [apps/web/src/components/meeting-capture/RecordingPillHost.tsx](../../apps/web/src/components/meeting-capture/RecordingPillHost.tsx) | [RecordingPillHost.stories.tsx](../../apps/web/src/components/meeting-capture/RecordingPillHost.stories.tsx) | web |
 
 ## Web components/pages
 
@@ -396,6 +406,8 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | McpConsent, McpConsentPage | [apps/web/src/pages/McpConsent.tsx](../../apps/web/src/pages/McpConsent.tsx) | [McpConsent.stories.tsx](../../apps/web/src/pages/McpConsent.stories.tsx) | web |
 | McpOAuthCallbackPage | [apps/web/src/pages/McpOAuthCallback.tsx](../../apps/web/src/pages/McpOAuthCallback.tsx) | [McpOAuthCallback.stories.tsx](../../apps/web/src/pages/McpOAuthCallback.stories.tsx) | web |
 | CopyBox, McpTokenReveal, McpTokenDialog | [apps/web/src/pages/McpTokenDialog.tsx](../../apps/web/src/pages/McpTokenDialog.tsx) | [McpTokenDialog.stories.tsx](../../apps/web/src/pages/McpTokenDialog.stories.tsx) | web |
+| Section, Row, MeetingDetailPage | [apps/web/src/pages/MeetingDetail.tsx](../../apps/web/src/pages/MeetingDetail.tsx) | [MeetingDetail.stories.tsx](../../apps/web/src/pages/MeetingDetail.stories.tsx) | web |
+| MeetingsPage | [apps/web/src/pages/Meetings.tsx](../../apps/web/src/pages/Meetings.tsx) | [Meetings.stories.tsx](../../apps/web/src/pages/Meetings.stories.tsx) | web |
 | SerenitySettingsForm | [apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx) | [SerenitySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.stories.tsx) | web |
 | SupermemorySettingsForm | [apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx) | [SupermemorySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.stories.tsx) | web |
 | ScopePicker, MemorySettingsOverlay | [apps/web/src/pages/MemorySettingsOverlay.tsx](../../apps/web/src/pages/MemorySettingsOverlay.tsx) | [MemorySettingsOverlay.stories.tsx](../../apps/web/src/pages/MemorySettingsOverlay.stories.tsx) | web |
@@ -430,6 +442,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Composer | [apps/web/src/pages/shell/composer.tsx](../../apps/web/src/pages/shell/composer.tsx) | [composer.stories.tsx](../../apps/web/src/pages/shell/composer.stories.tsx) | web |
 | DelegateWaitNotice | [apps/web/src/pages/shell/DelegateWaitNotice.tsx](../../apps/web/src/pages/shell/DelegateWaitNotice.tsx) | [DelegateWaitNotice.stories.tsx](../../apps/web/src/pages/shell/DelegateWaitNotice.stories.tsx) | web |
 | NewSpaceDialog, RenameSpaceDialog, PickerInfoDialog, NewBotSectionDialog, RenameBotSectionDialog, ClearConversationDialog, ArchiveBotsDialog, DeleteBotDialog, DeleteItemDialog | [apps/web/src/pages/shell/dialogs.tsx](../../apps/web/src/pages/shell/dialogs.tsx) | [dialogs.stories.tsx](../../apps/web/src/pages/shell/dialogs.stories.tsx) | web |
+| DictationButton, DictationError | [apps/web/src/pages/shell/dictation-button.tsx](../../apps/web/src/pages/shell/dictation-button.tsx) | [dictation-button.stories.tsx](../../apps/web/src/pages/shell/dictation-button.stories.tsx) | web |
 | GroupIntro | [apps/web/src/pages/shell/GroupIntro.tsx](../../apps/web/src/pages/shell/GroupIntro.tsx) | [GroupIntro.stories.tsx](../../apps/web/src/pages/shell/GroupIntro.stories.tsx) | web |
 | MentionIcon | [apps/web/src/pages/shell/mention-icon.tsx](../../apps/web/src/pages/shell/mention-icon.tsx) | [mention-icon.stories.tsx](../../apps/web/src/pages/shell/mention-icon.stories.tsx) | web |
 | ResultCard, ChoiceCard, OnboardingFocusQuestion, OnboardingFocusOptionHint, OnboardingFocusOptionLabel, AppConnectCard, ChartCanvas, ChartCanvasPlot, McpApprovalCard, ChartBlockView, ArtifactImage, ArtifactImageGrid | [apps/web/src/pages/shell/message-cards.tsx](../../apps/web/src/pages/shell/message-cards.tsx) | [message-cards.stories.tsx](../../apps/web/src/pages/shell/message-cards.stories.tsx) | web |

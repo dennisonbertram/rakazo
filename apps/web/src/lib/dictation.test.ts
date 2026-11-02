@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   combineTranscript,
   Dictation,
+  insertAtCursor,
   MAX_TRANSCRIPTION_RESPONSE_BYTES,
   speechLocaleTag,
   TRANSCRIPTION_RESPONSE_TIMEOUT_MS,
@@ -1657,5 +1658,17 @@ describe("transcriptionLanguage", () => {
   it("hints the provider with the language the caller picked", () => {
     vi.stubGlobal("navigator", { language: "es-ES" });
     expect(transcriptionLanguage()).toBe("es");
+  });
+});
+
+describe("insertAtCursor", () => {
+  it("keeps text on both sides and adds one space where words would touch", () => {
+    expect(insertAtCursor("hello world", 5, 5, "big")).toEqual({
+      text: "hello big world",
+      caret: 9,
+    });
+    expect(insertAtCursor("", 0, 0, "hi")).toEqual({ text: "hi", caret: 2 });
+    expect(insertAtCursor("a ", 2, 2, "b")).toEqual({ text: "a b", caret: 3 });
+    expect(insertAtCursor("abc def", 1, 6, "X")).toEqual({ text: "a X f", caret: 3 });
   });
 });

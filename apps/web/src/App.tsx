@@ -263,6 +263,8 @@ function SessionApp() {
             <Route path="/app/calendar" element={<ShellPage />} />
             <Route path="/app/contacts" element={<ShellPage />} />
             <Route path="/app/contacts/:contactId" element={<ShellPage />} />
+            <Route path="/app/meetings" element={<ShellPage />} />
+            <Route path="/app/meetings/:meetingId" element={<ShellPage />} />
             <Route path="/app/pages/:botId/:pageId" element={<ShellPage />} />
             <Route path="/app/:botId" element={<ShellPage />} />
           </Route>

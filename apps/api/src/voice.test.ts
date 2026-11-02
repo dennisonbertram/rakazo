@@ -17,6 +17,12 @@ import {
 } from "./voice.js";
 
 describe("toVoiceStatus", () => {
+  it("is ready to transcribe when only a transcription provider is selected", () => {
+    const status = toVoiceStatus(null, "openai-compatible");
+    expect(status.transcriptionProvider).toBe("openai-compatible");
+    expect(status.transcriptionReady).toBe(true);
+    expect(toVoiceStatus(null, null).transcriptionReady).toBe(false);
+  });
   it("treats a saved key without a voice as configured but not ready", () => {
     expect(toVoiceStatus({ provider: "elevenlabs", voiceId: "" })).toEqual({
       configured: true,

@@ -43,6 +43,7 @@ import {
   LogOut,
   Mail,
   Megaphone,
+  Mic,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
@@ -409,6 +410,7 @@ export type SpaceSidebarProps = {
   investorsMode: boolean;
   fundraisingMode: boolean;
   contactsMode: boolean;
+  meetingsMode: boolean;
   calendarMode: boolean;
   companyMode: boolean;
   dataRoomMode: boolean;
@@ -526,6 +528,7 @@ export function SpaceSidebar({
   investorsMode,
   fundraisingMode,
   contactsMode,
+  meetingsMode,
   calendarMode,
   companyMode,
   dataRoomMode,
@@ -842,6 +845,7 @@ export function SpaceSidebar({
                 { key: "fundraising", label: t`Fundraising` },
                 { key: "company", label: t`Company` },
                 { key: "calendar", label: t`Calendar` },
+                { key: "meetings", label: t`Meetings` },
                 { key: "contacts", label: t`Contacts` },
                 { key: "data-room", label: t`Data room` },
                 { key: "artifacts", label: t`Artifacts` },
@@ -1013,6 +1017,20 @@ export function SpaceSidebar({
                   onOpen={() => {
                     setMobileSidebarOpen(false);
                     navigate("/app/calendar");
+                  }}
+                />
+              )}
+              {hiddenPages.includes("meetings") ? null : (
+                <SidebarPageLink
+                  testId="sidebar-meetings"
+                  href="/app/meetings"
+                  current={meetingsMode}
+                  icon={<Mic size={15} strokeWidth={1.8} aria-hidden="true" />}
+                  label={t`Meetings`}
+                  rail={rail}
+                  onOpen={() => {
+                    setMobileSidebarOpen(false);
+                    navigate("/app/meetings");
                   }}
                 />
               )}

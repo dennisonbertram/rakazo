@@ -165,6 +165,7 @@ import { mountLocalSettings } from "./local-settings.js";
 import { mountMailPushRoute } from "./mail-push.js";
 import { mountRegisterLimit } from "./mcp-register-limit.js";
 import { mountMcpDiscovery, mountMcpServer } from "./mcp-server.js";
+import { mountMeetingCaptureRoutes } from "./meeting-captures.js";
 import {
   createMessagingInboundHandler,
   teamChatSenderCanWakeMessageRoutines,
@@ -175,6 +176,7 @@ import { mountOmiRoutes } from "./omi.js";
 import { mountApiRequestBodyLimits } from "./request-body-limit.js";
 import { mountSystemRoutes, mountTenantRoutes } from "./route-scope.js";
 import { createRouter } from "./router.js";
+import type { RouteAuthContext } from "./routes/context.js";
 import { mountScreenTarget } from "./screen-proxy.js";
 import { isDeferredReservationLost, TeamChatBridge } from "./team-chat-bridge.js";
 import { ModelTeamChatEngagementJudge } from "./team-chat-judge.js";
@@ -889,7 +891,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       mailWritesDisabled: env.mailWritesDisabled,
     },
   });
-  const rpc = new RPCHandler(router, {
+  const rpc = new RPCHandler<RouteAuthContext>(router, {
     clientInterceptors: [onError((error, { path }) => logUnexpectedRpcError(error, path))],
   });
   const app = new Hono();
@@ -1013,6 +1015,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   mountContactPhoto(app, { prisma, artifacts }, loggedActor);
   mountDataRoomRoutes(app, { prisma, artifacts, jobs }, loggedActor);
   mountOmiRoutes(app, { prisma, artifacts, jobs }, loggedActor);
+  mountMeetingCaptureRoutes(app, { prisma, artifacts, jobs }, loggedActor);
   mountInvestorPortal(app, {
     store: prismaPortalStore(prisma),
     artifacts,

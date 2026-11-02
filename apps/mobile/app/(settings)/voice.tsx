@@ -76,11 +76,13 @@ export default function VoiceSettings() {
   const deviceVoiceSaveInFlight = useRef(false);
 
   const load = useCallback(async (nextProvider?: string) => {
-    const [nextCatalog, nextCredentials, nextStatus] = await Promise.all([
+    const [fullCatalog, nextCredentials, nextStatus] = await Promise.all([
       rpc<VoiceCatalogEntry[]>("voice/catalog"),
       rpc<VoiceCredential[]>("voice/credentials"),
       rpc<VoiceStatus>("voice/status"),
     ]);
+    // Transcription-only servers are set up on web and desktop.
+    const nextCatalog = fullCatalog.filter((entry) => entry.speech !== false);
     const selected = nextProvider || nextStatus.provider || nextCatalog[0]?.id || "";
     setCatalog(nextCatalog);
     setCredentials(nextCredentials);

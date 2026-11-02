@@ -84,6 +84,11 @@ msgstr ""
 msgid "{0, plural, one {# finance lookup} other {# finance lookups}}"
 msgstr ""
 
+#. placeholder {0}: status.count
+#: src/components/integrations/HexCard.tsx
+msgid "{0, plural, one {# meeting} other {# meetings}}"
+msgstr ""
+
 #. placeholder {0}: group.count
 #: src/components/inbox/InboxDigest.tsx
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -620,6 +625,11 @@ msgstr ""
 msgid "{legalSafes} SAFEs found in Legal"
 msgstr ""
 
+#: src/pages/MeetingDetail.tsx
+#: src/pages/Meetings.tsx
+msgid "{minutes} min"
+msgstr ""
+
 #: src/lib/relative-time.ts
 msgid "{minutes}m ago"
 msgstr "il y a {minutes} min"
@@ -868,6 +878,10 @@ msgstr ""
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "A folder with that name already exists"
+msgstr ""
+
+#: src/lib/meeting-capture/controller.ts
+msgid "A recording is already running."
 msgstr ""
 
 #: src/components/finance/WalletDialog.tsx
@@ -1181,6 +1195,10 @@ msgstr "Ajouter une URL de serveur"
 msgid "Add skill"
 msgstr ""
 
+#: src/components/meeting-capture/RecordButton.tsx
+msgid "Add speech to text"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add the header name."
 msgstr ""
@@ -1478,6 +1496,10 @@ msgstr ""
 msgid "Also in Gmail"
 msgstr ""
 
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Also record a browser tab"
+msgstr ""
+
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Always act"
 msgstr "Agir toujours"
@@ -1611,6 +1633,10 @@ msgstr "L'API est de retour, mais la mise à jour n'est pas terminée. Vérifiez
 #: src/pages/Onboarding.tsx
 msgid "API key"
 msgstr "Clé API"
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "API key (optional)"
+msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "API key configured (not verified)."
@@ -2111,6 +2137,7 @@ msgid "Bank only: {bankRunwayMonths} mo"
 msgstr ""
 
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Base URL"
 msgstr "URL de base"
 
@@ -2392,6 +2419,7 @@ msgstr "Impossible d'atteindre le serveur."
 #: src/components/integrations/ConnectionDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/DevinConnectDialog.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/SignInStep.tsx
@@ -2895,6 +2923,7 @@ msgstr ""
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/Meetings.tsx
 msgid "Clear filters"
 msgstr ""
 
@@ -3245,6 +3274,7 @@ msgstr "Les ordinateurs sont désactivés. Définissez SANDBOX_PROVIDER=docker a
 msgid "Configure API key"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyReview.tsx
 msgid "Confirm"
@@ -3281,6 +3311,7 @@ msgstr ""
 #: src/components/integrations/ExchangeConnectDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
@@ -4013,6 +4044,14 @@ msgstr "Impossible de charger les intégrations"
 msgid "Could not load investors"
 msgstr ""
 
+#: src/pages/MeetingDetail.tsx
+msgid "Could not load meeting"
+msgstr ""
+
+#: src/pages/Meetings.tsx
+msgid "Could not load meetings"
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not load model settings"
 msgstr "Impossible de charger les paramètres du modèle"
@@ -4323,6 +4362,10 @@ msgstr ""
 msgid "Could not save the page."
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Could not save the recording setting"
+msgstr ""
+
 #: src/components/fundraising/RoundCard.tsx
 msgid "Could not save the round"
 msgstr ""
@@ -4449,6 +4492,10 @@ msgstr ""
 msgid "Could not update computer"
 msgstr "Impossible de mettre à jour l'ordinateur"
 
+#: src/components/integrations/HexCard.tsx
+msgid "Could not update Hex"
+msgstr ""
+
 #: src/pages/Shell.tsx
 msgid "Could not update reaction"
 msgstr "Impossible de mettre à jour la réaction"
@@ -4516,6 +4563,10 @@ msgstr ""
 
 #: src/lib/inbox-sync-error.ts
 msgid "Couldn't reach Gmail."
+msgstr ""
+
+#: src/components/integrations/HexCard.tsx
+msgid "Couldn't read Hex"
 msgstr ""
 
 #: src/components/data-room/Preview.tsx
@@ -4779,6 +4830,7 @@ msgstr ""
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
+#: src/pages/Meetings.tsx
 msgid "Date"
 msgstr ""
 
@@ -4815,6 +4867,10 @@ msgstr "jours"
 msgid "Deadlines"
 msgstr ""
 
+#: src/pages/MeetingDetail.tsx
+msgid "Decisions"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Decline"
 msgstr "Refuser"
@@ -4845,12 +4901,12 @@ msgstr "Par défaut ({0})"
 #: src/components/data-room/Preview.tsx
 #: src/components/fundraising/SafeList.tsx
 #: src/components/integrations/OmiPage.tsx
-#: src/components/integrations/StoredMeetingsList.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
 #: src/pages/KnowledgeSection.tsx
+#: src/pages/MeetingDetail.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
@@ -4859,8 +4915,8 @@ msgstr "Par défaut ({0})"
 msgid "Delete"
 msgstr "Supprimer"
 
-#. placeholder {0}: deleting?.title ?? ""
-#: src/components/integrations/StoredMeetingsList.tsx
+#. placeholder {0}: meeting?.title ?? ""
+#: src/pages/MeetingDetail.tsx
 msgid "Delete \"{0}\"?"
 msgstr "Supprimer « {0} » ?"
 
@@ -4932,6 +4988,10 @@ msgstr "Supprimer le groupe"
 
 #: src/components/cap-table/CapTableEditor.tsx
 msgid "Delete holder"
+msgstr ""
+
+#: src/components/integrations/HexCard.tsx
+msgid "Delete imported meetings too"
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx
@@ -5019,6 +5079,7 @@ msgid "Desktop"
 msgstr ""
 
 #: src/components/DesktopUpdates.tsx
+#: src/components/integrations/HexCard.tsx
 msgid "Desktop app"
 msgstr "Application de bureau"
 
@@ -5059,6 +5120,10 @@ msgstr ""
 
 #: src/components/integrations/McpDetail.tsx
 msgid "Devin sessions are not affected."
+msgstr ""
+
+#: src/pages/shell/dictation-button.tsx
+msgid "Dictate"
 msgstr ""
 
 #: src/components/integrations/SignInStep.tsx
@@ -5114,6 +5179,7 @@ msgid "Discarded"
 msgstr ""
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/integrations/OmiPage.tsx
 #: src/pages/CompanyPrivacy.tsx
 #: src/pages/MemorySettingsOverlay.tsx
@@ -5132,6 +5198,10 @@ msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Disconnect {name}?"
+msgstr ""
+
+#: src/components/integrations/HexCard.tsx
+msgid "Disconnect Hex?"
 msgstr ""
 
 #: src/components/integrations/McpDetail.tsx
@@ -5169,6 +5239,7 @@ msgstr ""
 #: src/components/data-room/ImportActivity.tsx
 #: src/components/finance/StatementImport.tsx
 #: src/components/investors/ActionItems.tsx
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Legal.tsx
 #: src/pages/legal/LegalDeadlines.tsx
@@ -5467,8 +5538,16 @@ msgstr ""
 msgid "Duplicate"
 msgstr "Dupliquer"
 
+#: src/pages/Meetings.tsx
+msgid "Duration"
+msgstr ""
+
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Each bot keeps its own"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Each recording needs “Everyone agreed to be recorded” to be ticked."
 msgstr ""
 
 #: src/pages/devin/DevinSessions.tsx
@@ -5785,6 +5864,10 @@ msgstr ""
 msgid "Every week"
 msgstr "Chaque semaine"
 
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Everyone agreed to be recorded"
+msgstr ""
+
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Exact text"
 msgstr ""
@@ -6083,6 +6166,10 @@ msgstr ""
 #: src/components/data-room/FolderTree.tsx
 #: src/pages/CompanyImportScope.tsx
 msgid "Folders"
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Follow-ups"
 msgstr ""
 
 #: src/components/AiDataSharing.tsx
@@ -6808,6 +6895,10 @@ msgstr ""
 msgid "Inside"
 msgstr ""
 
+#: src/components/integrations/HexCard.tsx
+msgid "Install Hex"
+msgstr ""
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Instance API key"
 msgstr "Clé API de l'instance"
@@ -7119,6 +7210,11 @@ msgstr ""
 
 #: src/pages/Legal.tsx
 msgid "Last scan failed: The AI key was rejected."
+msgstr ""
+
+#. placeholder {0}: formatRelativeTime(status.lastSyncedAt)
+#: src/components/integrations/HexCard.tsx
+msgid "Last sync {0}"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
@@ -7687,6 +7783,10 @@ msgstr "Moyen"
 msgid "Meeting"
 msgstr ""
 
+#: src/lib/meeting-capture/title.ts
+msgid "Meeting {time}"
+msgstr ""
+
 #: src/lib/slash-skills.ts
 msgid "Meeting notes"
 msgstr ""
@@ -7695,8 +7795,19 @@ msgstr ""
 msgid "Meeting notes and transcripts"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Meeting recording"
+msgstr ""
+
 #: src/pages/ContactDetail.tsx
+#: src/pages/Meetings.tsx
+#: src/pages/Shell.tsx
+#: src/pages/shell/space-sidebar.tsx
 msgid "Meetings"
+msgstr ""
+
+#: src/components/integrations/HexCard.tsx
+msgid "Meetings recorded on this Mac"
 msgstr ""
 
 #: src/pages/shell/GroupIntro.tsx
@@ -7826,9 +7937,17 @@ msgstr ""
 msgid "MFN"
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "Microphone access is blocked. Allow it in your browser and try again."
+msgstr ""
+
 #: src/lib/call-session.ts
 msgid "Microphone failed"
 msgstr "Le microphone a échoué"
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Microphone stopped"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Minimal"
@@ -7859,6 +7978,7 @@ msgstr ""
 #: src/pages/Onboarding.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-panel.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Model"
 msgstr "Modèle"
 
@@ -8455,6 +8575,10 @@ msgstr ""
 msgid "No bots yet"
 msgstr ""
 
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "No call audio"
+msgstr ""
+
 #: src/pages/McpConnectionActivity.tsx
 msgid "No calls yet"
 msgstr ""
@@ -8603,6 +8727,7 @@ msgstr ""
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
+#: src/pages/Meetings.tsx
 msgid "No matches"
 msgstr ""
 
@@ -8625,7 +8750,7 @@ msgstr "Aucun artefact correspondant sur cette page."
 msgid "No matching models"
 msgstr "Aucun modèle correspondant"
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/Meetings.tsx
 msgid "No meetings"
 msgstr ""
 
@@ -8655,6 +8780,10 @@ msgstr ""
 
 #: src/components/inbox/InboxDigest.tsx
 msgid "No newsletters in the last 7 days"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "No one can record meetings in this space."
 msgstr ""
 
 #: src/pages/legal/LegalDeadlines.tsx
@@ -8742,6 +8871,10 @@ msgstr ""
 
 #: src/pages/Finance.tsx
 msgid "No spend in this period"
+msgstr ""
+
+#: src/lib/meeting-capture/controller.ts
+msgid "No tab was shared. Start again to pick one."
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -9058,6 +9191,7 @@ msgstr ""
 msgid "Obligation"
 msgstr ""
 
+#: src/components/MeetingRecordingSettings.tsx
 #: src/pages/Investors.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Off"
@@ -9065,6 +9199,10 @@ msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Off in Settings"
+msgstr ""
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Offline, saved here"
 msgstr ""
 
 #: src/components/pages/PageSourcesDialog.tsx
@@ -9472,6 +9610,10 @@ msgstr "Mettre en attente"
 
 #: src/components/UiArtifactView.tsx
 msgid "Part of this can't be shown."
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Part of this meeting could not be transcribed."
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -10369,6 +10511,14 @@ msgstr "Reconnexion en cours"
 msgid "Reconstructed"
 msgstr ""
 
+#: src/components/meeting-capture/RecordButton.tsx
+msgid "Record"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Recording"
+msgstr ""
+
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Recording may have started, but the view could not refresh"
 msgstr "L'enregistrement a peut-être démarré, mais la vue n'a pas pu être actualisée"
@@ -10506,6 +10656,10 @@ msgstr ""
 
 #: src/pages/shell/transcript.tsx
 msgid "Remembered"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Remind"
 msgstr ""
 
 #: src/pages/Investors.tsx
@@ -10674,11 +10828,11 @@ msgstr ""
 msgid "Removes the connection and bot access."
 msgstr ""
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Removes this meeting and its to-dos from Praci."
 msgstr ""
 
-#: src/components/integrations/StoredMeetingsList.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Removes this meeting and its to-dos from Praci. Your note in Granola is not changed."
 msgstr ""
 
@@ -10925,6 +11079,7 @@ msgstr ""
 #: src/components/inbox/AttachmentReviewDialog.tsx
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/BrexControlsForm.tsx
+#: src/components/integrations/HexCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
@@ -11393,6 +11548,7 @@ msgstr ""
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
+#: src/pages/Meetings.tsx
 #: src/pages/shell/command-palette.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Search"
@@ -11828,6 +11984,10 @@ msgstr ""
 msgid "Share link"
 msgstr ""
 
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Share the call tab again"
+msgstr ""
+
 #: src/pages/CompanyFactDetail.tsx
 msgid "Share with team"
 msgstr ""
@@ -11933,8 +12093,8 @@ msgid "Show list"
 msgstr "Afficher la liste"
 
 #: src/components/integrations/IntegrationsHome.tsx
-#: src/components/integrations/StoredMeetingsList.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/pages/Meetings.tsx
 msgid "Show more"
 msgstr "Afficher plus"
 
@@ -11985,6 +12145,10 @@ msgstr ""
 
 #: src/pages/shell/working-label.ts
 msgid "Showing the emails it found"
+msgstr ""
+
+#: src/components/MeetingRecordingSettings.tsx
+msgid "Shows “Tell everyone you're recording.” before each recording."
 msgstr ""
 
 #: src/pages/shell/space-sidebar.tsx
@@ -12278,6 +12442,7 @@ msgstr ""
 #: src/pages/Company.tsx
 #: src/pages/devin/DevinSessions.tsx
 #: src/pages/finance/FinanceTransaction.tsx
+#: src/pages/Meetings.tsx
 msgid "Source"
 msgstr ""
 
@@ -12415,6 +12580,10 @@ msgstr ""
 msgid "Starred"
 msgstr ""
 
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Start"
+msgstr ""
+
 #: src/pages/Paywall.tsx
 msgid "Start {trialDays}-day free trial"
 msgstr ""
@@ -12529,6 +12698,7 @@ msgstr ""
 
 #: src/components/ai/primitives.tsx
 #: src/components/inbox/CleanupSenderRow.tsx
+#: src/components/meeting-capture/RecordingPill.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/composer.tsx
 #: src/pages/shell/transcript.tsx
@@ -12537,6 +12707,10 @@ msgstr "Arrêter"
 
 #: src/pages/CompanyPrivacy.tsx
 msgid "Stop Company imports from this source and remove its evidence. Facts without other evidence are removed; your edits stay. Your integration stays connected."
+msgstr ""
+
+#: src/pages/shell/dictation-button.tsx
+msgid "Stop dictation"
 msgstr ""
 
 #: src/components/ArtifactShareDialog.tsx
@@ -12636,6 +12810,10 @@ msgstr ""
 msgid "Summarizing"
 msgstr ""
 
+#: src/pages/MeetingDetail.tsx
+msgid "Summarizing…"
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Supports images"
 msgstr "Prend en charge les images"
@@ -12668,6 +12846,10 @@ msgstr ""
 msgid "Sync now"
 msgstr ""
 
+#: src/components/integrations/HexCard.tsx
+msgid "Synced"
+msgstr ""
+
 #. placeholder {0}: formatRelativeTime(new Date(state.at).toISOString())
 #: src/components/integrations/OmiPage.tsx
 msgid "Synced {0}"
@@ -12679,6 +12861,7 @@ msgstr ""
 
 #: src/components/inbox/TodoCard.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/HexCard.tsx
 msgid "Syncing"
 msgstr ""
 
@@ -12773,6 +12956,10 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 msgid "Teams message"
 msgstr "Message Teams"
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Tell everyone you're recording."
+msgstr ""
 
 #: src/pages/legal/LegalContracts.tsx
 msgid "Term"
@@ -13049,6 +13236,10 @@ msgstr ""
 msgid "This bot runs on this computer, not a Linux desktop. Shell and files use your home folder."
 msgstr "Ce bot s'exécute sur cet ordinateur, pas sur un bureau Linux. Le shell et les fichiers utilisent votre dossier personnel."
 
+#: src/lib/meeting-capture/controller.ts
+msgid "This browser cannot record meetings."
+msgstr ""
+
 #: src/components/data-room/ItemDialogs.tsx
 #: src/pages/Artifacts.tsx
 msgid "This can't be undone."
@@ -13148,6 +13339,10 @@ msgstr "Ce fournisseur n'est pas encore connecté."
 msgid "This reader has no verified incremental change feed."
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "This recording was closed and could not be saved."
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "This removes the connection from every space."
 msgstr ""
@@ -13222,8 +13417,10 @@ msgstr ""
 msgid "Time zone updated"
 msgstr ""
 
+#: src/components/meeting-capture/RecordForm.tsx
 #: src/pages/Board.tsx
 #: src/pages/gtm/GtmPlan.tsx
+#: src/pages/Meetings.tsx
 msgid "Title"
 msgstr "Titre"
 
@@ -13386,7 +13583,17 @@ msgstr ""
 msgid "Transactions are {0} off the closing balance"
 msgstr ""
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Transcribe"
+msgstr ""
+
+#: src/components/meeting-capture/RecordingPill.tsx
+#: src/pages/shell/dictation-button.tsx
+msgid "Transcribing…"
+msgstr ""
+
 #: src/components/call/CallCard.tsx
+#: src/pages/MeetingDetail.tsx
 msgid "Transcript"
 msgstr "Transcription"
 
@@ -13450,6 +13657,8 @@ msgstr ""
 #: src/pages/Inbox.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
+#: src/pages/MeetingDetail.tsx
+#: src/pages/Meetings.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
@@ -13701,6 +13910,10 @@ msgstr "Échec de la mise à jour"
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Update finished with errors"
 msgstr "Mise à jour terminée avec des erreurs"
+
+#: src/components/integrations/HexCard.tsx
+msgid "Update Hex"
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "Update link"
@@ -14495,6 +14708,10 @@ msgstr "Vous avez le contrôle"
 msgid "You read most of these, so keep them unless you are sure"
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "You were signed out."
+msgstr ""
+
 #: src/pages/McpTokenDialog.tsx
 msgid "You won't see this token again."
 msgstr ""
@@ -14552,6 +14769,10 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 msgid "Your text is saved as a draft. Attachments are not kept."
+msgstr ""
+
+#: src/pages/MeetingDetail.tsx
+msgid "Your to-dos"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx

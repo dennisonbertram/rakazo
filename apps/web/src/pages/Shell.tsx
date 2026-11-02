@@ -92,6 +92,7 @@ import {
   Megaphone,
   Menu,
   MessageSquare,
+  Mic,
   PanelLeftOpen,
   PanelRightClose,
   Pencil,
@@ -145,6 +146,7 @@ import type { SendTarget } from "../components/data-room/SendToAgent";
 import { ErrorBoundary, lazyOverlay, SectionLoadFailed } from "../components/ErrorBoundary";
 import { AgentAvatar } from "../components/integrations/AgentAvatar";
 import { DevinConnectDialog } from "../components/integrations/DevinConnectDialog";
+import { RecordingPillHost } from "../components/meeting-capture/RecordingPillHost";
 import { PageAgentIntro, pageAgentKind } from "../components/PageAgentIntro";
 import { PageNavContext } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
@@ -206,6 +208,7 @@ import { desktopBridge } from "../lib/desktop";
 import { setDockedAgentBotId } from "../lib/docked-agent";
 import { financeAgentSuggestions, findFinanceAgent } from "../lib/finance-agent";
 import { findGtmAgent } from "../lib/gtm-agent";
+import { useHexSync } from "../lib/hex/useHexSync";
 import {
   maskCurrencyWhenHidden,
   setHideAmounts,
@@ -301,6 +304,8 @@ import { IntegrationsPage } from "./Integrations";
 import { InvestorsPage } from "./Investors";
 import { UpdateEditor } from "./investors/UpdateEditor";
 import { LegalPage } from "./Legal";
+import { MeetingDetailPage } from "./MeetingDetail";
+import { MeetingsPage } from "./Meetings";
 import { NotFoundPage } from "./NotFound";
 import { ResizableSidePanel } from "./ResizableSidePanel";
 import type { RoutineDraftState } from "./RoutineEditor";
@@ -633,6 +638,8 @@ export function ShellPage() {
   searchParamsRef.current = searchParams;
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  // Pulls Hex meetings in the macOS desktop app once the user connected Hex.
+  useHexSync();
   const [groups, setGroups] = useState<Group[]>([]);
   const [bots, setBots] = useState<Bot[]>([]);
   const sendToAgentTargets = useMemo(() => sendTargets(bots), [bots]);
@@ -1184,6 +1191,8 @@ export function ShellPage() {
   const investorUpdateMatch = useMatch("/app/investors/updates/:id");
   const fundraisingMode = useMatch("/app/fundraising") != null;
   const calendarMode = useMatch("/app/calendar") != null;
+  const meetingMatch = useMatch("/app/meetings/:meetingId");
+  const meetingsMode = useMatch("/app/meetings") != null || meetingMatch != null;
   const contactMatch = useMatch("/app/contacts/:contactId");
   const contactsMode = useMatch("/app/contacts") != null || contactMatch != null;
   const botPageMatch = useMatch("/app/pages/:botId/:pageId");
@@ -1202,6 +1211,7 @@ export function ShellPage() {
     dataRoomMode ||
     artifactsMode ||
     contactsMode ||
+    meetingsMode ||
     calendarMode ||
     boardMode ||
     botPageMatch != null;
@@ -1240,6 +1250,7 @@ export function ShellPage() {
     integrationsMode ||
     artifactsMode ||
     contactsMode ||
+    meetingsMode ||
     calendarMode ||
     boardMode ||
     botPageMatch != null
@@ -2424,6 +2435,7 @@ export function ShellPage() {
       },
       { id: "company", label: t`Company`, icon: <Building2 {...icon} /> },
       { id: "calendar", label: t`Calendar`, icon: <CalendarDays {...icon} /> },
+      { id: "meetings", label: t`Meetings`, icon: <Mic {...icon} /> },
       { id: "contacts", label: t`Contacts`, icon: <BookUser {...icon} /> },
       { id: "data-room", label: t`Data room`, icon: <FolderOpen {...icon} /> },
       { id: "artifacts", label: t`Artifacts`, icon: <Files {...icon} /> },
@@ -4675,6 +4687,7 @@ export function ShellPage() {
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
               running={composerShowsStop(currentRuns)}
               disabled={composerDisabled}
+              canDictate={Boolean(voiceStatus?.transcribe || voiceStatus?.transcriptionReady)}
               disabledPlaceholder={
                 legalWaitsForConsent ? t`Allow access on the page to ask` : undefined
               }
@@ -4861,6 +4874,7 @@ export function ShellPage() {
         investorsMode={investorsMode}
         fundraisingMode={fundraisingMode}
         contactsMode={contactsMode}
+        meetingsMode={meetingsMode}
         calendarMode={calendarMode}
         companyMode={companyMode}
         dataRoomMode={dataRoomMode}
@@ -5004,6 +5018,7 @@ export function ShellPage() {
             paneDraggingFiles ? "ring-2 ring-inset ring-ring" : ""
           }`}
         >
+          <RecordingPillHost />
           {/* Pages carry their own h1; a chat's title is inside a button, so it is named here. */}
           {pageMode ? null : (
             <h1 className="sr-only">
@@ -5175,6 +5190,13 @@ export function ShellPage() {
                   : undefined
               }
             />
+          ) : meetingMatch?.params.meetingId ? (
+            <MeetingDetailPage
+              meetingId={meetingMatch.params.meetingId}
+              spaceName={pageSpaceName}
+            />
+          ) : meetingsMode ? (
+            <MeetingsPage spaceName={pageSpaceName} onAddSpeech={() => openSettings("voice")} />
           ) : contactMatch?.params.contactId ? (
             <ContactDetailPage id={contactMatch.params.contactId} spaceName={pageSpaceName} />
           ) : botPageMatch?.params.botId && botPageMatch.params.pageId ? (
@@ -6038,9 +6060,7 @@ export function ShellPage() {
                   await refreshBots();
                   navigate(contextBot ? `/app/${chat.id}` : `/app/g/${chat.id}`);
                 })
-                .catch((error: unknown) =>
-                  setSendError(errorText(error, t`Failed to duplicate`)),
-                );
+                .catch((error: unknown) => setSendError(errorText(error, t`Failed to duplicate`)));
             }}
             onClear={
               contextBot
