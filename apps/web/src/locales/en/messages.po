@@ -10019,6 +10019,10 @@ msgstr "Pre-money cap {0}"
 msgid "Prepare"
 msgstr "Prepare"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Preparing"
+msgstr "Preparing"
+
 #: src/components/ComposeEmail.tsx
 msgid "Preparing draft…"
 msgstr "Preparing draft…"
@@ -10436,6 +10440,7 @@ msgstr "Reads:"
 
 #: src/components/data-room/DataRoomStats.tsx
 #: src/pages/gtm/GtmChannels.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Ready"
 msgstr "Ready"
 
@@ -10445,8 +10450,8 @@ msgid "Ready until {0}"
 msgstr "Ready until {0}"
 
 #: src/pages/VoiceSettingsOverlay.tsx
-msgid "Ready. Dictation and recordings use this Mac."
-msgstr "Ready. Dictation and recordings use this Mac."
+msgid "Ready. Audio stays on this Mac."
+msgstr "Ready. Audio stays on this Mac."
 
 #: src/components/integrations/BrexCardsSection.tsx
 msgid "Reason"

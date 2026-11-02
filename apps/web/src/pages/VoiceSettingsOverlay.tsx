@@ -25,38 +25,49 @@ import { useDeviceSpeech } from "../lib/device-speech";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 
-function DeviceSpeechSection() {
+/** On-device speech status, with the answers of prepare and forget applied at once. */
+function useDeviceSpeechControl() {
   const pushed = useDeviceSpeech();
   const [local, setLocal] = useState<DesktopSpeechStatus | null>(null);
   const [pending, setPending] = useState(false);
   // A pushed status is newer than the last local answer.
   useEffect(() => setLocal(null), [pushed]);
   const status = local ?? pushed;
-  if (!status || status.state === "unavailable") return null;
-  const speech = desktopBridge()?.speech;
   const run = (action: "prepare" | "forget") => {
     setPending(true);
     if (action === "prepare") setLocal({ state: "preparing", progress: null });
-    void speech?.[action]()
+    void desktopBridge()
+      ?.speech?.[action]()
       .then(setLocal, () => setLocal({ state: "error" }))
       .finally(() => setPending(false));
   };
+  const listed = status && status.state !== "unavailable" ? status : null;
+  return { status: listed, pending, run };
+}
+
+function DeviceSpeechPane({
+  status,
+  pending,
+  run,
+}: {
+  status: DesktopSpeechStatus;
+  pending: boolean;
+  run: (action: "prepare" | "forget") => void;
+}) {
   const percent =
     status.state === "preparing" && status.progress !== null
       ? Math.round(status.progress * 100)
       : null;
   return (
-    <section data-testid="device-speech" className="mb-6 border-b border-border pb-6">
-      <h3 className="text-[15px] text-foreground">
-        <Trans>On this device</Trans>
-      </h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        <Trans>
-          Transcribe with Hex on this Mac. Audio stays on this computer; only text is sent to Praci.
-        </Trans>
-      </p>
+    <section data-testid="device-speech">
       {status.state === "not-prepared" ? (
         <>
+          <p className="text-sm text-muted-foreground">
+            <Trans>
+              Transcribe with Hex on this Mac. Audio stays on this computer; only text is sent to
+              Praci.
+            </Trans>
+          </p>
           <Button type="button" className="mt-3" disabled={pending} onClick={() => run("prepare")}>
             <Trans>Prepare</Trans>
           </Button>
@@ -67,27 +78,27 @@ function DeviceSpeechSection() {
       ) : null}
       {status.state === "preparing" ? (
         <>
-          <p className="mt-3 text-sm text-foreground">
-            {percent === null ? <Trans>Preparing…</Trans> : <Trans>Preparing… {percent}%</Trans>}
-          </p>
           <div
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={percent ?? undefined}
-            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
           >
             <div
               className={`h-full bg-primary ${percent === null ? "w-1/3 animate-pulse" : ""}`}
               style={percent === null ? undefined : { width: `${percent}%` }}
             />
           </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {percent === null ? <Trans>Preparing…</Trans> : <Trans>Preparing… {percent}%</Trans>}
+          </p>
         </>
       ) : null}
       {status.state === "ready" ? (
         <>
-          <p className="mt-3 text-sm text-foreground">
-            <Trans>Ready. Dictation and recordings use this Mac.</Trans>
+          <p className="text-sm text-success">
+            <Trans>Ready. Audio stays on this Mac.</Trans>
           </p>
           <Button
             type="button"
@@ -103,7 +114,7 @@ function DeviceSpeechSection() {
       ) : null}
       {status.state === "error" ? (
         <>
-          <p className="mt-3 text-sm text-destructive">
+          <p className="text-sm text-destructive">
             <Trans>Couldn't prepare Hex.</Trans>
           </p>
           <Button type="button" className="mt-3" disabled={pending} onClick={() => run("prepare")}>
@@ -136,6 +147,10 @@ export function VoiceSettingsOverlay({
   const [status, setStatus] = useState<VoiceStatus | null>(null);
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [provider, setProvider] = useState("");
+  const device = useDeviceSpeechControl();
+  // Until the person picks a row, the device is shown only when it is ready.
+  const [pick, setPick] = useState<"device" | "provider" | null>(null);
+  const deviceSelected = pick === "device" || (pick === null && device.status?.state === "ready");
   const [apiKey, setApiKey] = useState("");
   const [voiceId, setVoiceId] = useState("");
   const [speechModel, setSpeechModel] = useState("");
@@ -331,6 +346,35 @@ export function VoiceSettingsOverlay({
             <Trans>Providers</Trans>
           </div>
           <div className="rk-scroll overflow-y-auto rounded-xl border border-border">
+            {device.status ? (
+              <button
+                type="button"
+                aria-current={deviceSelected ? "true" : undefined}
+                disabled={busy}
+                onClick={() => setPick("device")}
+                className={`flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-start transition-colors last:border-0 disabled:pointer-events-none disabled:opacity-50 ${
+                  deviceSelected ? "bg-foreground/10" : "hover:bg-accent"
+                }`}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] text-foreground">
+                    <Trans>On this device</Trans>
+                  </span>
+                  <span className="mt-0.5 block text-[12px] text-muted-foreground/80">
+                    <Trans>Transcribe</Trans>
+                  </span>
+                </span>
+                {device.status.state === "ready" ? (
+                  <span className="text-[12px] text-success">
+                    <Trans>Ready</Trans>
+                  </span>
+                ) : device.status.state === "preparing" ? (
+                  <span className="text-[12px] text-muted-foreground">
+                    <Trans>Preparing</Trans>
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
             {catalog.map((entry) => {
               const connected =
                 credentials.some((cred) => cred.provider === entry.id) ||
@@ -339,9 +383,10 @@ export function VoiceSettingsOverlay({
                 <button
                   key={entry.id}
                   type="button"
-                  aria-current={entry.id === provider ? "true" : undefined}
+                  aria-current={!deviceSelected && entry.id === provider ? "true" : undefined}
                   disabled={busy}
                   onClick={() => {
+                    setPick("provider");
                     setProvider(entry.id);
                     setApiKey("");
                     setError(null);
@@ -354,7 +399,9 @@ export function VoiceSettingsOverlay({
                       .finally(() => markPending(null));
                   }}
                   className={`flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-start transition-colors last:border-0 disabled:pointer-events-none disabled:opacity-50 ${
-                    entry.id === provider ? "bg-foreground/10" : "hover:bg-accent"
+                    !deviceSelected && entry.id === provider
+                      ? "bg-foreground/10"
+                      : "hover:bg-accent"
                   }`}
                 >
                   <span className="min-w-0 flex-1">
@@ -381,153 +428,162 @@ export function VoiceSettingsOverlay({
         </div>
 
         <div className="rk-scroll min-h-0 min-w-0 flex-1 overflow-y-auto">
-          <DeviceSpeechSection />
-          {loading ? (
-            <p className="text-sm text-muted-foreground">
-              <Trans>Loading voice providers…</Trans>
-            </p>
-          ) : null}
-          {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
-          {notice ? <p className="mb-4 text-sm text-success">{notice}</p> : null}
-          {selected ? (
+          {deviceSelected && device.status ? (
+            <DeviceSpeechPane {...device} status={device.status} />
+          ) : (
             <>
-              {isCompat ? (
-                <>
-                  <Field className="mt-5">
-                    <FieldLabel htmlFor={baseUrlId}>
-                      <Trans>Base URL</Trans>
-                    </FieldLabel>
-                    <Input
-                      id={baseUrlId}
-                      value={baseUrl}
-                      maxLength={2048}
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder="http://localhost:8000"
-                      onChange={(event) => setBaseUrl(event.target.value)}
-                    />
-                  </Field>
-                  <Field className="mt-5">
-                    <FieldLabel htmlFor={compatModelId}>
-                      <Trans>Model</Trans>
-                    </FieldLabel>
-                    <Input
-                      id={compatModelId}
-                      value={compatModel}
-                      maxLength={120}
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder="whisper-large-v3"
-                      onChange={(event) => setCompatModel(event.target.value)}
-                    />
-                  </Field>
-                </>
+              {loading ? (
+                <p className="text-sm text-muted-foreground">
+                  <Trans>Loading voice providers…</Trans>
+                </p>
               ) : null}
-              <Field className="mt-5">
-                <FieldLabel htmlFor={apiKeyId}>
+              {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
+              {notice ? <p className="mb-4 text-sm text-success">{notice}</p> : null}
+              {selected ? (
+                <>
                   {isCompat ? (
-                    <Trans>API key (optional)</Trans>
-                  ) : (
-                    <Trans>{selected.name} API key</Trans>
-                  )}
-                </FieldLabel>
-                <Input
-                  id={apiKeyId}
-                  type="password"
-                  autoComplete="new-password"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  placeholder={credential ? t`Paste a replacement key` : t`Paste your API key`}
-                />
-              </Field>
-              <Button
-                type="button"
-                className="mt-3"
-                disabled={busy || connectDisabled}
-                onClick={() => void connectKey()}
-              >
-                {pending === "connect" ? (
-                  <Trans>Connecting…</Trans>
-                ) : credential ? (
-                  <Trans>Replace key</Trans>
-                ) : (
-                  <Trans>Connect {selected.name}</Trans>
-                )}
-              </Button>
-              {credential || compatConnected ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  disabled={busy}
-                  onClick={() => void disconnectProvider()}
-                >
-                  {pending === "disconnect" ? (
-                    <Trans>Disconnecting…</Trans>
-                  ) : (
-                    <Trans>Disconnect</Trans>
-                  )}
-                </Button>
-              ) : null}
-
-              {credential ? (
-                <>
-                  <Field className="mt-6">
-                    <FieldLabel htmlFor={voiceSelectId}>
-                      <Trans>Voice</Trans>
-                    </FieldLabel>
-                    <NativeSelect
-                      id={voiceSelectId}
-                      className="w-full"
-                      value={voiceId}
-                      disabled={busy}
-                      onChange={(event) => void chooseVoice(event.target.value)}
-                    >
-                      {voiceOptions.map((voice) => (
-                        <NativeSelectOption key={voice.id} value={voice.id}>
-                          {voice.label}
-                          {voice.description ? ` · ${voice.description}` : ""}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </Field>
-                  {selected.id === "fish-audio" ? (
-                    <Field className="mt-6">
-                      <FieldLabel htmlFor={speechModelId}>
-                        <Trans>Speech model</Trans>
-                      </FieldLabel>
-                      <Input
-                        id={speechModelId}
-                        value={speechModel}
-                        maxLength={64}
-                        autoComplete="off"
-                        spellCheck={false}
-                        disabled={busy}
-                        placeholder={t`Optional`}
-                        onChange={(event) => setSpeechModel(event.target.value)}
-                        onBlur={() => void saveSpeechModel()}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter") return;
-                          event.preventDefault();
-                          event.currentTarget.blur();
-                        }}
-                      />
-                    </Field>
+                    <>
+                      <Field className="mt-5">
+                        <FieldLabel htmlFor={baseUrlId}>
+                          <Trans>Base URL</Trans>
+                        </FieldLabel>
+                        <Input
+                          id={baseUrlId}
+                          value={baseUrl}
+                          maxLength={2048}
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="http://localhost:8000"
+                          onChange={(event) => setBaseUrl(event.target.value)}
+                        />
+                      </Field>
+                      <Field className="mt-5">
+                        <FieldLabel htmlFor={compatModelId}>
+                          <Trans>Model</Trans>
+                        </FieldLabel>
+                        <Input
+                          id={compatModelId}
+                          value={compatModel}
+                          maxLength={120}
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="whisper-large-v3"
+                          onChange={(event) => setCompatModel(event.target.value)}
+                        />
+                      </Field>
+                    </>
                   ) : null}
+                  <Field className="mt-5">
+                    <FieldLabel htmlFor={apiKeyId}>
+                      {isCompat ? (
+                        <Trans>API key (optional)</Trans>
+                      ) : (
+                        <Trans>{selected.name} API key</Trans>
+                      )}
+                    </FieldLabel>
+                    <Input
+                      id={apiKeyId}
+                      type="password"
+                      autoComplete="new-password"
+                      value={apiKey}
+                      onChange={(event) => setApiKey(event.target.value)}
+                      placeholder={credential ? t`Paste a replacement key` : t`Paste your API key`}
+                    />
+                  </Field>
                   <Button
                     type="button"
-                    variant="secondary"
-                    className="mt-4 rounded-full"
-                    disabled={busy || !status?.ready}
-                    onClick={() => void testVoice()}
+                    className="mt-3"
+                    disabled={busy || connectDisabled}
+                    onClick={() => void connectKey()}
                   >
-                    {pending === "test" ? <Trans>Playing…</Trans> : <Trans>Hear a sample</Trans>}
+                    {pending === "connect" ? (
+                      <Trans>Connecting…</Trans>
+                    ) : credential ? (
+                      <Trans>Replace key</Trans>
+                    ) : (
+                      <Trans>Connect {selected.name}</Trans>
+                    )}
                   </Button>
+                  {credential || compatConnected ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      disabled={busy}
+                      onClick={() => void disconnectProvider()}
+                    >
+                      {pending === "disconnect" ? (
+                        <Trans>Disconnecting…</Trans>
+                      ) : (
+                        <Trans>Disconnect</Trans>
+                      )}
+                    </Button>
+                  ) : null}
+
+                  {credential ? (
+                    <>
+                      <Field className="mt-6">
+                        <FieldLabel htmlFor={voiceSelectId}>
+                          <Trans>Voice</Trans>
+                        </FieldLabel>
+                        <NativeSelect
+                          id={voiceSelectId}
+                          className="w-full"
+                          value={voiceId}
+                          disabled={busy}
+                          onChange={(event) => void chooseVoice(event.target.value)}
+                        >
+                          {voiceOptions.map((voice) => (
+                            <NativeSelectOption key={voice.id} value={voice.id}>
+                              {voice.label}
+                              {voice.description ? ` · ${voice.description}` : ""}
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                      </Field>
+                      {selected.id === "fish-audio" ? (
+                        <Field className="mt-6">
+                          <FieldLabel htmlFor={speechModelId}>
+                            <Trans>Speech model</Trans>
+                          </FieldLabel>
+                          <Input
+                            id={speechModelId}
+                            value={speechModel}
+                            maxLength={64}
+                            autoComplete="off"
+                            spellCheck={false}
+                            disabled={busy}
+                            placeholder={t`Optional`}
+                            onChange={(event) => setSpeechModel(event.target.value)}
+                            onBlur={() => void saveSpeechModel()}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter") return;
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            }}
+                          />
+                        </Field>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="mt-4 rounded-full"
+                        disabled={busy || !status?.ready}
+                        onClick={() => void testVoice()}
+                      >
+                        {pending === "test" ? (
+                          <Trans>Playing…</Trans>
+                        ) : (
+                          <Trans>Hear a sample</Trans>
+                        )}
+                      </Button>
+                    </>
+                  ) : null}
                 </>
               ) : null}
             </>
-          ) : null}
+          )}
         </div>
       </div>
     </>

@@ -234,59 +234,17 @@ it("saves an OpenAI-compatible server's base URL and model, and never shows the 
   }
 });
 
-it("shows the on-device section only when the desktop bridge reports a state", async () => {
+async function renderWithSpeech(speech?: unknown) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  voice.catalog.mockResolvedValue([]);
+  voice.catalog.mockResolvedValue([
+    { id: "fish-audio", name: "Fish Audio", description: "", transcribe: true },
+  ]);
   voice.credentials.mockResolvedValue([]);
   voice.status.mockResolvedValue({ configured: false, ready: false, transcribe: false });
-  const render = async (speech?: unknown) => {
-    vi.stubGlobal(
-      "window",
-      Object.assign(window, { rakazoDesktop: speech ? { speech } : undefined }),
-    );
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<VoiceSettingsOverlay embedded onClose={() => undefined} />);
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-    return container;
-  };
-  const bridge = (state: object) => ({
-    status: async () => state,
-    onStatus: () => () => undefined,
-    prepare: vi.fn(),
-    forget: vi.fn(),
-  });
-
-  expect((await render()).querySelector("[data-testid=device-speech]")).toBeNull();
-  expect(
-    (await render(bridge({ state: "unavailable" }))).querySelector("[data-testid=device-speech]"),
-  ).toBeNull();
-  const text = async (state: object) =>
-    (await render(bridge(state))).querySelector("[data-testid=device-speech]")?.textContent;
-  expect(await text({ state: "not-prepared" })).toContain("Prepare");
-  expect(await text({ state: "preparing", progress: 0.42 })).toContain("Preparing… 42%");
-  expect(await text({ state: "preparing", progress: null })).not.toContain("%");
-  expect(await text({ state: "ready" })).toContain("Stop using");
-  expect(await text({ state: "error" })).toContain("Try again");
-});
-
-it("applies the status returned by prepare when nothing is pushed", async () => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  voice.catalog.mockResolvedValue([]);
-  voice.credentials.mockResolvedValue([]);
-  voice.status.mockResolvedValue({ configured: false, ready: false, transcribe: false });
-  const speech = {
-    status: async () => ({ state: "not-prepared" }),
-    onStatus: () => () => undefined,
-    prepare: async () => ({ state: "ready" }),
-    forget: vi.fn(),
-  };
-  vi.stubGlobal("window", Object.assign(window, { rakazoDesktop: { speech } }));
+  vi.stubGlobal(
+    "window",
+    Object.assign(window, { rakazoDesktop: speech ? { speech } : undefined }),
+  );
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -296,11 +254,59 @@ it("applies the status returned by prepare when nothing is pushed", async () => 
   await act(async () => {
     await Promise.resolve();
   });
-  const section = () => container.querySelector("[data-testid=device-speech]");
+  const row = () =>
+    [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("On this device"),
+    );
+  const pane = () => container.querySelector("[data-testid=device-speech]");
+  return { container, row, pane };
+}
+const bridge = (state: object, extra: object = {}) => ({
+  status: async () => state,
+  onStatus: () => () => undefined,
+  prepare: vi.fn(),
+  forget: vi.fn(),
+  ...extra,
+});
+
+it("hides the On this device row without a bridge or when unavailable", async () => {
+  expect((await renderWithSpeech()).row()).toBeUndefined();
+  expect((await renderWithSpeech(bridge({ state: "unavailable" }))).row()).toBeUndefined();
+});
+
+it("selects the device by default when ready, with a Ready label on the row", async () => {
+  const { row, pane } = await renderWithSpeech(bridge({ state: "ready" }));
+  expect(row()?.textContent).toContain("Ready");
+  expect(pane()?.textContent).toContain("Ready. Audio stays on this Mac.");
+  expect(pane()?.textContent).toContain("Stop using");
+});
+
+it("shows each state's pane after selecting the row", async () => {
+  const cases: Array<[object, string]> = [
+    [{ state: "not-prepared" }, "Prepare"],
+    [{ state: "preparing", progress: 0.42 }, "Preparing… 42%"],
+    [{ state: "error" }, "Try again"],
+  ];
+  for (const [state, text] of cases) {
+    const { row, pane } = await renderWithSpeech(bridge(state));
+    expect(pane()).toBeNull();
+    await act(async () => row()?.click());
+    expect(pane()?.textContent).toContain(text);
+  }
+  const { row, pane } = await renderWithSpeech(bridge({ state: "preparing", progress: null }));
+  await act(async () => row()?.click());
+  expect(pane()?.textContent).not.toContain("%");
+});
+
+it("applies the status returned by prepare when nothing is pushed", async () => {
+  const { row, pane } = await renderWithSpeech(
+    bridge({ state: "not-prepared" }, { prepare: async () => ({ state: "ready" }) }),
+  );
+  await act(async () => row()?.click());
   await act(async () => {
-    [...(section()?.querySelectorAll("button") ?? [])]
+    [...(pane()?.querySelectorAll("button") ?? [])]
       .find((b) => b.textContent === "Prepare")
       ?.click();
   });
-  expect(section()?.textContent).toContain("Ready. Dictation and recordings use this Mac.");
+  expect(pane()?.textContent).toContain("Ready. Audio stays on this Mac.");
 });

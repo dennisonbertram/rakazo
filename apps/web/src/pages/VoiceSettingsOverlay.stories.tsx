@@ -125,6 +125,14 @@ export const OpenAiCompatible: Story = {
     }),
 };
 
+/** Opens the On this device row; a ready device is already selected. */
+const openDeviceRow: Story["play"] = async ({ canvasElement }) => {
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  [...canvasElement.querySelectorAll("button")]
+    .find((button) => button.textContent?.includes("On this device"))
+    ?.click();
+};
+
 const withSpeech = (state: DesktopSpeechStatus) => () => {
   const speech = {
     status: async () => state,
@@ -146,14 +154,17 @@ const withSpeech = (state: DesktopSpeechStatus) => () => {
 
 export const OnDeviceNotPrepared: Story = {
   args: { embedded: true },
+  play: openDeviceRow,
   beforeEach: withSpeech({ state: "not-prepared" }),
 };
 export const OnDevicePreparing: Story = {
   args: { embedded: true },
+  play: openDeviceRow,
   beforeEach: withSpeech({ state: "preparing", progress: 0.42 }),
 };
 export const OnDevicePreparingUnknown: Story = {
   args: { embedded: true },
+  play: openDeviceRow,
   beforeEach: withSpeech({ state: "preparing", progress: null }),
 };
 export const OnDeviceReady: Story = {
@@ -162,5 +173,6 @@ export const OnDeviceReady: Story = {
 };
 export const OnDeviceError: Story = {
   args: { embedded: true },
+  play: openDeviceRow,
   beforeEach: withSpeech({ state: "error" }),
 };

@@ -10019,6 +10019,10 @@ msgstr ""
 msgid "Prepare"
 msgstr ""
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Preparing"
+msgstr ""
+
 #: src/components/ComposeEmail.tsx
 msgid "Preparing draft…"
 msgstr ""
@@ -10436,6 +10440,7 @@ msgstr ""
 
 #: src/components/data-room/DataRoomStats.tsx
 #: src/pages/gtm/GtmChannels.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Ready"
 msgstr ""
 
@@ -10445,7 +10450,7 @@ msgid "Ready until {0}"
 msgstr ""
 
 #: src/pages/VoiceSettingsOverlay.tsx
-msgid "Ready. Dictation and recordings use this Mac."
+msgid "Ready. Audio stays on this Mac."
 msgstr ""
 
 #: src/components/integrations/BrexCardsSection.tsx
