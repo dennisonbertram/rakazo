@@ -103,7 +103,11 @@ function chat(id: string, name: string) {
 function space(
   id: string,
   name: string,
-  options: { canRename?: boolean; canDelete?: boolean; bots?: ReturnType<typeof chat>[] } = {},
+  options: {
+    canRename?: boolean;
+    canDelete?: boolean;
+    bots?: ReturnType<typeof chat>[];
+  } = {},
 ) {
   return {
     id,
@@ -143,10 +147,21 @@ describe("sidebarGroupsForSpaces", () => {
   });
 
   it("leaves a hidden bot out of every group", () => {
-    const hidden = { ...chat("h", "Hidden one"), hiddenAt: "2026-01-01T00:00:00.000Z" };
-    const pinnedHidden = { ...chat("p", "Pinned hidden"), pinned: true, hiddenAt: "2026-01-01" };
+    const hidden = {
+      ...chat("h", "Hidden one"),
+      hiddenAt: "2026-01-01T00:00:00.000Z",
+    };
+    const pinnedHidden = {
+      ...chat("p", "Pinned hidden"),
+      pinned: true,
+      hiddenAt: "2026-01-01",
+    };
     const groups = sidebarGroupsForSpaces(
-      [space("a", "Acme", { bots: [chat("c", "Chief"), hidden, pinnedHidden] })],
+      [
+        space("a", "Acme", {
+          bots: [chat("c", "Chief"), hidden, pinnedHidden],
+        }),
+      ],
       "",
       "a",
       "Personal",
@@ -175,13 +190,21 @@ describe("sidebarGroupsForSpaces", () => {
       undefined,
       "Personnel",
     );
-    expect(group).toMatchObject({ title: "Personnel", spaceName: "Personal", relabeled: true });
+    expect(group).toMatchObject({
+      title: "Personnel",
+      spaceName: "Personal",
+      relabeled: true,
+    });
   });
 
   it("lists the only space's chats with no heading or menu, and brings them back with a second space", () => {
     const only = [space("space-1", "Personal", { canRename: true })];
     const [solo] = sidebarGroupsForSpaces(only, "", "space-1", null);
-    expect(solo).toMatchObject({ title: null, canRenameSpace: false, canDeleteSpace: false });
+    expect(solo).toMatchObject({
+      title: null,
+      canRenameSpace: false,
+      canDeleteSpace: false,
+    });
     expect(solo?.bots).toHaveLength(1);
 
     const both = sidebarGroupsForSpaces([...only, space("space-2", "Work")], "", "space-1", null);
@@ -195,7 +218,11 @@ describe("sidebarGroupsForSpaces", () => {
       undefined,
       "Personal",
     );
-    expect(group).toMatchObject({ title: "Personal", spaceName: "Personal", relabeled: false });
+    expect(group).toMatchObject({
+      title: "Personal",
+      spaceName: "Personal",
+      relabeled: false,
+    });
   });
 
   it("keeps the Personnel heading above pinned agents, folders and the rest", () => {
@@ -203,7 +230,10 @@ describe("sidebarGroupsForSpaces", () => {
     const filed = { ...chat("b2", "Ops"), sectionId: "s1" };
     const loose = chat("b3", "Helper");
     const only = {
-      ...space("space-1", "Personal", { canRename: true, bots: [pinned, filed, loose] }),
+      ...space("space-1", "Personal", {
+        canRename: true,
+        bots: [pinned, filed, loose],
+      }),
       botSections: [
         { id: "s1", name: "Ops team", collapsed: true },
         { id: "s2", name: "Empty folder" },
@@ -235,7 +265,9 @@ describe("sidebarGroupsForSpaces", () => {
   });
 
   it("heads a pinned-only single space with Personnel", () => {
-    const only = space("space-1", "Personal", { bots: [{ ...chat("b1", "Chief"), pinned: true }] });
+    const only = space("space-1", "Personal", {
+      bots: [{ ...chat("b1", "Chief"), pinned: true }],
+    });
     const groups = sidebarGroupsForSpaces([only], "", undefined, "Personnel");
     expect(groups.map((g) => g.title)).toEqual(["Personnel", "Pinned", null]);
   });
@@ -270,7 +302,11 @@ describe("sidebarGroupsForSpaces", () => {
     const groups = sidebarGroupsForSpaces(
       [
         space("space-1", "Personal", { canRename: true }),
-        space("space-2", "Support", { canRename: true, canDelete: true, bots: [] }),
+        space("space-2", "Support", {
+          canRename: true,
+          canDelete: true,
+          bots: [],
+        }),
       ],
       "",
       undefined,
@@ -279,7 +315,10 @@ describe("sidebarGroupsForSpaces", () => {
 
     // Support has no chats, so it has no header; the space switcher is its only way in.
     expect(groups.map((group) => group.title)).toEqual(["Personal"]);
-    expect(groups[0]).toMatchObject({ canRenameSpace: true, canDeleteSpace: false });
+    expect(groups[0]).toMatchObject({
+      canRenameSpace: true,
+      canDeleteSpace: false,
+    });
   });
 
   it("keeps the active empty space's block so it can still be renamed or deleted", () => {
@@ -290,7 +329,11 @@ describe("sidebarGroupsForSpaces", () => {
     const groups = sidebarGroupsForSpaces(spaces, "", "space-2");
     expect(groups.map((g) => g.title)).toEqual(["Personal", "Empty"]);
     expect(sidebarGroupsForSpaces(spaces, "", "space-1").map((g) => g.title)).toEqual(["Personal"]);
-    expect(groups[1]).toMatchObject({ canRenameSpace: true, canDeleteSpace: true, current: true });
+    expect(groups[1]).toMatchObject({
+      canRenameSpace: true,
+      canDeleteSpace: true,
+      current: true,
+    });
   });
 
   it("marks the space being shown only when several are listed", () => {
@@ -492,7 +535,10 @@ it("marks Investors as current and opens its page", async () => {
           createElement(
             "div",
             null,
-            createElement(SidebarFixture, { mode: "expanded", investorsMode: true }),
+            createElement(SidebarFixture, {
+              mode: "expanded",
+              investorsMode: true,
+            }),
             createElement(CurrentPath),
           ),
         ),
@@ -535,7 +581,10 @@ it("marks Fundraising as current and opens its page", async () => {
           createElement(
             "div",
             null,
-            createElement(SidebarFixture, { mode: "expanded", fundraisingMode: true }),
+            createElement(SidebarFixture, {
+              mode: "expanded",
+              fundraisingMode: true,
+            }),
             createElement(CurrentPath),
           ),
         ),
@@ -892,6 +941,68 @@ it("keeps the first and focused roster rows tabbable and moves focus down with A
   }
 });
 
+it("makes folder headers, folds and their Actions part of the roster tab stop", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  stubSidebarObservers();
+  Element.prototype.scrollIntoView ??= () => undefined;
+
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const press = (el: HTMLElement, key: string) =>
+    act(async () => {
+      el.focus();
+      el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    });
+  try {
+    await act(async () => {
+      root.render(
+        createElement(
+          MemoryRouter,
+          null,
+          createElement(SidebarFixture, {
+            mode: "expanded",
+            pageAgents: true,
+            emailChats: true,
+          }),
+        ),
+      );
+    });
+    const header = container.querySelector<HTMLElement>('[data-sidebar-folder="folder_workspace"]');
+    const folder = header?.querySelector<HTMLElement>("button");
+    const pageFold = container.querySelector<HTMLElement>('[data-testid="sidebar-page-agents"]');
+    const emailFold = container.querySelector<HTMLElement>('[data-testid="sidebar-email-chats"]');
+    if (!header || !folder || !pageFold || !emailFold)
+      throw new Error("Expected a folder and both folds");
+    const others = [header, pageFold.parentElement, emailFold.parentElement].map((wrapper) =>
+      [...(wrapper?.querySelectorAll<HTMLElement>("button") ?? [])].at(-1),
+    );
+    expect(others.filter(Boolean)).toHaveLength(3);
+    for (const control of [folder, pageFold, emailFold, ...others]) {
+      expect(control?.tabIndex).toBe(-1);
+    }
+
+    const rows = [...container.querySelectorAll<HTMLElement>("[data-roster-row]")];
+    const above = rows[rows.indexOf(folder) - 1];
+    if (!above) throw new Error("Expected a row above the folder");
+    await press(above, "ArrowDown");
+    expect(document.activeElement).toBe(folder);
+    const below = rows[rows.indexOf(pageFold) - 1];
+    if (!below) throw new Error("Expected a row above the Page agents fold");
+    await press(below, "ArrowDown");
+    expect(document.activeElement).toBe(pageFold);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it("opens the command palette from expanded and rail Search", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("matchMedia", () => ({
@@ -1012,7 +1123,10 @@ it("treats a page made with New page as a page agent, listed only when unused on
 });
 
 describe("foldRows", () => {
-  const row = (id: string) => ({ depth: 0, item: { kind: "bot", chat: { id } } });
+  const row = (id: string) => ({
+    depth: 0,
+    item: { kind: "bot", chat: { id } },
+  });
   const rows = [row("a"), row("b")];
 
   it("lists every row, nested one level, when the fold is open", () => {
@@ -1062,4 +1176,52 @@ it("shows the +N more bar slim, at the bottom of the list", async () => {
     container.remove();
     vi.unstubAllGlobals();
   }
+});
+
+describe("bot row click", () => {
+  async function clickRow(detail: number, coarse = false) {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: coarse && q === "(pointer: coarse)",
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    stubSidebarObservers();
+    Element.prototype.scrollIntoView ??= () => undefined;
+    const onFocusComposer = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            MemoryRouter,
+            null,
+            createElement(SidebarFixture, {
+              mode: "expanded",
+              onFocusComposer,
+            }),
+          ),
+        );
+      });
+      const row = container.querySelector<HTMLElement>('[data-roster-row="bot_ada"]');
+      await act(async () => {
+        row?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail }));
+      });
+      return onFocusComposer;
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  }
+
+  it("asks for the message box after a mouse click", async () => {
+    expect(await clickRow(1)).toHaveBeenCalledWith("bot_ada");
+  });
+
+  it("leaves focus on the row after a keyboard activation or on a touch screen", async () => {
+    expect(await clickRow(0)).not.toHaveBeenCalled();
+    expect(await clickRow(1, true)).not.toHaveBeenCalled();
+  });
 });

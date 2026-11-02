@@ -92,6 +92,40 @@ describePostgres("transcription selection (PostgreSQL)", () => {
     await close();
   });
 
+  it("stores an OpenAI-compatible server and transcribes through it without echoing the key", async () => {
+    const { createServer } = await import("node:http");
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ text: "from the fixture" }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const baseUrl = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const who = actor(userA);
+      await expect(
+        setTranscription(deps(), who, { provider: "openai-compatible" }),
+      ).rejects.toThrow("base URL");
+      const set = await setTranscription(deps(), who, {
+        provider: "openai-compatible",
+        baseUrl,
+        model: "whisper-large-v3",
+        apiKey: "fixture-key-123",
+      });
+      expect(set).toEqual({ provider: "openai-compatible" });
+      const row = await prisma.transcriptionSelection.findUniqueOrThrow({
+        where: { userId: userA },
+      });
+      expect(row.provider).toBe("openai-compatible");
+      expect(JSON.stringify(set)).not.toContain("fixture-key-123");
+      await expect(transcribeVoice(deps(), who, audio)).resolves.toEqual({
+        text: "from the fixture",
+      });
+      await clearTranscription(deps(), who);
+    } finally {
+      server.close();
+    }
+  });
+
   it("selecting a transcription-only provider does not change the speech provider", async () => {
     const a = client(actor(userA));
     const connected = await a.voice.connect({

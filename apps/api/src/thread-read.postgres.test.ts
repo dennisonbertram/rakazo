@@ -150,6 +150,21 @@ describePostgres("thread read boundary (PostgreSQL)", () => {
     expect(await read(id)).toEqual({ lastReadSeq: 2, unread: false });
   });
 
+  it("reports whether the unread flag changed", async () => {
+    const id = await thread(alice);
+    expect(await setThreadUnreadState(prisma, alice, target(id), false, { toEnd: true })).toBe(
+      true,
+    );
+    expect(await setThreadUnreadState(prisma, alice, target(id), false, { toEnd: true })).toBe(
+      false,
+    );
+    expect(await setThreadUnreadState(prisma, alice, target(id), true)).toBe(true);
+    expect(await setThreadUnreadState(prisma, alice, target(id), true)).toBe(false);
+    expect(await markThreadUnreadFrom(prisma, alice, target(id), mid(id, 2))).toBe(false);
+    await setThreadUnreadState(prisma, alice, target(id), false, { toEnd: true });
+    expect(await markThreadUnreadFrom(prisma, alice, target(id), mid(id, 2))).toBe(true);
+  });
+
   it("leaves another user's or space's thread untouched", async () => {
     const id = await thread(alice);
     await setThreadUnreadState(prisma, bob, target(id), false);

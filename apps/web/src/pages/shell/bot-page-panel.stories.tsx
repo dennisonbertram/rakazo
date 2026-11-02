@@ -54,7 +54,7 @@ const meta = {
   args: { botId: "bot_demo", remote: null },
   decorators: [
     (Story) => (
-      <div className="w-[384px]">
+      <div className="w-full max-w-[384px]">
         <Story />
       </div>
     ),
@@ -124,6 +124,36 @@ export const SeveralPages: Story = {
       },
     }),
 };
+
+const manyPages = (count: number) => {
+  const titles = [
+    "Cash",
+    "Burn",
+    "Pipeline",
+    "Hiring plan and headcount",
+    "Runway",
+    "Board prep",
+    "Spend",
+    "Quarterly goals and key results",
+  ];
+  return Array.from({ length: count }, (_, i) =>
+    summary(`page_${i}`, titles[i] ?? `Page ${i + 1}`),
+  );
+};
+const manyMocks = (count: number) =>
+  mockRpc({
+    "pages.list": manyPages(count),
+    "pages.get": (input: unknown) => {
+      const { pageId } = input as { pageId?: string };
+      return { ...page(1, "# Notes\n\nSample text."), id: pageId, title: pageId };
+    },
+  });
+
+/** Eight tabs, including long titles: the strip scrolls and both buttons stay visible. */
+export const EightPages: Story = { beforeEach: () => manyMocks(8) };
+
+/** Twenty tabs: the strip scrolls sideways; Page options and New page stay clickable. */
+export const TwentyPages: Story = { beforeEach: () => manyMocks(20) };
 
 /** Opens the title field the way "New page" and the Rename menu item do. */
 export const RenameOpen: Story = {
@@ -201,6 +231,7 @@ const liveMocks = (blocks: unknown[]) => ({
   "pages.data": liveData(blocks),
   "pages.sources": sources,
   "pages.refresh": liveData(liveBlocks),
+  "pages.shareStatus": null,
   "pages.share": {
     url: "https://app.example.test/s#example-token",
     expiresAt: "2026-11-29T00:00:00.000Z",
@@ -252,5 +283,19 @@ export const LivePageSources: Story = {
     const menu = await within(canvasElement).findByRole("button", { name: "Page options" });
     await userEvent.click(menu);
     await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Sources" }));
+  },
+};
+
+/** Share on a page that is already shared: Replace link and Stop sharing, with no link shown. */
+export const LivePageShareReopened: Story = {
+  beforeEach: () =>
+    mockRpc({
+      ...liveMocks(liveBlocks),
+      "pages.shareStatus": { artifactId: "art_snapshot", expiresAt: "2026-11-29T00:00:00.000Z" },
+    }),
+  play: async ({ canvasElement }) => {
+    const menu = await within(canvasElement).findByRole("button", { name: "Page options" });
+    await userEvent.click(menu);
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Share" }));
   },
 };

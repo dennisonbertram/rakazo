@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { HttpSourceCall, McpSourceCall, MessageBlock } from "@rakazo/contracts";
-import { MessageBlock as MessageBlockSchema } from "@rakazo/contracts";
+import { approvalTitle, MessageBlock as MessageBlockSchema } from "@rakazo/contracts";
 import type { NotificationEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -128,7 +128,7 @@ export async function postPageSourceApproval(
       run,
       {
         kind: "help",
-        title: `${botName} needs approval`,
+        title: approvalTitle(botName),
         body: block.text,
         botId: run.botId,
         threadId: run.threadId,

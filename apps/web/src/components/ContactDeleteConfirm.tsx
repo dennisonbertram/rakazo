@@ -13,7 +13,8 @@ import {
 } from "@rakazo/ui-web";
 
 /** True when deleting the contact would remove more than its own fields, which Undo cannot bring back. */
-export const hasLinks = (linked: ContactLinked) => linked.portal || linked.documents.length > 0;
+export const hasLinks = (linked: ContactLinked) =>
+  linked.portal || linked.documents.length > 0 || linked.safes > 0;
 
 /** What the delete removes, in words: "their portal access and access to 2 shared documents". */
 function removes(linked: ContactLinked): string {
@@ -24,6 +25,8 @@ function removes(linked: ContactLinked): string {
     parts.push(
       plural(count, { one: "access to # shared document", other: "access to # shared documents" }),
     );
+  if (linked.safes > 0)
+    parts.push(plural(linked.safes, { one: "the link to # SAFE", other: "the links to # SAFEs" }));
   return parts.join(` ${t`and`} `);
 }
 

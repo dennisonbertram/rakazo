@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { Router } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
 import type {
   AdapterContext,
@@ -9,6 +10,7 @@ import type {
 import {
   computerControlExpireJobKey,
   dataRoomBlobDeleteJob,
+  MEMORY_REVISION_CONFLICT_ERROR,
   messagingDeliverJob,
   routineJobKey,
   routineWakeupJob,
@@ -99,6 +101,7 @@ import {
   PageValidationError,
   PinsValidationError,
   pageChartSvgs,
+  pageShareStatus,
   parseModelSecret,
   persistPreparedSecret,
   personCalendarMeetings,
@@ -140,6 +143,7 @@ import {
   screenLeaseIdForRun,
   scriptedCatalogEntry,
   selectDefaultCredentialId,
+  selectTranscriptionTarget,
   serializeModelSecret,
   sharePageSnapshot,
   startAuditDraftRun,
@@ -160,6 +164,7 @@ import {
 } from "@rakazo/adapters";
 import type {
   Actor,
+  AppContract,
   Bot,
   BotSecretMetadata,
   ComposeFields,
@@ -168,9 +173,11 @@ import type {
   ExportManifest,
   McpServer,
   Me,
+  MeetingRecordingPolicy,
   NotificationDto,
   Routine,
   SpaceNavigation,
+  UpdateBotAppControl,
   WatchPausedReason,
 } from "@rakazo/contracts";
 import {
@@ -185,6 +192,7 @@ import {
   foldComputerCommands,
   GOOGLE_DESKTOP_REDIRECT_URI,
   GRANOLA_API_CONNECTOR_ID,
+  HEX_CONNECTOR_ID,
   IntegrationProviderIdSchema,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
@@ -195,6 +203,7 @@ import {
   isCompanyImporterSpawnKey,
   isCustomPageSpawnKey,
   isDataRoomAgentSpawnKey,
+  isDeniedApp,
   isFinanceAgentSpawnKey,
   isGranolaEndpoint,
   isGtmAgentSpawnKey,
@@ -207,6 +216,7 @@ import {
   isShareableArtifactMimeType,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
+  NOTIFICATION_CATCH_UP_ID,
   NOTIFICATION_HEARTBEAT_ID,
   notificationKindOf,
   OMI_CONNECTOR_ID,
@@ -578,15 +588,25 @@ import {
   revertConnectedMcpApprovals,
 } from "./mcp-approval.js";
 import { buildMcpUpdateMaterial, mcpOrigin } from "./mcp-material.js";
+import {
+  activeCapture,
+  appendCaptureText,
+  discardCapture,
+  finishCapture,
+  setMeetingRecording,
+  startCapture,
+} from "./meeting-captures.js";
 import type { MeetingsDeps } from "./meetings.js";
 import {
   connectGranola,
   deleteStoredMeeting,
   disconnectGranola,
+  getStoredMeeting,
   granolaStatus,
   listStoredMeetings,
   refreshGranola,
 } from "./meetings.js";
+import { connectLocal, disconnectLocal, importLocal, localStatus } from "./meetings-local.js";
 import {
   disconnectMemoryProvider,
   persistMemoryProviderConfig,
@@ -612,7 +632,7 @@ import {
 import { rememberedMessageIds, rememberThreadMessage } from "./remember-message.js";
 import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
-import type { RouterDeps } from "./routes/context.js";
+import type { RouteAuthContext, RouterDeps } from "./routes/context.js";
 import { asTenant, createRouteContext } from "./routes/context.js";
 import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
@@ -737,6 +757,14 @@ async function reconcilePendingConnections(
 
 /** A provider saying the remote account does not exist: it is already gone, so revoke is done. */
 /** Page validation and duplicate-title errors become 400 and 409; anything else is rethrown. */
+/** Tells the owner's other tabs and devices a chat's read state changed, so they reload their lists. */
+function notifyThreadReadChanged(deps: RouterDeps, actor: Actor) {
+  return deps.notificationEvents.notify(
+    { spaceId: actor.spaceId, userId: actor.userId },
+    { id: NOTIFICATION_CATCH_UP_ID, surface: "threads", importance: "info" },
+  );
+}
+
 function pageError(error: unknown): unknown {
   if (error instanceof PageValidationError) {
     return new ORPCError("BAD_REQUEST", { message: error.message });
@@ -1349,7 +1377,10 @@ async function asMemberOf<T>(
   return runAsTenant({ spaceId, userId: actor.userId }, fn);
 }
 
-export function createRouter(deps: RouterDeps) {
+// Named so declaration emit does not spell out the whole router, which no longer fits.
+export type AppRouter = Router<AppContract, RouteAuthContext>;
+
+export function createRouter(deps: RouterDeps): AppRouter {
   const routeContext = createRouteContext(deps);
   const { os, authed } = routeContext;
   const repos = createRepos(deps.prisma);
@@ -1812,6 +1843,9 @@ export function createRouter(deps: RouterDeps) {
           }
         }),
       ),
+      setMeetingRecording: authed.spaces.setMeetingRecording.handler(({ context, input }) =>
+        setMeetingRecording(deps, context.actor, input.policy),
+      ),
       // Acts on the Space being deleted, not the current one, so its emptiness check and
       // teardown see that Space's rows. Membership is checked first.
       remove: authed.spaces.remove.handler(({ context, input }) =>
@@ -1980,6 +2014,33 @@ export function createRouter(deps: RouterDeps) {
         spaces: navigation.spaces,
       };
     }),
+    appControl: {
+      status: authed.appControl.status.handler(async ({ context }) => {
+        const none = { available: false, accessibility: "unknown", platform: null } as const;
+        if (!deps.appControl || !context.actor.isDeploymentOwner) return none;
+        try {
+          const status = await deps.appControl.status(
+            connectionContext(context.actor, randomUUID()),
+          );
+          return {
+            available: status.available,
+            accessibility: status.accessibility,
+            platform: status.platform ?? null,
+            ...(status.installed === false ? { needsInstall: true } : {}),
+          };
+        } catch {
+          return none;
+        }
+      }),
+      apps: authed.appControl.apps.handler(async ({ context }) => {
+        if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+        if (!deps.appControl) {
+          throw new ORPCError("PRECONDITION_FAILED", { message: "App control is not set up" });
+        }
+        const apps = await deps.appControl.listApps(connectionContext(context.actor, randomUUID()));
+        return { apps: apps.filter((app) => !isDeniedApp(app)) };
+      }),
+    },
     deployment: {
       get: authed.deployment.get.handler(async ({ context }) => {
         if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
@@ -2757,6 +2818,7 @@ export function createRouter(deps: RouterDeps) {
           }
         }
         if (!existing.thread) throw new IsolationError();
+        const appControl = await checkAppControlUpdate(deps, context.actor, existing, input);
         if (input.runsOn !== undefined && input.runsOn !== (existing.runsOn ?? null)) {
           assertRunsOnAllowed({
             runsOn: input.runsOn,
@@ -2827,6 +2889,9 @@ export function createRouter(deps: RouterDeps) {
             ...(input.crossSpaceCommunication !== undefined
               ? { crossSpaceCommunication: input.crossSpaceCommunication }
               : {}),
+            ...(appControl?.enabled !== undefined ? { appControlEnabled: appControl.enabled } : {}),
+            ...(appControl?.apps !== undefined ? { appControlApps: appControl.apps } : {}),
+            ...(appControl?.headed !== undefined ? { appControlHeaded: appControl.headed } : {}),
             ...(input.disabledBuiltinTools !== undefined
               ? { disabledBuiltinTools: input.disabledBuiltinTools }
               : {}),
@@ -3601,19 +3666,19 @@ export function createRouter(deps: RouterDeps) {
       }),
       markRead: authed.threads.markRead.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        await setThreadUnreadState(deps.prisma, context.actor, target, false, {
+        const changed = await setThreadUnreadState(deps.prisma, context.actor, target, false, {
           upToMessageId: input.upToMessageId,
           toEnd: input.toEnd,
         });
+        if (changed) await notifyThreadReadChanged(deps, context.actor);
         return { ok: true as const };
       }),
       markUnread: authed.threads.markUnread.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        if (input.messageId) {
-          await markThreadUnreadFrom(deps.prisma, context.actor, target, input.messageId);
-        } else {
-          await setThreadUnreadState(deps.prisma, context.actor, target, true);
-        }
+        const changed = input.messageId
+          ? await markThreadUnreadFrom(deps.prisma, context.actor, target, input.messageId)
+          : await setThreadUnreadState(deps.prisma, context.actor, target, true);
+        if (changed) await notifyThreadReadChanged(deps, context.actor);
         return { ok: true as const };
       }),
     },
@@ -4359,21 +4424,29 @@ export function createRouter(deps: RouterDeps) {
           },
         });
         if (!doc) throw new IsolationError();
-        const updated = await deps.memory.commit(
-          {
-            scope: doc.scope as "bot" | "user",
-            botId: doc.botId ?? undefined,
-            path: doc.path,
-            content: input.content,
-          },
-          {
-            operationId: "mem",
-            traceId: "mem",
-            spaceId: context.actor.spaceId,
-            userId: context.actor.userId,
-            signal: new AbortController().signal,
-          },
-        );
+        const updated = await deps.memory
+          .commit(
+            {
+              scope: doc.scope as "bot" | "user",
+              botId: doc.botId ?? undefined,
+              path: doc.path,
+              content: input.content,
+              expectedRevision: input.expectedRevision,
+            },
+            {
+              operationId: "mem",
+              traceId: "mem",
+              spaceId: context.actor.spaceId,
+              userId: context.actor.userId,
+              signal: new AbortController().signal,
+            },
+          )
+          .catch((error: unknown) => {
+            if (error instanceof Error && error.message === MEMORY_REVISION_CONFLICT_ERROR) {
+              throw new ORPCError("CONFLICT", { message: "Memory changed since it was opened" });
+            }
+            throw error;
+          });
         return {
           id: updated.id,
           scope: doc.scope as "bot" | "user",
@@ -4383,6 +4456,22 @@ export function createRouter(deps: RouterDeps) {
           revision: updated.revision,
           updatedAt: new Date().toISOString(),
         };
+      }),
+      remove: authed.memory.remove.handler(async ({ context, input }) => {
+        const where = {
+          id: input.documentId,
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+        };
+        // Revisions go with the document (ON DELETE CASCADE).
+        const { count } = await deps.prisma.memoryDocument.deleteMany({
+          where: { ...where, revision: input.revision },
+        });
+        if (count === 0) {
+          if (!(await deps.prisma.memoryDocument.findFirst({ where }))) throw new IsolationError();
+          throw new ORPCError("CONFLICT", { message: "Memory changed since it was opened" });
+        }
+        return { ok: true as const };
       }),
       exportMarkdown: authed.memory.exportMarkdown.handler(async ({ context, input }) => {
         const docs = await deps.prisma.memoryDocument.findMany({
@@ -4468,6 +4557,21 @@ export function createRouter(deps: RouterDeps) {
           expiresAt: expiresAt.toISOString(),
           artifactId,
         };
+      }),
+      shareStatus: authed.pages.shareStatus.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return null;
+        return pageShareStatus(deps.prisma, {
+          spaceId: bot.spaceId,
+          userId: bot.userId,
+          botId: bot.id,
+          pageId: page.id,
+        });
       }),
       sources: authed.pages.sources.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
@@ -4978,7 +5082,7 @@ export function createRouter(deps: RouterDeps) {
             await deps.jobs.cancel(routineJobKey(row.id));
           }
         }
-        return mapRoutine(row);
+        return mapRoutine(row, await routineLastRunFailed(deps, row.id));
       }),
       remove: authed.routines.remove.handler(async ({ context, input }) => {
         const existing = await deps.prisma.routine.findFirst({
@@ -6546,7 +6650,7 @@ export function createRouter(deps: RouterDeps) {
             status: { in: ["connected", "pending", "error"] },
             // The Granola key shows through meetings.status, never as a generic app.
             // Omi shows through omi.status.
-            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID] },
+            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID, HEX_CONNECTOR_ID] },
           },
           // Without an order Postgres returns rows in storage order, which changes when a row is
           // updated, so the accounts of one app swapped places between loads.
@@ -8375,10 +8479,42 @@ export function createRouter(deps: RouterDeps) {
         refreshGranola(meetingsFor(context.actor), context.actor),
       ),
       list: authed.meetings.list.handler(({ context, input }) =>
-        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor),
+        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor, input),
+      ),
+      get: authed.meetings.get.handler(({ context, input }) =>
+        getStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
       ),
       delete: authed.meetings.delete.handler(({ context, input }) =>
         deleteStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
+      ),
+      connectLocal: authed.meetings.connectLocal.handler(({ context }) =>
+        connectLocal(meetingsFor(context.actor), context.actor),
+      ),
+      localStatus: authed.meetings.localStatus.handler(({ context }) =>
+        localStatus(meetingsFor(context.actor), context.actor),
+      ),
+      importLocal: authed.meetings.importLocal.handler(({ context, input }) =>
+        importLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+      disconnectLocal: authed.meetings.disconnectLocal.handler(({ context, input }) =>
+        disconnectLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+    },
+    meetingCaptures: {
+      start: authed.meetingCaptures.start.handler(({ context, input }) =>
+        startCapture(deps, context.actor, input),
+      ),
+      appendText: authed.meetingCaptures.appendText.handler(({ context, input }) =>
+        appendCaptureText(deps, context.actor, input),
+      ),
+      finish: authed.meetingCaptures.finish.handler(({ context, input }) =>
+        finishCapture(deps, context.actor, input),
+      ),
+      discard: authed.meetingCaptures.discard.handler(({ context, input }) =>
+        discardCapture(deps, context.actor, input.captureId),
+      ),
+      active: authed.meetingCaptures.active.handler(({ context }) =>
+        activeCapture(deps, context.actor),
       ),
     },
     omi: {
@@ -9605,7 +9741,12 @@ export function createRouter(deps: RouterDeps) {
       status: authed.voice.status.handler(async ({ context }) => {
         const cred = await findDefaultVoiceCredential(deps.prisma, context.actor);
         const selection = await findTranscriptionSelection(deps, context.actor);
-        return toVoiceStatus(cred, selection?.provider ?? null);
+        // The same choice server transcription makes, so Record shows only when audio would be sent.
+        const { target, consented } = await selectTranscriptionTarget(deps, context.actor);
+        return {
+          ...toVoiceStatus(cred, selection?.provider ?? null),
+          transcriptionConsented: Boolean(target && consented),
+        };
       }),
       setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) => {
         const result = await setTranscription(deps, context.actor, {
@@ -9743,6 +9884,7 @@ async function memberSpaceNavigation(
           name: true,
           isDefault: true,
           deletingAt: true,
+          meetingRecording: true,
           _count: { select: { memberships: true } },
         },
       },
@@ -9815,6 +9957,8 @@ async function memberSpaceNavigation(
         isDefault: membership.space.isDefault,
         hasContent: spacesWithContent.has(membership.spaceId),
         memberCount: membership.space._count.memberships,
+        meetingRecording: membership.space.meetingRecording as MeetingRecordingPolicy,
+        canSetMeetingRecording: membership.role === "owner" || membership.role === "admin",
         canRename: membership.role === "owner" && membership.space.deletingAt === null,
         canDelete:
           membership.role === "owner" &&
@@ -10270,6 +10414,54 @@ export function assertRunsOnAllowed(input: {
   if (input.runsOn === "this-mac" && !input.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
 }
 
+/**
+ * Validates an owner's app control change and returns what to store. Turning it off, removing
+ * apps and the headed switch need no more than ownership; turning it on or adding apps needs a
+ * provider and a bot that does not run on this Mac.
+ */
+async function checkAppControlUpdate(
+  deps: RouterDeps,
+  actor: Actor,
+  bot: { runsOn?: string | null; appControlEnabled?: boolean },
+  input: { appControl?: UpdateBotAppControl; runsOn?: string | null },
+): Promise<UpdateBotAppControl | undefined> {
+  const change = input.appControl;
+  const movesHost = input.runsOn !== undefined && input.runsOn !== (bot.runsOn ?? null);
+  if (!change && !movesHost) return undefined;
+  if (change && !actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+  let apps = change?.apps;
+  if (apps) {
+    const seen = new Set<string>();
+    apps = apps.filter((app) => {
+      if (isDeniedApp(app)) {
+        throw new ORPCError("BAD_REQUEST", { message: `${app.name} cannot be used` });
+      }
+      const key = app.id.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  const adds = change?.enabled === true || (apps !== undefined && apps.length > 0);
+  if (adds && !deps.appControl) {
+    throw new ORPCError("PRECONDITION_FAILED", { message: "App control is not set up" });
+  }
+  // The settings as they will be after this update, so a combined change cannot slip through.
+  const enabledAfter = change?.enabled ?? bot.appControlEnabled ?? false;
+  if (enabledAfter && (adds || movesHost)) {
+    const hostAfter =
+      (input.runsOn !== undefined ? input.runsOn : bot.runsOn) ??
+      (await deploymentComputerHost(deps));
+    if (hostAfter === "this-mac") {
+      throw new ORPCError("BAD_REQUEST", {
+        message:
+          "A bot that runs on this Mac cannot use apps on it. Turn off apps on this Mac first.",
+      });
+    }
+  }
+  return change ? { ...change, ...(apps ? { apps } : {}) } : undefined;
+}
+
 async function deploymentComputerHost(deps: RouterDeps): Promise<"docker" | "this-mac"> {
   const settings = await deps.prisma.deploymentSettings.findUnique({ where: { id: "default" } });
   return computerHostFor(settings?.computerHost, deps.env.sandboxProvider) === "this-mac"
@@ -10320,8 +10512,27 @@ async function persistModelCredential(
   ) {
     throw new ORPCError("BAD_REQUEST", { message: authError });
   }
+  // Signing in again without a model (OpenRouter OAuth) keeps the model this
+  // provider already uses in this space instead of resetting to the first catalog row.
+  const keptModelId = requestedModelId
+    ? undefined
+    : usableModelId(
+        (
+          await deps.prisma.spaceModelPreference.findFirst({
+            where: {
+              spaceId: actor.spaceId,
+              userId: actor.userId,
+              credential: { provider: input.provider },
+              modelId: { not: null },
+            },
+            orderBy: { updatedAt: "desc" },
+            select: { modelId: true },
+          })
+        )?.modelId,
+      );
   const defaultModel =
     requestedModelId ??
+    keptModelId ??
     defaultCatalogModelId(input.provider, input.plaintext) ??
     usableModelId(deps.env.defaultModel);
   const allowedThinking = defaultModel
@@ -10394,7 +10605,20 @@ async function persistModelCredential(
         thinkingLevel = defaultModel
           ? clampCatalogThinkingLevel(thinkingLevel, allowedThinking)
           : null;
-        await selectSpaceModelPreference(tx, actor, credential.id, defaultModel, thinkingLevel);
+        // A new connection only becomes the default when the space has none yet or this
+        // credential already is it; otherwise the owner's choice stays in place.
+        const currentDefault = await tx.spaceModelPreference.findFirst({
+          where: { spaceId: actor.spaceId, userId: actor.userId, isDefault: true },
+          select: { credentialId: true },
+        });
+        const preference = await selectSpaceModelPreference(
+          tx,
+          actor,
+          credential.id,
+          defaultModel,
+          thinkingLevel,
+          { makeDefault: !currentDefault || currentDefault.credentialId === credential.id },
+        );
         input.signal?.throwIfAborted();
         if (existing) {
           await deleteUnreferencedCredentialSecret(tx, {
@@ -10404,7 +10628,7 @@ async function persistModelCredential(
           });
           input.signal?.throwIfAborted();
         }
-        return { ...credential, isDefault: true, defaultModel };
+        return { ...credential, isDefault: preference.isDefault, defaultModel };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     ),
@@ -10492,35 +10716,38 @@ async function assertRoutineTaughtSkill(
   }
 }
 
-function mapRoutine(row: {
-  id: string;
-  botId: string;
-  name: string;
-  prompt: string;
-  crons: string[];
-  timezone: string;
-  active: boolean;
-  notify: boolean;
-  webhookEnabled: boolean;
-  githubEnabled: boolean;
-  messageProvider: string | null;
-  modelProvider: string | null;
-  modelId: string | null;
-  modelCredentialId?: string | null;
-  thinkingLevel: string | null;
-  lastRunAt: Date | null;
-  nextRunAt: Date | null;
-  quiet: boolean;
-  watch: unknown;
-  managedKind: string | null;
-  taughtSkill?: { id: string; name: string } | null;
-  watchState?: {
-    lastCheckedAt: Date | null;
-    lastChangedAt: Date | null;
-    pausedReason: string | null;
-  } | null;
-  createdAt: Date;
-}): Routine {
+function mapRoutine(
+  row: {
+    id: string;
+    botId: string;
+    name: string;
+    prompt: string;
+    crons: string[];
+    timezone: string;
+    active: boolean;
+    notify: boolean;
+    webhookEnabled: boolean;
+    githubEnabled: boolean;
+    messageProvider: string | null;
+    modelProvider: string | null;
+    modelId: string | null;
+    modelCredentialId?: string | null;
+    thinkingLevel: string | null;
+    lastRunAt: Date | null;
+    nextRunAt: Date | null;
+    quiet: boolean;
+    watch: unknown;
+    managedKind: string | null;
+    taughtSkill?: { id: string; name: string } | null;
+    watchState?: {
+      lastCheckedAt: Date | null;
+      lastChangedAt: Date | null;
+      pausedReason: string | null;
+    } | null;
+    createdAt: Date;
+  },
+  lastRunFailed = false,
+): Routine {
   const watch = WatchSpecSchema.safeParse(row.watch);
   return {
     id: row.id,
@@ -10550,9 +10777,24 @@ function mapRoutine(row: {
       lastCheckedAt: row.watchState?.lastCheckedAt?.toISOString() ?? null,
       lastChangedAt: row.watchState?.lastChangedAt?.toISOString() ?? null,
       pausedReason: (row.watchState?.pausedReason as WatchPausedReason | null) ?? null,
+      lastRunFailed,
     },
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * Whether the routine's newest finished run failed (cancelled counts as finished). Ordered by
+ * createdAt, not completedAt, which is null for some finished runs.
+ */
+// ponytail: one findFirst per routine; a nested `include ... take: 1` loads every run in Prisma 7.
+async function routineLastRunFailed(deps: RouterDeps, routineId: string) {
+  const last = await deps.prisma.run.findFirst({
+    where: { routineId, status: { in: ["completed", "failed", "cancelled"] } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { status: true },
+  });
+  return last?.status === "failed";
 }
 
 async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
@@ -10560,7 +10802,9 @@ async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
     where: { botId, spaceId: actor.spaceId },
     include: routineInclude,
   });
-  return rows.map(mapRoutine);
+  return Promise.all(
+    rows.map(async (row) => mapRoutine(row, await routineLastRunFailed(deps, row.id))),
+  );
 }
 
 /**

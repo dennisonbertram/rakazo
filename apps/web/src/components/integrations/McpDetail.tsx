@@ -100,7 +100,16 @@ export function McpDetail({
     );
   }
 
-  const status = reconnect.busy ? "connecting" : mcpStatus(server);
+  // A bank can be signed in yet lapsed or failing in sync; the Finance overview knows, as the tile does.
+  const financeStatus = data.financeSources.find((source) => source.serverId === server.id)?.status;
+  const status = reconnect.busy
+    ? "connecting"
+    : financeStatus === "needs_reconnect"
+      ? "reconnect"
+      : financeStatus === "error"
+        ? "failed"
+        : mcpStatus(server);
+  const showReconnect = status === "reconnect" || status === "failed";
   const assigned = (botId: string) =>
     data.mcpAssignments.some((entry) => entry.botId === botId && entry.serverId === server.id);
 
@@ -162,13 +171,14 @@ export function McpDetail({
       if (shared) {
         // Exclusivity must be off first: the server refuses to grant an exclusive server to other agents.
         await exclusive(false);
-        for (const bot of data.bots) if (!assigned(bot.id)) await assign(bot.id, true);
+        await Promise.all(
+          data.bots.filter((bot) => !assigned(bot.id)).map((bot) => assign(bot.id, true)),
+        );
         return;
       }
       await exclusive(true);
       if (server.agentBotId && !assigned(server.agentBotId)) await assign(server.agentBotId, true);
-      for (const bot of data.bots)
-        if (bot.id !== server.agentBotId && assigned(bot.id)) await assign(bot.id, false);
+      // Other agents' rows stay on the server so turning sharing back on restores them.
     }, t`Could not update access`);
 
   const host = server.endpoint ? new URL(server.endpoint).host : (server.command ?? "");
@@ -262,13 +272,13 @@ export function McpDetail({
             </Button>
           ) : null}
           {/* While healthy, signing in again or out is rare: it waits in a menu. */}
-          {!brexCards && status === "reconnect" && server.transport !== "stdio" ? (
+          {!brexCards && showReconnect && server.transport !== "stdio" ? (
             <Button disabled={reconnect.busy || busy} onClick={() => void reconnect.run()}>
               <Trans>Reconnect</Trans>
             </Button>
           ) : null}
           {/* Brex cards takes a pasted token, not a sign-in: its token is replaced instead. */}
-          {!brexCards && status !== "reconnect" && (server.transport !== "stdio" || signedIn) ? (
+          {!brexCards && !showReconnect && (server.transport !== "stdio" || signedIn) ? (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={<Button variant="outline" size="icon" aria-label={t`Sign-in options`} />}

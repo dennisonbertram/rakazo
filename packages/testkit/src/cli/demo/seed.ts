@@ -24,6 +24,8 @@ import {
   DEMO_ARCHIVED_BOT,
   DEMO_ARTIFACTS,
   DEMO_BOTS,
+  DEMO_CALENDAR_OLD_REF,
+  DEMO_CALENDAR_REF,
   DEMO_CAP_TABLE,
   DEMO_CHIEF_DRAFT,
   DEMO_CHIEF_DRAFT_V1,
@@ -390,6 +392,19 @@ export async function seedDemo(options: DemoSeedOptions): Promise<string[]> {
       data: { secretId: await fakeLogin(reconnectScope, true) },
     });
     done.push(`space "${DEMO_FINANCE_RECONNECT_SPACE}" (Mercury needs reconnecting)`);
+
+    // Google Calendar: the offline connector serves the invented events of demoCalendar().
+    await prisma.connection.create({
+      data: {
+        ...scope,
+        connectorId: "google",
+        provider: "googlecalendar",
+        displayName: "Founder calendar",
+        status: "connected",
+        providerRef: DEMO_CALENDAR_REF,
+      },
+    });
+    done.push("Google Calendar with invented events");
   } finally {
     await prisma.$disconnect();
     await pool.end();
@@ -785,6 +800,27 @@ export async function seedDemo(options: DemoSeedOptions): Promise<string[]> {
     await session.rpc("connections/complete", { connectionId: begun.connectionId }, space.id);
     await session.rpc("inbox/refresh", {}, space.id).catch(() => undefined);
     done.push(`space "${name}" with a Gmail account that ${what}`);
+    if (name === DEMO_RECONNECT_SPACE) {
+      // Google Calendar whose account the offline connector rejects, so the agenda reports it.
+      const db = createDb(options.databaseUrl);
+      try {
+        const owner = await db.prisma.user.findUniqueOrThrow({ where: { email: options.email } });
+        await db.prisma.connection.create({
+          data: {
+            spaceId: space.id,
+            userId: owner.id,
+            connectorId: "google",
+            provider: "googlecalendar",
+            displayName: "Old calendar",
+            status: "connected",
+            providerRef: DEMO_CALENDAR_OLD_REF,
+          },
+        });
+      } finally {
+        await db.prisma.$disconnect();
+        await db.pool.end();
+      }
+    }
   }
   // The Data room documents already carry a type, date and parties, as if Praci had read them, so the
   // founder allowed that earlier; otherwise the Data room asks for consent it seems to have used.

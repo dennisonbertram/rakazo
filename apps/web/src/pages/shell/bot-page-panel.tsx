@@ -35,6 +35,7 @@ import { ArrowDown, ArrowUp, GripVertical, MoreHorizontal, Plus, X } from "lucid
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ArtifactShareDialog } from "../../components/ArtifactShareDialog";
 import { GtmBlock, GtmBlockContext } from "../../components/gtm/GtmBlock";
+import { PageHeader } from "../../components/PageHeader";
 import { HtmlPageView } from "../../components/pages/HtmlPageView";
 import {
   PageChartFrame,
@@ -44,6 +45,7 @@ import {
 import { PageSourcesDialog } from "../../components/pages/PageSourcesDialog";
 import { isNewerRemote, resolveRemotePage } from "../../lib/page-sync";
 import { rpc } from "../../lib/rpc";
+import { SIDEBAR_PAGES_CHANGED_EVENT } from "../../lib/sidebar-pages-event";
 import { errorText } from "../../lib/user-error";
 import { ChartCanvas } from "./message-cards";
 import { PageChartNode, usePageChartRows } from "./page-chart-extension";
@@ -54,13 +56,19 @@ import { PageMetricNode, PageTableNode } from "./page-live-extensions";
 
 const SAVE_DELAY_MS = 800;
 
+/** Deletes the block, then focuses the editor so Ctrl+Z / Cmd+Z restores it. */
+const deleteAndFocus = ({ deleteNode, editor }: Pick<NodeViewProps, "deleteNode" | "editor">) => {
+  deleteNode();
+  editor.view.focus();
+};
+
 function LiveDelete({ onClick }: { onClick: () => void }) {
   return (
     <Button
       variant="ghost"
       size="icon-sm"
       aria-label={t`Delete block`}
-      className="absolute end-1 bottom-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      className="absolute end-1 bottom-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
       onClick={onClick}
     >
       <X size={14} />
@@ -98,14 +106,14 @@ function ChartView({ node, deleteNode, editor }: NodeViewProps) {
       )}
       {editor.isEditable ? (
         chart.source ? (
-          <LiveDelete onClick={deleteNode} />
+          <LiveDelete onClick={() => deleteAndFocus({ deleteNode, editor })} />
         ) : (
           <Button
             variant="ghost"
             size="icon-sm"
             aria-label={t`Delete chart`}
-            className="absolute end-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            onClick={deleteNode}
+            className="absolute end-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
+            onClick={() => deleteAndFocus({ deleteNode, editor })}
           >
             <X size={14} />
           </Button>
@@ -127,7 +135,9 @@ function MetricView({ node, deleteNode, editor }: NodeViewProps) {
   return (
     <NodeViewWrapper className="group relative my-3 min-w-0" contentEditable={false}>
       <PageMetricBlock block={block} data={live.blocks.get(liveKey("pageMetric", block))} />
-      {editor.isEditable ? <LiveDelete onClick={deleteNode} /> : null}
+      {editor.isEditable ? (
+        <LiveDelete onClick={() => deleteAndFocus({ deleteNode, editor })} />
+      ) : null}
     </NodeViewWrapper>
   );
 }
@@ -138,7 +148,9 @@ function TableView({ node, deleteNode, editor }: NodeViewProps) {
   return (
     <NodeViewWrapper className="group relative my-3 min-w-0" contentEditable={false}>
       <PageTableBlock block={block} data={live.blocks.get(liveKey("pageTable", block))} />
-      {editor.isEditable ? <LiveDelete onClick={deleteNode} /> : null}
+      {editor.isEditable ? (
+        <LiveDelete onClick={() => deleteAndFocus({ deleteNode, editor })} />
+      ) : null}
     </NodeViewWrapper>
   );
 }
@@ -230,8 +242,11 @@ function PageEditor({
   refreshTick = 0,
   onSources,
   onPageChange,
+  onReview,
 }: {
   botId: string;
+  /** Opens where a pending source is approved; set only on the full-width page. */
+  onReview?: () => void;
   /** Without one, the bot's first page. */
   pageId?: string;
   remote: PageRemoteUpdate | null;
@@ -281,7 +296,7 @@ function PageEditor({
         "aria-label": t`Page`,
         dir: "auto",
         class:
-          "min-h-40 text-sm outline-none [&_a]:text-link [&_a]:underline [&_blockquote]:border-s-2 [&_blockquote]:border-border [&_blockquote]:ps-3 [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:ps-5 [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3 [&_ul]:list-disc [&_ul]:ps-5 [&_table]:w-full [&_td]:border [&_td]:border-border [&_td]:p-1 [&_th]:border [&_th]:border-border [&_th]:p-1 [&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:ps-0 [&_ul[data-type=taskList]_li]:flex [&_ul[data-type=taskList]_li]:gap-2 [&_img]:max-w-full",
+          "min-h-40 text-sm outline-none [&_a]:text-link [&_a]:underline [&_blockquote]:border-s-2 [&_blockquote]:border-border [&_blockquote]:ps-3 [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:ps-5 [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3 [&_ul]:list-disc [&_ul]:ps-5 [&_table]:w-full [&_table:not([data-slot=table])_td]:border [&_table:not([data-slot=table])_td]:border-border [&_table:not([data-slot=table])_td]:p-1 [&_table:not([data-slot=table])_th]:border [&_table:not([data-slot=table])_th]:border-border [&_table:not([data-slot=table])_th]:p-1 [&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:ps-0 [&_ul[data-type=taskList]_li]:flex [&_ul[data-type=taskList]_li]:gap-2 [&_img]:max-w-full",
       },
     },
   });
@@ -475,8 +490,9 @@ function PageEditor({
       refreshing,
       blocks: liveBlocks,
       refresh: () => void refresh(),
+      onReview,
     }),
-    [liveLoaded, refreshing, liveBlocks, refresh],
+    [liveLoaded, refreshing, liveBlocks, refresh, onReview],
   );
 
   if (!loaded)
@@ -517,6 +533,9 @@ function nextTitle(pages: BotPageSummary[]): string {
 }
 
 /** The bot's page: a row of page titles when there are several, and the active page's editor. */
+const announcePagesChanged = () =>
+  window.dispatchEvent(new CustomEvent(SIDEBAR_PAGES_CHANGED_EVENT));
+
 export function BotPagePanel({
   botId,
   remote,
@@ -525,7 +544,10 @@ export function BotPagePanel({
   fixedPageId,
   onTitle,
   onMissing,
+  onReview,
 }: {
+  /** Opens where a pending source is approved; used by the full-width page only. */
+  onReview?: () => void;
   botId: string;
   /** Shows only this page: no switcher, no new or delete. Used by the full-width page. */
   fixedPageId?: string;
@@ -546,7 +568,7 @@ export function BotPagePanel({
   const [error, setError] = useState("");
   const [hasSources, setHasSources] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [shared, setShared] = useState<{ url: string; artifactId: string } | null>(null);
+  const [shared, setShared] = useState<{ url: string | null; artifactId: string } | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [dataTick, setDataTick] = useState(0);
@@ -559,7 +581,10 @@ export function BotPagePanel({
     const list = await rpc.pages.list({ botId });
     setPages(list);
     if (fixedPageId) {
-      if (!list.some((page) => page.id === fixedPageId)) onMissingRef.current?.();
+      if (!list.some((page) => page.id === fixedPageId)) {
+        announcePagesChanged();
+        onMissingRef.current?.();
+      }
       return;
     }
     // Keep the open page; otherwise open the first.
@@ -617,6 +642,7 @@ export function BotPagePanel({
     run(async () => {
       const page = await rpc.pages.create({ botId, title: nextTitle(pages) });
       await loadPages();
+      announcePagesChanged();
       setActiveId(page.id);
       setRenaming(true);
     });
@@ -626,6 +652,7 @@ export function BotPagePanel({
       if (active && title.trim() && title.trim() !== active.title) {
         const renamed = await rpc.pages.rename({ botId, pageId: active.id, title });
         setPages((list) => list.map((page) => (page.id === renamed.id ? renamed : page)));
+        announcePagesChanged();
       }
       setRenaming(false);
     });
@@ -633,9 +660,22 @@ export function BotPagePanel({
   const share = () =>
     run(async () => {
       if (!active) return;
-      const result = await rpc.pages.share({ botId, pageId: active.id });
-      if (result) setShared({ url: result.url, artifactId: result.artifactId });
+      const status = await rpc.pages.shareStatus({ botId, pageId: active.id });
+      if (status) setShared({ url: null, artifactId: status.artifactId });
+      else await makeShareLink(active.id);
     });
+
+  const makeShareLink = async (pageId: string) => {
+    const result = await rpc.pages.share({ botId, pageId });
+    if (result) setShared({ url: result.url, artifactId: result.artifactId });
+  };
+
+  const replaceShare = async () => {
+    if (!active) return;
+    setShareBusy(true);
+    await run(() => makeShareLink(active.id));
+    setShareBusy(false);
+  };
 
   const stopSharing = async () => {
     if (!shared) return;
@@ -653,39 +693,86 @@ export function BotPagePanel({
       setDeleting(false);
       setActiveId(undefined);
       await loadPages();
+      announcePagesChanged();
     });
+
+  const renameForm =
+    renaming && active ? (
+      <form
+        className="min-w-0 flex-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void rename(String(new FormData(event.currentTarget).get("title") ?? ""));
+        }}
+      >
+        <Input
+          name="title"
+          autoFocus
+          aria-label={t`Page title`}
+          defaultValue={active.title}
+          maxLength={BOT_PAGE_TITLE_MAX}
+          // Typing replaces the title, so "New page" never ends up as a prefix.
+          onFocus={(event) => event.currentTarget.select()}
+          onKeyDown={(event) => event.key === "Escape" && setRenaming(false)}
+          onBlur={() => setRenaming(false)}
+        />
+      </form>
+    ) : null;
+
+  const optionsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t`Page options`}>
+            <MoreHorizontal size={16} />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        {hasSources ? (
+          <DropdownMenuItem onClick={() => setRefreshTick((n) => n + 1)}>
+            <Trans>Refresh</Trans>
+          </DropdownMenuItem>
+        ) : null}
+        {hasSources ? (
+          <DropdownMenuItem onClick={() => setSourcesOpen(true)}>
+            <Trans>Sources</Trans>
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onClick={() => void share()}>
+          <Trans>Share</Trans>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setRenaming(true)}>
+          <Trans>Rename</Trans>
+        </DropdownMenuItem>
+        {pages.length > 1 && !fixedPageId ? (
+          <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
+            <Trans>Delete</Trans>
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <div>
-      {pages.length > 0 ? (
+      {fixedPageId ? (
+        <PageHeader
+          title={renameForm ?? activeTitle}
+          actions={pages.length > 0 ? optionsMenu : null}
+        />
+      ) : pages.length > 0 ? (
         <div className="mb-3 flex items-center gap-1">
-          {renaming && active ? (
-            <form
-              className="min-w-0 flex-1"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void rename(String(new FormData(event.currentTarget).get("title") ?? ""));
-              }}
-            >
-              <Input
-                name="title"
-                autoFocus
-                aria-label={t`Page title`}
-                defaultValue={active.title}
-                maxLength={BOT_PAGE_TITLE_MAX}
-                // Typing replaces the title, so "New page" never ends up as a prefix.
-                onFocus={(event) => event.currentTarget.select()}
-                onKeyDown={(event) => event.key === "Escape" && setRenaming(false)}
-                onBlur={() => setRenaming(false)}
-              />
-            </form>
-          ) : (
+          {renameForm ?? (
             <div className="min-w-0 flex-1">
-              {pages.length > 1 && !fixedPageId ? (
+              {pages.length > 1 ? (
                 <Tabs value={activeId} onValueChange={(next) => setActiveId(String(next))}>
-                  <TabsList aria-label={t`Pages`}>
+                  <TabsList
+                    aria-label={t`Pages`}
+                    className="justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
                     {pages.map((page) => (
-                      <TabsTrigger key={page.id} value={page.id} className="px-3">
+                      <TabsTrigger key={page.id} value={page.id} className="flex-none px-3">
                         {page.title}
                       </TabsTrigger>
                     ))}
@@ -694,49 +781,17 @@ export function BotPagePanel({
               ) : null}
             </div>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" aria-label={t`Page options`}>
-                  <MoreHorizontal size={16} />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end">
-              {hasSources ? (
-                <DropdownMenuItem onClick={() => setRefreshTick((n) => n + 1)}>
-                  <Trans>Refresh</Trans>
-                </DropdownMenuItem>
-              ) : null}
-              {hasSources ? (
-                <DropdownMenuItem onClick={() => setSourcesOpen(true)}>
-                  <Trans>Sources</Trans>
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuItem onClick={() => void share()}>
-                <Trans>Share</Trans>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setRenaming(true)}>
-                <Trans>Rename</Trans>
-              </DropdownMenuItem>
-              {pages.length > 1 && !fixedPageId ? (
-                <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
-                  <Trans>Delete</Trans>
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {fixedPageId ? null : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t`New page`}
-              disabled={pages.length >= BOT_PAGE_MAX_PAGES}
-              onClick={() => void create()}
-            >
-              <Plus size={16} />
-            </Button>
-          )}
+          {optionsMenu}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label={t`New page`}
+            disabled={pages.length >= BOT_PAGE_MAX_PAGES}
+            onClick={() => void create()}
+          >
+            <Plus size={16} />
+          </Button>
         </div>
       ) : null}
       {error && pages.length > 0 ? (
@@ -765,6 +820,7 @@ export function BotPagePanel({
           refreshTick={refreshTick}
           onSources={setHasSources}
           onPageChange={reportPage}
+          onReview={fixedPageId ? onReview : undefined}
         />
       ) : null}
       {pages.length === 0 && error ? (
@@ -785,6 +841,7 @@ export function BotPagePanel({
           url={shared.url}
           busy={shareBusy}
           error={error || null}
+          onReplace={() => void replaceShare()}
           onStop={() => void stopSharing()}
           onClose={() => setShared(null)}
         />

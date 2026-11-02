@@ -15,8 +15,13 @@ export function companyDateEnd(value: CompanyPartialDate): string {
   if (value.precision === "month") end.setUTCMonth(end.getUTCMonth() + 1, 0);
   return end.toISOString().slice(0, 10);
 }
-export function companyFactTitle(fact: CompanyFact): string {
+export function companyFactTitle(
+  fact: CompanyFact,
+  nameOf?: (id: string) => string | undefined,
+): string {
   if (fact.kind === "entity") return fact.record.displayName;
   if (fact.kind === "event") return fact.record.title;
-  return fact.record.role ?? fact.record.relation.replaceAll("_", " ");
+  const label = fact.record.role ?? fact.record.relation.replaceAll("_", " ");
+  if (!nameOf) return label;
+  return [nameOf(fact.record.fromId), label, nameOf(fact.record.toId)].filter(Boolean).join(" · ");
 }

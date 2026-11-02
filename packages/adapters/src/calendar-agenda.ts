@@ -1,6 +1,6 @@
 import type { AdapterContext } from "@rakazo/adapter-kit";
 import type { CalendarAgenda, CalendarItem } from "@rakazo/contracts";
-import { isOneShotRoutineCrons } from "@rakazo/core";
+import { isOneShotRoutineCrons, nextRoutineRunDateAcross } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { Prisma } from "@rakazo/db";
 import type { CalendarAccount, CalendarToolDeps } from "./calendar-tools.js";
@@ -13,8 +13,16 @@ const OPEN_BOT = { archivedAt: null };
 /** How long one Google account gets before it is reported as failed. */
 export const ACCOUNT_TIMEOUT_MS = 8000;
 const CALENDAR_LIST_PAGES = 4;
+const EVENT_PAGES = 4;
+/** A routine that runs again within this long shows only its first run. */
+const SUB_DAILY_MS = 6 * 3_600_000;
+const MAX_OCCURRENCES_PER_ROUTINE = 100;
+const MAX_ROUTINE_ITEMS = 500;
 
-export type CalendarAgendaDeps = Pick<CalendarToolDeps, "connectors" | "google"> & {
+export type CalendarAgendaDeps = Pick<
+  CalendarToolDeps,
+  "connectors" | "google"
+> & {
   prisma: Pick<PrismaClient, "scratchpadItem" | "inboxTodo" | "routine">;
 };
 
@@ -22,19 +30,23 @@ const str = (value: unknown) => (typeof value === "string" ? value : undefined);
 
 /**
  * The user's Google events (every account, every selected calendar), open to-dos with a due time,
- * one-shot check-backs and the next run of each repeating routine, in start order. The API page
+ * one-shot check-backs and each run of every repeating routine in the window, in start order. The API page
  * and the bot tool both call this. `accounts` is null when Google is off for this caller.
  *
- * ponytail: a repeating routine shows only its next run, not every cron occurrence; expand the
- * occurrences when a month view needs them. Page watches (every few minutes) and the managed
- * check-in routine are left out because they would bury everything else.
+ * A repeating routine shows every run in the range, up to 100 per routine and 500 routine items
+ * overall. One that runs again within 6 hours shows only its first run, like page watches (every
+ * few minutes) and the managed check-in routine, which are left out because they would bury
+ * everything else.
  */
 export async function calendarAgenda(
   deps: CalendarAgendaDeps,
   scope: { spaceId: string; userId: string },
   range: { from: Date; to: Date },
   google: { accounts: CalendarAccount[]; context: AdapterContext } | null,
-  options: { sources?: "all" | "local" | "google"; accountTimeoutMs?: number } = {},
+  options: {
+    sources?: "all" | "local" | "google";
+    accountTimeoutMs?: number;
+  } = {},
 ): Promise<CalendarAgenda> {
   const errors: CalendarAgenda["errors"] = [];
   const accounts = google?.accounts ?? [];
@@ -51,9 +63,11 @@ export async function calendarAgenda(
           account.label,
         ).catch((error: unknown) => ({
           items: [] as CalendarItem[],
-          failed: error instanceof TimeoutError ? error.message : errorText(error),
+          failed:
+            error instanceof TimeoutError ? error.message : errorText(error),
         }));
-        if (result.failed) errors.push({ account: account.label, message: result.failed });
+        if (result.failed)
+          errors.push({ account: account.label, message: result.failed });
         return result.items;
       }),
     ),
@@ -79,7 +93,11 @@ export async function calendarAgenda(
     sources === "google"
       ? none<never>()
       : deps.prisma.inboxTodo.findMany({
-          where: { ...scope, doneAt: null, dueOn: { gte: range.from, lt: range.to } },
+          where: {
+            ...scope,
+            doneAt: null,
+            dueOn: { gte: range.from, lt: range.to },
+          },
           select: { id: true, text: true, dueOn: true, messageId: true },
           orderBy: { dueOn: "asc" },
           take: MAX_PER_QUERY,
@@ -92,13 +110,14 @@ export async function calendarAgenda(
             active: true,
             managedKind: null,
             watch: { equals: Prisma.DbNull },
-            nextRunAt: { gte: range.from, lt: range.to },
+            nextRunAt: { not: null, lt: range.to },
             bot: OPEN_BOT,
           },
           select: {
             id: true,
             name: true,
             crons: true,
+            timezone: true,
             nextRunAt: true,
             botId: true,
             bot: { select: { name: true } },
@@ -108,7 +127,10 @@ export async function calendarAgenda(
         }),
   ]);
   const local = (
-    item: Pick<CalendarItem, "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId">,
+    item: Pick<
+      CalendarItem,
+      "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId"
+    >,
     start: Date,
   ): CalendarItem => ({
     ...item,
@@ -154,25 +176,81 @@ export async function calendarAgenda(
           ]
         : [],
     ),
-    ...routines.flatMap((row) =>
-      row.nextRunAt
-        ? [
-            local(
-              {
-                id: `routine:${row.id}`,
-                kind: isOneShotRoutineCrons(row.crons) ? "check_back" : "routine",
-                title: row.name,
-                allDay: false,
-                botId: row.botId,
-                botName: row.bot.name,
-              },
-              row.nextRunAt,
-            ),
-          ]
-        : [],
-    ),
+    ...routineItems(routines, range, local),
   ].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
   return { items, errors, googleConnected: accounts.length > 0 };
+}
+
+type RoutineRow = {
+  id: string;
+  name: string;
+  crons: string[];
+  timezone: string | null;
+  nextRunAt: Date | null;
+  botId: string;
+  bot: { name: string };
+};
+
+function routineItems(
+  rows: RoutineRow[],
+  range: { from: Date; to: Date },
+  local: (
+    item: Pick<
+      CalendarItem,
+      "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId"
+    >,
+    start: Date,
+  ) => CalendarItem,
+): CalendarItem[] {
+  const items: CalendarItem[] = [];
+  for (const row of rows) {
+    if (!row.nextRunAt) continue;
+    const base = {
+      title: row.name,
+      allDay: false,
+      botId: row.botId,
+      botName: row.bot.name,
+    };
+    if (isOneShotRoutineCrons(row.crons)) {
+      if (row.nextRunAt >= range.from)
+        items.push(
+          local(
+            { ...base, id: `routine:${row.id}`, kind: "check_back" },
+            row.nextRunAt,
+          ),
+        );
+      continue;
+    }
+    let at: Date | null = row.nextRunAt;
+    let first = true;
+    for (
+      let n = 0;
+      at && at < range.to && n < MAX_OCCURRENCES_PER_ROUTINE;
+      n++
+    ) {
+      if (at >= range.from)
+        items.push(
+          local(
+            {
+              ...base,
+              id: `routine:${row.id}:${at.toISOString()}`,
+              kind: "routine",
+            },
+            at,
+          ),
+        );
+      const next: Date | null = nextRoutineRunDateAcross(
+        row.crons,
+        row.nextRunAt,
+        at,
+        row.timezone ?? undefined,
+      );
+      if (first && next && next.getTime() - at.getTime() < SUB_DAILY_MS) break;
+      first = false;
+      at = next;
+    }
+  }
+  return items.slice(0, MAX_ROUTINE_ITEMS);
 }
 
 class TimeoutError extends Error {}
@@ -186,9 +264,13 @@ async function withTimeout<T>(
 ): Promise<T> {
   const timeout = AbortSignal.timeout(ms);
   const timedOut = new Promise<never>((_, reject) =>
-    timeout.addEventListener("abort", () => reject(new TimeoutError(`Couldn't load ${label}`)), {
-      once: true,
-    }),
+    timeout.addEventListener(
+      "abort",
+      () => reject(new TimeoutError(`Couldn't load ${label}`)),
+      {
+        once: true,
+      },
+    ),
   );
   return Promise.race([
     work({ ...context, signal: AbortSignal.any([context.signal, timeout]) }),
@@ -216,7 +298,12 @@ async function accountEvents(
     );
     for (const entry of Array.isArray(listed?.items) ? listed.items : []) {
       const record = asRecord(entry);
-      if (record && record.selected === true && !record.deleted && str(record.id))
+      if (
+        record &&
+        record.selected === true &&
+        !record.deleted &&
+        str(record.id)
+      )
         calendars.push(record);
     }
     pageToken = str(listed?.nextPageToken);
@@ -234,14 +321,19 @@ async function accountEvents(
         maxResults: String(MAX_PER_QUERY),
       });
       try {
-        const data = asRecord(
-          await get(
-            `${CALENDAR_API}/calendars/${encodeURIComponent(str(calendar.id)!)}/events?${params}`,
-          ),
-        );
-        for (const raw of Array.isArray(data?.items) ? data.items : []) {
-          const item = eventItem(raw, account, str(calendar.id)!);
-          if (item) items.push(item);
+        for (let page = 0; page < EVENT_PAGES; page++) {
+          const data = asRecord(
+            await get(
+              `${CALENDAR_API}/calendars/${encodeURIComponent(str(calendar.id)!)}/events?${params}`,
+            ),
+          );
+          for (const raw of Array.isArray(data?.items) ? data.items : []) {
+            const item = eventItem(raw, account, str(calendar.id)!);
+            if (item) items.push(item);
+          }
+          const token = str(data?.nextPageToken);
+          if (!token) break;
+          params.set("pageToken", token);
         }
       } catch (error) {
         failed ??= errorText(error);
@@ -259,8 +351,13 @@ function eventItem(
   const event = asRecord(raw);
   const id = str(event?.id);
   if (!event || !id || event.status === "cancelled") return null;
-  const attendees = Array.isArray(event.attendees) ? event.attendees.map(asRecord) : [];
-  if (attendees.some((a) => a?.self === true && a.responseStatus === "declined")) return null;
+  const attendees = Array.isArray(event.attendees)
+    ? event.attendees.map(asRecord)
+    : [];
+  if (
+    attendees.some((a) => a?.self === true && a.responseStatus === "declined")
+  )
+    return null;
   const when = (value: unknown) => {
     const point = asRecord(value);
     const dateTime = str(point?.dateTime);

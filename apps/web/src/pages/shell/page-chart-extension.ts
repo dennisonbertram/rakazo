@@ -1,13 +1,19 @@
 import type { PageChart } from "@rakazo/contracts";
 import { PAGE_CHART_FENCE } from "@rakazo/contracts";
-import { pageChartFence, parsePageChart } from "@rakazo/core";
+import { historyChartRows, pageChartFence, parsePageChart } from "@rakazo/core";
 import { Node } from "@tiptap/react";
+import { useMemo } from "react";
 import { chartKey, usePageLive } from "./page-live";
 
 /** The one place chart rows are read: live rows for a chart with a source, else its snapshot. */
 export function usePageChartRows(chart: PageChart): unknown[] {
   const { blocks } = usePageLive();
-  return (chart.source && blocks.get(chartKey(chart))?.rows) || chart.data;
+  const rows = (chart.source && blocks.get(chartKey(chart))?.rows) || chart.data;
+  // Memoised: ChartCanvasPlot re-plots whenever the rows identity changes.
+  return useMemo(
+    () => (chart.over === "history" ? historyChartRows(rows) : rows),
+    [chart.over, rows],
+  );
 }
 
 const FENCE = new RegExp(

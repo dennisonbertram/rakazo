@@ -59,6 +59,7 @@ import { runMailAttachmentFiling } from "./mail-attachment-filing.js";
 import { runMailSyncJob } from "./mail-sync-job.js";
 import { expireMailSearch } from "./mail-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
+import { runCaptureFinalize, runCaptureSweep, runCaptureTranscribe } from "./meeting-capture.js";
 import { runMeetingDigest } from "./meeting-digest.js";
 import { createMeetingSourceRegistry } from "./meeting-source-registry.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
@@ -393,6 +394,31 @@ export function createBackgroundJobHandlers(deps: {
         payload,
       );
     }),
+    "meetings.capture_transcribe": asPayloadTenant((payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      return runCaptureTranscribe(
+        {
+          prisma: deps.prisma,
+          artifacts: deps.artifacts,
+          secrets: deps.secretStore,
+          jobs: deps.jobs,
+        },
+        payload,
+      );
+    }),
+    "meetings.capture_finalize": asPayloadTenant((payload) =>
+      runCaptureFinalize(
+        {
+          prisma: deps.prisma,
+          jobs: deps.jobs,
+          ...(deps.artifacts ? { artifacts: deps.artifacts } : {}),
+        },
+        payload,
+      ),
+    ),
+    "meetings.capture_sweep": async () => {
+      await runCaptureSweep({ prisma: deps.prisma, jobs: deps.jobs });
+    },
     "omi.assemble": asPayloadTenant(async (payload) => {
       if (!deps.artifacts) throw new Error("Artifact store is not configured");
       await runOmiAssemble(

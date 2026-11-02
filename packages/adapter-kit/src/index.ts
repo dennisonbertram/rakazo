@@ -1,3 +1,4 @@
+export * from "./app-control.js";
 export * from "./background-jobs.js";
 export * from "./cloud-agents.js";
 export * from "./company-extractor.js";

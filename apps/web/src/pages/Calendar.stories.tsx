@@ -137,6 +137,7 @@ export const GoogleLoading: Story = {
     mockRpc({
       "calendar.agenda": (input: { sources?: "local" | "google" }) =>
         input.sources === "google" ? new Promise(() => {}) : split(agenda())(input),
+      "scratchpad.waitingOnYou": [],
     }),
 };
 
@@ -210,6 +211,7 @@ export const LoadError: Story = {
       "calendar.agenda": () => {
         throw new Error("Could not load the calendar");
       },
+      "scratchpad.waitingOnYou": [],
     }),
 };
 
@@ -238,4 +240,35 @@ export const PhoneEmptyDay: Story = {
   ...phone,
   parameters: view("day"),
   beforeEach: withAgenda(agenda({ items: [] })),
+};
+
+/** A daily routine and a weekly one come back once per run: every day in Week and Month, one row each in Schedule. */
+export const RepeatingRoutines: Story = {
+  beforeEach: withAgenda(
+    agenda({
+      items: [
+        ...items.filter((entry) => entry.kind !== "routine"),
+        ...Array.from({ length: 14 }, (_, day) =>
+          item({
+            id: `routine:r2:${day}`,
+            kind: "routine",
+            title: "Morning briefing",
+            start: at(day - 3, 8),
+            botId: "bot_ada",
+            botName: "Ada",
+          }),
+        ),
+        ...[0, 7].map((day) =>
+          item({
+            id: `routine:r3:${day}`,
+            kind: "routine",
+            title: "Weekly metrics digest",
+            start: at(day, 14),
+            botId: "bot_cy",
+            botName: "Cy",
+          }),
+        ),
+      ],
+    }),
+  ),
 };

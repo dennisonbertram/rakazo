@@ -232,6 +232,19 @@ export function pageChartFence(chart: PageChart): string {
   return `\`\`\`${PAGE_CHART_FENCE}\n${JSON.stringify(chart)}\n\`\`\``;
 }
 
+/**
+ * History rows carry `at` as an ISO string on the wire. Plot only draws a time axis for Dates, so
+ * charts over history convert it at render time. Other rows are returned as they are.
+ */
+export function historyChartRows(rows: unknown[]): unknown[] {
+  return rows.map((row) => {
+    if (typeof row !== "object" || row === null) return row;
+    const at = (row as { at?: unknown }).at;
+    const date = typeof at === "string" ? new Date(at) : null;
+    return date && !Number.isNaN(date.getTime()) ? { ...row, at: date } : row;
+  });
+}
+
 export function pageMetricFence(block: PageMetricBlock): string {
   return `\`\`\`${PAGE_METRIC_FENCE}\n${JSON.stringify(PageMetricBlockSchema.parse(block))}\n\`\`\``;
 }

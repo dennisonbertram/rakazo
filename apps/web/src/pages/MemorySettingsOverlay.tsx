@@ -73,7 +73,7 @@ export function MemorySettingsOverlay({
   embedded?: boolean;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const providerSelectId = useId();
   const defaultRegistration = defaultMemoryProviderSettings();
   const [selectedProvider, setSelectedProvider] = useState(
@@ -232,7 +232,7 @@ export function MemorySettingsOverlay({
                 <Trans>Memory provider</Trans>
               </summary>
               <p className="mt-2 mb-4 text-[13px] text-muted-foreground/80">
-                {registration.description}
+                {i18n._(registration.description)}
               </p>
               {MEMORY_PROVIDER_SETTINGS.length > 1 ? (
                 <Field className="mb-4">

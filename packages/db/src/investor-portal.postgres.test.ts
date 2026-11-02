@@ -340,7 +340,11 @@ describePostgres("investor portal (PostgreSQL)", () => {
 
   it("contacts.linked names tokens and shares", async () => {
     const plain = await contact(mine, "Plain");
-    expect(await linkedContact(prisma, mine, plain.id)).toEqual({ portal: false, documents: [] });
+    expect(await linkedContact(prisma, mine, plain.id)).toEqual({
+      portal: false,
+      documents: [],
+      safes: 0,
+    });
     const a = await contact(mine, "Linked");
     await mintPortalToken(prisma, mine, a.id, now);
     const doc = await item(mine, "linked.pdf");
@@ -348,7 +352,18 @@ describePostgres("investor portal (PostgreSQL)", () => {
     expect(await linkedContact(prisma, mine, a.id)).toEqual({
       portal: true,
       documents: ["linked.pdf"],
+      safes: 0,
     });
+    // A revoked investor has no live link, but deleting the contact drops the block record.
+    const barred = await contact(mine, "Barred");
+    await prisma.contact.update({ where: { id: barred.id }, data: { portalBlockedAt: now } });
+    expect((await linkedContact(prisma, mine, barred.id)).portal).toBe(true);
+    // A SAFE linked to the contact counts too.
+    const funded = await contact(mine, "Funded");
+    await prisma.safe.create({
+      data: { ...mine, contactId: funded.id, investorName: "Funded", amountCents: 1n },
+    });
+    expect((await linkedContact(prisma, mine, funded.id)).safes).toBe(1);
     await expect(linkedContact(prisma, sameSpace, a.id)).rejects.toThrow(IsolationError);
   });
 });

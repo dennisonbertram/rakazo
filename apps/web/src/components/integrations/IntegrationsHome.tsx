@@ -58,6 +58,7 @@ import {
   useFinanceStatus,
 } from "./FinanceSection";
 import { GranolaStatusLine, granolaLine } from "./GranolaMeetingsCard";
+import { HexCard } from "./HexCard";
 import { IMessageSection } from "./IMessageSection";
 import {
   AgentStack,
@@ -793,6 +794,7 @@ export function IntegrationsHome({
                         <CardHead name="Omi" sub={firstPartyDescription.omi} to={OMI_PATH} />
                       </Card>
                     ) : null}
+                    {wholeList && !searching ? <HexCard /> : null}
                     {(wholeList && !searching ? data.sources : []).map((source) => (
                       <SourceCard key={source.id} source={source} onRemove={setRemoving} />
                     ))}

@@ -254,14 +254,17 @@ export async function linkedContact(
   const row = await prisma.contact.findFirst({
     where: { id, ...ownerOf(actor) },
     select: {
-      _count: { select: { portalTokens: true, portalSessions: true } },
+      portalBlockedAt: true,
+      _count: { select: { portalTokens: true, portalSessions: true, safes: true } },
       shares: { select: { dataRoomItem: { select: { name: true } } } },
     },
   });
   if (!row) throw new IsolationError("Contact not found");
   return {
-    portal: row._count.portalTokens + row._count.portalSessions > 0,
+    // A revoked investor counts: deleting the contact also removes the record of the block.
+    portal: row._count.portalTokens + row._count.portalSessions > 0 || row.portalBlockedAt != null,
     documents: row.shares.map((share) => share.dataRoomItem.name).sort(),
+    safes: row._count.safes,
   };
 }
 

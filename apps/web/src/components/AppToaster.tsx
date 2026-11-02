@@ -19,9 +19,10 @@ import {
 import { followNotifications } from "../lib/notification-stream";
 import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
+import { NOTIFICATIONS_CHANGED_EVENT } from "../lib/use-sidebar-glance";
 import { AgentAvatar } from "./integrations/AgentAvatar";
 
-const announceChange = () => window.dispatchEvent(new CustomEvent("rakazo:notifications-changed"));
+const announceChange = () => window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
 
 /** The server already reports `shownAt`/`seenAt`; look the notification up again to see them. */
 async function wasShown(n: NotificationDto): Promise<boolean> {
@@ -160,14 +161,14 @@ export function AppToaster() {
       ).catch(() => undefined);
     };
     syncApprovals();
-    window.addEventListener("rakazo:notifications-changed", syncApprovals);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, syncApprovals);
     const poll = setInterval(() => {
       if (hasApprovalToasts()) syncApprovals();
     }, APPROVAL_POLL_MS);
     return () => {
       controller.abort();
       clearInterval(poll);
-      window.removeEventListener("rakazo:notifications-changed", syncApprovals);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, syncApprovals);
       window.removeEventListener(NOTIFICATION_SETTINGS_CHANGED, reload);
     };
   }, [signedIn]);

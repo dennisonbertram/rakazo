@@ -2025,6 +2025,24 @@ describe("MCP connector integration agents", () => {
     }
   });
 
+  it("runs an annotation-only read and refuses a write for an ordinary bot on a released bank server", async () => {
+    const released = { agentBotId: null, agentExclusive: false, agentBot: null };
+    const { connector, state, names, call } = await setup("other", { spawnKey: null }, released);
+    try {
+      expect(await names()).toContain("annotatedRead");
+      expect(await call("annotatedRead", true)).toMatchObject([{ type: "result" }]);
+      expect(state.calls).toEqual(["annotatedRead"]);
+      state.tools = TOOLS.map((tool) =>
+        tool.name === "mystery" ? { ...tool, annotations: { readOnlyHint: false } } : tool,
+      );
+      expect(await call("mystery")).toMatchObject([{ type: "error" }]);
+      expect(await call("requestSendMoney")).toMatchObject([{ type: "error" }]);
+      expect(state.calls).toEqual(["annotatedRead"]);
+    } finally {
+      await connector.close();
+    }
+  });
+
   it("lists fresh metadata on request while the cached listing is still valid", async () => {
     const { connector, state, assignment } = await setup("agent-1", agentBot, {});
     const context = {

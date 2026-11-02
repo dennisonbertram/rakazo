@@ -62,8 +62,28 @@ it("keeps Always allow quiet, with its consequence beside it", () => {
   const always = button(container, "Always allow this");
   expect(always.className).toContain("underline");
   expect(button(container, "Allow once").className).not.toContain("underline");
-  expect(container.textContent).toContain("Won't ask again for this kind of action.");
+  expect(container.textContent).toContain("Won't ask again anywhere in this space.");
   expect(container.textContent).not.toContain("tool");
+});
+
+it("states the same scope on a site card", () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const block: AskBlock = {
+    ...pending,
+    site: "docs.example.test",
+    actions: [
+      { id: "allow", label: "Allow once" },
+      { id: "always", label: "Always allow docs.example.test" },
+      { id: "deny", label: "Deny" },
+    ],
+  };
+  act(() =>
+    createRoot(container).render(
+      <AskCard block={block} canAnswer onAnswer={async () => undefined} />,
+    ),
+  );
+  expect(container.textContent).toContain("Won't ask again anywhere in this space.");
 });
 
 it("moves focus to the composer once the answer is sent", async () => {
@@ -186,4 +206,26 @@ it("holds a new card's buttons for a second after another card was answered", as
   expect((button(second, "Allow once") as HTMLButtonElement).disabled).toBe(true);
   await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
   expect((button(second, "Allow once") as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("keeps the run-scoped allow label of a desktop app card and offers no Always allow", () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const card: AskBlock = {
+    kind: "ask",
+    text: "Use Music on this Mac",
+    approvalEffectId: "effect_desktop",
+    actions: [
+      { id: "allow", label: "Allow for this run" },
+      { id: "deny", label: "Deny" },
+    ],
+    status: "pending",
+  };
+  act(() =>
+    createRoot(container).render(
+      <AskCard block={card} canAnswer onAnswer={async () => undefined} />,
+    ),
+  );
+  expect(button(container, "Allow for this run")).toBeTruthy();
+  expect(container.textContent).not.toContain("Always allow");
 });

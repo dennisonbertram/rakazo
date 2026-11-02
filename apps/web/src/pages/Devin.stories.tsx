@@ -52,6 +52,15 @@ export const StalePartial: Story = {
   beforeEach: reads({ ...overview, stale: true, partial: true }),
 };
 
+/** Devin cannot be reached: the rows stay, the header says how old they are, and there is no error notice. */
+export const Unreachable: Story = {
+  beforeEach: reads({
+    ...overview,
+    stale: true,
+    connection: { ...overview.connection, status: "unreachable" },
+  }),
+};
+
 export const Rejected: Story = { beforeEach: reads(rejected) };
 
 export const RejectedMember: Story = {

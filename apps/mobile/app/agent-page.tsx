@@ -143,10 +143,12 @@ export default function AgentPageScreen() {
         ? t("Not approved")
         : status === "missing"
           ? t("Source not found")
-          : t("No data yet");
+          : status === "paused"
+            ? t("Paused")
+            : t("No data yet");
   const cellText = ({ text, usd }: LiveCell) => (usd ? maskAmountsWhenHidden(text) : text);
-  const warning = (
-    <View accessible accessibilityLabel={t("Source failed")}>
+  const warning = (status: string) => (
+    <View accessible accessibilityLabel={status === "paused" ? t("Source paused") : t("Source failed")}>
       <NativeSymbol
         ios="exclamationmark.triangle.fill"
         android="warning-outline"
@@ -220,12 +222,12 @@ export default function AgentPageScreen() {
           <View key={index}>
             <View style={styles.row}>
               <Text style={styles.rowTitle}>{block.label}</Text>
-              {block.status === "failed" ? warning : null}
+              {block.status === "failed" || block.status === "paused" ? warning(block.status) : null}
               <Text style={styles.value}>
                 {block.value ? cellText(block.value) : placeholder(block.status)}
               </Text>
             </View>
-            {block.status === "failed" && block.error ? (
+            {(block.status === "failed" || block.status === "paused") && block.error ? (
               <Text style={styles.error}>{block.error}</Text>
             ) : null}
           </View>
@@ -248,9 +250,9 @@ export default function AgentPageScreen() {
             ) : (
               <Text style={styles.detail}>{placeholder(block.status)}</Text>
             )}
-            {block.status === "failed" ? (
+            {block.status === "failed" || block.status === "paused" ? (
               <View style={styles.failed}>
-                {warning}
+                {warning(block.status)}
                 {block.error ? <Text style={styles.error}>{block.error}</Text> : null}
               </View>
             ) : null}

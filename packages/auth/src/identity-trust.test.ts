@@ -110,6 +110,9 @@ function fixture({
     dataRoomItem: {
       findMany: vi.fn(async () => [{ spaceId: "space-1", storageKey: "blob/k1" }]),
     },
+    meetingCaptureChunk: {
+      findMany: vi.fn(async () => [{ spaceId: "space-1", blobKey: "capture/k3" }]),
+    },
     contactPhoto: {
       findMany: vi.fn(async () => [{ spaceId: "space-1", storageKey: "photo/k2" }]),
     },
@@ -540,6 +543,7 @@ describe("session credentials", () => {
     expect(f.blobs).toEqual([
       { spaceId: "space-1", storageKey: "blob/k1" },
       { spaceId: "space-1", storageKey: "photo/k2" },
+      { spaceId: "space-1", storageKey: "capture/k3" },
     ]);
     expect(f.homes).toEqual([
       expect.objectContaining({ homeKey: "home-1", homeSnapshotId: "snap-2" }),

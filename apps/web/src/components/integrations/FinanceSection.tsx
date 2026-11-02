@@ -82,7 +82,8 @@ function CryptoTile({
           </div>
         </div>
       </div>
-      <div className={`${hasKey || hasServer ? "" : "mt-auto "}flex items-center gap-2`}>
+      {children}
+      <div className="mt-auto flex items-center gap-2">
         {hasKey === null ? null : (
           <>
             {/* Nothing to connect without a key: the first wallet added starts it. Not "Not connected". */}
@@ -108,7 +109,6 @@ function CryptoTile({
       {dialog ? (
         <BlockscoutConnectDialog onConnected={reload} onClose={() => setDialog(false)} />
       ) : null}
-      {children}
     </IntegrationTile>
   );
 }
@@ -409,15 +409,18 @@ export function FinanceSection({
                 <div className="min-w-0">
                   <TileName
                     name={name}
-                    to={connected && serverId ? `/app/integrations/mcp/${serverId}` : undefined}
+                    to={serverId ? `/app/integrations/mcp/${serverId}` : undefined}
                   />
                   <div className="line-clamp-2 text-xs text-muted-foreground">
                     {description[provider]}
                   </div>
                 </div>
               </div>
-              {/* Connected: the status row sits under the name, level with Gmail and Carta's. */}
-              <div className={`${connected ? "" : "mt-auto "}flex items-center gap-2`}>
+              {/* Used by first, then the action row at the bottom, level with Gmail and Carta's. */}
+              {connected ? (
+                <div className="max-sm:hidden empty:hidden">{extras?.[provider]}</div>
+              ) : null}
+              <div className="mt-auto flex items-center gap-2">
                 {busy === provider ? (
                   <StatusBadge status="connecting" />
                 ) : connected ? (
@@ -462,9 +465,6 @@ export function FinanceSection({
                 <p role="alert" className="text-xs text-destructive">
                   {error}
                 </p>
-              ) : null}
-              {connected ? (
-                <div className="max-sm:hidden empty:hidden">{extras?.[provider]}</div>
               ) : null}
             </IntegrationTile>
           );

@@ -133,6 +133,8 @@ function ActivityTerminal({ botId, hidden }: { botId: string; hidden: boolean })
       attach_file: (path) => t`Attached ${path}`,
       open_path: (path) => t`Opened ${path}`,
       launch_app: (app) => t`Launched ${app}`,
+      // The server writes the whole line ("Read Music"); it never carries app content.
+      desktop_app: (line) => line,
     };
     // Writes are queued, so clear in-band (ESC c) rather than with reset(), which runs
     // immediately and would let an earlier queued render land after it.

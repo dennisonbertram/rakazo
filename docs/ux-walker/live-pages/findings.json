@@ -1,0 +1,991 @@
+[
+  {
+    "id": "LP-01",
+    "title": "Page options button is covered by the page tab strip",
+    "severity": "high",
+    "category": "accessibility",
+    "description": "With four or more page tabs the selected tab slides over the Page options (...) button in the chat side panel, on desktop and on a phone. A click or tap on the dots lands on the tab, so Share, Sources, Rename, Refresh and Delete cannot be reached by pointer; only the keyboard works.",
+    "stories": [
+      "STORY-002",
+      "STORY-004",
+      "STORY-025",
+      "STORY-051",
+      "STORY-057",
+      "STORY-061",
+      "STORY-063"
+    ],
+    "source_finding_ids": [
+      "F-002-1",
+      "F-004-1",
+      "F-051-1",
+      "F-057-1",
+      "F-061-1",
+      "F-063-5",
+      "F-025-2"
+    ],
+    "suggested_fix": "Reserve space for the button, let the tab row scroll on its own, or move Page options out of the tab row.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-02",
+    "title": "HTML page stays on \"Loading\"",
+    "severity": "high",
+    "category": "happy-path",
+    "description": "The Cash HTML page often never leaves its own \"Loading\" text, in the side panel and on the full-width route, even though the data call returns. About half of the loads worked. Data appeared only after the Cash page sources were refreshed.",
+    "stories": [
+      "STORY-012",
+      "STORY-036",
+      "STORY-041"
+    ],
+    "source_finding_ids": [
+      "F-012-2",
+      "F-036-1",
+      "F-041-1"
+    ],
+    "suggested_fix": "Show a timeout and error state in the frame; fix the first-load handshake.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-03",
+    "title": "Spend chart x axis shows raw ISO timestamps that overlap; y axis is clipped; no title or axis names",
+    "severity": "high",
+    "category": "visual",
+    "description": "X labels overlap into an unreadable smear at every width (and spill outside the card at 390 px). Y labels are cut off on the left (34,000 shows as 4,000). The chart has no title, axis titles are raw field names, and amounts have no $ sign.",
+    "stories": [
+      "STORY-001",
+      "STORY-014",
+      "STORY-045",
+      "STORY-046",
+      "STORY-050",
+      "STORY-061"
+    ],
+    "source_finding_ids": [
+      "F-001-1",
+      "F-014-1",
+      "F-014-2",
+      "F-045-2",
+      "F-046-1",
+      "F-050-6",
+      "F-061-3"
+    ],
+    "suggested_fix": "Format dates, thin ticks, add left padding, title the chart and format amounts.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-04",
+    "title": "Removing the only source of a page destroys its blocks",
+    "severity": "high",
+    "category": "error-handling",
+    "description": "Removing the only source on Spend turns the number block and the history chart into \"Source not found\"; the chart loses its title and axes. The confirm dialog does not say what will break.",
+    "stories": [
+      "STORY-021"
+    ],
+    "source_finding_ids": [
+      "F-021-1",
+      "F-021-3"
+    ],
+    "suggested_fix": "Name the blocks that depend on the source in the confirm dialog; keep block titles on orphaned blocks.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-05",
+    "title": "Share silently replaces the existing live link",
+    "severity": "high",
+    "category": "happy-path",
+    "description": "Opening Share on a page that already has a live link creates a new link and kills the old one. The dialog looks the same for first share, replace and stop; the owner cannot see or reuse the current link. Earlier recipients lose access without warning, and a wrong-tab share is easy.",
+    "stories": [
+      "STORY-050",
+      "STORY-053",
+      "STORY-055",
+      "STORY-056",
+      "STORY-057"
+    ],
+    "source_finding_ids": [
+      "F-050-2",
+      "F-053-2",
+      "F-055-1",
+      "F-056-1",
+      "F-057-3"
+    ],
+    "suggested_fix": "Show the existing link and its age first; make \"New link\" an explicit action that warns about the old one.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-06",
+    "title": "Sidebar page list does not follow create, rename and delete",
+    "severity": "high",
+    "category": "happy-path",
+    "description": "A deleted page keeps its sidebar row; clicking it silently opens an unrelated chat. A new page is missing from the sidebar and the \"Show in sidebar\" list until reload, and renamed pages keep the old name until reload (side panel and full-width route).",
+    "stories": [
+      "STORY-002",
+      "STORY-003",
+      "STORY-004",
+      "STORY-045",
+      "STORY-048"
+    ],
+    "source_finding_ids": [
+      "F-048-1",
+      "F-048-2",
+      "F-004-3",
+      "F-002-2",
+      "F-003-1",
+      "F-045-1"
+    ],
+    "suggested_fix": "Invalidate the sidebar page query after page create, rename and delete.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-07",
+    "title": "Source path that resolves to nothing shows \"No data yet\" while Sources says ok",
+    "severity": "medium",
+    "category": "happy-path",
+    "description": "Residual defect after discounting the seed (the seeded sources point at JSON paths the demo finance_overview result lacks, which is a seed artifact). When a block path resolves to nothing, the block drops its old value to \"No data yet\", Sources still shows the source as ok, and the shared snapshot is empty too. A broken path is hidden, and a manual Refresh or Retry removes numbers the user had. Original severity was critical (F-013-1, F-016-1); downgraded.",
+    "stories": [
+      "STORY-013",
+      "STORY-016",
+      "STORY-020",
+      "STORY-022",
+      "STORY-025",
+      "STORY-050"
+    ],
+    "source_finding_ids": [
+      "F-013-1",
+      "F-016-1",
+      "F-050-1",
+      "F-022-1",
+      "F-025-1",
+      "F-020-2"
+    ],
+    "suggested_fix": "Flag a block whose path found nothing (warning dot, \"Path not found\") and keep the last good value.",
+    "status": "deferred",
+    "original_severity": "critical"
+  },
+  {
+    "id": "LP-08",
+    "title": "After Resume, the badge still says \"failed\" with the old paused text",
+    "severity": "medium",
+    "category": "error-handling",
+    "description": "Right after Resume the row badge goes red \"failed\" and \"Paused after 5 failed refreshes\" stays, so it looks as if resume failed. Also seen on the whole page after resume in the review story.",
+    "stories": [
+      "STORY-020",
+      "STORY-050",
+      "STORY-060"
+    ],
+    "source_finding_ids": [
+      "F-020-1",
+      "F-050-3",
+      "F-060-1"
+    ],
+    "suggested_fix": "Clear the failure text on resume and show \"resuming\" or \"ok\".",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-09",
+    "title": "Sources dialog names sources by internal ids, not block titles",
+    "severity": "medium",
+    "category": "consistency",
+    "description": "Rows read cash, vendors, stale, paused, pausedempty, outside, spend while the page shows Monthly burn, Largest vendors, Cash (stale) and so on. Each row also repeats the internal \"finance_overview - Hourly\".",
+    "stories": [
+      "STORY-016",
+      "STORY-017",
+      "STORY-018",
+      "STORY-019",
+      "STORY-021",
+      "STORY-024",
+      "STORY-034",
+      "STORY-060",
+      "STORY-063"
+    ],
+    "source_finding_ids": [
+      "F-016-2",
+      "F-017-1",
+      "F-017-2",
+      "F-018-2",
+      "F-019-3",
+      "F-021-2",
+      "F-024-2",
+      "F-034-3",
+      "F-060-3",
+      "F-063-3"
+    ],
+    "suggested_fix": "Show block titles (or a label field) as the primary row text.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-10",
+    "title": "Delete block is one click, with no confirmation or undo, and is hover-only",
+    "severity": "medium",
+    "category": "error-handling",
+    "description": "The X is invisible without hover, so touch users cannot find it, yet a tap reveals it under the thumb; keyboard focus reveals it silently; Cmd+Z did not restore the block.",
+    "stories": [
+      "STORY-008",
+      "STORY-009",
+      "STORY-015",
+      "STORY-016",
+      "STORY-044",
+      "STORY-059",
+      "STORY-063"
+    ],
+    "source_finding_ids": [
+      "F-008-2",
+      "F-009-1",
+      "F-015-1",
+      "F-015-2",
+      "F-016-4",
+      "F-044-2",
+      "F-059-1",
+      "F-063-2"
+    ],
+    "suggested_fix": "Add Undo toast, always-visible overflow menu on touch, focus ring on cards.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-11",
+    "title": "Failed, paused and pending blocks share one amber dot",
+    "severity": "medium",
+    "category": "visual",
+    "description": "Only the hover label or popover tells \"I paused this\" from \"this is broken\".",
+    "stories": [
+      "STORY-012",
+      "STORY-019",
+      "STORY-038",
+      "STORY-056"
+    ],
+    "source_finding_ids": [
+      "F-012-5",
+      "F-019-2",
+      "F-038-1",
+      "F-056-3"
+    ],
+    "suggested_fix": "Use different icons or colours for paused and failed.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-12",
+    "title": "Status popovers cover the block value and Delete button",
+    "severity": "medium",
+    "category": "layout",
+    "description": "The dot popover opens over the number it explains, on desktop and phone.",
+    "stories": [
+      "STORY-011",
+      "STORY-022",
+      "STORY-038",
+      "STORY-059"
+    ],
+    "source_finding_ids": [
+      "F-011-2",
+      "F-022-3",
+      "F-038-2",
+      "F-059-2"
+    ],
+    "suggested_fix": "Anchor the popover above or to the side of the value.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-13",
+    "title": "Status popovers give no next step",
+    "severity": "medium",
+    "category": "error-handling",
+    "description": "Failed: only \"Request timed out\" and Retry (not saying Retry refreshes the whole page). Paused: no way to resume. Paused by the user: empty popover.",
+    "stories": [
+      "STORY-010",
+      "STORY-011",
+      "STORY-019"
+    ],
+    "source_finding_ids": [
+      "F-010-1",
+      "F-011-1",
+      "F-019-1"
+    ],
+    "suggested_fix": "Add the action (Resume in Sources) and a one-line reason to each popover.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-14",
+    "title": "\"Waiting for approval\" lands in the chat with the card off screen",
+    "severity": "medium",
+    "category": "flow",
+    "description": "The link opens the Finance chat but not at the approval card, which hides behind the composer or a \"new messages\" pill, while the side panel still shows the page.",
+    "stories": [
+      "STORY-016",
+      "STORY-029",
+      "STORY-046"
+    ],
+    "source_finding_ids": [
+      "F-016-3",
+      "F-029-1",
+      "F-046-2"
+    ],
+    "suggested_fix": "Scroll to and highlight the approval card.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-15",
+    "title": "Pending source row in Sources has no route to its approval card",
+    "severity": "medium",
+    "category": "flow",
+    "description": "Menu has only Remove and Change schedule.",
+    "stories": [
+      "STORY-034"
+    ],
+    "source_finding_ids": [
+      "F-034-1"
+    ],
+    "suggested_fix": "Add \"Review request\" to the row menu.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-16",
+    "title": "HTML page ignores Hide amounts",
+    "severity": "medium",
+    "category": "happy-path",
+    "description": "Blocks pages and the header chip are masked; the HTML page still shows its numbers, and nothing says so.",
+    "stories": [
+      "STORY-041"
+    ],
+    "source_finding_ids": [
+      "F-041-2"
+    ],
+    "suggested_fix": "Document the limit in the page tool, or mask known amounts via the frame bridge.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-17",
+    "title": "No freshness or failure cue on HTML pages",
+    "severity": "medium",
+    "category": "happy-path",
+    "description": "No dot, Retry or time on the page; the owner must open Sources, and a Refresh gives no visible sign.",
+    "stories": [
+      "STORY-036",
+      "STORY-038",
+      "STORY-062"
+    ],
+    "source_finding_ids": [
+      "F-038-3",
+      "F-062-2",
+      "F-036-2"
+    ],
+    "suggested_fix": "Show the same fetched-time and status chip as blocks pages.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-18",
+    "title": "HTML page frame is a white slab in dark mode",
+    "severity": "medium",
+    "category": "visual",
+    "description": "The frame does not follow the app theme, has no border, and flashes white \"Loading\" on tab switch. A shared Spend chart is also a white picture in a dark card (F-057-2).",
+    "stories": [
+      "STORY-001",
+      "STORY-024",
+      "STORY-035",
+      "STORY-036",
+      "STORY-037",
+      "STORY-041",
+      "STORY-057",
+      "STORY-062"
+    ],
+    "source_finding_ids": [
+      "F-001-2",
+      "F-024-1",
+      "F-037-1",
+      "F-041-4",
+      "F-062-3",
+      "F-036-3",
+      "F-035-1",
+      "F-057-2"
+    ],
+    "suggested_fix": "Pass theme to the frame and give it a border or inset.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-19",
+    "title": "Chart warning triangle has no accessible name or explanation",
+    "severity": "medium",
+    "category": "accessibility",
+    "description": "Amber triangle on the Spend chart is not focusable and cannot be clicked, unlike the dots on other blocks.",
+    "stories": [
+      "STORY-014"
+    ],
+    "source_finding_ids": [
+      "F-014-3"
+    ],
+    "suggested_fix": "Make it a button with the same popover as other status dots.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-20",
+    "title": "Conflict banner \"Page changed. Reload\" hides the cost",
+    "severity": "medium",
+    "category": "error-handling",
+    "description": "It does not say that Reload discards typing, and typing stops being saved while it shows.",
+    "stories": [
+      "STORY-006"
+    ],
+    "source_finding_ids": [
+      "F-006-1"
+    ],
+    "suggested_fix": "Say what Reload discards; offer copy-out.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-21",
+    "title": "A bot with no pages gives no hint how to get one",
+    "severity": "medium",
+    "category": "disclosure",
+    "description": "No Page button, Add page row or empty state; only asking in chat creates one.",
+    "stories": [
+      "STORY-007"
+    ],
+    "source_finding_ids": [
+      "F-007-1"
+    ],
+    "suggested_fix": "Empty state: \"Ask Finance to build a page\".",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-22",
+    "title": "Delete page confirm does not say what is lost",
+    "severity": "medium",
+    "category": "error-handling",
+    "description": "\"Delete Board prep?\" does not mention permanence, revisions or share links.",
+    "stories": [
+      "STORY-004"
+    ],
+    "source_finding_ids": [
+      "F-004-2"
+    ],
+    "suggested_fix": "State consequences in the dialog.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-23",
+    "title": "Page options menu puts Share first",
+    "severity": "medium",
+    "category": "accessibility",
+    "description": "Pressing Enter on the opened menu creates a public link with no confirmation; rename was also unreliable.",
+    "stories": [
+      "STORY-003"
+    ],
+    "source_finding_ids": [
+      "F-003-2"
+    ],
+    "suggested_fix": "Put Rename first; confirm before creating a link.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-24",
+    "title": "Dead share link page is bare and does not recover on hash change",
+    "severity": "medium",
+    "category": "error-handling",
+    "description": "\"This link is not available.\" is a tiny grey line with no reason or next step; revoked and replaced links look identical; pasting a valid link into the same tab (only #token changes) still shows the error until reload.",
+    "stories": [
+      "STORY-052",
+      "STORY-054",
+      "STORY-056"
+    ],
+    "source_finding_ids": [
+      "F-052-1",
+      "F-054-1",
+      "F-056-2"
+    ],
+    "suggested_fix": "Add reason and next step; react to hashchange.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-25",
+    "title": "Hide amounts gives no indication on the page",
+    "severity": "medium",
+    "category": "disclosure",
+    "description": "Nothing says amounts are masked or how to turn it off (control is in the account menu only).",
+    "stories": [
+      "STORY-012"
+    ],
+    "source_finding_ids": [
+      "F-012-1"
+    ],
+    "suggested_fix": "Small \"Amounts hidden\" chip with a toggle.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-26",
+    "title": "Phone drawer starts with Pages collapsed",
+    "severity": "medium",
+    "category": "flow",
+    "description": "Cash takes 3 taps (menu, expand, Cash) instead of 2.",
+    "stories": [
+      "STORY-049",
+      "STORY-063"
+    ],
+    "source_finding_ids": [
+      "F-049-1",
+      "F-063-4"
+    ],
+    "suggested_fix": "Expand Pages by default when a page is the current route.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-27",
+    "title": "Sources rows truncate schedule text on a phone",
+    "severity": "medium",
+    "category": "layout",
+    "description": "The new schedule after Change schedule cannot be read (\"finance_overview - E...\").",
+    "stories": [
+      "STORY-049",
+      "STORY-060",
+      "STORY-063"
+    ],
+    "source_finding_ids": [
+      "F-049-4",
+      "F-060-2",
+      "F-063-1"
+    ],
+    "suggested_fix": "Stack the detail line under the title.",
+    "status": "deferred"
+  },
+  {
+    "id": "LP-28",
+    "title": "Drawer hides the agent that needs approval behind \"+11 more\"",
+    "severity": "medium",
+    "category": "flow",
+    "description": "With Pages expanded the agent and unread marker are not visible.",
+    "stories": [
+      "STORY-033"
+    ],
+    "source_finding_ids": [
+      "F-033-1"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-29",
+    "title": "Landscape phone leaves ~130 px for chat",
+    "severity": "medium",
+    "category": "layout",
+    "description": "Header and chips use ~180 of 390 px; the approval card is clipped.",
+    "stories": [
+      "STORY-033"
+    ],
+    "source_finding_ids": [
+      "F-033-2"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-30",
+    "title": "Markdown table styled unlike the live table card",
+    "severity": "low",
+    "category": "consistency",
+    "description": "Heavy grid borders and centred headers vs light rows and muted headers.",
+    "stories": [
+      "STORY-008",
+      "STORY-012",
+      "STORY-044",
+      "STORY-049",
+      "STORY-051"
+    ],
+    "source_finding_ids": [
+      "F-008-1",
+      "F-012-4",
+      "F-044-1",
+      "F-049-5",
+      "F-051-2"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-31",
+    "title": "Icon-only controls and small touch targets",
+    "severity": "low",
+    "category": "accessibility",
+    "description": "Page/List/Routines glyph buttons, 24-34 px targets, 20 px \"Waiting for approval\" link.",
+    "stories": [
+      "STORY-011",
+      "STORY-046",
+      "STORY-049",
+      "STORY-057",
+      "STORY-058"
+    ],
+    "source_finding_ids": [
+      "F-011-3",
+      "F-046-4",
+      "F-049-2",
+      "F-057-4",
+      "F-058-1",
+      "F-058-5"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-32",
+    "title": "Panel forgets the tab and the tab row scrolls away",
+    "severity": "low",
+    "category": "flow",
+    "description": "Close/reopen or Back resets to the first tab; panel opens on the wrong page for an approval; tab row not sticky.",
+    "stories": [
+      "STORY-025",
+      "STORY-035",
+      "STORY-041",
+      "STORY-046",
+      "STORY-058"
+    ],
+    "source_finding_ids": [
+      "F-025-3",
+      "F-035-2",
+      "F-041-3",
+      "F-046-3",
+      "F-058-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-33",
+    "title": "Sidebar rows and menus are hard to tell apart",
+    "severity": "low",
+    "category": "consistency",
+    "description": "Identical teal avatars for the three pages, partial collapse of Pages, two controls named Page options, Show in sidebar list includes bot pages.",
+    "stories": [
+      "STORY-007",
+      "STORY-047",
+      "STORY-048",
+      "STORY-049"
+    ],
+    "source_finding_ids": [
+      "F-007-2",
+      "F-047-1",
+      "F-047-2",
+      "F-048-4",
+      "F-049-6"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-34",
+    "title": "Menu items wrap to two lines",
+    "severity": "low",
+    "category": "layout",
+    "description": "\"Change schedule\", \"Remove from sidebar\".",
+    "stories": [
+      "STORY-018",
+      "STORY-034",
+      "STORY-049"
+    ],
+    "source_finding_ids": [
+      "F-018-1",
+      "F-034-2",
+      "F-049-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-35",
+    "title": "Stop sharing gives no feedback",
+    "severity": "low",
+    "category": "error-handling",
+    "description": "Dialogs close and nothing else changes.",
+    "stories": [
+      "STORY-050",
+      "STORY-053"
+    ],
+    "source_finding_ids": [
+      "F-050-5",
+      "F-053-1"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-36",
+    "title": "Stop-sharing confirm opens over the Share dialog",
+    "severity": "low",
+    "category": "visual",
+    "description": "Ghost buttons show through.",
+    "stories": [
+      "STORY-039",
+      "STORY-050"
+    ],
+    "source_finding_ids": [
+      "F-039-2",
+      "F-050-4"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-37",
+    "title": "Share dialog link field scrolled to the end; host 127.0.0.1 vs localhost",
+    "severity": "low",
+    "category": "flow",
+    "description": "Only the last 30 characters show; expiry has no date.",
+    "stories": [
+      "STORY-051"
+    ],
+    "source_finding_ids": [
+      "F-051-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-38",
+    "title": "Shared HTML page has default margin, no card and no snapshot time; stale blocks look healthy in the snapshot",
+    "severity": "low",
+    "category": "visual",
+    "description": "",
+    "stories": [
+      "STORY-039",
+      "STORY-052"
+    ],
+    "source_finding_ids": [
+      "F-039-1",
+      "F-052-2"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-39",
+    "title": "Approval card wording differs from the spec",
+    "severity": "low",
+    "category": "consistency",
+    "description": "\"Answered: Approve\" vs \"Allow\"; card names host twice and not the block it unlocks; Inbox card reuses Allow / Not now.",
+    "stories": [
+      "STORY-027",
+      "STORY-030",
+      "STORY-033"
+    ],
+    "source_finding_ids": [
+      "F-027-2",
+      "F-030-1",
+      "F-030-2",
+      "F-033-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-40",
+    "title": "\"Waiting for approval\" looks like muted text",
+    "severity": "low",
+    "category": "hierarchy",
+    "description": "Underlined link on the full page, plain text in the panel.",
+    "stories": [
+      "STORY-029",
+      "STORY-058"
+    ],
+    "source_finding_ids": [
+      "F-029-2",
+      "F-058-2"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-41",
+    "title": "Rename edge cases",
+    "severity": "low",
+    "category": "error-handling",
+    "description": "Duplicate-name error replaces the title and clears only on Escape; tapping away discards the typed title silently.",
+    "stories": [
+      "STORY-003",
+      "STORY-061"
+    ],
+    "source_finding_ids": [
+      "F-003-3",
+      "F-061-4"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-42",
+    "title": "New page is blank and gives no saved indicator",
+    "severity": "low",
+    "category": "disclosure",
+    "description": "No placeholder, no saving/saved cue.",
+    "stories": [
+      "STORY-002",
+      "STORY-006",
+      "STORY-048"
+    ],
+    "source_finding_ids": [
+      "F-002-3",
+      "F-006-2",
+      "F-048-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-43",
+    "title": "Refresh gives no visible confirmation",
+    "severity": "low",
+    "category": "error-handling",
+    "description": "Busy state under a second; no toast.",
+    "stories": [
+      "STORY-013"
+    ],
+    "source_finding_ids": [
+      "F-013-2"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-44",
+    "title": "Block fetch time is hover-only and undated",
+    "severity": "low",
+    "category": "flow",
+    "description": "Older fetches show \"Oct 30\" with no time; hover shows a bare clock time.",
+    "stories": [
+      "STORY-009"
+    ],
+    "source_finding_ids": [
+      "F-009-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-45",
+    "title": "Block accessible name runs label, time and value together",
+    "severity": "low",
+    "category": "accessibility",
+    "description": "\"Monthly burn8:12 AM$86,000\".",
+    "stories": [
+      "STORY-009"
+    ],
+    "source_finding_ids": [
+      "F-009-2"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-46",
+    "title": "Layout jump when masking; numeric column left-aligned",
+    "severity": "low",
+    "category": "consistency",
+    "description": "Total column moves ~90 px.",
+    "stories": [
+      "STORY-012"
+    ],
+    "source_finding_ids": [
+      "F-012-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-47",
+    "title": "HTML frame has fixed ~589 px height",
+    "severity": "low",
+    "category": "layout",
+    "description": "Empty white below content.",
+    "stories": [
+      "STORY-062"
+    ],
+    "source_finding_ids": [
+      "F-062-4"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-48",
+    "title": "Catalog mismatch: tab order and header gear",
+    "severity": "low",
+    "category": "happy-path",
+    "description": "Tabs are Cash, Cash HTML, Spend; a settings gear sits in the panel header.",
+    "stories": [
+      "STORY-001"
+    ],
+    "source_finding_ids": [
+      "F-001-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-49",
+    "title": "Menu needed two clicks after closing a popover with Escape",
+    "severity": "low",
+    "category": "hierarchy",
+    "description": "",
+    "stories": [
+      "STORY-016"
+    ],
+    "source_finding_ids": [
+      "F-016-5"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-50",
+    "title": "Pending block shows the refreshing shimmer",
+    "severity": "low",
+    "category": "error-handling",
+    "description": "Block that was never fetched shimmers during page refresh.",
+    "stories": [
+      "STORY-022"
+    ],
+    "source_finding_ids": [
+      "F-022-2"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-51",
+    "title": "Once, resizing 1280 to 390 gave a blank page (not reproducible)",
+    "severity": "low",
+    "category": "visual",
+    "description": "Unconfirmed.",
+    "stories": [
+      "STORY-044"
+    ],
+    "source_finding_ids": [
+      "F-044-3"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-52",
+    "title": "Block names carry state text as well as a dot",
+    "severity": "suggestion",
+    "category": "simplicity",
+    "description": "\"Cash (stale)\", \"Payroll (paused)\" (seed naming).",
+    "stories": [
+      "STORY-044"
+    ],
+    "source_finding_ids": [
+      "F-044-4"
+    ],
+    "suggested_fix": null,
+    "status": "deferred"
+  },
+  {
+    "id": "LP-53",
+    "title": "Chat header cash chip and Cash page show different numbers",
+    "severity": "suggestion",
+    "category": "hierarchy",
+    "description": "Possibly seed data.",
+    "stories": [
+      "STORY-058"
+    ],
+    "source_finding_ids": [
+      "F-058-4"
+    ],
+    "suggested_fix": null,
+    "status": "deferred",
+    "original_severity": "low"
+  }
+]

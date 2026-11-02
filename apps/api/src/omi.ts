@@ -141,7 +141,7 @@ export async function disconnectOmi(
 }
 
 /** The body, or null when it is over `max` bytes. Never holds more than `max` + one chunk. */
-async function readBody(request: Request, max: number): Promise<Uint8Array | null> {
+export async function readBody(request: Request, max: number): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > max) {
     cancelBody(request.body);

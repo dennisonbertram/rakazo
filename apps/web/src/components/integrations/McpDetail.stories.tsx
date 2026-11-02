@@ -112,6 +112,19 @@ export const BankNoAgent: Story = {
   args: { data: mockIntegrations({ servers: [mercury()] }) },
 };
 
+/** Signed in, but the bank refused the token during a sync: the page matches the tile. */
+export const BankNeedsReconnect: Story = {
+  parameters: { entry: "/app/integrations/mcp/srv_1" },
+  args: {
+    data: mockIntegrations({
+      servers: [mercury({ oauthStatus: "connected" })],
+      financeSources: [
+        { provider: "mercury", serverId: "srv_1", status: "needs_reconnect", lastSyncedAt: null },
+      ],
+    }),
+  },
+};
+
 export const CanCreateAgent: Story = {
   parameters: { entry: "/app/integrations/mcp/srv_1" },
   args: {

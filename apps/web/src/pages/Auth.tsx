@@ -46,6 +46,11 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const [reset, setReset] = useState<AuthCapabilities | null>(null);
   const [capabilityError, setCapabilityError] = useState(false);
   const [capabilityAttempt, setCapabilityAttempt] = useState(0);
+  const next = signInNext(searchParams.get("next"));
+  // Keep a validated `next` on the links between auth pages; never copy `error` or `verify`.
+  const withNext = (path: string) =>
+    next === "/app" ? path : `${path}?next=${encodeURIComponent(next)}`;
+  const forgotOff = mode === "forgot" && reset !== null && !reset.passwordReset;
   const passwordFieldId = mode === "in" ? "current-password" : "new-password";
   const title = sent ? (
     <Trans>Check your email</Trans>
@@ -118,7 +123,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           ? await authClient.signUp.email({
               email: trimmedEmail,
               password,
-              name: name || trimmedEmail.split("@")[0] || "User",
+              name: name.trim() || trimmedEmail.split("@")[0] || "User",
             })
           : await authClient.signIn.email({ email: trimmedEmail, password });
       if (result.error) {
@@ -224,7 +229,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             </>
           ) : null}
           <Link
-            to="/sign-in"
+            to={withNext("/sign-in")}
             className="inline-block py-3 font-medium text-foreground sm:py-0 pointer-coarse:py-3.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <Trans>Back to sign in</Trans>
@@ -265,7 +270,20 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
               {error}
             </p>
           ) : null}
-          {reset?.passwordAuth ? (
+          {forgotOff ? (
+            <div className="flex w-full flex-col items-center gap-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                <Trans>Password recovery is not configured for this server</Trans>
+              </p>
+              <Link
+                to={withNext("/sign-in")}
+                className="inline-block py-3 font-medium text-foreground sm:py-0 pointer-coarse:py-3.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <Trans>Back to sign in</Trans>
+              </Link>
+            </div>
+          ) : null}
+          {reset?.passwordAuth && !forgotOff ? (
             <>
               {mode === "up" ? (
                 <div className="w-full">
@@ -386,7 +404,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   {mode === "in" && reset?.passwordReset ? (
                     <div className="text-right text-sm">
                       <Link
-                        to="/forgot-password"
+                        to={withNext("/forgot-password")}
                         className="inline-block py-2 font-medium text-foreground pointer-coarse:py-3 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       >
                         <Trans>Forgot password?</Trans>
@@ -442,7 +460,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   <>
                     <Trans>Don’t have an account?</Trans>{" "}
                     <Link
-                      to="/sign-up"
+                      to={withNext("/sign-up")}
                       className="inline-block py-3 font-medium text-foreground sm:py-0 pointer-coarse:py-3.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                       <Trans>Sign up</Trans>
@@ -452,7 +470,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   <>
                     <Trans>Already have an account?</Trans>{" "}
                     <Link
-                      to="/sign-in"
+                      to={withNext("/sign-in")}
                       className="inline-block py-3 font-medium text-foreground sm:py-0 pointer-coarse:py-3.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                       <Trans>Sign in</Trans>
@@ -460,7 +478,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   </>
                 ) : (
                   <Link
-                    to="/sign-in"
+                    to={withNext("/sign-in")}
                     className="inline-block py-3 font-medium text-foreground sm:py-0 pointer-coarse:py-3.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
                     <Trans>Back to sign in</Trans>

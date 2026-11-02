@@ -26,7 +26,12 @@ import { holdNewRows } from "../components/data-room/hold-new-rows";
 import { ImportActivity, importProgress } from "../components/data-room/ImportActivity";
 import { ImportSources } from "../components/data-room/ImportFromEmail";
 import type { DataRoomEntry } from "../components/data-room/ItemDialogs";
-import { ItemDialog, isFolder, NewFolderDialog } from "../components/data-room/ItemDialogs";
+import {
+  ItemDialog,
+  isFolder,
+  MoveFilesDialog,
+  NewFolderDialog,
+} from "../components/data-room/ItemDialogs";
 import type { ItemAction } from "../components/data-room/ItemMenu";
 import type { RowInteraction } from "../components/data-room/ItemRows";
 import { GridView, ListView, SubfolderList } from "../components/data-room/ItemRows";
@@ -489,6 +494,7 @@ export function DataRoomPage({
 
   const [action, setAction] = useState<{ kind: ItemAction; item: DataRoomEntry } | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [movingChecked, setMovingChecked] = useState(false);
   const [compose, setCompose] = useState<ComposeRestore | null>(null);
   // A search or filter keeps the selection; another folder starts a new one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the folder is the trigger.
@@ -823,6 +829,7 @@ export function DataRoomPage({
             onNewFolder={() => setCreatingFolder(true)}
             onAutoSort={() => setAutoSorting(true)}
             statsView={showStats}
+            previewBeside={!!shown && !narrow && !showStats}
             trailing={viewToggles("@min-[640px]/bd:hidden")}
             leading={
               filters.status ? null : (
@@ -1049,6 +1056,7 @@ export function DataRoomPage({
                       .catch((cause) => showNoticeToast(errorText(cause)))
                   }
                   busy={bulkBusy}
+                  onMove={() => setMovingChecked(true)}
                   onDownload={() => void downloadChecked()}
                   onSend={() => void sendChecked()}
                   agents={agents}
@@ -1115,6 +1123,29 @@ export function DataRoomPage({
             showNoticeToast(t`Created ${folder.name}`);
             reloadFolders();
             setFilters({ ...filters, folderId: folder.id });
+          }}
+        />
+      ) : null}
+      {movingChecked ? (
+        <MoveFilesDialog
+          items={checkedItems}
+          folders={nodes}
+          onClose={() => setMovingChecked(false)}
+          onDone={({ moved, failed, folderId }) => {
+            // The files that moved leave the selection; the ones that failed stay ticked.
+            setChecked((current) => new Map([...current].filter(([id]) => !moved.includes(id))));
+            if (failed.length) {
+              const names = checkedItems
+                .filter((item) => failed.includes(item.id))
+                .map((item) => item.name);
+              showNoticeToast(t`Could not move ${names.join(", ")}`);
+            }
+            setPinned((current) =>
+              current && moved.includes(current.id) ? { ...current, folderId } : current,
+            );
+            window.dispatchEvent(new Event(DATA_ROOM_CHANGED));
+            reload();
+            reloadFolders();
           }}
         />
       ) : null}

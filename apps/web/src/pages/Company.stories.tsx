@@ -118,6 +118,18 @@ export const Running: Story = {
       "company.page": { ...companyFixture, latestRun: { id: "run", status: "running" } },
     }),
 };
+export const RunningEmpty: Story = {
+  beforeEach: () =>
+    mockRpc({
+      ...responses,
+      "company.page": {
+        entities: [],
+        edges: [],
+        events: [],
+        latestRun: { id: "run", status: "running" },
+      },
+    }),
+};
 export const EventsOnly: Story = {
   beforeEach: () =>
     mockRpc({

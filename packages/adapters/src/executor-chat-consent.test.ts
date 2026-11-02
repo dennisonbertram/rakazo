@@ -1,5 +1,8 @@
 import type { AgentRunRequest } from "@rakazo/adapter-kit";
-import { AI_DISCLOSURE_VERSION, PINNED_CONNECTION_LOST_MESSAGE } from "@rakazo/contracts";
+import {
+  AI_DISCLOSURE_VERSION,
+  PINNED_CONNECTION_LOST_MESSAGE,
+} from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { aiRecipient } from "./ai-consent.js";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
@@ -58,7 +61,11 @@ async function runChat(
   const runtimeRun = vi.fn(async function* (next: AgentRunRequest) {
     request = next;
     if (delegate) {
-      await next.executeTool?.("message_bot", { bot_id: "bot-2", message: "hi" }, "call-1");
+      await next.executeTool?.(
+        "message_bot",
+        { bot_id: "bot-2", message: "hi" },
+        "call-1",
+      );
     }
     yield { type: "done" as const, text: "Done" };
   });
@@ -92,7 +99,9 @@ async function runChat(
         memoryScope: null,
         computer: { id: "computer-1", scope: "dedicated" },
       })),
-      findMany: vi.fn(async () => [{ id: "bot-2", name: "Ana", spawnKey: null }]),
+      findMany: vi.fn(async () => [
+        { id: "bot-2", name: "Ana", spawnKey: null },
+      ]),
       // The delegation target runs on a different model than the chat bot.
       findFirst: vi.fn(async (args: { where?: { id?: string } }) => ({
         id: "bot-2",
@@ -126,18 +135,25 @@ async function runChat(
         sourceBlocks ? { blocks: sourceBlocks, replyTo: null } : null,
       ),
     },
-    task: { findUniqueOrThrow: vi.fn(async () => ({ id: run.taskId, prompt: "Look again" })) },
+    task: {
+      findUniqueOrThrow: vi.fn(async () => ({
+        id: run.taskId,
+        prompt: "Look again",
+      })),
+    },
     computer: { updateMany: vi.fn(async () => ({ count: 1 })) },
     connection: { findMany: vi.fn(async () => []) },
     spaceModelPreference: {
-      findFirst: vi.fn<(...args: unknown[]) => Promise<Record<string, unknown> | null>>(
-        async () => null,
-      ),
+      findFirst: vi.fn<
+        (...args: unknown[]) => Promise<Record<string, unknown> | null>
+      >(async () => null),
     },
     // A pinned connection's key is on file unless the run is meant to lose it.
     secret: {
       findFirst: vi.fn(async () =>
-        pinned === "ok" ? { id: "secret-1", ciphertext: "cipher-1", userId: "user-1" } : null,
+        pinned === "ok"
+          ? { id: "secret-1", ciphertext: "cipher-1", userId: "user-1" }
+          : null,
       ),
     },
     userModelCredential: {
@@ -171,7 +187,9 @@ async function runChat(
     },
     aiDataConsent: {
       findUnique: vi.fn(
-        async (args: { where: { userId_spaceId_recipientKey: { recipientKey: string } } }) => {
+        async (args: {
+          where: { userId_spaceId_recipientKey: { recipientKey: string } };
+        }) => {
           const key = args.where.userId_spaceId_recipientKey.recipientKey;
           const ok = Array.isArray(consented)
             ? consented.some((modelId) => allowedKey(modelId) === key)
@@ -193,7 +211,12 @@ async function runChat(
       findMany: vi.fn(async () => []),
       findUnique: vi.fn(async () =>
         effectStatus
-          ? { id: "effect-1", runId: "run-1", spaceId: "space-1", status: effectStatus }
+          ? {
+              id: "effect-1",
+              runId: "run-1",
+              spaceId: "space-1",
+              status: effectStatus,
+            }
           : null,
       ),
       create: vi.fn(async () => ({
@@ -205,7 +228,13 @@ async function runChat(
     },
     artifact: {
       findMany: vi.fn(async () => [
-        { id: "art-1", storageKey: "shot.png", size: 4, mimeType: "image/png", name: "shot.png" },
+        {
+          id: "art-1",
+          storageKey: "shot.png",
+          size: 4,
+          mimeType: "image/png",
+          name: "shot.png",
+        },
       ]),
     },
   };
@@ -214,7 +243,10 @@ async function runChat(
   const executor = createRunExecutor({
     prisma,
     deploymentModelKey: "fake-deployment-key",
-    runtime: { describe: () => ({ capabilities: { scripted } }), run: runtimeRun },
+    runtime: {
+      describe: () => ({ capabilities: { scripted } }),
+      run: runtimeRun,
+    },
     sandbox: {
       describe: () => ({ capabilities: { graphical: false } }),
       writeFile: vi.fn(async () => undefined),
@@ -226,7 +258,11 @@ async function runChat(
     memory: { read: async () => ({ documents: [] }) },
     memoryProviders: { resolve: async () => null },
     artifacts: { get },
-    events: { append: vi.fn(async () => undefined), finalizeRun, pauseRunForInput },
+    events: {
+      append: vi.fn(async () => undefined),
+      finalizeRun,
+      pauseRunForInput,
+    },
     jobs: { enqueue: vi.fn(async () => undefined) },
     secrets: [],
     secretStore: { load: vi.fn(async () => "sk-test-key-12345678") },
@@ -242,16 +278,31 @@ describe("Chat runs need AI consent for the model they use", () => {
     expect(runtimeRun).not.toHaveBeenCalled();
     expect(pauseRunForInput).toHaveBeenCalledWith(
       expect.objectContaining({
-        blocks: [expect.objectContaining({ kind: "ask", consent: expect.any(Object) })],
+        blocks: [
+          expect.objectContaining({ kind: "ask", consent: expect.any(Object) }),
+        ],
       }),
     );
   });
 
   it("ends the run when the owner chose Not now", async () => {
-    const { runtimeRun, pauseRunForInput, finalizeRun } = await runChat(false, "denied");
+    const { runtimeRun, pauseRunForInput, finalizeRun } = await runChat(
+      false,
+      "denied",
+    );
     expect(runtimeRun).not.toHaveBeenCalled();
     expect(pauseRunForInput).not.toHaveBeenCalled();
-    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "failed" }));
+    expect(finalizeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "failed",
+        error: expect.stringContaining("Send a message to be asked again"),
+      }),
+    );
+    expect(finalizeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.stringContaining("Chat is off until you allow AI models"),
+      }),
+    );
   });
 
   it("runs the model once consent is on file", async () => {
@@ -266,7 +317,11 @@ describe("Chat runs need AI consent for the model they use", () => {
   });
 
   it("pauses a follow-up message without consent", async () => {
-    const { runtimeRun, pauseRunForInput } = await runChat(false, null, "follow_up");
+    const { runtimeRun, pauseRunForInput } = await runChat(
+      false,
+      null,
+      "follow_up",
+    );
     expect(runtimeRun).not.toHaveBeenCalled();
     expect(pauseRunForInput).toHaveBeenCalled();
   });
@@ -290,7 +345,14 @@ describe("Chat runs need AI consent for the model they use", () => {
   });
 
   it("fails a run whose pinned connection is gone instead of using another", async () => {
-    const { runtimeRun, finalizeRun } = await runChat(true, null, "user", null, false, "gone");
+    const { runtimeRun, finalizeRun } = await runChat(
+      true,
+      null,
+      "user",
+      null,
+      false,
+      "gone",
+    );
     expect(runtimeRun).not.toHaveBeenCalled();
     expect(finalizeRun).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -301,21 +363,35 @@ describe("Chat runs need AI consent for the model they use", () => {
   });
 
   it("fails a pinned run whose secret vanished instead of using the deployment key", async () => {
-    const { runtimeRun, finalizeRun } = await runChat(true, null, "user", null, false, "no-secret");
+    const { runtimeRun, finalizeRun } = await runChat(
+      true,
+      null,
+      "user",
+      null,
+      false,
+      "no-secret",
+    );
     expect(runtimeRun).not.toHaveBeenCalled();
     expect(finalizeRun).toHaveBeenCalledWith(
-      expect.objectContaining({ outcome: "failed", error: PINNED_CONNECTION_LOST_MESSAGE }),
+      expect.objectContaining({
+        outcome: "failed",
+        error: PINNED_CONNECTION_LOST_MESSAGE,
+      }),
     );
   });
 
   it("keeps an allowed backup model", async () => {
     const { request } = await runChat(["openai/gpt-6-luna", "openai/gpt-4o"]);
-    expect(request?.fallbackModels).toEqual([{ provider: "openrouter", id: "openai/gpt-4o" }]);
+    expect(request?.fallbackModels).toEqual([
+      { provider: "openrouter", id: "openai/gpt-4o" },
+    ]);
   });
 
   it("refuses a subagent model the user has not allowed", async () => {
     const { request } = await runChat(["openai/gpt-6-luna"]);
-    await expect(request?.resolveModel?.("openrouter", "openai/gpt-4o")).rejects.toThrow(/Allow/);
+    await expect(
+      request?.resolveModel?.("openrouter", "openai/gpt-4o"),
+    ).rejects.toThrow(/Allow/);
   });
 
   const delegated = (ownerOrigin: boolean) => [
@@ -331,28 +407,61 @@ describe("Chat runs need AI consent for the model they use", () => {
   ];
 
   it("does not send an owner's delegated chat to a model the user has not allowed", async () => {
-    const { runtimeRun, finalizeRun } = await runChat(false, null, "bot_message", delegated(true));
+    const { runtimeRun, finalizeRun } = await runChat(
+      false,
+      null,
+      "bot_message",
+      delegated(true),
+    );
     expect(runtimeRun).not.toHaveBeenCalled();
-    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "failed" }));
+    expect(finalizeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "failed",
+        error: expect.stringContaining(
+          "in Settings under Privacy and approvals",
+        ),
+      }),
+    );
   });
 
   it("runs a delegated chat once the user allowed the model", async () => {
-    const { runtimeRun } = await runChat(true, null, "bot_message", delegated(true));
+    const { runtimeRun } = await runChat(
+      true,
+      null,
+      "bot_message",
+      delegated(true),
+    );
     expect(runtimeRun).toHaveBeenCalled();
   });
 
   it("leaves a delegation that did not start from the owner's chat alone", async () => {
-    const { runtimeRun } = await runChat(false, null, "bot_message", delegated(false));
+    const { runtimeRun } = await runChat(
+      false,
+      null,
+      "bot_message",
+      delegated(false),
+    );
     expect(runtimeRun).toHaveBeenCalled();
   });
 
   it.each(["user", "follow_up"])(
     "asks on a card before a %s message is delegated to an unallowed model",
     async (trigger) => {
-      const { pauseRunForInput } = await runChat(["openai/gpt-6-luna"], null, trigger, null, true);
+      const { pauseRunForInput } = await runChat(
+        ["openai/gpt-6-luna"],
+        null,
+        trigger,
+        null,
+        true,
+      );
       expect(pauseRunForInput).toHaveBeenCalledWith(
         expect.objectContaining({
-          blocks: [expect.objectContaining({ kind: "ask", consent: expect.any(Object) })],
+          blocks: [
+            expect.objectContaining({
+              kind: "ask",
+              consent: expect.any(Object),
+            }),
+          ],
         }),
       );
     },

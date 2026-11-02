@@ -44,7 +44,6 @@ describe("SLASH_ACTIONS", () => {
     expect(SLASH_ACTIONS.map((action) => action.id)).toEqual([
       "chat-settings",
       "settings-general",
-      "settings-usage",
     ]);
   });
 });

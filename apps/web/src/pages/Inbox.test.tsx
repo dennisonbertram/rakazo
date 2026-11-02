@@ -930,6 +930,19 @@ it("a burst of 140 j presses in the open message moves one row and marks only it
   expect(rpcMock.markRead).toHaveBeenCalledWith({ messageId: "b", read: true });
 });
 
+it("u in the open message marks it unread and it stays unread after the read dwell", async () => {
+  realDialog.on = true;
+  const c = await render();
+  await click(c.querySelector('[data-row-id="a"]'));
+  await dwell(100);
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true }));
+  });
+  await dwell(1000);
+  expect(c.querySelector('[data-testid="message"]')).toBeNull();
+  expect(rpcMock.markRead).toHaveBeenLastCalledWith({ messageId: "a", read: false });
+});
+
 it("keeps a mark's Undo on screen long enough to reach it", async () => {
   const c = await render();
   await click(byText(c, "noise b"));
@@ -1993,4 +2006,53 @@ it("lists open to-dos that bots saved for the person", async () => {
   const c = await render();
   await dwell();
   expect(c.textContent).toContain("Sign the form");
+});
+
+describe("refresh when the tab becomes visible", () => {
+  const setVisibility = (state: "visible" | "hidden") => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+
+  afterEach(() => {
+    delete (document as { visibilityState?: unknown }).visibilityState;
+    vi.useRealTimers();
+  });
+
+  it("syncs once when the tab shows again after more than a minute hidden", async () => {
+    vi.useFakeTimers();
+    await render();
+    setVisibility("hidden");
+    await advance(61_000);
+    const syncs = rpcMock.refresh.mock.calls.length;
+    setVisibility("visible");
+    await advance(0);
+    expect(rpcMock.refresh.mock.calls.length).toBe(syncs + 1);
+  });
+
+  it("does not sync again when the tab shows within a minute of the last sync", async () => {
+    vi.useFakeTimers();
+    await render();
+    setVisibility("hidden");
+    await advance(20_000);
+    const syncs = rpcMock.refresh.mock.calls.length;
+    setVisibility("visible");
+    await advance(0);
+    expect(rpcMock.refresh.mock.calls.length).toBe(syncs);
+  });
+
+  it("does nothing while the page is paused", async () => {
+    vi.useFakeTimers();
+    await render(undefined, undefined, { paused: true });
+    setVisibility("hidden");
+    await advance(61_000);
+    const syncs = rpcMock.refresh.mock.calls.length;
+    setVisibility("visible");
+    await advance(0);
+    expect(rpcMock.refresh.mock.calls.length).toBe(syncs);
+  });
 });

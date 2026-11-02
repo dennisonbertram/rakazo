@@ -154,7 +154,7 @@ export function CommandPalette({
   searchLinks?: (query: string) => Promise<PaletteLinkGroup[]>;
   onOpenPath?: (path: string) => void;
   /** Commands found only by typing; they have no row in the empty palette. */
-  actions?: { label: string; run: () => void }[];
+  actions?: { label: string; keywords?: string; run: () => void }[];
 }) {
   useHideAmounts();
   const [search, setSearch] = useState("");
@@ -219,7 +219,7 @@ export function CommandPalette({
   const shownPages = needle ? ranked(pages, entryScore) : pages;
   const shownGroups = needle ? ranked(groups, entryScore) : groups;
   const shownActions = needle
-    ? ranked(actions, (action) => paletteMatchScore(action.label, needle))
+    ? ranked(actions, (action) => paletteMatchScore(action.label, needle, action.keywords))
     : [];
   const filteredBots = useMemo(
     () =>
@@ -445,6 +445,9 @@ export function CommandPalette({
       return { ...group, entries: [...titles, ...bodies] };
     })
     .sort((a, b) => groupRank(b) - groupRank(a));
+  // An action is a title match: it lists after title-matched link groups and before body-only ones.
+  const titledLinks = directLinks.filter((group) => groupRank(group) >= 1);
+  const bodyLinks = directLinks.filter((group) => groupRank(group) < 1);
   const searching = Boolean(needle && searchLinks && answered !== needle);
 
   // Direct matches come first, so Enter opens the first row; with none, the catch-all search does.
@@ -465,8 +468,12 @@ export function CommandPalette({
           : shownPages[0]
             ? `page:${shownPages[0].id}`
             : "";
-    const last = linkEntries[0] ?? fallbackLinks[0]?.entries[0];
-    return local || (last ? `link:${last.id}` : "");
+    if (local) return local;
+    const titled = titledLinks[0]?.entries[0];
+    if (titled) return `link:${titled.id}`;
+    if (shownActions[0]) return `action:${shownActions[0].label}`;
+    const last = bodyLinks[0]?.entries[0] ?? fallbackLinks[0]?.entries[0];
+    return last ? `link:${last.id}` : "";
   })();
   const [picked, setPicked] = useState("");
   // biome-ignore lint/correctness/useExhaustiveDependencies: restart from the best match when the query changes
@@ -539,7 +546,7 @@ export function CommandPalette({
               {section === "bots" ? botsGroup : section === "groups" ? groupsGroup : pagesGroup}
             </Fragment>
           ))}
-          {directLinks.map(linkGroup)}
+          {titledLinks.map(linkGroup)}
           {shownActions.length ? (
             <CommandGroup>
               {shownActions.map((action) => (
@@ -559,6 +566,7 @@ export function CommandPalette({
               ))}
             </CommandGroup>
           ) : null}
+          {bodyLinks.map(linkGroup)}
           {fallbackLinks.map(linkGroup)}
         </CommandList>
         {moreBelow ? (

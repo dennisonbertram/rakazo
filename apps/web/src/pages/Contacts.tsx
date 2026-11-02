@@ -30,6 +30,7 @@ import {
   CONTACT_RESTORED_EVENT,
   SAVED_ROW_CLASS,
   useContactNotices,
+  useWithoutDeleted,
 } from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
 
@@ -48,7 +49,8 @@ export function ContactsPage({
   spaceName?: string;
   onAskAgent?: () => void;
 }) {
-  const [contacts, setContacts] = useState<Contact[] | null>(null);
+  const [fetched, setContacts] = useState<Contact[] | null>(null);
+  const contacts = useWithoutDeleted(fetched);
   const [error, setError] = useState("");
   // Search, kind and sort live in the URL: ?q=, kind, sort, dir. "default" is the server's order.
   const list = useListParams(CONTACT_SORTS, { field: "default", dir: "asc" });

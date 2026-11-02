@@ -170,6 +170,7 @@ export function ModelSettingsOverlay({
   const refreshRevisionRef = useRef(0);
   const selectionRevisionRef = useRef(0);
   const selectedLabelRef = useRef<string | undefined>(undefined);
+  const selectedProviderRef = useRef("");
 
   const {
     oauth,
@@ -184,9 +185,9 @@ export function ModelSettingsOverlay({
     onClearError: () => setError(null),
     onError: setError,
     onFinished: async (controller) => {
-      await refresh();
+      const next = await refresh();
       if (controller.signal.aborted) return;
-      setNotice(t`Connected and using ${selectedLabelRef.current ?? "this model"}.`);
+      setNotice(connectedNotice(next?.credentials));
     },
   });
 
@@ -194,10 +195,18 @@ export function ModelSettingsOverlay({
     onClearError: () => setError(null),
     onError: setError,
     onConnected: async () => {
-      await refresh();
-      setNotice(t`Connected and using ${selectedLabelRef.current ?? "this model"}.`);
+      const next = await refresh();
+      setNotice(connectedNotice(next?.credentials));
     },
   });
+
+  // A connection that is not the space default must not claim it is in use.
+  function connectedNotice(next: ModelCredential[] | undefined, label = selectedLabelRef.current) {
+    return next?.find((entry) => entry.provider === selectedProviderRef.current)?.isDefault ===
+      false
+      ? t`Connected.`
+      : t`Connected and using ${label ?? "this model"}.`;
+  }
 
   async function refresh() {
     const refreshRevision = ++refreshRevisionRef.current;
@@ -207,7 +216,7 @@ export function ModelSettingsOverlay({
       rpc.models.credentials(),
       rpc.me(),
     ]);
-    if (refreshRevision !== refreshRevisionRef.current) return;
+    if (refreshRevision !== refreshRevisionRef.current) return undefined;
     const nextProvider =
       provider && nextCatalog.some((entry) => entry.provider === provider)
         ? provider
@@ -262,6 +271,7 @@ export function ModelSettingsOverlay({
       setAccountId(nextCredential?.accountId ?? "");
       setGatewayId(nextCredential?.gatewayId ?? "");
     }
+    return { credentials: nextCredentials, me: nextMe, catalog: nextCatalog };
   }
 
   useEffect(() => {
@@ -369,6 +379,7 @@ export function ModelSettingsOverlay({
   const modelsForProvider = catalog.filter((entry) => entry.provider === provider);
   const selected = modelsForProvider.find((entry) => entry.id === modelId) ?? modelsForProvider[0];
   selectedLabelRef.current = selected?.label;
+  selectedProviderRef.current = selected?.provider ?? "";
   const selectedProviderName = selected?.providerName ?? selected?.provider ?? "";
   const disconnectName = selectedProviderName;
   const hostCredentialSource = me?.hostCredentialSource ?? "";
@@ -488,6 +499,8 @@ export function ModelSettingsOverlay({
       nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID ? (nextCredential?.baseUrl ?? "") : "",
     );
     detailScrollRef.current?.scrollTo({ top: 0 });
+    // On a narrow screen the detail sits below the list; on desktop it is already in view.
+    detailScrollRef.current?.scrollIntoView({ block: "nearest" });
     setApiKey("");
     setAccountId(nextCredential?.accountId ?? "");
     setGatewayId(nextCredential?.gatewayId ?? "");
@@ -708,12 +721,12 @@ export function ModelSettingsOverlay({
             },
       );
       setApiKey("");
-      await refresh();
+      const next = await refresh();
       detailScrollRef.current?.scrollTo({ top: 0 });
       setNotice(
         isOpenAiCompatible || savingLimitOnly
           ? t`Saved.`
-          : t`Connected and using ${selected.label}.`,
+          : connectedNotice(next?.credentials, selected.label),
       );
     } catch (err) {
       setError(errorText(err, t`Could not connect this provider`));
@@ -728,13 +741,25 @@ export function ModelSettingsOverlay({
     setError(null);
     setNotice(null);
     setPending("disconnect");
+    const wasDefault = credential.isDefault;
     try {
       await rpc.models.disconnect({ provider: selected.provider });
       setApiKey("");
       setThinkingLevel(null);
-      await refresh();
+      const next = await refresh();
       detailScrollRef.current?.scrollTo({ top: 0 });
-      setNotice(t`Disconnected ${selected.providerName ?? selected.provider}.`);
+      const name = selected.providerName ?? selected.provider;
+      const fallback = next
+        ? (next.catalog.find(
+            (entry) =>
+              entry.provider === next.me.defaultProvider && entry.id === next.me.defaultModel,
+          )?.label ?? next.me.defaultModel)
+        : "";
+      setNotice(
+        wasDefault && fallback
+          ? t`Disconnected ${name}. Bots now use ${fallback}.`
+          : t`Disconnected ${name}.`,
+      );
     } catch (err) {
       setError(errorText(err, t`Could not disconnect this provider`));
     } finally {
@@ -1429,7 +1454,10 @@ export function ModelSettingsOverlay({
                         emptyLabel={t`No matching models`}
                         loadingLabel={t`Loading models…`}
                         options={[
-                          ...probeModels.map((id) => ({ value: id, label: id })),
+                          ...probeModels.map((id) => ({
+                            value: id,
+                            label: id,
+                          })),
                           { value: "", label: t`Other model…` },
                         ]}
                       />
@@ -1598,8 +1626,8 @@ export function ModelSettingsOverlay({
                       <DisclosureChevron />
                       <Trans>Use your own key</Trans>
                     </summary>
-                    <div className="mt-5">{connectionControls}</div>
-                    <div className="mt-6">{catalogModelConfig}</div>
+                    <div className="mt-5">{catalogModelConfig}</div>
+                    <div className="mt-6">{connectionControls}</div>
                   </details>
                 </>
               ) : (
@@ -1607,8 +1635,8 @@ export function ModelSettingsOverlay({
                   <p className="text-sm leading-[1.5] text-muted-foreground">
                     <Trans>Connect {selectedProviderName} to use it as your personal model.</Trans>
                   </p>
-                  {connectionControls}
-                  <div className="mt-6">{catalogModelConfig}</div>
+                  <div className="mt-5">{catalogModelConfig}</div>
+                  <div className="mt-6">{connectionControls}</div>
                 </>
               )}
             </>

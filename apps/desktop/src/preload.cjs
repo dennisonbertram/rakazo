@@ -19,6 +19,22 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     download: () => ipcRenderer.invoke("desktop.update.download"),
     install: () => ipcRenderer.invoke("desktop.update.install"),
   },
+  hex: {
+    available: () => ipcRenderer.invoke("desktop.hex.available"),
+    list: (sinceMs) => ipcRenderer.invoke("desktop.hex.list", sinceMs),
+    show: (id) => ipcRenderer.invoke("desktop.hex.show", id),
+  },
+  speech: {
+    status: () => ipcRenderer.invoke("desktop.speech.status"),
+    prepare: () => ipcRenderer.invoke("desktop.speech.prepare"),
+    forget: () => ipcRenderer.invoke("desktop.speech.forget"),
+    transcribe: (wav) => ipcRenderer.invoke("desktop.speech.transcribe", wav),
+    onStatus: (listener) => {
+      const handler = (_event, status) => listener(status);
+      ipcRenderer.on("desktop.speech.status", handler);
+      return () => ipcRenderer.off("desktop.speech.status", handler);
+    },
+  },
   oauth: {
     open: (url) => ipcRenderer.invoke("desktop.oauth.open", url),
     cancel: (url) => ipcRenderer.invoke("desktop.oauth.cancel", url),

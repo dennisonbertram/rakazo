@@ -24,6 +24,7 @@ import {
   DEMO_RATE_LIMIT_SPACE,
   DEMO_RECONNECT_SPACE,
   demoBrexCards,
+  demoCalendar,
   demoCarta,
   demoCrypto,
   demoFinance,
@@ -142,6 +143,8 @@ function stackEnv(): NodeJS.ProcessEnv {
     WAKEUP_DRIVER: "memory",
     // DEMO_SANDBOX_PROVIDER=docker gives bots a real computer in the demo.
     SANDBOX_PROVIDER: process.env.DEMO_SANDBOX_PROVIDER || "fake",
+    // DEMO_APP_CONTROL_PROVIDER=fake|agent-desktop turns on apps on this computer (off by default).
+    APP_CONTROL_PROVIDER: process.env.DEMO_APP_CONTROL_PROVIDER || "",
     TICKET_BOARD_ENABLED: "true",
     CLOUD_AGENT_PROVIDER: "emulator",
     COMPOSIO_API_KEY: "",
@@ -424,6 +427,7 @@ async function serve() {
     composio,
     meetingSources: createMeetingSourceRegistry({ granolaBaseUrl }),
     brexApi: { baseUrl: brexBaseUrl },
+    calendar: demoCalendar(),
     financeCallToolFor: demoFinance().callToolFor,
     mcpServers: {
       [new URL(CARTA_MCP_ENDPOINT).hostname]: demoCarta(WEB_ORIGIN),

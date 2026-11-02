@@ -6,6 +6,7 @@ export * from "./ai-consent.js";
 export * from "./alchemy-crypto-key.js";
 export * from "./alchemy-crypto-source.js";
 export * from "./apns-push.js";
+export * from "./app-control/index.js";
 export {
   mailRequestIsValid,
   type NormalizedMailEdits,
@@ -44,6 +45,7 @@ export * from "./browser-tools.js";
 export * from "./builtin-skills.js";
 export * from "./builtin-tools.js";
 export * from "./calendar-agenda.js";
+export * from "./calendar-api-emulator.js";
 export * from "./calendar-person.js";
 export { type CalendarAccount, listCalendarAccounts } from "./calendar-tools.js";
 export * from "./cartesia-voice.js";
@@ -159,6 +161,7 @@ export * from "./mcp-oauth.js";
 export * from "./mcp-read-tools.js";
 export * from "./mcp-server-tool.js";
 export * from "./mcp-transport.js";
+export * from "./meeting-capture.js";
 export * from "./meeting-digest.js";
 export * from "./meeting-source-registry.js";
 export * from "./meeting-sync.js";
@@ -183,6 +186,7 @@ export * from "./omi-sort.js";
 export * from "./omi-sort-split.js";
 export * from "./omi-transcribe.js";
 export * from "./openai-compatible-embedder.js";
+export * from "./openai-compatible-transcription.js";
 export * from "./openai-compatible-url.js";
 export * from "./openai-voice.js";
 export * from "./page-browser-session.js";

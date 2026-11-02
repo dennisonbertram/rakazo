@@ -1,5 +1,5 @@
 import type { NotificationDto } from "@rakazo/contracts";
-import { isDevinSessionUrl } from "@rakazo/contracts";
+import { isApprovalTitle, isDevinSessionUrl } from "@rakazo/contracts";
 import type { NotificationToastInput } from "@rakazo/ui-web";
 import { enqueueNotificationToast } from "@rakazo/ui-web";
 import { enqueueApprovalToast, hasApprovalToast, retainApprovalToasts } from "./approval-toasts";
@@ -12,7 +12,7 @@ export const NOTIFICATION_SETTINGS_CHANGED = "rakazo:notification-settings-chang
 
 /** Approval requests are titled "<agent> needs approval"; other needs_input kinds (questions, codes, Devin) are not. */
 export const isApprovalRequest = (n: Pick<NotificationDto, "kind" | "title">) =>
-  n.kind === "needs_input" && n.title.endsWith(" needs approval");
+  n.kind === "needs_input" && isApprovalTitle(n.title);
 
 /** The toast and OS text for a stored notification; amounts stay hidden while Hide money is on. */
 export function attentionFromDto(n: NotificationDto): AttentionNotification {

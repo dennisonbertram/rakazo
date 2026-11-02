@@ -983,4 +983,7 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Source not found": "未找到数据源",
   "No data yet": "暂无数据",
   "Source failed": "数据源失败",
+  "Connected.": "已连接。",
+  "Disconnected {provider}. Bots now use {model}.": "已断开 {provider}。机器人现在使用 {model}。",
+  "Source paused": "来源已暂停",
 };

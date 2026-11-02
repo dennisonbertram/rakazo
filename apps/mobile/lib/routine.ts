@@ -36,14 +36,17 @@ export function routineActivityLine(routine: Routine, now = new Date()): string 
       budget: t("Paused: too many checks today"),
     }[status.pausedReason];
   }
+  const failed = status.lastRunFailed && t("Last run failed");
   const parts = routine.watch
     ? [
+        failed,
         status.lastCheckedAt && `${t("Checked")} ${ago(status.lastCheckedAt, now)}`,
         status.lastChangedAt && `${t("Changed")} ${ago(status.lastChangedAt, now)}`,
       ]
     : [
-        (status.lastRunAt ?? routine.lastRunAt) &&
-          `${t("Last ran")} ${when((status.lastRunAt ?? routine.lastRunAt) as string)}`,
+        failed ||
+          ((status.lastRunAt ?? routine.lastRunAt) &&
+            `${t("Last ran")} ${when((status.lastRunAt ?? routine.lastRunAt) as string)}`),
         status.nextRunAt && routine.active && `${t("Next")} ${when(status.nextRunAt)}`,
       ];
   return parts.filter(Boolean).join(" · ") || null;

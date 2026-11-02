@@ -222,6 +222,34 @@ export function buildConsentAskBlock(effectId: string): MessageBlock {
   };
 }
 
+/** The label of the one allow button on a desktop app card; it covers the rest of the run in that app. */
+export const DESKTOP_APP_ALLOW_LABEL = "Allow for this run";
+
+/**
+ * The first action in an app on the owner's computer (docs/local-desktop-control). Allow covers
+ * that app for this run only, so there is no "Always allow".
+ */
+export function buildDesktopAppAskBlock(
+  effectId: string,
+  appName: string,
+  computerWord: "Mac" | "computer",
+  secrets: string[],
+): MessageBlock {
+  return {
+    kind: "ask",
+    approvalEffectId: effectId,
+    text: redactSecrets(
+      `Use ${sanitizeMessagingLabel(appName).replace(CARD_TITLE_ESCAPED, "\\$&")} on this ${computerWord}`,
+      secrets,
+    ),
+    status: "pending",
+    actions: [
+      { id: "allow", label: DESKTOP_APP_ALLOW_LABEL },
+      { id: "deny", label: "Deny" },
+    ],
+  };
+}
+
 /**
  * The Carta, Inbox and email agents' mail_send: always asks, never from a saved rule or Auto Review, so
  * the founder sees the whole message on a card before investor or customer mail goes out.

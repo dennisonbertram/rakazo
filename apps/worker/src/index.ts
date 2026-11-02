@@ -15,6 +15,7 @@ import {
   ChatSdkMessagingSurface,
   CodexCatalogCache,
   createAgentHomeStore,
+  createAppControlProvider,
   createArtifactStore,
   createBackgroundJobHandlers,
   createCloudAgentConnection,
@@ -78,6 +79,7 @@ import {
   createThreadEvents,
   describeRowSecurity,
   isTooManyDatabaseConnections,
+  PostgresAppControlStore,
   parsePositiveInteger,
   pushSessionExpiresAt,
   rowSecurityWarning,
@@ -224,7 +226,12 @@ async function main() {
   const mail = createMailProvider({ prisma, connectors: stack.connector });
   const gmailPush = gmailPushConfigFromEnv(process.env, webOrigin);
   let companyImport: ReturnType<typeof createCompanyImportEngine> | undefined;
+  // Local desktop control: absent unless APP_CONTROL_PROVIDER is set (docs/local-desktop-control).
+  const appControlStore = new PostgresAppControlStore(prisma);
+  const appControl = createAppControlProvider(process.env, { dataDir, store: appControlStore });
   const executor = createRunExecutor({
+    appControl,
+    appControlStore,
     shutdownSignal: shutdown.signal,
     companyImport: () => {
       if (!companyImport) throw new Error("Company import engine is not initialized.");

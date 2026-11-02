@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   pauseSource: vi.fn(),
   resumeSource: vi.fn(),
   share: vi.fn(),
+  shareStatus: vi.fn(),
 }));
 const revoke = vi.hoisted(() => vi.fn());
 vi.mock("../../lib/rpc", () => ({
@@ -28,6 +29,10 @@ vi.mock("@lingui/core/macro", () => ({
 }));
 vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
+  useLingui: () => ({
+    t: (parts: TemplateStringsArray, ...values: unknown[]) =>
+      parts.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ""), ""),
+  }),
 }));
 
 import { setHideAmounts } from "../../lib/hide-amounts-preference";
@@ -276,6 +281,7 @@ it("Share makes the snapshot link and Stop sharing revokes the snapshot artifact
     expiresAt: "2026-11-29T00:00:00.000Z",
     artifactId: "art1",
   });
+  mocks.shareStatus.mockResolvedValue(null);
   revoke.mockResolvedValue({ ok: true });
   await render();
   await openMenu();
@@ -289,4 +295,105 @@ it("Share makes the snapshot link and Stop sharing revokes the snapshot artifact
   );
   expect(revoke).toHaveBeenCalledWith({ artifactId: "art1" });
   expect(document.querySelector("input[readonly]")).toBeNull();
+});
+
+it("puts the single Page options button in the header row on the full-width page", async () => {
+  await render({ fixedPageId: "p1" });
+  const buttons = container.querySelectorAll('[aria-label="Page options"]');
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]?.closest("[data-page-header]")).not.toBeNull();
+  expect(container.querySelector("h1")?.textContent).toBe("Cash");
+});
+
+it("keeps the options menu out of a page header in the docked panel", async () => {
+  await render();
+  expect(container.querySelector("[data-page-header]")).toBeNull();
+});
+
+it("leaves Markdown table borders out of live tables", async () => {
+  await render();
+  const cls = container.querySelector('[role="textbox"]')?.getAttribute("class") ?? "";
+  expect(cls).not.toMatch(/(^|\s)\[&_td\]:border/);
+  expect(cls).toContain("[&_table:not([data-slot=table])_td]:border");
+});
+
+it("opens the review from a pending block on the full-width page only", async () => {
+  mocks.data.mockResolvedValue({
+    ...data(""),
+    blocks: [
+      { status: "pending", fetchedAt: null },
+      { status: "pending", fetchedAt: null },
+    ],
+  });
+  const onReview = vi.fn();
+  await render({ fixedPageId: "p1", onReview });
+  const link = [...container.querySelectorAll("button")].find((b) =>
+    b.textContent?.includes("Waiting for approval"),
+  );
+  await act(async () => link?.click());
+  expect(onReview).toHaveBeenCalled();
+  await render({ fixedPageId: undefined, onReview });
+  expect(
+    [...container.querySelectorAll("button")].some((b) =>
+      b.textContent?.includes("Waiting for approval"),
+    ),
+  ).toBe(false);
+});
+
+it("reopens an existing share without replacing its link, then Replace link makes a new one", async () => {
+  mocks.shareStatus.mockResolvedValue({ artifactId: "a1", expiresAt: "2026-11-29T00:00:00.000Z" });
+  mocks.share.mockResolvedValue({
+    url: "https://app.example.test/s#new",
+    expiresAt: "2026-11-29T00:00:00.000Z",
+    artifactId: "a2",
+  });
+  revoke.mockResolvedValue({ ok: true });
+  await render();
+  await openMenu();
+  await click(byText("Share", '[role="menuitem"]'));
+  expect(mocks.shareStatus).toHaveBeenCalledWith({ botId: "bot_demo", pageId: "p1" });
+  expect(mocks.share).not.toHaveBeenCalled();
+  expect(document.querySelector("input[readonly]")).toBeNull();
+  await click(byText("Replace link", "button"));
+  expect(mocks.share).toHaveBeenCalledTimes(1);
+  expect(document.querySelector<HTMLInputElement>("input[readonly]")?.value).toBe(
+    "https://app.example.test/s#new",
+  );
+});
+
+it("stops a reopened share by its artifact id", async () => {
+  mocks.shareStatus.mockResolvedValue({ artifactId: "a1", expiresAt: "2026-11-29T00:00:00.000Z" });
+  revoke.mockResolvedValue({ ok: true });
+  await render();
+  await openMenu();
+  await click(byText("Share", '[role="menuitem"]'));
+  await click(byText("Stop sharing", "button"));
+  await click(
+    [...document.querySelectorAll("button")].filter((b) => b.textContent === "Stop sharing").at(-1),
+  );
+  expect(revoke).toHaveBeenCalledWith({ artifactId: "a1" });
+});
+
+it("returns focus to the editor after deleting a live block, so Ctrl+Z restores it", async () => {
+  await render();
+  const buttons = () => container.querySelectorAll('[aria-label="Delete block"]');
+  expect(buttons()).toHaveLength(2);
+  // ProseMirror groups edits made within 500 ms into one undo step; a person is slower than that.
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 600)));
+  await click(buttons()[0]);
+  expect(buttons()).toHaveLength(1);
+  const editor = container.querySelector('[role="textbox"]');
+  expect(document.activeElement).toBe(editor);
+  await act(async () => {
+    editor?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+  });
+  expect(buttons()).toHaveLength(2);
+});
+
+it("hides the live block delete button on touch screens", async () => {
+  await render();
+  const cls = container.querySelector('[aria-label="Delete block"]')?.getAttribute("class") ?? "";
+  expect(cls).toContain("pointer-coarse:hidden");
 });

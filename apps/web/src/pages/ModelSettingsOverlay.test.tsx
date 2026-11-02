@@ -12,7 +12,9 @@ const models = vi.hoisted(() => ({
   embeddingModel: vi.fn(async () => ({ modelId: null })),
   setEmbeddingModel: vi.fn(),
   autoFileEmail: vi.fn(async () => ({ enabled: true })),
-  setAutoFileEmail: vi.fn(async ({ enabled }: { enabled: boolean }) => ({ enabled })),
+  setAutoFileEmail: vi.fn(async ({ enabled }: { enabled: boolean }) => ({
+    enabled,
+  })),
   credentials: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
@@ -209,6 +211,12 @@ async function renderSettings(focusProvider?: string, ownModel = true) {
 }
 
 beforeEach(() => {
+  for (const name of ["scrollTo", "scrollIntoView"]) {
+    Object.defineProperty(Element.prototype, name, {
+      configurable: true,
+      value: vi.fn(),
+    });
+  }
   vi.mocked(rpc.me).mockResolvedValue(account("deepseek", "deepseek-chat"));
   models.list.mockResolvedValue([deepseekEntry]);
   models.credentials.mockResolvedValue([]);
@@ -250,7 +258,9 @@ it("saves a typed Data room embedding id unchanged and resets it to the default"
       .querySelector("input[aria-label='Model id']")!
       .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   });
-  expect(models.setEmbeddingModel).toHaveBeenLastCalledWith({ modelId: "sample/embedding-v2" });
+  expect(models.setEmbeddingModel).toHaveBeenLastCalledWith({
+    modelId: "sample/embedding-v2",
+  });
   expect(trigger.textContent).toContain("sample/embedding-v2");
   await act(async () => trigger.click());
   const reset = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
@@ -297,7 +307,10 @@ it("shows a stored BYOK key when provider settings reopen", async () => {
       await Promise.resolve();
     });
     expect(models.connect).toHaveBeenCalledWith(
-      expect.objectContaining({ provider: "deepseek", apiKey: "sk-replacement-key" }),
+      expect.objectContaining({
+        provider: "deepseek",
+        apiKey: "sk-replacement-key",
+      }),
     );
     expect(keyField(view.container).value).toBe("");
     expect(keyField(view.container).placeholder).toBe(STORED_PLACEHOLDER);
@@ -541,8 +554,18 @@ it("lists the server's own provider as In use, not Connected, ahead of the A-Z l
     hostCredentialSource: "environment",
   } as never);
   models.list.mockResolvedValue([
-    { ...deepseekEntry, provider: "amazon", providerName: "Amazon Bedrock", id: "a" },
-    { ...deepseekEntry, provider: "openrouter", providerName: "OpenRouter", id: "or-model" },
+    {
+      ...deepseekEntry,
+      provider: "amazon",
+      providerName: "Amazon Bedrock",
+      id: "a",
+    },
+    {
+      ...deepseekEntry,
+      provider: "openrouter",
+      providerName: "OpenRouter",
+      id: "or-model",
+    },
   ]);
   const view = await renderSettings();
   try {
@@ -566,8 +589,18 @@ it("marks In use on the provider of the active model only, not also the server's
     hostCredentialSource: "environment",
   } as never);
   models.list.mockResolvedValue([
-    { ...deepseekEntry, provider: "amazon", providerName: "Amazon Bedrock", id: "a" },
-    { ...deepseekEntry, provider: "openrouter", providerName: "OpenRouter", id: "or-model" },
+    {
+      ...deepseekEntry,
+      provider: "amazon",
+      providerName: "Amazon Bedrock",
+      id: "a",
+    },
+    {
+      ...deepseekEntry,
+      provider: "openrouter",
+      providerName: "OpenRouter",
+      id: "or-model",
+    },
   ]);
   const view = await renderSettings();
   try {
@@ -609,7 +642,12 @@ it("keeps the Data room attachment setting out of Models", async () => {
 
 it("lists common providers first and reveals the rest behind More", async () => {
   models.list.mockResolvedValue([
-    { ...deepseekEntry, provider: "anthropic", providerName: "Anthropic", id: "c" },
+    {
+      ...deepseekEntry,
+      provider: "anthropic",
+      providerName: "Anthropic",
+      id: "c",
+    },
     { ...deepseekEntry, provider: "zeta", providerName: "Zeta AI", id: "z" },
   ]);
   const view = await renderSettings();
@@ -667,4 +705,102 @@ it("disables the Model and Voice switch while a voice change is pending", async 
   expect(pills.every((b) => b.disabled)).toBe(true);
   await act(async () => root.unmount());
   container.remove();
+});
+
+const mistralEntry = {
+  provider: "mistral",
+  providerName: "Mistral",
+  id: "mistral-medium",
+  label: "Mistral Medium",
+  billing: "API key",
+  auth: "api-key" as const,
+  authHint: "API key",
+};
+const deepseekCredential = {
+  id: "cred-deepseek",
+  provider: "deepseek",
+  label: "DeepSeek",
+  hasKey: true,
+  isDefault: true,
+  modelId: "deepseek-chat",
+};
+const mistralCredential = {
+  id: "cred-mistral",
+  provider: "mistral",
+  label: "Mistral",
+  hasKey: true,
+  isDefault: false,
+  modelId: "mistral-medium",
+};
+
+function providerRow(container: HTMLElement, name: string) {
+  const row = [...container.querySelectorAll("button")].find((b) =>
+    b.textContent?.startsWith(name),
+  );
+  if (!row) throw new Error(`Missing provider row: ${name}`);
+  return row;
+}
+
+it("shows the Model field before the API key field on an unconnected provider", async () => {
+  models.list.mockResolvedValue([deepseekEntry, mistralEntry]);
+  models.credentials.mockResolvedValue([deepseekCredential]);
+  const view = await renderSettings();
+  try {
+    await act(async () => providerRow(view.container, "Mistral").click());
+    const label = [...view.container.querySelectorAll("span")].find(
+      (s) => s.textContent === "Model",
+    )!;
+    const position = label.compareDocumentPosition(keyField(view.container));
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("says Connected. and offers Use this model when a second provider joins a default", async () => {
+  models.list.mockResolvedValue([deepseekEntry, mistralEntry]);
+  models.credentials.mockResolvedValue([deepseekCredential]);
+  const view = await renderSettings();
+  try {
+    await act(async () => providerRow(view.container, "Mistral").click());
+    await typeInto(keyField(view.container), "sk-mistral-key");
+    models.credentials.mockResolvedValue([deepseekCredential, mistralCredential]);
+    await act(async () => {
+      buttons(view.container, "Connect API key")[0]?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const text = view.container.textContent ?? "";
+    expect(text).toContain("Connected.");
+    expect(text).not.toContain("Connected and using");
+    expect(buttons(view.container, "Use this model").length).toBeGreaterThan(0);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("names the model the bots fall back to when the default is disconnected", async () => {
+  models.list.mockResolvedValue([deepseekEntry, mistralEntry]);
+  models.credentials.mockResolvedValue([deepseekCredential, mistralCredential]);
+  const view = await renderSettings();
+  try {
+    vi.mocked(rpc.me).mockResolvedValue(account("mistral", "mistral-medium"));
+    models.credentials.mockResolvedValue([mistralCredential]);
+    await act(async () => {
+      buttons(view.container, "Disconnect")[0]?.click();
+    });
+    const confirm = buttons(view.container, "Disconnect");
+    await act(async () => {
+      confirm[confirm.length - 1]?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(view.container.textContent).toContain(
+      "Disconnected DeepSeek. Bots now use Mistral Medium.",
+    );
+  } finally {
+    await view.unmount();
+  }
 });

@@ -70,7 +70,7 @@ let root: Root;
 
 async function render(
   options: {
-    onSave?: () => Promise<void>;
+    onSave?: (input: { name?: string; botIds?: string[] }) => Promise<void>;
     onRemove?: () => Promise<void>;
     covered?: boolean;
     instance?: string;
@@ -131,7 +131,53 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+async function submitForm() {
+  await act(async () => {
+    container.querySelector("form")?.requestSubmit();
+    await Promise.resolve();
+  });
+}
+
 describe("GroupSettings", () => {
+  const botOf = (id: string, name: string) => ({ id, name, color: "blue", status: "idle" }) as Bot;
+  const threeBots = [
+    botOf("bot-1", "Researcher"),
+    botOf("bot-2", "Writer"),
+    botOf("bot-3", "Chief"),
+  ];
+
+  it("keeps the default responder first when members are re-ticked and added", async () => {
+    const onSave = vi.fn(async () => undefined);
+    await render({ bots: threeBots, onSave });
+    await click("Researcher");
+    await click("Chief");
+    await click("Researcher");
+    await click("Save");
+    expect(onSave).toHaveBeenCalledWith({ name: undefined, botIds: ["bot-1", "bot-2", "bot-3"] });
+  });
+
+  it("saves on Enter in the form", async () => {
+    const onSave = vi.fn(async () => undefined);
+    await render({ bots: threeBots, onSave });
+    const input = container.querySelector("input") as HTMLInputElement;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      set?.call(input, "Renamed");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await submitForm();
+    expect(onSave).toHaveBeenCalledWith({ name: "Renamed", botIds: undefined });
+  });
+
+  it("does not save on Enter while the selection is invalid", async () => {
+    const onSave = vi.fn(async () => undefined);
+    await render({ bots: threeBots, onSave });
+    await click("Researcher");
+    await click("Writer");
+    await submitForm();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("lists the group's members first and shows every bot without an inner scroll", async () => {
     const bot = (id: string, name: string) => ({ id, name, color: "blue", status: "idle" }) as Bot;
     await render({

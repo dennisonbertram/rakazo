@@ -6,7 +6,13 @@ import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 
 vi.mock("@lingui/react/macro", () => ({
-  useLingui: () => ({ t: (parts: TemplateStringsArray) => parts.join("") }),
+  useLingui: () => ({
+    t: (parts: TemplateStringsArray) => parts.join(""),
+    i18n: {
+      _: (descriptor: { message?: string } | string) =>
+        typeof descriptor === "string" ? descriptor : (descriptor.message ?? ""),
+    },
+  }),
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("../lib/rpc", () => ({ rpc: { memory: {} } }));

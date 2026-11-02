@@ -21,8 +21,9 @@ it("does not draw a chart while amounts are hidden, so no raw value reaches the 
   setHideAmounts(true);
   const el = document.createElement("div");
   document.body.append(el);
+  const root = createRoot(el);
   await act(async () =>
-    createRoot(el).render(
+    root.render(
       <ChartCanvas
         spec={{ marks: [{ type: "barY", options: { x: "m", y: "v" } }] }}
         data={[{ m: "Sep", v: 73781 }]}
@@ -33,6 +34,7 @@ it("does not draw a chart while amounts are hidden, so no raw value reaches the 
   expect(el.querySelector("[data-testid=chart-hidden]")).not.toBeNull();
   expect(el.innerHTML).not.toContain("73781");
   expect(el.querySelector("svg")).toBeNull();
+  await act(async () => root.unmount());
 });
 
 it("says what each first-run focus covers until one is picked", async () => {

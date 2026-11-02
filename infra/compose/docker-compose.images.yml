@@ -190,6 +190,8 @@ services:
       - ALL
     pids_limit: 256
     mem_limit: 1536m
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       SECRET_STORE: ${SECRET_STORE:-encrypted}
       INFISICAL_URL: ${INFISICAL_URL:-}
@@ -223,6 +225,10 @@ services:
       CLOUD_AGENT_SPACE_ID: ${CLOUD_AGENT_SPACE_ID:-}
       CURSOR_API_KEY: ${CURSOR_API_KEY:-}
       SANDBOX_SUPERVISOR_URL: http://supervisor:7091
+      # Local desktop control: set only by the packaged desktop app on macOS.
+      APP_CONTROL_PROVIDER: ${APP_CONTROL_PROVIDER:-}
+      APP_CONTROL_BRIDGE_URL: ${APP_CONTROL_BRIDGE_URL:-}
+      APP_CONTROL_BRIDGE_TOKEN: ${APP_CONTROL_BRIDGE_TOKEN:-}
       WAKEUP_DRIVER: graphile
       AGENT_RUNTIME: pi
       # Optional egress proxy (Mainland / corporate). Empty = unset; either case works.
@@ -451,6 +457,8 @@ services:
       - ALL
     pids_limit: 512
     mem_limit: 2g
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       SECRET_STORE: ${SECRET_STORE:-encrypted}
       INFISICAL_URL: ${INFISICAL_URL:-}
@@ -469,6 +477,10 @@ services:
       CLOUD_AGENT_SPACE_ID: ${CLOUD_AGENT_SPACE_ID:-}
       CURSOR_API_KEY: ${CURSOR_API_KEY:-}
       SANDBOX_SUPERVISOR_URL: http://supervisor:7091
+      # Local desktop control: set only by the packaged desktop app on macOS.
+      APP_CONTROL_PROVIDER: ${APP_CONTROL_PROVIDER:-}
+      APP_CONTROL_BRIDGE_URL: ${APP_CONTROL_BRIDGE_URL:-}
+      APP_CONTROL_BRIDGE_TOKEN: ${APP_CONTROL_BRIDGE_TOKEN:-}
       WAKEUP_DRIVER: graphile
       AGENT_RUNTIME: pi
       # Optional egress proxy (Mainland / corporate). Empty = unset; either case works.

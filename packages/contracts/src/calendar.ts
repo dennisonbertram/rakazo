@@ -6,7 +6,7 @@ export const CALENDAR_AGENDA_MAX_DAYS = 93;
 export const CalendarItemKindSchema = z.enum(["event", "todo", "check_back", "routine"]);
 export type CalendarItemKind = z.infer<typeof CalendarItemKindSchema>;
 
-/** A Google event, a bot or inbox to-do, a one-shot check-back, or the next run of a repeating routine. */
+/** A Google event, a bot or inbox to-do, a one-shot check-back, or a run of a repeating routine. */
 export const CalendarItemSchema = z.object({
   id: z.string(),
   kind: CalendarItemKindSchema,

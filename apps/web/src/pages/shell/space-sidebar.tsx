@@ -43,6 +43,7 @@ import {
   LogOut,
   Mail,
   Megaphone,
+  Mic,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
@@ -83,10 +84,7 @@ import {
 import { glanceBadge, rowStatusKind, StatusMark } from "../../components/sidebar-glance";
 import { STICKY_GROUP_HEADER } from "../../components/sticky-group-header";
 import { FirstRunTour } from "../../components/tour/FirstRunTour";
-import { clearTourStep } from "../../components/tour/TourPopover";
 import type { AgentApp } from "../../lib/agent-app";
-import { clearAgentAppCache } from "../../lib/agent-app";
-import { authClient } from "../../lib/auth";
 import { desktopBridge } from "../../lib/desktop";
 import { maskCurrencyWhenHidden } from "../../lib/hide-amounts-preference";
 import { LEGAL_DUE_SOON_PATH } from "../../lib/legal-format";
@@ -100,8 +98,10 @@ import {
   rosterWorkStatusLabel,
 } from "../../lib/roster-status";
 import { formatRosterTime } from "../../lib/roster-time";
-import { clearSpaceSelection, rpc } from "../../lib/rpc";
+import { rpc } from "../../lib/rpc";
 import { sidebarInert } from "../../lib/shell-layout";
+import { signOutAndLeave } from "../../lib/sign-out";
+import { isCoarsePointer } from "../../lib/visual-viewport";
 import { ActivityList } from "../ActivityList";
 import type { ContextMenuPosition } from "../BotContextMenu";
 import type { SettingsSection } from "../SettingsOverlay";
@@ -410,6 +410,7 @@ export type SpaceSidebarProps = {
   investorsMode: boolean;
   fundraisingMode: boolean;
   contactsMode: boolean;
+  meetingsMode: boolean;
   calendarMode: boolean;
   companyMode: boolean;
   dataRoomMode: boolean;
@@ -527,6 +528,7 @@ export function SpaceSidebar({
   investorsMode,
   fundraisingMode,
   contactsMode,
+  meetingsMode,
   calendarMode,
   companyMode,
   dataRoomMode,
@@ -820,7 +822,7 @@ export function SpaceSidebar({
       ) : null}
       <div
         ref={sidebarPaneRef}
-        className="flex min-h-0 flex-1 flex-col pointer-coarse:md:max-lg:flex-initial max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col pointer-coarse:md:max-lg:flex-initial max-lg:snap-y max-lg:snap-proximity max-lg:scroll-pb-11 max-lg:overflow-y-auto max-lg:[&_[data-roster-row]]:snap-end lg:contents short:lg:flex short:lg:overflow-y-auto short:lg:scroll-pb-11"
       >
         {bootstrapMe === undefined ? null : (
           // Waiting for the account (undefined) keeps pages the user hid from flashing in.
@@ -843,6 +845,7 @@ export function SpaceSidebar({
                 { key: "fundraising", label: t`Fundraising` },
                 { key: "company", label: t`Company` },
                 { key: "calendar", label: t`Calendar` },
+                { key: "meetings", label: t`Meetings` },
                 { key: "contacts", label: t`Contacts` },
                 { key: "data-room", label: t`Data room` },
                 { key: "artifacts", label: t`Artifacts` },
@@ -1017,6 +1020,20 @@ export function SpaceSidebar({
                   }}
                 />
               )}
+              {hiddenPages.includes("meetings") ? null : (
+                <SidebarPageLink
+                  testId="sidebar-meetings"
+                  href="/app/meetings"
+                  current={meetingsMode}
+                  icon={<Mic size={15} strokeWidth={1.8} aria-hidden="true" />}
+                  label={t`Meetings`}
+                  rail={rail}
+                  onOpen={() => {
+                    setMobileSidebarOpen(false);
+                    navigate("/app/meetings");
+                  }}
+                />
+              )}
               {hiddenPages.includes("contacts") ? null : (
                 <SidebarPageLink
                   testId="sidebar-contacts"
@@ -1088,7 +1105,7 @@ export function SpaceSidebar({
         <div
           ref={sidebarScrollRef}
           tabIndex={-1}
-          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 pointer-coarse:lg:flex-initial lg:snap-y lg:snap-proximity lg:scroll-pt-10 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
+          className="rk-scroll rk-scroll-fade-top flex flex-col gap-0.5 px-2.5 pb-2.5 max-lg:shrink-0 lg:min-h-0 lg:flex-1 pointer-coarse:lg:flex-initial lg:snap-y lg:snap-proximity lg:scroll-pt-10 lg:scroll-pb-11 lg:overflow-y-auto [overflow-anchor:none] short:lg:flex-none short:lg:shrink-0 short:lg:overflow-visible [&_[data-roster-row]]:snap-start [&_[data-roster-fold]]:snap-start"
         >
           {activityMode && !rail ? (
             <button
@@ -1378,6 +1395,7 @@ export function SpaceSidebar({
                           return (
                             <PageAgentsRow
                               key={displayRow.foldHeader}
+                              rosterId={`${group.key}:${displayRow.foldHeader}`}
                               actions={
                                 email ? (
                                   <>
@@ -1622,7 +1640,14 @@ export function SpaceSidebar({
                                             },
                                       );
                                     }}
-                                    onClick={() => {
+                                    onClick={(event) => {
+                                      // detail is 0 for keyboard activation, which keeps focus on the row.
+                                      if (
+                                        item.kind === "bot" &&
+                                        event.detail > 0 &&
+                                        !isCoarsePointer()
+                                      )
+                                        setFocusComposerBotId(item.chat.id);
                                       openSpaceChat(
                                         item.chat.spaceId,
                                         item.kind === "bot"
@@ -1834,6 +1859,7 @@ export function SpaceSidebar({
             <div className="mt-2 border-t border-border pt-2">
               <button
                 type="button"
+                data-roster-row="archived"
                 aria-expanded={archivedOpen}
                 onClick={() => setArchivedOpen((open) => !open)}
                 className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[13.5px] text-muted-foreground hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
@@ -1862,6 +1888,7 @@ export function SpaceSidebar({
                       <Button
                         variant="ghost"
                         size="xs"
+                        aria-label={t`Restore ${bot.name}`}
                         onClick={() =>
                           void rpc.bots.restore({ botId: bot.id }).then(() => refreshBots(true))
                         }
@@ -1891,6 +1918,7 @@ export function SpaceSidebar({
                       <Button
                         variant="ghost"
                         size="xs"
+                        aria-label={t`Restore ${group.name}`}
                         onClick={() =>
                           void rpc.groups
                             .restore({ groupId: group.id })
@@ -2046,14 +2074,12 @@ export function SpaceSidebar({
             role="menuitem"
             variant="ghost"
             className="w-full justify-start font-normal"
-            onClick={() =>
-              void authClient.signOut().then(() => {
-                clearTourStep(userId);
-                clearAgentAppCache();
-                clearSpaceSelection();
-                navigate("/");
-              })
-            }
+            onClick={() => {
+              // The toaster hides toasts while a menu or the drawer is open; close both so a failure shows.
+              setMenuOpen(false);
+              setMobileSidebarOpen(false);
+              void signOutAndLeave(navigate, userId);
+            }}
           >
             <LogOut className="text-muted-foreground" strokeWidth={1.75} />
             <Trans>Log out</Trans>

@@ -594,11 +594,21 @@ export default function Models() {
       await rpc("models/disconnect", { provider: selected.provider });
       setApiKey("");
       setThinkingLevel(null);
-      await load({ provider });
+      const wasDefault = credential.isDefault;
+      const nextMe = await load({ provider });
+      const fallback =
+        catalog.find(
+          (entry) => entry.provider === nextMe.defaultProvider && entry.id === nextMe.defaultModel,
+        )?.label ?? nextMe.defaultModel;
+      const name = selected.providerName ?? selected.provider;
       publishFeedback("connection", {
-        notice: t("Disconnected {provider}.", {
-          provider: selected.providerName ?? selected.provider,
-        }),
+        notice:
+          wasDefault && fallback
+            ? t("Disconnected {provider}. Bots now use {model}.", {
+                provider: name,
+                model: fallback,
+              })
+            : t("Disconnected {provider}.", { provider: name }),
       });
     } catch (err) {
       publishFeedback("connection", {
@@ -682,7 +692,7 @@ export default function Models() {
     if (isOpenAiCompatible && parsedMaxTokens === undefined) return;
     setPending("connect");
     try {
-      await rpc(
+      const connected = await rpc<MobileModelCredential>(
         "models/connect",
         isOpenAiCompatible
           ? {
@@ -719,7 +729,9 @@ export default function Models() {
         notice:
           isOpenAiCompatible || savingLimitOnly
             ? t("Saved.")
-            : t("Connected and using {label}.", { label: selected.label }),
+            : connected.isDefault
+              ? t("Connected and using {label}.", { label: selected.label })
+              : t("Connected."),
       });
     } catch (err) {
       publishFeedback("connection", {
@@ -733,14 +745,20 @@ export default function Models() {
   async function finishSubscriptionSignIn(loginId: string, controller: AbortController) {
     await waitForModelOAuth(loginId, controller.signal);
     if (controller.signal.aborted) return;
-    await rpc("models/finishOAuth", { loginId }, { signal: controller.signal });
+    const connected = await rpc<MobileModelCredential>(
+      "models/finishOAuth",
+      { loginId },
+      { signal: controller.signal },
+    );
     if (controller.signal.aborted) return;
     oauthLoginIdRef.current = null;
     setOauth(null);
     await load({ provider, modelId });
     if (controller.signal.aborted) return;
     publishFeedback("connection", {
-      notice: t("Connected and using {label}.", { label: selected?.label ?? t("this model") }),
+      notice: connected.isDefault
+        ? t("Connected and using {label}.", { label: selected?.label ?? t("this model") })
+        : t("Connected."),
     });
   }
 
@@ -1630,19 +1648,19 @@ export default function Models() {
               )}
               {ownKeyProvider === provider ? (
                 <>
-                  {catalogConnectionControls}
-                  {feedback}
                   <Text style={styles.sectionTitle}>{t("Model")}</Text>
                   {catalogModelCard}
+                  {catalogConnectionControls}
+                  {feedback}
                 </>
               ) : null}
             </>
           ) : (
             <>
-              {catalogConnectionControls}
-              {feedback}
               <Text style={styles.sectionTitle}>{t("Model")}</Text>
               {catalogModelCard}
+              {catalogConnectionControls}
+              {feedback}
             </>
           )
         ) : (

@@ -1,6 +1,7 @@
 import type { EmulatedMcpServer, EmulatedMessage } from "@rakazo/adapters";
 import type { SourceMeeting } from "@rakazo/contracts";
 import { FINANCE_MCP_ENDPOINTS } from "@rakazo/contracts";
+import { CalendarApiEmulator } from "../../../../adapters/src/calendar-api-emulator.js";
 import { makePdf } from "../../../../adapters/src/data-room-test-fakes.js";
 import {
   brexAccountsResponse,
@@ -2597,6 +2598,78 @@ export function demoBrexCards() {
 }
 
 /** The one key the demo's Granola emulator accepts. It is fake and works nowhere else. */
+/** The Google Calendar account of the company space; the reconnect space's account is unknown to the emulator, so it answers 401. */
+export const DEMO_CALENDAR_REF = "mock-demo-calendar";
+export const DEMO_CALENDAR_OLD_REF = "mock-demo-calendar-old";
+const DEMO_CALENDAR_TEAM = "team@example.test";
+const DEMO_CALENDAR_OTHER = "holidays@example.test";
+
+/** Invented Google Calendar events around `now`, in local time, behind the demo's offline Google connector. */
+export function demoCalendar(now = new Date()): CalendarApiEmulator {
+  const calendar = new CalendarApiEmulator([DEMO_CALENDAR_REF]);
+  const at = (days: number, hour: number, minute = 0) => {
+    const day = new Date(now);
+    day.setDate(day.getDate() + days);
+    day.setHours(hour, minute, 0, 0);
+    return day;
+  };
+  const timed = (start: Date, minutes: number) => ({
+    start: { dateTime: start.toISOString() },
+    end: { dateTime: new Date(start.getTime() + minutes * 60_000).toISOString() },
+  });
+  const allDay = (days: number) => {
+    const iso = (offset: number) =>
+      at(days + offset, 12)
+        .toISOString()
+        .slice(0, 10);
+    return { start: { date: iso(0) }, end: { date: iso(1) } };
+  };
+  const guests = [
+    { email: "maya@example.test", self: true, responseStatus: "accepted" },
+    { email: "river@example.test", responseStatus: "accepted" },
+    { email: "sam@example.test", responseStatus: "tentative" },
+  ];
+  const seed = (id: string, summary: string, when: object, extra: object = {}, cal = "primary") =>
+    calendar.seed(DEMO_CALENDAR_REF, { id, summary, ...when, ...extra }, cal);
+  calendar.seedCalendar(DEMO_CALENDAR_REF, {
+    id: "primary",
+    summary: "Founder calendar",
+    selected: true,
+  });
+  calendar.seedCalendar(DEMO_CALENDAR_REF, {
+    id: DEMO_CALENDAR_TEAM,
+    summary: "Team",
+    selected: true,
+  });
+  calendar.seedCalendar(DEMO_CALENDAR_REF, {
+    id: DEMO_CALENDAR_OTHER,
+    summary: "Holidays",
+    selected: false,
+  });
+  seed("demosync", "Weekly sync", timed(at(0, 10), 30), {
+    attendees: guests,
+    hangoutLink: "https://meet.example.test/demo-sync",
+  });
+  seed("demoa", "Investor update prep", timed(at(1, 14), 60));
+  seed("demob", "Product review", timed(at(1, 14, 30), 60));
+  seed("demooffsite", "Offsite", allDay(2));
+  seed("demodeclined", "Vendor pitch (declined)", timed(at(1, 9), 60), {
+    attendees: [{ email: "maya@example.test", self: true, responseStatus: "declined" }],
+  });
+  seed("democancelled", "Cancelled planning", { ...timed(at(1, 11), 60), status: "cancelled" });
+  seed("demoinvite", "Intro call with a new advisor", timed(at(3, 16), 30), {
+    attendees: [{ email: "maya@example.test", self: true, responseStatus: "needsAction" }],
+  });
+  seed(
+    "demolong",
+    "Quarterly planning, hiring plan, roadmap trade-offs and budget review with the whole leadership team",
+    timed(at(4, 11), 90),
+  );
+  seed("demoteam", "Team lunch", timed(at(0, 12, 30), 60), {}, DEMO_CALENDAR_TEAM);
+  seed("demoholiday", "Public holiday", allDay(3), {}, DEMO_CALENDAR_OTHER);
+  return calendar;
+}
+
 export const DEMO_GRANOLA_KEY = "grn_demo_fake_key_0000";
 
 /** Meetings the demo's Granola emulator serves, so Connect has something to sync. Invented. */

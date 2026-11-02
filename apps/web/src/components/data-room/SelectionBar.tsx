@@ -8,7 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@rakazo/ui-web";
-import { Download, Mail, Send, X } from "lucide-react";
+import { Download, FolderInput, Mail, Send, X } from "lucide-react";
+import { TOOLBAR_BUTTON, TOOLBAR_LABEL } from "./FilterBar";
 import type { SendTarget } from "./SendToAgent";
 
 /** What can be done with the ticked files. It shows only while at least one row is ticked. */
@@ -17,6 +18,7 @@ export function SelectionBar({
   total,
   onSelectAll,
   busy = false,
+  onMove,
   onDownload,
   onSend,
   onClear,
@@ -30,6 +32,8 @@ export function SelectionBar({
   onSelectAll?: () => void;
   /** A download or a send is reading the files. */
   busy?: boolean;
+  /** Opens the Move dialog for the ticked files. */
+  onMove?: () => void;
   onDownload: () => void;
   /** Without it (no connected mailbox is known) there is no Email. */
   onSend?: () => void;
@@ -45,39 +49,83 @@ export function SelectionBar({
     <div
       role="toolbar"
       data-testid="data-room-selection"
-      className="absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-2 border-t border-border bg-background px-3 py-1.5 text-sm shadow-sm"
+      className="absolute inset-x-0 bottom-0 z-20 flex flex-nowrap items-center gap-2 border-t border-border bg-background px-3 py-1.5 text-sm shadow-sm"
     >
-      <span className="me-auto font-medium">
+      <span className="me-auto min-w-0 truncate font-medium">
         {more ? (
-          <Trans>
-            {count} of {total} selected
-          </Trans>
+          <>
+            <span className="max-sm:hidden">
+              <Trans>
+                {count} of {total} selected
+              </Trans>
+            </span>
+            <span className="sm:hidden">
+              {count}/{total}
+            </span>
+          </>
         ) : (
           <Trans>{count} selected</Trans>
         )}
-        {more ? (
-          <Button variant="link" size="xs" className="ms-2 h-auto p-0" onClick={onSelectAll}>
-            <Trans>Select all {total}</Trans>
-          </Button>
-        ) : null}
       </span>
-      <Button variant="outline" size="sm" disabled={busy} onClick={onDownload}>
+      {more ? (
+        <Button variant="link" size="xs" className="h-auto shrink-0 p-0" onClick={onSelectAll}>
+          <Trans>Select all {total}</Trans>
+        </Button>
+      ) : null}
+      {onMove ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className={`shrink-0 ${TOOLBAR_BUTTON}`}
+          disabled={busy}
+          onClick={onMove}
+        >
+          <FolderInput aria-hidden="true" />
+          <span className={TOOLBAR_LABEL}>
+            <Trans>Move</Trans>
+          </span>
+        </Button>
+      ) : null}
+      <Button
+        variant="outline"
+        size="sm"
+        className={`shrink-0 ${TOOLBAR_BUTTON}`}
+        disabled={busy}
+        onClick={onDownload}
+      >
         <Download aria-hidden="true" />
-        <Trans>Download</Trans>
+        <span className={TOOLBAR_LABEL}>
+          <Trans>Download</Trans>
+        </span>
       </Button>
       {onSend ? (
-        <Button variant="outline" size="sm" disabled={busy} onClick={onSend}>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`shrink-0 ${TOOLBAR_BUTTON}`}
+          disabled={busy}
+          onClick={onSend}
+        >
           <Mail aria-hidden="true" />
-          <Trans>Email</Trans>
+          <span className={TOOLBAR_LABEL}>
+            <Trans>Email</Trans>
+          </span>
         </Button>
       ) : null}
       {agents?.length && onSendToAgent ? (
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" size="sm" disabled={busy}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`shrink-0 ${TOOLBAR_BUTTON}`}
+                disabled={busy}
+              >
                 <Send aria-hidden="true" />
-                <Trans>Send to agent</Trans>
+                <span className={TOOLBAR_LABEL}>
+                  <Trans>Send to agent</Trans>
+                </span>
               </Button>
             }
           />
@@ -94,7 +142,13 @@ export function SelectionBar({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      <Button variant="ghost" size="icon-sm" aria-label={t`Clear selection`} onClick={onClear}>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="shrink-0"
+        aria-label={t`Clear selection`}
+        onClick={onClear}
+      >
         <X aria-hidden="true" />
       </Button>
     </div>

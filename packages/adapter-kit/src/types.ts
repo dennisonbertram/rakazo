@@ -827,6 +827,12 @@ export interface BackgroundJobPayloads {
   "meetings.digest": { spaceId: string; userId: string; meetingId: string; continue?: boolean };
   "finance.sync": { userId: string; spaceId: string };
   /** Turns a pendant connection's uploaded records into audio recordings in the Data room. Ids only. */
+  /** Transcribes one chunk of a meeting capture. Ids only. */
+  "meetings.capture_transcribe": { spaceId: string; userId: string; chunkId: string };
+  /** Stores a finished capture as a meeting once its chunks are settled. Ids only. */
+  "meetings.capture_finalize": { spaceId: string; userId: string; captureId: string };
+  /** Finishes captures that stopped sending chunks. */
+  "meetings.capture_sweep": Record<string, never>;
   "omi.assemble": { spaceId: string; userId: string; connectionId: string };
   /** Transcribes one Omi recording in the Data room. Ids only. */
   "omi.transcribe": { spaceId: string; userId: string; itemId: string };

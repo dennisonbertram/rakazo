@@ -221,7 +221,7 @@ it("has no Create agent button on Carta or once an agent exists", async () => {
   expect(container.textContent).not.toContain("Create agent");
   expect(container.textContent).toContain("Let other agents use");
   expect(container.querySelector<HTMLAnchorElement>('a[href="/app/bot_ada"]')?.textContent).toBe(
-    "Ada",
+    "Open Ada",
   );
 });
 
@@ -307,11 +307,39 @@ it("turning Share on lifts exclusivity before assigning every agent, and off ret
   await show(false, OTHER, { ...withAgent, agentExclusive: false }, everyone);
   await act(async () => container.querySelector<HTMLElement>("#server-shared")?.click());
   expect(setExclusive).toHaveBeenCalledWith({ serverId: "s1", exclusive: true });
-  expect(replaceAssignments).toHaveBeenCalledTimes(1);
-  expect(replaceAssignments.mock.calls[0]?.[0]).toMatchObject({
-    botId: "bot_bram",
-    assignments: [],
-  });
+  // The server keeps the other agents' rows when sharing turns off, so nothing is revoked.
+  expect(replaceAssignments).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["needs_reconnect", "Needs reconnect"],
+  ["error", "Failed"],
+] as const)("shows a bank whose sync is %s with one Reconnect button", async (status, badge) => {
+  const data = {
+    ...mockIntegrations({
+      servers: [
+        mockServer("s1", "Mercury", {
+          endpoint: "https://mcp.mercury.com/mcp",
+          oauthStatus: "connected",
+        }),
+      ],
+      financeSources: [{ provider: "mercury", serverId: "s1", status, lastSyncedAt: null }],
+    }),
+    refresh,
+  };
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={["/app/integrations/mcp/s1"]}>
+        <Routes>
+          <Route path="/app/integrations/mcp/:serverId" element={<McpDetail data={data} />} />
+        </Routes>
+      </MemoryRouter>,
+    ),
+  );
+  expect(container.textContent).toContain(badge);
+  const buttons = [...container.querySelectorAll("button")];
+  expect(buttons.filter((b) => b.textContent === "Reconnect")).toHaveLength(1);
+  expect(container.querySelector('[aria-label="Sign-in options"]')).toBeNull();
 });
 
 it("disables the row buttons and shows Creating agent while the agent is being created", async () => {

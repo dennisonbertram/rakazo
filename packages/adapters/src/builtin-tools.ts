@@ -16,6 +16,7 @@ import {
 } from "@rakazo/contracts";
 import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
+import { appControlTools } from "./app-control/tools.js";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
 import { PRACI_SOURCE_TOOLS } from "./praci-source-tools.js";
@@ -537,7 +538,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "page_create",
     description:
-      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design.',
+      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design. Style it for light and dark (prefers-color-scheme).',
     inputSchema: {
       type: "object",
       properties: { title: { type: "string" }, kind: { type: "string", enum: ["blocks", "html"] } },
@@ -554,7 +555,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "page_write",
     description:
-      "Replace this bot's page. baseRevision is the revision from page_read (0 for a new page). A stale revision saves nothing and returns the current page.",
+      "Replace this bot's page. baseRevision is the revision from page_read (0 for a new page). A stale revision saves nothing and returns the current page. The title is shown above the page; do not start with a heading that repeats it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2080,7 +2081,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "calendar_agenda",
     description:
-      "Read-only. One time-ordered list of what is coming up for the owner: Google Calendar events from every connected account, open to-dos with a due time (scratchpad_add with dueAt) from every bot, and routines and check-backs (schedule_create with runAt) with their next run. Defaults to now through the next 7 days; pass from and to (ISO 8601, at most 93 days apart) for another window. Use it to see what is due or scheduled; use schedule_create with runAt to set a check-back and scratchpad_add with dueAt for a to-do.",
+      "Read-only. One time-ordered list of what is coming up for the owner: Google Calendar events from every connected account, open to-dos with a due time (scratchpad_add with dueAt) from every bot, and routines and check-backs (schedule_create with runAt) with each run in the window (a routine that runs more than once every 6 hours shows only its first run). Defaults to now through the next 7 days; pass from and to (ISO 8601, at most 93 days apart) for another window. Use it to see what is due or scheduled; use schedule_create with runAt to set a check-back and scratchpad_add with dueAt for a to-do.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2461,6 +2462,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   ...voiceAgentTools,
   ...calendarToolDefinitions,
+  ...appControlTools,
 ];
 
 export const gtmPostTool: ConnectorTool = {

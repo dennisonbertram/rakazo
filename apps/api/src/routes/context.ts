@@ -2,6 +2,7 @@ import type { Implementer, ImplementerInternalWithMiddlewares } from "@orpc/serv
 import { implement, ORPCError } from "@orpc/server";
 import type {
   AgentHomeStore,
+  AppControlProvider,
   ArtifactStore,
   JobPublisher,
   MailProvider,
@@ -77,6 +78,8 @@ export interface RouterDeps {
   auth: Auth;
   jobs: JobPublisher;
   sandbox: SandboxProvider;
+  /** Local desktop control; absent unless APP_CONTROL_PROVIDER is set. */
+  appControl?: AppControlProvider;
   memory: MemoryStore;
   memoryProviders: MemoryProviderResolver;
   home: AgentHomeStore;
@@ -165,7 +168,7 @@ export interface RouterDeps {
   };
 }
 
-type RouteAuthContext = {
+export type RouteAuthContext = {
   actor: Actor | null;
   /** The signed-in session, so a push token ends with the session that registered it. */
   sessionId?: string;

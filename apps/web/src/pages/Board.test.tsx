@@ -175,6 +175,31 @@ it("renders status columns and opens a ticket with comments", async () => {
   }
 });
 
+it("shows the priority on a card only for high and urgent", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  api.bots.list.mockResolvedValue([bot("bot-1", "Helper")]);
+  api.tickets.list.mockResolvedValue({
+    tickets: [
+      { ...ticket("A", "t-urgent", "todo", "RAK-4"), priority: "urgent" },
+      { ...ticket("B", "t-high", "todo", "RAK-5"), priority: "high" },
+      ticket("C", "t-normal", "todo", "RAK-6"),
+      { ...ticket("D", "t-low", "todo", "RAK-7"), priority: "low" },
+    ],
+  });
+  const page = await renderBoard();
+  try {
+    const text = (id: string) =>
+      page.container.querySelector(`[data-testid="board-card-${id}"]`)?.textContent ?? "";
+    expect(text("t-urgent")).toContain("RAK-4 · Urgent");
+    expect(text("t-high")).toContain("RAK-5 · High");
+    expect(text("t-normal")).not.toMatch(/Normal|Low|High|Urgent|·/);
+    expect(text("t-low")).not.toMatch(/Normal|Low|High|Urgent|·/);
+  } finally {
+    await page.cleanup();
+    vi.unstubAllGlobals();
+  }
+});
+
 it("creates a ticket without a status picker", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   api.bots.list.mockResolvedValue([bot("bot-1", "Helper")]);

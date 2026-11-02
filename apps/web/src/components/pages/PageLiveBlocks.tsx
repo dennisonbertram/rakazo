@@ -19,6 +19,7 @@ import {
 } from "@rakazo/ui-web";
 import type { ReactNode } from "react";
 import { maskCurrencyText, useHideAmounts } from "../../lib/hide-amounts-preference";
+import { formatMailTime } from "../../lib/mail-time";
 import { cellValue, formatCell, tableColumns, usePageLive } from "../../pages/shell/page-live";
 import { Shimmer } from "../ai/primitives";
 
@@ -27,6 +28,8 @@ function placeholder(block: PageLiveBlock | undefined): string {
   switch (block?.status) {
     case "pending":
       return t`Waiting for approval`;
+    case "paused":
+      return t`Paused`;
     case "denied":
       return t`Not approved`;
     case "missing":
@@ -36,13 +39,8 @@ function placeholder(block: PageLiveBlock | undefined): string {
   }
 }
 
-function fetchedAtText(fetchedAt: string | null | undefined): string {
-  if (!fetchedAt) return "";
-  const date = new Date(fetchedAt);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
+const fetchedAtText = (fetchedAt: string | null | undefined) =>
+  fetchedAt ? formatMailTime(fetchedAt) : "";
 
 /**
  * Status treatment shared by metrics, tables and live charts: a warning dot with the error and
@@ -68,6 +66,7 @@ export function LiveBlockFrame({
   const live = usePageLive();
   const busy = live.refreshing || !live.loaded;
   const time = fetchedAtText(block?.fetchedAt);
+  const stale = (block?.status === "failed" || block?.status === "paused") && hasValue;
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: focus reveals the fetch time, like hover
     <div tabIndex={0} aria-busy={busy} className="group/live relative min-w-0 outline-none">
@@ -77,12 +76,20 @@ export function LiveBlockFrame({
         {label ? <span className="min-w-0 truncate">{label}</span> : null}
         <span className="flex items-center gap-1.5">
           {time ? (
-            <span className="opacity-0 transition-opacity group-hover/live:opacity-100 group-focus-within/live:opacity-100 group-focus/live:opacity-100">
+            <span
+              className={
+                stale
+                  ? undefined
+                  : "opacity-0 transition-opacity group-hover/live:opacity-100 group-focus-within/live:opacity-100 group-focus/live:opacity-100"
+              }
+            >
               {time}
             </span>
           ) : null}
           {block?.status === "failed" ? (
             <FailedDot error={block.error} onRetry={live.refresh} />
+          ) : block?.status === "paused" ? (
+            <FailedDot error={block.error} />
           ) : null}
         </span>
       </div>
@@ -91,7 +98,19 @@ export function LiveBlockFrame({
           children
         ) : (
           <p className="text-sm text-muted-foreground">
-            {busy ? <Shimmer>{t`Refreshing`}</Shimmer> : placeholder(block)}
+            {busy ? (
+              <Shimmer>{t`Refreshing`}</Shimmer>
+            ) : block?.status === "pending" && live.onReview ? (
+              <button
+                type="button"
+                className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                onClick={live.onReview}
+              >
+                {placeholder(block)}
+              </button>
+            ) : (
+              placeholder(block)
+            )}
           </p>
         )}
       </div>
@@ -99,14 +118,15 @@ export function LiveBlockFrame({
   );
 }
 
-function FailedDot({ error, onRetry }: { error?: string; onRetry: () => void }) {
+/** A failed source offers Retry; a paused one (no `onRetry`) cannot be retried. */
+function FailedDot({ error, onRetry }: { error?: string; onRetry?: () => void }) {
   return (
     <Popover>
       <PopoverTrigger
         render={
           <button
             type="button"
-            aria-label={t`Source failed`}
+            aria-label={onRetry ? t`Source failed` : t`Source paused`}
             className="flex size-4 items-center justify-center rounded-full"
           />
         }
@@ -115,9 +135,11 @@ function FailedDot({ error, onRetry }: { error?: string; onRetry: () => void }) 
       </PopoverTrigger>
       <PopoverContent align="end">
         <p className="break-words text-muted-foreground">{error}</p>
-        <Button size="sm" variant="secondary" className="w-fit" onClick={onRetry}>
-          <Trans>Retry</Trans>
-        </Button>
+        {onRetry ? (
+          <Button size="sm" variant="secondary" className="w-fit" onClick={onRetry}>
+            <Trans>Retry</Trans>
+          </Button>
+        ) : null}
       </PopoverContent>
     </Popover>
   );
@@ -163,7 +185,7 @@ export function PageTableBlock({
         label={block.name}
         hasValue={rows !== undefined && rows.length > 0}
       >
-        <Table>
+        <Table compact>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (

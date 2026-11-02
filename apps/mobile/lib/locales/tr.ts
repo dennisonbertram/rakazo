@@ -957,4 +957,7 @@ export const TR_MESSAGES: Record<string, string> = {
   "Source not found": "Kaynak bulunamadı",
   "No data yet": "Henüz veri yok",
   "Source failed": "Kaynak başarısız",
+  "Connected.": "Bağlandı.",
+  "Disconnected {provider}. Bots now use {model}.": "{provider} bağlantısı kesildi. Botlar artık {model} kullanacak.",
+  "Source paused": "Kaynak duraklatıldı",
 };

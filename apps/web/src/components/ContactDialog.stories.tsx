@@ -1,6 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { userEvent, within } from "storybook/test";
-import { mockRpc } from "../lib/__mocks__/rpc";
 import { withPageBehind } from "../stories/decorators";
 import { ContactDialog } from "./ContactDialog";
 
@@ -54,20 +52,11 @@ export const AddedByAgent: Story = {
 };
 /** Opened from the Cap table, where a hint says contacts do not change Carta. */
 export const FromCapTable: Story = { args: { fromCapTable: true } };
-/** The duplicate-email error sits under the Email field, with a way to open the existing contact. */
+/** The duplicate-email error shows under the Email field while typing, with a way to open the existing contact. */
 export const DuplicateEmail: Story = {
   args: {
     prefill: { name: "Ada Again", email: "ada@example.test", organization: null },
     contacts: [contact],
     onOpenContact: () => {},
-  },
-  beforeEach: () =>
-    mockRpc({
-      "contacts.save": () => {
-        throw new Error("Another contact already has this email.");
-      },
-    }),
-  play: async () => {
-    await userEvent.click(await within(document.body).findByRole("button", { name: "Save" }));
   },
 };

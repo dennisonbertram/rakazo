@@ -243,6 +243,9 @@ async function runIdentityExecutor({
       if (value && typeof value === "object" && "not" in value) {
         return row[key] !== (value as { not: unknown }).not;
       }
+      if (value && typeof value === "object" && "notIn" in value) {
+        return !(value as { notIn: unknown[] }).notIn.includes(row[key]);
+      }
       return row[key] === value;
     });
   let runtimeRunCount = 0;

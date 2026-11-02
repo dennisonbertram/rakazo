@@ -70,19 +70,23 @@ function show() {
   return { onDeleted, onClose };
 }
 
-it("deletes a plain contact at once, keeping the Undo path", async () => {
-  rpcMock.linked.mockResolvedValue({ portal: false, documents: [] });
+it("hands a plain contact to the page to delete after the Undo window", async () => {
+  rpcMock.linked.mockResolvedValue({ portal: false, documents: [], safes: 0 });
   rpcMock.remove.mockResolvedValue({ ok: true });
   const { onDeleted, onClose } = show();
   await click(button("Delete"));
   await flush();
-  expect(rpcMock.remove).toHaveBeenCalledWith({ id: "c1" });
+  expect(rpcMock.remove).not.toHaveBeenCalled();
   expect(onDeleted).toHaveBeenCalledWith(ada);
   expect(onClose).toHaveBeenCalled();
 });
 
 it("asks first when the contact has linked data, names what goes, and offers no Undo", async () => {
-  rpcMock.linked.mockResolvedValue({ portal: true, documents: ["Deck.pdf", "Terms.pdf"] });
+  rpcMock.linked.mockResolvedValue({
+    portal: true,
+    documents: ["Deck.pdf", "Terms.pdf"],
+    safes: 0,
+  });
   rpcMock.remove.mockResolvedValue({ ok: true });
   const { onDeleted, onClose } = show();
   await click(button("Delete"));
@@ -105,7 +109,7 @@ it("asks first when the contact has linked data, names what goes, and offers no 
 });
 
 it("Cancel on the question deletes nothing", async () => {
-  rpcMock.linked.mockResolvedValue({ portal: false, documents: ["Deck.pdf"] });
+  rpcMock.linked.mockResolvedValue({ portal: false, documents: ["Deck.pdf"], safes: 0 });
   const { onDeleted } = show();
   await click(button("Delete"));
   await flush();
@@ -118,4 +122,52 @@ it("Cancel on the question deletes nothing", async () => {
   expect(rpcMock.remove).not.toHaveBeenCalled();
   expect(onDeleted).not.toHaveBeenCalled();
   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+});
+
+const dana: Contact = { ...ada, id: "c2", name: "Dana Example", email: "dana@example.test" };
+
+function typeEmail(value: string) {
+  const input = document.getElementById("contact-email") as HTMLInputElement;
+  return act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    set?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+it("shows the duplicate email while typing and blocks Save", async () => {
+  const onOpenContact = vi.fn();
+  act(() =>
+    root.render(
+      <ContactDialog
+        contact={null}
+        contacts={[ada, dana]}
+        onClose={() => {}}
+        onSaved={() => {}}
+        onOpenContact={onOpenContact}
+      />,
+    ),
+  );
+  await typeEmail("Dana@Example.test");
+  const email = document.getElementById("contact-email");
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+    "Another contact already has this email.",
+  );
+  expect(email?.getAttribute("aria-invalid")).toBe("true");
+  expect(document.getElementById(email?.getAttribute("aria-describedby") ?? "")).not.toBeNull();
+  await click(button("Open Dana Example"));
+  expect(onOpenContact).toHaveBeenCalledWith(dana);
+  expect(button("Save")?.hasAttribute("disabled")).toBe(true);
+  expect(rpcMock.save).not.toHaveBeenCalled();
+});
+
+it("shows no duplicate error when editing the contact that owns the email", async () => {
+  act(() =>
+    root.render(
+      <ContactDialog contact={dana} contacts={[ada, dana]} onClose={() => {}} onSaved={() => {}} />,
+    ),
+  );
+  await typeEmail("DANA@example.test");
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+  expect(button("Save")?.hasAttribute("disabled")).toBe(false);
 });

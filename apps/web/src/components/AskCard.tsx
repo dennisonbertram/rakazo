@@ -84,6 +84,7 @@ function approvalActionLabel(
   if (outcome === "created") return t`Create space`;
   if (outcome === "cancelled") return t`Cancel`;
   // A payment's label already carries the amount ("Send $300.00"): keep it.
+  if (id === "allow" && fallback === "Allow for this run") return t`Allow for this run`;
   if (id === "allow")
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
   if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
@@ -343,7 +344,7 @@ export function AskCard({
                     )}
                   </Button>
                   <span className="text-[13px] text-muted-foreground">
-                    <Trans>Won't ask again for this kind of action.</Trans>
+                    <Trans>Won't ask again anywhere in this space.</Trans>
                   </span>
                 </div>
               ) : (

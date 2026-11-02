@@ -210,6 +210,25 @@ describe("renderPageChartSvg", () => {
   });
 });
 
+describe("renderPageChartSvg history", () => {
+  it("plots a history chart on a time axis without a warning or ISO ticks", async () => {
+    const data = Array.from({ length: 8 }, (_, i) => ({
+      at: new Date(Date.UTC(2026, 8, 6 + i * 7, 13, 17)).toISOString(),
+      value: 34000 + i * 1000,
+    }));
+    const svg = await renderPageChartSvg({
+      name: "c",
+      spec: { marks: [{ type: "lineY", options: { x: "at", y: "value" } }] },
+      data,
+      source: "cash",
+      path: "/cash",
+      over: "history",
+    });
+    expect(svg).not.toContain("warning");
+    expect(svg).not.toContain("T13:");
+  });
+});
+
 describe("page tools", () => {
   const run = (
     name: "page_list" | "page_create" | "page_read" | "page_write" | "page_edit",

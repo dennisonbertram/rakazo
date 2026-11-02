@@ -1,6 +1,14 @@
 import { useLingui } from "@lingui/react/macro";
 import type { NotificationKind } from "@rakazo/contracts";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -56,12 +64,14 @@ export function FolderHeader({
 }) {
   const { t } = useLingui();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const dnd = useFolderDnd(id, readOnly || editing);
   const actions = t`Actions for ${name}`;
   return (
     <div
       ref={dnd?.setNodeRef}
       data-sidebar-folder={id}
+      data-roster-item={`folder:${id}`}
       data-drop-into={dnd?.dropsInto ? "" : undefined}
       className={`group/folder ${collapsed ? "relative" : `${STICKY_GROUP_HEADER} top-0`} mt-1 flex items-center rounded-lg ${
         dnd?.isDragging ? "opacity-50" : ""
@@ -77,6 +87,7 @@ export function FolderHeader({
       ) : (
         <button
           type="button"
+          data-roster-row={`folder:${id}`}
           aria-expanded={!collapsed}
           aria-label={collapsed ? t`Expand ${name}` : t`Collapse ${name}`}
           className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-start text-[13px] font-medium text-foreground/80 hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
@@ -117,6 +128,7 @@ export function FolderHeader({
             render={
               <Button
                 type="button"
+                data-roster-actions=""
                 variant="ghost"
                 size="icon-sm"
                 aria-label={actions}
@@ -133,13 +145,30 @@ export function FolderHeader({
               <Pencil />
               {t`Rename`}
             </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={count > 0 ? () => setConfirmingDelete(true) : onDelete}
+            >
               <Trash2 />
               {t`Delete folder`}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t`Delete ${name}?`}</AlertDialogTitle>
+            <AlertDialogDescription>{t`Its chats stay in the sidebar.`}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onDelete}>
+              {t`Delete folder`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

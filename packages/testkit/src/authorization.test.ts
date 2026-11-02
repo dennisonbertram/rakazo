@@ -152,6 +152,7 @@ describeWithDatabase("API authorization and resource isolation", () => {
       ["computer/heartbeat", { botId: "missing-bot" }],
       ["memory/list", {}],
       ["memory/update", { documentId: "missing-memory", content: "Nope" }],
+      ["memory/remove", { documentId: "missing-memory", revision: 1 }],
       ["memory/exportMarkdown", {}],
       ["routines/list", { botId: "missing-bot" }],
       ["routines/create", routineInput("missing-bot")],
