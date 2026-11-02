@@ -1,8 +1,8 @@
 import type { ArtifactStore } from "@rakazo/adapter-kit";
 import type { PrismaClient } from "@rakazo/db";
-import { createArtifactShare, createDb, openArtifactShare } from "@rakazo/db";
+import { createArtifactShare, createDb, openArtifactShare, revokeArtifactShare } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { sharePageSnapshot } from "./page-snapshot.js";
+import { pageShareStatus, sharePageSnapshot } from "./page-snapshot.js";
 import { resolvePageData } from "./page-sources.js";
 import { createBotPage, getBotPage } from "./pages.js";
 
@@ -102,5 +102,32 @@ describePostgres("page snapshot sharing (PostgreSQL)", () => {
     await expect(
       createArtifactShare(prisma, { spaceId, userId: otherUserId }, artifactId, () => true),
     ).rejects.toThrow();
+  });
+
+  it("finds the page's live share, and nothing once it is stopped or for another owner", async () => {
+    const { artifactId } = await share();
+    const scope = { spaceId, userId, botId, pageId };
+    expect(await pageShareStatus(prisma, scope)).toMatchObject({ artifactId });
+    expect(await pageShareStatus(prisma, { ...scope, userId: otherUserId })).toBeNull();
+    expect(await pageShareStatus(prisma, { ...scope, spaceId: "other-space" })).toBeNull();
+    await revokeArtifactShare(prisma, { spaceId, userId }, artifactId);
+    expect(await pageShareStatus(prisma, scope)).toBeNull();
+  });
+
+  it("keeps one live link per page across a rename", async () => {
+    const first = await share();
+    await prisma.botPage.update({ where: { id: pageId }, data: { title: "Cash renamed" } });
+    const second = await share();
+    expect(await openArtifactShare(prisma, first.token)).toBeNull();
+    expect(await openArtifactShare(prisma, second.token)).not.toBeNull();
+    const live = await prisma.artifactShare.count({
+      where: {
+        spaceId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        artifact: { spaceId, userId, runId: `page-share:${pageId}` },
+      },
+    });
+    expect(live).toBe(1);
   });
 });
