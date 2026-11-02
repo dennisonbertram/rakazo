@@ -1,6 +1,6 @@
 # Document scanner: paper in, PDF in the Data room
 
-Status: plan only, no product code. Epic #1051 (#1045–#1050). File references were read at `origin/main` (c2be84f24). Format follows `docs/omi/README.md`. Mockup: `docs/scanner/mockup.html`.
+Status: plan only, no product code. Epic #1051 (#1045–#1050). File references were read at `origin/main` (c2be84f24). Format follows `docs/omi/README.md`. Mockups: `docs/scanner/page-mockup/index.html` (screenshots and HTML snapshots edited from the running app).
 
 ## Decisions
 
@@ -13,6 +13,8 @@ Decided by the owner on 2026-11-01 unless marked open.
 | D3 | Where does the scanner code run? | The Praci desktop app (Electron main process). It already holds the signed-in session, so no new credential is needed. |
 | D4 | How does a scan start? | Both, with a switch: **Scan when paper is loaded** (on by default) and a **Scan** button in the app. The scanner's own touch-screen Scan button is still being investigated (S0). |
 | D5 | Where do scans go? | A "Scans" folder at the top of the Data room, created on first use with `ensureDataRoomFolder` (`apps/web/src/lib/data-room.ts`). The folder can be changed in the scanner panel. Filing into "whichever folder is open" is not used: an automatic scan can happen while any page is open. |
+| D7 | A page of its own? | Yes (2026-11-02): a **Scanner** page in the sidebar, laid out like Legal, with its own **Scanner agent** docked on the right like every page agent. |
+| D8 | What is a scan in the Data room? | An ordinary Data room document with `source: "scan"`, filed into "Scans". The Scanner page lists every `source: "scan"` item wherever it is now, so moving one to Legal / Contracts keeps it on the page. |
 | D6 | How does the desktop app get SANE? | v1 requires Homebrew `sane-backends` on macOS (or the distro package on Linux) and says so when it is missing. Bundling `libsane` into the signed app is a later step if the owner wants zero setup. |
 
 ## Summary
@@ -67,15 +69,29 @@ Exposed on `window.rakazoDesktop.scanner` in `apps/desktop/src/preload.cjs`, onl
 - `onDocument(listener)`: delivers `{ id, name, bytes, sha256 }` for each PDF in the outbox.
 - `confirm(id, storedSha256)`: main deletes the outbox file only when the hashes match.
 
-### Web (renderer)
+### Scanner page (`/app/scanner`)
 
-- When `window.rakazoDesktop?.scanner` exists, the Data room toolbar shows a scanner control next to Import. It is absent on web, mobile and Windows desktop.
-- The control shows the state in one short line and, on open, the **Scan when paper is loaded** switch, a **Scan** button and the folder.
-- Each delivered PDF goes through the existing `uploadFilesToDataRoom` (`apps/web/src/components/data-room/upload-toasts.ts`) into `ensureDataRoomFolder(folderPath)`, so progress, stalls, retry, duplicates and the folder toast are the ones every upload already has. Its `onUploaded` callback compares the item's `sha256` with the PDF's and calls `confirm`. A mismatch shows an error toast and leaves the PDF in the outbox.
-- Name: `Scan 2026-11-01 09.01.pdf` (local time). The Data room's existing classify step and Auto-sort can rename or move it later.
+Built from the Legal page's parts (`apps/web/src/pages/Legal*`, the docked agent panel and the list rows), shown in the mockups:
+
+- **Header:** "Scanner", the space switcher, a status line ("ScanSnap iX1600 · Scans when paper is loaded", "Scanning · page 3", "No scanner found", "Install sane-backends with Homebrew" with **Copy command**), a **Scan** button, a ⋯ menu with the **Scan when paper is loaded** switch and "Save to Scans · Change", and **Ask** for the Scanner agent.
+- **List:** every `source: "scan"` item, newest first: the name, the folder it is in now, and "date · pages · type". A scan in progress shows as a top row ("Scanning…", "3 pages so far"); a new upload shows the Data room's existing "Reading" state until it is ready. Search and Type and Folder filters reuse the Data room's list parameters.
+- **On web, mobile and Windows** the page still lists scans and the agent still answers; the header shows no status, and **Scan** and the ⋯ menu are hidden, because only the desktop app can reach the scanner.
+- **Upload:** each delivered PDF goes through the existing `uploadFilesToDataRoom` (`apps/web/src/components/data-room/upload-toasts.ts`) into `ensureDataRoomFolder(["Scans"])` with `source=scan`, so progress, stalls, retry, duplicates and the folder toast are the ones every upload already has. Its `onUploaded` callback compares the item's `sha256` with the PDF's and calls `confirm`. A mismatch shows an error toast and leaves the PDF in the outbox.
+- **Name** on arrival: `Scan 2026-11-02 09.31.pdf` (local time) until the Scanner agent names it.
+
+### Scanner agent
+
+A page agent like the Legal agent: spawn key `scanner-agent:<userId>` (one per user per space), created the first time the Scanner page opens, docked on the page, listed under Page agents.
+
+- **After each scan is read**, a run names it ("MOCK Signed NDA - Bolt Freight"), sets its Data room type, and posts one line in the page chat ("Scanned 3 pages and saved them to Scans as …").
+- **On request**, it answers questions about scans and hands a scan to another page agent ("Send it to the Legal agent"); filing into another folder is that agent's job or the user's.
+- **Tools:** `search_data_room` and `read_data_room_item` limited to `source: "scan"` items, plus the existing Data room rename and set-type operations on those items. Handing a scan to another agent reuses the existing agent-to-agent message path, passing only the item id; which tool that is gets confirmed in S6. No mail, web, files or delete.
+- **Untrusted text:** a scanned page can contain anything, including instructions. Scan text is wrapped as untrusted when given to a model, the agent's only writes are a rename and a type on the scan itself, and anything else needs the usual approval card.
+- AI-data consent gates its runs, as for the Data room's own reading.
 
 ### Server
 
+- Let `POST /api/data-room/upload` take `source=scan` (only `upload` and `scan` are accepted from that route) so scans are marked at the source.
 - Add `sha256` to the Data room item returned by `POST /api/data-room/upload` and to `DataRoomApiItemSchema` (`packages/contracts/src/data-room-api.ts`, `itemDto` in `apps/api/src/data-room.ts`). The column already exists (`data_room_items.sha256`). No other server change: the route, storage, dedupe and ingest are reused.
 
 ### Security and tenancy
@@ -90,8 +106,8 @@ Exposed on `window.rakazoDesktop.scanner` in `apps/desktop/src/preload.cjs`, onl
 |---|---|---|
 | Desktop, macOS | Full feature | USB scanner on the user's machine |
 | Desktop, Linux | Same code; untested | SANE is native there |
-| Desktop, Windows | Control hidden | No SANE; would need WIA or TWAIN |
-| Web, mobile, iOS | Control hidden; scans appear in the Data room like any file | A browser or phone cannot reach a USB scanner |
+| Desktop, Windows | Page and agent; no Scan button or status | No SANE; would need WIA or TWAIN |
+| Web, mobile, iOS | Page and agent; no Scan button or status | A browser or phone cannot reach a USB scanner |
 
 ## The touch-screen Scan button (S0)
 
@@ -118,17 +134,18 @@ Research summary (2026-11-01, from source; nothing run on hardware):
 | Slice | Scope | Depends on |
 |---|---|---|
 | **S0 Button probe** | Finish the sensor log for the touch-screen button; record the result here. Not merged code. | owner's scanner |
-| **S1 Stored hash** | `sha256` on the upload response and `DataRoomApiItemSchema`; API test that the returned hash equals the uploaded bytes' hash; regenerate the API spec. | — |
+| **S1 Stored hash and scan source** | `source=scan` on the upload route; `sha256` on the upload response and `DataRoomApiItemSchema`; API test that the returned hash equals the uploaded bytes' hash; regenerate the API spec. | — |
 | **S2 Desktop scanner service** | `scanner.ts` (SANE lookup, device list, feeder watch, scan, PDF writer, outbox), settings, IPC and preload. Unit tests drive a fake `scanimage` script (fixture JPEGs, empty feeder, jam, busy, missing SANE) so they run offline. | — |
-| **S3 Data room scanner control** | Toolbar control with states, switch, Scan button and folder; upload through `uploadFilesToDataRoom`; hash check and `confirm`. Storybook stories for every state with a mocked `rakazoDesktop.scanner`; E2E screenshot of the control on a mocked desktop bridge. | S1, S2 |
+| **S3 Scanner page** | Sidebar page, header states, ⋯ menu, scan list with filters, in-progress row; upload through `uploadFilesToDataRoom`; hash check and `confirm`; desktop-only controls hidden elsewhere. Storybook stories for every state with a mocked `rakazoDesktop.scanner`; E2E screenshot of the page. | S1, S2 |
+| **S6 Scanner agent** | Spawn key, provisioning on first visit, docked chat, naming and typing each new scan, scan-only Data room tools, untrusted wrapping, hand-off to another page agent. Tests: exact tool set, an injection line in a scan cannot act beyond rename and type, a run per new scan. | S1, S3 |
 | **S4 Wi-Fi gate** | Run scansnack against the owner's iX1600; record the result here. Not merged code. | owner's scanner |
 | **S5 Wi-Fi client** | TypeScript client in the main process, pairing flow, button listener, same outbox and IPC. | S2, S4 passing |
 
-Hand test for S2 and S3: the owner's iX1600 on USB with the desktop app pointed at a demo stack (`DEMO_SLOT=<n> pnpm demo:up`), never the live stack. Load paper, see the toast, open the PDF in the Data room, check both sides are there. Unplug mid-scan and check nothing partial is filed. Stop the API mid-upload and check the PDF is sent again after it returns.
+Hand test for S2 and S3: the owner's iX1600 on USB with the desktop app pointed at a demo stack (`DEMO_SLOT=<n> pnpm demo:up`), never the live stack. Load paper, see the in-progress row and the toast, see the Scanner agent name the scan, open the PDF in the Data room, check both sides are there. Unplug mid-scan and check nothing partial is filed. Stop the API mid-upload and check the PDF is sent again after it returns.
 
-## Mockup
+## Mockups
 
-`docs/scanner/mockup.html`: the toolbar control beside Import, the open control, its states (SANE missing with Copy command, no scanner, busy, scanning with Cancel, error), and the existing upload toast. There is no status dot on the toolbar: the state shows inside the control, and an error during an automatic scan raises a toast. Popover sizes are approximations of the Import menu.
+`docs/scanner/page-mockup/index.html`. Each frame was made by editing the running demo app's own page (Legal, its docked agent, the Data room) in the browser, so the sidebar, header, rows, chips, menus and chat are the app's real elements with invented MOCK data. Frames: ready with the Scanner agent open; scanning; a new scan being read; no scanner found; sane-backends missing; the Data room's Scans folder; the ⋯ menu. Known differences from a real build: the ⋯ menu was moved by hand under its button, and the composer placeholder "Message Scanner agent" is cut off by the real composer width.
 
 ## Not built
 
