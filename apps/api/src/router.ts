@@ -101,6 +101,7 @@ import {
   PageValidationError,
   PinsValidationError,
   pageChartSvgs,
+  pageShareStatus,
   parseModelSecret,
   persistPreparedSecret,
   personCalendarMeetings,
@@ -4556,6 +4557,21 @@ export function createRouter(deps: RouterDeps): AppRouter {
           expiresAt: expiresAt.toISOString(),
           artifactId,
         };
+      }),
+      shareStatus: authed.pages.shareStatus.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return null;
+        return pageShareStatus(deps.prisma, {
+          spaceId: bot.spaceId,
+          userId: bot.userId,
+          botId: bot.id,
+          pageId: page.id,
+        });
       }),
       sources: authed.pages.sources.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);

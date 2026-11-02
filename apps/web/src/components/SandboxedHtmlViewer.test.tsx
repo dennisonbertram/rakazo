@@ -273,6 +273,47 @@ it("pushes data to the shell after the frame is ready and whenever it changes", 
   vi.restoreAllMocks();
 });
 
+it("posts data that arrives after the frame's ready ping", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const show = async (data?: Record<string, unknown>) =>
+    act(async () => {
+      root.render(<SandboxedHtmlViewer title="Page" html="<p>x</p>" data={data} />);
+    });
+  await show(undefined);
+  const iframe = container.querySelector("iframe");
+  if (!iframe?.contentWindow) throw new Error("viewer frame missing");
+  const postMessage = vi.spyOn(iframe.contentWindow, "postMessage").mockImplementation(() => {});
+  const dataPosts = () =>
+    postMessage.mock.calls.map(([message]) => message).filter((m) => m?.type === "praci-data");
+
+  await act(async () => {
+    iframe.dispatchEvent(new Event("load"));
+  });
+  // The frame reports ready while the data request is still in flight.
+  await act(async () => {
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        source: iframe.contentWindow as Window,
+        data: { type: "praci-viewer-ready" },
+      }),
+    );
+  });
+  expect(dataPosts()).toEqual([]);
+
+  await show({ Cash: { status: "ok", value: 1 } });
+  expect(dataPosts()).toEqual([
+    { type: "praci-data", sources: { Cash: { status: "ok", value: 1 } } },
+  ]);
+
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 it("lets the shell load the nested srcdoc preview and rejects http(s) navigations", () => {
   const sources = operativeFrameSources(shellContentSecurityPolicy(shell));
 

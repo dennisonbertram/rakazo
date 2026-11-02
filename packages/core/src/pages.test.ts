@@ -2,6 +2,7 @@ import type { GtmPageBlock } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import {
   gtmPageContentError,
+  historyChartRows,
   pageChartFence,
   pageGtmFence,
   pageMetricFence,
@@ -220,5 +221,22 @@ describe("gtmPageContentError", () => {
       "> ```",
     ].join("\n");
     expect(gtmPageContentError(content, true)).toEqual(expect.any(String));
+  });
+});
+
+describe("historyChartRows", () => {
+  it("turns ISO at strings into Dates and leaves everything else alone", () => {
+    const none = { value: 1 };
+    const word = { at: "soon", value: 2 };
+    const [first, second, third, fourth] = historyChartRows([
+      { at: "2026-09-06T13:17:00.000Z", value: 3 },
+      none,
+      word,
+      "text",
+    ]) as [Record<string, unknown>, unknown, unknown, unknown];
+    expect(first?.at).toEqual(new Date("2026-09-06T13:17:00.000Z"));
+    expect(second).toBe(none);
+    expect(third).toBe(word);
+    expect(fourth).toBe("text");
   });
 });

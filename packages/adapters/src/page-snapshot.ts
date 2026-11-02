@@ -12,7 +12,7 @@ import {
   tableColumns,
 } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
-import { createArtifactShare } from "@rakazo/db";
+import { createArtifactShare, getArtifactShare } from "@rakazo/db";
 import { renderPageChartSvg } from "./pages.js";
 import { attachWorkspaceFileToThread } from "./thread-artifacts.js";
 
@@ -144,6 +144,19 @@ export async function sharePageSnapshot(
     bytes: new TextEncoder().encode(html),
     operationId: `page.share:${randomUUID()}`,
   });
+  // A rename starts a new artifact family, so end every earlier link of this page first.
+  await deps.prisma.artifactShare.updateMany({
+    where: {
+      spaceId: input.spaceId,
+      revokedAt: null,
+      artifact: {
+        spaceId: input.spaceId,
+        userId: input.userId,
+        runId: `page-share:${input.page.id}`,
+      },
+    },
+    data: { revokedAt: new Date() },
+  });
   const { token, expiresAt } = await createArtifactShare(
     deps.prisma,
     { spaceId: input.spaceId, userId: input.userId },
@@ -151,4 +164,24 @@ export async function sharePageSnapshot(
     isShareableArtifactMimeType,
   );
   return { artifactId, token, expiresAt };
+}
+
+/** The page's live share, if any: its newest snapshot artifact. Never returns a token (only hashes are stored). */
+export async function pageShareStatus(
+  prisma: PrismaClient,
+  input: { spaceId: string; userId: string; botId: string; pageId: string },
+): Promise<{ artifactId: string; expiresAt: string } | null> {
+  const newest = await prisma.artifact.findFirst({
+    where: {
+      spaceId: input.spaceId,
+      userId: input.userId,
+      botId: input.botId,
+      runId: `page-share:${input.pageId}`,
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  if (!newest) return null;
+  const share = await getArtifactShare(prisma, input, newest.id);
+  return share ? { artifactId: share.artifactId, expiresAt: share.expiresAt.toISOString() } : null;
 }
