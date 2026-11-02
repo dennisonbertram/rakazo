@@ -56,9 +56,12 @@ public struct VoiceStatus: Sendable, Hashable, Decodable {
   public let voiceId: String
   public let transcriptionProvider: String?
   public let transcriptionReady: Bool
+  /// Nil on older servers.
+  public let transcriptionConsented: Bool?
 
   private enum CodingKeys: String, CodingKey {
     case configured, ready, transcribe, provider, voiceId, transcriptionProvider, transcriptionReady
+    case transcriptionConsented
   }
 
   public init(from decoder: Decoder) throws {
@@ -70,6 +73,7 @@ public struct VoiceStatus: Sendable, Hashable, Decodable {
     voiceId = try container.decodeIfPresent(String.self, forKey: .voiceId) ?? ""
     transcriptionProvider = try container.decodeIfPresent(String.self, forKey: .transcriptionProvider)
     transcriptionReady = try container.decodeIfPresent(Bool.self, forKey: .transcriptionReady) ?? false
+    transcriptionConsented = try container.decodeIfPresent(Bool.self, forKey: .transcriptionConsented)
   }
 }
 

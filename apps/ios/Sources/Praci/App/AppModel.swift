@@ -22,6 +22,9 @@ final class AppModel {
   private(set) var userID: String?
   private(set) var userConfirmed = false
 
+  /// The meeting recording in progress, if any, and its uploads.
+  @ObservationIgnored private(set) lazy var capture = CaptureController(app: self)
+
   @ObservationIgnored private let rpc: RPCClient
   @ObservationIgnored private let transport: any HTTPTransport
   @ObservationIgnored private let defaults: UserDefaults
@@ -66,6 +69,14 @@ final class AppModel {
       spaceID = nil
       return try await send(procedure, input: input, spaceID: nil, timeout: timeout)
     }
+  }
+
+  /// Sends one named space and leaves the active space alone if the server rejects it. Meeting
+  /// captures use this: a recording belongs to the space it started in, whatever is selected later.
+  func call<I: Encodable & Sendable, O: Decodable>(
+    _ procedure: String, input: I, spaceID: String, timeout: TimeInterval = 8
+  ) async throws -> O {
+    try await send(procedure, input: input, spaceID: spaceID, timeout: timeout)
   }
 
   /// Downloads a URL on the signed-in server with the session's credentials.
@@ -140,7 +151,7 @@ final class AppModel {
     }
   }
 
-  private func endSession() async {
+  func endSession() async {
     reset()
     await authentication.sync()
   }

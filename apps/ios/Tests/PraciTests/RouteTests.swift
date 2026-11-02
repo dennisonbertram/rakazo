@@ -23,6 +23,8 @@ func openURLsMapToRoutes() {
   #expect(route("rakazo://open/legal") == .legal)
   #expect(route("rakazo://open/cap-table") == .capTable)
   #expect(route("rakazo://open/data-room") == .dataRoom)
+  #expect(route("rakazo://open/meetings") == .meetings)
+  #expect(route("rakazo://open/meeting/m1") == .meeting(id: "m1"))
 }
 
 @Test
