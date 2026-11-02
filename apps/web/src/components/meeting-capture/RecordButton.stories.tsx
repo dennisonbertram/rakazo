@@ -17,7 +17,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Remind: Story = {
-  args: { availability: { loaded: true, policy: "remind", engine: true } },
+  args: { availability: { loaded: true, policy: "remind", engine: true, device: false } },
 };
 
 export const RemindOpen: Story = {
@@ -28,16 +28,16 @@ export const RemindOpen: Story = {
 };
 
 export const ConfirmOpen: Story = {
-  args: { availability: { loaded: true, policy: "confirm", engine: true } },
+  args: { availability: { loaded: true, policy: "confirm", engine: true, device: false } },
   play: RemindOpen.play,
 };
 
 /** No speech-to-text engine: Record becomes a way to add one. */
 export const NoEngine: Story = {
-  args: { availability: { loaded: true, policy: "remind", engine: false } },
+  args: { availability: { loaded: true, policy: "remind", engine: false, device: false } },
 };
 
 /** The space policy is off: nothing is drawn. */
 export const PolicyOff: Story = {
-  args: { availability: { loaded: true, policy: "off", engine: true } },
+  args: { availability: { loaded: true, policy: "off", engine: true, device: false } },
 };

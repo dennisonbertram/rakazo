@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { ORPCError } from "@orpc/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BufferedChunk, CaptureRecord, ChunkStore } from "./buffer";
 
 vi.mock("@lingui/core/macro", () => ({
@@ -10,13 +10,31 @@ vi.mock("@lingui/core/macro", () => ({
 }));
 const rpc = vi.hoisted(() => ({
   me: vi.fn(),
-  meetingCaptures: { start: vi.fn(), active: vi.fn(), finish: vi.fn(), discard: vi.fn() },
+  meetingCaptures: {
+    start: vi.fn(),
+    appendText: vi.fn(),
+    active: vi.fn(),
+    finish: vi.fn(),
+    discard: vi.fn(),
+  },
   meetings: { list: vi.fn() },
 }));
 vi.mock("../rpc", () => ({
   rpc,
   withSpaceHeaders: (init?: HeadersInit) => new Headers(init),
 }));
+const device = vi.hoisted(() => ({ transcribe: vi.fn(), speech: undefined as unknown }));
+vi.mock("../device-speech", () => ({ transcribeOnDevice: device.transcribe }));
+vi.mock("../desktop", async (original) => {
+  const actual = await original<typeof import("../desktop")>();
+  return {
+    ...actual,
+    desktopBridge: () => {
+      const real = actual.desktopBridge();
+      return device.speech ? ({ ...real, speech: device.speech } as typeof real) : real;
+    },
+  };
+});
 // Every "tab" (a fresh copy of the controller) shares one store, as IndexedDB is shared.
 const shared = vi.hoisted(() => ({ store: null as unknown as ChunkStore }));
 vi.mock("./buffer", async (original) => ({
@@ -180,6 +198,8 @@ beforeEach(async () => {
   rpc.meetingCaptures.active.mockResolvedValue(null);
   rpc.meetings.list.mockResolvedValue({ items: [] });
   vi.stubGlobal("fetch", respond(201));
+  device.speech = undefined;
+  rpc.meetingCaptures.appendText.mockResolvedValue({ ok: true });
   c = await openTab();
 });
 afterEach(() => {
@@ -605,4 +625,87 @@ it("keeps another person's capture when its space refuses this user", async () =
   expect(await shared.store.records()).toHaveLength(1);
   expect(await shared.store.all()).toHaveLength(1);
   expect(c.captureView().phase).toBe("idle");
+});
+
+describe("on-device capture", () => {
+  const ready = () => {
+    device.speech = { status: async () => ({ state: "ready" }) };
+    device.transcribe.mockResolvedValue({ ok: true, text: "hello" });
+  };
+  const startDevice = async () => {
+    ready();
+    await c.startCapture({});
+  };
+  const first = () => fakes.list[0] as { options: Opts };
+
+  it("starts with engine device and keeps it in the record", async () => {
+    await startDevice();
+    expect(rpc.meetingCaptures.start).toHaveBeenCalledWith(
+      expect.objectContaining({ engine: "device" }),
+      { context: { spaceId: "sA" } },
+    );
+    expect((await shared.store.records())[0]?.engine).toBe("device");
+  });
+
+  it("starts with engine server when on-device speech is not ready, and for old records", async () => {
+    device.speech = { status: async () => ({ state: "not-prepared" }) };
+    await c.startCapture({});
+    expect(rpc.meetingCaptures.start).toHaveBeenCalledWith(
+      expect.objectContaining({ engine: "server" }),
+      expect.anything(),
+    );
+    expect((await shared.store.records())[0]?.engine).toBe("server");
+  });
+
+  it("uploads text through appendText and never the chunk route", async () => {
+    await startDevice();
+    await first().options.onChunk(fakeChunk(first().options, 1));
+    await settle(100);
+    expect(rpc.meetingCaptures.appendText).toHaveBeenCalledWith(
+      { captureId: "c1", track: "microphone", seq: 1, startMs: 0, endMs: 1000, text: "hello" },
+      { context: { spaceId: "sA" } },
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await c.chunkStore.all()).toEqual([]);
+  });
+
+  it("keeps the chunk until appendText resolves", async () => {
+    await startDevice();
+    let done: () => void = () => {};
+    rpc.meetingCaptures.appendText.mockReturnValue(new Promise<void>((r) => (done = r)));
+    await first().options.onChunk(fakeChunk(first().options, 1));
+    await settle(100);
+    expect(await c.chunkStore.all()).toHaveLength(1);
+    done();
+    await settle(100);
+    expect(await c.chunkStore.all()).toEqual([]);
+  });
+
+  it("keeps and retries a chunk when the helper asks for a retry", async () => {
+    await startDevice();
+    device.transcribe.mockResolvedValueOnce({ ok: false, retry: true });
+    await first().options.onChunk(fakeChunk(first().options, 1));
+    await settle(100);
+    expect(await c.chunkStore.all()).toHaveLength(1);
+    await settle(6_000);
+    expect(rpc.meetingCaptures.appendText).toHaveBeenCalledTimes(1);
+    expect(await c.chunkStore.all()).toEqual([]);
+  });
+
+  it("drops a chunk that cannot be transcribed and reports it lost", async () => {
+    await startDevice();
+    device.transcribe.mockResolvedValue({ ok: false, retry: false });
+    await first().options.onChunk(fakeChunk(first().options, 1));
+    await settle(100);
+    expect(await c.chunkStore.all()).toEqual([]);
+    expect((await shared.store.records())[0]?.lostChunks).toBe(1);
+  });
+
+  it("classifies appendText errors like chunk upload errors", async () => {
+    await startDevice();
+    rpc.meetingCaptures.appendText.mockRejectedValue(new ORPCError("NOT_FOUND"));
+    await first().options.onChunk(fakeChunk(first().options, 1));
+    await settle(100);
+    expect(c.captureView().phase).toBe("failed");
+  });
 });
