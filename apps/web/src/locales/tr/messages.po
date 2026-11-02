@@ -9969,6 +9969,14 @@ msgstr ""
 msgid "Praci can now read your documents."
 msgstr ""
 
+#: src/lib/meeting-capture/controller.ts
+msgid "Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci."
+msgstr ""
+
+#: src/lib/meeting-capture/controller.ts
+msgid "Praci can't hear call audio. Try again, or turn off Record call audio."
+msgstr ""
+
 #: src/components/legal/ConsentPrompt.tsx
 msgid "Praci doesn't read your documents."
 msgstr ""
@@ -10513,6 +10521,14 @@ msgstr ""
 
 #: src/components/meeting-capture/RecordButton.tsx
 msgid "Record"
+msgstr ""
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Record call audio"
+msgstr ""
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Record call audio again"
 msgstr ""
 
 #: src/components/MeetingRecordingSettings.tsx

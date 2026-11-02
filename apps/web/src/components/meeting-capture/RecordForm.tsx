@@ -8,12 +8,15 @@ import { defaultMeetingTitle } from "../../lib/meeting-capture/title";
 export function RecordForm({
   policy,
   tabAudioAvailable = false,
+  systemAudio = false,
   busy = false,
   error,
   onStart,
 }: {
   policy: "remind" | "confirm";
   tabAudioAvailable?: boolean;
+  /** The desktop app records call audio without a picker: the box reads "Record call audio" and starts checked. */
+  systemAudio?: boolean;
   busy?: boolean;
   error?: string;
   onStart: (options: StartOptions) => void;
@@ -21,7 +24,7 @@ export function RecordForm({
   const { t } = useLingui();
   const [title, setTitle] = useState("");
   const [agreed, setAgreed] = useState(false);
-  const [tabAudio, setTabAudio] = useState(false);
+  const [tabAudio, setTabAudio] = useState(systemAudio);
   const titleId = useId();
   const agreedId = useId();
   const tabId = useId();
@@ -72,7 +75,11 @@ export function RecordForm({
             onCheckedChange={(on) => setTabAudio(on === true)}
           />
           <label htmlFor={tabId} className="text-sm">
-            <Trans>Also record a browser tab</Trans>
+            {systemAudio ? (
+              <Trans>Record call audio</Trans>
+            ) : (
+              <Trans>Also record a browser tab</Trans>
+            )}
           </label>
         </div>
       ) : null}

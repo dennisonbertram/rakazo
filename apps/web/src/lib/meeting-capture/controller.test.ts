@@ -341,6 +341,22 @@ it("a recovered call recording records the microphone and offers to share the ca
   expect((fakes.list[1] as Fake).options.track).toBe("system");
 });
 
+it.each([
+  ["darwin", "Screen & System Audio Recording"],
+  ["win32", "turn off Record call audio"],
+  [undefined, "No tab was shared"],
+])("call audio that cannot start on %s says what to do", async (platform, text) => {
+  vi.stubGlobal("window", { rakazoDesktop: platform ? { platform } : undefined });
+  Object.defineProperty(navigator, "mediaDevices", {
+    value: {
+      getUserMedia: gum,
+      getDisplayMedia: vi.fn(async () => Promise.reject(new Error("x"))),
+    },
+    configurable: true,
+  });
+  await expect(c.startCapture({ tabAudio: true })).rejects.toThrow(text);
+});
+
 // 1. Stop in an observer tab stops the tab that holds the microphone.
 it("Stop in another tab stops the recording tab, which stores the meeting once", async () => {
   await c.startCapture({});

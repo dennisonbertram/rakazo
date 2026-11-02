@@ -93,6 +93,19 @@ it("remind: one line and Start is ready at once", async () => {
   expect(startCapture).toHaveBeenCalledWith({ title: "", tabAudio: false });
 });
 
+it("on desktop, Record call audio starts checked and is sent with Start", async () => {
+  vi.stubGlobal("window", Object.assign(window, { rakazoDesktop: { platform: "darwin" } }));
+  rpc.voice.status.mockResolvedValue(voice(true));
+  rpc.spaces.list.mockResolvedValue(space());
+  startCapture.mockResolvedValue(undefined);
+  await mount(<RecordButton />);
+  await click(button("Record"));
+  expect(document.body.textContent).toContain("Record call audio");
+  await click(button("Start"));
+  expect(startCapture).toHaveBeenCalledWith({ title: "", tabAudio: true });
+  delete (window as { rakazoDesktop?: unknown }).rakazoDesktop;
+});
+
 it("confirm: Start stays disabled until the box is ticked, then sends consent", async () => {
   rpc.voice.status.mockResolvedValue(voice(true));
   rpc.spaces.list.mockResolvedValue(space({ meetingRecording: "confirm" }));

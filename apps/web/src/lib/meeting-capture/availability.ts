@@ -1,5 +1,6 @@
 import type { MeetingRecordingPolicy } from "@rakazo/contracts";
 import { useEffect, useState } from "react";
+import { desktopBridge } from "../desktop";
 import { rpc } from "../rpc";
 
 export type RecordAvailability =
@@ -38,4 +39,10 @@ export function tabAudioSupported(): boolean {
   if (!navigator.mediaDevices?.getDisplayMedia) return false;
   const agent = typeof navigator.userAgent === "string" ? navigator.userAgent : "";
   return /Chrome\//.test(agent) && !/Mobile|Android/i.test(agent);
+}
+
+/** The desktop app records system audio ("Them") itself on macOS and Windows; no tab is picked. */
+export function systemAudioSupported(): boolean {
+  const platform = desktopBridge()?.platform;
+  return platform === "darwin" || platform === "win32";
 }

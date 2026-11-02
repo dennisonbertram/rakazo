@@ -24,6 +24,9 @@ export const Confirm: Story = { args: { policy: "confirm" } };
 
 export const WithTabAudio: Story = { args: { tabAudioAvailable: true } };
 
+/** The desktop app records call audio without a picker, so the box starts checked. */
+export const DesktopCallAudio: Story = { args: { tabAudioAvailable: true, systemAudio: true } };
+
 export const Starting: Story = { args: { busy: true } };
 
 export const MicrophoneBlocked: Story = {

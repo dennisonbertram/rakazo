@@ -44,6 +44,20 @@ export const ShareTabAgain: Story = {
   },
 };
 
+/** Desktop: the warning offers to record call audio again. */
+export const DesktopNoCallAudio: Story = {
+  args: {
+    state: {
+      kind: "recording",
+      title: "Pricing review with Dana",
+      elapsedMs: 754_000,
+      noCallAudio: true,
+    },
+    onShareTab: () => undefined,
+    systemAudio: true,
+  },
+};
+
 export const Offline: Story = {
   args: {
     state: {

@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { systemAudioSupported } from "../../lib/meeting-capture/availability";
 import {
   captureView,
   dismissStored,
@@ -58,6 +59,7 @@ export function RecordingPillHost() {
           }}
           onStop={() => void stopCapture()}
           onShareTab={view.canShareTab ? () => void shareTabAudio() : undefined}
+          systemAudio={systemAudioSupported()}
         />
       )}
     </div>

@@ -31,6 +31,7 @@ export function RecordingPill({
   onStop,
   onDismiss,
   onShareTab,
+  systemAudio = false,
   className,
 }: {
   state: RecordingPillState;
@@ -38,6 +39,8 @@ export function RecordingPill({
   onDismiss?: () => void;
   /** Shown on "No call audio" when the call tab can be shared again. */
   onShareTab?: () => void;
+  /** The desktop app records call audio itself, so the retry is not about a tab. */
+  systemAudio?: boolean;
   className?: string;
 }) {
   const { t } = useLingui();
@@ -82,7 +85,7 @@ export function RecordingPill({
             <button
               type="button"
               className="shrink-0 text-xs text-warning underline-offset-2 hover:underline"
-              title={t`Share the call tab again`}
+              title={systemAudio ? t`Record call audio again` : t`Share the call tab again`}
               onClick={onShareTab}
             >
               <Trans>No call audio</Trans>

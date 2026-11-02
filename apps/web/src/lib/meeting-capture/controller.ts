@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { ORPCError } from "@orpc/client";
 import type { MeetingCaptureTrack } from "@rakazo/contracts";
+import { desktopBridge } from "../desktop";
 import { rpc, withSpaceHeaders } from "../rpc";
 import type { BufferedChunk, CaptureOwner, CaptureRecord } from "./buffer";
 import {
@@ -304,6 +305,13 @@ async function tabAudio(): Promise<MediaStream | null> {
   try {
     display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
   } catch {
+    const platform = desktopBridge()?.platform;
+    if (platform === "darwin")
+      throw new Error(
+        t`Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci.`,
+      );
+    if (platform === "win32")
+      throw new Error(t`Praci can't hear call audio. Try again, or turn off Record call audio.`);
     throw new Error(t`No tab was shared. Start again to pick one.`);
   }
   for (const video of display.getVideoTracks()) video.stop();
