@@ -207,3 +207,27 @@ it("lets the page tab strip scroll sideways without hiding the options and New p
   }
   expect(container.querySelector('[aria-label="New page"]')?.className).toContain("shrink-0");
 });
+
+it("tells the sidebar once when a page is renamed", async () => {
+  mocks.list.mockResolvedValue([summary("p1", "Cash")]);
+  mocks.get.mockResolvedValue(pageOf("p1", "Cash", "Cash text"));
+  mocks.create.mockResolvedValue(pageOf("p2", "New page", ""));
+  mocks.rename.mockResolvedValue(summary("p2", "Burn"));
+  mocks.list.mockResolvedValue([summary("p1", "Cash"), summary("p2", "New page")]);
+  await act(async () => {
+    root.render(<BotPagePanel botId="bot_demo" remote={null} />);
+  });
+  await act(async () => {
+    (container.querySelector('[aria-label="New page"]') as HTMLElement).click();
+  });
+  const changed = vi.fn();
+  window.addEventListener("praci:sidebar-pages-changed", changed);
+  const title = container.querySelector('input[aria-label="Page title"]') as HTMLInputElement;
+  title.value = "Burn";
+  await act(async () => {
+    title.form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  });
+  window.removeEventListener("praci:sidebar-pages-changed", changed);
+  expect(mocks.rename).toHaveBeenCalledTimes(1);
+  expect(changed).toHaveBeenCalledTimes(1);
+});

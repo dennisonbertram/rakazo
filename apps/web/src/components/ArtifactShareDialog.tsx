@@ -31,7 +31,7 @@ export function ArtifactShareDialog({
 }: {
   name: string;
   url: string | null;
-  /** Absent for a page share, which has no expiry to show and no way to replace its link. */
+  /** Absent for a page share, which has no expiry to show. */
   expiresAt?: string;
   busy: boolean;
   error: string | null;

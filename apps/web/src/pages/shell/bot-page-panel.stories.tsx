@@ -231,6 +231,7 @@ const liveMocks = (blocks: unknown[]) => ({
   "pages.data": liveData(blocks),
   "pages.sources": sources,
   "pages.refresh": liveData(liveBlocks),
+  "pages.shareStatus": null,
   "pages.share": {
     url: "https://app.example.test/s#example-token",
     expiresAt: "2026-11-29T00:00:00.000Z",
@@ -282,5 +283,19 @@ export const LivePageSources: Story = {
     const menu = await within(canvasElement).findByRole("button", { name: "Page options" });
     await userEvent.click(menu);
     await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Sources" }));
+  },
+};
+
+/** Share on a page that is already shared: Replace link and Stop sharing, with no link shown. */
+export const LivePageShareReopened: Story = {
+  beforeEach: () =>
+    mockRpc({
+      ...liveMocks(liveBlocks),
+      "pages.shareStatus": { artifactId: "art_snapshot", expiresAt: "2026-11-29T00:00:00.000Z" },
+    }),
+  play: async ({ canvasElement }) => {
+    const menu = await within(canvasElement).findByRole("button", { name: "Page options" });
+    await userEvent.click(menu);
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Share" }));
   },
 };
