@@ -20,10 +20,13 @@ import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { desktopBridge } from "../lib/desktop";
 import { rpc } from "../lib/rpc";
 import { sidebarPageCopy } from "../lib/sidebar-page-copy";
+import { SIDEBAR_PAGES_CHANGED_EVENT } from "../lib/sidebar-pages-event";
 import { errorText } from "../lib/user-error";
 import { AddSidebarPage } from "./AddSidebarPage";
 import { SidebarPageLink } from "./SidebarPageLink";
 import { usePagesCollapsed } from "./SidebarPagesGroup";
+
+export { SIDEBAR_PAGES_CHANGED_EVENT };
 
 /** The user's added sidebar pages, then the "+ Add page" row. */
 export function SidebarPages({
@@ -56,13 +59,18 @@ export function SidebarPages({
 
   useEffect(() => {
     let active = true;
-    const seen = latest.current;
-    void rpc.sidebarPages
-      .list()
-      .then((next) => active && latest.current === seen && setState(next))
-      .catch((cause) => active && setError(errorText(cause)));
+    const load = () => {
+      const seen = latest.current;
+      void rpc.sidebarPages
+        .list()
+        .then((next) => active && latest.current === seen && setState(next))
+        .catch((cause) => active && setError(errorText(cause)));
+    };
+    load();
+    window.addEventListener(SIDEBAR_PAGES_CHANGED_EVENT, load);
     return () => {
       active = false;
+      window.removeEventListener(SIDEBAR_PAGES_CHANGED_EVENT, load);
     };
   }, []);
 

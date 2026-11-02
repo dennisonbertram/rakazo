@@ -45,6 +45,7 @@ import {
 import { PageSourcesDialog } from "../../components/pages/PageSourcesDialog";
 import { isNewerRemote, resolveRemotePage } from "../../lib/page-sync";
 import { rpc } from "../../lib/rpc";
+import { SIDEBAR_PAGES_CHANGED_EVENT } from "../../lib/sidebar-pages-event";
 import { errorText } from "../../lib/user-error";
 import { ChartCanvas } from "./message-cards";
 import { PageChartNode, usePageChartRows } from "./page-chart-extension";
@@ -55,13 +56,19 @@ import { PageMetricNode, PageTableNode } from "./page-live-extensions";
 
 const SAVE_DELAY_MS = 800;
 
+/** Deletes the block, then focuses the editor so Ctrl+Z / Cmd+Z restores it. */
+const deleteAndFocus = ({ deleteNode, editor }: Pick<NodeViewProps, "deleteNode" | "editor">) => {
+  deleteNode();
+  editor.view.focus();
+};
+
 function LiveDelete({ onClick }: { onClick: () => void }) {
   return (
     <Button
       variant="ghost"
       size="icon-sm"
       aria-label={t`Delete block`}
-      className="absolute end-1 bottom-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      className="absolute end-1 bottom-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
       onClick={onClick}
     >
       <X size={14} />
@@ -99,14 +106,14 @@ function ChartView({ node, deleteNode, editor }: NodeViewProps) {
       )}
       {editor.isEditable ? (
         chart.source ? (
-          <LiveDelete onClick={deleteNode} />
+          <LiveDelete onClick={() => deleteAndFocus({ deleteNode, editor })} />
         ) : (
           <Button
             variant="ghost"
             size="icon-sm"
             aria-label={t`Delete chart`}
-            className="absolute end-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            onClick={deleteNode}
+            className="absolute end-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
+            onClick={() => deleteAndFocus({ deleteNode, editor })}
           >
             <X size={14} />
           </Button>
@@ -128,7 +135,9 @@ function MetricView({ node, deleteNode, editor }: NodeViewProps) {
   return (
     <NodeViewWrapper className="group relative my-3 min-w-0" contentEditable={false}>
       <PageMetricBlock block={block} data={live.blocks.get(liveKey("pageMetric", block))} />
-      {editor.isEditable ? <LiveDelete onClick={deleteNode} /> : null}
+      {editor.isEditable ? (
+        <LiveDelete onClick={() => deleteAndFocus({ deleteNode, editor })} />
+      ) : null}
     </NodeViewWrapper>
   );
 }
@@ -139,7 +148,9 @@ function TableView({ node, deleteNode, editor }: NodeViewProps) {
   return (
     <NodeViewWrapper className="group relative my-3 min-w-0" contentEditable={false}>
       <PageTableBlock block={block} data={live.blocks.get(liveKey("pageTable", block))} />
-      {editor.isEditable ? <LiveDelete onClick={deleteNode} /> : null}
+      {editor.isEditable ? (
+        <LiveDelete onClick={() => deleteAndFocus({ deleteNode, editor })} />
+      ) : null}
     </NodeViewWrapper>
   );
 }
@@ -522,6 +533,9 @@ function nextTitle(pages: BotPageSummary[]): string {
 }
 
 /** The bot's page: a row of page titles when there are several, and the active page's editor. */
+const announcePagesChanged = () =>
+  window.dispatchEvent(new CustomEvent(SIDEBAR_PAGES_CHANGED_EVENT));
+
 export function BotPagePanel({
   botId,
   remote,
@@ -554,7 +568,7 @@ export function BotPagePanel({
   const [error, setError] = useState("");
   const [hasSources, setHasSources] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [shared, setShared] = useState<{ url: string; artifactId: string } | null>(null);
+  const [shared, setShared] = useState<{ url: string | null; artifactId: string } | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [dataTick, setDataTick] = useState(0);
@@ -567,7 +581,10 @@ export function BotPagePanel({
     const list = await rpc.pages.list({ botId });
     setPages(list);
     if (fixedPageId) {
-      if (!list.some((page) => page.id === fixedPageId)) onMissingRef.current?.();
+      if (!list.some((page) => page.id === fixedPageId)) {
+        announcePagesChanged();
+        onMissingRef.current?.();
+      }
       return;
     }
     // Keep the open page; otherwise open the first.
@@ -625,6 +642,7 @@ export function BotPagePanel({
     run(async () => {
       const page = await rpc.pages.create({ botId, title: nextTitle(pages) });
       await loadPages();
+      announcePagesChanged();
       setActiveId(page.id);
       setRenaming(true);
     });
@@ -634,6 +652,7 @@ export function BotPagePanel({
       if (active && title.trim() && title.trim() !== active.title) {
         const renamed = await rpc.pages.rename({ botId, pageId: active.id, title });
         setPages((list) => list.map((page) => (page.id === renamed.id ? renamed : page)));
+        announcePagesChanged();
       }
       setRenaming(false);
     });
@@ -641,9 +660,22 @@ export function BotPagePanel({
   const share = () =>
     run(async () => {
       if (!active) return;
-      const result = await rpc.pages.share({ botId, pageId: active.id });
-      if (result) setShared({ url: result.url, artifactId: result.artifactId });
+      const status = await rpc.pages.shareStatus({ botId, pageId: active.id });
+      if (status) setShared({ url: null, artifactId: status.artifactId });
+      else await makeShareLink(active.id);
     });
+
+  const makeShareLink = async (pageId: string) => {
+    const result = await rpc.pages.share({ botId, pageId });
+    if (result) setShared({ url: result.url, artifactId: result.artifactId });
+  };
+
+  const replaceShare = async () => {
+    if (!active) return;
+    setShareBusy(true);
+    await run(() => makeShareLink(active.id));
+    setShareBusy(false);
+  };
 
   const stopSharing = async () => {
     if (!shared) return;
@@ -661,6 +693,7 @@ export function BotPagePanel({
       setDeleting(false);
       setActiveId(undefined);
       await loadPages();
+      announcePagesChanged();
     });
 
   const renameForm =
@@ -690,7 +723,7 @@ export function BotPagePanel({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label={t`Page options`}>
+          <Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t`Page options`}>
             <MoreHorizontal size={16} />
           </Button>
         }
@@ -734,9 +767,12 @@ export function BotPagePanel({
             <div className="min-w-0 flex-1">
               {pages.length > 1 ? (
                 <Tabs value={activeId} onValueChange={(next) => setActiveId(String(next))}>
-                  <TabsList aria-label={t`Pages`}>
+                  <TabsList
+                    aria-label={t`Pages`}
+                    className="justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
                     {pages.map((page) => (
-                      <TabsTrigger key={page.id} value={page.id} className="px-3">
+                      <TabsTrigger key={page.id} value={page.id} className="flex-none px-3">
                         {page.title}
                       </TabsTrigger>
                     ))}
@@ -749,6 +785,7 @@ export function BotPagePanel({
           <Button
             variant="ghost"
             size="icon-sm"
+            className="shrink-0"
             aria-label={t`New page`}
             disabled={pages.length >= BOT_PAGE_MAX_PAGES}
             onClick={() => void create()}
@@ -804,6 +841,7 @@ export function BotPagePanel({
           url={shared.url}
           busy={shareBusy}
           error={error || null}
+          onReplace={() => void replaceShare()}
           onStop={() => void stopSharing()}
           onClose={() => setShared(null)}
         />

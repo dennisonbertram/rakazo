@@ -35,7 +35,7 @@ const rpcMock = vi.hoisted(() => ({
 vi.mock("../lib/user-error", () => ({ errorText: () => "Could not add the page" }));
 vi.mock("../lib/rpc", () => ({ rpc: { sidebarPages: rpcMock } }));
 
-import { SidebarPages } from "./SidebarPages";
+import { SIDEBAR_PAGES_CHANGED_EVENT, SidebarPages } from "./SidebarPages";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -269,4 +269,17 @@ it("opens an added bot page and removes it by page id", async () => {
   expect(rpcMock.remove).toHaveBeenCalledWith({ pageId: "pg1" });
   expect(path).toBe("/app");
   expect(menuTexts()).not.toContain("Cash");
+});
+
+it("re-lists when the sidebar pages change event fires", async () => {
+  rpcMock.list
+    .mockResolvedValueOnce(state([{ ...cash, title: "Board prep" }], []))
+    .mockResolvedValueOnce(state([{ ...cash, title: "Board notes" }], []));
+  await render([]);
+  expect(container.textContent).toContain("Board prep");
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent(SIDEBAR_PAGES_CHANGED_EVENT));
+  });
+  expect(container.textContent).toContain("Board notes");
+  expect(rpcMock.list).toHaveBeenCalledTimes(2);
 });
