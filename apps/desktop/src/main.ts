@@ -5,7 +5,18 @@ import path from "node:path";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { LOCAL_SETTINGS_PAGE } from "@rakazo/contracts/local-settings";
 import type { Session } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  dialog,
+  ipcMain,
+  Menu,
+  net,
+  session,
+  shell,
+} from "electron";
+import { startAppControlBridge } from "./app-control-bridge.js";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -13,7 +24,9 @@ import { buildApplicationMenuTemplate } from "./application-menu.js";
 import type { ElectronAutoUpdater } from "./auto-update.js";
 import { DesktopUpdateController, LAUNCH_CHECK_DELAY_MS } from "./auto-update.js";
 import { openBrowserAuth } from "./browser-auth.js";
+import { createDeviceSpeech } from "./device-speech.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
+import { createHexRunner, findHex } from "./hex-bridge.js";
 import { requestLocalSettings } from "./local-settings.js";
 import {
   LocalStackController,
@@ -54,6 +67,7 @@ import { oauthPopupSessionPreferences, shouldOpenInAppPopup } from "./window-ope
 import {
   browserWindowOptions,
   developmentIconFile,
+  restrictWebRtc,
   setupWindowOptions,
   warmWindowTtlMs,
 } from "./window-options.js";
@@ -117,7 +131,13 @@ if (PERFORMANCE_USER_DATA) {
 app.once("will-finish-launching", () => markOnce("rk:main:will-finish-launching"));
 app.once("ready", () => markOnce("rk:main:ready"));
 // Includes fresh partitions and popup-created sessions, before they load remote content.
-app.on("session-created", (value) => installSessionPermissions(value, permissionTarget));
+const displayCapture = {
+  platform: process.platform,
+  getSources: desktopCapturer.getSources.bind(desktopCapturer),
+};
+app.on("session-created", (value) =>
+  installSessionPermissions(value, permissionTarget, displayCapture),
+);
 
 function permissionTarget() {
   if (mainWindow === null || mainWindow.isDestroyed()) return null;
@@ -303,6 +323,7 @@ function createWindow(url: string, partition: string | null) {
       ...(partition === null ? {} : { partition }),
     },
   });
+  restrictWebRtc(win.webContents);
   mainWindow = win;
   appWindowTargets.set(win, url);
   installBluetooth(win);
@@ -950,7 +971,7 @@ function safeOrigin(targetUrl: string) {
 }
 
 app.whenReady().then(async () => {
-  installSessionPermissions(session.defaultSession, permissionTarget);
+  installSessionPermissions(session.defaultSession, permissionTarget, displayCapture);
   const userDataDir = app.getPath("userData");
   const stackImages = readStackImages(
     JSON.parse(readFileSync(path.join(app.getAppPath(), "package.json"), "utf8")),
@@ -977,6 +998,7 @@ app.whenReady().then(async () => {
     images: stackImages,
     probe: (url, signal, token) => probeManagedStack(url, token, signal),
     randomHex: (bytes) => randomBytes(bytes).toString("hex"),
+    startAppControl: (saved) => startAppControlBridge({ userDataDir, ...saved }),
     onState: (state) => {
       if (setupWindow !== null && !setupWindow.isDestroyed()) {
         setupWindow.webContents.send("desktop.setup.stack.changed", state);
@@ -1116,6 +1138,51 @@ app.whenReady().then(async () => {
       fullScreen: win?.isFullScreen() ?? false,
     };
   });
+  // Hex records meetings on macOS only; elsewhere the answers are "not found" and nothing runs.
+  const hex = createHexRunner();
+  const hexMac = process.platform === "darwin";
+  ipcMain.handle(
+    "desktop.hex.available",
+    (event) => hexMac && fromMainWindow(event) && hex.available(),
+  );
+  ipcMain.handle("desktop.hex.list", (event, sinceMs: unknown) =>
+    hexMac && fromMainWindow(event) && typeof sinceMs === "number"
+      ? hex.list(sinceMs)
+      : { state: "not_found" },
+  );
+  ipcMain.handle("desktop.hex.show", (event, id: unknown) =>
+    hexMac && fromMainWindow(event) && typeof id === "string"
+      ? hex.show(id)
+      : { state: "not_found" },
+  );
+  // On-device speech needs Hex's helper, so it is macOS on Apple silicon only.
+  const speech = createDeviceSpeech({
+    userDataDir: app.getPath("userData"),
+    supported: process.platform === "darwin" && process.arch === "arm64",
+    command: () => {
+      const hexPath = findHex();
+      return hexPath === undefined ? undefined : [hexPath, "service", "--embedded"];
+    },
+    onStatus: (status) => {
+      if (mainWindow !== null && !mainWindow.isDestroyed())
+        mainWindow.webContents.send("desktop.speech.status", status);
+    },
+  });
+  const unavailable = { state: "unavailable" } as const;
+  ipcMain.handle("desktop.speech.status", (event) =>
+    fromMainWindow(event) ? speech.status() : unavailable,
+  );
+  ipcMain.handle("desktop.speech.prepare", (event) =>
+    fromMainWindow(event) ? speech.prepare() : unavailable,
+  );
+  ipcMain.handle("desktop.speech.forget", (event) =>
+    fromMainWindow(event) ? speech.forget() : unavailable,
+  );
+  ipcMain.handle("desktop.speech.transcribe", (event, wav: unknown) =>
+    fromMainWindow(event) ? speech.transcribe(wav) : { ok: false, retry: false },
+  );
+  // will-quit, not before-quit: a capture can still cancel the quit while it is being confirmed.
+  app.on("will-quit", () => void speech.close());
   ipcMain.handle("desktop.update.state", () => desktopUpdater.state());
   ipcMain.handle("desktop.update.check", (event) =>
     fromMainWindow(event) ? desktopUpdater.check(true) : desktopUpdater.state(),
@@ -1324,4 +1391,5 @@ app.on("before-quit", () => {
   clearTimeout(warmWindowTimer);
   // Containers keep running; only an in-flight pull/up is cut short.
   localStack?.abort();
+  void localStack?.closeAppControl();
 });

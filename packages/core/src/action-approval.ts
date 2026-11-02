@@ -59,6 +59,8 @@ const BUILTIN_MAIL_WRITE_TOOLS = new Set(["mail_draft", "mail_modify", "mail_sen
 /** Cannot be auto-reviewed or permanently allowed. imessage_send is a message to a person from the user's agent line. */
 const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "respond_agent_connection",
+  // The owner's own card per app per run (docs/local-desktop-control); never a saved rule.
+  "desktop_app_act",
   "create_space",
   "imessage_send",
   "company_fact_upsert",
@@ -98,8 +100,11 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "render_ui",
   "attach_file",
   "page_write",
+  "page_create",
   "pins_write",
   "page_edit",
+  "page_source_set",
+  "page_source_remove",
   // Praci's own legal records (reads and upserts in the actor's space and user rows). No mail,
   // posting or connector write. Tainted runs still ask: none of these is in EXTERNAL_TAINT_SAFE_TOOLS
   // or MEETING_TAINT_FREE_TOOLS, and the executor checks taint separately from this gate. Integration-agent
@@ -237,6 +242,9 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "create_ui_artifact",
   "render_ui",
   "page_write",
+  "page_source_set",
+  "page_source_remove",
+  "page_create",
   "pins_write",
   "attach_file",
   "recall_memory",
@@ -341,6 +349,7 @@ const BUILTIN_ACTION_TYPES: Record<string, ApprovalActionType> = {
   open_path: "files_and_commands",
   launch_app: "files_and_commands",
   computer_act: "use_computer",
+  desktop_app_act: "use_computer",
   browser_act: "use_computer",
   browser_navigate: "use_computer",
   delete_bot: "delete_data",
@@ -405,17 +414,12 @@ export function actionTypeForTool(input: {
   return "connected_apps_write";
 }
 
-/** Rows always offer Allow. */
-export function actionTypeAllowsAllow(_id: ApprovalActionType): boolean {
-  return true;
-}
-
 /** A per-tool rule can never be Allow for a tool that always needs an explicit approval. */
 export function toolRuleAllowsAllow(toolName: string): boolean {
   return !toolRequiresExplicitApproval(toolName);
 }
 
-const EFFECT_TO_CHOICE: Record<StoredActionApprovalRule["effect"], ApprovalChoice> = {
+export const EFFECT_TO_CHOICE: Record<StoredActionApprovalRule["effect"], ApprovalChoice> = {
   always_allow: "allow",
   require_approval: "ask",
   block: "block",
@@ -770,9 +774,12 @@ export function isSecretAskBlock(block: {
 export function isApprovalAskBlock(block: {
   kind: string;
   approvalEffectId?: string;
+  /** A page source approval has no effect row; its card is still an approval card. */
+  pageSource?: unknown;
   actions?: Array<{ id: string; label: string }>;
 }): boolean {
-  if (block.kind !== "ask" || !block.approvalEffectId || !block.actions?.length) return false;
+  if (block.kind !== "ask" || !(block.approvalEffectId || block.pageSource)) return false;
+  if (!block.actions?.length) return false;
   const actionIds = new Set(block.actions.map((action) => action.id));
   return (
     actionIds.has("allow") &&

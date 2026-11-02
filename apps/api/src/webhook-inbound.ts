@@ -4,6 +4,7 @@ import { runContinueJob, SecretStoreUnavailableError } from "@rakazo/adapter-kit
 import {
   inboundRoutineModelPin,
   secretRefMatches,
+  splitRoutinesByConnectionPin,
   taughtSkillPromptForRoutine,
 } from "@rakazo/adapters";
 import { formatUntrustedDeliveryPayload, inboundRoutineBlock } from "@rakazo/core";
@@ -27,6 +28,7 @@ export type WebhookEvents = {
     modelPin?: {
       modelProvider: string;
       modelId: string;
+      modelCredentialId?: string | null;
       thinkingLevel: string | null;
     };
   }): Promise<{ messageId: string; runId: string | null; seq: number }>;
@@ -272,6 +274,7 @@ export async function deliverWebhookEvent(
       taughtSkillId?: string | null;
       modelProvider: string | null;
       modelId: string | null;
+      modelCredentialId?: string | null;
       thinkingLevel: string | null;
     }>;
     source: "webhook" | "github" | "messaging";
@@ -279,7 +282,23 @@ export async function deliverWebhookEvent(
     /** Messaging wakes share the live chat thread; keep a separate webhook run. */
     allowParallelRun?: boolean;
   },
-) {
+): Promise<{ ok: true; messageId: string; runId: string | null; seq: number }> {
+  // Routines pinned to different connections each get their own turn (and their own idempotency
+  // key); a later one waits behind the first as pending steering and runs on its own pin.
+  const groups = splitRoutinesByConnectionPin(input.routines);
+  if (groups.length > 1) {
+    const sent = [];
+    for (const [index, routines] of groups.entries()) {
+      sent.push(
+        await deliverWebhookEvent(deps, target, {
+          ...input,
+          routines,
+          idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey}#${index}` : undefined,
+        }),
+      );
+    }
+    return sent[0]!;
+  }
   const routinePrompts = await Promise.all(
     input.routines.map(async (routine) => {
       const skillPrompt =
@@ -336,6 +355,7 @@ export async function deliverWebhookEvent(
           modelPin: {
             modelProvider: pin.modelProvider,
             modelId: pin.modelId,
+            ...(pin.modelCredentialId ? { modelCredentialId: pin.modelCredentialId } : {}),
             thinkingLevel: pin.thinkingLevel ?? null,
           },
         }

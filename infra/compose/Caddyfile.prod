@@ -28,6 +28,20 @@
 		}
 	}
 
+	# Outside AI clients: the MCP endpoint and its OAuth discovery documents are served by the API.
+	# Exact /mcp only: /mcp/oauth/callback is a web app page.
+	handle /mcp {
+		reverse_proxy api:3100 {
+			import deploy_retry
+		}
+	}
+
+	handle /.well-known/oauth-* {
+		reverse_proxy api:3100 {
+			import deploy_retry
+		}
+	}
+
 	handle /api/* {
 		reverse_proxy api:3100 {
 			import deploy_retry

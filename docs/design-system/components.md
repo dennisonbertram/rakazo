@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 313 of 313
-- Web and shared components: 807
+- Web and shared component files with stories: 331 of 331
+- Web and shared components: 848
 - Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 46 in 38 files, native story pending
+- SwiftUI views: 126 in 67 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -80,6 +80,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | AskBotButton | [apps/web/src/components/AskBotButton.tsx](../../apps/web/src/components/AskBotButton.tsx) | [AskBotButton.stories.tsx](../../apps/web/src/components/AskBotButton.stories.tsx) | web |
 | AskCard | [apps/web/src/components/AskCard.tsx](../../apps/web/src/components/AskCard.tsx) | [AskCard.stories.tsx](../../apps/web/src/components/AskCard.stories.tsx) | web |
 | AutoFileEmailSetting | [apps/web/src/components/AutoFileEmailSetting.tsx](../../apps/web/src/components/AutoFileEmailSetting.tsx) | [AutoFileEmailSetting.stories.tsx](../../apps/web/src/components/AutoFileEmailSetting.stories.tsx) | web |
+| BotAppControlSection | [apps/web/src/components/BotAppControlSection.tsx](../../apps/web/src/components/BotAppControlSection.tsx) | [BotAppControlSection.stories.tsx](../../apps/web/src/components/BotAppControlSection.stories.tsx) | web |
 | BotAudienceTag | [apps/web/src/components/BotAudienceTag.tsx](../../apps/web/src/components/BotAudienceTag.tsx) | [BotAudienceTag.stories.tsx](../../apps/web/src/components/BotAudienceTag.stories.tsx) | web |
 | BotTodos | [apps/web/src/components/BotTodos.tsx](../../apps/web/src/components/BotTodos.tsx) | [BotTodos.stories.tsx](../../apps/web/src/components/BotTodos.stories.tsx) | web |
 | CloudAgentCard | [apps/web/src/components/CloudAgentCard.tsx](../../apps/web/src/components/CloudAgentCard.tsx) | [CloudAgentCard.stories.tsx](../../apps/web/src/components/CloudAgentCard.stories.tsx) | web |
@@ -104,6 +105,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | MailOutbox | [apps/web/src/components/MailOutbox.tsx](../../apps/web/src/components/MailOutbox.tsx) | [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
 | MailThreadCard | [apps/web/src/components/MailThreadCard.tsx](../../apps/web/src/components/MailThreadCard.tsx) | [MailThreadCard.stories.tsx](../../apps/web/src/components/MailThreadCard.stories.tsx) | web |
 | MarkdownLinkPrompt | [apps/web/src/components/markdown-link-prompt.tsx](../../apps/web/src/components/markdown-link-prompt.tsx) | [markdown-link-prompt.stories.tsx](../../apps/web/src/components/markdown-link-prompt.stories.tsx) | web |
+| MeetingRecordingSettings | [apps/web/src/components/MeetingRecordingSettings.tsx](../../apps/web/src/components/MeetingRecordingSettings.tsx) | [MeetingRecordingSettings.stories.tsx](../../apps/web/src/components/MeetingRecordingSettings.stories.tsx) | web |
 | MessageHoverMetadata | [apps/web/src/components/MessageHoverMetadata.tsx](../../apps/web/src/components/MessageHoverMetadata.tsx) | [MessageHoverMetadata.stories.tsx](../../apps/web/src/components/MessageHoverMetadata.stories.tsx) | web |
 | ModelPreflightFeedback | [apps/web/src/components/ModelConnectionPreflightNotice.tsx](../../apps/web/src/components/ModelConnectionPreflightNotice.tsx) | [ModelConnectionPreflightNotice.stories.tsx](../../apps/web/src/components/ModelConnectionPreflightNotice.stories.tsx) | web |
 | NotificationSettingsSection | [apps/web/src/components/NotificationSettings.tsx](../../apps/web/src/components/NotificationSettings.tsx) | [NotificationSettings.stories.tsx](../../apps/web/src/components/NotificationSettings.stories.tsx) | web |
@@ -115,7 +117,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | PdfViewer | [apps/web/src/components/PdfViewer.tsx](../../apps/web/src/components/PdfViewer.tsx) | [PdfViewer.stories.tsx](../../apps/web/src/components/PdfViewer.stories.tsx) | web |
 | RowsSkeleton | [apps/web/src/components/RowsSkeleton.tsx](../../apps/web/src/components/RowsSkeleton.tsx) | [RowsSkeleton.stories.tsx](../../apps/web/src/components/RowsSkeleton.stories.tsx) | web |
 | RunsOnPicker, DefaultRunsOnSection | [apps/web/src/components/RunsOnPicker.tsx](../../apps/web/src/components/RunsOnPicker.tsx) | [RunsOnPicker.stories.tsx](../../apps/web/src/components/RunsOnPicker.stories.tsx) | web |
-| SandboxedHtmlViewer | [apps/web/src/components/SandboxedHtmlViewer.tsx](../../apps/web/src/components/SandboxedHtmlViewer.tsx) | [SandboxedHtmlViewer.stories.tsx](../../apps/web/src/components/SandboxedHtmlViewer.stories.tsx) | web |
+| SandboxedHtmlViewer | [apps/web/src/components/SandboxedHtmlViewer.tsx](../../apps/web/src/components/SandboxedHtmlViewer.tsx) | [SandboxedHtmlViewer.stories.tsx](../../apps/web/src/components/SandboxedHtmlViewer.stories.tsx), [HtmlPageView.stories.tsx](../../apps/web/src/components/pages/HtmlPageView.stories.tsx) | web |
 | SecretRequestDialog | [apps/web/src/components/SecretRequestDialog.tsx](../../apps/web/src/components/SecretRequestDialog.tsx) | [SecretRequestDialog.stories.tsx](../../apps/web/src/components/SecretRequestDialog.stories.tsx) | web |
 | SectionCard | [apps/web/src/components/SectionCard.tsx](../../apps/web/src/components/SectionCard.tsx) | [SectionCard.stories.tsx](../../apps/web/src/components/SectionCard.stories.tsx) | web |
 | SheetPreview, SheetRow | [apps/web/src/components/SheetPreview.tsx](../../apps/web/src/components/SheetPreview.tsx) | [SheetPreview.stories.tsx](../../apps/web/src/components/SheetPreview.stories.tsx) | web |
@@ -189,7 +191,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ImportActivity | [apps/web/src/components/data-room/ImportActivity.tsx](../../apps/web/src/components/data-room/ImportActivity.tsx) | [ImportActivity.stories.tsx](../../apps/web/src/components/data-room/ImportActivity.stories.tsx) | web |
 | DrivePicker | [apps/web/src/components/data-room/ImportFromDrive.tsx](../../apps/web/src/components/data-room/ImportFromDrive.tsx) | [ImportFromDrive.stories.tsx](../../apps/web/src/components/data-room/ImportFromDrive.stories.tsx) | web |
 | MessageRow, EmailPicker, ImportSources | [apps/web/src/components/data-room/ImportFromEmail.tsx](../../apps/web/src/components/data-room/ImportFromEmail.tsx) | [ImportFromEmail.stories.tsx](../../apps/web/src/components/data-room/ImportFromEmail.stories.tsx) | web |
-| NameInput, FolderOptions, NewFolderDialog, ItemDialog, ShareDialog, DeleteDialog | [apps/web/src/components/data-room/ItemDialogs.tsx](../../apps/web/src/components/data-room/ItemDialogs.tsx) | [ItemDialogs.stories.tsx](../../apps/web/src/components/data-room/ItemDialogs.stories.tsx) | web |
+| NameInput, FolderOptions, MoveFilesDialog, NewFolderDialog, ItemDialog, ShareDialog, DeleteDialog | [apps/web/src/components/data-room/ItemDialogs.tsx](../../apps/web/src/components/data-room/ItemDialogs.tsx) | [ItemDialogs.stories.tsx](../../apps/web/src/components/data-room/ItemDialogs.stories.tsx) | web |
 | ItemMenuItems, ItemMenu | [apps/web/src/components/data-room/ItemMenu.tsx](../../apps/web/src/components/data-room/ItemMenu.tsx) | [ItemDialogs.stories.tsx](../../apps/web/src/components/data-room/ItemDialogs.stories.tsx), [ItemMenu.stories.tsx](../../apps/web/src/components/data-room/ItemMenu.stories.tsx) | web |
 | FileContext, Marker, Columns, ListHead, RetryButton, ReplaceButton, FailedAction, ItemRow, SubfolderList, ListView, ThumbnailImage, TextPreview, TilePreview, GridView, TypeAndDate, Snippet | [apps/web/src/components/data-room/ItemRows.tsx](../../apps/web/src/components/data-room/ItemRows.tsx) | [ItemRows.stories.tsx](../../apps/web/src/components/data-room/ItemRows.stories.tsx) | web |
 | PathBar | [apps/web/src/components/data-room/PathBar.tsx](../../apps/web/src/components/data-room/PathBar.tsx) | [PathBar.stories.tsx](../../apps/web/src/components/data-room/PathBar.stories.tsx) | web |
@@ -268,6 +270,9 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Heading, AccountRow, AppDetail, ConfirmDialog | [apps/web/src/components/integrations/AppDetail.tsx](../../apps/web/src/components/integrations/AppDetail.tsx) | [AppDetail.stories.tsx](../../apps/web/src/components/integrations/AppDetail.stories.tsx) | web |
 | AppLogo | [apps/web/src/components/integrations/AppLogo.tsx](../../apps/web/src/components/integrations/AppLogo.tsx) | [AppLogo.stories.tsx](../../apps/web/src/components/integrations/AppLogo.stories.tsx) | web |
 | BlockscoutConnectDialog | [apps/web/src/components/integrations/BlockscoutConnectDialog.tsx](../../apps/web/src/components/integrations/BlockscoutConnectDialog.tsx) | [BlockscoutConnectDialog.stories.tsx](../../apps/web/src/components/integrations/BlockscoutConnectDialog.stories.tsx) | web |
+| BrexCardsConnectDialog | [apps/web/src/components/integrations/BrexCardsConnectDialog.tsx](../../apps/web/src/components/integrations/BrexCardsConnectDialog.tsx) | [BrexCardsConnectDialog.stories.tsx](../../apps/web/src/components/integrations/BrexCardsConnectDialog.stories.tsx) | web |
+| BrexCardsSection, EditLimitDialog, CancelDialog | [apps/web/src/components/integrations/BrexCardsSection.tsx](../../apps/web/src/components/integrations/BrexCardsSection.tsx) | [BrexCardsSection.stories.tsx](../../apps/web/src/components/integrations/BrexCardsSection.stories.tsx) | web |
+| BrexControlsForm | [apps/web/src/components/integrations/BrexControlsForm.tsx](../../apps/web/src/components/integrations/BrexControlsForm.tsx) | [BrexControlsForm.stories.tsx](../../apps/web/src/components/integrations/BrexControlsForm.stories.tsx) | web |
 | ConnectAppDialog | [apps/web/src/components/integrations/ConnectAppDialog.tsx](../../apps/web/src/components/integrations/ConnectAppDialog.tsx) | [ConnectAppDialog.stories.tsx](../../apps/web/src/components/integrations/ConnectAppDialog.stories.tsx) | web |
 | ConnectAppsStep, OnboardingConnectApps | [apps/web/src/components/integrations/ConnectAppsStep.tsx](../../apps/web/src/components/integrations/ConnectAppsStep.tsx) | [ConnectAppsStep.stories.tsx](../../apps/web/src/components/integrations/ConnectAppsStep.stories.tsx) | web |
 | ConnectionDialog | [apps/web/src/components/integrations/ConnectionDialog.tsx](../../apps/web/src/components/integrations/ConnectionDialog.tsx) | [ConnectionDialog.stories.tsx](../../apps/web/src/components/integrations/ConnectionDialog.stories.tsx) | web |
@@ -277,14 +282,16 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | TileName, CryptoTile, AlchemyTile, ExchangeTile, FinanceSection | [apps/web/src/components/integrations/FinanceSection.tsx](../../apps/web/src/components/integrations/FinanceSection.tsx) | [FinanceSection.stories.tsx](../../apps/web/src/components/integrations/FinanceSection.stories.tsx) | web |
 | GranolaStatusLine, GranolaMeetingsCard | [apps/web/src/components/integrations/GranolaMeetingsCard.tsx](../../apps/web/src/components/integrations/GranolaMeetingsCard.tsx) | [GranolaMeetingsCard.stories.tsx](../../apps/web/src/components/integrations/GranolaMeetingsCard.stories.tsx) | web |
 | GranolaPage | [apps/web/src/components/integrations/GranolaPage.tsx](../../apps/web/src/components/integrations/GranolaPage.tsx) | [GranolaPage.stories.tsx](../../apps/web/src/components/integrations/GranolaPage.stories.tsx) | web |
+| Line, HexCard | [apps/web/src/components/integrations/HexCard.tsx](../../apps/web/src/components/integrations/HexCard.tsx) | [HexCard.stories.tsx](../../apps/web/src/components/integrations/HexCard.stories.tsx) | web |
 | Labeled, SetupDialog, IMessageSection | [apps/web/src/components/integrations/IMessageSection.tsx](../../apps/web/src/components/integrations/IMessageSection.tsx) | [IMessageSection.stories.tsx](../../apps/web/src/components/integrations/IMessageSection.stories.tsx) | web |
 | WritesSwitch, IntegrationAgentSection | [apps/web/src/components/integrations/IntegrationAgentSection.tsx](../../apps/web/src/components/integrations/IntegrationAgentSection.tsx) | [IntegrationAgentSection.stories.tsx](../../apps/web/src/components/integrations/IntegrationAgentSection.stories.tsx) | web |
 | IntegrationSetup | [apps/web/src/components/integrations/IntegrationSetup.tsx](../../apps/web/src/components/integrations/IntegrationSetup.tsx) | [IntegrationSetup.stories.tsx](../../apps/web/src/components/integrations/IntegrationSetup.stories.tsx) | web |
 | Card, OpenPageLink, UsedBy, McpCard, GranolaKeyCard, AppCard, SourceCard, AppTile, IntegrationsHome | [apps/web/src/components/integrations/IntegrationsHome.tsx](../../apps/web/src/components/integrations/IntegrationsHome.tsx) | [IntegrationsHome.stories.tsx](../../apps/web/src/components/integrations/IntegrationsHome.stories.tsx) | web |
 | McpDetail | [apps/web/src/components/integrations/McpDetail.tsx](../../apps/web/src/components/integrations/McpDetail.tsx) | [McpDetail.stories.tsx](../../apps/web/src/components/integrations/McpDetail.stories.tsx) | web |
+| StatusLine, OmiView, OmiAgent, OmiPage | [apps/web/src/components/integrations/OmiPage.tsx](../../apps/web/src/components/integrations/OmiPage.tsx) | [OmiPage.stories.tsx](../../apps/web/src/components/integrations/OmiPage.stories.tsx) | web |
+| SegmentRow, OmiSegments, OmiTrash | [apps/web/src/components/integrations/OmiSegments.tsx](../../apps/web/src/components/integrations/OmiSegments.tsx) | [OmiPage.stories.tsx](../../apps/web/src/components/integrations/OmiPage.stories.tsx), [OmiSegments.stories.tsx](../../apps/web/src/components/integrations/OmiSegments.stories.tsx) | web |
 | IntegrationTile, StatusBadge, TileMenu, AgentStack, AgentToggleList, CardHead, SectionTitle, SourceBadge | [apps/web/src/components/integrations/parts.tsx](../../apps/web/src/components/integrations/parts.tsx) | [parts.stories.tsx](../../apps/web/src/components/integrations/parts.stories.tsx) | web |
 | SignInStep | [apps/web/src/components/integrations/SignInStep.tsx](../../apps/web/src/components/integrations/SignInStep.tsx) | [SignInStep.stories.tsx](../../apps/web/src/components/integrations/SignInStep.stories.tsx) | web |
-| StoredMeetingsList | [apps/web/src/components/integrations/StoredMeetingsList.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.tsx) | [StoredMeetingsList.stories.tsx](../../apps/web/src/components/integrations/StoredMeetingsList.stories.tsx) | web |
 
 ## Web components/investors
 
@@ -298,6 +305,23 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | --- | --- | --- | --- |
 | LegalConsentPrompt | [apps/web/src/components/legal/ConsentPrompt.tsx](../../apps/web/src/components/legal/ConsentPrompt.tsx) | [ConsentPrompt.stories.tsx](../../apps/web/src/components/legal/ConsentPrompt.stories.tsx) | web |
 | LegalGraphView | [apps/web/src/components/legal/LegalGraph.tsx](../../apps/web/src/components/legal/LegalGraph.tsx) | [LegalGraph.stories.tsx](../../apps/web/src/components/legal/LegalGraph.stories.tsx) | web |
+
+## Web components/meeting-capture
+
+| Component | File | Story file | Surface |
+| --- | --- | --- | --- |
+| Dot, RecordButton, RecordButtonView | [apps/web/src/components/meeting-capture/RecordButton.tsx](../../apps/web/src/components/meeting-capture/RecordButton.tsx) | [RecordButton.stories.tsx](../../apps/web/src/components/meeting-capture/RecordButton.stories.tsx) | web |
+| RecordForm | [apps/web/src/components/meeting-capture/RecordForm.tsx](../../apps/web/src/components/meeting-capture/RecordForm.tsx) | [RecordForm.stories.tsx](../../apps/web/src/components/meeting-capture/RecordForm.stories.tsx) | web |
+| RecordingPill | [apps/web/src/components/meeting-capture/RecordingPill.tsx](../../apps/web/src/components/meeting-capture/RecordingPill.tsx) | [RecordingPill.stories.tsx](../../apps/web/src/components/meeting-capture/RecordingPill.stories.tsx) | web |
+| RecordingPillHost | [apps/web/src/components/meeting-capture/RecordingPillHost.tsx](../../apps/web/src/components/meeting-capture/RecordingPillHost.tsx) | [RecordingPillHost.stories.tsx](../../apps/web/src/components/meeting-capture/RecordingPillHost.stories.tsx) | web |
+
+## Web components/pages
+
+| Component | File | Story file | Surface |
+| --- | --- | --- | --- |
+| HtmlPageView | [apps/web/src/components/pages/HtmlPageView.tsx](../../apps/web/src/components/pages/HtmlPageView.tsx) | [HtmlPageView.stories.tsx](../../apps/web/src/components/pages/HtmlPageView.stories.tsx) | web |
+| LiveBlockFrame, FailedDot, PageMetricBlock, PageTableBlock, PageChartFrame | [apps/web/src/components/pages/PageLiveBlocks.tsx](../../apps/web/src/components/pages/PageLiveBlocks.tsx) | [PageLiveBlocks.stories.tsx](../../apps/web/src/components/pages/PageLiveBlocks.stories.tsx) | web |
+| PageSourcesDialog | [apps/web/src/components/pages/PageSourcesDialog.tsx](../../apps/web/src/components/pages/PageSourcesDialog.tsx) | [PageSourcesDialog.stories.tsx](../../apps/web/src/components/pages/PageSourcesDialog.stories.tsx) | web |
 
 ## Web components/sidebar-folders
 
@@ -334,6 +358,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BillingSettingsPanel | [apps/web/src/pages/BillingSettingsPanel.tsx](../../apps/web/src/pages/BillingSettingsPanel.tsx) | [BillingSettingsPanel.stories.tsx](../../apps/web/src/pages/BillingSettingsPanel.stories.tsx) | web |
 | BoardPage, TicketDialog | [apps/web/src/pages/Board.tsx](../../apps/web/src/pages/Board.tsx) | [Board.stories.tsx](../../apps/web/src/pages/Board.stories.tsx) | web |
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
+| BotPageView | [apps/web/src/pages/BotPageView.tsx](../../apps/web/src/pages/BotPageView.tsx) | [BotPageView.stories.tsx](../../apps/web/src/pages/BotPageView.stories.tsx) | web |
 | CalendarPage | [apps/web/src/pages/Calendar.tsx](../../apps/web/src/pages/Calendar.tsx) | [Calendar.stories.tsx](../../apps/web/src/pages/Calendar.stories.tsx) | web |
 | CompanyPage | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
 | CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |
@@ -381,6 +406,8 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | McpConsent, McpConsentPage | [apps/web/src/pages/McpConsent.tsx](../../apps/web/src/pages/McpConsent.tsx) | [McpConsent.stories.tsx](../../apps/web/src/pages/McpConsent.stories.tsx) | web |
 | McpOAuthCallbackPage | [apps/web/src/pages/McpOAuthCallback.tsx](../../apps/web/src/pages/McpOAuthCallback.tsx) | [McpOAuthCallback.stories.tsx](../../apps/web/src/pages/McpOAuthCallback.stories.tsx) | web |
 | CopyBox, McpTokenReveal, McpTokenDialog | [apps/web/src/pages/McpTokenDialog.tsx](../../apps/web/src/pages/McpTokenDialog.tsx) | [McpTokenDialog.stories.tsx](../../apps/web/src/pages/McpTokenDialog.stories.tsx) | web |
+| Section, Row, MeetingDetailPage | [apps/web/src/pages/MeetingDetail.tsx](../../apps/web/src/pages/MeetingDetail.tsx) | [MeetingDetail.stories.tsx](../../apps/web/src/pages/MeetingDetail.stories.tsx) | web |
+| MeetingsPage | [apps/web/src/pages/Meetings.tsx](../../apps/web/src/pages/Meetings.tsx) | [Meetings.stories.tsx](../../apps/web/src/pages/Meetings.stories.tsx) | web |
 | SerenitySettingsForm | [apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.tsx) | [SerenitySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SerenitySettingsForm.stories.tsx) | web |
 | SupermemorySettingsForm | [apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.tsx) | [SupermemorySettingsForm.stories.tsx](../../apps/web/src/pages/memory-providers/SupermemorySettingsForm.stories.tsx) | web |
 | ScopePicker, MemorySettingsOverlay | [apps/web/src/pages/MemorySettingsOverlay.tsx](../../apps/web/src/pages/MemorySettingsOverlay.tsx) | [MemorySettingsOverlay.stories.tsx](../../apps/web/src/pages/MemorySettingsOverlay.stories.tsx) | web |
@@ -404,7 +431,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ShellPage, ComputerReleaseActions, DesktopKindEmptyState | [apps/web/src/pages/Shell.tsx](../../apps/web/src/pages/Shell.tsx) | [Shell.stories.tsx](../../apps/web/src/pages/Shell.stories.tsx) | web |
 | AvatarStudioPopover | [apps/web/src/pages/shell/avatar-studio-popover.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.tsx) | [avatar-studio-popover.stories.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.stories.tsx) | web |
 | BotCredentialsSection | [apps/web/src/pages/shell/bot-credentials.tsx](../../apps/web/src/pages/shell/bot-credentials.tsx) | [bot-credentials.stories.tsx](../../apps/web/src/pages/shell/bot-credentials.stories.tsx) | web |
-| ChartView, GtmView, BotPagePanel | [apps/web/src/pages/shell/bot-page-panel.tsx](../../apps/web/src/pages/shell/bot-page-panel.tsx) | [bot-page-panel.stories.tsx](../../apps/web/src/pages/shell/bot-page-panel.stories.tsx) | web |
+| LiveDelete, ChartView, MetricView, TableView, GtmView, PageEditor, BotPagePanel | [apps/web/src/pages/shell/bot-page-panel.tsx](../../apps/web/src/pages/shell/bot-page-panel.tsx) | [bot-page-panel.stories.tsx](../../apps/web/src/pages/shell/bot-page-panel.stories.tsx) | web |
 | ComputerModePicker, CheckInSetting, BotSettings | [apps/web/src/pages/shell/bot-panel.tsx](../../apps/web/src/pages/shell/bot-panel.tsx) | [bot-panel.stories.tsx](../../apps/web/src/pages/shell/bot-panel.stories.tsx) | web |
 | BotCreatePicker | [apps/web/src/pages/shell/bot-picker.tsx](../../apps/web/src/pages/shell/bot-picker.tsx) | [bot-picker.stories.tsx](../../apps/web/src/pages/shell/bot-picker.stories.tsx) | web |
 | PinsStrip, ItemRow, PinsList | [apps/web/src/pages/shell/bot-pins.tsx](../../apps/web/src/pages/shell/bot-pins.tsx) | [bot-pins.stories.tsx](../../apps/web/src/pages/shell/bot-pins.stories.tsx) | web |
@@ -415,13 +442,14 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Composer | [apps/web/src/pages/shell/composer.tsx](../../apps/web/src/pages/shell/composer.tsx) | [composer.stories.tsx](../../apps/web/src/pages/shell/composer.stories.tsx) | web |
 | DelegateWaitNotice | [apps/web/src/pages/shell/DelegateWaitNotice.tsx](../../apps/web/src/pages/shell/DelegateWaitNotice.tsx) | [DelegateWaitNotice.stories.tsx](../../apps/web/src/pages/shell/DelegateWaitNotice.stories.tsx) | web |
 | NewSpaceDialog, RenameSpaceDialog, PickerInfoDialog, NewBotSectionDialog, RenameBotSectionDialog, ClearConversationDialog, ArchiveBotsDialog, DeleteBotDialog, DeleteItemDialog | [apps/web/src/pages/shell/dialogs.tsx](../../apps/web/src/pages/shell/dialogs.tsx) | [dialogs.stories.tsx](../../apps/web/src/pages/shell/dialogs.stories.tsx) | web |
+| DictationButton, DictationError | [apps/web/src/pages/shell/dictation-button.tsx](../../apps/web/src/pages/shell/dictation-button.tsx) | [dictation-button.stories.tsx](../../apps/web/src/pages/shell/dictation-button.stories.tsx) | web |
 | GroupIntro | [apps/web/src/pages/shell/GroupIntro.tsx](../../apps/web/src/pages/shell/GroupIntro.tsx) | [GroupIntro.stories.tsx](../../apps/web/src/pages/shell/GroupIntro.stories.tsx) | web |
 | MentionIcon | [apps/web/src/pages/shell/mention-icon.tsx](../../apps/web/src/pages/shell/mention-icon.tsx) | [mention-icon.stories.tsx](../../apps/web/src/pages/shell/mention-icon.stories.tsx) | web |
 | ResultCard, ChoiceCard, OnboardingFocusQuestion, OnboardingFocusOptionHint, OnboardingFocusOptionLabel, AppConnectCard, ChartCanvas, ChartCanvasPlot, McpApprovalCard, ChartBlockView, ArtifactImage, ArtifactImageGrid | [apps/web/src/pages/shell/message-cards.tsx](../../apps/web/src/pages/shell/message-cards.tsx) | [message-cards.stories.tsx](../../apps/web/src/pages/shell/message-cards.stories.tsx) | web |
 | SidebarHeaderRow | [apps/web/src/pages/shell/sidebar-header-row.tsx](../../apps/web/src/pages/shell/sidebar-header-row.tsx) | [sidebar-header-row.stories.tsx](../../apps/web/src/pages/shell/sidebar-header-row.stories.tsx) | web |
 | SpaceSidebar | [apps/web/src/pages/shell/space-sidebar.tsx](../../apps/web/src/pages/shell/space-sidebar.tsx) | [space-sidebar.stories.tsx](../../apps/web/src/pages/shell/space-sidebar.stories.tsx) | web |
 | ThreadMarkdown, ThreadUiBlock, UnreadDivider, Transcript, QuoteSelectionButton, MessageHoverActions, SpeakerHeader, MessageView | [apps/web/src/pages/shell/transcript.tsx](../../apps/web/src/pages/shell/transcript.tsx) | [transcript.stories.tsx](../../apps/web/src/pages/shell/transcript.stories.tsx) | web |
-| VoiceSettingsOverlay | [apps/web/src/pages/VoiceSettingsOverlay.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.tsx) | [VoiceSettingsOverlay.stories.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.stories.tsx) | web |
+| DeviceSpeechPane, VoiceSettingsOverlay | [apps/web/src/pages/VoiceSettingsOverlay.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.tsx) | [VoiceSettingsOverlay.stories.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.stories.tsx) | web |
 | WelcomePage | [apps/web/src/pages/Welcome.tsx](../../apps/web/src/pages/Welcome.tsx) | [Welcome.stories.tsx](../../apps/web/src/pages/Welcome.stories.tsx) | web |
 | WindowChrome | [apps/web/src/pages/WindowChrome.tsx](../../apps/web/src/pages/WindowChrome.tsx) | [WindowChrome.stories.tsx](../../apps/web/src/pages/WindowChrome.stories.tsx) | web |
 
@@ -546,41 +574,70 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
-| AgentPageScreen | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
+| AgentPageScreen, FailedSource | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
 | AppShell | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
 | RootView | [apps/ios/Sources/Praci/App/RootView.swift](../../apps/ios/Sources/Praci/App/RootView.swift) | native story pending | iOS |
 | ArtifactScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift) | native story pending | iOS |
 | ArtifactsScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift) | native story pending | iOS |
 | AuthenticationView, AuthStatus | [apps/ios/Sources/Praci/AuthenticationView.swift](../../apps/ios/Sources/Praci/AuthenticationView.swift) | native story pending | iOS |
-| CapTableScreen | [apps/ios/Sources/Praci/CapTable/CapTableScreen.swift](../../apps/ios/Sources/Praci/CapTable/CapTableScreen.swift) | native story pending | iOS |
+| CapTableScreen, HolderRow, HolderDetailView | [apps/ios/Sources/Praci/CapTable/CapTableScreen.swift](../../apps/ios/Sources/Praci/CapTable/CapTableScreen.swift) | native story pending | iOS |
+| ComputerKeyBar | [apps/ios/Sources/Praci/Computer/ComputerKeyBar.swift](../../apps/ios/Sources/Praci/Computer/ComputerKeyBar.swift) | native story pending | iOS |
 | ComputerScreen | [apps/ios/Sources/Praci/Computer/ComputerScreen.swift](../../apps/ios/Sources/Praci/Computer/ComputerScreen.swift) | native story pending | iOS |
-| DataRoomScreen | [apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift) | native story pending | iOS |
-| FinanceScreen | [apps/ios/Sources/Praci/Finance/FinanceScreen.swift](../../apps/ios/Sources/Praci/Finance/FinanceScreen.swift) | native story pending | iOS |
+| DataRoomItemScreen | [apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift) | native story pending | iOS |
+| DataRoomFolderRow, DataRoomItemRow, DataRoomUploadRow, DataRoomConsentSheet | [apps/ios/Sources/Praci/DataRoom/DataRoomRows.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomRows.swift) | native story pending | iOS |
+| DataRoomScreen, DataRoomListView | [apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift) | native story pending | iOS |
+| FinanceScreen, TransactionRow, BurnChart | [apps/ios/Sources/Praci/Finance/FinanceScreen.swift](../../apps/ios/Sources/Praci/Finance/FinanceScreen.swift) | native story pending | iOS |
+| FinanceTransactionScreen | [apps/ios/Sources/Praci/Finance/FinanceTransactionScreen.swift](../../apps/ios/Sources/Praci/Finance/FinanceTransactionScreen.swift) | native story pending | iOS |
 | AgentRowView, PageRowView | [apps/ios/Sources/Praci/Home/HomeRows.swift](../../apps/ios/Sources/Praci/Home/HomeRows.swift) | native story pending | iOS |
 | HomeScreen | [apps/ios/Sources/Praci/Home/HomeScreen.swift](../../apps/ios/Sources/Praci/Home/HomeScreen.swift) | native story pending | iOS |
-| ComposeSheet | [apps/ios/Sources/Praci/Inbox/Compose/ComposeSheet.swift](../../apps/ios/Sources/Praci/Inbox/Compose/ComposeSheet.swift) | native story pending | iOS |
-| InboxMessageScreen | [apps/ios/Sources/Praci/Inbox/InboxMessageScreen.swift](../../apps/ios/Sources/Praci/Inbox/InboxMessageScreen.swift) | native story pending | iOS |
+| CleanupScreen, CleanupContent, SenderRow, RunningView, DoneView | [apps/ios/Sources/Praci/Inbox/Cleanup/CleanupScreen.swift](../../apps/ios/Sources/Praci/Inbox/Cleanup/CleanupScreen.swift) | native story pending | iOS |
+| ComposeSheet, ComposeContent, BannerView | [apps/ios/Sources/Praci/Inbox/Compose/ComposeSheet.swift](../../apps/ios/Sources/Praci/Inbox/Compose/ComposeSheet.swift) | native story pending | iOS |
+| InboxMessageScreen, MessageContent, MessageBody | [apps/ios/Sources/Praci/Inbox/InboxMessageScreen.swift](../../apps/ios/Sources/Praci/Inbox/InboxMessageScreen.swift) | native story pending | iOS |
 | InboxScreen, InboxContent, ToastView | [apps/ios/Sources/Praci/Inbox/InboxScreen.swift](../../apps/ios/Sources/Praci/Inbox/InboxScreen.swift) | native story pending | iOS |
 | InboxListView, ProblemBanner, EmptyInbox | [apps/ios/Sources/Praci/Inbox/List/InboxListView.swift](../../apps/ios/Sources/Praci/Inbox/List/InboxListView.swift) | native story pending | iOS |
 | InboxRowView, LabelText, TimeText | [apps/ios/Sources/Praci/Inbox/List/InboxRowView.swift](../../apps/ios/Sources/Praci/Inbox/List/InboxRowView.swift) | native story pending | iOS |
-| LegalScreen | [apps/ios/Sources/Praci/Legal/LegalScreen.swift](../../apps/ios/Sources/Praci/Legal/LegalScreen.swift) | native story pending | iOS |
+| TodosCard, TodosCardContent | [apps/ios/Sources/Praci/Inbox/Todos/TodosCard.swift](../../apps/ios/Sources/Praci/Inbox/Todos/TodosCard.swift) | native story pending | iOS |
+| LegalScreen, ContractRow, DeadlineRow, ContractDetailView, DeadlineDetailView | [apps/ios/Sources/Praci/Legal/LegalScreen.swift](../../apps/ios/Sources/Praci/Legal/LegalScreen.swift) | native story pending | iOS |
 | AgentRowMenu | [apps/ios/Sources/Praci/Manage/AgentRowMenu.swift](../../apps/ios/Sources/Praci/Manage/AgentRowMenu.swift) | native story pending | iOS |
 | BotSettingsScreen | [apps/ios/Sources/Praci/Manage/BotSettingsScreen.swift](../../apps/ios/Sources/Praci/Manage/BotSettingsScreen.swift) | native story pending | iOS |
 | GroupSettingsScreen | [apps/ios/Sources/Praci/Manage/GroupSettingsScreen.swift](../../apps/ios/Sources/Praci/Manage/GroupSettingsScreen.swift) | native story pending | iOS |
-| NewBotSheet | [apps/ios/Sources/Praci/Manage/NewBotSheet.swift](../../apps/ios/Sources/Praci/Manage/NewBotSheet.swift) | native story pending | iOS |
-| NewGroupSheet | [apps/ios/Sources/Praci/Manage/NewGroupSheet.swift](../../apps/ios/Sources/Praci/Manage/NewGroupSheet.swift) | native story pending | iOS |
+| NewBotSheet, ColorSwatches | [apps/ios/Sources/Praci/Manage/NewBotSheet.swift](../../apps/ios/Sources/Praci/Manage/NewBotSheet.swift) | native story pending | iOS |
+| NewGroupSheet, MemberRows, MemberFooter | [apps/ios/Sources/Praci/Manage/NewGroupSheet.swift](../../apps/ios/Sources/Praci/Manage/NewGroupSheet.swift) | native story pending | iOS |
+| ToastBody | [apps/ios/Sources/Praci/Manage/UndoToast.swift](../../apps/ios/Sources/Praci/Manage/UndoToast.swift) | native story pending | iOS |
 | RoutineScreen | [apps/ios/Sources/Praci/Routines/RoutineScreen.swift](../../apps/ios/Sources/Praci/Routines/RoutineScreen.swift) | native story pending | iOS |
 | RoutinesScreen | [apps/ios/Sources/Praci/Routines/RoutinesScreen.swift](../../apps/ios/Sources/Praci/Routines/RoutinesScreen.swift) | native story pending | iOS |
 | ServerView | [apps/ios/Sources/Praci/ServerView.swift](../../apps/ios/Sources/Praci/ServerView.swift) | native story pending | iOS |
+| AccountScreen, Initials | [apps/ios/Sources/Praci/Settings/Account/AccountScreen.swift](../../apps/ios/Sources/Praci/Settings/Account/AccountScreen.swift) | native story pending | iOS |
+| ChangePasswordScreen | [apps/ios/Sources/Praci/Settings/Account/ChangePasswordScreen.swift](../../apps/ios/Sources/Praci/Settings/Account/ChangePasswordScreen.swift) | native story pending | iOS |
+| DeleteAccountSheet | [apps/ios/Sources/Praci/Settings/Account/DeleteAccountSheet.swift](../../apps/ios/Sources/Praci/Settings/Account/DeleteAccountSheet.swift) | native story pending | iOS |
 | AIDataSharingScreen | [apps/ios/Sources/Praci/Settings/AIData/AIDataSharingScreen.swift](../../apps/ios/Sources/Praci/Settings/AIData/AIDataSharingScreen.swift) | native story pending | iOS |
-| IntegrationsScreen | [apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift](../../apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift) | native story pending | iOS |
-| ModelsScreen | [apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift](../../apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift) | native story pending | iOS |
-| ApprovalRulesScreen | [apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift](../../apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift) | native story pending | iOS |
+| ArchivedScreen | [apps/ios/Sources/Praci/Settings/Archived/ArchivedScreen.swift](../../apps/ios/Sources/Praci/Settings/Archived/ArchivedScreen.swift) | native story pending | iOS |
+| IntegrationsScreen, ConnectionDetailScreen | [apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift](../../apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift) | native story pending | iOS |
+| ConnectModelSheet, SignInFlowView, APIKeyForm, LocalServerForm | [apps/ios/Sources/Praci/Settings/Models/ConnectModelSheet.swift](../../apps/ios/Sources/Praci/Settings/Models/ConnectModelSheet.swift) | native story pending | iOS |
+| ModelsScreen, DefaultModelList, ProviderDetailScreen | [apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift](../../apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift) | native story pending | iOS |
+| NotificationPreferencesScreen | [apps/ios/Sources/Praci/Settings/Preferences/NotificationPreferencesScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/NotificationPreferencesScreen.swift) | native story pending | iOS |
+| UsageScreen | [apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift) | native story pending | iOS |
+| ApprovalRulesScreen, AddRuleSheet | [apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift](../../apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift) | native story pending | iOS |
 | SettingsScreen | [apps/ios/Sources/Praci/Settings/SettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/SettingsScreen.swift) | native story pending | iOS |
-| VoiceSettingsScreen | [apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift) | native story pending | iOS |
+| VoiceSettingsScreen, HostedVoiceScreen | [apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift) | native story pending | iOS |
 | BotAvatarView | [apps/ios/Sources/Praci/Shared/BotAvatarView.swift](../../apps/ios/Sources/Praci/Shared/BotAvatarView.swift) | native story pending | iOS |
 | ConsentSheet | [apps/ios/Sources/Praci/Shared/ConsentSheet.swift](../../apps/ios/Sources/Praci/Shared/ConsentSheet.swift) | native story pending | iOS |
 | LoadableView | [apps/ios/Sources/Praci/Shared/Loadable.swift](../../apps/ios/Sources/Praci/Shared/Loadable.swift) | native story pending | iOS |
+| SafeHTMLView | [apps/ios/Sources/Praci/Shared/SafeHTMLView.swift](../../apps/ios/Sources/Praci/Shared/SafeHTMLView.swift) | native story pending | iOS |
 | NewSpaceSheet | [apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift](../../apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift) | native story pending | iOS |
 | SpaceSettingsSheet | [apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift](../../apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift) | native story pending | iOS |
-| ThreadScreen | [apps/ios/Sources/Praci/Thread/ThreadScreen.swift](../../apps/ios/Sources/Praci/Thread/ThreadScreen.swift) | native story pending | iOS |
+| ApprovalCardView, InfoCardView, ResolvedLine, CardActionButton | [apps/ios/Sources/Praci/Thread/Approvals/ApprovalCardView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/ApprovalCardView.swift) | native story pending | iOS |
+| AskCardView, DetailWell, FreeTextAnswer | [apps/ios/Sources/Praci/Thread/Approvals/AskCardView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/AskCardView.swift) | native story pending | iOS |
+| ChoiceCardView | [apps/ios/Sources/Praci/Thread/Approvals/ChoiceCardView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/ChoiceCardView.swift) | native story pending | iOS |
+| ConnectCardView | [apps/ios/Sources/Praci/Thread/Approvals/ConnectCardView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/ConnectCardView.swift) | native story pending | iOS |
+| MailApprovalCardView | [apps/ios/Sources/Praci/Thread/Approvals/MailApprovalCardView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/MailApprovalCardView.swift) | native story pending | iOS |
+| McpApprovalCardView | [apps/ios/Sources/Praci/Thread/Approvals/McpApprovalCardView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/McpApprovalCardView.swift) | native story pending | iOS |
+| SecretAskView | [apps/ios/Sources/Praci/Thread/Approvals/SecretAskView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/SecretAskView.swift) | native story pending | iOS |
+| ComposerView | [apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift](../../apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift) | native story pending | iOS |
+| PendingSendsView | [apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift](../../apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift) | native story pending | iOS |
+| MessageActions | [apps/ios/Sources/Praci/Thread/MessageActions.swift](../../apps/ios/Sources/Praci/Thread/MessageActions.swift) | native story pending | iOS |
+| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView, UnsupportedBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
+| ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |
+| ThreadScreen, UnreadDivider | [apps/ios/Sources/Praci/Thread/ThreadScreen.swift](../../apps/ios/Sources/Praci/Thread/ThreadScreen.swift) | native story pending | iOS |
+| CallButton, CallView | [apps/ios/Sources/Praci/Voice/CallView.swift](../../apps/ios/Sources/Praci/Voice/CallView.swift) | native story pending | iOS |
+| DictationButton, DictationNotice | [apps/ios/Sources/Praci/Voice/DictationControl.swift](../../apps/ios/Sources/Praci/Voice/DictationControl.swift) | native story pending | iOS |

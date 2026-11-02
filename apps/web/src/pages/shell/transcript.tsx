@@ -464,6 +464,23 @@ export const Transcript = memo(function Transcript({
     return () => observer.disconnect();
   }, [scrollRef, messages]);
 
+  // The toaster pads the thread through --toast-reserve on <html>. That changes the scroll height
+  // without resizing the element or its children, so follow it here and keep the newest message
+  // clear above the toast.
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const observer = new MutationObserver(() => {
+      if (!following.current || jumpScrolling.current) return;
+      if (element.scrollHeight - element.scrollTop - element.clientHeight > 1) {
+        element.scrollTop = element.scrollHeight;
+        setAtEnd(true);
+      }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    return () => observer.disconnect();
+  }, [scrollRef]);
+
   const jumpToLatest = useCallback(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -744,7 +761,7 @@ export const Transcript = memo(function Transcript({
           }
         }}
         data-transcript=""
-        className="@container rk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-5 pb-[calc(1.25rem+var(--toast-reserve,0px))] md:px-[max(1.75rem,calc((100%-900px)/2))] md:pt-6 md:pb-[calc(1.5rem+var(--toast-reserve,0px))]"
+        className="@container rk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-5 pb-[calc(1.25rem+var(--toast-reserve,0px))] md:px-[max(1.75rem,calc((100%-720px)/2))] md:pt-6 md:pb-[calc(1.5rem+var(--toast-reserve,0px))]"
       >
         {olderCursor != null ? (
           <button
@@ -1994,8 +2011,8 @@ const MessageView = memo(function MessageView({
               <AskCard
                 block={block}
                 requestedAt={message.createdAt}
-                // A held message is answered without a waiting run, so it stays answerable.
-                canAnswer={canAnswer || block.share === true}
+                // A held message or a page source request is answered without a waiting run, so it stays answerable.
+                canAnswer={canAnswer || block.share === true || Boolean(block.pageSource)}
                 ownerOnly={ownerOnly}
                 onAnswer={(text, username) => onAnswer(message, text, username)}
               />

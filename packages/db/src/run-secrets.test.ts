@@ -13,6 +13,7 @@ describe("clearEndedRunState", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 1 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 2 })) },
     };
     await clearEndedRunState(prisma as unknown as PrismaClient, ["run-1", "run-2"]);
     expect(prisma.secret.deleteMany).toHaveBeenCalledWith({
@@ -22,6 +23,19 @@ describe("clearEndedRunState", () => {
           { userId: "user-2", spaceId: "space-1", kind: "run-secret:run-2" },
         ],
       },
+    });
+  });
+
+  it("deletes desktop app snapshot rows scoped by run, space and user", async () => {
+    const prisma = {
+      run: { findMany: vi.fn(async () => [{ id: "run-1", userId: "user-1", spaceId: "space-1" }]) },
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 1 })) },
+    };
+    await clearEndedRunState(prisma as unknown as PrismaClient, ["run-1"]);
+    expect(prisma.appControlSnapshot.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ runId: "run-1", spaceId: "space-1", userId: "user-1" }] },
     });
   });
 

@@ -1673,10 +1673,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
       }
       return;
     }
-    router.push({
-      pathname: "/account",
-      params: action === "settings-usage" ? { focus: "usage" } : undefined,
-    });
+    router.push({ pathname: "/account" });
   }
 
   async function send() {
@@ -2706,7 +2703,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
                 <Text style={{ color: tokens.destructive, fontSize: 13 }}>{runError}</Text>
               </Pressable>
               {/* A key or billing failure is fixed in Models; there is no native retry yet. */}
-              {runErrorAction(snap?.run?.error) === "models" ? (
+              {["models", "connection"].includes(runErrorAction(snap?.run?.error) ?? "") ? (
                 <Pressable accessibilityRole="button" onPress={() => router.push("/models")}>
                   <Text style={{ color: tokens.foreground, fontSize: 13, fontWeight: "600" }}>
                     {t("Models")}
@@ -3815,13 +3812,13 @@ const MessageBubble = memo(function MessageBubble({
                 askBlock.answer,
                 askBlock.actions,
                 isApprovalAskBlock(askBlock),
-                Boolean(askBlock.consent),
+                Boolean(askBlock.consent || askBlock.pageSource),
               )}
             </Text>
-          ) : canAnswer && onAnswer ? (
+          ) : (canAnswer || askBlock.pageSource) && onAnswer ? (
             <AskActions
               actions={askBlock.actions}
-              consent={Boolean(askBlock.consent)}
+              consent={Boolean(askBlock.consent || askBlock.pageSource)}
               accessibilityActions={actionProps.accessibilityActions}
               onAccessibilityAction={actionProps.onAccessibilityAction}
               onAnswer={(answer) => onAnswer(message, answer)}

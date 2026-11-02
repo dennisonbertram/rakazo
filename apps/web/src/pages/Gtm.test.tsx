@@ -42,7 +42,10 @@ vi.mock("./shell/bot-page-panel", () => ({
     useEffect(() => {
       if (mocks.pageContent === undefined || mocks.pageContent === "load-error") return;
       onPageChange({
+        id: "page_gtm",
+        kind: "blocks",
         botId: "bot_gtm",
+        title: "GTM",
         content: mocks.pageContent,
         revision: 1,
         updatedBy: "bot",
@@ -135,6 +138,15 @@ it("keeps layout C without live blocks", async () => {
   ).toBeTruthy();
 });
 
+it("puts Needs you before Channels", async () => {
+  await render();
+  const h2 = (name: string) =>
+    [...container.querySelectorAll("h2")].find((node) => node.textContent?.startsWith(name))!;
+  expect(
+    h2("Needs you").compareDocumentPosition(h2("Channels")) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});
+
 it("Approve sends the rendered updatedAt and shows Changed, review again when it lost", async () => {
   mocks.update.mockRejectedValue({ code: "CONFLICT" });
   await render();
@@ -213,8 +225,7 @@ it("mounts post previews and the email compliance editor under Needs you", async
   expect(email.textContent).toContain("Add unsubscribe instructions");
   expect(email.textContent).toContain("Add a postal address");
   expect(
-    [...email.querySelectorAll("button")].find((button) => button.textContent === "Approve")
-      ?.disabled,
+    [...email.querySelectorAll("button")].find((button) => button.textContent === "Send")?.disabled,
   ).toBe(true);
   expect(mocks.send).not.toHaveBeenCalled();
 });

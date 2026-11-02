@@ -4,17 +4,21 @@ import { presetFromCron } from "@rakazo/core";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ i18n: { locale: "en" }, t: (parts: TemplateStringsArray) => parts.join("") }),
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
+const models = vi.hoisted(() => ({ credentials: [] as unknown[], catalog: [] as unknown[] }));
 vi.mock("../lib/rpc", () => ({
-  rpc: { models: { credentials: async () => [], list: async () => [] } },
+  rpc: {
+    models: { credentials: async () => models.credentials, list: async () => models.catalog },
+  },
 }));
 
 import {
+  defaultRoutineName,
   emptyRoutineDraft,
   RoutineEditor,
   RoutineListHeader,
@@ -161,7 +165,7 @@ it("labels the routine list's create button in words, visible without hovering",
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const el = document.body.appendChild(document.createElement("div"));
   const root = createRoot(el);
-  await act(async () => root.render(<RoutineListHeader onCreate={() => undefined} />));
+  await act(async () => root.render(<RoutineListHeader empty onCreate={() => undefined} />));
   expect(el.querySelector("button")?.textContent).toBe("Create a routine");
   await act(async () => root.unmount());
   el.remove();
@@ -347,6 +351,17 @@ it("describes a watch, a check-in and a pause in the row", () => {
   } as Routine;
   expect(routineStatusLine(schedule, "en", now)).toBe("Last ran 8:00 AM · Next Tue 8:00 AM");
   expect(routineStatusLine(baseRoutine, "en", now)).toBeNull();
+  const failed = { ...schedule, status: { ...schedule.status, lastRunFailed: true } } as Routine;
+  expect(routineStatusLine(failed, "en", now)).toBe("Last run failed · Next Tue 8:00 AM");
+  expect(routineStatusLine({ ...failed, active: false }, "en", now)).toBe("Last run failed");
+  const failedWatch = { ...watch, status: { ...watch.status, lastRunFailed: true } } as Routine;
+  expect(routineStatusLine(failedWatch, "en", now)).toBe(
+    "Last run failed · Checked 4m ago · Changed 1d ago",
+  );
+  const failedPaused = { ...failedWatch, status: { ...failedWatch.status, pausedReason: "noisy" } };
+  expect(routineStatusLine(failedPaused as Routine, "en", now)).toBe(
+    "Paused: the page changes too often",
+  );
 });
 
 it("describes a connected-app watch by its app, not a page", () => {
@@ -364,4 +379,100 @@ it("describes a connected-app watch by its app, not a page", () => {
   } as Routine;
   expect(routineTriggerSummary(appWatch)).toBe("Watches Bank");
   expect(routineStatusLine(appWatch)).toBe("Paused: the app could not be checked");
+});
+
+it("picks the connection's first model when a connection is chosen with no model yet", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  models.credentials = [
+    { id: "c1", provider: "p1", label: "Key one", hasKey: true, isDefault: true },
+    { id: "c2", provider: "p2", label: "Key two", hasKey: true, isDefault: false },
+  ];
+  models.catalog = [
+    { provider: "p1", providerName: "P1", id: "m1", label: "M1", billing: "" },
+    { provider: "p2", providerName: "P2", id: "m2", label: "M2", billing: "" },
+  ];
+  const el = document.body.appendChild(document.createElement("div"));
+  const root = createRoot(el);
+  const noop = () => undefined;
+  const onChange = vi.fn();
+  await act(async () =>
+    root.render(
+      <RoutineEditor
+        draft={emptyRoutineDraft()}
+        onChange={onChange}
+        editing={null}
+        timezone="UTC"
+        webhook={{ path: "/hook", secret: null, configured: false }}
+        githubPath="/gh"
+        messageProviders={[]}
+        saving={false}
+        running={false}
+        error={null}
+        onBack={noop}
+        onClose={noop}
+        onSave={noop}
+        onTestRun={noop}
+        onDelete={noop}
+        onEnsureWebhook={async () => undefined}
+      />,
+    ),
+  );
+  await act(async () => {
+    (el.querySelector('button[aria-label="Advanced"]') as HTMLButtonElement).click();
+  });
+  const select = document.querySelector('select[id$="-connection"]') as HTMLSelectElement;
+  await act(async () => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
+    setValue.call(select, "c2");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({ credentialId: "c2", modelKey: expect.stringContaining("m2") }),
+  );
+  await act(async () => root.unmount());
+  el.remove();
+  vi.unstubAllGlobals();
+  models.credentials = [];
+  models.catalog = [];
+});
+
+it("shows the routine explainer only while the bot has no routines", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const el = document.body.appendChild(document.createElement("div"));
+  const root = createRoot(el);
+  await act(async () => root.render(<RoutineListHeader empty onCreate={() => undefined} />));
+  expect(el.querySelector("p")?.textContent).toContain("cash check every Monday");
+  await act(async () =>
+    root.render(<RoutineListHeader empty={false} onCreate={() => undefined} />),
+  );
+  expect(el.querySelector("p")).toBeNull();
+  expect(el.querySelector("button")?.textContent).toBe("Create a routine");
+  await act(async () => root.unmount());
+  el.remove();
+  vi.unstubAllGlobals();
+});
+
+describe("defaultRoutineName", () => {
+  it("keeps a short instruction as is", () => {
+    expect(defaultRoutineName("Check cash")).toBe("Check cash");
+  });
+  it("cuts a long instruction at a word with an ellipsis", () => {
+    const name = defaultRoutineName(
+      "Summarize every unread email from investors and draft replies",
+    );
+    expect(name).toBe("Summarize every unread email from…");
+  });
+  it("cuts a long word with no spaces at 40", () => {
+    expect(defaultRoutineName("x".repeat(100))).toBe(`${"x".repeat(40)}…`);
+  });
+  it("uses the first non-empty line and collapses whitespace", () => {
+    expect(defaultRoutineName("\n  \n Check   the\tcash \nthen email")).toBe("Check the cash");
+  });
+  it("falls back to the skill name, then Routine", () => {
+    expect(defaultRoutineName("  ", "Weekly report")).toBe("Weekly report");
+    expect(defaultRoutineName("")).toBe("Routine");
+  });
+  it("never exceeds 80 characters", () => {
+    expect(defaultRoutineName("", "s".repeat(200)).length).toBeLessThanOrEqual(80);
+  });
 });

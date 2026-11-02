@@ -69,6 +69,7 @@ model User {
   mailActionLogs              MailActionLog[]
   inboxTodos                  InboxTodo[]
   meetings                    Meeting[]
+  meetingCaptures             MeetingCapture[]
   meetingSyncStates           MeetingSyncState[]
   meetingTombstones           MeetingTombstone[]
   inboxSenderFeedback         InboxSenderFeedback[]
@@ -525,6 +526,13 @@ model Space {
   aiDataConsents              AiDataConsent[]
   mcpCallLogs                 McpCallLog[]
   externalActions             ExternalAction[]
+  omiUploads                  OmiUpload[]
+  omiSegments                 OmiSegment[]
+  meetingCaptures             MeetingCapture[]
+  meetingCaptureChunks        MeetingCaptureChunk[]
+  /// "remind", "confirm" or "off": whether and how meetings may be recorded here.
+  meetingRecording            String                       @default("remind")
+  brexCardReservations        BrexCardReservation[]
   mcpConnections              McpConnection[]
   id                          String                       @id
   organizationId              String
@@ -571,6 +579,9 @@ model Space {
   capabilities                CapabilityInstall[]
   memoryDocuments             MemoryDocument[]
   botPages                    BotPage[]
+  pageSources                 PageSource[]
+  pageSourceSnapshots         PageSourceSnapshot[]
+  appControlSnapshots         AppControlSnapshot[]
   botPins                     BotPins[]
   contacts                    Contact[]
   contactPhotos               ContactPhoto[]
@@ -841,6 +852,10 @@ model Bot {
   autoSpeak              Boolean               @default(false)
   modelProvider          String?
   modelId                String?
+  // The connection this bot's model runs on; null follows the space default. A plain column, not
+  // a foreign key: an automatic sign-out deletes the credential and the pin must survive it, so
+  // the run fails by name instead of quietly using another connection.
+  modelCredentialId      String?
   thinkingLevel          String?
   disabledBuiltinTools   String[]              @default([])
   // "internal" (default) or "external": talks to people outside the company. Server-owned; no bot tool reads or sets it.
@@ -855,11 +870,18 @@ model Bot {
   teamChatAmbientEnabled Boolean               @default(false)
   teamChatRules          String                @default("")
   crossSpaceCommunication Boolean              @default(false)
+  // Local desktop control (docs/local-desktop-control): off by default, owner-only.
+  appControlEnabled      Boolean               @default(false)
+  // [{ id, name }], max 20.
+  appControlApps         Json                  @default("[]")
+  appControlHeaded       Boolean               @default(false)
+  appControlSnapshots    AppControlSnapshot[]
   routines               Routine[]
   scratchpadItems        ScratchpadItem[]
   taughtSkills           TaughtSkill[]
   memoryDocuments        MemoryDocument[]
-  page                   BotPage?
+  pages                  BotPage[]
+  pageSources            PageSource[]
   pins                   BotPins?
   agentHome              AgentHome?
   browserProfile         BrowserProfile?
@@ -886,6 +908,7 @@ model Bot {
   @@index([sectionId])
   @@index([computerId])
   @@index([parentBotId])
+  @@index([modelCredentialId])
   @@map("bots")
 }
 
@@ -1075,6 +1098,8 @@ model Run {
   externalTaint        Boolean           @default(false)
   modelProvider        String?
   modelId              String?
+  // The routine's connection pin, captured with the model.
+  modelCredentialId    String?
   thinkingLevel        String?
   // True when these columns are the model the run must keep. A later attempt
   // may record the model it used in the same columns without setting this.
@@ -1136,6 +1161,7 @@ model SteeringMessage {
   /// Model agreed for an inbound delivery that had to wait. Empty follows the bot.
   modelProvider String?
   modelId       String?
+  modelCredentialId String?
   thinkingLevel String?
   claimedAt     DateTime?
   createdAt     DateTime  @default(now())
@@ -1239,6 +1265,8 @@ model Routine {
   messageProvider String?
   modelProvider   String?
   modelId         String?
+  // Pins the routine's own model to one of the owner's connections.
+  modelCredentialId String?
   thinkingLevel   String?
   lastRunAt       DateTime?
   nextRunAt       DateTime?
@@ -1261,6 +1289,7 @@ model Routine {
   @@index([active, nextRunAt])
   @@index([spaceId, botId])
   @@index([taughtSkillId])
+  @@index([modelCredentialId])
   @@map("routines")
 }
 
@@ -1535,11 +1564,69 @@ model Connection {
   privateByDefault    Boolean               @default(false)
   companyEvidence     CompanyEvidence[]
   companyCandidates   CompanyCandidate[]    @relation("CompanyCandidateConnection")
+  omiUploads          OmiUpload[]
+  omiSegments         OmiSegment[]
 
   @@index([spaceId, userId, connectorId])
   @@unique([id, spaceId, userId])
   @@index([agentBotId])
   @@map("connections")
+}
+
+/// One piece of records a pendant uploaded, kept raw until the assemble job turns it into recordings.
+model OmiUpload {
+  id           String     @id @default(cuid())
+  spaceId      String
+  space        Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  /// Sequence number of the first 444-byte record.
+  firstSeq     BigInt
+  /// SHA-256 (hex) of the body. A retry repeats both; a restarted counter repeats only firstSeq.
+  sha256       String
+  recordCount  Int
+  /// Omi codec byte: 20 (10 ms frames) or 21 (20 ms frames).
+  codec        Int
+  rtcValid     Boolean
+  receivedAt   DateTime   @default(now())
+  /// The raw bytes in the artifact store; removed once assembled.
+  storageKey   String
+  assembledAt  DateTime?
+
+  @@unique([connectionId, firstSeq, sha256])
+  @@index([connectionId, assembledAt])
+  @@map("omi_uploads")
+}
+
+/// One sorted stretch of an Omi recording: a meeting, a note or trash.
+model OmiSegment {
+  id           String       @id @default(cuid())
+  spaceId      String
+  space        Space        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  connectionId String
+  connection   Connection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  audioItemId  String
+  audioItem    DataRoomItem @relation("OmiSegmentAudio", fields: [audioItemId], references: [id], onDelete: Cascade)
+  /// Seconds from the start of the recording.
+  start        Int
+  end          Int
+  /// "meeting", "note" or "trash".
+  kind         String
+  title        String
+  meetingId    String?
+  meeting      Meeting?     @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  noteItemId   String?
+  noteItem     DataRoomItem? @relation("OmiSegmentNote", fields: [noteItemId], references: [id], onDelete: SetNull)
+  /// "agent" or "user"; a re-sort never changes a user's choice.
+  sortedBy     String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([audioItemId, start])
+  @@index([spaceId, userId, createdAt])
+  @@map("omi_segments")
 }
 
 model BotConnectionAccess {
@@ -1609,24 +1696,107 @@ model MemoryRevision {
   @@map("memory_revisions")
 }
 
-/// One Markdown page per bot, written by the bot's tools and edited by its owner.
+/// A bot's named Markdown pages (up to 20), written by the bot's tools and edited by its owner.
 model BotPage {
   id        String            @id @default(cuid())
   spaceId   String
   space     Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  botId     String            @unique
+  botId     String
   bot       Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   userId    String
+  title     String
   content   String
+  /// "blocks" (Markdown with live blocks) or "html" (one sandboxed HTML document). Fixed at creation.
+  kind      String            @default("blocks")
   revision  Int               @default(1)
   /// "bot" or "user"
   updatedBy String
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   revisions BotPageRevision[]
+  sources   PageSource[]
+  sidebarPages SidebarPage[]
 
+  // Titles are unique per bot ignoring case: unique index bot_pages_botId_title_key (raw SQL in
+  // migration 20261231000026) on (botId, lower(title)).
+  @@index([botId])
   @@index([spaceId])
   @@map("bot_pages")
+}
+
+/// A saved read-only data call on a bot page. Page blocks name it; the server reruns it without a model and stores each result as a snapshot.
+model PageSource {
+  id               String               @id @default(cuid())
+  spaceId          String
+  space            Space                @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  /// The bot's owner.
+  userId           String
+  botId            String
+  bot              Bot                  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  pageId           String
+  page             BotPage              @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  name             String
+  /// "praci" for now.
+  kind             String
+  call             Json
+  schedule         String
+  /// "pending" | "active" | "paused" | "denied"
+  status           String
+  nextRefreshAt    DateTime?
+  leaseUntil       DateTime?
+  failures         Int                  @default(0)
+  lastError        String?
+  lastRefreshAt    DateTime?
+  approvedCallHash String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  snapshots        PageSourceSnapshot[]
+
+  // Names are unique per page ignoring case: unique index page_sources_pageId_name_key (raw SQL in
+  // migration 20261231000029) on (pageId, lower(name)).
+  @@index([spaceId])
+  @@index([status, nextRefreshAt])
+  @@map("page_sources")
+}
+
+/// Snapshot ids a run's app control produced, so refs stay owned by one run across processes.
+model AppControlSnapshot {
+  id         String   @id @default(cuid())
+  spaceId    String
+  space      Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId     String
+  botId      String
+  bot        Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  runId      String
+  snapshotId String
+  appId      String
+  windowId   String?
+  surface    String
+  sensitive  Boolean
+  spent      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([spaceId, userId, botId, runId, snapshotId])
+  @@index([runId])
+  @@index([createdAt])
+  @@map("app_control_snapshots")
+}
+
+/// One successful result of a page source.
+model PageSourceSnapshot {
+  id        String     @id @default(cuid())
+  spaceId   String
+  space     Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  sourceId  String
+  source    PageSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  fetchedAt DateTime   @default(now())
+  value     Json
+  bytes     Int
+
+  @@index([sourceId, fetchedAt(sort: Desc)])
+  /// The per-space daily refresh budget counts a space's snapshots since UTC midnight.
+  @@index([spaceId, fetchedAt])
+  @@map("page_source_snapshots")
 }
 
 /// A bot's numbers strip (stats) and one sidebar list; separate from the page so refreshes never conflict with page edits.
@@ -2032,6 +2202,7 @@ model McpServer {
   financeBills          FinanceBill[]
   financeSyncState      FinanceSyncState?
   devinConnectionState  DevinConnectionState?
+  brexCards             BrexCardsConnection?
   devinSessions         DevinSession[]
   meetings              Meeting[]
   meetingSyncState      MeetingSyncState?
@@ -3302,18 +3473,22 @@ model CapTableSnapshot {
   @@map("cap_table_snapshots")
 }
 
-/// An optional sidebar page the user added from SIDEBAR_PAGE_TEMPLATES.
+/// An optional sidebar page the user added: a SIDEBAR_PAGE_TEMPLATES entry (templateKey) or one of
+/// their bot pages (pageId). Exactly one is set (CHECK sidebar_pages_one_target, raw SQL in the migration).
 model SidebarPage {
   id          String   @id @default(cuid())
   spaceId     String
   space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  templateKey String
+  templateKey String?
+  pageId      String?
+  page        BotPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
   position    Int
   createdAt   DateTime @default(now())
 
   @@unique([spaceId, userId, templateKey])
+  @@unique([spaceId, userId, pageId])
   @@index([spaceId, userId])
   @@map("sidebar_pages")
 }
@@ -3350,7 +3525,7 @@ model DataRoomItem {
   /// The import that filed this item, when one did.
   importId           String?
   import             DataRoomImport?   @relation(fields: [importId], references: [id], onDelete: SetNull)
-  /// "upload", "drive", "box", "gmail", "chat" or "finance".
+  /// "upload", "drive", "box", "gmail", "chat", "finance" or "omi".
   source             String
   sourceConnectionId String?
   sourceConnection   Connection?       @relation(fields: [sourceConnectionId], references: [id], onDelete: SetNull)
@@ -3399,6 +3574,8 @@ model DataRoomItem {
   companyEntities    CompanyEntity[] @relation("CompanyEntityDataRoomItem")
   companyEvidence    CompanyEvidence[] @relation("CompanyEvidenceDataRoomItem")
   companyCandidates  CompanyCandidate[] @relation("CompanyCandidateDataRoomItem")
+  omiAudioSegments   OmiSegment[]      @relation("OmiSegmentAudio")
+  omiNoteSegments    OmiSegment[]      @relation("OmiSegmentNote")
 
   @@index([spaceId, folderId])
   @@unique([id, spaceId, userId])
@@ -3710,6 +3887,51 @@ model DevinConnectionState {
   @@map("devin_connection_states")
 }
 
+/// The owner's hard limits for the Brex cards server. One row per space.
+model BrexCardsConnection {
+  serverId               String    @id
+  server                 McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  spaceId                String    @unique
+  createdByUserId        String
+  /// Brex company id (GET /v2/company), set at connect. The daily card cap is per Brex account.
+  brexAccountId          String
+  /// Amounts are USD cents.
+  maxNewCardLimitCents   Int       @default(100000)
+  maxCardLimitCents      Int       @default(500000)
+  maxSpendLimitBaseCents Int       @default(1000000)
+  /// New cards per rolling 24 hours, per Brex account.
+  maxCardsPerDay         Int       @default(5)
+  allowedDurations       String[]  @default(["MONTHLY", "ONE_TIME"])
+  /// A ONE_TIME card must lock within this many days; null means no rule.
+  oneTimeMaxDays         Int?      @default(90)
+  updatedAt              DateTime  @updatedAt
+
+  @@map("brex_cards_connections")
+}
+
+enum BrexCardReservationStatus {
+  reserved
+  created
+  failed
+  uncertain
+}
+
+/// A durable claim on the daily card cap, written before the Brex call. Reserved, created and
+/// uncertain rows count against the cap; failed rows do not.
+model BrexCardReservation {
+  id            String                    @id @default(cuid())
+  /// For row security. The cap itself is per brexAccountId.
+  spaceId       String
+  space         Space                     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  brexAccountId String
+  reservedAt    DateTime                  @default(now())
+  status        BrexCardReservationStatus
+  brexCardId    String?
+
+  @@index([brexAccountId, reservedAt])
+  @@map("brex_card_reservations")
+}
+
 /// The last-seen state of one Devin session, read by the page and the alert step.
 model DevinSession {
   id                String    @id @default(cuid())
@@ -3775,6 +3997,8 @@ model Meeting {
   /// GENERATED ALWAYS AS (to_tsvector('english', title || summary || transcript)) STORED; see the migration.
   tsv               Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, ((((title || ' '::text) || summary) || ' '::text) || COALESCE(transcript, ''::text)))"))
   inboxTodos        InboxTodo[]
+  omiSegments       OmiSegment[]
+  captures          MeetingCapture[]
 
   @@unique([spaceId, userId, provider, externalId])
   @@index([spaceId, userId, startedAt])
@@ -4326,4 +4550,62 @@ model CompanyImportCall {
 
   @@index([spaceId, ownerUserId, runId, status])
   @@map("company_import_calls")
+}
+
+/// One recording in progress (or just finished) on a device. Holds no content once finalized.
+model MeetingCapture {
+  id                 String                @id @default(cuid())
+  spaceId            String
+  space              Space                 @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Chosen by the client; makes `start` idempotent per user.
+  clientId           String
+  title              String?
+  /// "device" (text from the client) or "server" (audio transcribed here).
+  engine             String
+  /// "microphone" and/or "system".
+  tracks             String[]
+  /// "recording", "finishing", "done", "failed" or "discarded".
+  status             String                @default("recording")
+  startedAt          DateTime              @default(now())
+  endedAt            DateTime?
+  lastChunkAt        DateTime?
+  consentConfirmedAt DateTime?
+  meetingId          String?
+  meeting            Meeting?              @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  /// Short reason only; never audio or text.
+  error              String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  chunks             MeetingCaptureChunk[]
+
+  @@unique([userId, clientId])
+  @@index([spaceId, userId, status])
+  @@map("meeting_captures")
+}
+
+/// One stretch of one track. Audio lives in the artifact store until it is transcribed.
+model MeetingCaptureChunk {
+  id        String         @id @default(cuid())
+  spaceId   String
+  space     Space          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId    String
+  captureId String
+  capture   MeetingCapture @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  /// "microphone" or "system".
+  track     String
+  seq       Int
+  startMs   Int
+  endMs     Int
+  sha256    String
+  blobKey   String?
+  text      String?
+  /// "pending", "done" or "failed".
+  status    String         @default("pending")
+  attempts  Int            @default(0)
+  createdAt DateTime       @default(now())
+
+  @@unique([captureId, track, seq])
+  @@map("meeting_capture_chunks")
 }

@@ -22,7 +22,7 @@ const rules: ActionApprovalRule[] = [
     id: "rule_3",
     effect: "require_approval",
     matchKind: "tool",
-    matchValue: "demo_tool",
+    matchValue: "mcp__brex__lock_card",
     createdAt: "2026-01-01T00:00:00.000Z",
   },
   {
@@ -62,9 +62,6 @@ const meta = {
       </div>
     ),
   ],
-  parameters: {
-    docs: { description: { component: "Also shows: describeRule (the rule sentences)." } },
-  },
 } satisfies Meta<typeof ApprovalRulesSettings>;
 export default meta;
 type Story = StoryObj<typeof meta>;

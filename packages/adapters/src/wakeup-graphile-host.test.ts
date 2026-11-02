@@ -50,6 +50,12 @@ function handlers(): BackgroundJobHandlers {
     "mail.watch.renew": vi.fn(async () => undefined),
     "devin.refresh": vi.fn(async () => undefined),
     "finance.sync": vi.fn(async () => undefined),
+    "omi.assemble": vi.fn(async () => undefined),
+    "omi.transcribe": vi.fn(async () => undefined),
+    "omi.sort": vi.fn(async () => undefined),
+    "meetings.capture_transcribe": vi.fn(async () => undefined),
+    "meetings.capture_finalize": vi.fn(async () => undefined),
+    "meetings.capture_sweep": vi.fn(async () => undefined),
     "meetings.sync": vi.fn(async () => undefined),
     "meetings.digest": vi.fn(async () => undefined),
     "dataroom.blob.delete": vi.fn(async () => undefined),
@@ -67,6 +73,8 @@ function handlers(): BackgroundJobHandlers {
     "company.import.recover": vi.fn(async () => undefined),
     "company.refresh.tick": vi.fn(async () => undefined),
     "watch.probe": vi.fn(async () => undefined),
+    "pages.refresh.tick": vi.fn(async () => undefined),
+    "pages.snapshots.retention": vi.fn(async () => undefined),
   };
 }
 

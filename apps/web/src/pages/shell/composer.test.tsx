@@ -156,3 +156,101 @@ it("ends a long agent name in the placeholder with an ellipsis", async () => {
   expect(placeholder.endsWith("…")).toBe(true);
   expect(placeholder.length).toBeLessThan(45);
 });
+
+it("on a touch screen Return adds a line and only the Send button sends", async () => {
+  window.matchMedia = ((q: string) => ({
+    matches: q === "(pointer: coarse)",
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })) as never;
+  const onSend = vi.fn().mockResolvedValue(true);
+  await act(async () =>
+    root.render(
+      <Composer
+        activeName="Agent"
+        running={false}
+        pendingAttachments={[]}
+        attachmentNotice={null}
+        sendError={null}
+        runError={null}
+        runErrorId={null}
+        onRunErrorPresented={() => {}}
+        onDismissError={() => {}}
+        onRetrySend={() => {}}
+        sending={false}
+        fileInputRef={createRef()}
+        onAttachmentPick={() => false}
+        onRemoveAttachment={() => {}}
+        onSend={onSend}
+        onStop={async () => {}}
+        artifactTarget={{ botId: "b3" }}
+      />,
+    ),
+  );
+  const box = document.querySelector("textarea") as HTMLTextAreaElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, "hi");
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+  await act(async () => {
+    box.dispatchEvent(enter);
+  });
+  expect(enter.defaultPrevented).toBe(false);
+  expect(onSend).not.toHaveBeenCalled();
+});
+
+async function renderTyped(running: boolean, coarse = false) {
+  window.matchMedia = ((q: string) => ({
+    matches: coarse && q === "(pointer: coarse)",
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })) as never;
+  await act(async () =>
+    root.render(
+      <Composer
+        activeName="Agent"
+        running={running}
+        pendingAttachments={[]}
+        attachmentNotice={null}
+        sendError={null}
+        runError={null}
+        runErrorId={null}
+        onRunErrorPresented={() => {}}
+        onDismissError={() => {}}
+        onRetrySend={() => {}}
+        sending={false}
+        fileInputRef={createRef()}
+        onAttachmentPick={() => false}
+        onRemoveAttachment={() => {}}
+        onSend={vi.fn().mockResolvedValue(true)}
+        onStop={async () => {}}
+        artifactTarget={{ botId: "b4" }}
+      />,
+    ),
+  );
+  const box = document.querySelector("textarea") as HTMLTextAreaElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, "hi");
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const send = document.querySelector<HTMLButtonElement>('button[aria-label="Send"]');
+  send?.focus();
+  await act(async () => send?.click());
+  return box;
+}
+
+it("keeps focus in the message box after Send is clicked", async () => {
+  const box = await renderTyped(false);
+  expect(document.activeElement).toBe(box);
+});
+
+it("keeps focus in the message box after Send is clicked during a run", async () => {
+  const box = await renderTyped(true);
+  expect(document.activeElement).toBe(box);
+});
+
+it("does not focus the message box after Send on a touch screen", async () => {
+  const box = await renderTyped(false, true);
+  expect(document.activeElement).not.toBe(box);
+});

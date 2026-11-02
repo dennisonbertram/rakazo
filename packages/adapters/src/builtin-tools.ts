@@ -16,8 +16,10 @@ import {
 } from "@rakazo/contracts";
 import { uiArtifactInputSchema } from "@rakazo/ui-artifact";
 import { z } from "zod";
+import { appControlTools } from "./app-control/tools.js";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { calendarToolDefinitions } from "./calendar-tools.js";
+import { PRACI_SOURCE_TOOLS } from "./praci-source-tools.js";
 import { SCRATCHPAD_HANDOFF_AGENTS } from "./scratchpad-tools.js";
 import { uiBlocksInputSchema } from "./ui-blocks-tool.js";
 import { voiceAgentTools } from "./voice-agent-tools.js";
@@ -83,6 +85,11 @@ export const DELEGATION_TOOL_NAMES = new Set([
   "handoff_to_bot",
   "message_bot",
 ]);
+
+const PAGE_TITLE_PROPERTY = {
+  type: "string",
+  description: "Title of the page, from page_list (any letter case). Omit for the first page.",
+} as const;
 
 const scheduleCreateProperties = {
   name: { type: "string", description: "Short label shown in Routines." },
@@ -523,20 +530,38 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
-    name: "page_read",
-    description: "Read this bot's page (Markdown with chart blocks): its content and revision.",
+    name: "page_list",
+    description: "List this bot's pages: title, revision and last update of each.",
     inputSchema: { type: "object", properties: {} },
+    readOnly: true,
+  },
+  {
+    name: "page_create",
+    description:
+      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design. Style it for light and dark (prefers-color-scheme).',
+    inputSchema: {
+      type: "object",
+      properties: { title: { type: "string" }, kind: { type: "string", enum: ["blocks", "html"] } },
+      required: ["title"],
+    },
+  },
+  {
+    name: "page_read",
+    description:
+      "Read one of this bot's pages (Markdown with chart blocks): its content and revision. Without page, the first page.",
+    inputSchema: { type: "object", properties: { page: PAGE_TITLE_PROPERTY } },
     readOnly: true,
   },
   {
     name: "page_write",
     description:
-      "Replace this bot's page. baseRevision is the revision from page_read (0 for a new page). A stale revision saves nothing and returns the current page.",
+      "Replace this bot's page. baseRevision is the revision from page_read (0 for a new page). A stale revision saves nothing and returns the current page. The title is shown above the page; do not start with a heading that repeats it.",
     inputSchema: {
       type: "object",
       properties: {
         content: { type: "string", description: "The whole page as Markdown." },
         baseRevision: { type: "number" },
+        page: PAGE_TITLE_PROPERTY,
       },
       required: ["content", "baseRevision"],
     },
@@ -551,8 +576,73 @@ export const builtinAgentTools: ConnectorTool[] = [
         old_string: { type: "string" },
         new_string: { type: "string" },
         baseRevision: { type: "number" },
+        page: PAGE_TITLE_PROPERTY,
       },
       required: ["old_string", "new_string", "baseRevision"],
+    },
+  },
+  {
+    name: "page_source_list",
+    description:
+      "List the data sources saved on one of this bot's pages: name, tool, schedule, status, last refresh and last error.",
+    inputSchema: { type: "object", properties: { page: PAGE_TITLE_PROPERTY } },
+    readOnly: true,
+  },
+  {
+    name: "page_source_set",
+    description:
+      'Save or replace a named data source on a page: a read-only Praci data tool that the server reruns on a schedule without you. Page metric, table and chart blocks show its stored result by source name. A praci source runs once now and returns the saved source and a preview of the result (up to 4,000 characters) so you can choose the path to show. An mcp source returns status pending: the owner is asked, nothing is called until they allow it, and blocks show "Waiting for approval"; changing its server, tool or args asks again. An http source is one GET of a JSON or CSV API (optionally with a saved key); it also waits for the owner, and changing its url, secret or accept asks again. A page can have 20 sources and a space 100. A source that fails five times in a row is paused (you get a message); call this again with the same name to fix it and resume it.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        page: PAGE_TITLE_PROPERTY,
+        name: { type: "string", description: "1 to 40 characters, unique on the page." },
+        kind: {
+          type: "string",
+          enum: ["praci", "mcp", "http"],
+          description:
+            'Default "praci". "mcp" reads one read-only tool of an MCP server assigned to you; "http" does one GET of an API. Both wait for the owner\'s approval and do not run until they allow it.',
+        },
+        url: {
+          type: "string",
+          description:
+            "With kind http: the absolute http(s) URL to GET, at most 1,000 characters, no username, password or fragment.",
+        },
+        secret: {
+          type: "string",
+          description:
+            "With kind http: the name of a saved key whose site is the URL's origin. Optional.",
+        },
+        accept: {
+          type: "string",
+          enum: ["json", "csv"],
+          description: "With kind http: the response format. Default json.",
+        },
+        server: {
+          type: "string",
+          description: "With kind mcp: the name of an MCP server assigned to you.",
+        },
+        tool: {
+          type: "string",
+          description: `With kind praci, one of: ${PRACI_SOURCE_TOOLS.join(", ")}. With kind mcp, the server's tool name. It must be a tool you have.`,
+        },
+        args: { type: "object", description: "Arguments for the tool." },
+        schedule: {
+          type: "string",
+          enum: ["15m", "1h", "6h", "1d", "1w"],
+          description: "Default 1h.",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "page_source_remove",
+    description: "Remove a data source (and its stored results) from a page by name.",
+    inputSchema: {
+      type: "object",
+      properties: { page: PAGE_TITLE_PROPERTY, name: { type: "string" } },
+      required: ["name"],
     },
   },
   {
@@ -1991,7 +2081,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "calendar_agenda",
     description:
-      "Read-only. One time-ordered list of what is coming up for the owner: Google Calendar events from every connected account, open to-dos with a due time (scratchpad_add with dueAt) from every bot, and routines and check-backs (schedule_create with runAt) with their next run. Defaults to now through the next 7 days; pass from and to (ISO 8601, at most 93 days apart) for another window. Use it to see what is due or scheduled; use schedule_create with runAt to set a check-back and scratchpad_add with dueAt for a to-do.",
+      "Read-only. One time-ordered list of what is coming up for the owner: Google Calendar events from every connected account, open to-dos with a due time (scratchpad_add with dueAt) from every bot, and routines and check-backs (schedule_create with runAt) with each run in the window (a routine that runs more than once every 6 hours shows only its first run). Defaults to now through the next 7 days; pass from and to (ISO 8601, at most 93 days apart) for another window. Use it to see what is due or scheduled; use schedule_create with runAt to set a check-back and scratchpad_add with dueAt for a to-do.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2372,6 +2462,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   ...voiceAgentTools,
   ...calendarToolDefinitions,
+  ...appControlTools,
 ];
 
 export const gtmPostTool: ConnectorTool = {

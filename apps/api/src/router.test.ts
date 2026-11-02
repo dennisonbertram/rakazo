@@ -646,6 +646,98 @@ describe("thread answer delivery", () => {
   });
 });
 
+describe("thread answer for a page source card", () => {
+  const card = {
+    id: "message-1",
+    botId: "bot-1",
+    blocks: [
+      {
+        kind: "ask",
+        text: "Read Mercury every hour?",
+        status: "pending",
+        pageSource: { sourceId: "source-1", callHash: "a".repeat(64) },
+        actions: [
+          { id: "allow", label: "Allow" },
+          { id: "deny", label: "Not now" },
+        ],
+      },
+    ],
+  };
+
+  async function answer(source: unknown, who = "user-1") {
+    const answerRunInput = vi.fn().mockResolvedValue(true);
+    const update = vi.fn();
+    const prisma = {
+      bot: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "bot-1", thread: { id: "thread-1" }, computer: null }),
+      },
+      message: { findFirst: vi.fn().mockResolvedValue(card), update },
+      pageSource: { findFirst: vi.fn().mockResolvedValue(source), updateMany: vi.fn() },
+      $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ message: { update } })),
+    } as unknown as PrismaClient;
+    const deps = {
+      prisma,
+      events: { answerRunInput, notify: vi.fn() },
+      jobs: { enqueue: vi.fn() },
+      env: {
+        defaultProvider: "fake",
+        defaultModel: "fake-model",
+        webOrigin: "http://127.0.0.1:5173",
+        screenProxySecret: "fake-test-secret",
+        sandboxProvider: "fake",
+      },
+      dataDir: "/tmp/rakazo-router-test",
+    } as unknown as RouterDeps;
+    const actor = {
+      spaceId: "workspace-1",
+      userId: who,
+      email: "user@rakazo.test",
+      isDeploymentOwner: true,
+    } satisfies Actor;
+    const { response } = await new RPCHandler(createRouter(deps)).handle(
+      new Request("http://127.0.0.1/rpc/threads/answer", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          json: { botId: "bot-1", runId: "run-1", messageId: "message-1", answer: "allow" },
+        }),
+      }),
+      { prefix: "/rpc", context: { actor } },
+    );
+    return { response, answerRunInput, prisma };
+  }
+
+  it("never resumes a run, and refuses a source that is not this bot's", async () => {
+    // The lookup is scoped to the bot, space and owner, so another bot's source id finds nothing.
+    const { response, answerRunInput, prisma } = await answer(null);
+    expect(response.status).toBe(409);
+    expect(answerRunInput).not.toHaveBeenCalled();
+    expect(prisma.pageSource.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "source-1",
+        spaceId: "workspace-1",
+        userId: "user-1",
+        botId: "bot-1",
+      }),
+    });
+    expect(prisma.pageSource.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses a card whose call hash no longer matches the source", async () => {
+    const { response, prisma } = await answer({
+      id: "source-1",
+      kind: "mcp",
+      status: "pending",
+      call: { serverId: "s", tool: "getAccounts", args: {} },
+      updatedAt: new Date(),
+    });
+    expect(response.status).toBe(409);
+    expect(prisma.pageSource.updateMany).not.toHaveBeenCalled();
+  });
+});
+
 describe("thread stream authorization", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -2185,7 +2277,7 @@ describe("model credential persistence", () => {
   } satisfies Actor;
 
   function persistDeps(options?: { envDefaultModel?: string }) {
-    const upsert = vi.fn().mockResolvedValue({ id: "preference" });
+    const upsert = vi.fn().mockResolvedValue({ id: "preference", isDefault: true });
     const finish = vi.fn();
     // Connect loads any previous credential on the root client before the write transaction.
     const userModelCredential = {
@@ -3542,6 +3634,8 @@ describe("bot model auth on save", () => {
     bot?: Record<string, unknown>;
     /** How many of the chosen message targets are internal bots of this space and user. */
     internalTargets?: number;
+    /** Connection ids that belong to the caller. */
+    ownedCredentialIds?: string[];
   }) {
     const bot = { ...storedBot(options.modelId), ...options.bot };
     const preferenceFindFirst = vi.fn(options.preferences);
@@ -3554,6 +3648,11 @@ describe("bot model auth on save", () => {
       }
       return null;
     });
+    const credentialFindFirst = vi.fn(async (args: { where: { id?: string; userId?: string } }) =>
+      args.where.userId === actor.userId && options.ownedCredentialIds?.includes(args.where.id!)
+        ? credentialRow(args.where.id!, "secret-oauth")
+        : null,
+    );
     const botUpdate = vi.fn(async () => ({
       id: bot.id,
       name: "Ada renamed",
@@ -3576,7 +3675,7 @@ describe("bot model auth on save", () => {
         update: botUpdate,
       },
       spaceModelPreference: { findFirst: preferenceFindFirst },
-      userModelCredential: { findFirst: vi.fn(async () => null) },
+      userModelCredential: { findFirst: credentialFindFirst },
       secret: { findFirst: secretFindFirst },
       // listBots looks for delegate runs that wait for approval.
       run: { findMany: vi.fn(async () => []) },
@@ -3602,6 +3701,7 @@ describe("bot model auth on save", () => {
       preferenceFindFirst,
       secretFindFirst,
       botUpdate,
+      credentialFindFirst,
       userMessageCount: prisma.message.count,
       handler: new RPCHandler(createRouter(deps)),
     };
@@ -3631,6 +3731,74 @@ describe("bot model auth on save", () => {
         data: expect.objectContaining({ name: "Ada renamed", modelId: spark }),
       }),
     );
+  });
+
+  it("pins a bot to the caller's own connection", async () => {
+    const { botUpdate, handler } = saveDeps({
+      modelId: "other-model",
+      preferences: () => null,
+      ownedCredentialIds: ["cred-mine"],
+    });
+
+    const response = await call(handler, "bots/update", {
+      botId: "bot-1",
+      modelProvider: "openai-codex",
+      modelId: luna,
+      modelCredentialId: "cred-mine",
+    });
+
+    expect(response.status).toBe(200);
+    expect(botUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ modelCredentialId: "cred-mine" }),
+      }),
+    );
+  });
+
+  it("saves a rename while an unchanged pin points at a connection that is gone", async () => {
+    const { botUpdate, credentialFindFirst, handler } = saveDeps({
+      modelId: luna,
+      preferences: () => null,
+      bot: { modelCredentialId: "cred-gone" },
+      ownedCredentialIds: [],
+    });
+
+    const response = await call(handler, "bots/update", {
+      botId: "bot-1",
+      name: "Ada renamed",
+      modelProvider: "openai-codex",
+      modelId: luna,
+      modelCredentialId: "cred-gone",
+    });
+
+    expect(response.status).toBe(200);
+    expect(credentialFindFirst).not.toHaveBeenCalled();
+    expect(botUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name: "Ada renamed" }) }),
+    );
+  });
+
+  it("rejects pinning a bot to someone else's connection", async () => {
+    const { botUpdate, credentialFindFirst, handler } = saveDeps({
+      modelId: spark,
+      preferences: () => null,
+      ownedCredentialIds: [],
+    });
+
+    const response = await call(handler, "bots/update", {
+      botId: "bot-1",
+      modelProvider: "openai-codex",
+      modelId: spark,
+      modelCredentialId: "cred-theirs",
+    });
+
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(credentialFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "cred-theirs", userId: actor.userId }),
+      }),
+    );
+    expect(botUpdate).not.toHaveBeenCalled();
   });
 
   it("checks whether the new bot needs a fresh introduction only when its profile text changes", async () => {
@@ -3925,6 +4093,7 @@ describe("routines.update", () => {
           },
         ]),
       },
+      run: { findFirst: vi.fn(async () => null) },
       routine: {
         findFirst: vi.fn(async (args: { where: { bot?: { archivedAt: null } } }) =>
           botArchived && args.where.bot?.archivedAt === null ? null : savedRoutine,
@@ -4205,6 +4374,7 @@ describe("groups.archive", () => {
     // As in production: the run's computer is known only through its execution lease.
     const tx = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "group-1" }]),
       chatGroup: {
         findFirst: vi.fn().mockResolvedValue({

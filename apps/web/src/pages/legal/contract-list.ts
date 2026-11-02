@@ -1,4 +1,4 @@
-import type { LegalContract, LegalContractRow } from "@rakazo/contracts";
+import type { LegalContract, LegalContractRow, LegalContractStatus } from "@rakazo/contracts";
 import { groupLegalContracts } from "@rakazo/contracts";
 import { daysBetween } from "../../lib/legal-format";
 import type { SortDir } from "../../lib/list-params";
@@ -20,13 +20,31 @@ export type ContractFilters = {
 export const EXPIRING_DAYS = 90;
 export const CONTRACT_STATUSES = ["active", "expiring", "expired"] as const;
 
-const matchesStatus = (c: LegalContract, status: string, today: string) =>
-  status === "expiring"
-    ? c.status === "active" &&
-      c.expirationDate !== null &&
-      daysBetween(today, c.expirationDate) <= EXPIRING_DAYS &&
-      daysBetween(today, c.expirationDate) >= 0
-    : c.status === status;
+/**
+ * The stored status, except that an active contract that does not renew and whose end date has
+ * passed is expired. The server keeps the stored status; the agent reads that one.
+ */
+export function contractStatus(c: LegalContract, today: string): LegalContractStatus {
+  return c.status === "active" &&
+    c.autoRenews !== true &&
+    c.expirationDate !== null &&
+    c.expirationDate < today
+    ? "expired"
+    : c.status;
+}
+
+export const OPTIONAL_STATUSES = ["terminated", "draft", "unknown"] as const;
+
+const matchesStatus = (c: LegalContract, status: string, today: string) => {
+  if (status !== "expiring") return contractStatus(c, today) === status;
+  const days = c.expirationDate === null ? -1 : daysBetween(today, c.expirationDate);
+  return (
+    contractStatus(c, today) === "active" &&
+    c.autoRenews !== true &&
+    days >= 0 &&
+    days <= EXPIRING_DAYS
+  );
+};
 
 /** Contracts whose title or party names contain the search text and that match every set filter. */
 export function filterContracts(

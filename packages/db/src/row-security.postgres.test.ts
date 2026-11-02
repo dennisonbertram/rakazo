@@ -66,6 +66,42 @@ function rowsFor(t: Tenant, tag: string): Array<[string, Record<string, unknown>
       { spaceId: t.spaceId, userId: t.userId, name: `n-${tag}`, description: "d", content: "c" },
     ],
     ["userVoiceCredential", { userId: t.userId, provider: "p", secretId: t.personalSecretId }],
+    [
+      "botPage",
+      {
+        id: `rls-page-${tag}-${t.botId}`,
+        spaceId: t.spaceId,
+        userId: t.userId,
+        botId: t.botId,
+        title: `Page ${tag}`,
+        content: "",
+        updatedBy: "user",
+      },
+    ],
+    [
+      "pageSource",
+      {
+        id: `rls-page-source-${tag}-${t.botId}`,
+        spaceId: t.spaceId,
+        userId: t.userId,
+        botId: t.botId,
+        pageId: `rls-page-${tag}-${t.botId}`,
+        name: `Source ${tag}`,
+        kind: "praci",
+        call: { tool: "finance_overview", args: {} },
+        schedule: "1h",
+        status: "active",
+      },
+    ],
+    [
+      "pageSourceSnapshot",
+      {
+        spaceId: t.spaceId,
+        sourceId: `rls-page-source-${tag}-${t.botId}`,
+        value: { ok: true },
+        bytes: 11,
+      },
+    ],
   ];
 }
 

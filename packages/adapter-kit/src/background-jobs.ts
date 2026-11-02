@@ -92,7 +92,35 @@ const payloadSchemas = {
   "company.import.recover": z.object({}),
   "company.refresh.tick": z.object({}),
   "watch.probe": z.object({}),
+  "pages.refresh.tick": z.object({}),
+  "pages.snapshots.retention": z.object({}),
   "finance.sync": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
+  "meetings.capture_transcribe": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    chunkId: z.string().min(1),
+  }),
+  "meetings.capture_finalize": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    captureId: z.string().min(1),
+  }),
+  "meetings.capture_sweep": z.object({}),
+  "omi.assemble": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    connectionId: z.string().min(1),
+  }),
+  "omi.transcribe": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    itemId: z.string().min(1),
+  }),
+  "omi.sort": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    itemId: z.string().min(1),
+  }),
   "dataroom.blob.delete": z.object({ spaceId: z.string().min(1), storageKey: z.string().min(1) }),
   "dataroom.ingest": dataRoomStepPayload,
   "dataroom.classify": dataRoomStepPayload,
@@ -106,7 +134,7 @@ const payloadSchemas = {
     entries: z.number().int().positive(),
     importId: z.string().min(1),
     name: z.string().min(1),
-    source: z.enum(["upload", "gmail", "drive", "box", "chat"]),
+    source: z.enum(["upload", "gmail", "drive", "box", "chat", "omi"]),
     folderId: z.string().min(1).nullable(),
     sourceConnectionId: z.string().min(1).optional(),
     externalId: z.string().min(1).optional(),
@@ -442,6 +470,60 @@ export function meetingsDigestJob(
     replaceKey: `meetings.digest:${payload.meetingId}`,
     maxAttempts: 3,
     ...(availableAt ? { availableAt } : {}),
+  };
+}
+
+/** One queued transcription per chunk. */
+export function meetingsCaptureTranscribeJob(
+  payload: BackgroundJobPayloads["meetings.capture_transcribe"],
+): BackgroundJob {
+  return {
+    name: "meetings.capture_transcribe",
+    payload,
+    replaceKey: `meetings.capture_transcribe:${payload.chunkId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** One queued finalize per capture. */
+export function meetingsCaptureFinalizeJob(
+  payload: BackgroundJobPayloads["meetings.capture_finalize"],
+): BackgroundJob {
+  return {
+    name: "meetings.capture_finalize",
+    payload,
+    replaceKey: `meetings.capture_finalize:${payload.captureId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** One queued assembly per pendant connection; a repeat replaces it. */
+export function omiAssembleJob(payload: BackgroundJobPayloads["omi.assemble"]): BackgroundJob {
+  return {
+    name: "omi.assemble",
+    payload,
+    replaceKey: `omi.assemble:${payload.connectionId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** One queued transcription per recording; a repeat replaces it. */
+export function omiTranscribeJob(payload: BackgroundJobPayloads["omi.transcribe"]): BackgroundJob {
+  return {
+    name: "omi.transcribe",
+    payload,
+    replaceKey: `omi.transcribe:${payload.itemId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** One queued sort per recording; a repeat replaces it. */
+export function omiSortJob(payload: BackgroundJobPayloads["omi.sort"]): BackgroundJob {
+  return {
+    name: "omi.sort",
+    payload,
+    replaceKey: `omi.sort:${payload.itemId}`,
+    maxAttempts: 3,
   };
 }
 

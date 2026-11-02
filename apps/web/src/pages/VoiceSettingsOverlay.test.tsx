@@ -14,6 +14,8 @@ const voice = vi.hoisted(() => ({
   disconnect: vi.fn(),
   setVoice: vi.fn(),
   setSpeechModel: vi.fn(),
+  setTranscription: vi.fn(),
+  clearTranscription: vi.fn(),
 }));
 
 vi.mock("../lib/rpc", () => ({ rpc: { voice } }));
@@ -152,4 +154,174 @@ it("saves a Fish speech model on the existing provider pane", async () => {
     container.remove();
     vi.unstubAllGlobals();
   }
+});
+
+it("saves an OpenAI-compatible server's base URL and model, and never shows the key back", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  voice.catalog.mockResolvedValue([
+    {
+      id: "openai-compatible",
+      name: "OpenAI-compatible",
+      description: "",
+      transcribe: true,
+      speech: false,
+    },
+  ]);
+  voice.credentials.mockResolvedValue([]);
+  let connected: string | null = null;
+  voice.status.mockImplementation(async () => ({
+    configured: false,
+    ready: false,
+    transcribe: false,
+    provider: null,
+    voiceId: "",
+    transcriptionProvider: connected,
+    transcriptionReady: false,
+  }));
+  voice.setTranscription.mockImplementation(async ({ provider }: { provider: string }) => {
+    connected = provider;
+    return { provider };
+  });
+
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const field = (label: string) => {
+    const found = [...container.querySelectorAll("input")].find(
+      (input) => container.querySelector(`label[for="${input.id}"]`)?.textContent === label,
+    );
+    if (!found) throw new Error(`Missing field: ${label}`);
+    return found;
+  };
+  const type = async (input: HTMLInputElement, value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  try {
+    await act(async () => {
+      root.render(<VoiceSettingsOverlay embedded onClose={() => undefined} />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const connect = () =>
+      [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Connect "))!;
+    expect(connect().disabled).toBe(true);
+    await type(field("Base URL"), "http://localhost:8000");
+    await type(field("Model"), "whisper-large-v3");
+    expect(field("API key (optional)").type).toBe("password");
+    await type(field("API key (optional)"), "secret-key-value");
+    await act(async () => {
+      connect().click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(voice.setTranscription).toHaveBeenCalledWith({
+      provider: "openai-compatible",
+      baseUrl: "http://localhost:8000",
+      model: "whisper-large-v3",
+      apiKey: "secret-key-value",
+    });
+    expect(field("API key (optional)").value).toBe("");
+    expect(container.innerHTML).not.toContain("secret-key-value");
+    expect(container.textContent).toContain("Disconnect");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+async function renderWithSpeech(speech?: unknown) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  voice.catalog.mockResolvedValue([
+    { id: "fish-audio", name: "Fish Audio", description: "", transcribe: true },
+  ]);
+  voice.credentials.mockResolvedValue([]);
+  voice.status.mockResolvedValue({ configured: false, ready: false, transcribe: false });
+  vi.stubGlobal(
+    "window",
+    Object.assign(window, { rakazoDesktop: speech ? { speech } : undefined }),
+  );
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(<VoiceSettingsOverlay embedded onClose={() => undefined} />);
+  });
+  await act(async () => {
+    await Promise.resolve();
+  });
+  const row = () =>
+    [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("On this device"),
+    );
+  const pane = () => container.querySelector("[data-testid=device-speech]");
+  return { container, row, pane };
+}
+const bridge = (state: object, extra: object = {}) => ({
+  status: async () => state,
+  onStatus: () => () => undefined,
+  prepare: vi.fn(),
+  forget: vi.fn(),
+  ...extra,
+});
+
+it("hides the On this device row without a bridge or when unavailable", async () => {
+  expect((await renderWithSpeech()).row()).toBeUndefined();
+  expect((await renderWithSpeech(bridge({ state: "unavailable" }))).row()).toBeUndefined();
+});
+
+it("selects the device by default when ready, with a Ready label on the row", async () => {
+  const { row, pane } = await renderWithSpeech(bridge({ state: "ready" }));
+  expect(row()?.textContent).toContain("Ready");
+  expect(pane()?.textContent).toContain("Ready. Audio stays on this Mac.");
+  expect(pane()?.textContent).toContain("Stop using");
+});
+
+it("shows each state's pane after selecting the row", async () => {
+  const cases: Array<[object, string]> = [
+    [{ state: "not-prepared" }, "Prepare"],
+    [{ state: "preparing", progress: 0.42 }, "Preparing… 42%"],
+    [{ state: "error" }, "Try again"],
+  ];
+  for (const [state, text] of cases) {
+    const { row, pane } = await renderWithSpeech(bridge(state));
+    expect(pane()).toBeNull();
+    await act(async () => row()?.click());
+    expect(pane()?.textContent).toContain(text);
+  }
+  const { row, pane } = await renderWithSpeech(bridge({ state: "preparing", progress: null }));
+  await act(async () => row()?.click());
+  expect(pane()?.textContent).not.toContain("%");
+});
+
+it("applies the status returned by prepare when nothing is pushed", async () => {
+  const { row, pane } = await renderWithSpeech(
+    bridge({ state: "not-prepared" }, { prepare: async () => ({ state: "ready" }) }),
+  );
+  await act(async () => row()?.click());
+  await act(async () => {
+    [...(pane()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent === "Prepare")
+      ?.click();
+  });
+  expect(pane()?.textContent).toContain("Ready. Audio stays on this Mac.");
+});
+
+it("cancels a running prepare with forget", async () => {
+  const forget = vi.fn(async () => ({ state: "not-prepared" }));
+  const { row, pane } = await renderWithSpeech(
+    bridge({ state: "preparing", progress: 0.42 }, { forget }),
+  );
+  await act(async () => row()?.click());
+  await act(async () => {
+    [...(pane()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent === "Cancel")
+      ?.click();
+  });
+  expect(forget).toHaveBeenCalledOnce();
+  expect(pane()?.textContent).toContain("Prepare");
 });

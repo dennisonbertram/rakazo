@@ -1,6 +1,6 @@
 # Usage: maestro --udid <UDID> test maestro/sign-in.yaml -e EMAIL=... -e PASSWORD=... -e SERVER=http://127.0.0.1:3301
 # The app must already be installed. Clears app state, points it at SERVER (http needs the Use anyway confirmation), then signs in.
-appId: com.rakazo.app.dev
+appId: ai.praci.mobile.dev
 ---
 - launchApp:
     clearState: true

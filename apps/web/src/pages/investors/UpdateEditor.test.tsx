@@ -49,6 +49,7 @@ vi.mock("../../lib/rpc", () => ({
   },
 }));
 
+import { UNDO_SEND_MS } from "../../lib/outbox";
 import { UpdateEditor } from "./UpdateEditor";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -89,6 +90,7 @@ const button = (label: string) =>
     | HTMLElement
     | undefined;
 const click = (el: HTMLElement | undefined) => act(async () => el?.click());
+const advance = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 
 async function show(initial: InvestorUpdate, accounts: unknown[] = gmail, lookupOk = true) {
   rpcMock.get.mockResolvedValue(initial);
@@ -125,6 +127,7 @@ afterEach(() => {
 });
 
 it("asks once about leftover TBD, in the button row, and the Send label never shows the count", async () => {
+  vi.useFakeTimers();
   await show(update({ body: "Revenue was TBD." }));
   expect(document.querySelectorAll("[data-tbd]").length).toBe(1);
   expect(button("Send")).toBeDefined();
@@ -136,15 +139,83 @@ it("asks once about leftover TBD, in the button row, and the Send label never sh
   expect(button("Send")).toBeDefined();
   await click(button("Send"));
   await click(button("Send anyway"));
+  expect(rpcMock.send).not.toHaveBeenCalled();
+  await advance(UNDO_SEND_MS);
   expect(rpcMock.send).toHaveBeenCalledWith({ id: "u1" });
 });
 
 it("sends without asking when nothing is TBD", async () => {
+  vi.useFakeTimers();
   rpcMock.send.mockResolvedValue(update({ status: "sending" }));
   await show(update());
   await click(button("Send"));
   expect(document.body.textContent).not.toContain("TBD left");
+  await advance(UNDO_SEND_MS);
   expect(rpcMock.send).toHaveBeenCalledOnce();
+});
+
+it("holds Send for the undo window, then sends exactly once", async () => {
+  vi.useFakeTimers();
+  rpcMock.send.mockResolvedValue(update({ status: "sending" }));
+  await show(update());
+  await click(button("Send"));
+  expect(document.body.textContent).toContain("Sending…");
+  expect(button("Undo")).toBeDefined();
+  await advance(UNDO_SEND_MS - 1);
+  expect(rpcMock.send).not.toHaveBeenCalled();
+  await advance(1);
+  expect(rpcMock.send).toHaveBeenCalledOnce();
+  await advance(UNDO_SEND_MS * 2);
+  expect(rpcMock.send).toHaveBeenCalledOnce();
+});
+
+it("Undo during the hold sends nothing and makes the draft editable again", async () => {
+  vi.useFakeTimers();
+  await show(update());
+  const subject = () => document.getElementById("update-subject") as HTMLInputElement;
+  await click(button("Send"));
+  expect(subject().disabled).toBe(true);
+  expect((document.getElementById("to-c1") as HTMLInputElement).disabled).toBe(true);
+  await click(button("Undo"));
+  await advance(UNDO_SEND_MS * 2);
+  expect(rpcMock.send).not.toHaveBeenCalled();
+  expect(subject().disabled).toBe(false);
+  expect(button("Send")).toBeDefined();
+});
+
+it("leaving the page during the hold sends at once, and only once", async () => {
+  vi.useFakeTimers();
+  rpcMock.send.mockResolvedValue(update({ status: "sending" }));
+  await show(update());
+  await click(button("Send"));
+  expect(rpcMock.send).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+  expect(rpcMock.send).toHaveBeenCalledOnce();
+  expect(rpcMock.send).toHaveBeenCalledWith({ id: "u1" });
+  await advance(UNDO_SEND_MS * 2);
+  expect(rpcMock.send).toHaveBeenCalledOnce();
+  root = createRoot(container);
+});
+
+it("shows why Send is unavailable when the contacts fail to load, and recovers with Try again", async () => {
+  rpcMock.contacts.mockRejectedValueOnce(new Error("down"));
+  await show(update());
+  expect(document.body.textContent).not.toContain("No investors yet");
+  expect(document.querySelector("[role=alert]")?.textContent).toContain("down");
+  expect(button("Try again")).toBeDefined();
+  expect((button("Send") as HTMLButtonElement).disabled).toBe(true);
+  await click(button("Try again"));
+  await flush();
+  expect(document.getElementById("to-c1")).not.toBeNull();
+  expect(document.querySelector("[role=alert]")).toBeNull();
+  expect((button("Send") as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("shows an alert and disables Send when the Gmail accounts fail to load", async () => {
+  rpcMock.accounts.mockRejectedValue(new Error("down"));
+  await show(update(), undefined, false);
+  expect(button("Try again")).toBeDefined();
+  expect((button("Send") as HTMLButtonElement).disabled).toBe(true);
 });
 
 it("shows a sent update read-only with no footer button", async () => {
@@ -224,6 +295,7 @@ it("greys a revoked recipient, unticks it and never sends to it", async () => {
     contact("c2", "Bo", "bo@example.test"),
   ]);
   rpcMock.send.mockResolvedValue(update({ status: "sending" }));
+  vi.useFakeTimers();
   await show(update());
   const ada = document.getElementById("to-c1") as HTMLInputElement;
   expect(ada.checked).toBe(false);

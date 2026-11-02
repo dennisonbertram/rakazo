@@ -158,3 +158,37 @@ interrupted operations in the owner’s current workspace. A stale heartbeat alo
 never authorizes takeover. Progress reports
 actual lifecycle stages rather than estimated percentages; workspace files and
 browser profiles are portable, while system packages outside the workspace are not.
+
+## Apps on this computer
+
+A bot can read and use apps on the owner's own computer through the Praci desktop app. The
+design, security rules and slices are in `docs/local-desktop-control/README.md`; this section
+is the operator view.
+
+- **Tools.** `desktop_app_list`, `desktop_app_snapshot` and `desktop_app_act`. They read the
+  operating system accessibility tree (agent-desktop), so there are no screenshots and no
+  vision model is needed. The model snapshots an app, acts on a ref from that snapshot, and
+  snapshots again.
+- **When a bot has them.** The deployment has an app control provider
+  (`APP_CONTROL_PROVIDER=agent-desktop`), the bot's switch is on with at least one allowed app,
+  and the run was started by the deployment owner typing in chat. Runs that are unattended, from
+  a routine, another bot, a webhook, a message from outside or a resume of anything but a
+  user-started run never get them, and neither does a run that read outside content as an
+  external bot or a meeting agent. The executor checks again on every call, with the bot's
+  current settings.
+- **This Mac is excluded.** A bot whose computer runs on this Mac (its own setting or the
+  deployment default) already runs shell commands as the owner, so it does not get these tools.
+- **Approval.** The first action in each app in each run asks on an approval card titled "Use
+  {App} on this Mac" with "Allow for this run" and "Deny". Saved rules and Auto Review cannot
+  answer it and there is no "Always allow". Reads never ask. After the first read in a run,
+  `web_search` asks for the rest of the run.
+- **Untrusted content.** Snapshot results are marked `untrusted`, scrubbed of run secrets, and
+  count as outside content for the rest of the run. The Activity feed shows one line per call
+  ("Read Music", "Clicked in Music") and never tree text or typed text.
+- **Running agent-desktop.** When the API runs directly on the Mac (`pnpm dev`, `pnpm demo:up`)
+  it starts agent-desktop itself. In the packaged app the API runs in containers, so the desktop
+  app runs a loopback bridge (`APP_CONTROL_BRIDGE_URL`, `APP_CONTROL_BRIDGE_TOKEN`) and the
+  containers call it. `APP_CONTROL_PROVIDER=fake` gives a deterministic stand-in for tests.
+- **Setup on macOS.** Install agent-desktop with `npm install -g agent-desktop`, then grant
+  Accessibility to the process that runs it (Praci for the packaged app, your terminal for a
+  development checkout) in System Settings > Privacy & Security > Accessibility.

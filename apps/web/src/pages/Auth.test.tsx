@@ -42,6 +42,7 @@ vi.mock("../lib/auth", () => ({
       email: vi.fn(async () => ({ error: { code: "INVALID_EMAIL_OR_PASSWORD", message: "no" } })),
       passkey: vi.fn(async () => ({ error: { code: "AUTH_CANCELLED", message: "cancelled" } })),
     },
+    signUp: { email: vi.fn(async () => ({ data: null })) },
     requestPasswordReset: vi.fn(async () => ({})),
     resetPassword: vi.fn(async () => ({})),
   },
@@ -71,10 +72,10 @@ afterEach(async () => {
   vi.restoreAllMocks();
   delete window.rakazoDesktop;
 });
-async function render(mode: "in" | "up" | "forgot" = "in") {
+async function render(mode: "in" | "up" | "forgot" = "in", entry = "/") {
   await act(async () =>
     root.render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[entry]}>
         <AuthPage mode={mode} />
       </MemoryRouter>,
     ),
@@ -388,4 +389,48 @@ describe("passkey sign-in", () => {
     await act(async () => button()!.click());
     expect(host.querySelector('p[role="alert"]:not(:empty)')).toBeTruthy();
   });
+});
+
+const hrefOf = (text: string) =>
+  [...host.querySelectorAll("a")].find((a) => a.textContent === text)?.getAttribute("href");
+
+it("keeps next on the links between the auth pages", async () => {
+  vi.mocked(fetchAuthCapabilities).mockResolvedValue({
+    ...capabilities,
+    passwordAuth: true,
+    passwordReset: true,
+  });
+  const next = "?next=%2Fapp%2Fartifacts%3Fx%3D1";
+  await render("in", `/sign-in${next}`);
+  expect(hrefOf("Sign up")).toBe(`/sign-up${next}`);
+  expect(hrefOf("Forgot password?")).toBe(`/forgot-password${next}`);
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await render("forgot", `/forgot-password${next}`);
+  expect(hrefOf("Back to sign in")).toBe(`/sign-in${next}`);
+});
+
+it("drops a next that points outside the app", async () => {
+  vi.mocked(fetchAuthCapabilities).mockResolvedValue({ ...capabilities, passwordAuth: true });
+  await render("in", "/sign-in?next=https%3A%2F%2Fevil.test");
+  expect(hrefOf("Sign up")).toBe("/sign-up");
+});
+
+it("offers a way back when password recovery is off", async () => {
+  vi.mocked(fetchAuthCapabilities).mockResolvedValue({ ...capabilities, sso: null });
+  await render("forgot");
+  expect(host.textContent).toContain("Password recovery is not configured for this server");
+  expect(host.querySelector('a[href="/sign-in"]')).not.toBeNull();
+});
+
+it("sends the name without surrounding spaces", async () => {
+  vi.mocked(fetchAuthCapabilities).mockResolvedValue({ ...capabilities, passwordAuth: true });
+  await render("up");
+  await act(async () => {
+    setValue(host.querySelector<HTMLInputElement>("#name")!, " Dana ");
+    setValue(host.querySelector<HTMLInputElement>('input[name="email"]')!, "dana@example.test");
+    setValue(host.querySelector<HTMLInputElement>('input[type="password"]')!, "password123");
+  });
+  await act(async () => host.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+  expect(authClient.signUp.email).toHaveBeenCalledWith(expect.objectContaining({ name: "Dana" }));
 });

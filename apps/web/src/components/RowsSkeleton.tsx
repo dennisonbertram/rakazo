@@ -3,7 +3,15 @@ import { Skeleton } from "@rakazo/ui-web";
 import { StillLoading } from "./ShellSkeleton";
 
 /** Placeholder list rows (avatar and two lines) for any list that is still loading. */
-export function RowsSkeleton({ rows = 6, className = "" }: { rows?: number; className?: string }) {
+export function RowsSkeleton({
+  rows = 6,
+  className = "",
+  onRetry,
+}: {
+  rows?: number;
+  className?: string;
+  onRetry?: () => void;
+}) {
   const { t } = useLingui();
   return (
     <div role="status" aria-label={t`Loading…`} className={`flex flex-col gap-4 ${className}`}>
@@ -16,7 +24,7 @@ export function RowsSkeleton({ rows = 6, className = "" }: { rows?: number; clas
           </div>
         </div>
       ))}
-      <StillLoading />
+      <StillLoading onRetry={onRetry} />
     </div>
   );
 }

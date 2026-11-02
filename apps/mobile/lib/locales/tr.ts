@@ -952,4 +952,12 @@ export const TR_MESSAGES: Record<string, string> = {
     "Yapay zeka anahtarı harcama sınırına ulaştı. Sağlayıcınızdan sınırı artırın veya Ayarlar > Modeller bölümünde başka bir anahtar kullanın.",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "Model sağlayıcısı istekleri sınırlıyor. Birkaç dakika sonra tekrar deneyin.",
+  "Waiting for approval": "Onay bekleniyor",
+  "Not approved": "Onaylanmadı",
+  "Source not found": "Kaynak bulunamadı",
+  "No data yet": "Henüz veri yok",
+  "Source failed": "Kaynak başarısız",
+  "Connected.": "Bağlandı.",
+  "Disconnected {provider}. Bots now use {model}.": "{provider} bağlantısı kesildi. Botlar artık {model} kullanacak.",
+  "Source paused": "Kaynak duraklatıldı",
 };

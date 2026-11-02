@@ -24,7 +24,7 @@ import {
   Textarea,
 } from "@rakazo/ui-web";
 import { useId, useRef, useState } from "react";
-import { companyDate, companyFactTitle } from "../lib/company-format";
+import { companyDate, companyDateEnd, companyFactTitle } from "../lib/company-format";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
@@ -54,6 +54,21 @@ export function CompanyFactDetail({
   const [whatWeDo, setWhatWeDo] = useState(
     fact.kind === "entity" ? String(fact.record.attrs.whatWeDo ?? "") : "",
   );
+  const dated = fact.kind === "event" || fact.kind === "edge" ? fact.record : null;
+  const startCurrent =
+    fact.kind === "event"
+      ? fact.record.occursOn
+      : fact.kind === "edge"
+        ? fact.record.startsOn
+        : null;
+  const [start, setStart] = useState(startCurrent?.date ?? "");
+
+  const [end, setEnd] = useState(dated?.endsOn?.date ?? "");
+  const [amount, setAmount] = useState(
+    fact.kind === "event" && fact.record.amountCents != null
+      ? String(fact.record.amountCents / 100)
+      : "",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const ref = { kind: fact.kind, id: fact.record.id };
@@ -69,6 +84,17 @@ export function CompanyFactDetail({
       setBusy(false);
     }
   }
+  // Only changed dates are sent: the server locks every field it receives.
+  function changedDate(next: string, current: CompanyPartialDate | null | undefined) {
+    if (next === (current?.date ?? "")) return {};
+    return { value: next ? { date: next, precision: "day" as const } : null };
+  }
+  const startChange = changedDate(start, startCurrent);
+  const endChange = changedDate(end, dated?.endsOn);
+  const amountChanged =
+    fact.kind === "event" &&
+    fact.record.amountCents != null &&
+    Math.round(Number(amount) * 100) !== fact.record.amountCents;
   async function save() {
     if (fact.kind === "entity") {
       const attrs: Record<string, string> = {};
@@ -85,16 +111,38 @@ export function CompanyFactDetail({
         }),
       );
     } else if (fact.kind === "edge") {
-      if (name.trim() === initialName) return;
+      const patch = {
+        ...(name.trim() !== initialName ? { role: name.trim() || null } : {}),
+        ...("value" in startChange ? { startsOn: startChange.value } : {}),
+        ...("value" in endChange ? { endsOn: endChange.value } : {}),
+      };
+      if (Object.keys(patch).length === 0) return;
       await rpc.company.editEdge(
-        CompanyEdgeEditInputSchema.parse({ edgeId: fact.record.id, role: name.trim() || null }),
+        CompanyEdgeEditInputSchema.parse({ edgeId: fact.record.id, ...patch }),
       );
     } else {
-      if (name.trim() === initialName) return;
+      const patch = {
+        ...(name.trim() !== initialName ? { title: name } : {}),
+        ...("value" in startChange ? { occursOn: startChange.value } : {}),
+        ...("value" in endChange ? { endsOn: endChange.value } : {}),
+        ...(amountChanged ? { amountCents: Math.round(Number(amount) * 100) } : {}),
+      };
+      if (Object.keys(patch).length === 0) return;
       await rpc.company.editEvent(
-        CompanyEventEditInputSchema.parse({ eventId: fact.record.id, title: name }),
+        CompanyEventEditInputSchema.parse({
+          eventId: fact.record.id,
+          ...patch,
+        }),
       );
     }
+  }
+  // End before start would be stored as-is: the edit schemas do not check the range.
+  function rangeError() {
+    const from = "value" in startChange ? startChange.value : startCurrent;
+    const to = "value" in endChange ? endChange.value : dated?.endsOn;
+    return from && to && from.date > companyDateEnd(to)
+      ? t`End date is before the start date.`
+      : "";
   }
   return (
     <>
@@ -197,7 +245,9 @@ export function CompanyFactDetail({
                 className="space-y-4"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void act(save);
+                  const invalid = rangeError();
+                  setError(invalid);
+                  if (!invalid) void act(save);
                 }}
               >
                 <label htmlFor={`${id}-name`} className="block space-y-1">
@@ -210,6 +260,50 @@ export function CompanyFactDetail({
                     required={fact.kind !== "edge"}
                   />
                 </label>
+                {dated && (
+                  <>
+                    <label htmlFor={`${id}-start`} className="block space-y-1">
+                      <span>{fact.kind === "event" ? t`Date` : t`Start date`}</span>
+                      <Input
+                        id={`${id}-start`}
+                        type="date"
+                        value={start}
+                        onChange={(e) => setStart(e.target.value)}
+                        required={fact.kind === "event"}
+                      />
+                    </label>
+                    <label htmlFor={`${id}-end`} className="block space-y-1">
+                      <span>
+                        <Trans>End date</Trans>
+                      </span>
+                      <Input
+                        id={`${id}-end`}
+                        type="date"
+                        value={end}
+                        onChange={(e) => setEnd(e.target.value)}
+                      />
+                    </label>
+                  </>
+                )}
+                {fact.kind === "event" && fact.record.amountCents != null && (
+                  <label htmlFor={`${id}-amount`} className="block space-y-1">
+                    <span>
+                      <Trans>Amount</Trans>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Input
+                        id={`${id}-amount`}
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        required
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                      />
+                      <span className="text-muted-foreground">{fact.record.currency}</span>
+                    </span>
+                  </label>
+                )}
                 {fact.kind === "entity" &&
                   ["company", "matter", "product"].includes(fact.record.kind) && (
                     <label htmlFor={`${id}-description`} className="block space-y-1">

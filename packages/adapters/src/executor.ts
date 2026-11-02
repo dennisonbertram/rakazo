@@ -9,6 +9,8 @@ import type {
   AgentRuntime,
   AgentToolCompletion,
   AgentToolExecutionObserver,
+  AppControlProvider,
+  AppControlStore,
   ArtifactStore,
   AutoReviewProvider,
   AutoReviewRequest,
@@ -43,6 +45,7 @@ import {
 } from "@rakazo/adapter-kit";
 import type { ComputerCommand, MessageBlock, RunPhase, RunStatus } from "@rakazo/contracts";
 import {
+  approvalTitle,
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
   ATTACHMENT_MAX_BYTES,
@@ -72,6 +75,7 @@ import {
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
   isAttachmentImageMimeType,
+  isBrexCardsEndpoint,
   isCartaAgentSpawnKey,
   isCompanyAgentSpawnKey,
   isCompanyImporterSpawnKey,
@@ -88,7 +92,9 @@ import {
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
+  PINNED_CONNECTION_LOST_MESSAGE,
   RunPhaseSchema,
   VOICE_AGENT_BUILTIN_TOOLS,
   ZERNIO_READ_TOOLS,
@@ -130,6 +136,7 @@ import {
   humanizeToolName,
   inboundRoutinePrompts,
   inferAttachmentMimeType,
+  isActive,
   isBackgroundRunTrigger,
   isCallClientNonce,
   isMessagingChannelRun,
@@ -185,6 +192,7 @@ import {
   createThreadMessageInTransaction,
   dropRunTurnCheckpoint,
   effectiveMemoryScope,
+  findBotModelCredential,
   findDefaultModelCredential,
   findModelCredential,
   InvalidSpaceNameError,
@@ -194,6 +202,7 @@ import {
   listApprovalRules,
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
+  PinnedConnectionLostError,
   parseComputerMode,
   RUN_TURN_CHECKPOINT_KIND,
   readHistory,
@@ -219,8 +228,19 @@ import {
 } from "./agent-environment.js";
 import { aiRecipient } from "./ai-consent.js";
 import {
+  APP_CONTROL_INSTRUCTION,
+  APP_CONTROL_TOOL_NAMES,
+  APP_CONTROL_UNAVAILABLE,
+  appControlOffered,
+  DESKTOP_APP_READ_EFFECT_KIND,
+  DESKTOP_APP_USE_EFFECT_KIND,
+  runDesktopAppTool,
+  validAppControlApps,
+} from "./app-control/tools.js";
+import {
   buildApprovalAskBlock,
   buildConsentAskBlock,
+  buildDesktopAppAskBlock,
   cartaMailSendIsComplete,
   isCartaMailSend,
   isIntegrationAgentWrite,
@@ -485,6 +505,8 @@ import {
   MEETING_CONSENT_REQUIRED_MESSAGE,
   MEETING_TOOL_NAMES,
   meetingToolFromTool,
+  OMI_AGENT_BUILTIN_TOOLS,
+  omiConnectionOf,
   wrapMeetingNotes,
 } from "./meeting-tools.js";
 import { loadAgentMemoryContext } from "./memory-context.js";
@@ -510,6 +532,7 @@ import {
   modelIdSupportsImages,
 } from "./model-vision.js";
 import { runNotifyUser } from "./notify-user.js";
+import { pageSourceToolFromTool } from "./page-sources.js";
 import { pageToolFromTool } from "./pages.js";
 import type { CodexLiveCatalog } from "./pi-codex-catalog.js";
 import { codexLiveListsModel } from "./pi-codex-catalog.js";
@@ -809,7 +832,20 @@ function runtimeFallbackModel(runtime: AgentRuntime) {
   return runtime.describe().capabilities.scripted ? { provider: "scripted", id: "scripted" } : null;
 }
 
+/** The bot columns that decide whether it gets the desktop app tools. */
+type AppControlBotFields = {
+  appControlEnabled?: boolean;
+  appControlApps?: unknown;
+  appControlHeaded?: boolean;
+  runsOn?: string | null;
+  audience?: string | null;
+};
+
 export interface ExecutorDeps {
+  /** Local desktop control (docs/local-desktop-control); absent unless the deployment turned it on. */
+  appControl?: AppControlProvider;
+  /** The store behind `appControl`, to tell whether this run has read an app yet. */
+  appControlStore?: AppControlStore;
   contextStrategy?: AgentContextStrategy;
   prisma: PrismaClient;
   events: ThreadEvents;
@@ -1135,6 +1171,7 @@ export function isTerminalModelSetupError(error: unknown): boolean {
   return (
     error instanceof UnavailableModelForAuthError ||
     isRetiredModelCredentialError(error) ||
+    error instanceof PinnedConnectionLostError ||
     (error instanceof Error && error.message === CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE)
   );
 }
@@ -1151,13 +1188,22 @@ async function resolveRunModel(
           userId: scope.userId,
           spaceId: scope.spaceId,
         },
-        select: { modelProvider: true, modelId: true, thinkingLevel: true },
+        select: {
+          modelProvider: true,
+          modelId: true,
+          modelCredentialId: true,
+          thinkingLevel: true,
+        },
       })
     : null;
   const hasOverride = Boolean(override?.modelProvider && override.modelId);
   const [overrideCredential, defaultCredential, settings] = await Promise.all([
     hasOverride
-      ? findModelCredential(deps.prisma, scope, override!.modelProvider!, override!.modelId)
+      ? findBotModelCredential(deps.prisma, scope, {
+          modelProvider: override!.modelProvider!,
+          modelId: override!.modelId,
+          modelCredentialId: override!.modelCredentialId,
+        })
       : Promise.resolve(null),
     findDefaultModelCredential(deps.prisma, scope),
     deps.prisma.deploymentSettings.findUnique({
@@ -1433,7 +1479,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // The claim locks the row, so this is the model that was committed when it fired.
           const currentModel = await tx.routine.findUnique({
             where: { id: routine.id },
-            select: { modelProvider: true, modelId: true, thinkingLevel: true },
+            select: {
+              modelProvider: true,
+              modelId: true,
+              modelCredentialId: true,
+              thinkingLevel: true,
+            },
           });
           if (!currentModel) return null;
           const task = await tx.task.create({
@@ -1680,6 +1731,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? {
                     modelProvider: failed.modelProvider,
                     modelId: failed.modelId,
+                    modelCredentialId: failed.modelCredentialId,
                     thinkingLevel: failed.thinkingLevel,
                     modelPinned: true,
                   }
@@ -1979,6 +2031,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // may have started the chain, so the message must also carry the owner's own origin.
         // A meeting-source agent reads untrusted meeting text, so it gets a fixed list of built-ins.
         const meetingAgent = await isMeetingSourceAgent(bot, { prisma: deps.prisma });
+        // The Omi agent also reads the Data room, but only its own Omi connection's recordings.
+        const omiConnection = meetingAgent
+          ? await omiConnectionOf({ ...bot, archivedAt: null }, { prisma: deps.prisma })
+          : null;
         // Its own thread holds meeting text from now on (compaction, notifications), so it is marked.
         if (
           meetingAgent &&
@@ -2151,15 +2207,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // modelPinned distinguishes the captured choice from an attempt's recorded model.
         const modelChoice = runModelChoice(run, bot);
         const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
+        // A pinned connection that is gone fails the run by name; it never moves to another one.
+        let pinnedConnectionLost = false;
         const overrideCredential =
           hasModelOverride && modelChoice.modelProvider
-            ? await findModelCredential(
-                deps.prisma,
-                run,
-                modelChoice.modelProvider,
-                modelChoice.modelId,
-              )
+            ? await findBotModelCredential(deps.prisma, run, {
+                modelProvider: modelChoice.modelProvider,
+                modelId: modelChoice.modelId,
+                modelCredentialId: modelChoice.modelCredentialId,
+              }).catch((error: unknown) => {
+                if (!(error instanceof PinnedConnectionLostError)) throw error;
+                pinnedConnectionLost = true;
+                return null;
+              })
             : null;
+        // Backups stand in for a refused or exhausted account; a pinned connection never swaps.
+        const runPinnedToConnection = Boolean(hasModelOverride && modelChoice.modelCredentialId);
         runAbortController = new AbortController();
         if (!leaseValid) runAbortController.abort();
         if (deps.shutdownSignal?.aborted) runAbortController.abort(deps.shutdownSignal.reason);
@@ -2210,6 +2273,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const deniedIds = deniedConnectionIds(
           connectionRowsForAudience(storedConnections, bot.audience),
         );
+        // Omi recordings are anyone's speech: an agent reads them only with a grant on the Omi
+        // connection, whatever its status (a disconnected connection keeps its recordings).
+        for (const connection of storedConnections) {
+          if (connection.connectorId === OMI_CONNECTOR_ID && !botMayUseConnection(connection)) {
+            deniedIds.add(connection.id);
+          }
+        }
         const ordinaryAllowedConnections = storedConnections.filter(
           (connection) => !deniedIds.has(connection.id),
         );
@@ -2603,6 +2673,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           return true;
         };
+        if (pinnedConnectionLost) {
+          await failRunBeforeModel(PINNED_CONNECTION_LOST_MESSAGE, true);
+          return;
+        }
         if (pinError) {
           await failRunBeforeModel(pinError, pinError === PINNED_PROVIDER_NOT_CONNECTED);
           return;
@@ -2630,6 +2704,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             runModelProvider,
             runModelId,
             (values) => runSecrets.push(...values),
+            false,
+            runPinnedToConnection,
           );
         } catch (error) {
           // A dead or account-switched credential is already deleted. Retrying
@@ -2637,7 +2713,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (!isTerminalModelSetupError(error)) throw error;
           await failRunBeforeModel(
             error instanceof Error ? error.message : "Connect the provider again.",
-            isRetiredModelCredentialError(error),
+            isRetiredModelCredentialError(error) || error instanceof PinnedConnectionLostError,
           );
           return;
         }
@@ -2754,7 +2830,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             request,
           );
           if (recorded.duplicate && recorded.effect.status !== "intended") {
-            await failRunBeforeModel(CHAT_CONSENT_DECLINED_MESSAGE);
+            await failRunBeforeModel(CHAT_CONSENT_NOT_NOW_MESSAGE);
             return;
           }
           const paused = await deps.events.pauseRunForInput({
@@ -3267,7 +3343,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botUserId: bot.userId,
             trigger: run.trigger,
             messagingChannelRun,
-          });
+            ownerAgentPeer:
+              Boolean(omiConnection) && senderInScope && peerMessage?.ownerOrigin === true,
+          }) &&
+          // The Omi agent's Data room reads need the same AI data consent as meetings_*.
+          (!omiConnection || (await meetingConsentOk()));
         // Owner-initiated runs only (the owner's message, or a bot_message from the owner's own
         // agent), and only with the AI data sharing consent mail needs. Without it the agent has no
         // meetings_* tool and no live MCP tool either, so MCP cannot read meetings around the gate.
@@ -3310,7 +3390,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           run.trigger !== "routine" &&
           !isBackgroundRunTrigger(run.trigger) &&
           OWNER_INITIATED_TRIGGERS.has(run.trigger);
-        const meetingAgentToolSet: ReadonlySet<string> = new Set(MEETING_AGENT_BUILTIN_TOOLS);
+        const meetingAgentToolSet: ReadonlySet<string> = new Set(
+          omiConnection ? OMI_AGENT_BUILTIN_TOOLS : MEETING_AGENT_BUILTIN_TOOLS,
+        );
         const financeEnabled =
           financeToolsAllowed({
             ownerAgentPeer: financeAgentPeer,
@@ -3378,6 +3460,61 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trigger: run.trigger,
           messagingChannelRun,
         });
+        const threadMarkedNow = async (): Promise<boolean> => {
+          try {
+            const row = await deps.prisma.thread.findUnique({
+              where: { id: thread.id },
+              select: { meetingTaintedAt: true },
+            });
+            return row?.meetingTaintedAt != null;
+          } catch (error) {
+            // Unknown is treated as marked.
+            getLogger().error("meeting taint read", error);
+            return true;
+          }
+        };
+        // The desktop app tools (docs/local-desktop-control). Read again at each call, from the
+        // bot's current settings, so turning the switch off or removing an app takes effect at once.
+        // Steering from MCP or a chat can taint the run in the database while this attempt holds an
+        // older copy, so a call re-reads the run row. Once tainted, the tools stay off for the attempt.
+        let desktopStickyTaint = false;
+        const appControlAllowed = async (
+          current: AppControlBotFields,
+          fresh?: {
+            userId: string;
+            trigger: string;
+            unattended: boolean;
+            externalTaint: boolean;
+          },
+        ) => {
+          if (!deps.appControl || desktopStickyTaint) return false;
+          const settings = await deps.prisma.deploymentSettings.findUnique({
+            where: { id: "default" },
+          });
+          const live = fresh ?? {
+            userId: run.userId,
+            trigger: run.trigger,
+            unattended: run.unattended === true,
+            externalTaint: run.externalTaint === true,
+          };
+          const tainted = live.externalTaint || externalTaint();
+          if (tainted) desktopStickyTaint = true;
+          return appControlOffered({
+            hasProvider: true,
+            enabled: current.appControlEnabled === true,
+            appCount: validAppControlApps(current.appControlApps).length,
+            runUserId: live.userId,
+            ownerUserId: settings?.ownerUserId,
+            trigger: live.trigger,
+            unattended: live.unattended,
+            externalTaint: tainted,
+            meetingTainted: meetingTaint || (await threadMarkedNow()),
+            hostThisMac: (current.runsOn ?? settings?.computerHost) === "this-mac",
+            computerKind: computer.kind,
+            audience: current.audience,
+          });
+        };
+        const appControlOfferedForRun = await appControlAllowed(bot);
         const legalToolSet: ReadonlySet<string> = new Set(LEGAL_AGENT_BUILTIN_TOOLS);
         const dataRoomAgentToolSet: ReadonlySet<string> = new Set(DATA_ROOM_AGENT_BUILTIN_TOOLS);
         const companyAgentToolSet: ReadonlySet<string> = new Set(COMPANY_AGENT_BUILTIN_TOOLS);
@@ -3390,6 +3527,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             historyRetrievalEnabled: contextStrategy !== "current",
             graphicalToolsAllowed,
             pageBrowserAllowed,
+            appControlEnabled: appControlOfferedForRun,
             groupId: thread.groupId,
             trigger: run.trigger,
             semanticMemoryEnabled,
@@ -3410,6 +3548,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             cartaAgent,
             gtmAgent,
             integrationAgent: integrationAgent || appAgentIdentity,
+            omiAgent: Boolean(omiConnection),
             googleAgentProvider:
               appAgentConnection?.connectorId === "google"
                 ? appAgentConnection.provider
@@ -3506,6 +3645,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const exposedConnectorTools =
           !voiceAgent &&
           (!meetingAgent || meetingsEnabled) &&
+          !omiConnection &&
           (run.trigger !== "bot_message" || integrationPeerRun || connectedAppPeerRun)
             ? (peerDiscovered ?? discovered).filter(
                 (tool) =>
@@ -3608,8 +3748,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? TASK_CATALOG_GUIDANCE
           : undefined;
         const approvedEffects = await deps.prisma.externalEffect.findMany({
-          // A consent request is settled by its card; there is no tool call to replay.
-          where: { runId, status: "approved", kind: { not: AI_CONSENT_EFFECT_KIND } },
+          where: {
+            runId,
+            status: "approved",
+            // A consent card or a desktop app grant is settled by its card; there is no call to replay.
+            kind: { notIn: [AI_CONSENT_EFFECT_KIND, DESKTOP_APP_USE_EFFECT_KIND] },
+          },
           orderBy: APPROVED_EFFECT_REPLAY_ORDER,
           select: { kind: true, request: true, idempotencyKey: true },
         });
@@ -3624,9 +3768,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           computer.kind,
           instructionDisabledTools,
         );
-        const computerInstruction = dockerToolInstruction
-          ? `${baseComputerInstruction} ${dockerToolInstruction}`
-          : baseComputerInstruction;
+        const computerInstruction = [
+          baseComputerInstruction,
+          dockerToolInstruction,
+          appControlOfferedForRun ? APP_CONTROL_INSTRUCTION : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ");
         const workspaceInstruction =
           computerMode === "team"
             ? `Your Team Computer home is ${teamBotWorkspaceDirectory(bot.id)}. Relative file paths and shell working directories start there. Put intentionally shared work under shared/. Other bots' folders are visible under bots/; treat them as their working areas.`
@@ -3862,19 +4010,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
           };
         };
-        const threadMarkedNow = async (): Promise<boolean> => {
-          try {
-            const row = await deps.prisma.thread.findUnique({
-              where: { id: thread.id },
-              select: { meetingTaintedAt: true },
-            });
-            return row?.meetingTaintedAt != null;
-          } catch (error) {
-            // Unknown is treated as marked.
-            getLogger().error("meeting taint read", error);
-            return true;
-          }
-        };
         // A read-only call that a marked run's gate now records as an effect has handlers that
         // return without finishing it; settle it here so a retry does not treat a completed read
         // as interrupted. Re-reading is safe, so a failed settle is only logged.
@@ -3918,7 +4053,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trustedSitesPromise ??= (async () => {
             const sites = sitesInText(await loadOwnerWords());
             const rows = await deps.prisma.externalEffect.findMany({
-              where: { runId, kind: { in: [...SITE_GATED_TOOLS] }, status: { in: PASSED_EFFECT_STATUSES } },
+              where: {
+                runId,
+                kind: { in: [...SITE_GATED_TOOLS] },
+                status: { in: PASSED_EFFECT_STATUSES },
+              },
               select: { request: true },
             });
             for (const row of rows) {
@@ -3983,6 +4122,195 @@ export function createRunExecutor(deps: ExecutorDeps) {
             .then((count) => count > 1);
           if (await earlierAttemptPromise) outsideContentSeen = true;
           return outsideContentSeen;
+        };
+        const pauseForAsk = async (
+          block: MessageBlock,
+          notifyBody: string,
+          executionId: string,
+        ) => {
+          if (!(await renew())) {
+            // Another worker owns the run now; exit without leaving a local pause card.
+            return pauseForApproval();
+          }
+          await workspaceCheckpoint.flush();
+          await persistTurnCheckpoint(executionId);
+          await settleRunningHelpers();
+          const paused = await deps.events.pauseRunForInput({
+            spaceId: run.spaceId,
+            threadId: run.threadId,
+            botId: run.botId,
+            runId,
+            attemptId: attempt.id,
+            leaseOwner: workerId,
+            leaseFence: fence,
+            blocks: [block],
+          });
+          // pauseRunForInput returning false after a successful renew means the run row no
+          // longer matches this worker. Exiting via pauseForApproval() would leave the run
+          // stuck in "running" with no ask card — fail instead so the user can retry.
+          if (!paused) {
+            throw new Error("Could not pause this run for approval; try sending again.");
+          }
+          await notifyRun(deps, run, {
+            kind: "help",
+            title: approvalTitle(bot.name),
+            body: notifyBody,
+            botId: bot.id,
+            threadId: thread.id,
+          });
+          return pauseForApproval();
+        };
+        // Desktop app tools (docs/local-desktop-control). They are not effects: only the owner's
+        // allowance for one app in this run is, so retries and repeated actions never collide
+        // with the effect lifecycle. The grant is a desktop_app_use effect a person approved.
+        let desktopReadMemo = false;
+        const desktopReadKey = approvalEffectKey(runId, DESKTOP_APP_READ_EFFECT_KIND, {});
+        /**
+         * Whether this run has listed or read an app. Kept as a completed effect of the run, so a
+         * resumed attempt knows even if app control has since been turned off.
+         */
+        const desktopReadSeen = async () => {
+          if (desktopReadMemo) return true;
+          const found = await deps.prisma.externalEffect.findUnique({
+            where: { idempotencyKey: desktopReadKey },
+          });
+          desktopReadMemo = found != null;
+          return desktopReadMemo;
+        };
+        const markDesktopRead = async () => {
+          desktopReadMemo = true;
+          await deps.prisma.externalEffect
+            .create({
+              data: {
+                spaceId: run.spaceId,
+                runId,
+                kind: DESKTOP_APP_READ_EFFECT_KIND,
+                idempotencyKey: desktopReadKey,
+                status: "completed",
+                request: {},
+              },
+            })
+            .catch((error: unknown) => {
+              // Another call marked it first.
+              if ((error as { code?: unknown } | null)?.code !== "P2002") throw error;
+            });
+        };
+        const authorizeDesktopApp = async (
+          app: { id: string; name: string },
+          executionId: string,
+        ) => {
+          const request = { appId: app.id };
+          const record = () =>
+            recordEffect(
+              deps,
+              run,
+              DESKTOP_APP_USE_EFFECT_KIND,
+              approvalEffectKey(runId, DESKTOP_APP_USE_EFFECT_KIND, request),
+              request,
+              undefined,
+              consumedEffectIds,
+            );
+          const recorded = await record().catch((error: unknown) => {
+            if ((error as { code?: unknown } | null)?.code === "P2002") return record();
+            throw error;
+          });
+          if (recorded.effect.status === "approved") return undefined;
+          if (recorded.effect.status !== "intended") {
+            return { error: `You were not allowed to use ${app.name} in this run.` };
+          }
+          // One card at a time for the whole turn, shared with every other approval: a second pause
+          // would overwrite the first one's saved turn. The waiting call asks again after resume.
+          if (approvalRequest) return approvalRequest.then(() => pauseForApproval());
+          if (recorded.duplicate) {
+            const current = await deps.prisma.run.findUnique({
+              where: { id: runId },
+              select: { status: true },
+            });
+            if (current?.status === "waiting_input") return pauseForApproval();
+          }
+          // Set before the first await, so a parallel call sees the guard at once.
+          approvalRequest = (async () => {
+            const platform = (await deps.appControl?.status(context).catch(() => undefined))
+              ?.platform;
+            const block = buildDesktopAppAskBlock(
+              recorded.effect.id,
+              app.name,
+              platform === "macos" ? "Mac" : "computer",
+              runSecrets,
+            );
+            return pauseForAsk(block, block.kind === "ask" ? block.text : "", executionId);
+          })();
+          return approvalRequest;
+        };
+        const applyDesktopAppTool = async (
+          name: string,
+          args: Record<string, unknown>,
+          executionId: string,
+        ) => {
+          const provider = deps.appControl;
+          const current = await deps.prisma.bot.findFirst({
+            where: { id: bot.id, spaceId: run.spaceId },
+            select: {
+              appControlEnabled: true,
+              appControlApps: true,
+              appControlHeaded: true,
+              runsOn: true,
+              audience: true,
+            },
+          });
+          const fresh = await deps.prisma.run.findUnique({
+            where: { id: runId },
+            select: { userId: true, trigger: true, unattended: true, externalTaint: true },
+          });
+          if (!provider || !current || !fresh || !(await appControlAllowed(current, fresh))) {
+            return { error: APP_CONTROL_UNAVAILABLE };
+          }
+          if (
+            name === "desktop_app_act" &&
+            resolveActionApprovalDetail({
+              toolName: name,
+              viaConnector: false,
+              rules: await loadApprovalRules(),
+              botId: bot.id,
+            }).decision === "block"
+          ) {
+            return { error: BLOCKED_ACTION_MESSAGE };
+          }
+          const result = await runDesktopAppTool(name, args, {
+            provider,
+            scope: { spaceId: run.spaceId, userId: run.userId, botId: bot.id, runId },
+            policy: {
+              allowed: validAppControlApps(current.appControlApps),
+              headed: current.appControlHeaded,
+            },
+            context,
+            redact: (value) => redactConnectorPayload(value, [...runSecrets]),
+            activity: async (line, failure) => {
+              await deps.events
+                .append({
+                  spaceId: run.spaceId,
+                  threadId: thread.id,
+                  botId: bot.id,
+                  runId,
+                  type: "computer.command",
+                  payload: {
+                    executionId,
+                    kind: "desktop_app",
+                    command: line,
+                    cwd: ".",
+                    status: "done",
+                    exitCode: failure ? 1 : 0,
+                    output: failure ?? "",
+                  } satisfies ComputerCommand,
+                })
+                .catch((error: unknown) => getLogger().error("computer command event", error));
+            },
+            authorizeAct: (app) => authorizeDesktopApp(app, executionId),
+          });
+          if (name !== "desktop_app_act" && !(result as { error?: unknown }).error) {
+            await markDesktopRead();
+          }
+          return result;
         };
         const applyTool = async (
           name: string,
@@ -4093,6 +4421,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               };
             }
             args = prepared;
+          }
+          if (APP_CONTROL_TOOL_NAMES.has(name)) {
+            if (!offeredToolNames.has(name)) return { error: APP_CONTROL_UNAVAILABLE };
+            return applyDesktopAppTool(name, args, executionId);
           }
           if (name === GTM_POST_TOOL) {
             if (!offeredToolNames.has(name)) {
@@ -4712,9 +5044,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // list asks, whether it reads private data or writes. Read at each call so a marked
           // message claimed as steering mid-run counts from then on.
           const externalTaintedCall = runTainted && !externalTaintAllowsTool(name, policyArgs);
+          // A search query is an outbound channel that site gating does not cover, so once the
+          // run has read an app on the owner's computer, every search asks.
+          const desktopReadSearch = name === "web_search" && (await desktopReadSeen());
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
             scheduleNamesNewSite ||
+            desktopReadSearch ||
             // An unattended run has no judge and nobody to ask later: a read on a connector it had
             // not used before outside content arrived is held for the owner like a write.
             (connectorReadGated && run.unattended === true) ||
@@ -5093,40 +5429,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return inferred ? accountName(inferred) : undefined;
           };
 
-          const pauseForAsk = async (block: MessageBlock, notifyBody: string) => {
-            if (!(await renew())) {
-              // Another worker owns the run now; exit without leaving a local pause card.
-              return pauseForApproval();
-            }
-            await workspaceCheckpoint.flush();
-            await persistTurnCheckpoint(executionId);
-            await settleRunningHelpers();
-            const paused = await deps.events.pauseRunForInput({
-              spaceId: run.spaceId,
-              threadId: run.threadId,
-              botId: run.botId,
-              runId,
-              attemptId: attempt.id,
-              leaseOwner: workerId,
-              leaseFence: fence,
-              blocks: [block],
-            });
-            // pauseRunForInput returning false after a successful renew means the run row no
-            // longer matches this worker. Exiting via pauseForApproval() would leave the run
-            // stuck in "running" with no ask card — fail instead so the user can retry.
-            if (!paused) {
-              throw new Error("Could not pause this run for approval; try sending again.");
-            }
-            await notifyRun(deps, run, {
-              kind: "help",
-              title: `${bot.name} needs approval`,
-              body: notifyBody,
-              botId: bot.id,
-              threadId: thread.id,
-            });
-            return pauseForApproval();
-          };
-
           // The recipient and account behind a money request's ids, read with the same server's own
           // read tools. A failed read leaves the name out of the card.
           const readApprovalName = (
@@ -5179,6 +5481,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               integrationWriteTool,
               approvalReason: approvalCardReason,
               noAlwaysAllow:
+                desktopReadSearch ||
                 meetingTaintedCall ||
                 externalTaintedCall ||
                 requiresUnattendedApproval ||
@@ -5191,7 +5494,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               schedule: scheduleCard,
               moneyNames,
             });
-            return pauseForAsk(block, block.kind === "ask" ? block.text : "");
+            return pauseForAsk(block, block.kind === "ask" ? block.text : "", executionId);
           };
           const requestApproval = () => {
             // Parallel calls can need approval at once. Only the first saves the turn and shows
@@ -5252,6 +5555,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return pauseForAsk(
               buildConsentAskBlock(recorded.effect.id),
               "Allow access to your mail",
+              executionId,
             );
           };
 
@@ -5765,11 +6069,45 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
             }
           }
-          if (name === "page_read" || name === "page_write" || name === "page_edit") {
+          if (
+            name === "page_list" ||
+            name === "page_create" ||
+            name === "page_read" ||
+            name === "page_write" ||
+            name === "page_edit"
+          ) {
             return finish(
               await pageToolFromTool(
                 name,
                 { prisma: deps.prisma, events: deps.events },
+                {
+                  spaceId: run.spaceId,
+                  botId: bot.id,
+                  userId: bot.userId,
+                  runId,
+                  gtmPage: isGtmAgentSpawnKey(bot.spawnKey),
+                },
+                args,
+              ),
+            );
+          }
+          if (
+            name === "page_source_list" ||
+            name === "page_source_set" ||
+            name === "page_source_remove"
+          ) {
+            return finish(
+              await pageSourceToolFromTool(
+                name,
+                {
+                  prisma: deps.prisma,
+                  events: deps.events,
+                  ticketBoardEnabled: deps.ticketBoardEnabled,
+                  mcp: deps.mcp,
+                  secretStore: deps.secretStore,
+                  network: deps.secretHttp,
+                  notificationEvents: deps.notificationEvents,
+                },
                 {
                   spaceId: run.spaceId,
                   botId: bot.id,
@@ -6376,6 +6714,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   connectors: deps.connectors,
                   driveAccounts,
                   deniedConnectionIds: [...deniedIds],
+                  ...(omiConnection ? { onlyConnectionId: omiConnection.id } : {}),
+                  // Omi recording text is untrusted: the thread is marked before it is returned,
+                  // so every later write or send asks (the same mark meeting text sets).
+                  onUntrustedContent: async () => {
+                    await deps.prisma.thread.updateMany({
+                      where: { id: thread.id, meetingTaintedAt: null },
+                      data: { meetingTaintedAt: new Date() },
+                    });
+                  },
                 },
                 context,
                 args,
@@ -7871,7 +8218,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     : connectorCall.route,
                 tool: name,
                 args,
-                executionId: effectKey,
+                // The Brex cards server sends this id to Brex as the request's idempotency key.
+                // It is the approved effect's own id: a retry of the effect reuses it and a second
+                // approval of the same request has another. Every other server keeps the effect key.
+                executionId:
+                  isBrexCardsEndpoint(dispatchRoute?.endpoint) && applied
+                    ? applied.effect.id
+                    : effectKey,
                 beforeDispatch: connectionDenial,
               },
               context,
@@ -8178,6 +8531,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // recipient, so the Legal agent has none. A meeting-source agent has none for the same reason.
         if (
           !scripted &&
+          !runPinnedToConnection &&
           !legalOnly &&
           !meetingAgent &&
           !meetingTaint &&
@@ -9272,6 +9626,33 @@ export function createRunExecutor(deps: ExecutorDeps) {
           })
           .catch(() => undefined);
         await settleRunningHelpers();
+        // Snapshot ownership must outlive a pause for approval, so it goes only when the run is
+        // over, whatever the bot's settings are now.
+        if (deps.appControl || deps.appControlStore) {
+          const ended = await deps.prisma.run
+            .findUnique({
+              where: { id: runId },
+              select: { status: true, spaceId: true, userId: true, botId: true },
+            })
+            .catch(() => null);
+          if (ended && !isActive(ended.status as RunStatus)) {
+            const scope = {
+              spaceId: ended.spaceId,
+              userId: ended.userId,
+              botId: ended.botId,
+              runId,
+            };
+            await deps.appControlStore?.clearRun(scope).catch(() => undefined);
+            await deps.appControl
+              ?.endRun(scope, {
+                operationId: runId,
+                traceId: runId,
+                ...scope,
+                signal: AbortSignal.timeout(10_000),
+              })
+              .catch(() => undefined);
+          }
+        }
       }
     },
   };
@@ -9655,6 +10036,8 @@ export function selectBuiltinToolsForRun(options: {
   graphicalToolsAllowed: boolean;
   /** Page browser tools need a graphical computer (Chrome), not model vision. */
   pageBrowserAllowed?: boolean;
+  /** The desktop app tools: every condition in appControlOffered holds for this run. */
+  appControlEnabled?: boolean;
   groupId: string | null;
   trigger: string;
   semanticMemoryEnabled: boolean;
@@ -9683,6 +10066,8 @@ export function selectBuiltinToolsForRun(options: {
   fundraisingEnabled?: boolean;
   /** A meeting-source agent on an owner-initiated run with AI data sharing allowed. */
   meetingsEnabled?: boolean;
+  /** The Omi agent: an integration agent that still reads the Data room (its own recordings). */
+  omiAgent?: boolean;
   messagingChannelRun: boolean;
   /** The Carta agent: no delegation to other bots, whose runs would skip its mail approval. */
   cartaAgent?: boolean;
@@ -9710,7 +10095,7 @@ export function selectBuiltinToolsForRun(options: {
       imessageEnabled: false,
       calendarEnabled: options.calendarEnabled && options.googleAgentProvider === "googlecalendar",
       driveEnabled: options.driveEnabled && options.googleAgentProvider === "googledrive",
-      dataRoomEnabled: false,
+      dataRoomEnabled: options.omiAgent === true && options.dataRoomEnabled === true,
       financeEnabled: false,
       contactsEnabled: false,
       capTableEnabled: false,
@@ -9743,6 +10128,7 @@ export function selectBuiltinToolsForRun(options: {
       !disabled.has(tool.name) &&
       (options.audience !== "external" ||
         externalBotMayUseBuiltin(tool.name, options.externalComputerTools === true)) &&
+      (options.appControlEnabled || !APP_CONTROL_TOOL_NAMES.has(tool.name)) &&
       (options.imessageEnabled || !IMESSAGE_TOOL_NAMES.has(tool.name)) &&
       (options.driveEnabled || !DRIVE_TOOL_NAMES.has(tool.name)) &&
       (options.dataRoomEnabled || !DATA_ROOM_TOOL_NAMES.has(tool.name)) &&
@@ -10445,7 +10831,7 @@ export function userTurnInstructions(parts: {
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "page_write",
-      'You have one persistent page. Put durable output the user will revisit there (a summary, tracker, or dashboard); keep ordinary replies in chat. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order.',
+      'You have named pages, up to 20. Put durable output the user will revisit on a page (a summary, tracker, or dashboard); keep ordinary replies in chat. Call page_list to see them and page_create to add one; page_read, page_write and page_edit take an optional page (a title from page_list) and use the first page without it. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order. Live data: numbers come from sources, never from you. Call page_source_set first ({name, tool, args, schedule}; tools: finance_overview, finance_breakdown, finance_transactions, finance_recurring, cap_table_read, fundraising_read, contacts_list, board_tickets) and read the preview it returns to choose paths (JSON Pointers like /cash/balance). Then use fences, each with one line of JSON on the line after the opener and nothing after the fence name, for example ```metric then {"label":"Cash","source":"Overview","path":"/cash","format":"usd"} then ```. metric: {"label", "source", "path", "format": "number"|"usd"|"percent"|"text"}; table: {"name", "source", "path" (a JSON Pointer string to an array of objects), "columns"?: [{"key", "label", "format"?}], "limit"?}; a chart gets "source", "path" and "over": "latest" (rows are the array at path) or "history" (one {at, value} row per stored result; the path points at a number), and still needs a few sample rows in data. A source with kind "mcp" ({name, kind, server, tool, args, schedule}) reads one read-only tool of an MCP server you have; the owner must approve it, and its blocks show "Waiting for approval" until they do. A source with kind "http" ({name, kind, url, secret?, accept?, schedule}) does one GET of a JSON or CSV API (CSV becomes an array of row objects); a secret is the name of a saved key for that site. It needs the owner\'s approval too. Keep going without waiting. A block shows what the source last stored; page_source_list shows errors. At most 20 live blocks and 20 sources per page. Pages are Markdown by default. Call page_create with kind "html" only when blocks cannot express the design; the page is then one HTML document that page_write and page_edit save whole. Its sources must exist (page_source_set) and be named in the head: <meta name="praci-sources" content="Overview, Revenue"> and, for sources whose past results it needs, <meta name="praci-history" content="Revenue">. The page receives data through window message events: addEventListener("message", (e) => { if (e.data?.type === "praci-data") render(e.data.sources) }); sources[name] has status, fetchedAt, error?, value (the newest result) and history ([{at, value}], newest first). Expect the event again after each refresh. The page has no network and cannot load remote scripts, fonts, images or frames: inline all script, CSS and images (data: URIs).',
     ),
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
@@ -11025,10 +11411,13 @@ function redactBlocks(blocks: MessageBlock[], secrets: string[]): MessageBlock[]
   });
 }
 
-/** What the agent is told when the owner declined the consent card in this chat. */
-/** The run error after Not now on a chat's consent card; Settings has the switch. */
+/** The run error for a delegated chat with no consent; nobody there can be asked, Settings has the switch. */
 const CHAT_CONSENT_DECLINED_MESSAGE =
   "Chat is off until you allow AI models in Settings under Privacy and approvals.";
+
+/** The run error after the owner chose Not now; their next message asks again. The prefix is matched by roster-status. */
+const CHAT_CONSENT_NOT_NOW_MESSAGE =
+  "Chat is off until you allow AI models. Send a message to be asked again.";
 
 export const MAIL_CONSENT_DECLINED =
   "The user chose not to allow AI data sharing for mail, so mail cannot be read. Tell them you can't read their mail, and don't send them to another page.";
@@ -11431,6 +11820,7 @@ async function resolveModelKey(
   modelId: string,
   registerSecrets?: (values: string[]) => void,
   requireStoredSecret = false,
+  pinnedConnection = false,
 ): Promise<{
   apiKey?: string;
   accountId?: string;
@@ -11458,6 +11848,8 @@ async function resolveModelKey(
         where: { id: credential.secretId, userId, spaceId: null },
       });
       if (!row) {
+        // A pinned run never takes the deployment key when its connection's secret vanishes.
+        if (pinnedConnection) throw new PinnedConnectionLostError();
         if (requireStoredSecret) throw new Error("Backup model credential is no longer available");
         cloudflareGatewayProviderEnv({ provider });
         return { apiKey: deploymentKeyFor(deps, provider), redact: [] };

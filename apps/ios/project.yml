@@ -27,7 +27,7 @@ targets:
       - package: RakazoUI
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.rakazo.app
+        PRODUCT_BUNDLE_IDENTIFIER: ai.praci.mobile
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: complete
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
@@ -36,9 +36,9 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
       configs:
         Debug:
-          PRODUCT_BUNDLE_IDENTIFIER: com.rakazo.app.dev
+          PRODUCT_BUNDLE_IDENTIFIER: ai.praci.mobile.dev
         Release:
-          PRODUCT_BUNDLE_IDENTIFIER: com.rakazo.app
+          PRODUCT_BUNDLE_IDENTIFIER: ai.praci.mobile
     info:
       path: Praci-Info.plist
       properties:
@@ -60,7 +60,7 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "6.0"
-        PRODUCT_BUNDLE_IDENTIFIER: com.rakazo.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: ai.praci.mobile.tests
     dependencies:
       - target: Praci
       - package: RakazoCore

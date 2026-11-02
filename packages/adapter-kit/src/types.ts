@@ -812,6 +812,8 @@ export interface BackgroundJobPayloads {
   "company.refresh.tick": Record<string, never>;
   /** Checks the page watches that are due (no model); run every minute by the worker's cron. */
   "watch.probe": Record<string, never>;
+  "pages.refresh.tick": Record<string, never>;
+  "pages.snapshots.retention": Record<string, never>;
   /** Syncs a user's finance accounts and transactions from their Mercury and Brex servers; one queued job per user and space. */
   /** Names exactly one source: a Connection or an MCP server. */
   "meetings.sync": {
@@ -824,6 +826,18 @@ export interface BackgroundJobPayloads {
   /** Extracts commitments from a stored meeting; the handler is filled in by the digest slice. */
   "meetings.digest": { spaceId: string; userId: string; meetingId: string; continue?: boolean };
   "finance.sync": { userId: string; spaceId: string };
+  /** Turns a pendant connection's uploaded records into audio recordings in the Data room. Ids only. */
+  /** Transcribes one chunk of a meeting capture. Ids only. */
+  "meetings.capture_transcribe": { spaceId: string; userId: string; chunkId: string };
+  /** Stores a finished capture as a meeting once its chunks are settled. Ids only. */
+  "meetings.capture_finalize": { spaceId: string; userId: string; captureId: string };
+  /** Finishes captures that stopped sending chunks. */
+  "meetings.capture_sweep": Record<string, never>;
+  "omi.assemble": { spaceId: string; userId: string; connectionId: string };
+  /** Transcribes one Omi recording in the Data room. Ids only. */
+  "omi.transcribe": { spaceId: string; userId: string; itemId: string };
+  /** Sorts one transcribed Omi recording into meetings, notes and trash. Ids only. */
+  "omi.sort": { spaceId: string; userId: string; itemId: string };
   /** Removes a deleted Data room item's blob. Idempotent: a missing blob is success. */
   "dataroom.blob.delete": { spaceId: string; storageKey: string };
   /** Pipeline steps for one Data room item, in order; each queues the next. */
@@ -847,7 +861,7 @@ export interface BackgroundJobPayloads {
     /** The import that reports progress. */
     importId: string;
     name: string;
-    source: "upload" | "gmail" | "drive" | "box" | "chat";
+    source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi";
     folderId: string | null;
     sourceConnectionId?: string;
     externalId?: string;

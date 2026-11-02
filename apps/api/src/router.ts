@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { Router } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
 import type {
   AdapterContext,
@@ -9,6 +10,7 @@ import type {
 import {
   computerControlExpireJobKey,
   dataRoomBlobDeleteJob,
+  MEMORY_REVISION_CONFLICT_ERROR,
   messagingDeliverJob,
   routineJobKey,
   routineWakeupJob,
@@ -27,6 +29,7 @@ import {
   acquireComputerExecutionLease,
   addScratchpadItemFromTool,
   answerBotShare,
+  answerPageSourceApproval,
   applyCodexLiveCatalog,
   applyPendingSenderRules,
   applyTeachingDesktopInput,
@@ -48,6 +51,7 @@ import {
   computerSupportsTerminal,
   computerSupportsUpdate,
   computerUpdateView,
+  createBotPage,
   createDevinCallTool,
   createFaviconResolver,
   createMeetingSourceRegistry,
@@ -65,6 +69,7 @@ import {
   expireComputerControl,
   findBotShareEffect,
   findInvestorsAgent,
+  findPageSourceApproval,
   forgetBotSecret,
   getBotPage,
   getBotPins,
@@ -78,8 +83,11 @@ import {
   latestAccountExport,
   latestAuditMessageId,
   listAvailablePiCatalog,
+  listBotPages,
   listBotSecretMetadata,
   listCalendarAccounts,
+  listOmiSegments,
+  listPageSources,
   listPiCatalog,
   listScratchpadItems,
   McpOAuthBroker,
@@ -87,9 +95,13 @@ import {
   mcpStdioRefusal,
   modelCredentialAuthKindsForSpace,
   modelCredentialDto,
+  moveOmiSegment,
   normalizeSecretDestination,
+  PageConflictError,
   PageValidationError,
   PinsValidationError,
+  pageChartSvgs,
+  pageShareStatus,
   parseModelSecret,
   persistPreparedSecret,
   personCalendarMeetings,
@@ -104,17 +116,23 @@ import {
   provisionComputer,
   queueComputerUpdate,
   refreshBotPins,
+  refreshPageSource,
+  refreshPageSources,
   releaseComputerExecutionLease,
+  removeBotPage,
+  removePageSource,
   removeScratchpadItemFromUser,
-  renderPageChartSvg,
+  renameBotPage,
   replaceComputer,
   requestAccountExport,
   requestContactPhotos,
+  requeueOmiTranscriptions,
   resolveAutoReviewChecker,
   resolveBotUploadPath,
   resolveBotWorkspaceCwd,
   resolveBotWorkspacePath,
   resolveDataRoomAi,
+  resolvePageData,
   revokeScreenControl,
   routineRunModelPin,
   sanitizeComposioError,
@@ -125,7 +143,9 @@ import {
   screenLeaseIdForRun,
   scriptedCatalogEntry,
   selectDefaultCredentialId,
+  selectTranscriptionTarget,
   serializeModelSecret,
+  sharePageSnapshot,
   startAuditDraftRun,
   stopMailWatch,
   storeBotSecret,
@@ -134,6 +154,7 @@ import {
   toComputerRef,
   touchRunningComputer,
   UNAVAILABLE_MODEL_FOR_AUTH_MESSAGE,
+  updatePageSourceByOwner,
   updateScratchpadItemFromUser,
   updateTicket,
   validateConnectedModelChoice,
@@ -143,6 +164,7 @@ import {
 } from "@rakazo/adapters";
 import type {
   Actor,
+  AppContract,
   Bot,
   BotSecretMetadata,
   ComposeFields,
@@ -151,9 +173,11 @@ import type {
   ExportManifest,
   McpServer,
   Me,
+  MeetingRecordingPolicy,
   NotificationDto,
   Routine,
   SpaceNavigation,
+  UpdateBotAppControl,
   WatchPausedReason,
 } from "@rakazo/contracts";
 import {
@@ -168,15 +192,18 @@ import {
   foldComputerCommands,
   GOOGLE_DESKTOP_REDIRECT_URI,
   GRANOLA_API_CONNECTOR_ID,
+  HEX_CONNECTOR_ID,
   IntegrationProviderIdSchema,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
+  isBrexCardsEndpoint,
   isCartaAgentSpawnKey,
   isCartaEndpoint,
   isCompanyAgentSpawnKey,
   isCompanyImporterSpawnKey,
   isCustomPageSpawnKey,
   isDataRoomAgentSpawnKey,
+  isDeniedApp,
   isFinanceAgentSpawnKey,
   isGranolaEndpoint,
   isGtmAgentSpawnKey,
@@ -189,8 +216,10 @@ import {
   isShareableArtifactMimeType,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
+  NOTIFICATION_CATCH_UP_ID,
   NOTIFICATION_HEARTBEAT_ID,
   notificationKindOf,
+  OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   parseTicketRef,
   usableModelId,
@@ -214,13 +243,13 @@ import {
   messagingProviderBlocksBot,
   newRunUnattended,
   nextCronDateAcrossStrict,
-  splitPage,
   stableJsonText,
   withAppDirectory,
 } from "@rakazo/core";
 import type { Board as BoardRow, Notification, PrismaClient } from "@rakazo/db";
 import {
   AnswerTooLongError,
+  addSidebarBotPage,
   addSidebarFolder,
   addSidebarPage,
   appendEventInTransaction,
@@ -262,6 +291,7 @@ import {
   duplicateInvestorUpdate,
   ensureBoard,
   FundraiseRoundOpenError,
+  findBotModelCredential,
   findDefaultModelCredential,
   findDefaultVoiceCredential,
   findModelCredential,
@@ -308,6 +338,7 @@ import {
   newestModelCredentialOrder,
   newestVoiceCredentialOrder,
   notSent,
+  PinnedConnectionLostError,
   PortalBlockedError,
   Prisma,
   ProspectEmailRequiredError,
@@ -316,6 +347,7 @@ import {
   pushSessionExpiresAt,
   releaseAuditDraft,
   releaseSpaceDeletionClaim,
+  removeSidebarBotPage,
   removeSidebarFolder,
   removeSidebarPage,
   renameSpaceForMember,
@@ -382,6 +414,14 @@ import {
   listSpaceArtifacts,
 } from "./artifacts.js";
 import { botProfileLabelsChanged, commitBotUpdate } from "./bot-update.js";
+import type { BrexCardsDeps } from "./brex-cards.js";
+import {
+  brexCardsCards,
+  brexCardsConnect,
+  brexCardsGetControls,
+  brexCardsReplaceToken,
+  brexCardsSetControls,
+} from "./brex-cards.js";
 import type { CartaSyncDeps } from "./carta-agent.js";
 import {
   assignToExistingCartaAgent,
@@ -548,21 +588,32 @@ import {
   revertConnectedMcpApprovals,
 } from "./mcp-approval.js";
 import { buildMcpUpdateMaterial, mcpOrigin } from "./mcp-material.js";
+import {
+  activeCapture,
+  appendCaptureText,
+  discardCapture,
+  finishCapture,
+  setMeetingRecording,
+  startCapture,
+} from "./meeting-captures.js";
 import type { MeetingsDeps } from "./meetings.js";
 import {
   connectGranola,
   deleteStoredMeeting,
   disconnectGranola,
+  getStoredMeeting,
   granolaStatus,
   listStoredMeetings,
   refreshGranola,
 } from "./meetings.js";
+import { connectLocal, disconnectLocal, importLocal, localStatus } from "./meetings-local.js";
 import {
   disconnectMemoryProvider,
   persistMemoryProviderConfig,
   serializeSpaceMemoryConfig,
   updateMemoryProviderDefaultScope,
 } from "./memory-provider-config.js";
+import { connectOmi, deleteOmiRecordingsFor, disconnectOmi, omiStatus } from "./omi.js";
 import {
   chooseFocus,
   dismissFocus,
@@ -581,16 +632,16 @@ import {
 import { rememberedMessageIds, rememberThreadMessage } from "./remember-message.js";
 import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
-import type { RouterDeps } from "./routes/context.js";
+import type { RouteAuthContext, RouterDeps } from "./routes/context.js";
 import { asTenant, createRouteContext } from "./routes/context.js";
 import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
-
 import { listRoutineRuns } from "./routine-runs.js";
 import { listPendingApprovalNotifications, listSpaceRuns } from "./runs.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { querySpaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
+import { requireSpaceOwner } from "./space-owner.js";
 import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { HEARTBEAT, withHeartbeat } from "./stream.js";
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
@@ -705,6 +756,25 @@ async function reconcilePendingConnections(
 /** Serialize begin/revoke for one user+provider so slug-wide remote deletes cannot race a new connect. */
 
 /** A provider saying the remote account does not exist: it is already gone, so revoke is done. */
+/** Page validation and duplicate-title errors become 400 and 409; anything else is rethrown. */
+/** Tells the owner's other tabs and devices a chat's read state changed, so they reload their lists. */
+function notifyThreadReadChanged(deps: RouterDeps, actor: Actor) {
+  return deps.notificationEvents.notify(
+    { spaceId: actor.spaceId, userId: actor.userId },
+    { id: NOTIFICATION_CATCH_UP_ID, surface: "threads", importance: "info" },
+  );
+}
+
+function pageError(error: unknown): unknown {
+  if (error instanceof PageValidationError) {
+    return new ORPCError("BAD_REQUEST", { message: error.message });
+  }
+  if (error instanceof PageConflictError) {
+    return new ORPCError("CONFLICT", { message: error.message });
+  }
+  return error;
+}
+
 const shareJson = (share: { artifactId: string; version: number; expiresAt: Date } | null) =>
   share && { ...share, expiresAt: share.expiresAt.toISOString() };
 
@@ -786,6 +856,7 @@ function computerContext(actor: Actor, botId: string, operationId: string): Adap
 
 const EXCLUSIVE_SERVER_MESSAGE = "This integration is used only by its agent.";
 const RECONNECT_DEVIN_MESSAGE = "Use Reconnect on the Devin page to replace the key.";
+const REPLACE_BREX_TOKEN_MESSAGE = "Use Replace token on the Brex cards page to change the token.";
 
 function approvalRuleDto(row: {
   id: string;
@@ -1306,7 +1377,10 @@ async function asMemberOf<T>(
   return runAsTenant({ spaceId, userId: actor.userId }, fn);
 }
 
-export function createRouter(deps: RouterDeps) {
+// Named so declaration emit does not spell out the whole router, which no longer fits.
+export type AppRouter = Router<AppContract, RouteAuthContext>;
+
+export function createRouter(deps: RouterDeps): AppRouter {
   const routeContext = createRouteContext(deps);
   const { os, authed } = routeContext;
   const repos = createRepos(deps.prisma);
@@ -1445,6 +1519,16 @@ export function createRouter(deps: RouterDeps) {
     provisionAgent: async (actor, serverId) => (await provisionExclusiveAgent(actor, serverId)).bot,
     archiveBot: archiveActorBot,
     notificationEvents: deps.notificationEvents,
+  };
+  const brexCardsDeps: BrexCardsDeps = {
+    prisma: deps.prisma,
+    secrets: deps.secrets,
+    mcp: deps.mcp ?? {
+      callServerTool: () => Promise.reject(new Error("MCP is not available")),
+    },
+    ...(deps.brexApi ? { brexApi: deps.brexApi } : {}),
+    provisionAgent: async (actor, serverId) => (await provisionExclusiveAgent(actor, serverId)).bot,
+    archiveBot: archiveActorBot,
   };
   const onboardingDeps = { prisma: deps.prisma, events: deps.events, connectors: deps.connectors };
   const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets);
@@ -1759,6 +1843,9 @@ export function createRouter(deps: RouterDeps) {
           }
         }),
       ),
+      setMeetingRecording: authed.spaces.setMeetingRecording.handler(({ context, input }) =>
+        setMeetingRecording(deps, context.actor, input.policy),
+      ),
       // Acts on the Space being deleted, not the current one, so its emptiness check and
       // teardown see that Space's rows. Membership is checked first.
       remove: authed.spaces.remove.handler(({ context, input }) =>
@@ -1927,6 +2014,33 @@ export function createRouter(deps: RouterDeps) {
         spaces: navigation.spaces,
       };
     }),
+    appControl: {
+      status: authed.appControl.status.handler(async ({ context }) => {
+        const none = { available: false, accessibility: "unknown", platform: null } as const;
+        if (!deps.appControl || !context.actor.isDeploymentOwner) return none;
+        try {
+          const status = await deps.appControl.status(
+            connectionContext(context.actor, randomUUID()),
+          );
+          return {
+            available: status.available,
+            accessibility: status.accessibility,
+            platform: status.platform ?? null,
+            ...(status.installed === false ? { needsInstall: true } : {}),
+          };
+        } catch {
+          return none;
+        }
+      }),
+      apps: authed.appControl.apps.handler(async ({ context }) => {
+        if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+        if (!deps.appControl) {
+          throw new ORPCError("PRECONDITION_FAILED", { message: "App control is not set up" });
+        }
+        const apps = await deps.appControl.listApps(connectionContext(context.actor, randomUUID()));
+        return { apps: apps.filter((app) => !isDeniedApp(app)) };
+      }),
+    },
     deployment: {
       get: authed.deployment.get.handler(async ({ context }) => {
         if (!context.actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
@@ -2440,6 +2554,11 @@ export function createRouter(deps: RouterDeps) {
               await tx.userModelCredential.deleteMany({
                 where: { userId: context.actor.userId, id: { in: ids } },
               });
+              // The owner chose to disconnect, so what was pinned goes back to the default.
+              // An automatic sign-out never runs this and leaves the pin to fail by name.
+              const pinned = { userId: context.actor.userId, modelCredentialId: { in: ids } };
+              await tx.bot.updateMany({ where: pinned, data: { modelCredentialId: null } });
+              await tx.routine.updateMany({ where: pinned, data: { modelCredentialId: null } });
               for (const row of existing) {
                 await deleteUnreferencedCredentialSecret(tx, {
                   credentialKind: "model",
@@ -2588,17 +2707,40 @@ export function createRouter(deps: RouterDeps) {
         // Web settings resend the saved model on every save. Reject an
         // incompatible override only when this request is changing it; a run
         // still rejects a Spark model the subscription sign-in cannot call.
+        // The pin is the caller's own connection for the bot's provider. Changing the
+        // provider (or clearing the model) drops it unless the request names a new one.
+        const providerChanged =
+          input.modelProvider !== undefined && input.modelProvider !== existing.modelProvider;
+        const pinWrite = connectionPinWrite(input, existing.modelProvider);
+        // An unchanged pin is kept as stored, even if its connection has since gone, so a
+        // rename or voice change still saves; only a new pin or a new provider is checked.
+        if (pinWrite && (pinWrite !== existing.modelCredentialId || providerChanged)) {
+          await assertOwnedConnection(
+            deps,
+            context.actor,
+            pinWrite,
+            input.modelProvider !== undefined ? input.modelProvider : existing.modelProvider,
+          );
+        }
+        const effectivePin =
+          pinWrite === undefined ? (existing.modelCredentialId ?? null) : pinWrite;
         const settingModel =
           input.modelProvider !== undefined &&
           input.modelId !== undefined &&
-          (input.modelProvider !== existing.modelProvider || input.modelId !== existing.modelId);
+          (providerChanged ||
+            input.modelId !== existing.modelId ||
+            effectivePin !== (existing.modelCredentialId ?? null));
         if (settingModel && input.modelProvider && input.modelId) {
-          const credential = await findModelCredential(
-            deps.prisma,
-            context.actor,
-            input.modelProvider,
-            input.modelId,
-          );
+          const credential = await findBotModelCredential(deps.prisma, context.actor, {
+            modelProvider: input.modelProvider,
+            modelId: input.modelId,
+            modelCredentialId: effectivePin,
+          }).catch((error: unknown) => {
+            if (error instanceof PinnedConnectionLostError) {
+              throw new ORPCError("BAD_REQUEST", { message: error.message });
+            }
+            throw error;
+          });
           if (!credential) {
             throw new ORPCError("BAD_REQUEST", { message: "Connect that model provider first" });
           }
@@ -2676,6 +2818,7 @@ export function createRouter(deps: RouterDeps) {
           }
         }
         if (!existing.thread) throw new IsolationError();
+        const appControl = await checkAppControlUpdate(deps, context.actor, existing, input);
         if (input.runsOn !== undefined && input.runsOn !== (existing.runsOn ?? null)) {
           assertRunsOnAllowed({
             runsOn: input.runsOn,
@@ -2737,6 +2880,7 @@ export function createRouter(deps: RouterDeps) {
             ...(input.modelProvider !== undefined
               ? { modelProvider: input.modelProvider, modelId: input.modelId ?? null }
               : {}),
+            ...(pinWrite !== undefined ? { modelCredentialId: pinWrite } : {}),
             ...(input.thinkingLevel !== undefined ? { thinkingLevel } : {}),
             ...(input.teamChatAmbientEnabled !== undefined
               ? { teamChatAmbientEnabled: input.teamChatAmbientEnabled }
@@ -2745,6 +2889,9 @@ export function createRouter(deps: RouterDeps) {
             ...(input.crossSpaceCommunication !== undefined
               ? { crossSpaceCommunication: input.crossSpaceCommunication }
               : {}),
+            ...(appControl?.enabled !== undefined ? { appControlEnabled: appControl.enabled } : {}),
+            ...(appControl?.apps !== undefined ? { appControlApps: appControl.apps } : {}),
+            ...(appControl?.headed !== undefined ? { appControlHeaded: appControl.headed } : {}),
             ...(input.disabledBuiltinTools !== undefined
               ? { disabledBuiltinTools: input.disabledBuiltinTools }
               : {}),
@@ -3454,6 +3601,29 @@ export function createRouter(deps: RouterDeps) {
           userId: context.actor.userId,
           threadId: target.threadId,
         };
+        // A page source card is answered the same way, by server code that checks it still matches
+        // the source's call.
+        if (await findPageSourceApproval(deps.prisma, scope, input)) {
+          const approvalDeps = {
+            prisma: deps.prisma,
+            events: deps.events,
+            ticketBoardEnabled: deps.env?.ticketBoardEnabled,
+            mcp: deps.mcp,
+            secretStore: deps.secrets,
+            network: deps.remoteConnectors,
+            notificationEvents: deps.notificationEvents,
+          };
+          const answered = await answerPageSourceApproval(approvalDeps, scope, input);
+          if (!answered) {
+            throw new ORPCError("CONFLICT", {
+              message: "This prompt is no longer awaiting an answer",
+            });
+          }
+          // Allow runs the approved source once now; a failure is recorded on the source.
+          if (answered !== "denied") await refreshPageSource(approvalDeps, answered);
+          await clearAsked();
+          return { ok: true as const };
+        }
         if (await findBotShareEffect(deps.prisma, scope, input)) {
           const shared = await answerBotShare(deps, scope, input);
           if (!shared) {
@@ -3496,19 +3666,19 @@ export function createRouter(deps: RouterDeps) {
       }),
       markRead: authed.threads.markRead.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        await setThreadUnreadState(deps.prisma, context.actor, target, false, {
+        const changed = await setThreadUnreadState(deps.prisma, context.actor, target, false, {
           upToMessageId: input.upToMessageId,
           toEnd: input.toEnd,
         });
+        if (changed) await notifyThreadReadChanged(deps, context.actor);
         return { ok: true as const };
       }),
       markUnread: authed.threads.markUnread.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        if (input.messageId) {
-          await markThreadUnreadFrom(deps.prisma, context.actor, target, input.messageId);
-        } else {
-          await setThreadUnreadState(deps.prisma, context.actor, target, true);
-        }
+        const changed = input.messageId
+          ? await markThreadUnreadFrom(deps.prisma, context.actor, target, input.messageId)
+          : await setThreadUnreadState(deps.prisma, context.actor, target, true);
+        if (changed) await notifyThreadReadChanged(deps, context.actor);
         return { ok: true as const };
       }),
     },
@@ -4254,21 +4424,29 @@ export function createRouter(deps: RouterDeps) {
           },
         });
         if (!doc) throw new IsolationError();
-        const updated = await deps.memory.commit(
-          {
-            scope: doc.scope as "bot" | "user",
-            botId: doc.botId ?? undefined,
-            path: doc.path,
-            content: input.content,
-          },
-          {
-            operationId: "mem",
-            traceId: "mem",
-            spaceId: context.actor.spaceId,
-            userId: context.actor.userId,
-            signal: new AbortController().signal,
-          },
-        );
+        const updated = await deps.memory
+          .commit(
+            {
+              scope: doc.scope as "bot" | "user",
+              botId: doc.botId ?? undefined,
+              path: doc.path,
+              content: input.content,
+              expectedRevision: input.expectedRevision,
+            },
+            {
+              operationId: "mem",
+              traceId: "mem",
+              spaceId: context.actor.spaceId,
+              userId: context.actor.userId,
+              signal: new AbortController().signal,
+            },
+          )
+          .catch((error: unknown) => {
+            if (error instanceof Error && error.message === MEMORY_REVISION_CONFLICT_ERROR) {
+              throw new ORPCError("CONFLICT", { message: "Memory changed since it was opened" });
+            }
+            throw error;
+          });
         return {
           id: updated.id,
           scope: doc.scope as "bot" | "user",
@@ -4278,6 +4456,22 @@ export function createRouter(deps: RouterDeps) {
           revision: updated.revision,
           updatedAt: new Date().toISOString(),
         };
+      }),
+      remove: authed.memory.remove.handler(async ({ context, input }) => {
+        const where = {
+          id: input.documentId,
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+        };
+        // Revisions go with the document (ON DELETE CASCADE).
+        const { count } = await deps.prisma.memoryDocument.deleteMany({
+          where: { ...where, revision: input.revision },
+        });
+        if (count === 0) {
+          if (!(await deps.prisma.memoryDocument.findFirst({ where }))) throw new IsolationError();
+          throw new ORPCError("CONFLICT", { message: "Memory changed since it was opened" });
+        }
+        return { ok: true as const };
       }),
       exportMarkdown: authed.memory.exportMarkdown.handler(async ({ context, input }) => {
         const docs = await deps.prisma.memoryDocument.findMany({
@@ -4306,14 +4500,135 @@ export function createRouter(deps: RouterDeps) {
     pages: {
       get: authed.pages.get.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
-        const page = await getBotPage(deps.prisma, { spaceId: bot.spaceId, botId: bot.id });
-        if (!page || !input.chartSvgs) return page;
-        const chartSvgs = await Promise.all(
-          splitPage(page.content).flatMap((segment) =>
-            segment.kind === "chart" ? [renderPageChartSvg(segment.chart)] : [],
-          ),
-        );
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page || !input.chartSvgs || page.kind === "html") return page;
+        const chartSvgs = await pageChartSvgs(deps, { spaceId: bot.spaceId }, page);
         return { ...page, chartSvgs };
+      }),
+      data: authed.pages.data.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        return page ? resolvePageData(deps, { spaceId: bot.spaceId }, page) : null;
+      }),
+      refresh: authed.pages.refresh.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return null;
+        await refreshPageSources(
+          {
+            prisma: deps.prisma,
+            events: deps.events,
+            ticketBoardEnabled: deps.env?.ticketBoardEnabled,
+            mcp: deps.mcp,
+            secretStore: deps.secrets,
+            network: deps.remoteConnectors,
+          },
+          { spaceId: bot.spaceId, botId: bot.id, pageId: page.id },
+        );
+        return resolvePageData(deps, { spaceId: bot.spaceId }, page);
+      }),
+      share: authed.pages.share.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return null;
+        const data = await resolvePageData(deps, { spaceId: bot.spaceId }, page);
+        const { artifactId, token, expiresAt } = await sharePageSnapshot(
+          { prisma: deps.prisma, artifacts: deps.artifacts },
+          { spaceId: bot.spaceId, userId: bot.userId, botId: bot.id, page, data },
+        );
+        return {
+          url: `${deps.env.webOrigin}/s#${token}`,
+          expiresAt: expiresAt.toISOString(),
+          artifactId,
+        };
+      }),
+      shareStatus: authed.pages.shareStatus.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return null;
+        return pageShareStatus(deps.prisma, {
+          spaceId: bot.spaceId,
+          userId: bot.userId,
+          botId: bot.id,
+          pageId: page.id,
+        });
+      }),
+      sources: authed.pages.sources.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const page = await getBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!page) return [];
+        return listPageSources(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: page.id,
+        });
+      }),
+      removeSource: authed.pages.removeSource.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const removed = await removePageSource(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          { id: input.sourceId },
+        );
+        if (!removed) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return { ok: true as const };
+      }),
+      setSourceSchedule: authed.pages.setSourceSchedule.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const source = await updatePageSourceByOwner(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          input.sourceId,
+          { schedule: input.schedule },
+        );
+        if (!source) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return source;
+      }),
+      pauseSource: authed.pages.pauseSource.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const source = await updatePageSourceByOwner(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          input.sourceId,
+          { action: "pause" },
+        );
+        if (!source) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return source;
+      }),
+      resumeSource: authed.pages.resumeSource.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const source = await updatePageSourceByOwner(
+          { prisma: deps.prisma, events: deps.events },
+          { spaceId: bot.spaceId, botId: bot.id },
+          input.sourceId,
+          { action: "resume" },
+        );
+        if (!source) throw new ORPCError("NOT_FOUND", { message: "Source not found." });
+        return source;
       }),
       save: authed.pages.save.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
@@ -4324,6 +4639,7 @@ export function createRouter(deps: RouterDeps) {
               spaceId: bot.spaceId,
               botId: bot.id,
               userId: bot.userId,
+              pageId: input.pageId,
               content: input.content,
               baseRevision: input.baseRevision,
               updatedBy: "user",
@@ -4332,15 +4648,61 @@ export function createRouter(deps: RouterDeps) {
           );
           if (result.ok) return result;
           if (!result.page) {
-            throw new ORPCError("CONFLICT", { message: "The page was changed or removed." });
+            // A pageId of another bot or space also lands here: the page is not this bot's.
+            throw new ORPCError(input.pageId ? "NOT_FOUND" : "CONFLICT", {
+              message: "The page was changed or removed.",
+            });
           }
           return { ok: false as const, reason: "conflict" as const, page: result.page };
         } catch (error) {
-          if (error instanceof PageValidationError) {
-            throw new ORPCError("BAD_REQUEST", { message: error.message });
-          }
-          throw error;
+          throw pageError(error);
         }
+      }),
+      list: authed.pages.list.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        return listBotPages(deps.prisma, { spaceId: bot.spaceId, botId: bot.id });
+      }),
+      create: authed.pages.create.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        try {
+          return await createBotPage(
+            { prisma: deps.prisma, events: deps.events },
+            {
+              spaceId: bot.spaceId,
+              botId: bot.id,
+              userId: bot.userId,
+              title: input.title,
+              kind: input.kind,
+            },
+          );
+        } catch (error) {
+          throw pageError(error);
+        }
+      }),
+      rename: authed.pages.rename.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        try {
+          const page = await renameBotPage(deps.prisma, {
+            spaceId: bot.spaceId,
+            botId: bot.id,
+            pageId: input.pageId,
+            title: input.title,
+          });
+          if (!page) throw new ORPCError("NOT_FOUND", { message: "Page not found." });
+          return page;
+        } catch (error) {
+          throw pageError(error);
+        }
+      }),
+      remove: authed.pages.remove.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const removed = await removeBotPage(deps.prisma, {
+          spaceId: bot.spaceId,
+          botId: bot.id,
+          pageId: input.pageId,
+        });
+        if (!removed) throw new ORPCError("NOT_FOUND", { message: "Page not found." });
+        return { ok: true as const };
       }),
     },
     pins: {
@@ -4400,6 +4762,14 @@ export function createRouter(deps: RouterDeps) {
         }
         const bot = await repos.getBot(context.actor, input.botId);
         await assertRoutineModel(deps, context.actor, input);
+        if (input.modelCredentialId && input.modelProvider) {
+          await assertOwnedConnection(
+            deps,
+            context.actor,
+            input.modelCredentialId,
+            input.modelProvider,
+          );
+        }
         if (input.taughtSkillId) {
           await assertRoutineTaughtSkill(deps, context.actor, input.botId, input.taughtSkillId);
         }
@@ -4438,6 +4808,7 @@ export function createRouter(deps: RouterDeps) {
             messageProvider: input.messageProvider,
             modelProvider: input.modelProvider,
             modelId: input.modelId,
+            modelCredentialId: input.modelProvider ? input.modelCredentialId : null,
             thinkingLevel: input.thinkingLevel,
             // A watch is quiet by default; everything else keeps today's behavior.
             quiet: input.quiet ?? Boolean(input.watch),
@@ -4494,9 +4865,16 @@ export function createRouter(deps: RouterDeps) {
         const hasModel = Boolean(modelProvider && modelId);
         const modelChanged =
           modelProvider !== existing.modelProvider || modelId !== existing.modelId;
+        const pinWrite = connectionPinWrite(input, existing.modelProvider);
+        const modelCredentialId = !hasModel
+          ? null
+          : pinWrite === undefined
+            ? existing.modelCredentialId
+            : pinWrite;
         const touchesModel =
           input.modelProvider !== undefined ||
           input.modelId !== undefined ||
+          input.modelCredentialId !== undefined ||
           input.thinkingLevel !== undefined;
         if (Boolean(modelProvider) !== Boolean(modelId)) {
           throw new ORPCError("BAD_REQUEST", {
@@ -4516,6 +4894,9 @@ export function createRouter(deps: RouterDeps) {
             : input.thinkingLevel;
         if (modelChanged) {
           await assertRoutineModel(deps, context.actor, { modelProvider, modelId });
+        }
+        if (modelCredentialId && modelCredentialId !== existing.modelCredentialId) {
+          await assertOwnedConnection(deps, context.actor, modelCredentialId, modelProvider);
         }
         if (existing.managedKind) {
           const edited = Object.entries(input).filter(
@@ -4622,6 +5003,7 @@ export function createRouter(deps: RouterDeps) {
                 ? {
                     modelProvider: existing.modelProvider,
                     modelId: existing.modelId,
+                    modelCredentialId: existing.modelCredentialId,
                     thinkingLevel: existing.thinkingLevel,
                   }
                 : {}),
@@ -4639,7 +5021,7 @@ export function createRouter(deps: RouterDeps) {
               messageProvider: input.messageProvider,
               quiet: input.quiet,
               ...(input.watch === undefined ? {} : { watch: input.watch ?? Prisma.DbNull }),
-              ...(touchesModel ? { modelProvider, modelId, thinkingLevel } : {}),
+              ...(touchesModel ? { modelProvider, modelId, modelCredentialId, thinkingLevel } : {}),
               nextRunAt,
             },
             include: routineInclude,
@@ -4700,7 +5082,7 @@ export function createRouter(deps: RouterDeps) {
             await deps.jobs.cancel(routineJobKey(row.id));
           }
         }
-        return mapRoutine(row);
+        return mapRoutine(row, await routineLastRunFailed(deps, row.id));
       }),
       remove: authed.routines.remove.handler(async ({ context, input }) => {
         const existing = await deps.prisma.routine.findFirst({
@@ -4762,7 +5144,12 @@ export function createRouter(deps: RouterDeps) {
             });
             const currentModel = await tx.routine.findUnique({
               where: { id: routine.id },
-              select: { modelProvider: true, modelId: true, thinkingLevel: true },
+              select: {
+                modelProvider: true,
+                modelId: true,
+                modelCredentialId: true,
+                thinkingLevel: true,
+              },
             });
             if (!currentModel) throw new IsolationError();
             const created = await tx.run.create({
@@ -5526,6 +5913,16 @@ export function createRouter(deps: RouterDeps) {
           return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
         update: authed.mcp.servers.update.handler(async ({ context, input }) => {
+          // The Brex cards token changes only through Replace token, which checks it with Brex
+          // first, and only for the current space owner.
+          const brexRow = await deps.prisma.mcpServer.findFirst({
+            where: { id: input.id, ...actorScope(context.actor) },
+            select: { endpoint: true },
+          });
+          if (isBrexCardsEndpoint(brexRow?.endpoint)) {
+            await requireSpaceOwner(deps.prisma, context.actor);
+            throw new ORPCError("BAD_REQUEST", { message: REPLACE_BREX_TOKEN_MESSAGE });
+          }
           // The space's Devin connection is an owner's to change, and its key only through Reconnect.
           if (await requireOwnerForActiveDevinRow(deps.prisma, context.actor, input.id)) {
             const next = "config" in input ? input.config : input;
@@ -5763,11 +6160,22 @@ export function createRouter(deps: RouterDeps) {
             await devinDisconnect(devinDeps, context.actor, input.id);
             return { ok: true as const };
           }
+          // The current space owner removes a Brex cards server whoever connected it; its rows are
+          // in the connecting user's scope. A former owner who still owns the row is refused.
+          const brexRow = await deps.prisma.mcpServer.findFirst({
+            where: { id: input.id, spaceId: context.actor.spaceId },
+            select: { endpoint: true, userId: true },
+          });
+          let actor: Actor = context.actor;
+          if (isBrexCardsEndpoint(brexRow?.endpoint)) {
+            await requireSpaceOwner(deps.prisma, context.actor);
+            actor = { ...context.actor, userId: brexRow?.userId as string };
+          }
           const server = await deps.prisma.mcpServer.findFirst({
             where: {
               id: input.id,
-              spaceId: context.actor.spaceId,
-              userId: context.actor.userId,
+              spaceId: actor.spaceId,
+              userId: actor.userId,
             },
             select: { id: true, secretId: true },
           });
@@ -5776,13 +6184,8 @@ export function createRouter(deps: RouterDeps) {
           // Cards are closed first, including ones that were never assigned.
           let agentToArchive: string | null = null;
           const seqs = await deps.prisma.$transaction(async (tx) => {
-            const painted = await dismissMcpServerApprovals(
-              onboardingDeps,
-              context.actor,
-              server.id,
-              tx,
-            );
-            await companyWriter(tx, context.actor).disconnectMcpServer(server.id);
+            const painted = await dismissMcpServerApprovals(onboardingDeps, actor, server.id, tx);
+            await companyWriter(tx, actor).disconnectMcpServer(server.id);
             // The deleted row says which agent it had at that moment, so a concurrent relink is seen.
             const deleted = await tx.mcpServer.delete({ where: { id: server.id } });
             // Carta's agent is shared with the Cap table, and the Granola agent with the API key.
@@ -5793,18 +6196,27 @@ export function createRouter(deps: RouterDeps) {
               !isZernioEndpoint(deleted.endpoint)
                 ? deleted.agentBotId
                 : null;
+            // An agent that another server of the space still uses (the Brex finance and cards
+            // servers share one) stays with that server.
+            if (
+              agentToArchive &&
+              (await tx.mcpServer.count({
+                where: { spaceId: actor.spaceId, agentBotId: agentToArchive },
+              }))
+            )
+              agentToArchive = null;
             // Archived with the server, so the agent is never left active without it.
             if (agentToArchive)
               await tx.bot.updateMany({
-                where: { id: agentToArchive, ...actorScope(context.actor), archivedAt: null },
+                where: { id: agentToArchive, ...actorScope(actor), archivedAt: null },
                 data: { archivedAt: new Date(), pinned: false },
               });
             if (server.secretId) {
               await tx.secret.deleteMany({
                 where: {
                   id: server.secretId,
-                  spaceId: context.actor.spaceId,
-                  userId: context.actor.userId,
+                  spaceId: actor.spaceId,
+                  userId: actor.userId,
                 },
               });
             }
@@ -5812,7 +6224,7 @@ export function createRouter(deps: RouterDeps) {
           });
           // Runs and the computer of the archived agent are cleaned up now; the archive itself is done.
           if (agentToArchive)
-            await archiveActorBot(context.actor, agentToArchive).catch((error) =>
+            await archiveActorBot(actor, agentToArchive).catch((error) =>
               getLogger().error("mcp.servers.remove: agent not archived", error),
             );
           for (const event of seqs) await deps.events.notify(event.threadId, event.seq);
@@ -6237,7 +6649,8 @@ export function createRouter(deps: RouterDeps) {
             userId: context.actor.userId,
             status: { in: ["connected", "pending", "error"] },
             // The Granola key shows through meetings.status, never as a generic app.
-            connectorId: { not: GRANOLA_API_CONNECTOR_ID },
+            // Omi shows through omi.status.
+            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID, HEX_CONNECTOR_ID] },
           },
           // Without an order Postgres returns rows in storage order, which changes when a row is
           // updated, so the accounts of one app swapped places between loads.
@@ -8066,11 +8479,76 @@ export function createRouter(deps: RouterDeps) {
         refreshGranola(meetingsFor(context.actor), context.actor),
       ),
       list: authed.meetings.list.handler(({ context, input }) =>
-        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor),
+        listStoredMeetings(meetingsFor(context.actor), context.actor, input.cursor, input),
+      ),
+      get: authed.meetings.get.handler(({ context, input }) =>
+        getStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
       ),
       delete: authed.meetings.delete.handler(({ context, input }) =>
         deleteStoredMeeting(meetingsFor(context.actor), context.actor, input.meetingId),
       ),
+      connectLocal: authed.meetings.connectLocal.handler(({ context }) =>
+        connectLocal(meetingsFor(context.actor), context.actor),
+      ),
+      localStatus: authed.meetings.localStatus.handler(({ context }) =>
+        localStatus(meetingsFor(context.actor), context.actor),
+      ),
+      importLocal: authed.meetings.importLocal.handler(({ context, input }) =>
+        importLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+      disconnectLocal: authed.meetings.disconnectLocal.handler(({ context, input }) =>
+        disconnectLocal(meetingsFor(context.actor), context.actor, input),
+      ),
+    },
+    meetingCaptures: {
+      start: authed.meetingCaptures.start.handler(({ context, input }) =>
+        startCapture(deps, context.actor, input),
+      ),
+      appendText: authed.meetingCaptures.appendText.handler(({ context, input }) =>
+        appendCaptureText(deps, context.actor, input),
+      ),
+      finish: authed.meetingCaptures.finish.handler(({ context, input }) =>
+        finishCapture(deps, context.actor, input),
+      ),
+      discard: authed.meetingCaptures.discard.handler(({ context, input }) =>
+        discardCapture(deps, context.actor, input.captureId),
+      ),
+      active: authed.meetingCaptures.active.handler(({ context }) =>
+        activeCapture(deps, context.actor),
+      ),
+    },
+    omi: {
+      connect: authed.omi.connect.handler(({ context, input }) =>
+        connectOmi(
+          {
+            prisma: deps.prisma,
+            jobs: deps.jobs,
+            artifacts: deps.artifacts,
+            agent: {
+              prisma: deps.prisma,
+              repos,
+              archiveBot: (botId) => archiveActorBot(context.actor, botId),
+            },
+          },
+          context.actor,
+          input,
+        ),
+      ),
+      status: authed.omi.status.handler(({ context }) => omiStatus(deps, context.actor)),
+      deleteRecordings: authed.omi.deleteRecordings.handler(({ context }) =>
+        deleteOmiRecordingsFor(deps, context.actor),
+      ),
+      disconnect: authed.omi.disconnect.handler(({ context, input }) =>
+        disconnectOmi(deps, context.actor, input),
+      ),
+      segments: {
+        list: authed.omi.segments.list.handler(({ context, input }) =>
+          listOmiSegments(deps.prisma, context.actor, input),
+        ),
+        move: authed.omi.segments.move.handler(({ context, input }) =>
+          moveOmiSegment(deps, context.actor, input).catch(contactNotFound),
+        ),
+      },
     },
     devin: {
       sessions: authed.devin.sessions.handler(({ context }) =>
@@ -8089,6 +8567,24 @@ export function createRouter(deps: RouterDeps) {
         await devinDisconnect(devinDeps, context.actor);
         return { ok: true as const };
       }),
+    },
+    brexCards: {
+      connect: authed.brexCards.connect.handler(({ context, input }) =>
+        brexCardsConnect(brexCardsDeps, context.actor, input.token),
+      ),
+      replaceToken: authed.brexCards.replaceToken.handler(async ({ context, input }) => {
+        await brexCardsReplaceToken(brexCardsDeps, context.actor, input.token);
+        return { ok: true as const };
+      }),
+      cards: authed.brexCards.cards.handler(({ context }) =>
+        brexCardsCards(brexCardsDeps, context.actor),
+      ),
+      getControls: authed.brexCards.getControls.handler(({ context }) =>
+        brexCardsGetControls(brexCardsDeps, context.actor),
+      ),
+      setControls: authed.brexCards.setControls.handler(({ context, input }) =>
+        brexCardsSetControls(brexCardsDeps, context.actor, input),
+      ),
     },
     gtm: {
       agent: authed.gtm.agent.handler(({ context }) =>
@@ -8480,12 +8976,15 @@ export function createRouter(deps: RouterDeps) {
         listSidebarPages(deps.prisma, actorScope(context.actor)),
       ),
       add: authed.sidebarPages.add.handler(({ context, input }) =>
-        addSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey).catch(
-          sidebarPageError,
-        ),
+        ("pageId" in input
+          ? addSidebarBotPage(deps.prisma, actorScope(context.actor), input.pageId)
+          : addSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey)
+        ).catch(sidebarPageError),
       ),
       remove: authed.sidebarPages.remove.handler(({ context, input }) =>
-        removeSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey),
+        "pageId" in input
+          ? removeSidebarBotPage(deps.prisma, actorScope(context.actor), input.pageId)
+          : removeSidebarPage(deps.prisma, actorScope(context.actor), input.templateKey),
       ),
     },
     calendar: {
@@ -9242,11 +9741,21 @@ export function createRouter(deps: RouterDeps) {
       status: authed.voice.status.handler(async ({ context }) => {
         const cred = await findDefaultVoiceCredential(deps.prisma, context.actor);
         const selection = await findTranscriptionSelection(deps, context.actor);
-        return toVoiceStatus(cred, selection?.provider ?? null);
+        // The same choice server transcription makes, so Record shows only when audio would be sent.
+        const { target, consented } = await selectTranscriptionTarget(deps, context.actor);
+        return {
+          ...toVoiceStatus(cred, selection?.provider ?? null),
+          transcriptionConsented: Boolean(target && consented),
+        };
       }),
-      setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) =>
-        setTranscription(deps, context.actor, { ...input, signal: context.signal }),
-      ),
+      setTranscription: authed.voice.setTranscription.handler(async ({ context, input }) => {
+        const result = await setTranscription(deps, context.actor, {
+          ...input,
+          signal: context.signal,
+        });
+        await requeueOmiTranscriptions(deps, context.actor);
+        return result;
+      }),
       clearTranscription: authed.voice.clearTranscription.handler(async ({ context }) =>
         clearTranscription(deps, context.actor),
       ),
@@ -9270,15 +9779,17 @@ export function createRouter(deps: RouterDeps) {
           });
         });
       }),
-      connect: authed.voice.connect.handler(async ({ context, input }) =>
-        persistVoiceCredential(deps, context.actor, {
+      connect: authed.voice.connect.handler(async ({ context, input }) => {
+        const result = await persistVoiceCredential(deps, context.actor, {
           provider: input.provider,
           plaintext: input.apiKey,
           voiceId: input.voiceId,
           speechModel: input.speechModel,
           signal: context.signal,
-        }),
-      ),
+        });
+        await requeueOmiTranscriptions(deps, context.actor);
+        return result;
+      }),
       disconnect: authed.voice.disconnect.handler(async ({ context, input }) =>
         disconnectVoiceCredential(deps, context.actor, { provider: input.provider }),
       ),
@@ -9373,6 +9884,7 @@ async function memberSpaceNavigation(
           name: true,
           isDefault: true,
           deletingAt: true,
+          meetingRecording: true,
           _count: { select: { memberships: true } },
         },
       },
@@ -9445,6 +9957,8 @@ async function memberSpaceNavigation(
         isDefault: membership.space.isDefault,
         hasContent: spacesWithContent.has(membership.spaceId),
         memberCount: membership.space._count.memberships,
+        meetingRecording: membership.space.meetingRecording as MeetingRecordingPolicy,
+        canSetMeetingRecording: membership.role === "owner" || membership.role === "admin",
         canRename: membership.role === "owner" && membership.space.deletingAt === null,
         canDelete:
           membership.role === "owner" &&
@@ -9900,6 +10414,54 @@ export function assertRunsOnAllowed(input: {
   if (input.runsOn === "this-mac" && !input.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
 }
 
+/**
+ * Validates an owner's app control change and returns what to store. Turning it off, removing
+ * apps and the headed switch need no more than ownership; turning it on or adding apps needs a
+ * provider and a bot that does not run on this Mac.
+ */
+async function checkAppControlUpdate(
+  deps: RouterDeps,
+  actor: Actor,
+  bot: { runsOn?: string | null; appControlEnabled?: boolean },
+  input: { appControl?: UpdateBotAppControl; runsOn?: string | null },
+): Promise<UpdateBotAppControl | undefined> {
+  const change = input.appControl;
+  const movesHost = input.runsOn !== undefined && input.runsOn !== (bot.runsOn ?? null);
+  if (!change && !movesHost) return undefined;
+  if (change && !actor.isDeploymentOwner) throw new ORPCError("FORBIDDEN");
+  let apps = change?.apps;
+  if (apps) {
+    const seen = new Set<string>();
+    apps = apps.filter((app) => {
+      if (isDeniedApp(app)) {
+        throw new ORPCError("BAD_REQUEST", { message: `${app.name} cannot be used` });
+      }
+      const key = app.id.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  const adds = change?.enabled === true || (apps !== undefined && apps.length > 0);
+  if (adds && !deps.appControl) {
+    throw new ORPCError("PRECONDITION_FAILED", { message: "App control is not set up" });
+  }
+  // The settings as they will be after this update, so a combined change cannot slip through.
+  const enabledAfter = change?.enabled ?? bot.appControlEnabled ?? false;
+  if (enabledAfter && (adds || movesHost)) {
+    const hostAfter =
+      (input.runsOn !== undefined ? input.runsOn : bot.runsOn) ??
+      (await deploymentComputerHost(deps));
+    if (hostAfter === "this-mac") {
+      throw new ORPCError("BAD_REQUEST", {
+        message:
+          "A bot that runs on this Mac cannot use apps on it. Turn off apps on this Mac first.",
+      });
+    }
+  }
+  return change ? { ...change, ...(apps ? { apps } : {}) } : undefined;
+}
+
 async function deploymentComputerHost(deps: RouterDeps): Promise<"docker" | "this-mac"> {
   const settings = await deps.prisma.deploymentSettings.findUnique({ where: { id: "default" } });
   return computerHostFor(settings?.computerHost, deps.env.sandboxProvider) === "this-mac"
@@ -9950,8 +10512,27 @@ async function persistModelCredential(
   ) {
     throw new ORPCError("BAD_REQUEST", { message: authError });
   }
+  // Signing in again without a model (OpenRouter OAuth) keeps the model this
+  // provider already uses in this space instead of resetting to the first catalog row.
+  const keptModelId = requestedModelId
+    ? undefined
+    : usableModelId(
+        (
+          await deps.prisma.spaceModelPreference.findFirst({
+            where: {
+              spaceId: actor.spaceId,
+              userId: actor.userId,
+              credential: { provider: input.provider },
+              modelId: { not: null },
+            },
+            orderBy: { updatedAt: "desc" },
+            select: { modelId: true },
+          })
+        )?.modelId,
+      );
   const defaultModel =
     requestedModelId ??
+    keptModelId ??
     defaultCatalogModelId(input.provider, input.plaintext) ??
     usableModelId(deps.env.defaultModel);
   const allowedThinking = defaultModel
@@ -10024,7 +10605,20 @@ async function persistModelCredential(
         thinkingLevel = defaultModel
           ? clampCatalogThinkingLevel(thinkingLevel, allowedThinking)
           : null;
-        await selectSpaceModelPreference(tx, actor, credential.id, defaultModel, thinkingLevel);
+        // A new connection only becomes the default when the space has none yet or this
+        // credential already is it; otherwise the owner's choice stays in place.
+        const currentDefault = await tx.spaceModelPreference.findFirst({
+          where: { spaceId: actor.spaceId, userId: actor.userId, isDefault: true },
+          select: { credentialId: true },
+        });
+        const preference = await selectSpaceModelPreference(
+          tx,
+          actor,
+          credential.id,
+          defaultModel,
+          thinkingLevel,
+          { makeDefault: !currentDefault || currentDefault.credentialId === credential.id },
+        );
         input.signal?.throwIfAborted();
         if (existing) {
           await deleteUnreferencedCredentialSecret(tx, {
@@ -10034,7 +10628,7 @@ async function persistModelCredential(
           });
           input.signal?.throwIfAborted();
         }
-        return { ...credential, isDefault: true, defaultModel };
+        return { ...credential, isDefault: preference.isDefault, defaultModel };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     ),
@@ -10059,6 +10653,32 @@ async function assertWatchLimits(prisma: PrismaClient, spaceId: string, botId: s
 }
 
 /** A routine may only name a model the space has connected. */
+/** What a save writes to a pin: a new id, null to clear, or undefined to leave it alone. */
+function connectionPinWrite(
+  input: { modelProvider?: string | null; modelCredentialId?: string | null },
+  existingProvider: string | null,
+): string | null | undefined {
+  if (input.modelProvider === null) return null;
+  if (input.modelCredentialId !== undefined) return input.modelCredentialId;
+  return input.modelProvider !== undefined && input.modelProvider !== existingProvider
+    ? null
+    : undefined;
+}
+
+/** Only the caller's own connection, for the model's provider, can be pinned. */
+async function assertOwnedConnection(
+  deps: RouterDeps,
+  actor: Actor,
+  credentialId: string,
+  provider: string | null,
+) {
+  const owned = await deps.prisma.userModelCredential.findFirst({
+    where: { id: credentialId, userId: actor.userId, provider: provider ?? "" },
+    select: { id: true },
+  });
+  if (!owned) throw new IsolationError();
+}
+
 async function assertRoutineModel(
   deps: RouterDeps,
   actor: Actor,
@@ -10096,34 +10716,38 @@ async function assertRoutineTaughtSkill(
   }
 }
 
-function mapRoutine(row: {
-  id: string;
-  botId: string;
-  name: string;
-  prompt: string;
-  crons: string[];
-  timezone: string;
-  active: boolean;
-  notify: boolean;
-  webhookEnabled: boolean;
-  githubEnabled: boolean;
-  messageProvider: string | null;
-  modelProvider: string | null;
-  modelId: string | null;
-  thinkingLevel: string | null;
-  lastRunAt: Date | null;
-  nextRunAt: Date | null;
-  quiet: boolean;
-  watch: unknown;
-  managedKind: string | null;
-  taughtSkill?: { id: string; name: string } | null;
-  watchState?: {
-    lastCheckedAt: Date | null;
-    lastChangedAt: Date | null;
-    pausedReason: string | null;
-  } | null;
-  createdAt: Date;
-}): Routine {
+function mapRoutine(
+  row: {
+    id: string;
+    botId: string;
+    name: string;
+    prompt: string;
+    crons: string[];
+    timezone: string;
+    active: boolean;
+    notify: boolean;
+    webhookEnabled: boolean;
+    githubEnabled: boolean;
+    messageProvider: string | null;
+    modelProvider: string | null;
+    modelId: string | null;
+    modelCredentialId?: string | null;
+    thinkingLevel: string | null;
+    lastRunAt: Date | null;
+    nextRunAt: Date | null;
+    quiet: boolean;
+    watch: unknown;
+    managedKind: string | null;
+    taughtSkill?: { id: string; name: string } | null;
+    watchState?: {
+      lastCheckedAt: Date | null;
+      lastChangedAt: Date | null;
+      pausedReason: string | null;
+    } | null;
+    createdAt: Date;
+  },
+  lastRunFailed = false,
+): Routine {
   const watch = WatchSpecSchema.safeParse(row.watch);
   return {
     id: row.id,
@@ -10139,6 +10763,7 @@ function mapRoutine(row: {
     messageProvider: row.messageProvider,
     modelProvider: row.modelProvider ?? null,
     modelId: row.modelId ?? null,
+    modelCredentialId: row.modelCredentialId ?? null,
     thinkingLevel: (row.thinkingLevel as Routine["thinkingLevel"]) ?? null,
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
@@ -10152,9 +10777,24 @@ function mapRoutine(row: {
       lastCheckedAt: row.watchState?.lastCheckedAt?.toISOString() ?? null,
       lastChangedAt: row.watchState?.lastChangedAt?.toISOString() ?? null,
       pausedReason: (row.watchState?.pausedReason as WatchPausedReason | null) ?? null,
+      lastRunFailed,
     },
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * Whether the routine's newest finished run failed (cancelled counts as finished). Ordered by
+ * createdAt, not completedAt, which is null for some finished runs.
+ */
+// ponytail: one findFirst per routine; a nested `include ... take: 1` loads every run in Prisma 7.
+async function routineLastRunFailed(deps: RouterDeps, routineId: string) {
+  const last = await deps.prisma.run.findFirst({
+    where: { routineId, status: { in: ["completed", "failed", "cancelled"] } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { status: true },
+  });
+  return last?.status === "failed";
 }
 
 async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
@@ -10162,7 +10802,9 @@ async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
     where: { botId, spaceId: actor.spaceId },
     include: routineInclude,
   });
-  return rows.map(mapRoutine);
+  return Promise.all(
+    rows.map(async (row) => mapRoutine(row, await routineLastRunFailed(deps, row.id))),
+  );
 }
 
 /**

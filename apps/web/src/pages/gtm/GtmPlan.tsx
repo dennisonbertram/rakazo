@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { EmailItemCard } from "../../components/gtm/EmailItemCard";
 import { LinkedInPostPreview } from "../../components/gtm/LinkedInPostPreview";
 import { XPostPreview } from "../../components/gtm/XPostPreview";
+import { toDatetimeLocalValue } from "../../lib/datetime-local";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 
@@ -76,7 +77,8 @@ export function GtmItem({
   const [title, setTitle] = useState(item.title);
   const [notes, setNotes] = useState(item.notes);
   const [target, setTarget] = useState(item.target ?? "");
-  const [scheduledFor, setScheduledFor] = useState(item.scheduledFor ?? "");
+  const initialTime = item.scheduledFor ? toDatetimeLocalValue(new Date(item.scheduledFor)) : "";
+  const [scheduledFor, setScheduledFor] = useState(initialTime);
   const [proof, setProof] = useState("");
   const [marking, setMarking] = useState(false);
   const [queue, setQueue] = useState<{ version: string; result: GtmQueueOutput } | null>(null);
@@ -157,13 +159,19 @@ export function GtmItem({
           className="mt-3 space-y-3"
           onSubmit={(event) => {
             event.preventDefault();
+            // datetime-local drops seconds, so an untouched time is not sent back.
+            const timeChanged = scheduledFor !== initialTime;
+            if (timeChanged && Number.isNaN(Date.parse(scheduledFor))) {
+              setError(t`Enter a valid date and time.`);
+              return;
+            }
             void run(async () => {
               await rpc.scratchpad.update({
                 itemId: item.id,
                 title,
                 notes,
                 target,
-                ...(scheduledFor ? { scheduledFor: new Date(scheduledFor).toISOString() } : {}),
+                ...(timeChanged ? { scheduledFor: new Date(scheduledFor).toISOString() } : {}),
               });
               setEditing(false);
             });
@@ -199,9 +207,10 @@ export function GtmItem({
           </label>
           {post ? (
             <label className="block text-xs" htmlFor={`gtm-scheduled-for-${item.id}`}>
-              <Trans>Scheduled time (ISO)</Trans>
+              <Trans>Scheduled time</Trans>
               <Input
                 id={`gtm-scheduled-for-${item.id}`}
+                type="datetime-local"
                 value={scheduledFor}
                 required
                 onChange={(event) => setScheduledFor(event.target.value)}
@@ -250,7 +259,12 @@ export function GtmItem({
             <p className="mt-3 break-words text-xs text-muted-foreground">
               {item.target}
               {item.target && item.scheduledFor ? " · " : ""}
-              {item.scheduledFor ? new Date(item.scheduledFor).toLocaleString() : null}
+              {item.scheduledFor
+                ? new Date(item.scheduledFor).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
+                : null}
             </p>
           ) : null}
           {item.proof && !uncertain ? (
@@ -260,9 +274,9 @@ export function GtmItem({
                   {item.proof}
                 </a>
               ) : queued ? (
-                <>
-                  <Trans>Queued in Zernio</Trans> · {item.proof}
-                </>
+                <span title={item.proof}>
+                  <Trans>Queued in Zernio</Trans>
+                </span>
               ) : (
                 item.proof
               )}
@@ -298,7 +312,7 @@ export function GtmItem({
                     setTitle(item.title);
                     setNotes(item.notes);
                     setTarget(item.target ?? "");
-                    setScheduledFor(item.scheduledFor ?? "");
+                    setScheduledFor(initialTime);
                     setEditing(true);
                   }}
                 >

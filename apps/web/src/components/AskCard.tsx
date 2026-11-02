@@ -32,6 +32,9 @@ function formatAnsweredState(
 ): string {
   if (secret) return t`Saved`;
   if (!answer) return t`Answered`;
+  // A card the server closed itself reads the same whatever kind of approval it was.
+  if (approval && answer === "superseded") return t`Replaced by a newer request`;
+  if (approval && answer === "expired") return t`Expired`;
   if (share && approval) return answer === "allow" ? t`Shared` : t`Not shared`;
   if (consent && approval) return answer === "allow" ? t`Allowed` : t`Not now`;
   // A typed answer is already the user's own bubble; only a chosen option is named here.
@@ -81,6 +84,7 @@ function approvalActionLabel(
   if (outcome === "created") return t`Create space`;
   if (outcome === "cancelled") return t`Cancel`;
   // A payment's label already carries the amount ("Send $300.00"): keep it.
+  if (id === "allow" && fallback === "Allow for this run") return t`Allow for this run`;
   if (id === "allow")
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
   if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
@@ -289,7 +293,7 @@ export function AskCard({
                 secretInput,
                 outcome,
                 askActions,
-                Boolean(block.consent),
+                Boolean(block.consent || block.pageSource),
                 Boolean(block.share),
                 block.waitsFor,
               )}
@@ -340,7 +344,7 @@ export function AskCard({
                     )}
                   </Button>
                   <span className="text-[13px] text-muted-foreground">
-                    <Trans>Won't ask again for this kind of action.</Trans>
+                    <Trans>Won't ask again anywhere in this space.</Trans>
                   </span>
                 </div>
               ) : (
@@ -358,7 +362,7 @@ export function AskCard({
                       action.id,
                       action.label,
                       action.outcome,
-                      Boolean(block.consent),
+                      Boolean(block.consent || block.pageSource),
                       Boolean(block.share),
                       block.site,
                     )

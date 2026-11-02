@@ -82,6 +82,8 @@ export const ContactLinkedSchema = z.object({
   portal: z.boolean(),
   /** Names of the Data room documents shared with the contact. */
   documents: z.array(z.string()),
+  /** How many SAFEs name the contact; deleting it detaches them. */
+  safes: z.number().int(),
 });
 export type ContactLinked = z.infer<typeof ContactLinkedSchema>;
 

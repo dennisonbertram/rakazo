@@ -29,6 +29,7 @@ import {
   CodexCatalogCache,
   ComposioConnector,
   createAgentHomeStore,
+  createAppControlProvider,
   createArtifactStore,
   createBackgroundJobHandlers,
   createBlueBubblesPollState,
@@ -92,6 +93,7 @@ import {
   removePiUserSessions,
   resolveEnsName,
   reviewAttachment,
+  runPageRefreshTick,
   runWatchProbeTick,
   ScriptedAgentRuntime,
   SmtpEmailProvider,
@@ -119,6 +121,7 @@ import {
   describeRowSecurity,
   endSessionPushTokens,
   IsolationError,
+  PostgresAppControlStore,
   parsePositiveInteger,
   provisionMessagingIdentity,
   pushSessionExpiresAt,
@@ -162,15 +165,18 @@ import { mountLocalSettings } from "./local-settings.js";
 import { mountMailPushRoute } from "./mail-push.js";
 import { mountRegisterLimit } from "./mcp-register-limit.js";
 import { mountMcpDiscovery, mountMcpServer } from "./mcp-server.js";
+import { mountMeetingCaptureRoutes } from "./meeting-captures.js";
 import {
   createMessagingInboundHandler,
   teamChatSenderCanWakeMessageRoutines,
   wakeMessageRoutines,
 } from "./messaging-inbound.js";
 import { mountMessagingWebhookRoutes } from "./messaging-webhook.js";
+import { mountOmiRoutes } from "./omi.js";
 import { mountApiRequestBodyLimits } from "./request-body-limit.js";
 import { mountSystemRoutes, mountTenantRoutes } from "./route-scope.js";
 import { createRouter } from "./router.js";
+import type { RouteAuthContext } from "./routes/context.js";
 import { mountScreenTarget } from "./screen-proxy.js";
 import { isDeferredReservationLost, TeamChatBridge } from "./team-chat-bridge.js";
 import { ModelTeamChatEngagementJudge } from "./team-chat-judge.js";
@@ -239,9 +245,13 @@ type CreateAppOverrides = Partial<AppEnv> & {
   cryptoFetch?: typeof fetch;
   /** Replaces the real meeting providers, so the demo and tests run Granola against its emulator. */
   meetingSources?: MeetingSourceRegistry;
+  /** Points the in-process Brex cards server at an emulator instead of api.brex.com. */
+  brexApi?: { baseUrl?: string; fetch?: typeof fetch };
   /** Offline acceptance seams limited to GTM account and queue reads. */
   gtmQueueReader?: GtmQueueReader;
   gtmMcp?: Pick<McpConnector, "callServerTool">;
+  /** Replaces the Google connector, so the demo stack reads Calendar from an emulator. */
+  google?: ManagedConnectorProvider;
 };
 
 async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
@@ -261,8 +271,10 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     financeCallToolFor: financeCallToolOverride,
     cryptoFetch,
     meetingSources,
+    brexApi,
     gtmQueueReader,
     gtmMcp,
+    google: googleOverride,
     ...envOverrides
   } = overrides;
   const env = { ...loadEnv(process.env), ...envOverrides };
@@ -377,6 +389,12 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       dataDir: env.dataDir,
       prisma,
     });
+  // Local desktop control: absent unless APP_CONTROL_PROVIDER is set (docs/local-desktop-control).
+  const appControlStore = new PostgresAppControlStore(prisma);
+  const appControl = createAppControlProvider(process.env, {
+    dataDir: env.dataDir,
+    store: appControlStore,
+  });
   const mcpOAuth = new McpOAuthBroker(
     prisma,
     secrets,
@@ -397,6 +415,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       network: remoteConnectors,
       events,
       allowPrivateEndpoint: env.mcpAllowPrivateEndpoint,
+      ...(brexApi ? { brexApi } : {}),
     },
     mcpOAuth,
   );
@@ -471,7 +490,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     installed,
     ...integrationSettings
       .providers()
-      .filter((provider) => !composioOverride || provider.describe().id !== "composio"),
+      .filter((provider) => !composioOverride || provider.describe().id !== "composio")
+      .filter((provider) => !googleOverride || provider.describe().id !== "google"),
+    ...(googleOverride ? [googleOverride] : []),
     mcp,
   ]);
   const connector = stack.destination;
@@ -579,6 +600,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const codexCatalog = new CodexCatalogCache();
   let companyImport: ReturnType<typeof createCompanyImportEngine> | undefined;
   const executor = createRunExecutor({
+    appControl,
+    appControlStore,
     notificationEvents,
     contextStrategy,
     prisma,
@@ -661,6 +684,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     documents: documentReader,
   });
   const jobHandlers = createBackgroundJobHandlers({
+    ticketBoardEnabled,
     executor,
     prisma,
     sandbox,
@@ -676,6 +700,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     messaging,
     cloudAgent,
     devinCallTool: createDevinCallTool(prisma, mcp),
+    ...(brexApi ? { brexApi } : {}),
     notificationEvents,
     financeCallToolFor: financeCallToolOverride ?? createFinanceCallToolFor(prisma, mcp),
     artifacts,
@@ -717,12 +742,23 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
             notificationEvents,
             connector: stack.connector,
           }),
+        runPageRefreshes: () =>
+          runPageRefreshTick({
+            prisma,
+            jobs,
+            events,
+            ticketBoardEnabled,
+            mcp,
+            secretStore: secrets,
+            network: remoteConnectors,
+          }),
       })
     : undefined;
   reconciler?.start();
 
   const router = createRouter({
     email,
+    ...(brexApi ? { brexApi } : {}),
     describeTeachSteps: (input) =>
       describeTeachSteps({ prisma, runtime, resolveModel: executor.resolveModel }, input),
     reviewAttachment: (input, signal) =>
@@ -748,6 +784,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     auth,
     jobs,
     sandbox,
+    ...(appControl ? { appControl } : {}),
     memory,
     memoryProviders,
     home,
@@ -854,7 +891,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       mailWritesDisabled: env.mailWritesDisabled,
     },
   });
-  const rpc = new RPCHandler(router, {
+  const rpc = new RPCHandler<RouteAuthContext>(router, {
     clientInterceptors: [onError((error, { path }) => logUnexpectedRpcError(error, path))],
   });
   const app = new Hono();
@@ -977,6 +1014,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   mountInboxAttachment(app, { prisma, mail }, loggedActor);
   mountContactPhoto(app, { prisma, artifacts }, loggedActor);
   mountDataRoomRoutes(app, { prisma, artifacts, jobs }, loggedActor);
+  mountOmiRoutes(app, { prisma, artifacts, jobs }, loggedActor);
+  mountMeetingCaptureRoutes(app, { prisma, artifacts, jobs }, loggedActor);
   mountInvestorPortal(app, {
     store: prismaPortalStore(prisma),
     artifacts,

@@ -27,10 +27,12 @@ function candidateReason(reason: string) {
 
 export function CompanyReview({
   items,
+  nameOf,
   onOpen,
   onChanged,
 }: {
   items: CompanyReviewItem[];
+  nameOf?: (id: string) => string | undefined;
   onOpen: (fact: CompanyFact, editing?: boolean) => void;
   onChanged: () => void;
 }) {
@@ -46,6 +48,7 @@ export function CompanyReview({
         <ReviewItem
           key={item.kind === "candidate" ? `${item.id}:${item.candidate.version}` : item.id}
           item={item}
+          nameOf={nameOf}
           onOpen={onOpen}
           onChanged={onChanged}
         />
@@ -56,10 +59,12 @@ export function CompanyReview({
 
 function ReviewItem({
   item,
+  nameOf,
   onOpen,
   onChanged,
 }: {
   item: CompanyReviewItem;
+  nameOf?: (id: string) => string | undefined;
   onOpen: (fact: CompanyFact, editing?: boolean) => void;
   onChanged: () => void;
 }) {
@@ -150,7 +155,7 @@ function ReviewItem({
       </p>
       <h3 id={`${id}-title`} className="mt-1 font-medium">
         {maskCurrencyWhenHidden(
-          candidate?.title ?? (item.kind === "fact" ? companyFactTitle(item.fact) : ""),
+          candidate?.title ?? (item.kind === "fact" ? companyFactTitle(item.fact, nameOf) : ""),
         )}
       </h3>
       {item.kind === "fact" && (

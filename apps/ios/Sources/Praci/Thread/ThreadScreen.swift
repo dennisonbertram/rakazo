@@ -196,6 +196,11 @@ struct ThreadScreen: View {
   // MARK: Toolbar
 
   @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+    if case .bot(let id) = target {
+      ToolbarItem(placement: .topBarTrailing) {
+        CallButton(botID: id, name: model.title, avatar: model.botColor)
+      }
+    }
     ToolbarItem(placement: .topBarTrailing) {
       Menu {
         switch target {

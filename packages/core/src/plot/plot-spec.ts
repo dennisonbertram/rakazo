@@ -47,6 +47,39 @@ export type PlotSpec = {
   marks: PlotMarkSpec[];
 };
 
+/** The only top-level spec keys that reach Plot.plot; keep aligned with PlotSpec above. */
+export const PLOT_SPEC_KEYS: ReadonlySet<string> = new Set([
+  "title",
+  "data",
+  "width",
+  "height",
+  "marginLeft",
+  "marginRight",
+  "marginTop",
+  "marginBottom",
+  "grid",
+  "inset",
+  "aspectRatio",
+  "x",
+  "y",
+  "fx",
+  "fy",
+  "facet",
+  "color",
+  "r",
+  "opacity",
+  "symbol",
+  "length",
+  "projection",
+  "style",
+  "marks",
+]);
+
+/** The first top-level key of a spec that is not a PlotSpec key, or null. */
+export function unknownPlotSpecKey(spec: object): string | null {
+  return Object.keys(spec).find((key) => !PLOT_SPEC_KEYS.has(key)) ?? null;
+}
+
 type MarkFactory = (data: unknown, options: Record<string, unknown>) => Plot.Markish;
 
 const DATA_MARKS = {
@@ -322,7 +355,11 @@ export function buildPlotParts(
     throw new Error("The spec needs a non-empty marks array.");
   }
   assertPlotDataWithinLimits(spec, data);
-  const { title, marks, data: nestedData, ...plotOptions } = spec;
+  const { title, marks, data: nestedData, ...allOptions } = spec;
+  // Unknown keys never reach Plot.plot (stored pages may carry them); saving a page rejects them.
+  const plotOptions = Object.fromEntries(
+    Object.entries(allOptions).filter(([key]) => PLOT_SPEC_KEYS.has(key)),
+  );
   const sharedData = data ?? (Array.isArray(nestedData) ? nestedData : undefined);
   const normalizedData = new WeakMap<unknown[], unknown[]>();
   const normalizeData = (rows: unknown[]) => {

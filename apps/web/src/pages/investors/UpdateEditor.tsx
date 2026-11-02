@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useComposeEditor } from "../../components/compose/RichTextEditor";
 import { PAGE_GUTTER_X, PageHeader } from "../../components/PageHeader";
+import { UNDO_SEND_MS } from "../../lib/outbox";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { countTbd, TbdHighlight } from "./tbd-highlight";
@@ -78,7 +79,16 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
   const [drafting, setDrafting] = useState(false);
   const [asking, setAsking] = useState<"tbd" | null>(null);
   const [resend, setResend] = useState<string[] | null>(null);
+  const [partError, setPartError] = useState("");
+  const [contactsFailed, setContactsFailed] = useState(false);
+  const [reloads, setReloads] = useState(0);
+  // Send is held for UNDO_SEND_MS so the founder can take it back.
+  const [holding, setHolding] = useState(false);
+  const held = useRef<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const live = useRef(true);
   const loadedId = useRef<string | null>(null);
+  // Set in the same batch as the fields, so autosave never sees them half taken.
+  const [fieldsFor, setFieldsFor] = useState<string | null>(null);
   // The fields as the server last held them, so opening an update does not save it again.
   const saved = useRef("");
   const saving = useRef<Promise<unknown>>(Promise.resolve());
@@ -105,6 +115,17 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
     [updateId],
   );
   const wasSending = useRef(false);
+  // Leaving during the hold sends now: the founder believes the update went out.
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+      if (!held.current) return;
+      clearTimeout(held.current.timer);
+      void rpc.investors.updates.send({ id: held.current.id }).catch(() => undefined);
+      held.current = null;
+    };
+  }, []);
 
   // A revoked contact is never emailed: it is left out of the recipients whatever was saved.
   const recipients = useMemo(() => {
@@ -145,24 +166,31 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
 
   // First load: the update, the audience's contacts and the Gmail accounts.
   useEffect(() => {
-    let live = true;
+    let current = true;
+    const failed = (cause: unknown) =>
+      current && setPartError(errorText(cause, t`Could not load recipients`));
+    setPartError("");
+    setContactsFailed(false);
     void load().then((next) => {
-      if (!live || !next) return;
+      if (!current || !next) return;
       void rpc.contacts
         .list({ kind: next.audience === "board" ? "board" : "investor" })
         .then((list) => {
-          if (live) setContacts(list);
+          if (current) setContacts(list);
         })
-        .catch(() => undefined);
+        .catch((cause) => {
+          if (current) setContactsFailed(true);
+          failed(cause);
+        });
     });
     void rpc.investors.updates
       .accounts()
-      .then((list) => live && setAccounts(list))
-      .catch(() => undefined);
+      .then((list) => current && setAccounts(list))
+      .catch(failed);
     return () => {
-      live = false;
+      current = false;
     };
-  }, [load]);
+  }, [load, reloads]);
 
   // Fields take the stored values once per update, then belong to the founder.
   useEffect(() => {
@@ -172,6 +200,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
     setBody(update.body);
     setTicked(update.recipientContactIds);
     setFrom(update.fromConnectionId);
+    setFieldsFor(update.id);
     saved.current = fieldsKey(
       update.subject,
       update.body,
@@ -184,13 +213,13 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
 
   // A sent update is read-only; the editor follows the status.
   useEffect(() => {
-    editor?.setEditable(draft === true, false);
-  }, [editor, draft]);
+    editor?.setEditable(draft === true && !drafting && !holding, false);
+  }, [editor, draft, drafting, holding]);
 
   // Autosave when a field differs from what the server holds.
   useEffect(() => {
     const key = fieldsKey(subject, body, recipients, from);
-    if (!draft || loadedId.current !== updateId || key === saved.current) return;
+    if (!draft || fieldsFor !== updateId || key === saved.current) return;
     setSaveState("saving");
     pending.current = { subject, body, ticked: recipients, from, key };
     const timer = setTimeout(() => {
@@ -213,7 +242,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
         .catch(() => setSaveState("failed"));
     }, SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [subject, body, recipients, from, draft, updateId]);
+  }, [subject, body, recipients, from, draft, updateId, fieldsFor]);
 
   // While a send runs, read it again until it ends.
   const sending = update?.status === "sending";
@@ -263,11 +292,30 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
 
   const send = () => {
     setAsking(null);
-    void run(async () => {
-      await flushSave();
-      wasSending.current = true;
-      return rpc.investors.updates.send({ id: updateId });
-    });
+    setBusy(true);
+    setActionError("");
+    flushSave()
+      .then(() => {
+        if (!live.current) return;
+        const id = updateId;
+        const timer = setTimeout(() => {
+          held.current = null;
+          setHolding(false);
+          void run(() => {
+            wasSending.current = true;
+            return rpc.investors.updates.send({ id });
+          });
+        }, UNDO_SEND_MS);
+        held.current = { id, timer };
+        setHolding(true);
+      })
+      .catch((cause) => live.current && setActionError(errorText(cause)))
+      .finally(() => live.current && setBusy(false));
+  };
+  const undo = () => {
+    if (held.current) clearTimeout(held.current.timer);
+    held.current = null;
+    setHolding(false);
   };
   const trySend = () => (tbd > 0 ? setAsking("tbd") : send());
 
@@ -307,9 +355,11 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
         text: `Use the investor-update skill to write the ${update.audience} update for ${update.period} into the existing draft ${update.id}: read it with investor_update_draft get, then save the body with investor_update_draft save. Do not ask questions; write TBD for anything you cannot source.`,
       });
       const until = Date.now() + DRAFT_WAIT_MS;
-      while (Date.now() < until) {
+      while (live.current && Date.now() < until) {
         await new Promise((resolve) => setTimeout(resolve, DRAFT_POLL_MS));
+        if (!live.current) return;
         const next = await rpc.investors.updates.get({ id: updateId });
+        if (!live.current) return;
         if (next.body.trim()) {
           setUpdate(next);
           setBody(next.body);
@@ -320,9 +370,10 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
       }
       toast(t`The agent did not finish a draft`);
     } catch (cause) {
+      if (!live.current) return;
       toast(errorText(cause, t`Could not draft with the agent`));
     }
-    setDrafting(false);
+    if (live.current) setDrafting(false);
   };
 
   if (loadError && !update) {
@@ -402,13 +453,22 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
             <Input
               id="update-subject"
               value={subject}
-              disabled={!draft}
+              disabled={!draft || holding}
               onChange={(event) => setSubject(event.target.value)}
             />
           </div>
 
-          {draft && gmail ? (
-            <fieldset className="flex flex-col gap-1.5">
+          {partError ? (
+            <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="text-destructive">{partError}</span>
+              <Button variant="outline" size="sm" onClick={() => setReloads((n) => n + 1)}>
+                <Trans>Try again</Trans>
+              </Button>
+            </div>
+          ) : null}
+
+          {draft && gmail && !contactsFailed ? (
+            <fieldset className="flex min-w-0 flex-col gap-1.5">
               <legend className="mb-1.5 text-sm font-medium">
                 <Trans>To</Trans>
               </legend>
@@ -433,7 +493,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
                     <Checkbox
                       id={`to-${contact.id}`}
                       checked={checked}
-                      disabled={noEmail || revoked}
+                      disabled={noEmail || revoked || holding}
                       onCheckedChange={(next) =>
                         setTicked((current) =>
                           next
@@ -542,7 +602,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={drafting}
+                  disabled={drafting || holding}
                   onClick={() => void draftWithAgent()}
                 >
                   {drafting ? <Trans>Drafting…</Trans> : <Trans>Draft with agent</Trans>}
@@ -561,6 +621,7 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
               </Label>
               <NativeSelect
                 id="update-from"
+                disabled={holding}
                 value={from ?? accounts[0]?.connectionId ?? ""}
                 onChange={(event) => setFrom(event.target.value)}
               >
@@ -605,6 +666,15 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
             <Button disabled>
               <Trans>Sending</Trans>
             </Button>
+          ) : holding ? (
+            <>
+              <span className="me-auto text-sm text-muted-foreground" role="status">
+                <Trans>Sending…</Trans>
+              </span>
+              <Button variant="outline" className="pointer-coarse:min-h-11" onClick={undo}>
+                <Trans>Undo</Trans>
+              </Button>
+            </>
           ) : !gmail && update.audience === "board" ? (
             <Button render={<Link to="/app/integrations" />}>
               <Trans>Connect Gmail to send</Trans>
@@ -633,7 +703,12 @@ export function UpdateEditor({ updateId }: { updateId: string }) {
           ) : (
             <Button
               disabled={
-                busy || drafting || accounts === null || recipients.length === 0 || bodyEmpty
+                busy ||
+                drafting ||
+                accounts === null ||
+                Boolean(partError) ||
+                recipients.length === 0 ||
+                bodyEmpty
               }
               onClick={trySend}
             >

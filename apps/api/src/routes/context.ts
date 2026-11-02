@@ -2,6 +2,7 @@ import type { Implementer, ImplementerInternalWithMiddlewares } from "@orpc/serv
 import { implement, ORPCError } from "@orpc/server";
 import type {
   AgentHomeStore,
+  AppControlProvider,
   ArtifactStore,
   JobPublisher,
   MailProvider,
@@ -77,6 +78,8 @@ export interface RouterDeps {
   auth: Auth;
   jobs: JobPublisher;
   sandbox: SandboxProvider;
+  /** Local desktop control; absent unless APP_CONTROL_PROVIDER is set. */
+  appControl?: AppControlProvider;
   memory: MemoryStore;
   memoryProviders: MemoryProviderResolver;
   home: AgentHomeStore;
@@ -115,6 +118,8 @@ export interface RouterDeps {
   gtmMcp?: Pick<McpConnector, "callServerTool">;
   /** Replaces the read-only Devin caller built from `mcp`; tests pass a fake. */
   devinCallTool?: DevinCallTool;
+  /** Where the Brex token check reaches Brex; the demo and tests point it at an emulator. */
+  brexApi?: { baseUrl?: string; fetch?: typeof fetch };
   /** Meeting providers for the Granola key check; the demo and tests point Granola at the emulator. */
   meetingSources?: MeetingSourceRegistry;
   /** Reads an uploaded bank statement; wired in app.ts. */
@@ -163,7 +168,7 @@ export interface RouterDeps {
   };
 }
 
-type RouteAuthContext = {
+export type RouteAuthContext = {
   actor: Actor | null;
   /** The signed-in session, so a push token ends with the session that registered it. */
   sessionId?: string;

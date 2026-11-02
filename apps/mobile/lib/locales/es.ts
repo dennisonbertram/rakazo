@@ -958,4 +958,12 @@ export const ES_MESSAGES: Record<string, string> = {
     "La clave de IA alcanzó su límite de gasto. Aumenta el límite con tu proveedor o usa otra clave en Configuración > Modelos.",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "El proveedor del modelo está limitando las solicitudes. Inténtalo de nuevo en unos minutos.",
+  "Waiting for approval": "Esperando aprobación",
+  "Not approved": "No aprobado",
+  "Source not found": "Fuente no encontrada",
+  "No data yet": "Aún no hay datos",
+  "Source failed": "Falló la fuente",
+  "Connected.": "Conectado.",
+  "Disconnected {provider}. Bots now use {model}.": "{provider} desconectado. Los bots ahora usan {model}.",
+  "Source paused": "Fuente en pausa",
 };

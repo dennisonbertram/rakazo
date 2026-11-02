@@ -589,3 +589,82 @@ describe("notification delivery", () => {
     expect(container.textContent).not.toContain("Off in Settings");
   });
 });
+
+describe("BotSettings connection choice", () => {
+  const credential = (id: string, provider: string, modelId: string) => ({
+    id,
+    provider,
+    label: id,
+    hasKey: true,
+    isDefault: false,
+    modelId,
+  });
+  const entry = (provider: string, id: string) => ({
+    provider,
+    providerName: provider,
+    id,
+    label: id,
+    billing: "",
+  });
+
+  async function renderBot(overrides: Partial<Bot>) {
+    await act(async () => {
+      root.render(
+        <BotSettings
+          bot={{ ...bot(), ...overrides }}
+          memoryProviderConfigured={false}
+          onSkillsChange={() => undefined}
+          onSave={onSave}
+          onExport={async () => undefined}
+          onClear={() => undefined}
+        />,
+      );
+    });
+    await flush();
+  }
+  const advanced = () =>
+    container.querySelector<HTMLDetailsElement>('[data-testid="bot-settings-advanced"]');
+
+  function stubModels() {
+    vi.mocked(rpc.models.credentials).mockResolvedValueOnce([
+      credential("cred-a", "a", "a-second"),
+      credential("cred-b", "b", "b-x"),
+    ]);
+    vi.mocked(rpc.models.list).mockResolvedValueOnce([
+      entry("a", "a-first"),
+      entry("a", "a-second"),
+      entry("b", "b-x"),
+    ]);
+  }
+
+  it("keeps the connection's own model when it is chosen", async () => {
+    stubModels();
+    await renderBot({ modelProvider: "b", modelId: "b-x" });
+    await act(async () => container.querySelector("summary")?.click());
+    const select = container.querySelector<HTMLSelectElement>('select[id$="-connection"]');
+    if (!select) throw new Error("Missing connection select");
+    await act(async () => {
+      select.value = "cred-a";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(onSave.mock.calls.at(-1)?.[0]).toMatchObject({
+      modelProvider: "a",
+      modelId: "a-second",
+      modelCredentialId: "cred-a",
+    });
+  });
+
+  it("opens Advanced without saving when the pinned connection is gone", async () => {
+    stubModels();
+    await renderBot({ modelCredentialId: "cred_gone" });
+    expect(advanced()?.open).toBe(true);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("leaves Advanced closed when the pin is intact", async () => {
+    stubModels();
+    await renderBot({ modelCredentialId: "cred-a", modelProvider: "a", modelId: "a-second" });
+    expect(advanced()?.open).toBe(false);
+  });
+});

@@ -6,7 +6,12 @@ import type {
   DevinSessionsOutput,
   McpServer,
 } from "@rakazo/contracts";
-import { isCryptoEndpoint, isDevinEndpoint, isGranolaEndpoint } from "@rakazo/contracts";
+import {
+  isBrexCardsEndpoint,
+  isCryptoEndpoint,
+  isDevinEndpoint,
+  isGranolaEndpoint,
+} from "@rakazo/contracts";
 import { CONNECTION_CATALOG_PAGE_SIZE } from "@rakazo/core";
 import {
   AlertDialog,
@@ -42,6 +47,7 @@ import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { PAGE_GUTTER_X, PageHeader } from "../PageHeader";
 import { AppLogo } from "./AppLogo";
+import { BrexCardsConnectDialog } from "./BrexCardsConnectDialog";
 import { ConnectAppDialog } from "./ConnectAppDialog";
 import { CustomConnectionDialog } from "./CustomConnectionDialog";
 import { DevinConnectDialog } from "./DevinConnectDialog";
@@ -52,6 +58,7 @@ import {
   useFinanceStatus,
 } from "./FinanceSection";
 import { GranolaStatusLine, granolaLine } from "./GranolaMeetingsCard";
+import { HexCard } from "./HexCard";
 import { IMessageSection } from "./IMessageSection";
 import {
   AgentStack,
@@ -72,6 +79,7 @@ const PHONE_POPULAR = 3;
 const CHIPS = ["all", "finance", "social", "equity", "tools"] as const;
 type Chip = (typeof CHIPS)[number];
 const GRANOLA_PATH = "/app/integrations/granola";
+const OMI_PATH = "/app/integrations/omi";
 
 function hostOf(value: string | null) {
   if (!value) return "";
@@ -179,7 +187,7 @@ function McpCard({
         logo={known?.logo}
         sub={
           (known && descriptions[known.id]) ||
-          hostOf(server.endpoint) ||
+          (isBrexCardsEndpoint(server.endpoint) ? undefined : hostOf(server.endpoint)) ||
           server.command ||
           undefined
         }
@@ -416,6 +424,7 @@ export function IntegrationsHome({
   } | null>(null);
   /** The Devin key dialog: connecting the space, or replacing a refused key. */
   const [devinDialog, setDevinDialog] = useState<"connect" | "replace" | null>(null);
+  const [brexDialog, setBrexDialog] = useState(false);
   const [removing, setRemoving] = useState<CapabilityInstall | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   // The chips are the page's own section headings (plus All), so each one jumps to a heading you can see.
@@ -451,6 +460,7 @@ export function IntegrationsHome({
     box: t`Search and read files and folders`,
     granola: t`Meeting notes and transcripts`,
     wisprflow: t`Notetaker meetings, notes and tasks`,
+    omi: t`Pendant recordings, meetings and notes`,
   };
   const financeStatus = useFinanceStatus();
   const connectedKeys = connectedFinanceKeys(data.financeSources, financeStatus);
@@ -460,6 +470,25 @@ export function IntegrationsHome({
     (category === "all" || category === "finance") &&
     financeMatches &&
     connectedKeys.size < FINANCE_TILE_COUNT;
+  // Connecting Brex cards is for the space owner. The role comes from the space list's own flag for
+  // the owner's rights; until it answers, or if it fails, the tile stays hidden.
+  const [spaceOwner, setSpaceOwner] = useState(false);
+  useEffect(() => {
+    void Promise.resolve()
+      .then(() => rpc.spaces.list())
+      .then((navigation) =>
+        setSpaceOwner(
+          navigation.spaces.find((space) => space.id === navigation.current.id)?.canRename === true,
+        ),
+      )
+      .catch(() => setSpaceOwner(false));
+  }, []);
+  const [omiConnected, setOmiConnected] = useState(false);
+  useEffect(() => {
+    void Promise.resolve(rpc.omi?.status?.())
+      .then((status) => setOmiConnected(Boolean(status)))
+      .catch(() => undefined);
+  }, []);
   const granolaKey =
     data.meetings && data.meetings.status !== "disconnected" ? data.meetings : null;
   const hasGranolaServer = data.servers.some((server) => isGranolaEndpoint(server.endpoint));
@@ -471,13 +500,20 @@ export function IntegrationsHome({
       ) &&
       !data.sources.some((source) => isSameMcpEndpoint(source.source, entry.endpoint)) &&
       // A connected API key is already Granola's tile under Connected.
-      !(entry.id === "granola" && keyOnlyGranola),
+      !(entry.id === "granola" && keyOnlyGranola) &&
+      !(entry.id === "omi" && omiConnected),
   );
   const firstPartyMcp = unconnectedFirstParty.filter(
     (entry) =>
       (category === "all" || category === entry.section || category === entry.category) &&
       entry.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
+  // Brex cards has no https endpoint to match a connected server by, so its tile is hidden by its own check.
+  const showBrexTile =
+    spaceOwner &&
+    !data.servers.some((server) => isBrexCardsEndpoint(server.endpoint)) &&
+    (category === "all" || category === "tools" || category === "finance") &&
+    "brex cards".includes(query.trim().toLowerCase());
   // A chip whose heading would not show is not offered. Finance always has its own tiles. Until the
   // data arrives only All and Finance show, so the other chips join at the end instead of shifting.
   const chips = CHIPS.filter(
@@ -485,7 +521,9 @@ export function IntegrationsHome({
       id === "all" ||
       id === "finance" ||
       (data.loaded &&
-        (id === category || unconnectedFirstParty.some((entry) => entry.section === id))),
+        (id === category ||
+          unconnectedFirstParty.some((entry) => entry.section === id) ||
+          (id === "tools" && showBrexTile))),
   );
   const [chatMatches, setChatMatches] = useState(0);
   const financeServerIds = data.financeSources.flatMap((source) =>
@@ -521,11 +559,14 @@ export function IntegrationsHome({
   const otherMatches =
     showFinance ||
     firstPartyMcp.length > 0 ||
+    showBrexTile ||
     chatMatches > 0 ||
     (searching && connectedApps.length > 0);
   const wholeList = category === "all";
   const anyConnected =
-    apps.length + servers.length + data.sources.length + connectedKeys.size > 0 || keyOnlyGranola;
+    apps.length + servers.length + data.sources.length + connectedKeys.size > 0 ||
+    keyOnlyGranola ||
+    omiConnected;
   const hasConnected = chipOnly
     ? connectedApps.length > 0 || (category === "finance" && connectedKeys.size > 0)
     : anyConnected;
@@ -568,6 +609,10 @@ export function IntegrationsHome({
     // Granola has its own page: sign-in and the API key are both connected there.
     if (entry.id === "granola") {
       void navigate(GRANOLA_PATH);
+      return;
+    }
+    if (entry.id === "omi") {
+      void navigate(OMI_PATH);
       return;
     }
     setCustom({
@@ -744,6 +789,12 @@ export function IntegrationsHome({
                         description={firstPartyDescription.granola}
                       />
                     ) : null}
+                    {omiConnected && wholeList && !searching ? (
+                      <Card>
+                        <CardHead name="Omi" sub={firstPartyDescription.omi} to={OMI_PATH} />
+                      </Card>
+                    ) : null}
+                    {wholeList && !searching ? <HexCard /> : null}
                     {(wholeList && !searching ? data.sources : []).map((source) => (
                       <SourceCard key={source.id} source={source} onRemove={setRemoving} />
                     ))}
@@ -932,7 +983,8 @@ export function IntegrationsHome({
 
                 {(["social", "equity", "tools"] as const).map((section) => {
                   const entries = firstPartyMcp.filter((entry) => entry.section === section);
-                  return entries.length > 0 ? (
+                  const brexTile = section === "tools" && showBrexTile;
+                  return entries.length > 0 || brexTile ? (
                     <div
                       key={section}
                       data-flat={filtering ? "" : undefined}
@@ -954,6 +1006,9 @@ export function IntegrationsHome({
                             onConnect={() => connectFirstParty(entry)}
                           />
                         ))}
+                        {brexTile ? (
+                          <AppTile name="Brex cards" onConnect={() => setBrexDialog(true)} />
+                        ) : null}
                       </div>
                     </div>
                   ) : null;
@@ -1032,6 +1087,12 @@ export function IntegrationsHome({
             returnTo.current = null;
             if (back) navigate(back);
           }}
+        />
+      ) : null}
+      {brexDialog ? (
+        <BrexCardsConnectDialog
+          onConnected={() => data.refresh()}
+          onClose={() => setBrexDialog(false)}
         />
       ) : null}
       {devinDialog ? (

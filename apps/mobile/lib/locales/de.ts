@@ -580,6 +580,7 @@ export const DE_MESSAGES: Record<string, string> = {
   "Passwords do not match": "Die Passwörter stimmen nicht überein",
   // components/AskActions.tsx
   "Allow once": "Einmal erlauben",
+  "Allow for this run": "Für diesen Lauf erlauben",
   "Always allow": "Immer erlauben",
   "Could not submit answer": "Antwort konnte nicht gesendet werden",
   Deny: "Ablehnen",
@@ -1001,4 +1002,12 @@ export const DE_MESSAGES: Record<string, string> = {
     "Der KI-Schlüssel hat sein Ausgabenlimit erreicht. Erhöhe das Limit bei deinem Anbieter oder verwende in Einstellungen > Modelle einen anderen Schlüssel.",
   "The model provider is rate limiting requests. Try again in a few minutes.":
     "Der Modellanbieter begrenzt die Anfragen. Versuche es in ein paar Minuten erneut.",
+  "Waiting for approval": "Wartet auf Genehmigung",
+  "Not approved": "Nicht genehmigt",
+  "Source not found": "Quelle nicht gefunden",
+  "No data yet": "Noch keine Daten",
+  "Source failed": "Quelle fehlgeschlagen",
+  "Connected.": "Verbunden.",
+  "Disconnected {provider}. Bots now use {model}.": "{provider} getrennt. Bots verwenden jetzt {model}.",
+  "Source paused": "Quelle pausiert",
 };

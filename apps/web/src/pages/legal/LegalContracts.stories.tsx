@@ -223,3 +223,21 @@ export const GroupedFilteredSorted: StoryObj<typeof meta> = {
   parameters: { initialEntries: ["/?type=Warrant&sort=deadline&dir=desc"] },
   decorators: wide,
 };
+
+/** An active contract that does not renew and whose end date has passed shows the Expired chip. */
+export const Lapsed: StoryObj<typeof meta> = {
+  args: {
+    contracts: [
+      ...contracts,
+      {
+        ...contracts[0]!,
+        id: "lapsed",
+        title: "Hosting Agreement",
+        status: "active",
+        autoRenews: false,
+        expirationDate: "2025-01-31",
+      },
+    ],
+  },
+  decorators: Narrow.decorators,
+};

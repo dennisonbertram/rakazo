@@ -78,6 +78,7 @@ final class AccountModel {
     busy = true
     errorMessage = nil
     defer { busy = false }
+    await app.authentication.beforeSessionEnds?()
     do {
       // The account is gone once the server says so, even if this device could not clear itself.
       _ = try await app.authentication.client.deleteAccount(proof)

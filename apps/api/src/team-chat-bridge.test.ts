@@ -1282,6 +1282,7 @@ describe("team chat bridge", () => {
     const bridge = new TeamChatBridge({
       prisma: {
         externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+        appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         externalMessage: {
           updateMany,
           findUnique: vi.fn(async () => ({

@@ -11,6 +11,8 @@ struct ComposerView: View {
   @State private var importing = false
   @State private var photos: [PhotosPickerItem] = []
   @FocusState private var focused: Bool
+  @State private var dictation = DictationModel()
+  @Environment(\.scenePhase) private var scenePhase
 
   private var composer: ComposerModel { model.composer }
 
@@ -28,6 +30,7 @@ struct ComposerView: View {
         Text(notice).font(.footnote).foregroundStyle(Color.token(.destructive))
           .accessibilityIdentifier("composerNotice")
       }
+      DictationNotice(model: dictation)
       HStack(alignment: .bottom, spacing: 8) {
         attachMenu
         TextField("Message \(model.title)", text: $composer.text, axis: .vertical)
@@ -43,6 +46,10 @@ struct ComposerView: View {
     }
     .padding(.horizontal, 16).padding(.vertical, 8)
     .task { SendQueue.shared.bind(app) }
+    .onChange(of: scenePhase) { _, phase in
+      // Not on .inactive: the microphone permission prompt itself makes the scene inactive.
+      if phase == .background { dictation.stop() }
+    }
     .photosPicker(
       isPresented: $picking, selection: $photos, maxSelectionCount: max(composer.slotsLeft, 1),
       matching: .images
@@ -90,6 +97,8 @@ struct ComposerView: View {
       .disabled(composer.stopping)
       .accessibilityLabel("Stop")
       .accessibilityIdentifier("stop")
+    } else if dictation.listening || (composer.text.isEmpty && composer.attachments.isEmpty) {
+      DictationButton(model: dictation, text: Bindable(composer).text)
     } else {
       Button { composer.send(app) } label: {
         Image(systemName: "arrow.up").frame(width: 44, height: 44)

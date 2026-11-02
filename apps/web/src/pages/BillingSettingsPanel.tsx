@@ -64,15 +64,26 @@ export function BillingSettingsPanel() {
         : t`Renews ${day}`
     : null;
 
-  const price = status?.price ? formatBillingPrice(status.price, locale) : null;
   const seats = status?.seats ?? 0;
+  // The price is per seat and checkout bills one unit per seat, so show the total.
+  const price = status?.price
+    ? formatBillingPrice(
+        { ...status.price, amount: status.price.amount * Math.max(1, seats) },
+        locale,
+      )
+    : null;
+  const pastDue = status?.state === "past_due";
 
   return (
     <div data-testid="billing-settings" className="rounded-xl border border-border px-4 py-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           {status ? (
-            <h3 className="text-[15px] font-medium text-foreground">{stateLabel}</h3>
+            <h3
+              className={`text-[15px] font-medium ${pastDue ? "text-destructive" : "text-foreground"}`}
+            >
+              {stateLabel}
+            </h3>
           ) : error ? null : (
             <Skeleton className="h-5 w-24" />
           )}
@@ -93,7 +104,7 @@ export function BillingSettingsPanel() {
         </div>
         {status?.canManage && status.hasCustomer ? (
           <Button
-            variant="secondary"
+            variant={pastDue ? "default" : "secondary"}
             size="sm"
             disabled={pending}
             onClick={() => void openPortal()}

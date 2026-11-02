@@ -90,6 +90,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@kitlangton/hex':
+        specifier: 0.3.1
+        version: 0.3.1
       '@rakazo/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -669,6 +672,9 @@ importers:
       '@rakazo/adapter-kit':
         specifier: workspace:*
         version: link:../adapter-kit
+      '@rakazo/brex-mcp':
+        specifier: workspace:*
+        version: link:../brex-mcp
       '@rakazo/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -793,6 +799,25 @@ importers:
       better-auth:
         specifier: 1.7.14
         version: 1.7.14(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(pg@8.23.0)(prisma@7.10.0(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@7.0.2))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.5.0)(jsdom@30.0.1(@noble/hashes@2.3.0))(vite@8.3.0(@types/node@26.5.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(tsx@4.23.13)(yaml@2.9.0)))
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.5.0)(jsdom@30.0.1(@noble/hashes@2.3.0))(vite@8.3.0(@types/node@26.5.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/brex-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.30.0
+        version: 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.6.2)
+      '@rakazo/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: 4.6.2
+        version: 4.6.2
     devDependencies:
       typescript:
         specifier: 7.0.2
@@ -2900,6 +2925,15 @@ packages:
 
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
+
+  '@kitlangton/hex@0.3.1':
+    resolution: {integrity: sha512-jsj72A9Ipefn3MZZK1TuYpzUNB1kd7W9jBDKpk3qrTKmY1mR8kRvFfCll7MXFuExrLJ9rkNXzlrkrK4D+qAMxw==}
+    engines: {node: '>=20.3.0'}
+    peerDependencies:
+      effect: '>=4.0.0-rc.112 <5.0.0'
+    peerDependenciesMeta:
+      effect:
+        optional: true
 
   '@koromix/koffi-android-arm64@3.2.1':
     resolution: {integrity: sha512-1pJQ4jnZlUJduK9u9DC5CGy3aOgDUPvIXpNb6syV3+Dh5Q/ugezAIGCqvY+w+1mgXsve0pd0NVvJRjdZNHQ6MA==}
@@ -13382,6 +13416,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@js-sdsl/ordered-map@4.4.2': {}
+
+  '@kitlangton/hex@0.3.1': {}
 
   '@koromix/koffi-android-arm64@3.2.1':
     optional: true

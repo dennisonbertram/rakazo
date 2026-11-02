@@ -15,6 +15,7 @@ import {
   extractRoutineSkillMentions,
   formatCron,
   isOneShotRoutineCrons,
+  modelKeyForConnection,
   presetFromCron,
 } from "@rakazo/core";
 import {
@@ -54,6 +55,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { toDatetimeLocalValue } from "../lib/datetime-local";
 import { timezoneLabel } from "../lib/local-timezone";
 import {
   connectedModelOptions,
@@ -66,11 +68,6 @@ import { rpc } from "../lib/rpc";
 import { isHiddenBuiltinSkill, slashSkillLabel } from "../lib/slash-skills";
 import { RoutineRunHistory } from "./RoutineRunHistory";
 import { RoutineSchedule } from "./RoutineSchedule";
-
-function toDatetimeLocalValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 function defaultArmRunAtLocal(): string {
   return toDatetimeLocalValue(new Date(Date.now() + 60 * 60 * 1000));
@@ -104,6 +101,8 @@ export type RoutineDraftState = {
   runAtLocal: string;
   /** Empty runs this routine on the bot's model. */
   modelKey: string;
+  /** The connection the model runs on; empty uses the bot's connection or the default. */
+  credentialId: string;
   thinkingLevel: string;
   /** Empty keeps the routine's zone, or the account zone for a new routine. */
   timezone: string;
@@ -125,6 +124,7 @@ export function emptyRoutineDraft(): RoutineDraftState {
     active: true,
     runAtLocal: "",
     modelKey: "",
+    credentialId: "",
     thinkingLevel: "",
     timezone: "",
     quiet: false,
@@ -147,6 +147,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
       routine.modelProvider && routine.modelId
         ? modelOptionKey(routine.modelProvider, routine.modelId)
         : "",
+    credentialId: routine.modelCredentialId ?? "",
     thinkingLevel: routine.thinkingLevel ?? "",
     timezone: routine.timezone,
     quiet: routine.quiet,
@@ -223,6 +224,7 @@ export function routineStatusLine(
     }
   }
   const parts: string[] = [];
+  if (status.lastRunFailed && routine.watch) parts.push(t`Last run failed`);
   if (routine.watch) {
     if (status.lastCheckedAt) {
       const checked = formatRelativeTime(status.lastCheckedAt, now);
@@ -234,7 +236,9 @@ export function routineStatusLine(
     }
   } else {
     const lastRunAt = status.lastRunAt ?? routine.lastRunAt;
-    if (lastRunAt) {
+    if (status.lastRunFailed) {
+      parts.push(t`Last run failed`);
+    } else if (lastRunAt) {
       const lastRan = formatRunTime(lastRunAt, routine.timezone, locale, now);
       parts.push(t`Last ran ${lastRan}`);
     }
@@ -246,16 +250,39 @@ export function routineStatusLine(
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-export function RoutineListHeader({ onCreate }: { onCreate: () => void }) {
+const ROUTINE_NAME_CHARS = 40;
+
+/** The name a routine gets when none is typed: the instruction's first line, cut at a word. */
+export function defaultRoutineName(prompt: string, skillName?: string): string {
+  const line = prompt
+    .split("\n")
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .find(Boolean);
+  if (!line) return (skillName?.trim() || t`Routine`).slice(0, 80);
+  if (line.length <= ROUTINE_NAME_CHARS) return line;
+  const cut = line.slice(0, ROUTINE_NAME_CHARS + 1).lastIndexOf(" ");
+  return `${line.slice(0, cut > 0 ? cut : ROUTINE_NAME_CHARS)}…`;
+}
+
+export function RoutineListHeader({
+  onCreate,
+  empty,
+}: {
+  onCreate: () => void;
+  /** The bot has no routines of its own yet; only then is the example worth showing. */
+  empty: boolean;
+}) {
   return (
     <div className="mt-[30px] mb-3 flex items-center justify-between gap-3">
       <div className="min-w-0">
         <div className="text-sm text-muted-foreground">
           <Trans>Routines</Trans>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground/70 max-sm:hidden">
-          <Trans>Work this bot repeats for you, like a cash check every Monday.</Trans>
-        </p>
+        {empty ? (
+          <p className="mt-0.5 text-xs text-muted-foreground/70 max-sm:hidden">
+            <Trans>Work this bot repeats for you, like a cash check every Monday.</Trans>
+          </p>
+        ) : null}
       </div>
       <Button variant="secondary" size="sm" data-testid="routine-create-button" onClick={onCreate}>
         <Plus strokeWidth={1.9} />
@@ -307,7 +334,11 @@ export function RoutineListRow({
           {statusLine ? (
             <span
               data-testid="routine-status-line"
-              className="block text-[12.5px] text-muted-foreground/80"
+              className={`block text-[12.5px] ${
+                statusLine.startsWith(t`Last run failed`)
+                  ? "text-destructive"
+                  : "text-muted-foreground/80"
+              }`}
             >
               {statusLine}
             </span>
@@ -401,7 +432,11 @@ export function RoutineEditor({
       })
       .catch(() => undefined);
   }, []);
-  const modelOptions = connectedModelOptions(credentials, catalog);
+  const pinnedCredential = credentials.find((entry) => entry.id === draft.credentialId);
+  const modelOptions = connectedModelOptions(
+    pinnedCredential ? [pinnedCredential] : credentials,
+    catalog,
+  );
   const selectedModel = draft.modelKey ? parseModelOptionKey(draft.modelKey) : null;
   const selectedEntry = selectedModel
     ? catalog.find(
@@ -574,7 +609,11 @@ export function RoutineEditor({
         <Input
           id={`${fieldId}-name`}
           value={draft.name}
-          placeholder={t`Name this routine`}
+          placeholder={
+            draft.prompt.trim()
+              ? defaultRoutineName(draft.prompt, draft.taughtSkill?.name)
+              : t`Name this routine`
+          }
           onChange={(e) => onChange({ ...draft, name: e.target.value })}
           className="mt-2"
         />
@@ -703,6 +742,45 @@ export function RoutineEditor({
                   ))}
                 </NativeSelect>
               </label>
+
+              {credentials.length > 1 || draft.credentialId ? (
+                <label
+                  htmlFor={`${fieldId}-connection`}
+                  className="mt-5 block text-sm text-muted-foreground"
+                >
+                  <Trans>Connection</Trans>
+                  <NativeSelect
+                    id={`${fieldId}-connection`}
+                    className="mt-2 w-full"
+                    value={draft.credentialId}
+                    onChange={(event) => {
+                      const next = credentials.find((entry) => entry.id === event.target.value);
+                      onChange({
+                        ...draft,
+                        credentialId: next?.id ?? "",
+                        thinkingLevel: "",
+                        modelKey: next
+                          ? modelKeyForConnection(next, catalog, draft.modelKey)
+                          : draft.modelKey,
+                      });
+                    }}
+                  >
+                    <NativeSelectOption value="">{t`Bot's connection`}</NativeSelectOption>
+                    {draft.credentialId && !pinnedCredential ? (
+                      <NativeSelectOption value={draft.credentialId}>
+                        {t`Signed out or removed`}
+                      </NativeSelectOption>
+                    ) : null}
+                    {credentials.map((entry) => (
+                      <NativeSelectOption key={entry.id} value={entry.id}>
+                        {entry.authKind === "oauth"
+                          ? t`${entry.label} (Subscription)`
+                          : entry.label}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </label>
+              ) : null}
 
               <label
                 htmlFor={`${fieldId}-model`}

@@ -1425,16 +1425,21 @@ export async function markThreadUnreadFrom(
   actor: Actor,
   target: ThreadTarget,
   messageId: string,
-) {
-  const rows = await prisma.$queryRaw<{ id: string }[]>`
+): Promise<boolean> {
+  // `prev` reads the flag in the same statement; returns whether `unread` changed.
+  const rows = await prisma.$queryRaw<{ changed: boolean }[]>`
+    WITH prev AS (
+      SELECT t.id, t."unread" AS was FROM threads t
+      WHERE t.id = ${target.threadId} AND t."spaceId" = ${actor.spaceId}
+        AND t."userId" = ${actor.userId}
+    )
     UPDATE threads SET "unread" = true, "lastReadSeq" = m."seq" - 1
-    FROM messages m
-    WHERE m."id" = ${messageId} AND m."threadId" = threads.id
-      AND threads.id = ${target.threadId} AND threads."spaceId" = ${actor.spaceId}
-      AND threads."userId" = ${actor.userId}
-    RETURNING threads.id`;
+    FROM messages m, prev
+    WHERE m."id" = ${messageId} AND m."threadId" = threads.id AND prev.id = threads.id
+    RETURNING prev.was <> threads."unread" AS changed`;
   if (rows.length === 0) throw new ORPCError("NOT_FOUND");
   if (rows.length > 1) throw new IsolationError();
+  return rows[0]!.changed;
 }
 
 /**
@@ -1449,21 +1454,34 @@ export async function setThreadUnreadState(
   target: ThreadTarget,
   unread: boolean,
   read: { upToMessageId?: string; toEnd?: boolean } = {},
-) {
+): Promise<boolean> {
+  // `prev` reads the flag in the same statement; the result says whether `unread` changed.
   if (unread) {
-    const count = await prisma.$executeRaw`
+    const rows = await prisma.$queryRaw<{ changed: boolean }[]>`
+      WITH prev AS (
+        SELECT t.id, t."unread" AS was FROM threads t
+        WHERE t.id = ${target.threadId} AND t."spaceId" = ${actor.spaceId}
+          AND t."userId" = ${actor.userId}
+      )
       UPDATE threads SET
         "unread" = true,
         "lastReadSeq" = LEAST("lastReadSeq", COALESCE(
           (SELECT MAX(m."seq") - 1 FROM messages m WHERE m."threadId" = threads.id AND m."role" <> 'user'),
           "lastReadSeq"))
-      WHERE id = ${target.threadId} AND "spaceId" = ${actor.spaceId} AND "userId" = ${actor.userId}`;
-    if (count > 1) throw new IsolationError();
-    return;
+      FROM prev
+      WHERE threads.id = prev.id
+      RETURNING prev.was <> threads."unread" AS changed`;
+    if (rows.length > 1) throw new IsolationError();
+    return rows[0]?.changed ?? false;
   }
   const upTo = read.upToMessageId ?? null;
   // GREATEST keeps the boundary monotonic under concurrent tabs; the WHERE keeps it the caller's.
-  const rows = await prisma.$queryRaw<{ id: string }[]>`
+  const rows = await prisma.$queryRaw<{ changed: boolean }[]>`
+    WITH prev AS (
+      SELECT t.id, t."unread" AS was FROM threads t
+      WHERE t.id = ${target.threadId} AND t."spaceId" = ${actor.spaceId}
+        AND t."userId" = ${actor.userId}
+    )
     UPDATE threads SET
       "lastReadSeq" = GREATEST("lastReadSeq", LEAST(r.seq, "nextMessageSeq" - 1)),
       "unread" = CASE
@@ -1473,8 +1491,9 @@ export async function setThreadUnreadState(
     FROM (SELECT COALESCE(
       (SELECT m."seq" FROM messages m WHERE m."id" = ${upTo}::text AND m."threadId" = ${target.threadId}),
       CASE WHEN ${upTo}::text IS NULL THEN 2147483647 END) AS seq) r
-    WHERE threads.id = ${target.threadId} AND threads."spaceId" = ${actor.spaceId}
-      AND threads."userId" = ${actor.userId} AND r.seq IS NOT NULL
-    RETURNING threads.id`;
+      , prev
+    WHERE threads.id = prev.id AND r.seq IS NOT NULL
+    RETURNING prev.was <> threads."unread" AS changed`;
   if (rows.length > 1) throw new IsolationError();
+  return rows[0]?.changed ?? false;
 }

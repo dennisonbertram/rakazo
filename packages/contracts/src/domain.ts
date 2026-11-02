@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { AGENT_SECRET_NAME_PATTERN } from "./agent-secret-name.js";
+import { BotAppControlSchema, UpdateBotAppControlSchema } from "./app-control.js";
 import { BotAvatarValueSchema } from "./bot-avatar.js";
 import { DisabledBuiltinToolsSchema } from "./builtin-tools.js";
 import {
@@ -10,6 +11,7 @@ import {
 import { ThreadMessageSchema } from "./events.js";
 import { Id, MemoryScope, RunStatus, SandboxKind } from "./ids.js";
 import { McpHeadersSchema, McpRemoteEndpointSchema, McpTransportSchema } from "./mcp.js";
+import { MeetingRecordingPolicySchema } from "./meetings.js";
 import {
   PageWatchSpecSchema,
   RoutineManagedKindSchema,
@@ -144,10 +146,14 @@ export const BotSchema = z.object({
   autoSpeak: z.boolean(),
   modelProvider: z.string().nullable(),
   modelId: z.string().nullable(),
+  /** The model connection this bot runs on; null follows the space default. */
+  modelCredentialId: Id.nullable().optional(),
   thinkingLevel: ThinkingLevelSchema.nullable(),
   teamChatAmbientEnabled: z.boolean(),
   teamChatRules: z.string(),
   crossSpaceCommunication: z.boolean().optional(),
+  /** Local desktop control; only the deployment owner can change it. */
+  appControl: BotAppControlSchema.optional(),
   disabledBuiltinTools: z.array(z.string()).default([]),
   audience: BotAudienceSchema.default("internal"),
   /** An external bot may message only these internal bots. */
@@ -361,6 +367,10 @@ export const SpaceSchema = z.object({
   canDelete: z.boolean().optional(),
   /** Members of the space, so the sidebar can drop the heading of a space that is only the caller's. */
   memberCount: z.number().int().positive().optional(),
+  /** Whether meetings may be recorded in this space. */
+  meetingRecording: MeetingRecordingPolicySchema.optional(),
+  /** True only when the current member is an owner or admin and may change `meetingRecording`. */
+  canSetMeetingRecording: z.boolean().optional(),
   bots: z.array(SpaceBotSchema),
   groups: z.array(SpaceGroupSchema),
   externalConversations: z.array(ExternalConversationSchema),
@@ -431,10 +441,13 @@ export const UpdateBotInput = z
     autoSpeak: z.boolean().optional(),
     modelProvider: z.string().trim().min(1).max(80).nullable().optional(),
     modelId: z.string().trim().min(1).max(200).nullable().optional(),
+    /** Pins the bot to one of the caller's own model connections; null follows the space default. */
+    modelCredentialId: Id.nullable().optional(),
     thinkingLevel: ThinkingLevelSchema.nullable().optional(),
     teamChatAmbientEnabled: z.boolean().optional(),
     teamChatRules: z.string().max(TEAM_CHAT_RULES_MAX_LENGTH).optional(),
     crossSpaceCommunication: z.boolean().optional(),
+    appControl: UpdateBotAppControlSchema.optional(),
     disabledBuiltinTools: DisabledBuiltinToolsSchema.optional(),
     audience: BotAudienceSchema.optional(),
     externalMessageTargets: z.array(Id).max(200).optional(),
@@ -517,6 +530,8 @@ export const RoutineSchema = z.object({
   /** Null runs this routine on its bot's model. */
   modelProvider: z.string().nullable(),
   modelId: z.string().nullable(),
+  /** The owner's connection this routine's own model runs on; null uses the bot's pin or the default. */
+  modelCredentialId: Id.nullable().optional(),
   thinkingLevel: ThinkingLevelSchema.nullable(),
   lastRunAt: z.string().nullable(),
   nextRunAt: z.string().nullable(),
@@ -556,6 +571,7 @@ export const CreateRoutineInput = z
       .default(null),
     modelProvider: z.string().trim().min(1).max(80).nullable().default(null),
     modelId: z.string().trim().min(1).max(200).nullable().default(null),
+    modelCredentialId: Id.nullable().default(null),
     thinkingLevel: ThinkingLevelSchema.nullable().default(null),
     /** Defaults to on for a watch and off otherwise. */
     quiet: z.boolean().optional(),
@@ -1664,6 +1680,8 @@ export const VoiceStatusSchema = z.object({
   transcriptionProvider: z.string().nullable(),
   /** True once the selected transcription provider can be used for dictation. Always false until S3b. */
   transcriptionReady: z.boolean(),
+  /** This user has agreed, in this space, to send audio to the provider that would transcribe it. Absent on older servers. */
+  transcriptionConsented: z.boolean().optional(),
 });
 export type VoiceStatus = z.infer<typeof VoiceStatusSchema>;
 
@@ -1860,3 +1878,6 @@ export const ExportManifestSchema = z.object({
   history: z.array(ThreadMessageSchema),
 });
 export type ExportManifest = z.infer<typeof ExportManifestSchema>;
+
+/** The failed-run message when a bot's pinned connection is signed out or removed. */
+export const PINNED_CONNECTION_LOST_MESSAGE = "This bot's connection is signed out or removed.";

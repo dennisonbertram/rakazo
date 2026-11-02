@@ -54,6 +54,7 @@ export function moreBarCover(
   const edge = scroller.getBoundingClientRect().bottom - moreBarHeight();
   for (const row of scroller.querySelectorAll<HTMLElement>(rowSelector)) {
     const box = row.getBoundingClientRect();
+    // The bar covers a cut row whole, so no half row shows.
     if (box.top < edge - 0.5 && box.bottom > edge + 0.5) return Math.ceil(edge - box.top);
   }
   return 0;

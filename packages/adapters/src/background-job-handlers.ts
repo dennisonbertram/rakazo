@@ -58,6 +58,8 @@ import { runInboxTriage, triageReadiness } from "./inbox-triage.js";
 import { runMailAttachmentFiling } from "./mail-attachment-filing.js";
 import { runMailSyncJob } from "./mail-sync-job.js";
 import { expireMailSearch } from "./mail-tools.js";
+import type { McpConnector } from "./mcp-connector.js";
+import { runCaptureFinalize, runCaptureSweep, runCaptureTranscribe } from "./meeting-capture.js";
 import { runMeetingDigest } from "./meeting-digest.js";
 import { createMeetingSourceRegistry } from "./meeting-source-registry.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
@@ -65,6 +67,10 @@ import { runMeetingSyncJob } from "./meeting-sync-job.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-delivery.js";
 import { deliverDueNotifications } from "./notification-outbox.js";
+import { runOmiAssemble } from "./omi-assemble.js";
+import { runOmiSort } from "./omi-sort.js";
+import { runOmiTranscribe } from "./omi-transcribe.js";
+import { runPageRefreshTick, runPageSnapshotRetention } from "./page-source-tick.js";
 import { renderPdfPages } from "./pdf-render.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
 import { describeTeachSteps } from "./teach-steps.js";
@@ -142,6 +148,10 @@ export function createBackgroundJobHandlers(deps: {
   /** Gmail push settings; absent means polling only, and the watch renewal job does nothing. */
   gmailPush?: GmailPushConfig;
   companyImport?: CompanyImportEngine;
+  /** From the deployment; board_tickets is only a page source where the ticket board is on. */
+  ticketBoardEnabled?: boolean;
+  /** Needed for mcp page sources; without it they record an error. */
+  mcp?: Pick<McpConnector, "callServerTool" | "listServerTools">;
 }): BackgroundJobHandlers {
   const messagingDeps = deps.messaging
     ? { prisma: deps.prisma, messaging: deps.messaging, events: deps.events, jobs: deps.jobs }
@@ -384,6 +394,53 @@ export function createBackgroundJobHandlers(deps: {
         payload,
       );
     }),
+    "meetings.capture_transcribe": asPayloadTenant((payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      return runCaptureTranscribe(
+        {
+          prisma: deps.prisma,
+          artifacts: deps.artifacts,
+          secrets: deps.secretStore,
+          jobs: deps.jobs,
+        },
+        payload,
+      );
+    }),
+    "meetings.capture_finalize": asPayloadTenant((payload) =>
+      runCaptureFinalize(
+        {
+          prisma: deps.prisma,
+          jobs: deps.jobs,
+          ...(deps.artifacts ? { artifacts: deps.artifacts } : {}),
+        },
+        payload,
+      ),
+    ),
+    "meetings.capture_sweep": async () => {
+      await runCaptureSweep({ prisma: deps.prisma, jobs: deps.jobs });
+    },
+    "omi.assemble": asPayloadTenant(async (payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      await runOmiAssemble(
+        { prisma: deps.prisma, jobs: deps.jobs, artifacts: deps.artifacts },
+        payload,
+      );
+    }),
+    "omi.transcribe": asPayloadTenant((payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      return runOmiTranscribe(
+        {
+          prisma: deps.prisma,
+          artifacts: deps.artifacts,
+          secrets: deps.secretStore,
+          jobs: deps.jobs,
+        },
+        payload,
+      );
+    }),
+    "omi.sort": asPayloadTenant((payload) =>
+      runOmiSort({ ...dataRoomDeps(), runtime: deps.runtime }, payload),
+    ),
     "dataroom.blob.delete": async (payload) =>
       runAsTenant({ spaceId: payload.spaceId, userId: "" }, async () => {
         if (!deps.artifacts) throw new Error("Artifact store is not configured");
@@ -506,6 +563,19 @@ export function createBackgroundJobHandlers(deps: {
         events: deps.events,
         notificationEvents: deps.notificationEvents,
       });
+    },
+    "pages.refresh.tick": async () => {
+      await runPageRefreshTick({
+        prisma: deps.prisma,
+        events: deps.events,
+        jobs: deps.jobs,
+        ticketBoardEnabled: deps.ticketBoardEnabled,
+        mcp: deps.mcp,
+        secretStore: deps.secretStore,
+      });
+    },
+    "pages.snapshots.retention": async () => {
+      await runPageSnapshotRetention(deps.prisma);
     },
     "history.compact": asOwner(thread, async (payload) => {
       // Retrieval policies use stored context without paid message-count compaction.

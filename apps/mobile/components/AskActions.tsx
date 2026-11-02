@@ -14,6 +14,9 @@ const KNOWN_ASK_ACTION_LABELS: Record<string, string> = {
   deny: "Deny",
 };
 
+/** The desktop app card: one approval covers the rest of the run in that app. */
+const RUN_ALLOW_LABEL = "Allow for this run";
+
 const CONSENT_ASK_ACTION_LABELS: Record<string, string> = { allow: "Allow", deny: "Not now" };
 
 export function AskActions({
@@ -79,9 +82,11 @@ export function AskActions({
             >
               {pendingAction === action.id
                 ? t("Sending…")
-                : Object.hasOwn(labels, action.id)
-                  ? t(labels[action.id]!)
-                  : action.label}
+                : action.id === "allow" && action.label === RUN_ALLOW_LABEL
+                  ? t(RUN_ALLOW_LABEL)
+                  : Object.hasOwn(labels, action.id)
+                    ? t(labels[action.id]!)
+                    : action.label}
             </Text>
           </Pressable>
         );

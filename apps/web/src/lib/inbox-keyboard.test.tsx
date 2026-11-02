@@ -8,6 +8,8 @@ import { useInboxKeyboard } from "./inbox-keyboard";
 const toggle = vi.fn();
 const archive = vi.fn();
 const select = vi.fn();
+const read = vi.fn();
+let clock = Date.now();
 let root: ReturnType<typeof createRoot>;
 
 function Harness(props: { selectedId: string | undefined; hasPicked: boolean }) {
@@ -22,6 +24,7 @@ function Harness(props: { selectedId: string | undefined; hasPicked: boolean }) 
     compose: undefined,
     toggle,
     archive,
+    read,
     help: () => {},
   });
   return null;
@@ -29,12 +32,14 @@ function Harness(props: { selectedId: string | undefined; hasPicked: boolean }) 
 
 const show = (selectedId: string | undefined, hasPicked = false) =>
   act(async () => root.render(<Harness selectedId={selectedId} hasPicked={hasPicked} />));
-const press = (key: string) =>
+const press = (key: string, target: Element = document.body) =>
   act(async () => {
-    document.body.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
   });
 
 beforeEach(() => {
+  // j/k are throttled to one step per 150ms; each press here counts as a new moment.
+  vi.spyOn(Date, "now").mockImplementation(() => (clock += 200));
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   root = createRoot(document.body.appendChild(document.createElement("div")));
 });
@@ -42,6 +47,7 @@ afterEach(() => {
   act(() => root.unmount());
   document.body.innerHTML = "";
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 it("x checks the selected row, or the whole group when a group is selected", async () => {
@@ -72,4 +78,55 @@ it("e does nothing with no selection and nothing checked", async () => {
   await show(undefined, false);
   await press("e");
   expect(archive).not.toHaveBeenCalled();
+});
+
+const toast = () => {
+  const el = document.body.appendChild(document.createElement("div"));
+  el.setAttribute("role", "alertdialog");
+  el.setAttribute("data-slot", "notification-toast");
+  return el;
+};
+
+it("j works while a toast shows", async () => {
+  await show(undefined);
+  toast();
+  await press("j");
+  expect(select).toHaveBeenLastCalledWith("group:news@example.test");
+});
+
+it("j stays off under a real dialog, even beside a toast", async () => {
+  await show(undefined);
+  toast();
+  document.body.appendChild(document.createElement("div")).setAttribute("role", "dialog");
+  await press("j");
+  expect(select).not.toHaveBeenCalled();
+});
+
+it("j works with focus on the main landmark, but not elsewhere in it", async () => {
+  await show(undefined);
+  const main = document.body.appendChild(document.createElement("main"));
+  main.id = "main-content";
+  const bar = main.appendChild(document.createElement("div"));
+  await press("j", bar);
+  expect(select).not.toHaveBeenCalled();
+  await press("j", main);
+  expect(select).toHaveBeenCalledTimes(1);
+});
+
+it("j works with focus on the current page's sidebar link", async () => {
+  await show(undefined);
+  const link = document.body.appendChild(document.createElement("a"));
+  link.setAttribute("aria-current", "page");
+  await press("j", link);
+  expect(select).toHaveBeenCalledTimes(1);
+});
+
+it("u marks the selected message read or unread, and does nothing with no selection", async () => {
+  await show("m1");
+  await press("u");
+  expect(read).toHaveBeenLastCalledWith("m1");
+  read.mockClear();
+  await show(undefined);
+  await press("u");
+  expect(read).not.toHaveBeenCalled();
 });

@@ -1,6 +1,7 @@
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
 import { AiConsentQuerySchema, AiConsentStatusSchema } from "./ai-consent.js";
+import { AppControlAppSchema, AppControlStatusOutputSchema } from "./app-control.js";
 import {
   ARTIFACT_DESCRIPTION_MAX_LENGTH,
   ARTIFACT_NAME_MAX_LENGTH,
@@ -27,6 +28,12 @@ import {
   BotSecretPutInput,
   StoredBotSecretName,
 } from "./bot-secrets.js";
+import {
+  BrexCardsConnectInputSchema,
+  BrexCardsConnectOutputSchema,
+  BrexCardsControlsSchema,
+  BrexCardsListSchema,
+} from "./brex-cards.js";
 import { CalendarAgendaInputSchema, CalendarAgendaSchema } from "./calendar.js";
 import {
   CapTableChangeSourceInputSchema,
@@ -257,6 +264,13 @@ import {
   SafeSchema,
 } from "./fundraising.js";
 import { GtmOverviewSchema, GtmQueueInputSchema, GtmQueueOutputSchema } from "./gtm.js";
+import {
+  LocalMeetingsConnectInputSchema,
+  LocalMeetingsDisconnectInputSchema,
+  LocalMeetingsImportInputSchema,
+  LocalMeetingsImportOutputSchema,
+  LocalMeetingsStatusSchema,
+} from "./hex.js";
 import { Id, IsoDate } from "./ids.js";
 import {
   CleanupArchiveInputSchema,
@@ -334,8 +348,15 @@ import {
   UpdateMcpConnectionInput,
 } from "./mcp-connections.js";
 import {
+  MeetingCaptureActiveSchema,
+  MeetingCaptureAppendTextInputSchema,
+  MeetingCaptureFinishInputSchema,
+  MeetingCaptureStartInputSchema,
+  MeetingCaptureStartOutputSchema,
   MeetingConnectInputSchema,
+  MeetingRecordingPolicySchema,
   MeetingsStatusSchema,
+  StoredMeetingDetailSchema,
   StoredMeetingsPageSchema,
 } from "./meetings.js";
 import {
@@ -349,10 +370,34 @@ import {
   NotificationSignalSchema,
 } from "./notification.js";
 import {
+  OmiConnectInputSchema,
+  OmiDisconnectInputSchema,
+  OmiSegmentMoveInputSchema,
+  OmiSegmentSchema,
+  OmiSegmentsListInputSchema,
+  OmiStatusSchema,
+} from "./omi.js";
+import {
+  PageDataInputSchema,
+  PageDataSchema,
+  PageRefreshInputSchema,
+  PageShareInputSchema,
+  PageShareOutputSchema,
+  PageSourceRemoveInputSchema,
+  PageSourceScheduleInputSchema,
+  PageSourceSchema,
+  PageSourcesListInputSchema,
+} from "./page-sources.js";
+import {
+  BotPageCreateInputSchema,
   BotPageGetInputSchema,
+  BotPageListInputSchema,
+  BotPageRemoveInputSchema,
+  BotPageRenameInputSchema,
   BotPageSaveInputSchema,
   BotPageSaveOutputSchema,
   BotPageSchema,
+  BotPageSummarySchema,
 } from "./pages.js";
 import {
   BotPinsGetInputSchema,
@@ -538,8 +583,16 @@ export const appContract = {
     remove: oc
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
+    /** Owners and admins set whether meetings may be recorded in the current space. Applies to new captures. FORBIDDEN for members. */
+    setMeetingRecording: oc
+      .input(z.object({ policy: MeetingRecordingPolicySchema }))
+      .output(z.object({ policy: MeetingRecordingPolicySchema })),
   },
   bootstrap: oc.input(z.object({ botId: Id.optional() })).output(AppBootstrapSchema),
+  appControl: {
+    status: oc.output(AppControlStatusOutputSchema),
+    apps: oc.output(z.object({ apps: z.array(AppControlAppSchema) })),
+  },
   deployment: {
     get: oc.output(DeploymentSettingsSchema),
     update: oc
@@ -864,8 +917,19 @@ export const appContract = {
       .input(z.object({ botId: Id.optional(), scope: z.enum(["bot", "user"]).optional() }))
       .output(z.array(MemoryDocumentSchema)),
     update: oc
-      .input(z.object({ documentId: Id, content: z.string() }))
+      .input(
+        z.object({
+          documentId: Id,
+          content: z.string(),
+          /** When set, the update fails with CONFLICT unless the document is still at this revision. */
+          expectedRevision: z.number().int().optional(),
+        }),
+      )
       .output(MemoryDocumentSchema),
+    /** Deletes one memory and its history, only if it is still at `revision`. */
+    remove: oc
+      .input(z.object({ documentId: Id, revision: z.number().int() }))
+      .output(z.object({ ok: z.literal(true) })),
     exportMarkdown: oc.input(z.object({ botId: Id.optional() })).output(z.string()),
     providerConfig: oc.output(SpaceMemoryConfigSchema.nullable()),
     connectProvider: oc
@@ -886,6 +950,21 @@ export const appContract = {
   pages: {
     get: oc.input(BotPageGetInputSchema).output(BotPageSchema.nullable()),
     save: oc.input(BotPageSaveInputSchema).output(BotPageSaveOutputSchema),
+    list: oc.input(BotPageListInputSchema).output(z.array(BotPageSummarySchema)),
+    create: oc.input(BotPageCreateInputSchema).output(BotPageSchema),
+    rename: oc.input(BotPageRenameInputSchema).output(BotPageSummarySchema),
+    remove: oc.input(BotPageRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
+    data: oc.input(PageDataInputSchema).output(PageDataSchema.nullable()),
+    refresh: oc.input(PageRefreshInputSchema).output(PageDataSchema.nullable()),
+    share: oc.input(PageShareInputSchema).output(PageShareOutputSchema.nullable()),
+    shareStatus: oc
+      .input(PageShareInputSchema)
+      .output(z.object({ artifactId: z.string(), expiresAt: z.string() }).nullable()),
+    sources: oc.input(PageSourcesListInputSchema).output(z.array(PageSourceSchema)),
+    removeSource: oc.input(PageSourceRemoveInputSchema).output(z.object({ ok: z.literal(true) })),
+    setSourceSchedule: oc.input(PageSourceScheduleInputSchema).output(PageSourceSchema),
+    pauseSource: oc.input(PageSourceRemoveInputSchema).output(PageSourceSchema),
+    resumeSource: oc.input(PageSourceRemoveInputSchema).output(PageSourceSchema),
   },
   pins: {
     get: oc.input(BotPinsGetInputSchema).output(BotPinsSchema.nullable()),
@@ -923,6 +1002,7 @@ export const appContract = {
             /** Null clears the routine's own model and runs it on the bot's. */
             modelProvider: z.string().trim().min(1).max(80).nullable().optional(),
             modelId: z.string().trim().min(1).max(200).nullable().optional(),
+            modelCredentialId: Id.nullable().optional(),
             thinkingLevel: ThinkingLevelSchema.nullable().optional(),
             /** ISO datetime to arm a never-run one-shot. */
             runAt: IsoDate.optional(),
@@ -1546,9 +1626,19 @@ export const appContract = {
     catalog: oc.output(z.array(VoiceCatalogEntrySchema)),
     status: oc.output(VoiceStatusSchema),
     credentials: oc.output(z.array(VoiceCredentialSchema)),
-    /** Select a transcription provider with its own key. The key is never returned. */
+    /**
+     * Select a transcription provider with its own key. The key is never returned.
+     * An OpenAI-compatible server sends `baseUrl` and `model` and may omit the key.
+     */
     setTranscription: oc
-      .input(z.object({ provider: z.string().min(1), apiKey: z.string().min(8) }))
+      .input(
+        z.object({
+          provider: z.string().min(1),
+          apiKey: z.string().min(8).optional(),
+          baseUrl: z.string().max(2048).optional(),
+          model: z.string().max(120).optional(),
+        }),
+      )
       .output(z.object({ provider: z.string() })),
     clearTranscription: oc.output(z.object({ ok: z.literal(true) })),
     connect: oc
@@ -1755,10 +1845,60 @@ export const appContract = {
     refresh: oc.output(z.object({ ok: z.literal(true) })),
     /** The caller's stored meetings, newest first; a plain query that works with consent off and after disconnect. */
     list: oc
-      .input(z.object({ cursor: z.string().max(200).optional() }))
+      .input(
+        z.object({
+          cursor: z.string().max(200).optional(),
+          /** Case-insensitive text the title contains. */
+          q: z.string().max(200).optional(),
+          /** Exact source id, such as "granola". */
+          provider: z.string().max(64).optional(),
+        }),
+      )
       .output(StoredMeetingsPageSchema),
+    /** One of the caller's meetings with its digest, to-dos and transcript. NOT_FOUND for anyone else's. */
+    get: oc.input(z.object({ meetingId: Id })).output(StoredMeetingDetailSchema),
     /** Deletes one of the caller's meetings with its to-dos; sync does not bring it back. */
     delete: oc.input(z.object({ meetingId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Creates or reuses the caller's one connection for a source that runs on their computer (Hex), with its agent. */
+    connectLocal: oc.input(LocalMeetingsConnectInputSchema).output(z.object({ connectionId: Id })),
+    /** The local source's connection and what it imported; null before connecting. */
+    localStatus: oc.output(LocalMeetingsStatusSchema),
+    /** Stores up to 10 meetings the desktop app read from the user's computer. Idempotent by source id; the user becomes the only attendee; a meeting already recorded another way is skipped. */
+    importLocal: oc.input(LocalMeetingsImportInputSchema).output(LocalMeetingsImportOutputSchema),
+    /** Stops importing; imported meetings stay unless `deleteMeetings` is true. */
+    disconnectLocal: oc
+      .input(LocalMeetingsDisconnectInputSchema)
+      .output(z.object({ ok: z.literal(true) })),
+  },
+  meetingCaptures: {
+    /** Starts a recording. Idempotent by `clientId`. FORBIDDEN when the space's policy is off; BAD_REQUEST without `consentConfirmed: true` when it is confirm. Audio goes to POST /api/meeting-captures/:id/chunks. */
+    start: oc.input(MeetingCaptureStartInputSchema).output(MeetingCaptureStartOutputSchema),
+    /** Device engine only: one chunk of text. Idempotent by (captureId, track, seq). NOT_FOUND for anyone else's capture. */
+    appendText: oc
+      .input(MeetingCaptureAppendTextInputSchema)
+      .output(z.object({ ok: z.literal(true) })),
+    /** Stops recording and queues the stored meeting. Idempotent. */
+    finish: oc.input(MeetingCaptureFinishInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** Deletes the capture's chunks and audio; no meeting is stored. */
+    discard: oc.input(z.object({ captureId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** The caller's recording or waiting capture, for the recording indicator. */
+    active: oc.output(MeetingCaptureActiveSchema),
+  },
+  omi: {
+    /** Creates or reuses the caller's one Omi connection for this space and its agent. */
+    connect: oc.input(OmiConnectInputSchema).output(z.object({ connectionId: Id })),
+    /** The caller's Omi connection with upload and recording counts; null before connecting. */
+    status: oc.output(OmiStatusSchema),
+    /** Revokes the connection; recordings stay unless `deleteRecordings` is true. */
+    /** Deletes every recording, transcript, meeting and note; the connection stays. */
+    deleteRecordings: oc.output(z.object({ ok: z.literal(true) })),
+    disconnect: oc.input(OmiDisconnectInputSchema).output(z.object({ ok: z.literal(true) })),
+    segments: {
+      /** The caller's sorted stretches, newest first. */
+      list: oc.input(OmiSegmentsListInputSchema).output(z.array(OmiSegmentSchema)),
+      /** Moves one stretch to Meeting, Note or Trash; a re-sort keeps the choice. */
+      move: oc.input(OmiSegmentMoveInputSchema).output(OmiSegmentSchema),
+    },
   },
   devin: {
     /** Any member reads the space's cached sessions; a read older than a minute refreshes them first. */
@@ -1770,6 +1910,17 @@ export const appContract = {
     /** Space owners only. The old rows and key go; the acting owner becomes the connector. */
     replaceKey: oc.input(DevinKeyInputSchema).output(z.object({ ok: z.literal(true) })),
     disconnect: oc.output(z.object({ ok: z.literal(true) })),
+  },
+  /** Every procedure here needs the current space owner. */
+  brexCards: {
+    /** Checks the token with Brex first; nothing is stored for a refused token. Writes stay off. */
+    connect: oc.input(BrexCardsConnectInputSchema).output(BrexCardsConnectOutputSchema),
+    /** Checks the new token first; a refused token keeps the old one. Controls and model are kept. */
+    replaceToken: oc.input(BrexCardsConnectInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** The cards from Brex's `list_cards`, the only tool this page calls. */
+    cards: oc.output(BrexCardsListSchema),
+    getControls: oc.output(BrexCardsControlsSchema),
+    setControls: oc.input(BrexCardsControlsSchema).output(BrexCardsControlsSchema),
   },
   gtm: {
     /** Idempotent: creates the GTM agent and hourly work routine. */
@@ -1890,7 +2041,7 @@ export const appContract = {
     agent: oc.output(BotSchema),
   },
   calendar: {
-    /** One time-sorted list for the range: Google events from every connected account, bot to-dos, check-backs and the next run of repeating routines. */
+    /** One time-sorted list for the range: Google events from every connected account, bot to-dos, check-backs and each run of repeating routines in the range. */
     agenda: oc.input(CalendarAgendaInputSchema).output(CalendarAgendaSchema),
   },
   contacts: {

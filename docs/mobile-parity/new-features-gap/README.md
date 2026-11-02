@@ -1,5 +1,8 @@
 # New web features missing or partial on Expo
 
+> **Decision (2026-10-30):** on Android these features are reached through the phone-ready web app (Add to Home Screen), which was walked and fixed at phone width in #917, #931 and #942. On iPhone the native SwiftUI app covers them (#945, #960, #961, #967). This list stays as the Expo backlog; nothing here is scheduled.
+
+
 This compares the web app with the Expo app for features that shipped recently (PRs #850 to #916 and related). The comparison reads code only: it searches `apps/mobile` for matching screens, RPC calls and helpers. A simulator visual check is in `visual.md`; the Visual column says whether each row was visually confirmed or could not be checked. Items marked Verified were re-checked against the code while consolidating. Behavior on a device is not observed here.
 
 Status values: missing (no mobile path), partial (some mobile path), degrades-safely (explicit reason or safe fallback), present.

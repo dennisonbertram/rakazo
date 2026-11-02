@@ -92,6 +92,7 @@ import {
   Megaphone,
   Menu,
   MessageSquare,
+  Mic,
   PanelLeftOpen,
   PanelRightClose,
   Pencil,
@@ -145,6 +146,7 @@ import type { SendTarget } from "../components/data-room/SendToAgent";
 import { ErrorBoundary, lazyOverlay, SectionLoadFailed } from "../components/ErrorBoundary";
 import { AgentAvatar } from "../components/integrations/AgentAvatar";
 import { DevinConnectDialog } from "../components/integrations/DevinConnectDialog";
+import { RecordingPillHost } from "../components/meeting-capture/RecordingPillHost";
 import { PageAgentIntro, pageAgentKind } from "../components/PageAgentIntro";
 import { PageNavContext } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
@@ -203,9 +205,11 @@ import { fetchDataRoomBlob } from "../lib/data-room";
 import { dataRoomAgentSuggestions, findDataRoomAgent } from "../lib/data-room-agent";
 import { delegateWaitTarget, pendingDelegateAgents, pendingSentBlocks } from "../lib/delegate-wait";
 import { desktopBridge } from "../lib/desktop";
+import { useDeviceSpeech } from "../lib/device-speech";
 import { setDockedAgentBotId } from "../lib/docked-agent";
 import { financeAgentSuggestions, findFinanceAgent } from "../lib/finance-agent";
 import { findGtmAgent } from "../lib/gtm-agent";
+import { useHexSync } from "../lib/hex/useHexSync";
 import {
   maskCurrencyWhenHidden,
   setHideAmounts,
@@ -280,10 +284,11 @@ import { useNotificationsOff } from "../lib/use-notifications-off";
 import { useRefetchWhileOpen } from "../lib/use-refetch-while-open";
 import { useRememberedMessages } from "../lib/use-remembered-messages";
 import { useRunResumedAt } from "../lib/use-run-resumed-at";
-import { useSidebarGlance } from "../lib/use-sidebar-glance";
+import { NOTIFICATIONS_CHANGED_EVENT, useSidebarGlance } from "../lib/use-sidebar-glance";
 import { errorText } from "../lib/user-error";
 import { workingActivity } from "../lib/working-activity";
 import type { ContextMenuPosition } from "./BotContextMenu";
+import { BotPageView } from "./BotPageView";
 import { CalendarPage } from "./Calendar";
 import { CompanyPage } from "./Company";
 import { CompanyImportPage } from "./CompanyImport";
@@ -300,10 +305,13 @@ import { IntegrationsPage } from "./Integrations";
 import { InvestorsPage } from "./Investors";
 import { UpdateEditor } from "./investors/UpdateEditor";
 import { LegalPage } from "./Legal";
+import { MeetingDetailPage } from "./MeetingDetail";
+import { MeetingsPage } from "./Meetings";
 import { NotFoundPage } from "./NotFound";
 import { ResizableSidePanel } from "./ResizableSidePanel";
 import type { RoutineDraftState } from "./RoutineEditor";
 import {
+  defaultRoutineName,
   draftFromRoutine,
   emptyRoutineDraft,
   RoutineEditor,
@@ -312,7 +320,7 @@ import {
   routineNeedsOneShotArm,
 } from "./RoutineEditor";
 import type { SettingsSection } from "./SettingsOverlay";
-import type { PageRemoteUpdate } from "./shell/bot-page-panel";
+import type { PageDataUpdate, PageRemoteUpdate } from "./shell/bot-page-panel";
 import { BotPagePanel } from "./shell/bot-page-panel";
 import { BotSettings } from "./shell/bot-panel";
 import { PinsList, PinsStrip, useBotPins } from "./shell/bot-pins";
@@ -569,14 +577,30 @@ function findContacts(query: string): Promise<SearchLink[]> {
     .catch((): SearchLink[] => []);
 }
 
-/** Chats with a matching message, once per chat: the newest match and its date. */
-function findChats(query: string) {
+/**
+ * Chats with a matching message, once per chat: the newest match and its date. Routine hits are
+ * listed apart, once per routine. A group or a bot found only by its description is not a chat hit:
+ * Groups and Bots list those already.
+ */
+export function findChats(query: string) {
+  const needle = query.toLowerCase();
   return rpc.search
     .query({ q: query })
     .then(({ hits }) => {
       const seen = new Set<string>();
       const entries: PaletteEntry[] = [];
+      const routines: PaletteEntry[] = [];
       for (const hit of hits) {
+        if (hit.routineId && hit.botId) {
+          const id = `/app/${hit.botId}?routine=${hit.routineId}`;
+          if (!routines.some((entry) => entry.id === id)) {
+            routines.push({ id, label: hit.title, detail: hit.botName ?? undefined });
+          }
+          continue;
+        }
+        if (hit.kind === "conversation") {
+          if (hit.groupId || !hit.botName?.toLowerCase().includes(needle)) continue;
+        }
         const chatId = hit.groupId ?? hit.botId;
         const name = hit.groupName ?? hit.botName ?? hit.title;
         if (!chatId || seen.has(chatId)) continue;
@@ -598,9 +622,9 @@ function findChats(query: string) {
             : undefined,
         });
       }
-      return entries.slice(0, 5);
+      return { chats: entries.slice(0, 5), routines: routines.slice(0, 5) };
     })
-    .catch((): PaletteEntry[] => []);
+    .catch(() => ({ chats: [] as PaletteEntry[], routines: [] as PaletteEntry[] }));
 }
 
 export function ShellPage() {
@@ -615,6 +639,8 @@ export function ShellPage() {
   searchParamsRef.current = searchParams;
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  // Pulls Hex meetings in the macOS desktop app once the user connected Hex.
+  useHexSync();
   const [groups, setGroups] = useState<Group[]>([]);
   const [bots, setBots] = useState<Bot[]>([]);
   const sendToAgentTargets = useMemo(() => sendTargets(bots), [bots]);
@@ -743,6 +769,7 @@ export function ShellPage() {
   // The bot whose page exists (the Page control shows only then), and its latest page.updated event.
   const [pageBotId, setPageBotId] = useState<string | null>(null);
   const [pageRemote, setPageRemote] = useState<PageRemoteUpdate | null>(null);
+  const [pageDataRemote, setPageDataRemote] = useState<PageDataUpdate | null>(null);
   const [pinsSeq, setPinsSeq] = useState(0);
   const [restoredPanelKey, setRestoredPanelKey] = useState<string | null>(null);
   const panelStorageKeyRef = useRef<string | null>(null);
@@ -890,6 +917,7 @@ export function ShellPage() {
   const memoryProviderConfigRevision = useRef(0);
   const call = useCallSession();
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
+  const deviceSpeech = useDeviceSpeech();
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [dismissedRunErrorIds, setDismissedRunErrorIds] =
     useState<ReadonlySet<string>>(readSeenRunErrorIds);
@@ -1016,8 +1044,8 @@ export function ShellPage() {
   const [keepComputerRecovery, setKeepComputerRecovery] = useState(false);
   const recoveryHoldTimer = useRef<number | undefined>(undefined);
   const notificationsOff = useNotificationsOff(panel === "settings");
-  const showComputerRecoveryHint =
-    computersAreUnavailable(bootstrapMe?.sandboxProvider) || keepComputerRecovery;
+  const computersOff = computersAreUnavailable(bootstrapMe?.sandboxProvider);
+  const showComputerRecoveryHint = computersOff || keepComputerRecovery;
   const releaseComputerRecovery = useCallback(() => {
     window.clearTimeout(recoveryHoldTimer.current);
     recoveryHoldTimer.current = undefined;
@@ -1165,8 +1193,11 @@ export function ShellPage() {
   const investorUpdateMatch = useMatch("/app/investors/updates/:id");
   const fundraisingMode = useMatch("/app/fundraising") != null;
   const calendarMode = useMatch("/app/calendar") != null;
+  const meetingMatch = useMatch("/app/meetings/:meetingId");
+  const meetingsMode = useMatch("/app/meetings") != null || meetingMatch != null;
   const contactMatch = useMatch("/app/contacts/:contactId");
   const contactsMode = useMatch("/app/contacts") != null || contactMatch != null;
+  const botPageMatch = useMatch("/app/pages/:botId/:pageId");
   // Inbox, Finance, Legal, Data room, Investors and Integrations are pages of their own: no bot
   // route. Inbox, Finance, Legal and Investors keep their agent in a side panel.
   const pageMode =
@@ -1182,8 +1213,10 @@ export function ShellPage() {
     dataRoomMode ||
     artifactsMode ||
     contactsMode ||
+    meetingsMode ||
     calendarMode ||
-    boardMode;
+    boardMode ||
+    botPageMatch != null;
   useEffect(() => {
     if (!financeMode) setFinanceAgentOpen(false);
   }, [financeMode]);
@@ -1215,7 +1248,14 @@ export function ShellPage() {
     namedOnly: (bot) => pageAgentKind(bot.spawnKey) !== null,
   });
   const active =
-    inGroup || integrationsMode || artifactsMode || contactsMode || calendarMode || boardMode
+    inGroup ||
+    integrationsMode ||
+    artifactsMode ||
+    contactsMode ||
+    meetingsMode ||
+    calendarMode ||
+    boardMode ||
+    botPageMatch != null
       ? undefined
       : companyMode
         ? findCompanyAgent(bots, userId, companyImportMode)
@@ -1763,6 +1803,7 @@ export function ShellPage() {
     };
     window.addEventListener("focus", refreshVisibleBots);
     document.addEventListener("visibilitychange", refreshVisibleBots);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshVisibleBots);
     // Poll skips while a refresh is in flight; focus/visibility and event-driven
     // callers still bump botsRefreshEpoch so only the latest response applies.
     const poll = window.setInterval(() => {
@@ -1775,6 +1816,7 @@ export function ShellPage() {
       window.clearInterval(poll);
       window.removeEventListener("focus", refreshVisibleBots);
       document.removeEventListener("visibilitychange", refreshVisibleBots);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshVisibleBots);
     };
   }, []);
 
@@ -1916,9 +1958,14 @@ export function ShellPage() {
         applyThreadEvent(event, commitSnapshot, commitComputer, snapshotRef, computerRef),
       onEvent: (event, _initial) => {
         if (event.type === "page.updated") {
-          const { revision, updatedBy } = event.payload as PageRemoteUpdate;
+          const { pageId, revision, updatedBy } = event.payload as PageRemoteUpdate;
           setPageBotId(active.id);
-          setPageRemote({ revision, updatedBy, seq: event.seq });
+          setPageRemote({ pageId, revision, updatedBy, seq: event.seq });
+        }
+        if (event.type === "page.data") {
+          const { pageId } = event.payload as { pageId?: string };
+          setPageBotId(active.id);
+          setPageDataRemote({ pageId, seq: event.seq });
         }
         if (event.type === "pins.updated") setPinsSeq(event.seq);
         if (event.type === "thread.cleared") {
@@ -2145,14 +2192,15 @@ export function ShellPage() {
     document.querySelector("[data-sidebar-current]")?.scrollIntoView?.({ block: "nearest" });
   }, [bootstrapMe?.spaceId]);
 
-  // A bot just made or opened from elsewhere can sit under "+N more"; bring its row into view.
+  // A bot or group just made or opened from elsewhere can sit under "+N more"; bring its row into view.
   // biome-ignore lint/correctness/useExhaustiveDependencies: also when the row first appears
   useEffect(() => {
-    if (!botId) return;
+    const chatId = botId ?? groupId;
+    if (!chatId) return;
     sidebarRef.current
-      ?.querySelector(`[data-roster-bot-id="${CSS.escape(botId)}"]`)
+      ?.querySelector(`[data-roster-chat][data-roster-row="${CSS.escape(chatId)}"]`)
       ?.scrollIntoView?.({ block: "nearest" });
-  }, [botId, listedBots.length]);
+  }, [botId, groupId, listedBots.length, groups.length]);
 
   const openSpaceChat = useCallback(
     (spaceId: string, path: string) => {
@@ -2295,11 +2343,13 @@ export function ShellPage() {
     async (sectionId: string) => {
       try {
         await rpc.botSections.remove({ sectionId });
+      } catch (error) {
+        setSendError(errorText(error, t`Failed to delete folder`));
       } finally {
         await refreshBots().catch(() => undefined);
       }
     },
-    [refreshBots],
+    [refreshBots, t],
   );
   const autoGroupSidebar = useCallback(async () => {
     try {
@@ -2387,6 +2437,7 @@ export function ShellPage() {
       },
       { id: "company", label: t`Company`, icon: <Building2 {...icon} /> },
       { id: "calendar", label: t`Calendar`, icon: <CalendarDays {...icon} /> },
+      { id: "meetings", label: t`Meetings`, icon: <Mic {...icon} /> },
       { id: "contacts", label: t`Contacts`, icon: <BookUser {...icon} /> },
       { id: "data-room", label: t`Data room`, icon: <FolderOpen {...icon} /> },
       { id: "artifacts", label: t`Artifacts`, icon: <Files {...icon} /> },
@@ -2406,7 +2457,12 @@ export function ShellPage() {
         keywords: t`apps, connections`,
         icon: <LayoutGrid {...icon} />,
       },
-      { id: "settings", label: t`Settings`, icon: <Settings {...icon} /> },
+      {
+        id: "settings",
+        label: t`Settings`,
+        keywords: t`theme, dark mode, appearance, notifications, time zone`,
+        icon: <Settings {...icon} />,
+      },
     ];
   }, [t, bootstrapMe?.ticketBoardEnabled, glance.hasTickets, glance.devinConnected]);
   // A page hidden in Page options stays out of search and the command palette too.
@@ -2416,7 +2472,7 @@ export function ShellPage() {
   );
   const searchPaletteLinks = useCallback(
     async (q: string) => {
-      const [found, contacts, chats] = await Promise.all([
+      const [found, contacts, { chats, routines }] = await Promise.all([
         findDocumentsAndArtifacts(q),
         findContacts(q),
         findChats(q),
@@ -2449,6 +2505,11 @@ export function ShellPage() {
           heading: t`Chats`,
           icon: <MessageSquare size={16} strokeWidth={1.75} />,
           entries: chats,
+        },
+        {
+          heading: t`Routines`,
+          icon: <CalendarClock size={16} strokeWidth={1.75} />,
+          entries: routines,
         },
         {
           heading: t`Artifacts`,
@@ -2490,6 +2551,26 @@ export function ShellPage() {
     ],
     [paletteBots],
   );
+
+  // Settings tabs found only by typing; Computer and Connections are left out (see Integrations).
+  const settingsJumps = (
+    [
+      { label: t`Model settings`, keywords: t`models, providers, API key`, section: "models" },
+      { label: t`Voice settings`, keywords: t`voice, speech`, section: "voice" },
+      { label: t`Memory settings`, keywords: t`memory`, section: "memory" },
+      { label: t`Privacy and approvals`, keywords: t`privacy, approvals`, section: "privacy" },
+      ...(bootstrapMe?.billingEnabled === true
+        ? [{ label: t`Billing`, section: "billing" as const }]
+        : []),
+    ] satisfies { label: string; keywords?: string; section: SettingsSection }[]
+  ).map(({ label, keywords, section }) => ({
+    label,
+    keywords,
+    run: () => {
+      setMobileSidebarOpen(false);
+      openSettings(section);
+    },
+  }));
 
   function openSearchResult(path: string) {
     setMobileSidebarOpen(false);
@@ -3995,7 +4076,9 @@ export function ShellPage() {
       await refreshComputerFor(targetBotId);
     } catch (error) {
       if (!stillThisBoot() || !stillThisBot()) return;
-      setComputerError(errorText(error, t`Could not take control`));
+      setComputerError(
+        errorText(error, takeControl ? t`Could not take control` : t`Could not start the computer`),
+      );
       setComputerErrorFromScreen(false);
       throw error;
     } finally {
@@ -4021,7 +4104,7 @@ export function ShellPage() {
       autoBooted.current = null;
       return;
     }
-    if (!active) return;
+    if (!active || bootstrapMe === undefined) return;
     const botId = active.id;
     let cancelled = false;
     void (async () => {
@@ -4032,7 +4115,7 @@ export function ShellPage() {
       const state = snap?.computer?.state;
       const screen = state === "running" ? await refreshComputerScreen(botId) : null;
       if (cancelled || activeBotId.current !== botId) return;
-      const action = computerPanelAutoBoot(state, screen);
+      const action = computerPanelAutoBoot(state, screen, computersOff);
       if (action === "wait") {
         if (state === "running") autoBooted.current = botId;
         return;
@@ -4050,7 +4133,7 @@ export function ShellPage() {
     return () => {
       cancelled = true;
     };
-  }, [panel, active?.id]);
+  }, [panel, active?.id, bootstrapMe?.sandboxProvider]);
 
   useEffect(() => {
     setComputerOpen(false);
@@ -4606,6 +4689,11 @@ export function ShellPage() {
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
               running={composerShowsStop(currentRuns)}
               disabled={composerDisabled}
+              canDictate={
+                deviceSpeech?.state === "ready" ||
+                Boolean(voiceStatus?.transcribe || voiceStatus?.transcriptionReady)
+              }
+              deviceDictation={deviceSpeech?.state === "ready"}
               disabledPlaceholder={
                 legalWaitsForConsent ? t`Allow access on the page to ask` : undefined
               }
@@ -4632,6 +4720,7 @@ export function ShellPage() {
                 // "" is a rejected key: open the provider the failed run used.
                 openSettings("models", provider || (activeSnapshot?.run?.modelProvider ?? ""))
               }
+              onOpenBotSettings={() => setPanel("settings")}
               onNavigate={navigate}
               sending={sending}
               fileInputRef={fileInputRef}
@@ -4673,13 +4762,7 @@ export function ShellPage() {
                   if (pageMode && active) openBot(active.id);
                   return;
                 }
-                if (action === "settings-general") {
-                  openSettings("general");
-                  return;
-                }
-                if (action === "settings-usage") {
-                  openSettings("general");
-                }
+                openSettings("general");
               }}
             />
           ) : null}
@@ -4797,6 +4880,7 @@ export function ShellPage() {
         investorsMode={investorsMode}
         fundraisingMode={fundraisingMode}
         contactsMode={contactsMode}
+        meetingsMode={meetingsMode}
         calendarMode={calendarMode}
         companyMode={companyMode}
         dataRoomMode={dataRoomMode}
@@ -4940,6 +5024,7 @@ export function ShellPage() {
             paneDraggingFiles ? "ring-2 ring-inset ring-ring" : ""
           }`}
         >
+          <RecordingPillHost />
           {/* Pages carry their own h1; a chat's title is inside a button, so it is named here. */}
           {pageMode ? null : (
             <h1 className="sr-only">
@@ -5095,7 +5180,8 @@ export function ShellPage() {
               <IntegrationsPage
                 activeBotId={activeBotId.current}
                 onOpenMessaging={() => setMessagingSettingsOpen(true)}
-                onOpenAiDataSharing={() => openSettings("general")}
+                onOpenAiDataSharing={() => openSettings("privacy")}
+                onOpenVoiceSettings={() => openSettings("voice")}
               />
             </ErrorBoundary>
           ) : dataRoomMode ? (
@@ -5110,8 +5196,23 @@ export function ShellPage() {
                   : undefined
               }
             />
+          ) : meetingMatch?.params.meetingId ? (
+            <MeetingDetailPage
+              meetingId={meetingMatch.params.meetingId}
+              spaceName={pageSpaceName}
+            />
+          ) : meetingsMode ? (
+            <MeetingsPage spaceName={pageSpaceName} onAddSpeech={() => openSettings("voice")} />
           ) : contactMatch?.params.contactId ? (
             <ContactDetailPage id={contactMatch.params.contactId} spaceName={pageSpaceName} />
+          ) : botPageMatch?.params.botId && botPageMatch.params.pageId ? (
+            // No bot is open on this route, so no page events arrive: the page loads when opened.
+            <BotPageView
+              botId={botPageMatch.params.botId}
+              pageId={botPageMatch.params.pageId}
+              remote={null}
+              dataRemote={null}
+            />
           ) : calendarMode ? (
             <CalendarPage spaceName={pageSpaceName} bots={bots} onOpenBot={openBotSettings} />
           ) : contactsMode ? (
@@ -5367,7 +5468,7 @@ export function ShellPage() {
                     ) : panel === "list" ? (
                       <Trans>List</Trans>
                     ) : active ? (
-                      computerScreenError || noComputerScreen ? null : (
+                      computerScreenError || noComputerScreen || computersOff ? null : (
                         computerStateLabel(computer?.state)
                       )
                     ) : (
@@ -5379,7 +5480,7 @@ export function ShellPage() {
                   {active &&
                   panel === "computer" &&
                   !computerOpen &&
-                  computerPanelNeedsMaintenance(computer?.state, booting) ? (
+                  computerPanelNeedsMaintenance(computer?.state, booting, computersOff) ? (
                     <ComputerMaintenanceActions
                       botId={active.id}
                       computer={computer}
@@ -5412,7 +5513,12 @@ export function ShellPage() {
               </div>
             ) : null}
             {panel === "page" && active ? (
-              <BotPagePanel key={active.id} botId={active.id} remote={pageRemote} />
+              <BotPagePanel
+                key={active.id}
+                botId={active.id}
+                remote={pageRemote}
+                dataRemote={pageDataRemote}
+              />
             ) : null}
             {panel === "list" && botPins?.list ? (
               <PinsList pins={botPins} onPins={setBotPins} />
@@ -5420,6 +5526,7 @@ export function ShellPage() {
             {panel === "computer" && active ? (
               <div>
                 <RoutineListHeader
+                  empty={activeRoutines.every((r) => r.managedKind !== null)}
                   onCreate={() => {
                     setRoutineDraft(emptyRoutineDraft());
                     setRoutineWebhookSecret(null);
@@ -5490,6 +5597,7 @@ export function ShellPage() {
                             (showComputerRecoveryHint ? (
                               <ComputersUnavailableHint
                                 sandboxProvider={bootstrapMe?.sandboxProvider}
+                                deploymentOwner={bootstrapMe?.isDeploymentOwner === true}
                                 onRecovered={(sandboxProvider) => {
                                   setBootstrapMe((prev) =>
                                     prev ? { ...prev, sandboxProvider } : prev,
@@ -5718,6 +5826,8 @@ export function ShellPage() {
                     const routineModel = {
                       modelProvider: model?.provider ?? null,
                       modelId: model?.modelId ?? null,
+                      modelCredentialId:
+                        model && routineDraft.credentialId ? routineDraft.credentialId : null,
                       thinkingLevel: (model && routineDraft.thinkingLevel
                         ? routineDraft.thinkingLevel
                         : null) as ThinkingLevel | null,
@@ -5740,7 +5850,9 @@ export function ShellPage() {
                       }
                       saved = await rpc.routines.update({
                         routineId: targetRoutine.id,
-                        name: routineDraft.name || t`Routine`,
+                        name:
+                          routineDraft.name.trim() ||
+                          defaultRoutineName(routineDraft.prompt, routineDraft.taughtSkill?.name),
                         prompt: routineDraft.prompt.trim(),
                         taughtSkillId: routineDraft.taughtSkill?.id ?? null,
                         crons,
@@ -5757,6 +5869,8 @@ export function ShellPage() {
                           : {}),
                         ...(routineModel.modelProvider !== targetRoutine.modelProvider ||
                         routineModel.modelId !== targetRoutine.modelId ||
+                        routineModel.modelCredentialId !==
+                          (targetRoutine.modelCredentialId ?? null) ||
                         routineModel.thinkingLevel !== targetRoutine.thinkingLevel
                           ? routineModel
                           : {}),
@@ -5765,7 +5879,9 @@ export function ShellPage() {
                     } else {
                       saved = await rpc.routines.create({
                         botId: targetBotId,
-                        name: routineDraft.name || t`Routine`,
+                        name:
+                          routineDraft.name.trim() ||
+                          defaultRoutineName(routineDraft.prompt, routineDraft.taughtSkill?.name),
                         prompt: routineDraft.prompt.trim(),
                         taughtSkillId: routineDraft.taughtSkill?.id ?? null,
                         crons,
@@ -5945,10 +6061,12 @@ export function ShellPage() {
               const request = contextBot
                 ? rpc.bots.duplicate({ botId: contextBot.id })
                 : rpc.groups.duplicate({ groupId: contextGroup!.id });
-              void request.then(async (chat) => {
-                await refreshBots();
-                navigate(contextBot ? `/app/${chat.id}` : `/app/g/${chat.id}`);
-              });
+              void request
+                .then(async (chat) => {
+                  await refreshBots();
+                  navigate(contextBot ? `/app/${chat.id}` : `/app/g/${chat.id}`);
+                })
+                .catch((error: unknown) => setSendError(errorText(error, t`Failed to duplicate`)));
             }}
             onClear={
               contextBot
@@ -5978,7 +6096,9 @@ export function ShellPage() {
               const request = contextBot
                 ? rpc.bots.archive({ botId: contextBot.id })
                 : rpc.groups.archive({ groupId: contextGroup!.id });
-              void request.then(() => refreshBots(true));
+              void request
+                .then(() => refreshBots(true))
+                .catch((error: unknown) => setSendError(errorText(error, t`Failed to archive`)));
             }}
             onDelete={() => {
               if (contextBot) setDeleteTarget(contextBot);
@@ -6226,6 +6346,7 @@ export function ShellPage() {
           actions={[
             { label: t`New folder`, run: () => void createFolder() },
             { label: t`Group chats into folders`, run: () => void autoGroupSidebar() },
+            ...settingsJumps,
           ]}
           searchLinks={searchPaletteLinks}
           onOpenPath={openSearchResult}
@@ -6505,7 +6626,7 @@ export function ShellPage() {
                     onRefresh={refreshActiveTeaching}
                   />
                 ) : null}
-                {computerBot && !recordingSkill ? (
+                {computerBot && !recordingSkill && !computersOff ? (
                   <ComputerMaintenanceActions
                     botId={computerBot.id}
                     computer={computer}
