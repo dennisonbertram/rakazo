@@ -50,7 +50,7 @@ describe("bluetooth picker", () => {
     expect(f.choose).not.toHaveBeenCalled();
     f.fire(3000);
     await flush();
-    expect(f.choose).toHaveBeenCalledWith(["Omi", "Unknown device"]);
+    expect(f.choose).toHaveBeenCalledWith(["Omi", "Unknown device"], expect.anything());
     expect(cb).toHaveBeenCalledWith("b");
     expect(f.writeSaved).toHaveBeenCalledWith("b");
   });
