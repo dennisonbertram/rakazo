@@ -107,7 +107,7 @@ export function RecordingPill({
   return state.kind === "recording" && state.callAudioError ? (
     <div className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-col items-center gap-1">
       {pill}
-      <p role="alert" className="text-center text-xs text-destructive">
+      <p role="alert" className="max-w-md text-center text-xs text-destructive">
         {state.callAudioError}
       </p>
     </div>
