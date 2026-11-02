@@ -15,6 +15,7 @@ final class DictationModel {
 
   func toggle(text: Binding<String>) async {
     if listening { stop(); return }
+    guard !VoiceAudio.meetingActive else { return }
     message = nil
     let started = epoch
     guard VoiceAudio.onDeviceSupported() else { message = VoiceAudio.dictationUnavailable; return }
