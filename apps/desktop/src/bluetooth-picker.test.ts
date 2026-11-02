@@ -1,6 +1,6 @@
 import type { BluetoothDevice, WebContents } from "electron";
 import { describe, expect, it, vi } from "vitest";
-import { createBluetoothPicker } from "./bluetooth-picker.js";
+import { createBluetoothPicker, originKeyedStore } from "./bluetooth-picker.js";
 import { isAppWebContents } from "./session-permissions.js";
 
 const omi = { deviceId: "a", deviceName: "Omi" } as BluetoothDevice;
@@ -114,11 +114,51 @@ describe("bluetooth picker", () => {
     expect(cb).toHaveBeenCalledWith("");
   });
 
+  it("aborts the chooser when the request times out", () => {
+    const f = fixture();
+    let signal: AbortSignal | undefined;
+    f.choose.mockImplementation((_n, s) => {
+      signal = s;
+      return new Promise(() => {});
+    });
+    f.picker.select([omi], vi.fn());
+    f.fire(3000);
+    expect(signal?.aborted).toBe(false);
+    f.fire(30000);
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("labels pairing with the given name or Unknown device", async () => {
+    const f = fixture();
+    f.choose.mockResolvedValue(0);
+    await f.picker.confirmPairing("Omi");
+    await f.picker.confirmPairing("");
+    expect(f.choose.mock.calls.map((c) => c[0])).toEqual([["Omi"], ["Unknown device"]]);
+  });
+
+  it("does not reuse a saved device on another origin", () => {
+    let data: Record<string, string> = {};
+    let origin: string | null = "https://a.example.test";
+    const store = originKeyedStore(
+      () => data,
+      (d) => {
+        data = d;
+      },
+      () => origin,
+    );
+    store.writeSaved("a");
+    expect(store.readSaved()).toBe("a");
+    origin = "https://b.example.test";
+    expect(store.readSaved()).toBeNull();
+    origin = null;
+    expect(store.readSaved()).toBeNull();
+  });
+
   it("confirms pairing only when the user picks the device", async () => {
     const f = fixture();
     f.choose.mockResolvedValueOnce(0).mockResolvedValueOnce(-1);
-    expect(await f.picker.confirmPairing("a")).toBe(true);
-    expect(await f.picker.confirmPairing("a")).toBe(false);
+    expect(await f.picker.confirmPairing("Omi")).toBe(true);
+    expect(await f.picker.confirmPairing("Omi")).toBe(false);
   });
 });
 

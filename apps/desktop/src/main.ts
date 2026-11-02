@@ -44,7 +44,7 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
-import { createBluetoothPicker } from "./bluetooth-picker.js";
+import { createBluetoothPicker, originKeyedStore } from "./bluetooth-picker.js";
 import { installSessionPermissions, isAppWebContents } from "./session-permissions.js";
 import {
   DEFAULT_LOCAL_WEB_URL,
@@ -147,33 +147,41 @@ function permissionTarget() {
 
 function installBluetooth(win: BrowserWindow) {
   const file = path.join(app.getPath("userData"), "bluetooth-device.json");
-  const picker = createBluetoothPicker({
-    readSaved: () => {
+  const store = originKeyedStore(
+    () => {
       try {
-        const id = JSON.parse(readFileSync(file, "utf8")).deviceId;
-        return typeof id === "string" ? id : null;
+        const all = JSON.parse(readFileSync(file, "utf8"));
+        return all !== null && typeof all === "object" ? all : {};
       } catch {
-        return null;
+        return {};
       }
     },
-    writeSaved: (deviceId) => {
+    (all) => {
       try {
-        writeFileSync(file, JSON.stringify({ deviceId }));
+        writeFileSync(file, JSON.stringify(all));
       } catch {
         // Not remembering the device only means the chooser shows again.
       }
     },
-    choose: async (names) => {
+    () => safeOrigin(permissionTarget()?.url ?? ""),
+  );
+  const picker = createBluetoothPicker({
+    ...store,
+    choose: async (names, signal) => {
       const { response } = await dialog.showMessageBox(win, {
         message: "Choose a device",
         buttons: [...names, "Cancel"],
         cancelId: names.length,
+        signal,
       });
       return response < names.length ? response : -1;
     },
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (timer) => clearTimeout(timer as NodeJS.Timeout),
   });
+  // select-bluetooth-device carries no frame. Cross-origin frames are blocked by the bluetooth
+  // permissions-policy default ('self'), the web app grants allow="bluetooth" to no iframe, and
+  // agent HTML is sandboxed with an opaque origin.
   win.webContents.on("select-bluetooth-device", (event, devices, callback) => {
     event.preventDefault();
     if (!isAppWebContents(win.webContents, permissionTarget)) callback("");
@@ -181,7 +189,13 @@ function installBluetooth(win: BrowserWindow) {
   });
   win.once("closed", () => picker.cancel());
   win.webContents.session.setBluetoothPairingHandler((details, callback) => {
-    if (details.pairingKind !== "confirm" || !isAppWebContents(win.webContents, permissionTarget)) {
+    const origin = safeOrigin(permissionTarget()?.url ?? "");
+    const frame = details.frame;
+    if (
+      details.pairingKind !== "confirm" ||
+      !isAppWebContents(win.webContents, permissionTarget) ||
+      (frame && (frame.parent !== null || safeOrigin(frame.url) !== origin))
+    ) {
       callback({ confirmed: false });
       return;
     }
