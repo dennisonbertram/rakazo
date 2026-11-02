@@ -2450,6 +2450,7 @@ msgstr "无法连接服务器。"
 #: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Cancel"
 msgstr "取消"
 

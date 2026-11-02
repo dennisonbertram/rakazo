@@ -310,3 +310,18 @@ it("applies the status returned by prepare when nothing is pushed", async () => 
   });
   expect(pane()?.textContent).toContain("Ready. Audio stays on this Mac.");
 });
+
+it("cancels a running prepare with forget", async () => {
+  const forget = vi.fn(async () => ({ state: "not-prepared" }));
+  const { row, pane } = await renderWithSpeech(
+    bridge({ state: "preparing", progress: 0.42 }, { forget }),
+  );
+  await act(async () => row()?.click());
+  await act(async () => {
+    [...(pane()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent === "Cancel")
+      ?.click();
+  });
+  expect(forget).toHaveBeenCalledOnce();
+  expect(pane()?.textContent).toContain("Prepare");
+});

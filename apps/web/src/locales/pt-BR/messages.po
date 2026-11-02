@@ -2450,6 +2450,7 @@ msgstr "Não é possível acessar o servidor."
 #: src/pages/shell/bot-page-panel.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Cancel"
 msgstr "Cancelar"
 

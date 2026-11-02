@@ -93,6 +93,16 @@ function DeviceSpeechPane({
           <p className="mt-2 text-sm text-muted-foreground">
             {percent === null ? <Trans>Preparing…</Trans> : <Trans>Preparing… {percent}%</Trans>}
           </p>
+          {/* Forget aborts an in-flight prepare in main; it runs while prepare is still pending. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => run("forget")}
+          >
+            <Trans>Cancel</Trans>
+          </Button>
         </>
       ) : null}
       {status.state === "ready" ? (
