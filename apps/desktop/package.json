@@ -17,6 +17,7 @@
     "pack:local": "pnpm --filter @rakazo/web build && pnpm build && electron-builder --mac --dir -c.mac.notarize=false -c.mac.identity=null -c.extraMetadata.rakazoStackImages.image=praci/app -c.extraMetadata.rakazoStackImages.computerImage=praci/computer -c.extraMetadata.rakazoStackImages.tag=local -c.extraMetadata.rakazoStackImages.local=true"
   },
   "dependencies": {
+    "@kitlangton/hex": "0.3.1",
     "@rakazo/contracts": "workspace:*",
     "electron-updater": "6.8.9"
   },

@@ -41,6 +41,10 @@ const executable = (file: string) => {
   }
 };
 
+/** The first candidate that is an executable file. Never searches PATH. */
+export const findHex = (candidates = hexCandidates(homedir()), exists = executable) =>
+  candidates.find(exists);
+
 export function createHexRunner(
   options: {
     candidates?: string[];
@@ -54,7 +58,7 @@ export function createHexRunner(
   const candidates = options.candidates ?? hexCandidates(home);
   const exists = options.exists ?? executable;
   const exec = options.exec ?? (nodeExecFile as unknown as Exec);
-  const find = () => candidates.find(exists);
+  const find = () => findHex(candidates, exists);
 
   async function run<T>(
     args: string[],
