@@ -14,8 +14,93 @@ import {
 } from "@rakazo/ui-web";
 import { XIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { desktopBridge } from "../lib/desktop";
+import { useDeviceSpeech } from "../lib/device-speech";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
+
+function DeviceSpeechSection() {
+  const status = useDeviceSpeech();
+  const [pending, setPending] = useState(false);
+  if (!status || status.state === "unavailable") return null;
+  const speech = desktopBridge()?.speech;
+  const run = (action: "prepare" | "forget") => {
+    setPending(true);
+    void speech?.[action]().finally(() => setPending(false));
+  };
+  const percent =
+    status.state === "preparing" && status.progress !== null
+      ? Math.round(status.progress * 100)
+      : null;
+  return (
+    <section data-testid="device-speech" className="mb-6 border-b border-border pb-6">
+      <h3 className="text-[15px] text-foreground">
+        <Trans>On this device</Trans>
+      </h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        <Trans>
+          Transcribe with Hex on this Mac. Audio stays on this computer; only text is sent to Praci.
+        </Trans>
+      </p>
+      {status.state === "not-prepared" ? (
+        <>
+          <Button type="button" className="mt-3" disabled={pending} onClick={() => run("prepare")}>
+            <Trans>Prepare</Trans>
+          </Button>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            <Trans>Downloads the speech model once.</Trans>
+          </p>
+        </>
+      ) : null}
+      {status.state === "preparing" ? (
+        <>
+          <p className="mt-3 text-sm text-foreground">
+            {percent === null ? <Trans>Preparing…</Trans> : <Trans>Preparing… {percent}%</Trans>}
+          </p>
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent ?? undefined}
+            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+          >
+            <div
+              className={`h-full bg-primary ${percent === null ? "w-1/3 animate-pulse" : ""}`}
+              style={percent === null ? undefined : { width: `${percent}%` }}
+            />
+          </div>
+        </>
+      ) : null}
+      {status.state === "ready" ? (
+        <>
+          <p className="mt-3 text-sm text-foreground">
+            <Trans>Ready. Dictation and recordings use this Mac.</Trans>
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            disabled={pending}
+            onClick={() => run("forget")}
+          >
+            <Trans>Stop using</Trans>
+          </Button>
+        </>
+      ) : null}
+      {status.state === "error" ? (
+        <>
+          <p className="mt-3 text-sm text-destructive">
+            <Trans>Couldn't prepare Hex.</Trans>
+          </p>
+          <Button type="button" className="mt-3" disabled={pending} onClick={() => run("prepare")}>
+            <Trans>Try again</Trans>
+          </Button>
+        </>
+      ) : null}
+    </section>
+  );
+}
 
 export function VoiceSettingsOverlay({
   onClose,
@@ -283,6 +368,7 @@ export function VoiceSettingsOverlay({
         </div>
 
         <div className="rk-scroll min-h-0 min-w-0 flex-1 overflow-y-auto">
+          <DeviceSpeechSection />
           {loading ? (
             <p className="text-sm text-muted-foreground">
               <Trans>Loading voice providers…</Trans>

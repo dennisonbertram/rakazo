@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 331 of 331
-- Web and shared components: 847
+- Web and shared components: 848
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 126 in 67 files, native story pending
 
@@ -449,7 +449,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SidebarHeaderRow | [apps/web/src/pages/shell/sidebar-header-row.tsx](../../apps/web/src/pages/shell/sidebar-header-row.tsx) | [sidebar-header-row.stories.tsx](../../apps/web/src/pages/shell/sidebar-header-row.stories.tsx) | web |
 | SpaceSidebar | [apps/web/src/pages/shell/space-sidebar.tsx](../../apps/web/src/pages/shell/space-sidebar.tsx) | [space-sidebar.stories.tsx](../../apps/web/src/pages/shell/space-sidebar.stories.tsx) | web |
 | ThreadMarkdown, ThreadUiBlock, UnreadDivider, Transcript, QuoteSelectionButton, MessageHoverActions, SpeakerHeader, MessageView | [apps/web/src/pages/shell/transcript.tsx](../../apps/web/src/pages/shell/transcript.tsx) | [transcript.stories.tsx](../../apps/web/src/pages/shell/transcript.stories.tsx) | web |
-| VoiceSettingsOverlay | [apps/web/src/pages/VoiceSettingsOverlay.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.tsx) | [VoiceSettingsOverlay.stories.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.stories.tsx) | web |
+| DeviceSpeechSection, VoiceSettingsOverlay | [apps/web/src/pages/VoiceSettingsOverlay.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.tsx) | [VoiceSettingsOverlay.stories.tsx](../../apps/web/src/pages/VoiceSettingsOverlay.stories.tsx) | web |
 | WelcomePage | [apps/web/src/pages/Welcome.tsx](../../apps/web/src/pages/Welcome.tsx) | [Welcome.stories.tsx](../../apps/web/src/pages/Welcome.stories.tsx) | web |
 | WindowChrome | [apps/web/src/pages/WindowChrome.tsx](../../apps/web/src/pages/WindowChrome.tsx) | [WindowChrome.stories.tsx](../../apps/web/src/pages/WindowChrome.stories.tsx) | web |
 

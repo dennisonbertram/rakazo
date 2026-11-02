@@ -1,4 +1,5 @@
 import { readBoundedResponseBytes } from "@rakazo/core";
+import { transcribeOnDevice } from "./device-speech";
 import { getActiveUiLocale } from "./i18n.js";
 import { selectedSpaceId, withSpaceHeaders } from "./rpc.js";
 import type { UiLocale } from "./ui-locale.js";
@@ -198,6 +199,7 @@ export class Dictation {
   private media: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private token = 0;
+  private device = false;
   private silenceTimer: ReturnType<typeof setTimeout> | undefined;
   private restartTimer: ReturnType<typeof setTimeout> | undefined;
   private transcribeAbort: AbortController | null = null;
@@ -263,6 +265,8 @@ export class Dictation {
     transcribe?: boolean;
     /** Record and transcribe on the server even where on-device speech exists. */
     server?: boolean;
+    /** Transcribe on this computer through the desktop app; no audio is uploaded. */
+    device?: boolean;
     endpointMs?: number;
     onFinal: (text: string) => void;
   }): Promise<void> {
@@ -272,6 +276,11 @@ export class Dictation {
     this.onFinal = opts.onFinal;
     this.set({ status: "listening", transcript: "" });
     const transcribe = Boolean(opts.transcribe);
+    this.device = Boolean(opts.device);
+    if (this.device) {
+      await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
+      return;
+    }
     // An unknown capability is not a refusal: a device whose browser cannot hold the
     // microphone open goes to the server even before the voice status has loaded.
     if (opts.server || (prefersServerDictation() && opts.transcribe !== false)) {
@@ -578,6 +587,22 @@ export class Dictation {
       TRANSCRIPTION_RESPONSE_TIMEOUT_MS,
     );
     try {
+      if (this.device) {
+        const result = await transcribeOnDevice(blob);
+        if (this.token !== mine) return;
+        if (!result.ok) {
+          this.failListening(mine, "Could not transcribe that recording.");
+          return;
+        }
+        const prefix = normalizedTranscript(this.snapshot.transcript);
+        this.finish(
+          prefix
+            ? [prefix, normalizedTranscript(result.text)].filter(Boolean).join(" ")
+            : result.text,
+          mine,
+        );
+        return;
+      }
       const audioBase64 = await blobToBase64(blob);
       if (this.token !== mine) return;
       const res = await withAbort(

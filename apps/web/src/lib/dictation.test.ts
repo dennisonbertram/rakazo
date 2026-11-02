@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const onDevice = vi.hoisted(() => ({ transcribe: vi.fn() }));
+vi.mock("./device-speech.js", () => ({ transcribeOnDevice: onDevice.transcribe }));
+
 import {
   combineTranscript,
   Dictation,
@@ -1670,5 +1674,35 @@ describe("insertAtCursor", () => {
     expect(insertAtCursor("", 0, 0, "hi")).toEqual({ text: "hi", caret: 2 });
     expect(insertAtCursor("a ", 2, 2, "b")).toEqual({ text: "a b", caret: 3 });
     expect(insertAtCursor("abc def", 1, 6, "X")).toEqual({ text: "a X f", caret: 3 });
+  });
+});
+
+describe("Dictation on device", () => {
+  it("transcribes through the bridge and never fetches", async () => {
+    const fetchMock = vi.fn();
+    stubRecorderFallback(fetchMock);
+    onDevice.transcribe.mockResolvedValue({ ok: true, text: "hello there" });
+    const onFinal = vi.fn();
+    const dictation = new Dictation();
+    await dictation.listen({ mode: "hold", transcribe: true, device: true, onFinal });
+    dictation.submitHold();
+    await vi.waitFor(() => expect(onFinal).toHaveBeenCalledWith("hello there"));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("drops the result when cancelled while transcribing", async () => {
+    stubRecorderFallback(vi.fn());
+    let resolve!: (value: { ok: true; text: string }) => void;
+    onDevice.transcribe.mockReturnValue(new Promise((r) => (resolve = r)));
+    const onFinal = vi.fn();
+    const dictation = new Dictation();
+    await dictation.listen({ mode: "hold", transcribe: true, device: true, onFinal });
+    dictation.submitHold();
+    await vi.waitFor(() => expect(dictation.state.status).toBe("transcribing"));
+    dictation.stop("cancel");
+    resolve({ ok: true, text: "late" });
+    await Promise.resolve();
+    expect(onFinal).not.toHaveBeenCalled();
+    expect(dictation.state.status).toBe("idle");
   });
 });

@@ -1,4 +1,10 @@
-import type { VoiceCatalogEntry, VoiceCredential, VoiceInfo, VoiceStatus } from "@rakazo/contracts";
+import type {
+  DesktopSpeechStatus,
+  VoiceCatalogEntry,
+  VoiceCredential,
+  VoiceInfo,
+  VoiceStatus,
+} from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { mockRpc, resetRpcMocks } from "../lib/__mocks__/rpc";
 import { withPageBehind } from "../stories/decorators";
@@ -117,4 +123,44 @@ export const OpenAiCompatible: Story = {
       "voice.credentials": [],
       "voice.status": { ...status, configured: false, ready: false, provider: null, voiceId: "" },
     }),
+};
+
+const withSpeech = (state: DesktopSpeechStatus) => () => {
+  const speech = {
+    status: async () => state,
+    prepare: async () => state,
+    forget: async () => state,
+    transcribe: async () => ({ ok: false as const, retry: false }),
+    onStatus: () => () => undefined,
+  };
+  window.rakazoDesktop = { speech } as unknown as typeof window.rakazoDesktop;
+  mockRpc({
+    "voice.catalog": catalog,
+    "voice.credentials": [],
+    "voice.status": { ...status, configured: false, ready: false, provider: null, voiceId: "" },
+  });
+  return () => {
+    window.rakazoDesktop = undefined;
+  };
+};
+
+export const OnDeviceNotPrepared: Story = {
+  args: { embedded: true },
+  beforeEach: withSpeech({ state: "not-prepared" }),
+};
+export const OnDevicePreparing: Story = {
+  args: { embedded: true },
+  beforeEach: withSpeech({ state: "preparing", progress: 0.42 }),
+};
+export const OnDevicePreparingUnknown: Story = {
+  args: { embedded: true },
+  beforeEach: withSpeech({ state: "preparing", progress: null }),
+};
+export const OnDeviceReady: Story = {
+  args: { embedded: true },
+  beforeEach: withSpeech({ state: "ready" }),
+};
+export const OnDeviceError: Story = {
+  args: { embedded: true },
+  beforeEach: withSpeech({ state: "error" }),
 };

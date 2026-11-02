@@ -205,6 +205,7 @@ import { fetchDataRoomBlob } from "../lib/data-room";
 import { dataRoomAgentSuggestions, findDataRoomAgent } from "../lib/data-room-agent";
 import { delegateWaitTarget, pendingDelegateAgents, pendingSentBlocks } from "../lib/delegate-wait";
 import { desktopBridge } from "../lib/desktop";
+import { useDeviceSpeech } from "../lib/device-speech";
 import { setDockedAgentBotId } from "../lib/docked-agent";
 import { financeAgentSuggestions, findFinanceAgent } from "../lib/finance-agent";
 import { findGtmAgent } from "../lib/gtm-agent";
@@ -916,6 +917,7 @@ export function ShellPage() {
   const memoryProviderConfigRevision = useRef(0);
   const call = useCallSession();
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
+  const deviceSpeech = useDeviceSpeech();
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [dismissedRunErrorIds, setDismissedRunErrorIds] =
     useState<ReadonlySet<string>>(readSeenRunErrorIds);
@@ -4687,7 +4689,11 @@ export function ShellPage() {
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
               running={composerShowsStop(currentRuns)}
               disabled={composerDisabled}
-              canDictate={Boolean(voiceStatus?.transcribe || voiceStatus?.transcriptionReady)}
+              canDictate={
+                deviceSpeech?.state === "ready" ||
+                Boolean(voiceStatus?.transcribe || voiceStatus?.transcriptionReady)
+              }
+              deviceDictation={deviceSpeech?.state === "ready"}
               disabledPlaceholder={
                 legalWaitsForConsent ? t`Allow access on the page to ask` : undefined
               }

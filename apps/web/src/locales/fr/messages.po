@@ -4561,6 +4561,10 @@ msgstr ""
 msgid "Couldn't load senders"
 msgstr ""
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Couldn't prepare Hex."
+msgstr ""
+
 #: src/lib/inbox-sync-error.ts
 msgid "Couldn't reach Gmail."
 msgstr ""
@@ -5398,6 +5402,10 @@ msgstr ""
 #: src/components/DesktopUpdates.tsx
 msgid "Downloading…"
 msgstr "Téléchargement en cours…"
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Downloads the speech model once."
+msgstr ""
 
 #: src/components/fundraising/SafeList.tsx
 #: src/components/investors/ActionItems.tsx
@@ -9230,6 +9238,10 @@ msgstr "En appel avec {0}"
 msgid "On a schedule"
 msgstr "Sur planification"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "On this device"
+msgstr ""
+
 #: src/components/integrations/BrexControlsForm.tsx
 msgid "One time"
 msgstr ""
@@ -10003,17 +10015,26 @@ msgstr ""
 msgid "Pre-money cap {0}"
 msgstr ""
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Prepare"
+msgstr ""
+
 #: src/components/ComposeEmail.tsx
 msgid "Preparing draft…"
 msgstr ""
 
 #: src/components/DataExport.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Preparing…"
 msgstr ""
 
 #. placeholder {0}: job.progress
 #: src/components/DataExport.tsx
 msgid "Preparing… {0}%"
+msgstr ""
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Preparing… {percent}%"
 msgstr ""
 
 #: src/components/tour/FirstRunTour.tsx
@@ -10421,6 +10442,10 @@ msgstr ""
 #. placeholder {0}: i18n.date(new Date(job.expiresAt), { dateStyle: "medium" })
 #: src/components/DataExport.tsx
 msgid "Ready until {0}"
+msgstr ""
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Ready. Dictation and recordings use this Mac."
 msgstr ""
 
 #: src/components/integrations/BrexCardsSection.tsx
@@ -12750,6 +12775,10 @@ msgstr "Arrêter l'enseignement"
 msgid "Stop tracking"
 msgstr ""
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Stop using"
+msgstr ""
+
 #: src/components/AskCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Stopped"
@@ -13603,6 +13632,10 @@ msgstr ""
 msgid "Transcribe"
 msgstr ""
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Transcribe with Hex on this Mac. Audio stays on this computer; only text is sent to Praci."
+msgstr ""
+
 #: src/components/meeting-capture/RecordingPill.tsx
 #: src/pages/shell/dictation-button.tsx
 msgid "Transcribing…"
@@ -13678,6 +13711,7 @@ msgstr ""
 #: src/pages/Onboarding.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Try again"
 msgstr "Réessayer"
 

@@ -4561,6 +4561,10 @@ msgstr "Couldn't load notifications"
 msgid "Couldn't load senders"
 msgstr "Couldn't load senders"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Couldn't prepare Hex."
+msgstr "Couldn't prepare Hex."
+
 #: src/lib/inbox-sync-error.ts
 msgid "Couldn't reach Gmail."
 msgstr "Couldn't reach Gmail."
@@ -5398,6 +5402,10 @@ msgstr "Downloading {0} of {1} min"
 #: src/components/DesktopUpdates.tsx
 msgid "Downloading…"
 msgstr "Downloading…"
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Downloads the speech model once."
+msgstr "Downloads the speech model once."
 
 #: src/components/fundraising/SafeList.tsx
 #: src/components/investors/ActionItems.tsx
@@ -9230,6 +9238,10 @@ msgstr "On a call with {0}"
 msgid "On a schedule"
 msgstr "On a schedule"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "On this device"
+msgstr "On this device"
+
 #: src/components/integrations/BrexControlsForm.tsx
 msgid "One time"
 msgstr "One time"
@@ -10003,11 +10015,16 @@ msgstr "Praci read this file but couldn't tell what kind of document it is."
 msgid "Pre-money cap {0}"
 msgstr "Pre-money cap {0}"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Prepare"
+msgstr "Prepare"
+
 #: src/components/ComposeEmail.tsx
 msgid "Preparing draft…"
 msgstr "Preparing draft…"
 
 #: src/components/DataExport.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Preparing…"
 msgstr "Preparing…"
 
@@ -10015,6 +10032,10 @@ msgstr "Preparing…"
 #: src/components/DataExport.tsx
 msgid "Preparing… {0}%"
 msgstr "Preparing… {0}%"
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Preparing… {percent}%"
+msgstr "Preparing… {percent}%"
 
 #: src/components/tour/FirstRunTour.tsx
 msgid "Press + to create a bot or a group chat."
@@ -10422,6 +10443,10 @@ msgstr "Ready"
 #: src/components/DataExport.tsx
 msgid "Ready until {0}"
 msgstr "Ready until {0}"
+
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Ready. Dictation and recordings use this Mac."
+msgstr "Ready. Dictation and recordings use this Mac."
 
 #: src/components/integrations/BrexCardsSection.tsx
 msgid "Reason"
@@ -12750,6 +12775,10 @@ msgstr "Stop teaching"
 msgid "Stop tracking"
 msgstr "Stop tracking"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Stop using"
+msgstr "Stop using"
+
 #: src/components/AskCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Stopped"
@@ -13603,6 +13632,10 @@ msgstr "Transactions are {0} off the closing balance"
 msgid "Transcribe"
 msgstr "Transcribe"
 
+#: src/pages/VoiceSettingsOverlay.tsx
+msgid "Transcribe with Hex on this Mac. Audio stays on this computer; only text is sent to Praci."
+msgstr "Transcribe with Hex on this Mac. Audio stays on this computer; only text is sent to Praci."
+
 #: src/components/meeting-capture/RecordingPill.tsx
 #: src/pages/shell/dictation-button.tsx
 msgid "Transcribing…"
@@ -13678,6 +13711,7 @@ msgstr "Try {name} again"
 #: src/pages/Onboarding.tsx
 #: src/pages/portal/PortalHome.tsx
 #: src/pages/Shell.tsx
+#: src/pages/VoiceSettingsOverlay.tsx
 msgid "Try again"
 msgstr "Try again"
 

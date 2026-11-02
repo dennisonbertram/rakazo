@@ -87,6 +87,7 @@ export const Composer = memo(function Composer({
   onStop,
   onVoice,
   canDictate,
+  deviceDictation,
   quickAsk,
   replyTarget,
   replyQuote,
@@ -136,6 +137,8 @@ export const Composer = memo(function Composer({
   onVoice?: () => void;
   /** A speech-to-text engine is set up; the mic stays hidden until then. */
   canDictate?: boolean;
+  /** Dictate on this computer through the desktop app instead of the server. */
+  deviceDictation?: boolean;
   /** One suggested question shown above the empty composer; sending it is one tap. */
   quickAsk?: { label: string; onAsk: () => void };
   artifactTarget: ArtifactTarget;
@@ -367,6 +370,7 @@ export const Composer = memo(function Composer({
       mode: "endpoint",
       transcribe: true,
       server: true,
+      device: deviceDictation,
       onFinal: (text) => {
         // Read the caret now: the draft may have changed while the audio was transcribed.
         const field = textareaRef.current;

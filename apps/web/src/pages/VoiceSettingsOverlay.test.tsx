@@ -233,3 +233,44 @@ it("saves an OpenAI-compatible server's base URL and model, and never shows the 
     vi.unstubAllGlobals();
   }
 });
+
+it("shows the on-device section only when the desktop bridge reports a state", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  voice.catalog.mockResolvedValue([]);
+  voice.credentials.mockResolvedValue([]);
+  voice.status.mockResolvedValue({ configured: false, ready: false, transcribe: false });
+  const render = async (speech?: unknown) => {
+    vi.stubGlobal(
+      "window",
+      Object.assign(window, { rakazoDesktop: speech ? { speech } : undefined }),
+    );
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<VoiceSettingsOverlay embedded onClose={() => undefined} />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    return container;
+  };
+  const bridge = (state: object) => ({
+    status: async () => state,
+    onStatus: () => () => undefined,
+    prepare: vi.fn(),
+    forget: vi.fn(),
+  });
+
+  expect((await render()).querySelector("[data-testid=device-speech]")).toBeNull();
+  expect(
+    (await render(bridge({ state: "unavailable" }))).querySelector("[data-testid=device-speech]"),
+  ).toBeNull();
+  const text = async (state: object) =>
+    (await render(bridge(state))).querySelector("[data-testid=device-speech]")?.textContent;
+  expect(await text({ state: "not-prepared" })).toContain("Prepare");
+  expect(await text({ state: "preparing", progress: 0.42 })).toContain("Preparing… 42%");
+  expect(await text({ state: "preparing", progress: null })).not.toContain("%");
+  expect(await text({ state: "ready" })).toContain("Stop using");
+  expect(await text({ state: "error" })).toContain("Try again");
+});
