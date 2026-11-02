@@ -83,7 +83,9 @@ final class ChunkWriter: @unchecked Sendable {
     do {
       let url = try disk.partURL(record, seq: seq, startMs: chunkStartMs)
       var settings: [String: Any] = [
-        AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: rate, AVNumberOfChannelsKey: 1,
+        // The container is named outright: the file's `.part` extension says nothing about it.
+        AVAudioFileTypeKey: kAudioFileM4AType, AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVSampleRateKey: rate, AVNumberOfChannelsKey: 1,
         AVEncoderBitRateKey: 64_000
       ]
       // Low-rate input (a Bluetooth headset at 16 kHz) cannot be encoded at 64 kbps; let the encoder choose.

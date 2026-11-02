@@ -174,21 +174,22 @@ public struct CaptureDisk: Sendable {
     try? fileManager.removeItem(at: chunk.url)
   }
 
-  /// After a crash: each leftover `.part` file is audio that cannot be used. It is deleted and
-  /// counted as a lost chunk, and `nextSeq` moves past it. Saves and returns the updated record.
+  /// After a crash: each leftover `.part` file is audio that cannot be used. It is counted as a
+  /// lost chunk (and `nextSeq` moves past it), the record is saved, and only then are the files
+  /// deleted, so a failed save never loses the count. Returns the updated record.
   public func recover(_ record: CaptureRecord) throws -> CaptureRecord {
     var record = record
     let folder = try folder(for: record)
     let items = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-    var changed = false
-    for url in items where url.pathExtension == "part" {
-      try? fileManager.removeItem(at: url)
+    let leftovers = items.filter { $0.pathExtension == "part" }
+    guard !leftovers.isEmpty else { return record }
+    for url in leftovers {
       record.lostChunks += 1
       let parts = url.deletingPathExtension().lastPathComponent.split(separator: "-")
       if parts.count >= 2, let seq = Int(parts[1]) { record.nextSeq = max(record.nextSeq, seq + 1) }
-      changed = true
     }
-    if changed { try save(record) }
+    try save(record)
+    for url in leftovers { try? fileManager.removeItem(at: url) }
     return record
   }
 

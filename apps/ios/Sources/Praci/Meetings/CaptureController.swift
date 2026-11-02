@@ -113,10 +113,27 @@ final class CaptureController {
     onStored = { id in
       if let id, app.path.last == .meetings { app.open(.meeting(id: id)) }
     }
+    watchSignIn(app)
     let previous = app.authentication.beforeSessionEnds
     app.authentication.beforeSessionEnds = { [weak self] in
       await previous?()
       self?.sessionEnding(apiBase: app.authentication.endpoint.absoluteString, userID: app.userID)
+    }
+  }
+
+  /// Any change to signed-out (revalidation, an expired token, a rejected upload) ends the
+  /// recording and wipes its files, the same as sign-out does.
+  private func watchSignIn(_ app: AppModel) {
+    withObservationTracking {
+      _ = app.authentication.isSignedIn
+    } onChange: { [weak self] in
+      Task { @MainActor in
+        guard let self else { return }
+        if !app.authentication.isSignedIn {
+          self.sessionEnding(apiBase: app.authentication.endpoint.absoluteString, userID: app.userID)
+        }
+        self.watchSignIn(app)
+      }
     }
   }
 
@@ -200,6 +217,9 @@ final class CaptureController {
     }
   }
 
+  /// Background time ran out: stop working on this recording but keep its files for `resume`.
+  func expireBackgroundWork() { endRecording() }
+
   // MARK: Sign-out
 
   /// Stops the microphone and deletes everything this user recorded on the phone.
@@ -243,8 +263,13 @@ final class CaptureController {
   // swiftlint:disable:next cyclomatic_complexity
   private func finishFlow(_ first: CaptureRecord, _ who: CaptureIdentity) async {
     let started = epoch
-    let task = UIApplication.shared.beginBackgroundTask(withName: "meeting-finish")
-    defer { if task != .invalid { UIApplication.shared.endBackgroundTask(task) } }
+    // Background time covers the uploads and finish only; when it runs out, what is left stays on
+    // disk and the next foreground or launch picks it up (`resume`).
+    let window = BackgroundWindow()
+    window.begin { [weak self] in
+      if self?.epoch == started { self?.expireBackgroundWork() }
+    }
+    defer { window.end() }
     while epoch == started {
       guard let record = stored(first.captureId, who) else { return endRecording() }
       let outcome = await server.upload(record)
@@ -256,6 +281,7 @@ final class CaptureController {
         do {
           try await server.finish(fresh)
           live?.offline = false
+          window.end()
           return await waitForStored(fresh, started)
         } catch CaptureFinishError.refused {
           return closeAsFailed(fresh, alert: true)
@@ -325,5 +351,24 @@ final class CaptureController {
 
   private func stored(_ captureID: String, _ who: CaptureIdentity) -> CaptureRecord? {
     disk.records(apiBase: who.apiBase, userId: who.userID).first { $0.captureId == captureID }
+  }
+}
+
+/// One `beginBackgroundTask` assertion that ends itself when the system's time is up.
+@MainActor
+private final class BackgroundWindow {
+  private var identifier = UIBackgroundTaskIdentifier.invalid
+
+  func begin(onExpire: @escaping @MainActor () -> Void) {
+    identifier = UIApplication.shared.beginBackgroundTask(withName: "meeting-finish") { [weak self] in
+      onExpire()
+      self?.end()
+    }
+  }
+
+  func end() {
+    guard identifier != .invalid else { return }
+    UIApplication.shared.endBackgroundTask(identifier)
+    identifier = .invalid
   }
 }

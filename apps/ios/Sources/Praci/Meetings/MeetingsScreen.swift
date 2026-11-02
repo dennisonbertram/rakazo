@@ -45,7 +45,7 @@ struct MeetingsScreen: View {
       }
     }
     .sheet(isPresented: $recording) {
-      if let options = record.options { RecordSheet(options: options) }
+      RecordSheet(model: record)
     }
     .task { await record.load(app) }
     .onChange(of: app.capture.storedCount) { Task { await model.load(app, query: query) } }

@@ -45,6 +45,7 @@ final class DictationModel {
 struct DictationButton: View {
   let model: DictationModel
   @Binding var text: String
+  @Environment(AppModel.self) private var app
 
   var body: some View {
     Button { Task { await model.toggle(text: $text) } } label: {
@@ -53,6 +54,7 @@ struct DictationButton: View {
     }
     .buttonStyle(.glassProminent)
     .buttonBorderShape(.circle)
+    .disabled(app.capture.isBusy)
     .accessibilityLabel(model.listening ? "Stop dictation" : "Dictate")
     .accessibilityIdentifier("dictate")
   }

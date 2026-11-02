@@ -61,6 +61,22 @@ private func record(
   #expect(try disk.recover(recovered).lostChunks == 1)  // nothing left to count
 }
 
+@Test func recoveryKeepsTheLeftoverWhenTheCountCannotBeSaved() throws {
+  let disk = tempDisk()
+  let rec = record()
+  try disk.save(rec)
+  let leftover = try disk.partURL(rec, seq: 0, startMs: 0)
+  try Data("half".utf8).write(to: leftover)
+  // record.json can no longer be replaced: a non-empty folder stands in its place.
+  let file = try disk.folder(for: rec).appendingPathComponent("record.json")
+  try FileManager.default.removeItem(at: file)
+  try FileManager.default.createDirectory(
+    at: file.appendingPathComponent("x"), withIntermediateDirectories: true)
+
+  #expect(throws: (any Error).self) { try disk.recover(rec) }
+  #expect(FileManager.default.fileExists(atPath: leftover.path))
+}
+
 @Test func wipeRemovesOnlyThatUsersCaptures() throws {
   let disk = tempDisk()
   let mine = record()

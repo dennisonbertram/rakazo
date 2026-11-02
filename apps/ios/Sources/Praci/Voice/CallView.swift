@@ -19,6 +19,7 @@ struct CallButton: View {
     } label: {
       Label("Call", systemImage: "phone")
     }
+    .disabled(app.capture.isBusy)
     .accessibilityIdentifier("call")
     // swiftlint:disable:next multiple_closures_with_trailing_closure
     .fullScreenCover(isPresented: $presenting, onDismiss: { coordinator.end() }) {

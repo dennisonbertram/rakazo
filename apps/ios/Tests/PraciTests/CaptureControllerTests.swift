@@ -209,6 +209,49 @@ struct CaptureControllerTests {
   }
 
   @Test
+  func aSessionThatEndsWithoutTheSignOutHookStillStopsAndWipes() async throws {
+    let harness = Harness()
+    let storage = MemoryStorage()
+    storage.session = StoredSession(endpoint: URL(string: "http://127.0.0.1:3301")!, token: "synthetic-token")
+    let authentication = AuthenticationModel(
+      client: AuthClient(
+        endpoint: URL(string: "http://127.0.0.1:3301")!, storage: storage, transport: SessionEndsTransport()),
+      defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let app = AppModel(
+      authentication: authentication, defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    await authentication.start()
+    #expect(authentication.isSignedIn)
+    harness.controller.attach(to: app)
+    try await harness.recordOneChunk()
+    #expect(!harness.records().isEmpty)
+    // Foreground revalidation finds the session rejected; sign-out never ran.
+    await authentication.revalidate()
+    #expect(!authentication.isSignedIn)
+    for _ in 0..<50 where harness.controller.live != nil { try await Task.sleep(for: .milliseconds(20)) }
+    #expect(harness.controller.live == nil)
+    #expect(harness.source.stopped)
+    #expect(harness.records().isEmpty)
+  }
+
+  @Test
+  func whenBackgroundTimeRunsOutTheFilesStayForTheNextLaunch() async throws {
+    let harness = Harness()
+    harness.server.onUpload = { _ in .retryLater }
+    try await harness.recordOneChunk()
+    let stopping = Task { await harness.controller.stop() }
+    for _ in 0..<100 where harness.controller.live?.offline != true { try await Task.sleep(for: .milliseconds(20)) }
+    harness.controller.expireBackgroundWork()
+    await stopping.value
+    #expect(harness.controller.live == nil)
+    #expect(!harness.records().isEmpty)
+    // The next foreground finishes it.
+    harness.server.onUpload = { _ in .done }
+    await harness.controller.resume()
+    #expect(harness.server.finished.count == 1)
+    #expect(harness.records().isEmpty)
+  }
+
+  @Test
   func signOutStopsTheMicrophoneAndDeletesTheRecording() async throws {
     let harness = Harness()
     let app = AppModel(
@@ -235,5 +278,18 @@ struct CaptureControllerTests {
 private struct FakeNoTransport: HTTPTransport {
   func send(_ request: HTTPRequest, maximumResponseBytes: Int) async throws -> HTTPResponse {
     HTTPResponse(statusCode: 500)
+  }
+}
+
+/// Answers get-session once, then rejects the session.
+private actor SessionEndsTransport: HTTPTransport {
+  private var sessionChecks = 0
+
+  func send(_ request: HTTPRequest, maximumResponseBytes: Int) async throws -> HTTPResponse {
+    guard request.url.path.contains("get-session") else { return HTTPResponse(statusCode: 500) }
+    sessionChecks += 1
+    return sessionChecks == 1
+      ? HTTPResponse(statusCode: 200, body: Data(#"{"user":{"id":"u1"}}"#.utf8))
+      : HTTPResponse(statusCode: 401)
   }
 }

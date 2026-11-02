@@ -32,7 +32,7 @@ final class RecordModel {
 
 /// The sheet behind Record: an optional title, the space's recording notice, and Start.
 struct RecordSheet: View {
-  let options: RecordModel.Options
+  let model: RecordModel
   @Environment(AppModel.self) private var app
   @Environment(\.dismiss) private var dismiss
   @State private var title = ""
@@ -44,24 +44,29 @@ struct RecordSheet: View {
     "Meeting \(Date.now.formatted(date: .omitted, time: .shortened))"
   }
 
-  private var confirm: Bool { options.policy == "confirm" }
+  private var confirm: Bool { model.options?.policy == "confirm" }
 
   var body: some View {
     NavigationStack {
-      if options.serverTranscribes {
-        form
-      } else {
-        Form {
-          NavigationLink("Add speech to text") { VoiceSettingsScreen() }
-            .accessibilityIdentifier("addSpeechToText")
+      if let options = model.options {
+        if options.serverTranscribes {
+          form(options)
+        } else {
+          Form {
+            NavigationLink("Add speech to text") { VoiceSettingsScreen() }
+              .accessibilityIdentifier("addSpeechToText")
+          }
+          .toolbar { cancel }
+          // Back from Voice settings the provider may be set up now.
+          .onAppear { Task { await model.load(app) } }
         }
-        .toolbar { cancel }
       }
     }
-    .presentationDetents([.medium])
+    // Sized to the form: title and notice, plus the consent toggle when the space asks for it.
+    .presentationDetents([.height(model.options?.policy == "confirm" ? 280 : 230)])
   }
 
-  private var form: some View {
+  private func form(_ options: RecordModel.Options) -> some View {
     Form {
       Section {
         TextField("Title", text: $title, prompt: Text(placeholder))
@@ -78,7 +83,7 @@ struct RecordSheet: View {
     .toolbar {
       cancel
       ToolbarItem(placement: .confirmationAction) {
-        Button("Start") { Task { await start() } }
+        Button("Start") { Task { await start(options) } }
           .disabled(starting || (confirm && !agreed))
           .accessibilityIdentifier("recordStart")
       }
@@ -91,7 +96,7 @@ struct RecordSheet: View {
     }
   }
 
-  private func start() async {
+  private func start(_ options: RecordModel.Options) async {
     starting = true
     failure = nil
     defer { starting = false }
