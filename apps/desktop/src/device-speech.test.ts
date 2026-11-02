@@ -37,9 +37,7 @@ const eventually = async (check: () => boolean) => {
   expect(check()).toBe(true);
 };
 
-function make(
-  options: { supported?: boolean; command?: () => string[] | undefined; timeoutMs?: number } = {},
-) {
+function make(options: Partial<Parameters<typeof createDeviceSpeech>[0]> = {}) {
   const statuses: DesktopSpeechStatus[] = [];
   const speech = createDeviceSpeech({
     userDataDir: dir,
@@ -83,7 +81,7 @@ describe("device speech", () => {
     });
     const { speech } = make({ supported: false });
     expect(await speech.prepare()).toEqual({ state: "unavailable" });
-    expect(await speech.transcribe(wav())).toEqual({ ok: false, retry: false });
+    expect(await speech.transcribe(wav())).toEqual({ ok: false, retry: true });
     expect(pids()).toEqual([]);
   });
 
@@ -117,14 +115,14 @@ describe("device speech", () => {
     expect(await speech.forget()).toEqual({ state: "not-prepared" });
     expect(existsSync(path.join(dir, "speech.json"))).toBe(false);
     await eventually(() => !alive(pid as number));
-    expect(await speech.transcribe(wav())).toEqual({ ok: false, retry: false });
+    expect(await speech.transcribe(wav())).toEqual({ ok: false, retry: true });
   });
 
   it("a lazy create that would download goes back to not-prepared", async () => {
     process.env.FAKE_HEX_MODE = "download";
     writeFileSync(path.join(dir, "speech.json"), '{"model":"parakeet_unified_en"}');
     const { speech } = make();
-    expect(await speech.transcribe(wav())).toEqual({ ok: false, retry: false });
+    expect(await speech.transcribe(wav())).toEqual({ ok: false, retry: true });
     expect(await speech.status()).toEqual({ state: "not-prepared" });
     expect(existsSync(path.join(dir, "speech.json"))).toBe(false);
     await eventually(() => pids().every((pid) => !alive(pid)));
@@ -174,6 +172,65 @@ describe("device speech", () => {
     expect(await speech.transcribe(wav(64, { 20: 3 }))).toEqual(refused);
     expect(await speech.transcribe(wav(16 * 1024 * 1024 + 1))).toEqual(refused);
     expect(pids()).toEqual([]);
+  });
+
+  it("a failed lazy create is retryable and does not make the state sticky", async () => {
+    writeFileSync(path.join(dir, "speech.json"), '{"model":"parakeet_unified_en"}');
+    const { speech } = make({ command: () => [process.execPath, path.join(dir, "missing.mjs")] });
+    expect(await speech.transcribe(wav())).toEqual({ ok: false, retry: true });
+    expect(await speech.status()).toEqual({ state: "ready" });
+  });
+
+  it("forget aborts an in-flight prepare and kills its helper", async () => {
+    process.env.FAKE_HEX_MODE = "hangprepare";
+    const { speech } = make();
+    const preparing = speech.prepare();
+    await eventually(() => pids().length === 1);
+    const started = Date.now();
+    expect(await speech.forget()).toEqual({ state: "not-prepared" });
+    expect(Date.now() - started).toBeLessThan(5000);
+    await preparing;
+    await eventually(() => pids().every((pid) => !alive(pid)));
+  });
+
+  it("close aborts an in-flight prepare", async () => {
+    process.env.FAKE_HEX_MODE = "hangprepare";
+    const { speech } = make();
+    const preparing = speech.prepare();
+    await eventually(() => pids().length === 1);
+    await speech.close();
+    await preparing;
+    await eventually(() => pids().every((pid) => !alive(pid)));
+  });
+
+  it("closes the helper when saving the choice fails", async () => {
+    const { speech } = make({
+      fs: {
+        read: async () => null,
+        write: async () => {
+          throw new Error(`EACCES: ${dir}/speech.json`);
+        },
+        remove: async () => {},
+      },
+    });
+    expect(await speech.prepare()).toEqual({ state: "error" });
+    await eventually(() => pids().every((pid) => !alive(pid)));
+  });
+
+  it("maps filesystem failures to statuses without paths", async () => {
+    const boom = async () => {
+      throw new Error(`EACCES: ${dir}/speech.json`);
+    };
+    const { speech } = make({ fs: { read: boom, write: boom, remove: boom } });
+    const results = [
+      await speech.status(),
+      await speech.forget(),
+      await speech.prepare(),
+      await speech.transcribe(wav()),
+    ];
+    expect(results[0]).toEqual({ state: "error" });
+    expect(results[3]).toEqual({ ok: false, retry: true });
+    expect(JSON.stringify(results)).not.toContain(dir);
   });
 
   it("never exposes the helper token", async () => {

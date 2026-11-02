@@ -1135,7 +1135,8 @@ app.whenReady().then(async () => {
   ipcMain.handle("desktop.speech.transcribe", (event, wav: unknown) =>
     fromMainWindow(event) ? speech.transcribe(wav) : { ok: false, retry: false },
   );
-  app.on("before-quit", () => void speech.close());
+  // will-quit, not before-quit: a capture can still cancel the quit while it is being confirmed.
+  app.on("will-quit", () => void speech.close());
   ipcMain.handle("desktop.update.state", () => desktopUpdater.state());
   ipcMain.handle("desktop.update.check", (event) =>
     fromMainWindow(event) ? desktopUpdater.check(true) : desktopUpdater.state(),

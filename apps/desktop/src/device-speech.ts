@@ -36,7 +36,19 @@ function isPcmWav(wav: unknown): wav is Uint8Array {
 }
 
 const refused: DesktopSpeechResult = { ok: false, retry: false };
+const retry: DesktopSpeechResult = { ok: false, retry: true };
+const CREATE_TIMEOUT_MS = 60_000;
 
+const defaultFs = {
+  read: (file: string) => readPrivateFile(file, 1024),
+  write: writePrivateFile,
+  remove: (file: string) => rm(file, { force: true }),
+};
+
+/**
+ * Only bad input is `retry: false`. Every other failure (not ready, helper missing or crashed, a
+ * timeout) is `retry: true`, so the caller keeps its audio and tries again later.
+ */
 export function createDeviceSpeech(options: {
   userDataDir: string;
   command: () => string[] | undefined;
@@ -44,10 +56,14 @@ export function createDeviceSpeech(options: {
   supported: boolean;
   onStatus: (status: DesktopSpeechStatus) => void;
   timeoutMs?: number;
+  /** Replaceable in tests. */
+  fs?: typeof defaultFs;
 }) {
+  const fs = options.fs ?? defaultFs;
   const file = path.join(options.userDataDir, FILE_NAME);
   const quit = new AbortController();
   let transcriber: Promise<Transcriber> | null = null;
+  let prepareAbort: AbortController | null = null;
   let preparing = false;
   let progress: number | null = null;
   let failed = false;
@@ -59,8 +75,9 @@ export function createDeviceSpeech(options: {
     return run;
   };
 
+  /** True when the user picked on-device speech. Throws only on a filesystem failure. */
   const picked = async () => {
-    const raw = await readPrivateFile(file, 1024);
+    const raw = await fs.read(file);
     try {
       return raw !== null && (JSON.parse(raw) as { model?: unknown }).model === MODEL;
     } catch {
@@ -72,7 +89,11 @@ export function createDeviceSpeech(options: {
     if (!options.supported || options.command() === undefined) return { state: "unavailable" };
     if (preparing) return { state: "preparing", progress };
     if (failed) return { state: "error" };
-    return (await picked()) ? { state: "ready" } : { state: "not-prepared" };
+    try {
+      return (await picked()) ? { state: "ready" } : { state: "not-prepared" };
+    } catch {
+      return { state: "error" };
+    }
   }
 
   const emit = async () => options.onStatus(await status());
@@ -94,42 +115,63 @@ export function createDeviceSpeech(options: {
     }
   };
 
-  const prepare = () =>
-    enqueue(async () => {
+  const prepare = () => {
+    const abort = new AbortController();
+    prepareAbort = abort;
+    return enqueue(async () => {
       const command = options.command();
-      if (!options.supported || command === undefined) return status();
+      if (
+        !options.supported ||
+        command === undefined ||
+        abort.signal.aborted ||
+        quit.signal.aborted
+      )
+        return status();
       await dropTranscriber();
       preparing = true;
       progress = null;
       failed = false;
       await emit();
+      let created: Promise<Transcriber> | null = null;
       try {
-        transcriber = create({
+        created = create({
           command: command as [string, ...string[]],
           model: MODEL,
           language: LANGUAGE,
-          signal: quit.signal,
+          signal: AbortSignal.any([quit.signal, abort.signal]),
           onProgress,
         });
-        await transcriber;
-        await writePrivateFile(file, JSON.stringify({ model: MODEL }));
+        transcriber = created;
+        await created;
+        await fs.write(file, JSON.stringify({ model: MODEL }));
       } catch {
-        transcriber = null;
-        failed = true;
+        await dropTranscriber();
+        failed = !abort.signal.aborted && !quit.signal.aborted;
       }
+      if (prepareAbort === abort) prepareAbort = null;
       preparing = false;
       await emit();
       return status();
     });
+  };
 
-  const forget = () =>
-    enqueue(async () => {
+  /** Cancels a prepare that is running or still queued, so forget and close do not wait for it. */
+  const cancelPrepare = () => prepareAbort?.abort();
+
+  const forget = () => {
+    cancelPrepare();
+    return enqueue(async () => {
       await dropTranscriber();
-      await rm(file, { force: true });
-      failed = false;
+      try {
+        await fs.remove(file);
+        failed = false;
+      } catch {
+        failed = true;
+      }
       await emit();
       return status();
     });
+  };
 
   /** After a restart the helper is created on first use. Transcription never downloads a model. */
   async function lazyCreate(command: string[]): Promise<Transcriber | null> {
@@ -139,7 +181,11 @@ export function createDeviceSpeech(options: {
       command: command as [string, ...string[]],
       model: MODEL,
       language: LANGUAGE,
-      signal: AbortSignal.any([quit.signal, download.signal]),
+      signal: AbortSignal.any([
+        quit.signal,
+        download.signal,
+        AbortSignal.timeout(CREATE_TIMEOUT_MS),
+      ]),
       onProgress: (event) => {
         if (event.type !== "downloading") return;
         downloading = true;
@@ -150,43 +196,51 @@ export function createDeviceSpeech(options: {
       return await transcriber;
     } catch {
       transcriber = null;
-      if (downloading) await rm(file, { force: true });
-      else failed = true;
-      await emit();
+      if (downloading) {
+        await fs.remove(file).catch(() => undefined);
+        await emit();
+      }
       return null;
     }
   }
 
   const transcribe = (wav: unknown): Promise<DesktopSpeechResult> => {
     if (!isPcmWav(wav)) return Promise.resolve(refused);
-    return enqueue(async () => {
-      const command = options.command();
-      if (!options.supported || command === undefined || (await status()).state !== "ready")
-        return refused;
-      const active = transcriber ? await transcriber.catch(() => null) : await lazyCreate(command);
-      if (active === null) {
-        transcriber = null;
-        return refused;
-      }
+    return enqueue(async (): Promise<DesktopSpeechResult> => {
       try {
-        const result = await active.transcribe(wav, {
-          signal: AbortSignal.any([
-            quit.signal,
-            AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
-          ]),
-        });
-        return { ok: true, text: result.transcript };
-      } catch (error) {
-        const rejected = isHexError(error) && error.status !== undefined && error.status < 500;
-        // A 4xx means the request was bad and the helper is fine; anything else may have killed it.
-        if (!rejected) await dropTranscriber();
-        return { ok: false, retry: !rejected };
+        const command = options.command();
+        if (!options.supported || command === undefined || (await status()).state !== "ready")
+          return retry;
+        const active = transcriber
+          ? await transcriber.catch(() => null)
+          : await lazyCreate(command);
+        if (active === null) {
+          transcriber = null;
+          return retry;
+        }
+        try {
+          const result = await active.transcribe(wav, {
+            signal: AbortSignal.any([
+              quit.signal,
+              AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
+            ]),
+          });
+          return { ok: true, text: result.transcript };
+        } catch (error) {
+          const rejected = isHexError(error) && error.status !== undefined && error.status < 500;
+          // A 4xx means the request was bad and the helper is fine; anything else may have killed it.
+          if (!rejected) await dropTranscriber();
+          return rejected ? refused : retry;
+        }
+      } catch {
+        return retry;
       }
     });
   };
 
   const close = async () => {
     quit.abort();
+    cancelPrepare();
     await queue;
     await dropTranscriber();
   };

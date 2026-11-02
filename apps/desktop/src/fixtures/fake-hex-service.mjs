@@ -1,6 +1,6 @@
 // Fake `hex service --embedded` for device-speech tests. Speaks the @kitlangton/hex API 2 embedded
 // handshake: one JSON "ready" line on stdout, then bearer-authenticated loopback HTTP. Exits when
-// stdin ends. FAKE_HEX_MODE: ok | hang | crash | download. FAKE_HEX_PID_FILE records each pid;
+// stdin ends. FAKE_HEX_MODE: ok | hang | hangprepare | crash | download. FAKE_HEX_PID_FILE records each pid;
 // FAKE_HEX_CRASH_MARKER makes crash mode crash only the first time (the marker file is created).
 import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -22,6 +22,7 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   if (req.method === "POST" && /^\/models\/[a-z0-9_]+\/prepare$/.test(url.pathname)) {
     res.writeHead(200, { "content-type": "text/event-stream" });
+    if (mode === "hangprepare") return res.write(": waiting\n\n");
     const events = [
       ...(mode === "download"
         ? [
