@@ -274,3 +274,33 @@ it("shows the on-device section only when the desktop bridge reports a state", a
   expect(await text({ state: "ready" })).toContain("Stop using");
   expect(await text({ state: "error" })).toContain("Try again");
 });
+
+it("applies the status returned by prepare when nothing is pushed", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  voice.catalog.mockResolvedValue([]);
+  voice.credentials.mockResolvedValue([]);
+  voice.status.mockResolvedValue({ configured: false, ready: false, transcribe: false });
+  const speech = {
+    status: async () => ({ state: "not-prepared" }),
+    onStatus: () => () => undefined,
+    prepare: async () => ({ state: "ready" }),
+    forget: vi.fn(),
+  };
+  vi.stubGlobal("window", Object.assign(window, { rakazoDesktop: { speech } }));
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(<VoiceSettingsOverlay embedded onClose={() => undefined} />);
+  });
+  await act(async () => {
+    await Promise.resolve();
+  });
+  const section = () => container.querySelector("[data-testid=device-speech]");
+  await act(async () => {
+    [...(section()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent === "Prepare")
+      ?.click();
+  });
+  expect(section()?.textContent).toContain("Ready. Dictation and recordings use this Mac.");
+});

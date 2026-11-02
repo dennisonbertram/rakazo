@@ -1,5 +1,11 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { VoiceCatalogEntry, VoiceCredential, VoiceInfo, VoiceStatus } from "@rakazo/contracts";
+import type {
+  DesktopSpeechStatus,
+  VoiceCatalogEntry,
+  VoiceCredential,
+  VoiceInfo,
+  VoiceStatus,
+} from "@rakazo/contracts";
 import {
   Button,
   Dialog,
@@ -20,13 +26,20 @@ import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 
 function DeviceSpeechSection() {
-  const status = useDeviceSpeech();
+  const pushed = useDeviceSpeech();
+  const [local, setLocal] = useState<DesktopSpeechStatus | null>(null);
   const [pending, setPending] = useState(false);
+  // A pushed status is newer than the last local answer.
+  useEffect(() => setLocal(null), [pushed]);
+  const status = local ?? pushed;
   if (!status || status.state === "unavailable") return null;
   const speech = desktopBridge()?.speech;
   const run = (action: "prepare" | "forget") => {
     setPending(true);
-    void speech?.[action]().finally(() => setPending(false));
+    if (action === "prepare") setLocal({ state: "preparing", progress: null });
+    void speech?.[action]()
+      .then(setLocal, () => setLocal({ state: "error" }))
+      .finally(() => setPending(false));
   };
   const percent =
     status.state === "preparing" && status.progress !== null
