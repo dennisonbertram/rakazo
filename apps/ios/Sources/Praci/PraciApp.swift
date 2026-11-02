@@ -13,6 +13,8 @@ struct PraciApp: App {
     let router = NotificationRouter(app: app)
     _app = State(initialValue: app)
     _router = State(initialValue: router)
+    // After the router, which sets its own sign-out hook; the capture controller chains onto it.
+    _ = app.capture
     UNUserNotificationCenter.current().delegate = router
     UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
   }
@@ -25,12 +27,16 @@ struct PraciApp: App {
         .task {
           AppearanceChoice.applyStored()
           await app.authentication.start()
+          if app.authentication.isSignedIn { await app.capture.resume() }
           router.settle(startupDone: true)
         }
         .onChange(of: app.authentication.isSignedIn) { _, _ in router.settle(startupDone: false) }
         .onChange(of: scenePhase) { _, phase in
           if phase == .active {
-            Task { await app.authentication.revalidate() }
+            Task {
+              await app.authentication.revalidate()
+              if app.authentication.isSignedIn { await app.capture.resume() }
+            }
           }
         }
     }

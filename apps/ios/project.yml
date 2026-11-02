@@ -39,6 +39,8 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: ai.praci.mobile.dev
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: ai.praci.mobile
+          # The recorded-meeting fixture is for Debug builds and the Maestro flow only.
+          EXCLUDED_SOURCE_FILE_NAMES: FileAudioSource.swift meeting-fixture.m4a
     info:
       path: Praci-Info.plist
       properties:
@@ -47,7 +49,9 @@ targets:
           - CFBundleURLSchemes:
               - rakazo
         NSLocalNetworkUsageDescription: Connect to your Praci server on your local network.
-        NSMicrophoneUsageDescription: Talk to your agent.
+        NSMicrophoneUsageDescription: Talk to your agent and record meetings.
+        UIBackgroundModes:
+          - audio
         NSSpeechRecognitionUsageDescription: Turn your speech into messages.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

@@ -8,9 +8,16 @@ struct AppShell: View {
     // ponytail: NavigationStack until the Duo phase moves this to NavigationSplitView.
     NavigationStack(path: $app.path) {
       HomeScreen()
+        .safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
         .navigationDestination(for: Route.self) { route in
-          destination(route)
+          destination(route).safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
         }
+    }
+    .alert(
+      app.capture.closedAlert ?? "", isPresented: Binding(
+        get: { app.capture.closedAlert != nil }, set: { if !$0 { app.capture.closedAlert = nil } })
+    ) {
+      Button("OK", role: .cancel) {}
     }
     .sheet(isPresented: $app.showingSettings) {
       NavigationStack { SettingsScreen() }
@@ -35,6 +42,8 @@ struct AppShell: View {
     case .legal: LegalScreen()
     case .capTable: CapTableScreen()
     case .dataRoom: DataRoomScreen()
+    case .meetings: MeetingsScreen()
+    case .meeting(let id): MeetingDetailScreen(meetingID: id)
     }
   }
 }

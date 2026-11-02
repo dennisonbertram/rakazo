@@ -33,8 +33,12 @@ public struct SpaceSummary: Sendable, Identifiable, Hashable, Decodable {
   public let isDefault: Bool
   public let canRename: Bool
   public let canDelete: Bool
+  /// "remind", "confirm" or "off": what the space asks before recording a meeting.
+  public let meetingRecording: String
 
-  private enum CodingKeys: String, CodingKey { case id, name, isDefault, canRename, canDelete }
+  private enum CodingKeys: String, CodingKey {
+    case id, name, isDefault, canRename, canDelete, meetingRecording
+  }
 
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -43,6 +47,7 @@ public struct SpaceSummary: Sendable, Identifiable, Hashable, Decodable {
     isDefault = try c.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
     canRename = try c.decodeIfPresent(Bool.self, forKey: .canRename) ?? true
     canDelete = try c.decodeIfPresent(Bool.self, forKey: .canDelete) ?? false
+    meetingRecording = try c.decodeIfPresent(String.self, forKey: .meetingRecording) ?? "remind"
   }
 }
 

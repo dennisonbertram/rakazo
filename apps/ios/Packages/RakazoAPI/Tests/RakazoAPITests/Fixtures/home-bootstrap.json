@@ -278,7 +278,8 @@
         "hasContent": true,
         "canRename": true,
         "canDelete": false,
-        "memberCount": 2
+        "memberCount": 2,
+        "meetingRecording": "confirm"
       },
       {
         "id": "space-2",

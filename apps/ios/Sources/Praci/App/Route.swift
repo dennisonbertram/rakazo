@@ -21,6 +21,8 @@ enum Route: Hashable, Sendable {
   case legal
   case capTable
   case dataRoom
+  case meetings
+  case meeting(id: String)
 
   /// Accepts only `rakazo://open/...`; any other URL (including `rakazo://sign-in`) is ignored.
   init?(url: URL) {
@@ -33,6 +35,8 @@ enum Route: Hashable, Sendable {
     case ("legal", nil, nil): self = .legal
     case ("cap-table", nil, nil): self = .capTable
     case ("data-room", nil, nil): self = .dataRoom
+    case ("meetings", nil, nil): self = .meetings
+    case ("meeting", let id?, nil): self = .meeting(id: id)
     case ("inbox", let id?, nil): self = .inboxMessage(messageID: id)
     case ("bot", let id?, nil): self = .thread(.bot(id))
     case ("group", let id?, nil): self = .thread(.group(id))
