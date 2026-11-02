@@ -114,7 +114,7 @@ type Controller = typeof import("./controller");
 let c: Controller;
 let locks: FakeLocks;
 const gum = vi.fn();
-const micTrack = () => ({ stop: vi.fn() });
+const micTrack = (readyState = "live") => ({ stop: vi.fn(), readyState });
 const stream = (track = micTrack()) => ({
   getTracks: () => [track],
   getVideoTracks: () => [],
@@ -355,6 +355,73 @@ it.each([
     configurable: true,
   });
   await expect(c.startCapture({ tabAudio: true })).rejects.toThrow(text);
+});
+
+const stubDesktop = (platform: string) =>
+  vi.stubGlobal("window", {
+    rakazoDesktop: { platform },
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
+const stubDisplay = (display: () => unknown) => {
+  vi.stubGlobal(
+    "MediaStream",
+    class {
+      constructor(readonly tracks: unknown[]) {}
+      getTracks = () => this.tracks;
+      getAudioTracks = () => this.tracks;
+      getVideoTracks = () => [];
+    },
+  );
+  Object.defineProperty(navigator, "mediaDevices", {
+    value: { getUserMedia: gum, getDisplayMedia: vi.fn(async () => display()) },
+    configurable: true,
+  });
+};
+
+it("a call audio track that ends offers to record it again and keeps what was recorded", async () => {
+  stubDesktop("darwin");
+  stubDisplay(() => stream());
+  await c.startCapture({ tabAudio: true });
+  const system = fakes.list.find((r) => (r as Fake).options.track === "system") as Fake;
+  system.options.onEnded?.();
+  await settle(1_500);
+  expect(system.stopped).toBe(true);
+  expect(c.captureView()).toMatchObject({
+    phase: "recording",
+    noCallAudio: true,
+    canShareTab: true,
+  });
+  // The microphone still ends the capture as before.
+  const mic = fakes.list.find((r) => (r as Fake).options.track === "microphone") as Fake;
+  expect(mic.options.onEnded).toBeTypeOf("function");
+});
+
+it("an already ended call audio track is the same failure as a refused share", async () => {
+  vi.stubGlobal("window", { rakazoDesktop: { platform: "darwin" } });
+  const ended = micTrack("ended");
+  stubDisplay(() => stream(ended));
+  await expect(c.startCapture({ tabAudio: true })).rejects.toThrow(
+    "Screen & System Audio Recording",
+  );
+  expect(ended.stop).toHaveBeenCalled();
+});
+
+it("a failed retry shows why on the recording view, and a good one clears it", async () => {
+  stubDesktop("win32");
+  stubDisplay(() => stream());
+  await c.startCapture({ tabAudio: true });
+  const system = fakes.list.find((r) => (r as Fake).options.track === "system") as Fake;
+  system.options.onEnded?.();
+  await settle(1_500);
+  stubDisplay(() => stream(micTrack("ended")));
+  await c.shareTabAudio();
+  expect(c.captureView()).toMatchObject({
+    callAudioError: "Praci can't hear call audio. Try again, or turn off Record call audio.",
+  });
+  stubDisplay(() => stream());
+  await c.shareTabAudio();
+  expect(c.captureView()).not.toHaveProperty("callAudioError");
 });
 
 // 1. Stop in an observer tab stops the tab that holds the microphone.

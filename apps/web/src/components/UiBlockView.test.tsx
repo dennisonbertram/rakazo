@@ -66,5 +66,5 @@ it("keeps links in a card's body above the card-wide link", () => {
   ]);
   // The title link stretches over the card; the body link must sit above it.
   expect(links[0]?.className).toContain("after:absolute");
-  expect(links[1]?.closest("[class*=\"[&_a]:z-10\"]")).not.toBeNull();
+  expect(links[1]?.closest('[class*="[&_a]:z-10"]')).not.toBeNull();
 });

@@ -56,6 +56,7 @@ export function RecordingPillHost() {
             elapsedMs: now - view.startedAt,
             noCallAudio: view.noCallAudio,
             offline: view.offline,
+            callAudioError: view.callAudioError,
           }}
           onStop={() => void stopCapture()}
           onShareTab={view.canShareTab ? () => void shareTabAudio() : undefined}

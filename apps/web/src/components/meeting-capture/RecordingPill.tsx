@@ -20,6 +20,8 @@ export type RecordingPillState =
       elapsedMs: number;
       noCallAudio?: boolean;
       offline?: boolean;
+      /** Why recording call audio again failed. */
+      callAudioError?: string;
     }
   | { kind: "transcribing"; micStopped?: boolean }
   /** The capture was closed by the server; the person reads why and dismisses it. */
@@ -44,7 +46,7 @@ export function RecordingPill({
   className?: string;
 }) {
   const { t } = useLingui();
-  return (
+  const pill = (
     <div
       role="status"
       data-testid="recording-pill"
@@ -101,5 +103,15 @@ export function RecordingPill({
         </>
       )}
     </div>
+  );
+  return state.kind === "recording" && state.callAudioError ? (
+    <div className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-col items-center gap-1">
+      {pill}
+      <p role="alert" className="text-center text-xs text-destructive">
+        {state.callAudioError}
+      </p>
+    </div>
+  ) : (
+    pill
   );
 }

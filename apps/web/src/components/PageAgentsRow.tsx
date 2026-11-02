@@ -1,10 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@rakazo/ui-web";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@rakazo/ui-web";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
@@ -121,11 +116,7 @@ export function PageAgentsRow({
           >
             <MoreHorizontal size={14} aria-hidden="true" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            aria-label={menuLabel}
-            className="w-[220px]"
-          >
+          <DropdownMenuContent align="end" aria-label={menuLabel} className="w-[220px]">
             {actions}
           </DropdownMenuContent>
         </DropdownMenu>

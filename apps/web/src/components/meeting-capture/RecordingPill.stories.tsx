@@ -58,6 +58,21 @@ export const DesktopNoCallAudio: Story = {
   },
 };
 
+/** Recording call audio again failed on macOS. */
+export const DesktopCallAudioError: Story = {
+  args: {
+    ...DesktopNoCallAudio.args,
+    state: {
+      kind: "recording",
+      title: "Pricing review with Dana",
+      elapsedMs: 754_000,
+      noCallAudio: true,
+      callAudioError:
+        "Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci.",
+    },
+  },
+};
+
 export const Offline: Story = {
   args: {
     state: {

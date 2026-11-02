@@ -225,8 +225,7 @@ it("mounts post previews and the email compliance editor under Needs you", async
   expect(email.textContent).toContain("Add unsubscribe instructions");
   expect(email.textContent).toContain("Add a postal address");
   expect(
-    [...email.querySelectorAll("button")].find((button) => button.textContent === "Send")
-      ?.disabled,
+    [...email.querySelectorAll("button")].find((button) => button.textContent === "Send")?.disabled,
   ).toBe(true);
   expect(mocks.send).not.toHaveBeenCalled();
 });

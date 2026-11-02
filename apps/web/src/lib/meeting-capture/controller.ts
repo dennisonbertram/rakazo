@@ -29,6 +29,8 @@ export type CaptureView =
       offline: boolean;
       /** The call tab can be shared again (after a reload, sharing needs a click). */
       canShareTab?: boolean;
+      /** Why the last attempt to record call audio again failed. */
+      callAudioError?: string;
     }
   | {
       phase: "transcribing";
@@ -277,7 +279,17 @@ function addRecorder(s: Session, track: MeetingCaptureTrack, stream: MediaStream
     startedAt: s.startedAt,
     seqBase,
     onChunk: (chunk) => accept(s, chunk),
-    ...(track === "microphone" ? { onEnded: () => void stopCapture({ micStopped: true }) } : {}),
+    ...(track === "microphone"
+      ? { onEnded: () => void stopCapture({ micStopped: true }) }
+      : track === "system"
+        ? {
+            // Keep what was recorded, then let go so the pill offers to record call audio again.
+            onEnded: () => {
+              void recorder.stop();
+              if (s.recorders.get("system") === recorder) s.recorders.delete("system");
+            },
+          }
+        : {}),
   });
   s.recorders.set(track, recorder);
   recorder.start();
@@ -300,19 +312,28 @@ async function microphone(): Promise<MediaStream> {
   }
 }
 
+function callAudioError(): Error {
+  const platform = desktopBridge()?.platform;
+  if (platform === "darwin")
+    return new Error(
+      t`Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci.`,
+    );
+  if (platform === "win32")
+    return new Error(t`Praci can't hear call audio. Try again, or turn off Record call audio.`);
+  return new Error(t`No tab was shared. Start again to pick one.`);
+}
+
 async function tabAudio(): Promise<MediaStream | null> {
   let display: MediaStream;
   try {
     display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
   } catch {
-    const platform = desktopBridge()?.platform;
-    if (platform === "darwin")
-      throw new Error(
-        t`Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci.`,
-      );
-    if (platform === "win32")
-      throw new Error(t`Praci can't hear call audio. Try again, or turn off Record call audio.`);
-    throw new Error(t`No tab was shared. Start again to pick one.`);
+    throw callAudioError();
+  }
+  // macOS hands back an audio track that has already ended when System Audio Recording is denied.
+  if (display.getAudioTracks().some((track) => track.readyState !== "live")) {
+    stopTracks([display]);
+    throw callAudioError();
   }
   for (const video of display.getVideoTracks()) video.stop();
   // Nothing to record when the tab was shared without its sound.
@@ -539,9 +560,20 @@ export async function shareTabAudio(): Promise<void> {
   const s = session;
   if (!s || !live(s) || s.observer || s.stopping || !s.expectsTabAudio) return;
   if (s.recorders.has("system")) return;
-  const stream = await tabAudio().catch(() => null);
+  let stream: MediaStream | null;
+  try {
+    stream = await tabAudio();
+  } catch (cause) {
+    if (live(s) && view.phase === "recording")
+      set({ ...view, callAudioError: cause instanceof Error ? cause.message : String(cause) });
+    return;
+  }
   if (!stream) return;
   if (!live(s) || s.stopping || s.recorders.has("system")) return stopTracks([stream]);
+  if (view.phase === "recording" && view.callAudioError !== undefined) {
+    const { callAudioError: _cleared, ...rest } = view;
+    set(rest);
+  }
   addRecorder(s, "system", stream, resumeSeq(s));
 }
 
