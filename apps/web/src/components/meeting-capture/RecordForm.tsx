@@ -29,13 +29,14 @@ export function RecordForm({
   const agreedId = useId();
   const tabId = useId();
   const confirm = policy === "confirm";
+  const placeholder = defaultMeetingTitle(new Date());
   return (
     <form
       className="flex flex-col gap-2.5"
       onSubmit={(event) => {
         event.preventDefault();
         onStart({
-          title,
+          title: title.trim() ? title : placeholder,
           tabAudio,
           ...(confirm ? { consentConfirmed: true } : {}),
         });
@@ -48,7 +49,7 @@ export function RecordForm({
         id={titleId}
         value={title}
         maxLength={500}
-        placeholder={defaultMeetingTitle(new Date())}
+        placeholder={placeholder}
         onChange={(event) => setTitle(event.target.value)}
       />
       {confirm ? (

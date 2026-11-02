@@ -90,7 +90,19 @@ it("remind: one line and Start is ready at once", async () => {
   expect(document.body.textContent).toContain("Tell everyone you're recording.");
   expect(document.body.textContent).not.toContain("Everyone agreed");
   await click(button("Start"));
-  expect(startCapture).toHaveBeenCalledWith({ title: "", tabAudio: false });
+  expect(startCapture).toHaveBeenCalledWith({ title: expect.stringMatching(/^Meeting /), tabAudio: false });
+});
+
+it("a blank title starts with the placeholder the form showed", async () => {
+  rpc.voice.status.mockResolvedValue(voice(true));
+  rpc.spaces.list.mockResolvedValue(space());
+  startCapture.mockResolvedValue(undefined);
+  await mount(<RecordButton />);
+  await click(button("Record"));
+  const shown = document.body.querySelector("input")?.placeholder;
+  expect(shown).toMatch(/^Meeting /);
+  await click(button("Start"));
+  expect(startCapture).toHaveBeenCalledWith({ title: shown, tabAudio: false });
 });
 
 it("on desktop, Record call audio starts checked and is sent with Start", async () => {
@@ -102,7 +114,7 @@ it("on desktop, Record call audio starts checked and is sent with Start", async 
   await click(button("Record"));
   expect(document.body.textContent).toContain("Record call audio");
   await click(button("Start"));
-  expect(startCapture).toHaveBeenCalledWith({ title: "", tabAudio: true });
+  expect(startCapture).toHaveBeenCalledWith({ title: expect.stringMatching(/^Meeting /), tabAudio: true });
   delete (window as { rakazoDesktop?: unknown }).rakazoDesktop;
 });
 
@@ -117,7 +129,7 @@ it("confirm: Start stays disabled until the box is ticked, then sends consent", 
   await click(document.body.querySelector("[role=checkbox]"));
   expect((button("Start") as HTMLButtonElement).disabled).toBe(false);
   await click(button("Start"));
-  expect(startCapture).toHaveBeenCalledWith({ title: "", tabAudio: false, consentConfirmed: true });
+  expect(startCapture).toHaveBeenCalledWith({ title: expect.stringMatching(/^Meeting /), tabAudio: false, consentConfirmed: true });
 });
 
 it("shows why a recording could not start", async () => {
