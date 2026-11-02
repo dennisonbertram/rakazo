@@ -1632,7 +1632,13 @@ describe("syncing on mount", () => {
     rpcMock.overview.mockResolvedValue(
       connectedOverview({
         lastSyncedAt: fresh,
-        crypto: { totalCents: 0, byChain: [], byWallet: [], lastSyncedAt: null, unpricedTokenCount: 0 },
+        crypto: {
+          totalCents: 0,
+          byChain: [],
+          byWallet: [],
+          lastSyncedAt: null,
+          unpricedTokenCount: 0,
+        },
       }),
     );
     await show("/app/finance");

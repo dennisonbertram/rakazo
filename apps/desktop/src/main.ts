@@ -5,7 +5,17 @@ import path from "node:path";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { LOCAL_SETTINGS_PAGE } from "@rakazo/contracts/local-settings";
 import type { Session } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  dialog,
+  ipcMain,
+  Menu,
+  net,
+  session,
+  shell,
+} from "electron";
 import { startAppControlBridge } from "./app-control-bridge.js";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
@@ -119,7 +129,13 @@ if (PERFORMANCE_USER_DATA) {
 app.once("will-finish-launching", () => markOnce("rk:main:will-finish-launching"));
 app.once("ready", () => markOnce("rk:main:ready"));
 // Includes fresh partitions and popup-created sessions, before they load remote content.
-app.on("session-created", (value) => installSessionPermissions(value, permissionTarget));
+const displayCapture = {
+  platform: process.platform,
+  getSources: desktopCapturer.getSources.bind(desktopCapturer),
+};
+app.on("session-created", (value) =>
+  installSessionPermissions(value, permissionTarget, displayCapture),
+);
 
 function permissionTarget() {
   if (mainWindow === null || mainWindow.isDestroyed()) return null;
@@ -908,7 +924,7 @@ function safeOrigin(targetUrl: string) {
 }
 
 app.whenReady().then(async () => {
-  installSessionPermissions(session.defaultSession, permissionTarget);
+  installSessionPermissions(session.defaultSession, permissionTarget, displayCapture);
   const userDataDir = app.getPath("userData");
   const stackImages = readStackImages(
     JSON.parse(readFileSync(path.join(app.getAppPath(), "package.json"), "utf8")),

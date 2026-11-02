@@ -6,9 +6,7 @@ import type { KeyboardEvent } from "react";
 // wrapper (`data-roster-item`) holds its Actions button (`data-roster-actions`), which is a tab
 // stop only while its row is.
 
-const rowsIn = (root: HTMLElement) => [
-  ...root.querySelectorAll<HTMLElement>("[data-roster-row]"),
-];
+const rowsIn = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>("[data-roster-row]")];
 
 /** The row a focused element belongs to: the row itself, or the Actions button beside it. */
 export const rosterRowId = (target: HTMLElement) =>
@@ -16,10 +14,7 @@ export const rosterRowId = (target: HTMLElement) =>
   target.closest<HTMLElement>("[data-roster-item]")?.dataset.rosterItem;
 
 /** Makes one row (and its Actions button) tabbable: the last focused, else the open chat, else the first. */
-export function syncRosterTabStops(
-  root: HTMLElement | null,
-  stopId: string | null,
-) {
+export function syncRosterTabStops(root: HTMLElement | null, stopId: string | null) {
   if (!root) return;
   const rows = rowsIn(root);
   const stop =
@@ -38,23 +33,10 @@ export function syncRosterTabStops(
 }
 
 /** Up, Down, Home and End move focus between rows. Alt+Arrow (reorder) and a lift in progress are left alone. */
-export function moveRosterFocus(
-  root: HTMLElement | null,
-  event: KeyboardEvent,
-) {
+export function moveRosterFocus(root: HTMLElement | null, event: KeyboardEvent) {
   const target = event.target as HTMLElement;
-  if (
-    !root ||
-    event.altKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.defaultPrevented
-  )
-    return;
-  if (
-    !target.hasAttribute("data-roster-row") ||
-    target.getAttribute("aria-pressed") === "true"
-  )
+  if (!root || event.altKey || event.ctrlKey || event.metaKey || event.defaultPrevented) return;
+  if (!target.hasAttribute("data-roster-row") || target.getAttribute("aria-pressed") === "true")
     return;
   const rows = rowsIn(root);
   const index = rows.indexOf(target);

@@ -71,11 +71,7 @@ import {
 import { SidebarFixture } from "./space-sidebar.stories";
 
 function CurrentPath() {
-  return createElement(
-    "output",
-    { "data-testid": "current-path" },
-    useLocation().pathname,
-  );
+  return createElement("output", { "data-testid": "current-path" }, useLocation().pathname);
 }
 
 function stubSidebarObservers() {
@@ -130,14 +126,10 @@ describe("sidebarGroupsForSpaces", () => {
     const spaces = [space("a", "Acme"), space("b", "Side", { bots: [agent] })];
     const untouched = (bot: { id: string }) => bot.id === "legal";
     expect(
-      sidebarGroupsForSpaces(spaces, "", "a", "Personal", untouched).map(
-        (g) => g.spaceId,
-      ),
+      sidebarGroupsForSpaces(spaces, "", "a", "Personal", untouched).map((g) => g.spaceId),
     ).toEqual(["a"]);
     expect(
-      sidebarGroupsForSpaces(spaces, "", "b", "Personal", untouched).map(
-        (g) => g.spaceId,
-      ),
+      sidebarGroupsForSpaces(spaces, "", "b", "Personal", untouched).map((g) => g.spaceId),
     ).toContain("b");
   });
 
@@ -150,9 +142,7 @@ describe("sidebarGroupsForSpaces", () => {
     const spaces = [space("a", "Acme"), side];
     const untouched = (bot: { id: string }) => bot.id === "legal";
     expect(
-      sidebarGroupsForSpaces(spaces, "", "a", "Personal", untouched).map(
-        (g) => g.spaceId,
-      ),
+      sidebarGroupsForSpaces(spaces, "", "a", "Personal", untouched).map((g) => g.spaceId),
     ).toEqual(["a"]);
   });
 
@@ -181,10 +171,7 @@ describe("sidebarGroupsForSpaces", () => {
   });
 
   it("names the only space above its chats, beside its actions", () => {
-    const [group] = sidebarGroupsForSpaces(
-      [space("space-1", "Personal", { canRename: true })],
-      "",
-    );
+    const [group] = sidebarGroupsForSpaces([space("space-1", "Personal", { canRename: true })], "");
 
     expect(group).toMatchObject({
       title: "Personal",
@@ -220,12 +207,7 @@ describe("sidebarGroupsForSpaces", () => {
     });
     expect(solo?.bots).toHaveLength(1);
 
-    const both = sidebarGroupsForSpaces(
-      [...only, space("space-2", "Work")],
-      "",
-      "space-1",
-      null,
-    );
+    const both = sidebarGroupsForSpaces([...only, space("space-2", "Work")], "", "space-1", null);
     expect(both.map((group) => group.title)).toEqual(["Personal", "Work"]);
   });
 
@@ -271,9 +253,7 @@ describe("sidebarGroupsForSpaces", () => {
       relabeled: true,
       canRenameSpace: true,
     });
-    expect(groups.slice(1).every((g) => g.parentKey === groups[0]?.key)).toBe(
-      true,
-    );
+    expect(groups.slice(1).every((g) => g.parentKey === groups[0]?.key)).toBe(true);
     expect(groups.map((g) => g.bots.map((item) => item.id))).toEqual([
       [],
       ["b1"],
@@ -281,13 +261,7 @@ describe("sidebarGroupsForSpaces", () => {
       [],
       ["b3"],
     ]);
-    expect(groups.map((g) => g.collapsed)).toEqual([
-      false,
-      false,
-      true,
-      false,
-      false,
-    ]);
+    expect(groups.map((g) => g.collapsed)).toEqual([false, false, true, false, false]);
   });
 
   it("heads a pinned-only single space with Personnel", () => {
@@ -321,9 +295,7 @@ describe("sidebarGroupsForSpaces", () => {
       "folder",
       "root",
     ]);
-    expect(sidebarGroupsForSpaces([only], "chief").map((g) => g.kind)).toEqual([
-      "space",
-    ]);
+    expect(sidebarGroupsForSpaces([only], "chief").map((g) => g.kind)).toEqual(["space"]);
   });
 
   it("still names each space once there is more than one", () => {
@@ -356,9 +328,7 @@ describe("sidebarGroupsForSpaces", () => {
     ];
     const groups = sidebarGroupsForSpaces(spaces, "", "space-2");
     expect(groups.map((g) => g.title)).toEqual(["Personal", "Empty"]);
-    expect(
-      sidebarGroupsForSpaces(spaces, "", "space-1").map((g) => g.title),
-    ).toEqual(["Personal"]);
+    expect(sidebarGroupsForSpaces(spaces, "", "space-1").map((g) => g.title)).toEqual(["Personal"]);
     expect(groups[1]).toMatchObject({
       canRenameSpace: true,
       canDeleteSpace: true,
@@ -367,25 +337,16 @@ describe("sidebarGroupsForSpaces", () => {
   });
 
   it("marks the space being shown only when several are listed", () => {
-    const spaces = [
-      space("space-1", "Personal"),
-      space("space-2", "Empty", { bots: [] }),
-    ];
-    expect(
-      sidebarGroupsForSpaces(spaces, "", "space-1").map((g) => g.current),
-    ).toEqual([true]);
-    expect(
-      sidebarGroupsForSpaces([space("space-1", "Personal")], "", "space-1")[0]
-        ?.current,
-    ).toBe(false);
+    const spaces = [space("space-1", "Personal"), space("space-2", "Empty", { bots: [] })];
+    expect(sidebarGroupsForSpaces(spaces, "", "space-1").map((g) => g.current)).toEqual([true]);
+    expect(sidebarGroupsForSpaces([space("space-1", "Personal")], "", "space-1")[0]?.current).toBe(
+      false,
+    );
   });
 
   it("hides space actions while a search removes every chat from the only space", () => {
     expect(
-      sidebarGroupsForSpaces(
-        [space("space-1", "Personal", { canRename: true })],
-        "missing",
-      ),
+      sidebarGroupsForSpaces([space("space-1", "Personal", { canRename: true })], "missing"),
     ).toEqual([]);
   });
 });
@@ -398,9 +359,7 @@ describe("commitSpaceRename", () => {
       throw new Error("list failed");
     });
 
-    await expect(
-      commitSpaceRename({ rename, apply, refresh }),
-    ).resolves.toBeUndefined();
+    await expect(commitSpaceRename({ rename, apply, refresh })).resolves.toBeUndefined();
     expect(rename).toHaveBeenCalledOnce();
     expect(apply).toHaveBeenCalledOnce();
     expect(refresh).toHaveBeenCalledOnce();
@@ -426,21 +385,9 @@ describe("commitSpaceRename", () => {
 
 describe("activeSpaceFirst", () => {
   it("puts the space on screen first and keeps the others in order", () => {
-    const spaces = [
-      space("a", "Northwind"),
-      space("b", "Empty"),
-      space("c", "Third"),
-    ];
-    expect(activeSpaceFirst(spaces, "b").map((s) => s.id)).toEqual([
-      "b",
-      "a",
-      "c",
-    ]);
-    expect(activeSpaceFirst(spaces, undefined).map((s) => s.id)).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
+    const spaces = [space("a", "Northwind"), space("b", "Empty"), space("c", "Third")];
+    expect(activeSpaceFirst(spaces, "b").map((s) => s.id)).toEqual(["b", "a", "c"]);
+    expect(activeSpaceFirst(spaces, undefined).map((s) => s.id)).toEqual(["a", "b", "c"]);
   });
 });
 
@@ -504,21 +451,15 @@ it("shows Devin's needs-you count and opens its page", async () => {
     await act(async () => pageOptions()?.click());
     expect(document.body.textContent).toContain("Devin");
     await act(async () => pageOptions()?.click());
-    const link = container.querySelector<HTMLButtonElement>(
-      '[data-testid="sidebar-devin"]',
-    );
+    const link = container.querySelector<HTMLButtonElement>('[data-testid="sidebar-devin"]');
     expect(link?.getAttribute("aria-current")).toBe("page");
     expect(link?.getAttribute("aria-label")).toBe("Devin, 2 need you");
-    expect(
-      link?.querySelector('[data-testid="glance-value"]')?.textContent,
-    ).toBe("2");
+    expect(link?.querySelector('[data-testid="glance-value"]')?.textContent).toBe("2");
 
     await act(async () => {
       link?.click();
     });
-    expect(
-      container.querySelector('[data-testid="current-path"]')?.textContent,
-    ).toBe("/app/devin");
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe("/app/devin");
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -556,21 +497,15 @@ it("shows GTM's needs-you count and opens its page", async () => {
     );
   try {
     await act(async () => root.render(renderSidebar()));
-    const link = container.querySelector<HTMLButtonElement>(
-      '[data-testid="sidebar-gtm"]',
-    );
+    const link = container.querySelector<HTMLButtonElement>('[data-testid="sidebar-gtm"]');
     expect(link?.getAttribute("aria-current")).toBe("page");
     expect(link?.getAttribute("aria-label")).toBe("GTM, 2 need you");
-    expect(
-      link?.querySelector('[data-testid="glance-value"]')?.textContent,
-    ).toBe("2");
+    expect(link?.querySelector('[data-testid="glance-value"]')?.textContent).toBe("2");
 
     await act(async () => {
       link?.click();
     });
-    expect(
-      container.querySelector('[data-testid="current-path"]')?.textContent,
-    ).toBe("/app/gtm");
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe("/app/gtm");
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -610,15 +545,13 @@ it("marks Investors as current and opens its page", async () => {
       );
     });
 
-    const link = container.querySelector<HTMLButtonElement>(
-      '[data-testid="sidebar-investors"]',
-    );
+    const link = container.querySelector<HTMLButtonElement>('[data-testid="sidebar-investors"]');
     expect(link?.getAttribute("aria-current")).toBe("page");
 
     await act(async () => link?.click());
-    expect(
-      container.querySelector('[data-testid="current-path"]')?.textContent,
-    ).toBe("/app/investors");
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe(
+      "/app/investors",
+    );
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -658,23 +591,17 @@ it("marks Fundraising as current and opens its page", async () => {
       );
     });
 
-    const link = container.querySelector<HTMLButtonElement>(
-      '[data-testid="sidebar-fundraising"]',
-    );
+    const link = container.querySelector<HTMLButtonElement>('[data-testid="sidebar-fundraising"]');
     expect(link?.getAttribute("aria-current")).toBe("page");
     const scrollArea = link?.closest(".max-lg\\:overflow-y-auto");
     expect(scrollArea).not.toBeNull();
-    expect(scrollArea?.querySelector(".rk-scroll")?.className).toContain(
-      "lg:overflow-y-auto",
-    );
-    expect(scrollArea?.querySelector(".rk-scroll")?.className).toContain(
-      "lg:snap-proximity",
-    );
+    expect(scrollArea?.querySelector(".rk-scroll")?.className).toContain("lg:overflow-y-auto");
+    expect(scrollArea?.querySelector(".rk-scroll")?.className).toContain("lg:snap-proximity");
 
     await act(async () => link?.click());
-    expect(
-      container.querySelector('[data-testid="current-path"]')?.textContent,
-    ).toBe("/app/fundraising");
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe(
+      "/app/fundraising",
+    );
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -714,17 +641,13 @@ it("forwards tour skip and close callbacks", async () => {
     });
 
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[data-testid="tour-skip"]')
-        ?.click();
+      container.querySelector<HTMLButtonElement>('[data-testid="tour-skip"]')?.click();
     });
     expect(onTourSkip).toHaveBeenCalledOnce();
     expect(onTourEnd).toHaveBeenCalledOnce();
 
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[data-testid="tour-close"]')
-        ?.click();
+      container.querySelector<HTMLButtonElement>('[data-testid="tour-close"]')?.click();
     });
     expect(onTourEnd).toHaveBeenCalledTimes(2);
   } finally {
@@ -750,28 +673,20 @@ it("closes the mobile sidebar when opening Settings", async () => {
   try {
     await act(async () => {
       root.render(
-        createElement(
-          MemoryRouter,
-          null,
-          createElement(SidebarFixture, { mode: "expanded" }),
-        ),
+        createElement(MemoryRouter, null, createElement(SidebarFixture, { mode: "expanded" })),
       );
     });
 
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[data-testid="user-menu-trigger"]')
-        ?.click();
+      container.querySelector<HTMLButtonElement>('[data-testid="user-menu-trigger"]')?.click();
     });
     await act(async () => {
-      document.body
-        .querySelector<HTMLButtonElement>('[aria-label="Settings"]')
-        ?.click();
+      document.body.querySelector<HTMLButtonElement>('[aria-label="Settings"]')?.click();
     });
 
-    expect(
-      container.querySelector('[data-testid="bots-sidebar"]')?.className,
-    ).toContain("-translate-x-full");
+    expect(container.querySelector('[data-testid="bots-sidebar"]')?.className).toContain(
+      "-translate-x-full",
+    );
     expect(container.textContent).toContain("Open navigation");
   } finally {
     await act(async () => root.unmount());
@@ -819,15 +734,13 @@ it("navigates to Integrations from the account menu", async () => {
     expect(integrations?.textContent).toContain("Integrations");
 
     await act(async () => integrations?.click());
-    expect(
-      container.querySelector('[data-testid="current-path"]')?.textContent,
-    ).toBe("/app/integrations");
-    expect(
-      document.body.querySelector('[data-testid="menu-integrations"]'),
-    ).toBeNull();
-    expect(
-      container.querySelector('[data-testid="bots-sidebar"]')?.className,
-    ).toContain("-translate-x-full");
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe(
+      "/app/integrations",
+    );
+    expect(document.body.querySelector('[data-testid="menu-integrations"]')).toBeNull();
+    expect(container.querySelector('[data-testid="bots-sidebar"]')?.className).toContain(
+      "-translate-x-full",
+    );
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -863,9 +776,7 @@ it("hides an unused idle page agent and reveals it when active", async () => {
     await act(async () => root.render(renderFixture(false)));
 
     // The header stays (its menu holds New page), but the untouched agent is not listed.
-    expect(
-      container.querySelector('[data-testid="sidebar-page-agents"]'),
-    ).not.toBeNull();
+    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Inbox agent");
 
     await act(async () => root.render(renderFixture(true)));
@@ -916,9 +827,7 @@ it("returns from Activity to chats", async () => {
       );
     });
 
-    const back = container.querySelector<HTMLButtonElement>(
-      '[data-testid="activity-back"]',
-    );
+    const back = container.querySelector<HTMLButtonElement>('[data-testid="activity-back"]');
     expect(back?.textContent).toContain("Back to chats");
     await act(async () => back?.click());
     expect(toggleActivityMode).toHaveBeenCalledOnce();
@@ -970,9 +879,7 @@ it("folds email chats separately and reveals the active email chat", async () =>
     await act(async () => emailChats?.click());
     expect(emailChats?.getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("Client email");
-    expect(
-      container.querySelector('[data-testid="sidebar-page-agents"]'),
-    ).not.toBeNull();
+    expect(container.querySelector('[data-testid="sidebar-page-agents"]')).not.toBeNull();
 
     await act(async () => emailChats?.click());
     expect(emailChats?.getAttribute("aria-expanded")).toBe("false");
@@ -1004,18 +911,12 @@ it("keeps the first and focused roster rows tabbable and moves focus down with A
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const rows = () => [
-    ...container.querySelectorAll<HTMLButtonElement>("[data-roster-row]"),
-  ];
+  const rows = () => [...container.querySelectorAll<HTMLButtonElement>("[data-roster-row]")];
   const tabStops = () => rows().filter((row) => row.tabIndex === 0);
   try {
     await act(async () => {
       root.render(
-        createElement(
-          MemoryRouter,
-          null,
-          createElement(SidebarFixture, { mode: "expanded" }),
-        ),
+        createElement(MemoryRouter, null, createElement(SidebarFixture, { mode: "expanded" })),
       );
     });
 
@@ -1028,9 +929,7 @@ it("keeps the first and focused roster rows tabbable and moves focus down with A
 
     await act(async () => {
       current.focus();
-      current.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
-      );
+      current.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     });
 
     expect(document.activeElement).toBe(next);
@@ -1074,23 +973,13 @@ it("makes folder headers, folds and their Actions part of the roster tab stop", 
         ),
       );
     });
-    const header = container.querySelector<HTMLElement>(
-      '[data-sidebar-folder="folder_workspace"]',
-    );
+    const header = container.querySelector<HTMLElement>('[data-sidebar-folder="folder_workspace"]');
     const folder = header?.querySelector<HTMLElement>("button");
-    const pageFold = container.querySelector<HTMLElement>(
-      '[data-testid="sidebar-page-agents"]',
-    );
-    const emailFold = container.querySelector<HTMLElement>(
-      '[data-testid="sidebar-email-chats"]',
-    );
+    const pageFold = container.querySelector<HTMLElement>('[data-testid="sidebar-page-agents"]');
+    const emailFold = container.querySelector<HTMLElement>('[data-testid="sidebar-email-chats"]');
     if (!header || !folder || !pageFold || !emailFold)
       throw new Error("Expected a folder and both folds");
-    const others = [
-      header,
-      pageFold.parentElement,
-      emailFold.parentElement,
-    ].map((wrapper) =>
+    const others = [header, pageFold.parentElement, emailFold.parentElement].map((wrapper) =>
       [...(wrapper?.querySelectorAll<HTMLElement>("button") ?? [])].at(-1),
     );
     expect(others.filter(Boolean)).toHaveLength(3);
@@ -1098,9 +987,7 @@ it("makes folder headers, folds and their Actions part of the roster tab stop", 
       expect(control?.tabIndex).toBe(-1);
     }
 
-    const rows = [
-      ...container.querySelectorAll<HTMLElement>("[data-roster-row]"),
-    ];
+    const rows = [...container.querySelectorAll<HTMLElement>("[data-roster-row]")];
     const above = rows[rows.indexOf(folder) - 1];
     if (!above) throw new Error("Expected a row above the folder");
     await press(above, "ArrowDown");
@@ -1130,61 +1017,39 @@ it("opens the command palette from expanded and rail Search", async () => {
   document.body.append(container);
   const root = createRoot(container);
   const render = (mode: "expanded" | "rail", key: string) =>
-    createElement(
-      MemoryRouter,
-      null,
-      createElement(SidebarFixture, { mode, key }),
-    );
+    createElement(MemoryRouter, null, createElement(SidebarFixture, { mode, key }));
   try {
     await act(async () => root.render(render("expanded", "click")));
-    const input = container.querySelector<HTMLInputElement>(
-      '[data-testid="sidebar-search"] input',
-    );
+    const input = container.querySelector<HTMLInputElement>('[data-testid="sidebar-search"] input');
     await act(async () => input?.click());
-    expect(
-      container.querySelector('[data-testid="search-open"]'),
-    ).not.toBeNull();
+    expect(container.querySelector('[data-testid="search-open"]')).not.toBeNull();
 
     await act(async () => root.render(render("expanded", "enter")));
     const enterInput = container.querySelector<HTMLInputElement>(
       '[data-testid="sidebar-search"] input',
     );
     await act(async () => {
-      enterInput?.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-      );
+      enterInput?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     });
-    expect(
-      container.querySelector('[data-testid="search-open"]'),
-    ).not.toBeNull();
+    expect(container.querySelector('[data-testid="search-open"]')).not.toBeNull();
 
     await act(async () => root.render(render("expanded", "space")));
     const spaceInput = container.querySelector<HTMLInputElement>(
       '[data-testid="sidebar-search"] input',
     );
     await act(async () => {
-      spaceInput?.dispatchEvent(
-        new KeyboardEvent("keydown", { key: " ", bubbles: true }),
-      );
+      spaceInput?.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
     });
-    expect(
-      container.querySelector('[data-testid="search-open"]'),
-    ).not.toBeNull();
+    expect(container.querySelector('[data-testid="search-open"]')).not.toBeNull();
 
     await act(async () => root.render(render("rail", "rail")));
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[data-testid="sidebar-search-rail"]')
-        ?.click();
+      container.querySelector<HTMLButtonElement>('[data-testid="sidebar-search-rail"]')?.click();
     });
-    expect(
-      container.querySelector('[data-testid="search-open"]'),
-    ).not.toBeNull();
-    expect(
-      container
-        .querySelector('[data-testid="bots-sidebar"]')
-        ?.getAttribute("data-rail"),
-    ).toBe("true");
+    expect(container.querySelector('[data-testid="search-open"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="bots-sidebar"]')?.getAttribute("data-rail")).toBe(
+      "true",
+    );
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -1227,34 +1092,22 @@ async function renderSidebar(
 }
 
 it("lists Email chats directly below Page agents, before the other chats", async () => {
-  await renderSidebar(
-    { pageAgents: true, crowded: true, emailChats: true },
-    (container) => {
-      const pageAgents = container.querySelector(
-        '[data-testid="sidebar-page-agents"]',
-      );
-      const emailChats = container.querySelector(
-        '[data-testid="sidebar-email-chats"]',
-      );
-      const chat = [...container.querySelectorAll("[data-roster-row]")].find(
-        (row) => row.textContent?.includes("Plain chat"),
-      );
-      if (!pageAgents || !emailChats || !chat)
-        throw new Error("Expected both folds and a chat");
-      const following = Node.DOCUMENT_POSITION_FOLLOWING;
-      expect(
-        pageAgents.compareDocumentPosition(emailChats) & following,
-      ).toBeTruthy();
-      expect(emailChats.compareDocumentPosition(chat) & following).toBeTruthy();
-    },
-  );
+  await renderSidebar({ pageAgents: true, crowded: true, emailChats: true }, (container) => {
+    const pageAgents = container.querySelector('[data-testid="sidebar-page-agents"]');
+    const emailChats = container.querySelector('[data-testid="sidebar-email-chats"]');
+    const chat = [...container.querySelectorAll("[data-roster-row]")].find((row) =>
+      row.textContent?.includes("Plain chat"),
+    );
+    if (!pageAgents || !emailChats || !chat) throw new Error("Expected both folds and a chat");
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(pageAgents.compareDocumentPosition(emailChats) & following).toBeTruthy();
+    expect(emailChats.compareDocumentPosition(chat) & following).toBeTruthy();
+  });
 });
 
 it("treats a page made with New page as a page agent, listed only when unused ones are shown", async () => {
   const open = async (c: HTMLElement) => {
-    const fold = c.querySelector<HTMLButtonElement>(
-      '[data-testid="sidebar-page-agents"]',
-    );
+    const fold = c.querySelector<HTMLButtonElement>('[data-testid="sidebar-page-agents"]');
     expect(fold).not.toBeNull();
     await act(async () => fold?.click());
   };
@@ -1277,18 +1130,14 @@ describe("foldRows", () => {
   const rows = [row("a"), row("b")];
 
   it("lists every row, nested one level, when the fold is open", () => {
-    expect(
-      foldRows(rows, true, "a").map((r) => [r.item.chat.id, r.depth]),
-    ).toEqual([
+    expect(foldRows(rows, true, "a").map((r) => [r.item.chat.id, r.depth])).toEqual([
       ["a", 1],
       ["b", 1],
     ]);
   });
 
   it("keeps only the open thread under a closed fold", () => {
-    expect(foldRows(rows, false, "b").map((r) => r.item.chat.id)).toEqual([
-      "b",
-    ]);
+    expect(foldRows(rows, false, "b").map((r) => r.item.chat.id)).toEqual(["b"]);
     expect(foldRows(rows, false, "b", false)).toEqual([]);
     expect(foldRows(rows, false, "x")).toEqual([]);
   });
@@ -1311,19 +1160,13 @@ it("shows the +N more bar slim, at the bottom of the list", async () => {
   try {
     await act(async () =>
       root.render(
-        createElement(
-          MemoryRouter,
-          null,
-          createElement(SidebarFixture, { mode: "expanded" }),
-        ),
+        createElement(MemoryRouter, null, createElement(SidebarFixture, { mode: "expanded" })),
       ),
     );
     await act(async () => {
       for (const run of frames.splice(0)) run();
     });
-    const bar = container.querySelector<HTMLElement>(
-      '[data-testid="sidebar-more-rows"]',
-    );
+    const bar = container.querySelector<HTMLElement>('[data-testid="sidebar-more-rows"]');
     expect(bar?.textContent).toBe("+3 more");
     // 28px bar plus the 12px that reaches under the list's foot.
     expect(bar?.style.height).toBe("40px");
@@ -1362,9 +1205,7 @@ describe("bot row click", () => {
           ),
         );
       });
-      const row = container.querySelector<HTMLElement>(
-        '[data-roster-row="bot_ada"]',
-      );
+      const row = container.querySelector<HTMLElement>('[data-roster-row="bot_ada"]');
       await act(async () => {
         row?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail }));
       });

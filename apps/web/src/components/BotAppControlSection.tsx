@@ -94,7 +94,8 @@ export function BotAppControlSection({
       {needsInstall ? (
         <p className="mt-1 text-[12.5px] text-muted-foreground">
           <Trans>
-            Needs agent-desktop: <code className="whitespace-nowrap">npm install -g agent-desktop</code>
+            Needs agent-desktop:{" "}
+            <code className="whitespace-nowrap">npm install -g agent-desktop</code>
           </Trans>
         </p>
       ) : null}

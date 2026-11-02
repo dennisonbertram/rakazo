@@ -20,6 +20,8 @@ export type RecordingPillState =
       elapsedMs: number;
       noCallAudio?: boolean;
       offline?: boolean;
+      /** Why recording call audio again failed. */
+      callAudioError?: string;
     }
   | { kind: "transcribing"; micStopped?: boolean }
   /** The capture was closed by the server; the person reads why and dismisses it. */
@@ -31,6 +33,7 @@ export function RecordingPill({
   onStop,
   onDismiss,
   onShareTab,
+  systemAudio = false,
   className,
 }: {
   state: RecordingPillState;
@@ -38,10 +41,12 @@ export function RecordingPill({
   onDismiss?: () => void;
   /** Shown on "No call audio" when the call tab can be shared again. */
   onShareTab?: () => void;
+  /** The desktop app records call audio itself, so the retry is not about a tab. */
+  systemAudio?: boolean;
   className?: string;
 }) {
   const { t } = useLingui();
-  return (
+  const pill = (
     <div
       role="status"
       data-testid="recording-pill"
@@ -82,7 +87,7 @@ export function RecordingPill({
             <button
               type="button"
               className="shrink-0 text-xs text-warning underline-offset-2 hover:underline"
-              title={t`Share the call tab again`}
+              title={systemAudio ? t`Record call audio again` : t`Share the call tab again`}
               onClick={onShareTab}
             >
               <Trans>No call audio</Trans>
@@ -98,5 +103,15 @@ export function RecordingPill({
         </>
       )}
     </div>
+  );
+  return state.kind === "recording" && state.callAudioError ? (
+    <div className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-col items-center gap-1">
+      {pill}
+      <p role="alert" className="max-w-md text-center text-xs text-destructive">
+        {state.callAudioError}
+      </p>
+    </div>
+  ) : (
+    pill
   );
 }

@@ -44,6 +44,35 @@ export const ShareTabAgain: Story = {
   },
 };
 
+/** Desktop: the warning offers to record call audio again. */
+export const DesktopNoCallAudio: Story = {
+  args: {
+    state: {
+      kind: "recording",
+      title: "Pricing review with Dana",
+      elapsedMs: 754_000,
+      noCallAudio: true,
+    },
+    onShareTab: () => undefined,
+    systemAudio: true,
+  },
+};
+
+/** Recording call audio again failed on macOS. */
+export const DesktopCallAudioError: Story = {
+  args: {
+    ...DesktopNoCallAudio.args,
+    state: {
+      kind: "recording",
+      title: "Pricing review with Dana",
+      elapsedMs: 754_000,
+      noCallAudio: true,
+      callAudioError:
+        "Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci.",
+    },
+  },
+};
+
 export const Offline: Story = {
   args: {
     state: {

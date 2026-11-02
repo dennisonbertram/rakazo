@@ -335,7 +335,9 @@ export function RoutineListRow({
             <span
               data-testid="routine-status-line"
               className={`block text-[12.5px] ${
-                statusLine.startsWith(t`Last run failed`) ? "text-destructive" : "text-muted-foreground/80"
+                statusLine.startsWith(t`Last run failed`)
+                  ? "text-destructive"
+                  : "text-muted-foreground/80"
               }`}
             >
               {statusLine}

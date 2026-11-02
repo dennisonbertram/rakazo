@@ -62,7 +62,11 @@
         "dmg",
         "zip"
       ],
-      "notarize": true
+      "notarize": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Praci records your microphone when you dictate or record a meeting.",
+        "NSAudioCaptureUsageDescription": "Praci records call audio when you record a meeting."
+      }
     },
     "win": {
       "icon": "assets/icon.ico",

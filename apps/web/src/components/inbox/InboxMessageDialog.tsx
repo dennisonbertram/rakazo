@@ -374,13 +374,24 @@ function InboxMessage({
         // Back to the list, so the read timer cannot mark it read again.
         onRead(false);
         closeDialog();
-      }
-      else if (message && event.key in COMPOSE_KEYS && (event.key !== "a" || canReplyAll))
+      } else if (message && event.key in COMPOSE_KEYS && (event.key !== "a" || canReplyAll))
         setComposing(COMPOSE_KEYS[event.key] ?? null);
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onNavigate, composing, setComposing, nextId, previousId, message, canArchive, canReplyAll, onRead, shownUnread, closeDialog]);
+  }, [
+    onNavigate,
+    composing,
+    setComposing,
+    nextId,
+    previousId,
+    message,
+    canArchive,
+    canReplyAll,
+    onRead,
+    shownUnread,
+    closeDialog,
+  ]);
 
   // Ask agent and the Agent tab both open this email's agent beside it.
   const askAgent = () => {

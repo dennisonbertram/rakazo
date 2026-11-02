@@ -9969,6 +9969,14 @@ msgstr "Posting readiness unavailable."
 msgid "Praci can now read your documents."
 msgstr "Praci can now read your documents."
 
+#: src/lib/meeting-capture/controller.ts
+msgid "Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci."
+msgstr "Praci can't hear call audio. In System Settings, open Privacy & Security, then Screen & System Audio Recording, and turn on Praci."
+
+#: src/lib/meeting-capture/controller.ts
+msgid "Praci can't hear call audio. Try again, or turn off Record call audio."
+msgstr "Praci can't hear call audio. Try again, or turn off Record call audio."
+
 #: src/components/legal/ConsentPrompt.tsx
 msgid "Praci doesn't read your documents."
 msgstr "Praci doesn't read your documents."
@@ -10514,6 +10522,14 @@ msgstr "Reconstructed"
 #: src/components/meeting-capture/RecordButton.tsx
 msgid "Record"
 msgstr "Record"
+
+#: src/components/meeting-capture/RecordForm.tsx
+msgid "Record call audio"
+msgstr "Record call audio"
+
+#: src/components/meeting-capture/RecordingPill.tsx
+msgid "Record call audio again"
+msgstr "Record call audio again"
 
 #: src/components/MeetingRecordingSettings.tsx
 msgid "Recording"

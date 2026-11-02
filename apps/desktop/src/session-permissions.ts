@@ -1,4 +1,4 @@
-import type { Session, WebContents } from "electron";
+import type { DesktopCapturer, Session, WebContents } from "electron";
 import { isLoopbackHost } from "./setup-config.js";
 
 type AppPermissionTarget = {
@@ -19,10 +19,16 @@ function httpOrigin(value: string | undefined): string | null {
   }
 }
 
+export type DisplayCapture = {
+  platform: string;
+  getSources: DesktopCapturer["getSources"];
+};
+
 /** Install before loading any content, including setup, storage probes and OAuth popups. */
 export function installSessionPermissions(
   targetSession: Session,
   getApp: () => AppPermissionTarget | null,
+  capture?: DisplayCapture,
 ) {
   function currentApp() {
     const app = getApp();
@@ -33,6 +39,29 @@ export function installSessionPermissions(
     if (origin === null || httpOrigin(app.webContents.getURL()) !== origin) return null;
     return { ...app, origin };
   }
+
+  // Meeting capture records system audio ("Them") with no picker. macOS and Windows only.
+  // The renderer awaits the microphone prompt first, so user activation may be gone: do not require it.
+  targetSession.setDisplayMediaRequestHandler((request, callback) => {
+    const app = currentApp();
+    if (
+      !capture ||
+      (capture.platform !== "darwin" && capture.platform !== "win32") ||
+      !app ||
+      request.frame === null ||
+      request.frame !== app.webContents.mainFrame ||
+      httpOrigin(request.securityOrigin) !== app.origin ||
+      !request.audioRequested
+    ) {
+      callback({});
+      return;
+    }
+    capture
+      .getSources({ types: ["screen"], thumbnailSize: { width: 0, height: 0 } })
+      // No source means Screen & System Audio Recording is not allowed for Praci.
+      .then(([source]) => callback(source ? { video: source, audio: "loopback" } : {}))
+      .catch(() => callback({}));
+  });
 
   targetSession.setPermissionRequestHandler((contents, permission, callback, details) => {
     const app = currentApp();

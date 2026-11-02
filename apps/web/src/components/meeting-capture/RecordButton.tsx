@@ -2,7 +2,11 @@ import { Trans } from "@lingui/react/macro";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import { useState } from "react";
 import type { RecordAvailability } from "../../lib/meeting-capture/availability";
-import { tabAudioSupported, useRecordAvailability } from "../../lib/meeting-capture/availability";
+import {
+  systemAudioSupported,
+  tabAudioSupported,
+  useRecordAvailability,
+} from "../../lib/meeting-capture/availability";
 import { startCapture } from "../../lib/meeting-capture/controller";
 import { errorText } from "../../lib/user-error";
 import { RecordForm } from "./RecordForm";
@@ -51,7 +55,8 @@ export function RecordButtonView({
       <PopoverContent align="end" className="w-72">
         <RecordForm
           policy={availability.policy}
-          tabAudioAvailable={tabAudioSupported()}
+          tabAudioAvailable={systemAudioSupported() || tabAudioSupported()}
+          systemAudio={systemAudioSupported()}
           busy={busy}
           error={error}
           onStart={(options) => {

@@ -41,7 +41,9 @@ export const ConfirmDelete: Story = {
     const { userEvent, within } = await import("storybook/test");
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Actions for Apps" }));
-    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "Delete folder" }));
+    await userEvent.click(
+      await within(document.body).findByRole("menuitem", { name: "Delete folder" }),
+    );
   },
 };
 

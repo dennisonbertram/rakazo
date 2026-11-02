@@ -370,8 +370,6 @@ it("puts a connected bank's Used by line above its action row, which sits at the
     s.textContent?.includes("Used by"),
   );
   const open = t?.querySelector('a[href="/app/finance"]');
-  expect(
-    extras!.compareDocumentPosition(open!) & Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy();
+  expect(extras!.compareDocumentPosition(open!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(open?.parentElement?.className).toContain("mt-auto");
 });
