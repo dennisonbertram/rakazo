@@ -978,6 +978,28 @@ const CHECK_SENT = "Check the Sent folder before trying again.";
  * replayed call reports the earlier outcome instead of sending again. A send whose outcome is unclear
  * is never repeated. Same record and states as the Inbox composer's send (`ComposeSend`).
  */
+/**
+ * True when no send of this call reached the provider (no record, or one still draft or failed),
+ * so an interrupted call can be run again. A pending, unknown or sent record is not retryable.
+ */
+export async function mailSendNotDispatched(
+  prisma: PrismaClient,
+  scope: { spaceId: string; userId: string },
+  idempotencyKey: string,
+): Promise<boolean> {
+  const row = await prisma.composeSend.findUnique({
+    where: {
+      spaceId_userId_clientId: {
+        spaceId: scope.spaceId,
+        userId: scope.userId,
+        clientId: `agent:${idempotencyKey}`,
+      },
+    },
+    select: { state: true },
+  });
+  return !row || row.state === "draft" || row.state === "failed";
+}
+
 async function mailSend(
   deps: MailToolDeps,
   context: AdapterContext,
