@@ -61,6 +61,7 @@ import { expireMailSearch } from "./mail-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
 import { runCaptureFinalize, runCaptureSweep, runCaptureTranscribe } from "./meeting-capture.js";
 import { runMeetingDigest } from "./meeting-digest.js";
+import { runFollowupSweep, runMeetingFollowup } from "./meeting-followup.js";
 import { createMeetingSourceRegistry } from "./meeting-source-registry.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
 import { runMeetingSyncJob } from "./meeting-sync-job.js";
@@ -209,7 +210,11 @@ export function createBackgroundJobHandlers(deps: {
     };
   };
 
-  const meetingSources = deps.meetingSources ?? createMeetingSourceRegistry();
+  const meetingSources =
+    deps.meetingSources ??
+    createMeetingSourceRegistry(
+      deps.mcp ? { mcp: { prisma: deps.prisma, connector: deps.mcp } } : {},
+    );
 
   return {
     "run.continue": asOwner(run, async (payload) => {
@@ -341,6 +346,13 @@ export function createBackgroundJobHandlers(deps: {
         payload,
       ),
     ),
+    "meetings.followup": asPayloadTenant(async (payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      await runMeetingFollowup(
+        { prisma: deps.prisma, jobs: deps.jobs, artifacts: deps.artifacts },
+        payload,
+      );
+    }),
     "mail.attachments": asPayloadTenant(async (payload) => {
       const { mail, artifacts } = deps;
       if (!mail || !artifacts) throw new Error("Mail attachment filing is not configured");
@@ -421,6 +433,7 @@ export function createBackgroundJobHandlers(deps: {
     ),
     "meetings.capture_sweep": async () => {
       await runCaptureSweep({ prisma: deps.prisma, jobs: deps.jobs });
+      await runFollowupSweep({ prisma: deps.prisma, jobs: deps.jobs });
     },
     "omi.assemble": asPayloadTenant(async (payload) => {
       if (!deps.artifacts) throw new Error("Artifact store is not configured");

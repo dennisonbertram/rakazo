@@ -3525,7 +3525,7 @@ model DataRoomItem {
   /// The import that filed this item, when one did.
   importId           String?
   import             DataRoomImport?   @relation(fields: [importId], references: [id], onDelete: SetNull)
-  /// "upload", "drive", "box", "gmail", "chat", "finance" or "omi".
+  /// "upload", "drive", "box", "gmail", "chat", "finance", "omi" or "meeting" (a meeting's notes in Recordings).
   source             String
   sourceConnectionId String?
   sourceConnection   Connection?       @relation(fields: [sourceConnectionId], references: [id], onDelete: SetNull)

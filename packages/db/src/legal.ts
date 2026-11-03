@@ -122,6 +122,7 @@ export function createLegalRepos(prisma: PrismaClient) {
     LEFT JOIN legal_contracts c
       ON c."dataRoomItemId" = i.id AND c."spaceId" = i."spaceId" AND c."userId" = i."userId"
     WHERE i."spaceId" = ${actor.spaceId} AND i."userId" = ${actor.userId} AND i.status = 'ready'
+      AND i.source <> 'meeting'
       AND (c.id IS NULL OR i.revision > c."analyzedRevision")
       ${
         excludeConnectionIds.length
@@ -162,7 +163,7 @@ export function createLegalRepos(prisma: PrismaClient) {
     /** Creates or replaces the analysis of one item and records the revision it was made at. */
     async upsertContract(actor: Actor, input: LegalContractInput): Promise<LegalContractRecord> {
       const item = await prisma.dataRoomItem.findFirst({
-        where: { id: input.dataRoomItemId, ...scope(actor) },
+        where: { id: input.dataRoomItemId, ...scope(actor), source: { not: "meeting" } },
         select: { id: true, revision: true },
       });
       if (!item) throw new IsolationError();

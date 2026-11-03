@@ -12,6 +12,7 @@ import {
   requestMeetingSync,
   runMeetingSyncJob,
 } from "./meeting-sync-job.js";
+import { createFakeWisprFlow } from "./wispr-flow-fake.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describePostgres =
@@ -414,6 +415,103 @@ describePostgres("meetings.sync job (PostgreSQL)", () => {
       mcpServerId: server.id,
     });
     expect(await prisma.meetingSyncState.count({ where: { mcpServerId: server.id } })).toBe(1);
+    await prisma.mcpServer.delete({ where: { id: server.id } });
+  });
+
+  it("a Wispr Flow meeting becomes a meeting row and a queued digest, and a second sync adds nothing", async () => {
+    const flow = createFakeWisprFlow([meeting("f1", 2), meeting("f2", 1), meeting("shared-1", 1)], {
+      sharedIds: ["shared-1"],
+    });
+    const mcp = {
+      callServerTool: async (_server: unknown, _ctx: unknown, tool: string, args: never) =>
+        flow.call(tool, args),
+    };
+    const server = await prisma.mcpServer.create({
+      data: {
+        ...scope,
+        slug: `flow-${suffix}`,
+        name: "Flow",
+        transport: "http",
+        endpoint: "https://api.wisprflow.ai/connect/mcp",
+      },
+    });
+    const flowDeps = () => ({
+      ...deps(10),
+      registry: createMeetingSourceRegistry({ mcp: { prisma, connector: mcp as never } }),
+    });
+    const payload = { ...scope, provider: "wisprflow", mcpServerId: server.id };
+    // The scheduler picks the server up on its own.
+    expect(await reconcileMeetingSyncs({ prisma, jobs })).toBeGreaterThanOrEqual(1);
+    expect(
+      enqueued.some((j) => "mcpServerId" in j.payload && j.payload.mcpServerId === server.id),
+    ).toBe(true);
+    enqueued = [];
+    await runMeetingSyncJob(flowDeps(), payload);
+    const rows = await stored("wisprflow");
+    expect(rows.map((m) => m.externalId).sort()).toEqual(["f1", "f2"]);
+    expect(rows.every((m) => m.mcpServerId === server.id)).toBe(true);
+    const digests = () => enqueued.filter((j) => j.name === "meetings.digest").length;
+    expect(digests()).toBe(2);
+    // A second sync, after the minimum interval, stores and queues nothing new.
+    await prisma.meetingSyncState.updateMany({
+      where: { mcpServerId: server.id },
+      data: { lastSyncedAt: new Date(Date.now() - 3_600_000) },
+    });
+    enqueued = [];
+    await runMeetingSyncJob(flowDeps(), payload);
+    expect((await stored("wisprflow")).length).toBe(2);
+    expect(digests()).toBe(0);
+    await prisma.meetingSyncState.deleteMany({ where: { mcpServerId: server.id } });
+    await prisma.meeting.deleteMany({ where: { mcpServerId: server.id } });
+    await prisma.mcpServer.delete({ where: { id: server.id } });
+  });
+
+  it("stops queueing a Wispr Flow server whose sign-in was rejected until its credentials change", async () => {
+    const server = await prisma.mcpServer.create({
+      data: {
+        ...scope,
+        slug: `flow-auth-${suffix}`,
+        name: "Flow",
+        transport: "http",
+        endpoint: "https://api.wisprflow.ai/connect/mcp",
+      },
+    });
+    const queuedFor = () =>
+      enqueued.filter((j) => "mcpServerId" in j.payload && j.payload.mcpServerId === server.id);
+    const rejecting = {
+      ...deps(),
+      registry: createMeetingSourceRegistry({
+        mcp: {
+          prisma,
+          connector: {
+            callServerTool: async () => {
+              throw Object.assign(new Error("MCP authorization expired."), {
+                expected: "reconnect",
+              });
+            },
+          } as never,
+        },
+      }),
+    };
+    await runMeetingSyncJob(rejecting, {
+      ...scope,
+      provider: "wisprflow",
+      mcpServerId: server.id,
+    });
+    expect((await state({ mcpServerId: server.id })).error).toBe("Key rejected");
+    enqueued = [];
+    await prisma.meetingSyncState.updateMany({
+      where: { mcpServerId: server.id },
+      data: { updatedAt: new Date(Date.now() - 3_600_000) },
+    });
+    await prisma.$executeRaw`UPDATE mcp_servers SET "updatedAt" = now() - interval '2 hours' WHERE id = ${server.id}`;
+    await reconcileMeetingSyncs({ prisma, jobs });
+    expect(queuedFor()).toHaveLength(0);
+    // The user signs in again: the server row changes after the rejection.
+    await prisma.mcpServer.update({ where: { id: server.id }, data: { name: "Flow 2" } });
+    await reconcileMeetingSyncs({ prisma, jobs });
+    expect(queuedFor()).toHaveLength(1);
+    await prisma.meetingSyncState.deleteMany({ where: { mcpServerId: server.id } });
     await prisma.mcpServer.delete({ where: { id: server.id } });
   });
 
