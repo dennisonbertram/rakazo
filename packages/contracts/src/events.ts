@@ -69,6 +69,9 @@ export const ProductEventType = z.enum([
 ]);
 export type ProductEventType = z.infer<typeof ProductEventType>;
 
+/** The card reason when a call asks only because the chat read a meeting; the web card adds Clear conversation. */
+export const MEETING_MARK_REASON = "This chat read a meeting, so it asks first.";
+
 export const MessageRole = z.enum(["user", "bot", "system"]);
 export const BotMessageIntent = z.enum(["request", "result", "question", "status", "fyi"]);
 export type BotMessageIntent = z.infer<typeof BotMessageIntent>;

@@ -1004,7 +1004,7 @@ model Thread {
   unread                      Boolean               @default(false)
   /// Highest message seq the thread's owner has read; -1 before any. Moves forward only, except markUnread.
   lastReadSeq                 Int                   @default(-1)
-  /// Set when meeting-source agent text reached this thread (directly or forwarded). Never cleared.
+  /// Set when meeting-source agent text reached this thread (directly or forwarded). Cleared with the thread; meeting-source agents set it again on their next run.
   meetingTaintedAt            DateTime?
   messages                    Message[]
   events                      Event[]
@@ -1288,6 +1288,8 @@ model Routine {
   watchState      RoutineWatchState?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  /// When `prompt` last changed (updatedAt also moves with every schedule update); null reads as createdAt.
+  promptUpdatedAt DateTime?
   runs            Run[]
 
   @@index([active, nextRunAt])
@@ -1405,6 +1407,8 @@ model TaughtSkill {
   lastTestNote    String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  /// When `playbook` last changed (updatedAt also moves on every run); null reads as createdAt.
+  playbookUpdatedAt DateTime?
   routines   Routine[]
   heldValues TeachHeldValue[]
 

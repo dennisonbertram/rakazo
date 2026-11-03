@@ -103,6 +103,36 @@ export const ViaClient: Story = {
   ),
 };
 
+/** A message with a file: its More menu offers Send to agent, which opens the chosen agent with the file attached. */
+export const FileSendToAgent: Story = {
+  render: () => (
+    <div className="h-[560px]">
+      <Transcript
+        {...baseProps}
+        sendTargets={[
+          { id: "bot_legal", name: "Legal agent", color: "#336699" },
+          { id: "bot_finance", name: "Finance agent", color: "#996633" },
+        ]}
+        onSendFiles={noop}
+        messages={[
+          {
+            ...message(1, "bot", ""),
+            blocks: [
+              {
+                kind: "file",
+                artifactId: "artifact_demo",
+                name: "Sample call - transcript.md",
+                mimeType: "text/markdown",
+                size: 7300,
+              },
+            ],
+          },
+        ]}
+      />
+    </div>
+  ),
+};
+
 export const Unread: Story = {
   render: () => (
     <div className="h-[560px]">

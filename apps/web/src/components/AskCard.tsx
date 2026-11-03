@@ -3,7 +3,7 @@ import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { ThreadMessage } from "@rakazo/contracts";
-import { commandVariableName, connectorToolLabel } from "@rakazo/contracts";
+import { commandVariableName, connectorToolLabel, MEETING_MARK_REASON } from "@rakazo/contracts";
 import {
   formatMessageTime,
   isApprovalAskBlock,
@@ -16,6 +16,7 @@ import { Check, ChevronDown, KeyRound, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 import { errorText } from "../lib/user-error";
+import { useBotToolControls } from "./BotToolControls";
 import { SecretRequestDialog } from "./SecretRequestDialog";
 
 export type AskBlock = Extract<ThreadMessage["blocks"][number], { kind: "ask" }>;
@@ -121,6 +122,7 @@ export function AskCard({
   const { t } = useLingui();
   // Re-render when Hide amounts changes: a payment button carries its amount.
   useHideAmounts();
+  const botToolControls = useBotToolControls();
   const [editing, setEditing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [answer, setAnswer] = useState("");
@@ -271,7 +273,24 @@ export function AskCard({
         </p>
       ) : null}
       {block.approvalReason ? (
-        <p className="mt-2 text-[13px] text-muted-foreground">{block.approvalReason}</p>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          {block.approvalReason}
+          {block.approvalReason === MEETING_MARK_REASON &&
+          block.status !== "answered" &&
+          canAnswer &&
+          botToolControls?.clearConversation ? (
+            <>
+              {" "}
+              <Button
+                variant="link"
+                className="h-auto p-0 text-[13px]"
+                onClick={() => botToolControls.clearConversation?.()}
+              >
+                <Trans>Clear conversation</Trans>
+              </Button>
+            </>
+          ) : null}
+        </p>
       ) : null}
       {block.status === "answered" ? (
         (() => {

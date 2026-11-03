@@ -70,6 +70,8 @@ import { ActiveBotGlyph, CollaborationMarker } from "../../components/ai/Collabo
 import { BotToolControlsContext } from "../../components/BotToolControls";
 import { CloudAgentCard } from "../../components/CloudAgentCard";
 import { VoiceChatCard } from "../../components/call/VoiceChatCard";
+import type { SendTarget } from "../../components/data-room/SendToAgent";
+import { SendToAgentMenu } from "../../components/data-room/SendToAgent";
 import { EmailCards } from "../../components/EmailCards";
 import { FinanceCardGroup } from "../../components/FinanceCards";
 import { MailApprovalCard } from "../../components/MailApprovalCard";
@@ -175,6 +177,8 @@ export const Transcript = memo(function Transcript({
   onAnswer,
   onReply,
   onMarkUnread,
+  sendTargets,
+  onSendFiles,
   onQuote,
   onReact,
   remember,
@@ -230,6 +234,9 @@ export const Transcript = memo(function Transcript({
   ) => Promise<void>;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread?: (message: ThreadMessage) => void;
+  /** Agents a message's files can be sent to; with `onSendFiles`, adds Send to agent to the More menu. */
+  sendTargets?: SendTarget[];
+  onSendFiles?: (message: ThreadMessage, agent: SendTarget) => void;
   onQuote: (message: ThreadMessage, quote: string) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
   remember?: RememberControls;
@@ -942,6 +949,8 @@ export const Transcript = memo(function Transcript({
                         hideOnTouch={cardOnly}
                         onReply={onReply}
                         onMarkUnread={onMarkUnread}
+                        sendTargets={sendTargets}
+                        onSendFiles={onSendFiles}
                         onReact={onReact}
                         remember={remember}
                         tabbable={message.id === tabbableMoreId}
@@ -1227,12 +1236,18 @@ const CARD_CONTROL_KINDS: ReadonlySet<string> = new Set([
   "emails",
 ]);
 
+/** A block that carries a stored file the person can forward to another agent. */
+export const isForwardableBlock = (block: { kind: string }) =>
+  block.kind === "file" || block.kind === "image";
+
 function MessageHoverActions({
   message,
   side,
   hasReactions = false,
   onReply,
   onMarkUnread,
+  sendTargets,
+  onSendFiles,
   onReact,
   remember,
   below,
@@ -1247,6 +1262,8 @@ function MessageHoverActions({
   hasReactions?: boolean;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread?: (message: ThreadMessage) => void;
+  sendTargets?: SendTarget[];
+  onSendFiles?: (message: ThreadMessage, agent: SendTarget) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
   remember?: RememberControls;
   tabbable?: boolean;
@@ -1418,6 +1435,16 @@ function MessageHoverActions({
               <Copy size={14} strokeWidth={1.7} />
               <Trans>Copy</Trans>
             </DropdownMenuItem>
+            {onSendFiles && message.blocks.some(isForwardableBlock) ? (
+              <SendToAgentMenu
+                menu="dropdown"
+                agents={sendTargets}
+                onPick={(agent) => {
+                  setMoreOpen(false);
+                  onSendFiles(message, agent);
+                }}
+              />
+            ) : null}
             {canRemember ? (
               <DropdownMenuItem
                 disabled={remembered}

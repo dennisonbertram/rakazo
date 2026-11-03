@@ -1,7 +1,9 @@
+import { MEETING_MARK_REASON } from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { userEvent, within } from "storybook/test";
 import type { AskBlock } from "./AskCard";
 import { AskCard } from "./AskCard";
+import { BotToolControlsContext } from "./BotToolControls";
 
 const ask = (overrides: Partial<AskBlock> = {}): AskBlock => ({
   kind: "ask",
@@ -172,6 +174,36 @@ export const ApprovalWithReason: Story = {
       ],
     }),
   },
+};
+
+export const ApprovalMeetingMark: Story = {
+  args: {
+    block: ask({
+      text: "Allow the bot to send this email?",
+      approvalEffectId: "effect_demo",
+      approvalReason: MEETING_MARK_REASON,
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+  decorators: [
+    (Story) => (
+      <BotToolControlsContext.Provider
+        value={{
+          editableBotName: () => undefined,
+          disableTool: async () => undefined,
+          canSend: () => false,
+          sendDraft: async () => undefined,
+          openComposer: () => undefined,
+          clearConversation: () => undefined,
+        }}
+      >
+        <Story />
+      </BotToolControlsContext.Provider>
+    ),
+  ],
 };
 
 /** A connected-app tool: friendly title, with the exact tool id behind the chevron. */
