@@ -514,6 +514,7 @@ import {
   inboxGet,
   inboxList,
   inboxRefresh,
+  inboxNoReply,
   inboxTodoSetDone,
   inboxTodosList,
   inboxUnreadCount,
@@ -9194,6 +9195,9 @@ export function createRouter(deps: RouterDeps): AppRouter {
       ),
       unreadCount: authed.inbox.unreadCount.handler(({ context }) =>
         inboxUnreadCount(deps, context.actor),
+      ),
+      noReply: authed.inbox.noReply.handler(({ context, input }) =>
+        inboxNoReply(deps, context.actor, input),
       ),
       feedback: authed.inbox.feedback.handler(({ context, input }) =>
         inboxFeedbackSet(

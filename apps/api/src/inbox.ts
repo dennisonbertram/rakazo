@@ -10,6 +10,7 @@ import type {
 import { inboxTriageJob, MailProviderError } from "@rakazo/adapter-kit";
 import type { TriageReadinessDeps } from "@rakazo/adapters";
 import {
+  dismissReply,
   isMailConnection,
   mailSyncStatus,
   replyAllDiffers,
@@ -17,6 +18,7 @@ import {
   senderRulesState,
   triageReadiness,
   triageStatus,
+  undoReplyStop,
   waitForMailSync,
 } from "@rakazo/adapters";
 import type {
@@ -29,6 +31,7 @@ import type {
   InboxPileCounts,
   InboxRefreshOutput,
   InboxTodo,
+  InboxTodoDone,
   MailAccountSummary,
   MailRow,
 } from "@rakazo/contracts";
@@ -853,11 +856,25 @@ export async function inboxTodosList(
   };
 }
 
+/** "No reply needed" on one message, or with `undo` the Undo of the toast it raised. */
+export async function inboxNoReply(
+  deps: Pick<InboxDeps, "prisma">,
+  actor: Actor,
+  input: { messageId: string; undo?: boolean },
+): Promise<{ stopped: string | null }> {
+  const scope = { spaceId: actor.spaceId, userId: actor.userId };
+  if (input.undo) {
+    await undoReplyStop(deps.prisma, scope, input.messageId);
+    return { stopped: null };
+  }
+  return dismissReply(deps.prisma, scope, input.messageId);
+}
+
 export async function inboxTodoSetDone(
   deps: Pick<InboxDeps, "prisma">,
   actor: Actor,
   input: { id: string; done: boolean },
-): Promise<InboxTodo> {
+): Promise<InboxTodoDone> {
   const now = new Date();
   const scope = {
     id: input.id,
@@ -875,5 +892,11 @@ export async function inboxTodoSetDone(
     ? await deps.prisma.inboxTodo.findFirst({ where: scope, include: todoInclude })
     : null;
   if (!row) throw notFound();
-  return todoOut(row);
+  // Finishing a to-do for mail still in Needs reply, with no reply sent, says that mail needed none.
+  const stopped =
+    input.done && row.messageId
+      ? (await dismissReply(deps.prisma, { spaceId: actor.spaceId, userId: actor.userId }, row.messageId))
+          .stopped
+      : null;
+  return { ...todoOut(row), ...(stopped ? { stoppedSender: stopped } : {}) };
 }

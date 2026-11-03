@@ -320,6 +320,8 @@ export const CleanupSenderSchema = z.object({
   rule: SenderRuleStatusSchema.optional(),
   /** The pile the model chose for this sender often enough that its mail now goes there without it. Optional so older apps still parse. */
   learnedPile: InboxPileSchema.nullable().optional(),
+  /** Messages the user said needed no reply; Needs reply stops for the sender at 3. Omitted when 0. */
+  noReplyCount: z.number().int().positive().optional(),
 });
 
 export const CleanupListInputSchema = InboxScopeInputSchema;
@@ -433,6 +435,14 @@ export const InboxTodoSchema = z.object({
   dueOn: z.string().nullable(),
   doneAt: z.string().nullable(),
 });
+
+/** "No reply needed" on one message, or its Undo (the sender goes back to 2 corrections). */
+export const InboxNoReplyInputSchema = z.object({ messageId: Id, undo: z.boolean().optional() });
+/** `stopped` names the sender when this correction stopped Needs reply for it. */
+export const InboxNoReplyOutputSchema = z.object({ stopped: z.string().nullable() });
+
+/** A finished to-do; `stoppedSender` is set when finishing it stopped Needs reply for that sender. */
+export const InboxTodoDoneSchema = InboxTodoSchema.extend({ stoppedSender: z.string().optional() });
 
 export const InboxTodosOutputSchema = z.object({
   enabled: z.boolean(),
@@ -615,6 +625,7 @@ export type InboxListInput = z.infer<typeof InboxListInputSchema>;
 export type InboxMessage = z.infer<typeof InboxMessageSchema>;
 export type InboxThreadMessage = z.infer<typeof InboxThreadMessageSchema>;
 export type InboxTodo = z.infer<typeof InboxTodoSchema>;
+export type InboxTodoDone = z.infer<typeof InboxTodoDoneSchema>;
 export type InboxTodosOutput = z.infer<typeof InboxTodosOutputSchema>;
 export type MailRow = z.infer<typeof MailRowSchema>;
 export type InboxListOutput = z.infer<typeof InboxListOutputSchema>;
