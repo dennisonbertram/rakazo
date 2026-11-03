@@ -500,7 +500,7 @@ import {
 } from "./mcp-server-tool.js";
 import type { McpStdioPolicy } from "./mcp-transport.js";
 import { mcpStdioRefusal } from "./mcp-transport.js";
-import { recordOwnerOpened } from "./meeting-handoff.js";
+import { recordOwnerOpened, routedRunReadRefusal } from "./meeting-handoff.js";
 import {
   isMeetingSourceAgent,
   MEETING_AGENT_APPROVAL_TOOLS,
@@ -6747,6 +6747,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : await read(),
             );
           }
+          const routedRefusal = await routedRunReadRefusal(
+            deps.prisma,
+            { spaceId: run.spaceId, userId: bot.userId },
+            task.prompt,
+            name,
+            args,
+          );
+          if (routedRefusal) return finish({ error: routedRefusal });
           if (MEETING_TOOL_NAMES.has(name) && meetingsEnabled) {
             return finish(
               await meetingToolFromTool(
