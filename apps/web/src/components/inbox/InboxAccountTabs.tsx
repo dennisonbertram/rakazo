@@ -25,7 +25,10 @@ export function InboxAccountTabs({
       value={value ?? ALL}
       onValueChange={(next) => onChange(next === ALL ? undefined : String(next))}
     >
-      <TabsList className="max-w-full overflow-x-auto rounded-full [scrollbar-width:none] pointer-coarse:h-auto [&::-webkit-scrollbar]:hidden">
+      <TabsList
+        aria-label={t`Account`}
+        className="max-w-full justify-start overflow-x-auto rounded-full [scrollbar-width:none] pointer-coarse:h-auto [&::-webkit-scrollbar]:hidden"
+      >
         <TabsTrigger value={ALL} className="flex-none rounded-full px-3 pointer-coarse:h-11">
           {t`All`}
         </TabsTrigger>
