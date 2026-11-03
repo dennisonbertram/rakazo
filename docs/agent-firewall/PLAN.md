@@ -257,6 +257,9 @@ connections as for external bots; non-mail connector reads ask; `mail_modify` so
 history, task and scratchpad reads of a firewalled agent's records, and group runs with a
 firewalled member, store `externalTaint`. Injection fixture tests below.
 Content taint also covers calendar_agenda and any other reader of the firewalled agent's to-dos (scratchpad items with dueAt surface there), pages and pins.
+S2 must refuse or ask when `scratchpad_add` has `forAgent` (the stored botId becomes the recipient, so the firewalled author is lost), and must enforce the support scope on every mail read call (`mail_search`, `mail_grep`, `mail_get`, `inbox_overview`, `show_emails`).
+
+Profile change after Astra review: `page_source_set`, `page_source_remove` and `pins_write` are never offered (sources run other tools with model-controlled arguments). `page_write`, `page_create` and `page_edit` ask until S3's click-to-load covers pages.
 
 **S3. Output safety.** Exact-host site list, trusted-sites path off, per-hop redirect check,
 query-string rule; the three mail card tags; click-to-load images and full link hosts in

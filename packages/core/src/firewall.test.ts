@@ -38,11 +38,20 @@ describe("firewallToolClass", () => {
     expect(firewallToolClass("__proto__")).toBe("dropped");
   });
 
-  it("makes every tainted-run safe tool free, except the file and secret tools the profile never offers", () => {
+  it("makes every tainted-run safe tool free, except the ones the profile narrows", () => {
     // A tool added to EXTERNAL_TAINT_SAFE_TOOLS later fails here until someone decides about it.
-    const excluded = new Set(["attach_file", "list_secrets"]);
+    const narrowed = new Map<string, string>([
+      ["attach_file", "dropped"],
+      ["list_secrets", "dropped"],
+      ["page_source_set", "dropped"],
+      ["page_source_remove", "dropped"],
+      ["pins_write", "dropped"],
+      ["page_write", "ask"],
+      ["page_create", "ask"],
+    ]);
     for (const name of EXTERNAL_TAINT_SAFE_TOOLS) {
-      expect(firewallToolClass(name), name).toBe(excluded.has(name) ? "dropped" : "free");
+      expect(firewallToolClass(name), name).toBe(narrowed.get(name) ?? "free");
     }
   });
+
 });

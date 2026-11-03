@@ -1,5 +1,5 @@
 import { BUILTIN_TOOL_NAMES } from "@rakazo/contracts";
-import { firewallToolClass } from "@rakazo/core";
+import { FIREWALL_ASK_TOOLS, FIREWALL_FREE_TOOLS, firewallToolClass } from "@rakazo/core";
 import { describe, expect, it } from "vitest";
 import { agentConnectionTools, builtinAgentTools, gtmPostTool } from "./builtin-tools.js";
 import { companyAgentTools, companyImporterTools, companyReadTools } from "./company-tools.js";
@@ -91,6 +91,25 @@ describe("agent firewall tool classes", () => {
       "message_bot",
     ];
     for (const name of expected) expect(listed, name).toContain(name);
+  });
+});
+
+describe("firewall list entries", () => {
+  it("exist in the real tool inventory, so a rename or typo fails", () => {
+    for (const name of [...FIREWALL_FREE_TOOLS, ...FIREWALL_ASK_TOOLS]) {
+      expect(offered.has(name), name).toBe(true);
+    }
+  });
+
+  it("have their intended class", () => {
+    const intended = {
+      ask: ["page_write", "page_create", "page_edit"],
+      dropped: ["page_source_set", "page_source_remove", "pins_write", "list_secrets"],
+      free: ["page_list", "page_read", "pins_read", "scratchpad_add", "mail_get"],
+    } as const;
+    for (const [cls, names] of Object.entries(intended)) {
+      for (const name of names) expect(firewallToolClass(name), name).toBe(cls);
+    }
   });
 });
 

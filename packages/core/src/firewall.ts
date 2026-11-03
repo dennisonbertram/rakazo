@@ -19,19 +19,13 @@ export const FIREWALL_FREE_TOOLS: ReadonlySet<string> = new Set([
   "scratchpad_complete",
   "create_ui_artifact",
   "render_ui",
-  "page_write",
-  "page_source_set",
-  "page_source_remove",
-  "page_create",
-  "pins_write",
   "recall_memory",
   "task_catalog",
   "schedule_list",
   "schedule_runs",
-  // Its own pages and pins.
+  // Reads of its own pages and pins. Writes ask: page Markdown images are an outbound channel.
   "page_list",
   "page_read",
-  "page_edit",
   "pins_read",
   // Mail reads, inside the support scope (the executor checks the scope).
   "mail_search",
@@ -49,6 +43,9 @@ export const FIREWALL_FREE_TOOLS: ReadonlySet<string> = new Set([
  * mail_draft, mail_modify and web_fetch to free under the conditions in the plan.
  */
 export const FIREWALL_ASK_TOOLS: ReadonlySet<string> = new Set([
+  "page_write",
+  "page_create",
+  "page_edit",
   "mail_send",
   "mail_draft",
   "mail_modify",
