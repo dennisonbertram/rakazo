@@ -32923,6 +32923,9 @@
                         "displayName": {
                           "type": "string"
                         },
+                        "account": {
+                          "type": "string"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -33641,6 +33644,9 @@
                           "displayName": {
                             "type": "string"
                           },
+                          "account": {
+                            "type": "string"
+                          },
                           "status": {
                             "type": "string",
                             "enum": [
@@ -33821,7 +33827,7 @@
                       "displayName": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 80
+                        "maxLength": 60
                       }
                     },
                     "required": [
@@ -33862,6 +33868,9 @@
                           "type": "string"
                         },
                         "displayName": {
+                          "type": "string"
+                        },
+                        "account": {
                           "type": "string"
                         },
                         "status": {
@@ -34420,6 +34429,9 @@
                         "displayName": {
                           "type": "string"
                         },
+                        "account": {
+                          "type": "string"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -34638,6 +34650,9 @@
                           "type": "string"
                         },
                         "displayName": {
+                          "type": "string"
+                        },
+                        "account": {
                           "type": "string"
                         },
                         "status": {
