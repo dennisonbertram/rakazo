@@ -690,6 +690,7 @@ export default function Integrations() {
                   prominence="destructive"
                 />
               </View>
+              {row.account ? <Text style={styles.secondary}>{row.account}</Text> : null}
               {row.agentBotId ? (
                 <ConnectionAgent connectionId={row.id} botId={row.agentBotId} />
               ) : null}

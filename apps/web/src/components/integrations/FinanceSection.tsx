@@ -315,6 +315,16 @@ export function connectedFinanceKeys(sources: FinanceSource[], status: FinanceSt
   return keys;
 }
 
+/** Alchemy or an exchange that is connected but whose last check failed: it needs attention too. */
+export function erroredFinanceKeys(status: FinanceStatus) {
+  const keys = new Set<string>();
+  if (status.alchemy?.connected && status.alchemy.lastError) keys.add("alchemy");
+  for (const { provider } of EXCHANGES)
+    if (status.exchanges?.find((x) => x.provider === provider && x.connected && x.lastError))
+      keys.add(provider);
+  return keys;
+}
+
 /** Mercury or Brex whose sign-in lapsed or whose sync failed: the one thing to fix, shown first. */
 export function lapsedFinanceKeys(sources: FinanceSource[]) {
   const keys = new Set<string>();

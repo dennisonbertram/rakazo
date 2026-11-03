@@ -481,6 +481,29 @@ it("keeps Alchemy and exchanges that report an error under Finance", async () =>
   expect(container.textContent).toContain("The key was refused");
 });
 
+it("lists Alchemy and exchanges with an error under Needs attention, in the Connected list", async () => {
+  financeRpc.crypto.mockResolvedValue({
+    ...cryptoOn,
+    alchemy: { connected: true, lastError: "The key was refused" },
+  });
+  financeRpc.exchanges.mockResolvedValue([
+    { provider: "kraken", connected: true, lastError: "Read failed" },
+  ]);
+  await show(data(true, true), "/app/integrations?status=attention");
+  for (const id of ["alchemy", "kraken"]) {
+    expect(count(`finance-tile-${id}`)).toBe(1);
+    expect(inConnected(`finance-tile-${id}`)).toBe(true);
+  }
+  expect(count("finance-tile-crypto")).toBe(0);
+});
+
+it("keeps the filter and sort controls while one is set, even with a single card", async () => {
+  await show(data(true, true), "/app/integrations?status=attention");
+  expect(
+    container.querySelector('button[aria-label="Filter by Status"], [aria-label*="Status"]'),
+  ).not.toBeNull();
+});
+
 it("shows one Blockscout tile when its key and MCP server both exist", async () => {
   financeRpc.crypto.mockResolvedValue(cryptoOn);
   const blockscoutServer = {

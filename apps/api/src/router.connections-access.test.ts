@@ -191,17 +191,11 @@ describe("connections.list", () => {
     ]);
   });
 
-  it("hides a sign-in that was started over an hour ago and never finished", async () => {
+  it("keeps an old pending sign-in listed: begin reuses it, and hiding it would hide a fresh retry", async () => {
     const old = new Date(Date.now() - 2 * 3_600_000);
-    const h = harness(
-      [
-        conn("stale", "pending", { createdAt: old }),
-        conn("fresh", "pending", { createdAt: new Date() }),
-      ],
-      [],
-    );
+    const h = harness([conn("old", "pending", { createdAt: old })], []);
     const { json } = await h.call("connections/list", undefined);
-    expect(json.map((r: Row) => r.id)).toEqual(["fresh"]);
+    expect(json.map((r: Row) => r.id)).toEqual(["old"]);
   });
 });
 

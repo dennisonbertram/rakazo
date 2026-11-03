@@ -60,6 +60,7 @@ import { CustomConnectionDialog } from "./CustomConnectionDialog";
 import { DevinConnectDialog } from "./DevinConnectDialog";
 import {
   connectedFinanceKeys,
+  erroredFinanceKeys,
   FINANCE_TILE_COUNT,
   FinanceSection,
   lapsedFinanceKeys,
@@ -599,6 +600,7 @@ export function IntegrationsHome({
   // their own layout (Granola's key, Omi, Hex, sources) show only while nothing narrows the list.
   type Entry = EntryInfo & { key: string; node: ReactNode };
   const lapsedKeys = lapsedFinanceKeys(data.financeSources);
+  const erroredKeys = erroredFinanceKeys(financeStatus);
   const entries: Entry[] = [
     ...apps
       .filter(
@@ -632,7 +634,9 @@ export function IntegrationsHome({
       ? [
           ...[...connectedKeys].map((key) => ({ key, attention: false })),
           // Without a status filter a lapsed bank keeps its own section above Connected.
-          ...(status ? [...lapsedKeys].map((key) => ({ key, attention: true })) : []),
+          ...(status
+            ? [...lapsedKeys, ...erroredKeys].map((key) => ({ key, attention: true }))
+            : []),
         ].map(({ key, attention }) => ({
           key: `finance:${key}`,
           name: financeLabel[key] ?? key,
@@ -643,7 +647,7 @@ export function IntegrationsHome({
             <div key={key} className="contents [&_[data-testid=finance-section]]:contents">
               <FinanceSection
                 {...financeProps}
-                mode={attention ? "lapsed" : "connected"}
+                mode={!attention ? "connected" : erroredKeys.has(key) ? "available" : "lapsed"}
                 only={key}
               />
             </div>
@@ -651,6 +655,11 @@ export function IntegrationsHome({
         }))
       : []),
   ];
+  // Every kind of card counts, and an active filter or sort keeps its controls so it can be cleared.
+  const entryCount =
+    entries.filter((entry) => !entry.key.startsWith("finance:")).length +
+    connectedKeys.size +
+    (status ? 0 : lapsedKeys.size + erroredKeys.size);
   const connectedEntries = sortEntries(
     filterEntries(entries, { query, status }),
     list.sort.field,
@@ -790,7 +799,7 @@ export function IntegrationsHome({
                     setVisible(CONNECTION_CATALOG_PAGE_SIZE);
                   }}
                 />
-                {apps.length > 1 ? (
+                {entryCount > 1 || status || list.sort.field !== "default" ? (
                   <>
                     <PickFilter
                       label={t`Status`}

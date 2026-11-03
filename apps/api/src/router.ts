@@ -6663,11 +6663,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           include: { mailSyncState: { select: { needsReconnect: true, lastErrorAt: true } } },
         });
-        // A sign-in left open for over an hour is dead; the next attempt replaces it.
-        const stale = Date.now() - 3_600_000;
-        return rows
-          .filter((row) => row.status !== "pending" || row.createdAt.getTime() > stale)
-          .map(connectionDto);
+        return rows.map(connectionDto);
       }),
       begin: authed.connections.begin.handler(async ({ context, input }) => {
         if (input.redirect === "desktop" && input.connectorId !== "google") {
