@@ -14,6 +14,8 @@ import {
 } from "@rakazo/contracts";
 import type { StatusKind } from "@rakazo/core";
 import { appStatus, matchFeaturedConnectorId } from "@rakazo/core";
+import type { SortDir } from "./list-params";
+import { sortBy } from "./list-params";
 
 export type { StatusKind };
 
@@ -324,6 +326,79 @@ export function groupConnections(
       },
     ];
   });
+}
+
+/**
+ * What names each connected account of an app: its own label (left out when it is just the app's
+ * name) and its address, so two accounts of one app can be told apart.
+ */
+export function accountLabels(app: ConnectedApp): string[] {
+  return app.rows
+    .filter((row) => row.status === "connected")
+    .flatMap((row) => {
+      const own = row.displayName === app.name ? null : row.displayName;
+      const text = [own, row.account].filter(Boolean).join(" · ");
+      return text ? [text] : [];
+    });
+}
+
+/** The accounts a card lists: the first `max` lines, and how many more there are. */
+export function accountLines(labels: readonly string[], max: number) {
+  return { lines: labels.slice(0, max), more: Math.max(0, labels.length - max) };
+}
+
+export type AppStatusFilter = "connected" | "attention";
+export type AppSortField = "default" | "name" | "status" | "connected";
+
+/** What the page's search, status filter and sort read from any card: an app, a server or a finance tile. */
+export type EntryInfo = {
+  name: string;
+  /** Every text the search matches: the name, account labels, addresses, hosts. */
+  search: readonly string[];
+  attention: boolean;
+  /** Newest connection date, ISO text; null sorts last. */
+  created: string | null;
+};
+
+export function appEntry(app: ConnectedApp): EntryInfo & { app: ConnectedApp } {
+  return {
+    app,
+    name: app.name,
+    search: [app.name, ...app.rows.flatMap((row) => [row.displayName, row.account ?? ""])],
+    attention: app.status !== "connected",
+    created:
+      app.rows
+        .map((row) => row.createdAt)
+        .sort()
+        .at(-1) ?? null,
+  };
+}
+
+export function filterEntries<T extends EntryInfo>(
+  entries: readonly T[],
+  { query, status }: { query: string; status: AppStatusFilter | undefined },
+): T[] {
+  const needle = query.trim().toLowerCase();
+  return entries.filter(
+    (entry) =>
+      (!status || (status === "attention") === entry.attention) &&
+      (!needle || entry.search.some((text) => text.toLowerCase().includes(needle))),
+  );
+}
+
+/** Status sorts problems first when ascending. */
+export function sortEntries<T extends EntryInfo>(
+  entries: readonly T[],
+  field: AppSortField,
+  dir: SortDir,
+): T[] {
+  if (field === "default") return [...entries];
+  const pick = {
+    name: (entry: T) => entry.name,
+    status: (entry: T) => (entry.attention ? 0 : 1),
+    connected: (entry: T) => entry.created,
+  }[field];
+  return sortBy(entries, pick, dir);
 }
 
 /** Catalog apps with no account row yet, featured apps first. */

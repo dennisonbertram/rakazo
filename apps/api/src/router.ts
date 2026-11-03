@@ -996,13 +996,19 @@ function connectionDto(row: {
   createdAt: Date;
   writesEnabled: boolean;
   agentBotId: string | null;
+  metadata?: unknown;
   mailSyncState?: { needsReconnect: boolean; lastErrorAt: Date | null } | null;
 }) {
+  const stored = row.metadata as { mailAddress?: unknown; accountAddress?: unknown } | null;
+  const account = [stored?.mailAddress, stored?.accountAddress].find(
+    (value): value is string => typeof value === "string" && value !== "",
+  );
   return {
     id: row.id,
     connectorId: row.connectorId,
     provider: row.provider,
     displayName: row.displayName,
+    ...(account ? { account } : {}),
     status: row.status as "pending" | "connected" | "revoked" | "error",
     error: connectionError(row),
     ...(row.mailSyncState?.needsReconnect && row.mailSyncState.lastErrorAt
@@ -2645,6 +2651,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             thinkingLevel: source.thinkingLevel,
             disabledBuiltinTools: source.disabledBuiltinTools,
             audience: source.audience === "external" ? "external" : "internal",
+            firewall: source.firewall,
             externalMessageTargets: source.externalMessageTargets,
             externalComputerTools: source.externalComputerTools,
           })
@@ -2897,6 +2904,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
               : {}),
             ...(input.runsOn !== undefined ? { runsOn: input.runsOn } : {}),
             ...(input.audience !== undefined ? { audience: input.audience } : {}),
+            ...(input.firewall !== undefined ? { firewall: input.firewall } : {}),
             ...(messageTargets !== undefined ? { externalMessageTargets: messageTargets } : {}),
             ...(input.externalComputerTools !== undefined
               ? { externalComputerTools: input.externalComputerTools }

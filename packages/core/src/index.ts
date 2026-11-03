@@ -43,6 +43,7 @@ export * from "./finance/stablecoins.js";
 export * from "./finance/statements.js";
 export * from "./finance/types.js";
 export * from "./finance/vendor.js";
+export * from "./firewall.js";
 export * from "./format-file-size.js";
 export * from "./group-mentions.js";
 export * from "./html-page.js";

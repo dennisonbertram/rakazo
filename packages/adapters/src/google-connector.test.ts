@@ -328,6 +328,7 @@ describe("GoogleConnector.complete", () => {
     expect(call.get("redirect_uri")).toBe(REDIRECT);
     expect(call.get("client_secret")).toBe(CLIENT_SECRET);
     expect(result.connectionRef).toBe("sub-1");
+    expect(result.account).toBe("ann@example.test");
     expect(s.db.secrets).toHaveLength(1);
     const row = s.db.secrets[0] as {
       id: string;

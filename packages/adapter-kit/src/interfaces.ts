@@ -220,9 +220,9 @@ export interface ConnectionAuthProvider {
   complete(
     /** `provider` is the pending Connection's provider, for connectors whose providers need different grants. */
     request: { state: string; code?: string; redirectUrl?: string; provider?: string },
-    /** `scope`: the space-separated scopes the provider granted, when it reports them. */
+    /** `scope`: the space-separated scopes the provider granted, when it reports them. `account`: the signed-in account's address, when it reports one. */
     context: AdapterContext,
-  ): Promise<{ connectionRef: string; secretId?: string; scope?: string }>;
+  ): Promise<{ connectionRef: string; secretId?: string; scope?: string; account?: string }>;
   /** `provider` is the Connection's provider, for connectors that hold several apps per account. */
   revoke(
     connectionRef: string,

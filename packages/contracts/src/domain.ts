@@ -156,6 +156,8 @@ export const BotSchema = z.object({
   appControl: BotAppControlSchema.optional(),
   disabledBuiltinTools: z.array(z.string()).default([]),
   audience: BotAudienceSchema.default("internal"),
+  /** Agent firewall: everything the agent reads is untrusted. Only the owner's settings set it. */
+  firewall: z.boolean().default(false),
   /** An external bot may message only these internal bots. */
   externalMessageTargets: z.array(Id).default([]),
   /** An external bot has the browser and computer tools only when this is on. */
@@ -450,6 +452,7 @@ export const UpdateBotInput = z
     appControl: UpdateBotAppControlSchema.optional(),
     disabledBuiltinTools: DisabledBuiltinToolsSchema.optional(),
     audience: BotAudienceSchema.optional(),
+    firewall: z.boolean().optional(),
     externalMessageTargets: z.array(Id).max(200).optional(),
     externalComputerTools: z.boolean().optional(),
     runsOn: ComputerHostSchema.nullable().optional(),
@@ -892,6 +895,8 @@ export const ConnectionSchema = z.object({
   connectorId: z.string(),
   provider: z.string(),
   displayName: z.string(),
+  /** The account's own address (the mailbox), when known: what tells two accounts of one app apart. */
+  account: z.string().optional(),
   status: z.enum(["pending", "connected", "revoked", "error"]),
   /** Short user-safe reason when status is "error"; null otherwise. */
   error: z.string().nullable(),
