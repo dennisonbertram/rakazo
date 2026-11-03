@@ -38,6 +38,7 @@ export function makeBot(overrides: Partial<Bot> = {}): Bot {
     audience: "internal",
     externalMessageTargets: [],
     externalComputerTools: false,
+    firewall: false,
     webhookConfigured: false,
     spawnKey: null,
     runPhase: null,

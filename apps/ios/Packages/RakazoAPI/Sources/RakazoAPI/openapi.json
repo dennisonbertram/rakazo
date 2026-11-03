@@ -13412,6 +13412,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -13465,6 +13469,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -13897,6 +13902,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -13950,6 +13959,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -14382,6 +14392,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -14435,6 +14449,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -14856,6 +14871,10 @@
                               "external"
                             ]
                           },
+                          "firewall": {
+                            "default": false,
+                            "type": "boolean"
+                          },
                           "externalMessageTargets": {
                             "default": [],
                             "type": "array",
@@ -14909,6 +14928,7 @@
                           "teamChatRules",
                           "disabledBuiltinTools",
                           "audience",
+                          "firewall",
                           "externalMessageTargets",
                           "externalComputerTools",
                           "webhookConfigured",
@@ -15331,6 +15351,10 @@
                               "external"
                             ]
                           },
+                          "firewall": {
+                            "default": false,
+                            "type": "boolean"
+                          },
                           "externalMessageTargets": {
                             "default": [],
                             "type": "array",
@@ -15384,6 +15408,7 @@
                           "teamChatRules",
                           "disabledBuiltinTools",
                           "audience",
+                          "firewall",
                           "externalMessageTargets",
                           "externalComputerTools",
                           "webhookConfigured",
@@ -16478,6 +16503,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -16531,6 +16560,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -16724,14 +16754,17 @@
                       "audience": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema24"
                       },
-                      "externalMessageTargets": {
+                      "firewall": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema25"
                       },
-                      "externalComputerTools": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema26"
                       },
-                      "runsOn": {
+                      "externalComputerTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema28"
                       }
                     },
                     "required": [
@@ -17039,6 +17072,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -17092,6 +17129,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -19602,6 +19640,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -19655,6 +19697,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -20409,6 +20452,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -20462,6 +20509,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -25059,6 +25107,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -25112,6 +25164,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -36734,6 +36787,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -36787,6 +36844,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -43764,6 +43822,10 @@
                                     "external"
                                   ]
                                 },
+                                "firewall": {
+                                  "default": false,
+                                  "type": "boolean"
+                                },
                                 "externalMessageTargets": {
                                   "default": [],
                                   "type": "array",
@@ -43817,6 +43879,7 @@
                                 "teamChatRules",
                                 "disabledBuiltinTools",
                                 "audience",
+                                "firewall",
                                 "externalMessageTargets",
                                 "externalComputerTools",
                                 "webhookConfigured",
@@ -48039,6 +48102,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -48092,6 +48159,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -65170,6 +65238,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -65223,6 +65295,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -66834,6 +66907,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -66887,6 +66964,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -67672,6 +67750,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -67725,6 +67807,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -74482,6 +74565,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -74535,6 +74622,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -81455,6 +81543,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -81508,6 +81600,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -117874,6 +117967,10 @@
                                       "external"
                                     ]
                                   },
+                                  "firewall": {
+                                    "default": false,
+                                    "type": "boolean"
+                                  },
                                   "externalMessageTargets": {
                                     "default": [],
                                     "type": "array",
@@ -117924,6 +118021,7 @@
                                   "teamChatRules",
                                   "disabledBuiltinTools",
                                   "audience",
+                                  "firewall",
                                   "externalMessageTargets",
                                   "externalComputerTools",
                                   "webhookConfigured",
@@ -129809,6 +129907,10 @@
                             "external"
                           ]
                         },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -129862,6 +129964,7 @@
                         "teamChatRules",
                         "disabledBuiltinTools",
                         "audience",
+                        "firewall",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -132211,6 +132314,10 @@
               "external"
             ]
           },
+          "firewall": {
+            "default": false,
+            "type": "boolean"
+          },
           "externalMessageTargets": {
             "default": [],
             "type": "array",
@@ -132261,6 +132368,7 @@
           "teamChatRules",
           "disabledBuiltinTools",
           "audience",
+          "firewall",
           "externalMessageTargets",
           "externalComputerTools",
           "webhookConfigured",
@@ -133660,7 +133768,7 @@
         ]
       },
       "RpcBotsUpdateInputSchema22": {
-        "maxItems": 137,
+        "maxItems": 138,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
@@ -133679,16 +133787,19 @@
         ]
       },
       "RpcBotsUpdateInputSchema25": {
+        "type": "boolean"
+      },
+      "RpcBotsUpdateInputSchema26": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema26": {
+      "RpcBotsUpdateInputSchema27": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema27": {
+      "RpcBotsUpdateInputSchema28": {
         "anyOf": [
           {
             "type": "string",
