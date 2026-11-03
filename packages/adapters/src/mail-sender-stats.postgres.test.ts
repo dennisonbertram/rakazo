@@ -398,6 +398,27 @@ describePostgres("sender stats (PostgreSQL)", () => {
       });
     });
 
+    it("resets the no-reply corrections of a sender the user writes to, and of no one else", async () => {
+      const account = await connect("prior-reset");
+      await cache(account, "pal@example.test", 1);
+      await cache(account, "other@example.test", 1);
+      await refresh(account);
+      await prisma.mailSenderStat.updateMany({
+        where: { connectionId: account.id },
+        data: { noReplyCount: 3, noReplyAt: NOW },
+      });
+
+      await prisma.$transaction((tx) =>
+        markPriorContactFromSent(tx, scopeOf(account.id), ["pal@example.test"], NOW),
+      );
+
+      expect(await statFor(account.id, "pal@example.test")).toMatchObject({
+        noReplyCount: 0,
+        noReplyAt: null,
+      });
+      expect(await statFor(account.id, "other@example.test")).toMatchObject({ noReplyCount: 3 });
+    });
+
     it("flips false to true when a later sent message names the sender, and ignores other scopes", async () => {
       const account = await connect("prior-flip");
       const stranger = await connect("prior-flip-other", otherUserId);

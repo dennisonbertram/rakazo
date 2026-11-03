@@ -292,6 +292,8 @@ import {
   InboxListInputSchema,
   InboxListOutputSchema,
   InboxMarkReadInputSchema,
+  InboxNoReplyInputSchema,
+  InboxNoReplyOutputSchema,
   InboxMessageSchema,
   InboxMoveInputSchema,
   InboxMoveOutputSchema,
@@ -301,6 +303,7 @@ import {
   InboxRefreshInputSchema,
   InboxRefreshOutputSchema,
   InboxScopeInputSchema,
+  InboxTodoDoneSchema,
   InboxTodoSchema,
   InboxTodosOutputSchema,
   MailAccountSchema,
@@ -1701,6 +1704,8 @@ export const appContract = {
     unreadCount: oc.output(z.object({ count: z.number().int() })),
     feedback: oc.input(InboxFeedbackInputSchema).output(InboxFeedbackOutputSchema),
     markRead: oc.input(InboxMarkReadInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** The user says this message needs no reply; the third for one sender stops Needs reply for it. `undo` takes the sender back to 2. */
+    noReply: oc.input(InboxNoReplyInputSchema).output(InboxNoReplyOutputSchema),
     /** Adds the message's thread to the Chief's Open work. Tracking a tracked thread does nothing. */
     track: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     /** Marks the thread's open Chief item done. */
@@ -1730,7 +1735,7 @@ export const appContract = {
     },
     todos: {
       list: oc.input(InboxScopeInputSchema).output(InboxTodosOutputSchema),
-      setDone: oc.input(z.object({ id: Id, done: z.boolean() })).output(InboxTodoSchema),
+      setDone: oc.input(z.object({ id: Id, done: z.boolean() })).output(InboxTodoDoneSchema),
     },
   },
   company: {

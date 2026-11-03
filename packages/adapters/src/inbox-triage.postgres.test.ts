@@ -975,6 +975,126 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
     expect(rt.requests).toHaveLength(0);
     expect(await todosOf(user)).toEqual([]);
   });
+  describe("reply guard", () => {
+    const stat = (user: TestUser, senderAddress: string, extra: Record<string, unknown> = {}) =>
+      prisma.mailSenderStat.create({
+        data: {
+          spaceId,
+          userId: user.userId,
+          connectionId: user.connectionId,
+          senderAddress,
+          messageCount: 1,
+          ...extra,
+        },
+      });
+    const needsReplyOf = async (id: string) =>
+      (await prisma.cachedMailMessage.findUniqueOrThrow({ where: { id } })).needsReply;
+
+    it("clears Needs reply for a no-reply address, Auto-Submitted mail, and a sender never answered with 10 messages", async () => {
+      const user = await addUser();
+      const noReply = await mail(user, "Receipt ready", { from: "No-Reply@shop.test" });
+      const auto = await mail(user, "Out of office", { from: "ann@example.test" });
+      await prisma.cachedMailMessage.update({
+        where: { id: auto.id },
+        data: {
+          signals: {
+            listUnsubscribe: [],
+            oneClick: false,
+            listId: null,
+            bulk: false,
+            autoSubmitted: true,
+            auth: { dkim: "pass", spf: "pass", dmarc: "pass" },
+            dkimCoversUnsubscribe: false,
+            categories: {
+              spam: false,
+              promotions: false,
+              social: false,
+              updates: false,
+              forums: false,
+              important: false,
+            },
+          },
+        },
+      });
+      const bulk = await mail(user, "Quick question", { from: "sales@store.test" });
+      const person = await mail(user, "Lunch?", { from: "sam@friend.test" });
+      await stat(user, "sales@store.test", { priorContact: false, messageCount: 12 });
+      await stat(user, "sam@friend.test", { priorContact: true, messageCount: 12 });
+
+      await run(user, fakeRuntime(answerAll()).runtime);
+
+      expect(await needsReplyOf(noReply.id)).toBe(false);
+      expect(await needsReplyOf(auto.id)).toBe(false);
+      expect(await needsReplyOf(bulk.id)).toBe(false);
+      expect(await needsReplyOf(person.id)).toBe(true);
+    });
+
+    it("does not guard a sender whose prior contact is not checked yet", async () => {
+      const user = await addUser();
+      const row = await mail(user, "Question", { from: "new@store.test" });
+      await stat(user, "new@store.test", { priorContact: null, messageCount: 30 });
+      await run(user, fakeRuntime(answerAll()).runtime);
+      expect(await needsReplyOf(row.id)).toBe(true);
+    });
+
+    it("exempts a sender marked important and a saved contact from every reason", async () => {
+      const user = await addUser();
+      const marked = await mail(user, "From a marked sender", { from: "noreply@vip.test" });
+      const saved = await mail(user, "From a contact", { from: "Pat@Fund.test" });
+      await prisma.inboxSenderFeedback.create({
+        data: {
+          spaceId,
+          userId: user.userId,
+          senderAddress: "noreply@vip.test",
+          mark: "important",
+        },
+      });
+      await prisma.contact.create({
+        data: { spaceId, userId: user.userId, name: "Pat", email: "pat@fund.test" },
+      });
+      await stat(user, "pat@fund.test", { priorContact: false, messageCount: 40, noReplyCount: 4 });
+
+      await run(user, fakeRuntime(answerAll()).runtime);
+
+      expect(await needsReplyOf(marked.id)).toBe(true);
+      expect(await needsReplyOf(saved.id)).toBe(true);
+    });
+
+    it("stops Needs reply for a sender with three corrections but not two, and hints the model at 1 and 2", async () => {
+      const user = await addUser();
+      const three = await mail(user, "Third", { from: "deals@store.test" });
+      const two = await mail(user, "Second", { from: "news@shop.test" });
+      const none = await mail(user, "Zero", { from: "ann@example.test" });
+      await stat(user, "deals@store.test", { noReplyCount: 3 });
+      await stat(user, "news@shop.test", { noReplyCount: 2 });
+      const rt = fakeRuntime(answerAll());
+
+      await run(user, rt.runtime);
+
+      expect(await needsReplyOf(three.id)).toBe(false);
+      expect(await needsReplyOf(two.id)).toBe(true);
+      const sent = new Map(
+        rt
+          .prompts()
+          .flatMap(promptMessages)
+          .map((m) => [m.id, m]),
+      );
+      expect(sent.get(two.id)).toMatchObject({ noReplyCorrections: 2 });
+      expect(sent.get(none.id)).not.toHaveProperty("noReplyCorrections");
+    });
+
+    it("keeps a dismissed message out of Needs reply when it is triaged again", async () => {
+      const user = await addUser();
+      const row = await mail(user, "Dismissed");
+      await prisma.cachedMailMessage.update({
+        where: { id: row.id },
+        data: { replyDismissedAt: new Date() },
+      });
+      await run(user, fakeRuntime(answerAll()).runtime);
+      expect(await needsReplyOf(row.id)).toBe(false);
+    });
+  });
+
   describe("with a classifier", () => {
     const withTypesafeConsent = async () => {
       const user = await addUser();

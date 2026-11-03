@@ -91,7 +91,8 @@ export async function markPriorContactFromSent(
   if (addresses.length === 0) return;
   await tx.mailSenderStat.updateMany({
     where: { ...scope, senderAddress: { in: addresses } },
-    data: { priorContact: true, priorContactCheckedAt: now },
+    // Writing to a sender also ends any "no reply needed" corrections against it.
+    data: { priorContact: true, priorContactCheckedAt: now, noReplyCount: 0, noReplyAt: null },
   });
 }
 

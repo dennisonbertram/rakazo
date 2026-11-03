@@ -6,6 +6,7 @@ import type {
   InboxMark,
   InboxPileCounts,
   InboxTodo,
+  InboxTodoDone,
   MailRow,
 } from "@rakazo/contracts";
 import { InboxFilterSchema, InboxViewCategorySchema } from "@rakazo/contracts";
@@ -184,7 +185,8 @@ type Status =
       batches: Promise<string[]>;
     }
   | { kind: "moved"; messageId: string; subject: string }
-  | { kind: "replied" };
+  | { kind: "replied" }
+  | { kind: "stopped"; messageId: string; sender: string };
 
 type InboxFilter = (typeof InboxFilterSchema.options)[number];
 type InboxViewCategory = (typeof InboxViewCategorySchema.options)[number];
@@ -944,6 +946,24 @@ function InboxListPage({
       .catch((cause) => setError(errorText(cause)))
       .then(() => setReload((n) => n + 1));
   };
+  // The row leaves Needs reply at once; the server counts it and says when this was the third.
+  const noReply = (messageId: string) => {
+    setError("");
+    patchRows((list) =>
+      list.map((row) => (row.id === messageId ? { ...row, needsReply: false } : row)),
+    );
+    rpc.inbox
+      .noReply({ messageId })
+      .then(({ stopped }) =>
+        setStatus(stopped ? { kind: "stopped", messageId, sender: stopped } : null),
+      )
+      .catch((cause) => setError(errorText(cause)))
+      .then(() => setReload((n) => n + 1));
+  };
+  const undoStop = (messageId: string) => {
+    setStatus(null);
+    rpc.inbox.noReply({ messageId, undo: true }).catch((cause) => setError(errorText(cause)));
+  };
   const spamView = pile === "spam";
   // Checked rows that are still listed, so a reload never leaves a count for rows that are gone.
   const pickedRows = useMemo(() => rows.filter((row) => picked.has(row.id)), [rows, picked]);
@@ -1175,7 +1195,10 @@ function InboxListPage({
   const openReplyTodo = openId
     ? todos?.find((todo) => todo.messageId === openId && repeatsRow(todo))
     : undefined;
-  const changeTodo = (next: InboxTodo) => {
+  const changeTodo = ({ stoppedSender, ...next }: InboxTodoDone) => {
+    // Finishing a to-do for mail that needed no reply can be the third such correction.
+    if (stoppedSender && next.messageId)
+      setStatus({ kind: "stopped", messageId: next.messageId, sender: stoppedSender });
     const swap = (items: InboxTodo[]) => items.map((item) => (item.id === next.id ? next : item));
     // A held answer must not bring the old state back when it is applied.
     if (heldTodos.current) heldTodos.current.todos = swap(heldTodos.current.todos);
@@ -1369,6 +1392,10 @@ function InboxListPage({
         )
       ) : status.kind === "replied" ? (
         <Trans>Sent. Moved out of Needs reply</Trans>
+      ) : status.kind === "stopped" ? (
+        <span className="min-w-0 truncate" dir="auto">
+          <Trans>Stopped Needs reply for {status.sender}</Trans>
+        </span>
       ) : status.kind === "moved" ? (
         <span className="min-w-0 truncate" dir="auto">
           <Trans>Moved "{maskCurrencyWhenHidden(status.subject)}" to Inbox</Trans>
@@ -1393,7 +1420,9 @@ function InboxListPage({
                     ? unarchive(status.messageId)
                     : status.kind === "moved"
                       ? archive(status.messageId)
-                      : mark(status.messageId, null)
+                      : status.kind === "stopped"
+                        ? undoStop(status.messageId)
+                        : mark(status.messageId, null)
           }
         >
           <Trans>Undo</Trans>
@@ -1960,6 +1989,7 @@ function InboxListPage({
                             pickedIds={pickedSet}
                             onPick={pick}
                             onMove={moveOne}
+                            onNoReply={triage ? noReply : undefined}
                             hideNewsletter={pile === "newsletters"}
                           />
                         </Fragment>
@@ -1979,6 +2009,7 @@ function InboxListPage({
                   pickedIds={pickedSet}
                   onPick={pick}
                   onMove={moveOne}
+                  onNoReply={triage ? noReply : undefined}
                   showArchived={false}
                 />
               ) : (
@@ -1998,6 +2029,7 @@ function InboxListPage({
                     pickedIds={pickedSet}
                     onPick={pick}
                     onMove={moveOne}
+                    onNoReply={triage ? noReply : undefined}
                   />
                   {hiddenReplies > 0 ? (
                     <Button
@@ -2022,6 +2054,7 @@ function InboxListPage({
                       pickedIds={pickedSet}
                       onPick={pick}
                       onMove={moveOne}
+                      onNoReply={triage ? noReply : undefined}
                     />
                   ) : (
                     <>
@@ -2044,6 +2077,7 @@ function InboxListPage({
                         pickedIds={pickedSet}
                         onPick={pick}
                         onMove={moveOne}
+                        onNoReply={triage ? noReply : undefined}
                       />
                       <InboxGroup
                         title={<Trans>Earlier</Trans>}
@@ -2057,6 +2091,7 @@ function InboxListPage({
                         pickedIds={pickedSet}
                         onPick={pick}
                         onMove={moveOne}
+                        onNoReply={triage ? noReply : undefined}
                       />
                     </>
                   )}

@@ -72,16 +72,23 @@ vi.mock("../components/mail-row-menu", () => ({
     onSpam,
     onNotSpam,
     onTrash,
+    onNoReply,
     children,
   }: {
     onArchive: () => void;
     onSpam?: () => void;
     onNotSpam?: () => void;
     onTrash?: () => void;
+    onNoReply?: () => void;
     children: ReactNode;
   }) => (
     <div>
       {children}
+      {onNoReply ? (
+        <button type="button" data-menu="noReply" onClick={onNoReply}>
+          No reply needed
+        </button>
+      ) : null}
       <button type="button" data-menu="archive" onClick={onArchive}>
         Archive
       </button>
@@ -231,6 +238,7 @@ let listReply: () => unknown;
 let todosReply: () => unknown;
 let setDoneReply: () => Promise<unknown>;
 let archiveReply: (body: { messageIds: string[] }) => unknown;
+let noReplyReply: () => unknown;
 let moveReply: (body: { op: string; messageIds: string[] }) => unknown;
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -239,6 +247,7 @@ beforeEach(() => {
   setDoneReply = () => Promise.resolve({});
   archiveReply = (body) => ({ done: body.messageIds, failed: [] });
   moveReply = (body) => ({ done: body.messageIds, failed: [], batchId: "batch-1" });
+  noReplyReply = () => ({ stopped: null });
   state.push.mockReset();
   state.setOptions.mockReset();
   state.alert.mockReset();
@@ -246,6 +255,7 @@ beforeEach(() => {
     if (proc === "inbox/list") return listReply();
     if (proc === "inbox/archiveMany") return archiveReply(body as { messageIds: string[] });
     if (proc === "inbox/moveMany") return moveReply(body as { op: string; messageIds: string[] });
+    if (proc === "inbox/noReply") return noReplyReply();
     if (proc === "inbox/refresh") return { ok: true };
     if (proc === "inbox/todos/list") return todosReply();
     if (proc === "inbox/todos/setDone") return setDoneReply();
@@ -986,5 +996,36 @@ describe("spam and trash from the row menu", () => {
     await act(async () => menuButton("trash")?.click());
     expect(state.alert).toHaveBeenCalledWith("Could not move 1");
     expect(container.textContent).toContain("Subject r1");
+  });
+});
+
+describe("no reply needed from the row menu", () => {
+  const menuButton = (name: string) =>
+    container.querySelector<HTMLButtonElement>(`button[data-menu="${name}"]`);
+
+  it("offers it only on a Needs reply row and takes the row out of Needs reply at once", async () => {
+    listReply = () =>
+      inboxList({
+        rows: [mailRow("n1", { needsReply: true }), mailRow("n2", { needsReply: false })],
+      });
+    await render();
+    expect(container.querySelectorAll('button[data-menu="noReply"]')).toHaveLength(1);
+    await act(async () => menuButton("noReply")?.click());
+    expect(state.rpc).toHaveBeenCalledWith("inbox/noReply", { messageId: "n1" });
+    expect(state.alert).not.toHaveBeenCalled();
+  });
+
+  it("says Needs reply stopped for the sender, with Undo, after the third", async () => {
+    listReply = () => inboxList({ rows: [mailRow("n1", { needsReply: true })] });
+    noReplyReply = () => ({ stopped: "Store Bot" });
+    await render();
+    await act(async () => menuButton("noReply")?.click());
+    expect(state.alert).toHaveBeenCalledWith("Stopped Needs reply for Store Bot", undefined, [
+      expect.objectContaining({ text: "Undo" }),
+      expect.objectContaining({ text: "Done" }),
+    ]);
+    const undo = (state.alert.mock.calls[0]?.[2] as { text: string; onPress?: () => void }[])[0];
+    await act(async () => undo?.onPress?.());
+    expect(state.rpc).toHaveBeenCalledWith("inbox/noReply", { messageId: "n1", undo: true });
   });
 });

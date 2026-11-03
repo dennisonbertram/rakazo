@@ -949,6 +949,10 @@ export const HI_MESSAGES: Record<string, string> = {
   "No data yet": "अभी कोई डेटा नहीं",
   "Source failed": "स्रोत विफल रहा",
   "Connected.": "कनेक्ट हो गया।",
-  "Disconnected {provider}. Bots now use {model}.": "{provider} डिस्कनेक्ट हो गया। बॉट अब {model} का उपयोग करेंगे।",
+  "Disconnected {provider}. Bots now use {model}.":
+    "{provider} डिस्कनेक्ट हो गया। बॉट अब {model} का उपयोग करेंगे।",
   "Source paused": "स्रोत रोका गया",
+  "Needs reply stopped": "जवाब की ज़रूरत बंद",
+  "No reply needed": "जवाब की ज़रूरत नहीं",
+  "Stopped Needs reply for {sender}": "{sender} के लिए जवाब की ज़रूरत बंद की गई",
 };

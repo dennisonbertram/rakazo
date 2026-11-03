@@ -285,6 +285,24 @@ it("keeps Spam and Trash out of the inline hover buttons", async () => {
   expect(inline).not.toContain("Trash");
 });
 
+it("offers No reply needed in the More menu only on a Needs reply row", async () => {
+  const onNoReply = vi.fn();
+  await show({ row: { ...row, needsReply: true }, onNoReply });
+  const items = await menuItems();
+  expect(items.map((el) => el.textContent)).toEqual(["Archive", "Mark read", "No reply needed"]);
+  await act(async () => items[2]?.click());
+  expect(onNoReply).toHaveBeenCalledTimes(1);
+  const inline = [...document.querySelectorAll("div.absolute button[aria-label]")].map((el) =>
+    el.getAttribute("aria-label"),
+  );
+  expect(inline).not.toContain("No reply needed");
+});
+
+it("offers no No reply needed item on a row that does not need a reply", async () => {
+  await show({ row: { ...row, needsReply: false }, onNoReply: () => {} });
+  expect((await menuItems()).map((el) => el.textContent)).not.toContain("No reply needed");
+});
+
 it("offers Not spam, not Spam, for a row in the Spam pile", async () => {
   const onMove = vi.fn();
   await show({ row: { ...row, inInbox: false, pile: "spam" }, onMove });

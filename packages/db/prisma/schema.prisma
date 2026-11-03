@@ -2593,6 +2593,8 @@ model CachedMailMessage {
   dueOn             DateTime?   @db.Date
   /// Computed in code: the user sent a later message in the same thread.
   alreadyHandled    Boolean     @default(false)
+  /// The user said this message needs no reply; triage never puts it back in Needs reply.
+  replyDismissedAt  DateTime?
   /// Last time a sync or a search wrote this row.
   seenAt            DateTime
   /// Sync archived this message because its sender skips the inbox. Set once and never cleared, so an undo is not archived again.
@@ -2648,6 +2650,9 @@ model MailSenderStat {
   learnedAt             DateTime?
   /// The user forgot the learned pile; only mail received after this counts toward learning again.
   learnedForgottenAt    DateTime?
+  /// Messages from this sender the user said needed no reply. At 3 the sender no longer reaches Needs reply; writing to the sender resets it.
+  noReplyCount          Int        @default(0)
+  noReplyAt             DateTime?
 
   @@unique([connectionId, senderAddress])
   @@map("mail_sender_stats")

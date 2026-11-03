@@ -161,6 +161,24 @@ export const LongContent: Story = {
   },
 };
 
+/** Mail waiting on a reply adds No reply needed to the More menu. */
+export const NeedsReplyMenu: Story = {
+  args: {
+    row: { ...(rows[0] as MailRow), needsReply: true },
+    onMark: noop,
+    onArchive: noop,
+    onRead: noop,
+    onNoReply: noop,
+  },
+  decorators: [
+    (Story) => (
+      <div className="@container w-[360px]">
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 /** At phone width the actions move into the More menu. */
 export const NarrowWithMenu: Story = {
   args: { row: rows[0] as MailRow, onMark: noop, onArchive: noop, onRead: noop },

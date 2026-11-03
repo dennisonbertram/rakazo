@@ -25,6 +25,7 @@ import {
 import {
   isCleanupListed,
   isCleanupPreselected,
+  NO_REPLY_STOP_AT,
   planUnsubscribe,
   rankCleanupSenders,
   senderMarkMap,
@@ -172,7 +173,7 @@ export async function inboxCleanupList(
   // The same goes for a sender with a learned pile, so it can be forgotten.
   const skipped = [
     ...decisions.filter((d) => d.skipInboxAt),
-    ...stats.filter((s) => s.learnedPile !== null),
+    ...stats.filter((s) => s.learnedPile !== null || s.noReplyCount >= NO_REPLY_STOP_AT),
   ].map((row) => ({ connectionId: row.connectionId, address: row.senderAddress }));
   const facts = await senderFacts(prisma, actor, ids, undefined, true, skipped);
   const key = (connectionId: string, address: string) => `${connectionId}:${address}`;
@@ -186,15 +187,16 @@ export async function inboxCleanupList(
     const decision = decisionOf.get(key(fact.connectionId, fact.address));
     const skipInbox = Boolean(decision?.skipInboxAt);
     const learnedPile = parsePile(stat.learnedPile);
-    // A skipped or learned sender stays listed so the decision can be undone.
-    const decided = skipInbox || learnedPile !== null;
+    const stopped = stat.noReplyCount >= NO_REPLY_STOP_AT;
+    // A skipped, learned or stopped sender stays listed so the decision can be undone.
+    const decided = skipInbox || learnedPile !== null || stopped;
     // Someone saved in Contacts, or whose newest mail sorted into Important, is not clutter.
     if ((saved.has(fact.address) || fact.newestPile === "important") && !decided) return [];
     if (
       !isCleanupListed({
         messageCount: stat.messageCount,
         priorContact: stat.priorContact,
-        keep: skipInbox || learnedPile !== null,
+        keep: decided,
       })
     )
       return [];
@@ -225,6 +227,7 @@ export async function inboxCleanupList(
         unsubscribeStatus: parseStatus(decision?.unsubscribeStatus),
         ...(skipInbox && rule.success ? { rule: rule.data } : {}),
         learnedPile,
+        ...(stat.noReplyCount > 0 ? { noReplyCount: stat.noReplyCount } : {}),
       },
     ];
   });
@@ -367,7 +370,15 @@ export async function inboxCleanupForget(
   if (input.learned) {
     await deps.prisma.mailSenderStat.updateMany({
       where,
-      data: { learnedPile: null, learnedCount: 0, learnedAt: null, learnedForgottenAt: new Date() },
+      data: {
+        learnedPile: null,
+        learnedCount: 0,
+        learnedAt: null,
+        learnedForgottenAt: new Date(),
+        // Forgetting what was learned about the sender also forgets the no-reply corrections.
+        noReplyCount: 0,
+        noReplyAt: null,
+      },
     });
     return { ok: true };
   }
