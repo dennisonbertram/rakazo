@@ -310,7 +310,11 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const boardEvents = createBoardEvents(realtime);
   const notificationEvents = createNotificationEvents(realtime);
   const environmentSignupPolicy = signupPolicyFromEnv(env);
-  logger.info("built-in agent instructions upgraded", await upgradeBuiltInAgentInstructions(prisma));
+  // A failed upgrade leaves agents on their old text; it must never stop the API from starting.
+  await upgradeBuiltInAgentInstructions(prisma).then(
+    (counts) => logger.info("built-in agent instructions upgraded", counts),
+    (error: unknown) => logger.warn("built-in agent instruction upgrade failed", { error }),
+  );
   const deploymentSettings = await prisma.deploymentSettings.upsert({
     where: { id: "default" },
     create: {
