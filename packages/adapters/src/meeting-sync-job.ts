@@ -6,7 +6,7 @@ import type {
   SecretStore,
 } from "@rakazo/adapter-kit";
 import { MeetingSourceError, meetingsSyncJob } from "@rakazo/adapter-kit";
-import { GRANOLA_API_CONNECTOR_ID } from "@rakazo/contracts";
+import { GRANOLA_API_CONNECTOR_ID, isWisprFlowEndpoint } from "@rakazo/contracts";
 import type { MeetingSourceRef, PrismaClient } from "@rakazo/db";
 import { getMeetingSyncState, upsertMeetingSyncState } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -272,8 +272,8 @@ export async function requestMeetingSync(
 }
 
 /**
- * Scheduler step, run by the elected reconciler: queues a sync for each connected Granola key whose
- * sync state has been idle for 5 minutes (or does not exist yet). A source that failed is retried by
+ * Scheduler step, run by the elected reconciler: queues a sync for each connected Granola key and
+ * each Wispr Flow MCP server whose sync state has been idle for 5 minutes (or does not exist yet). A source that failed is retried by
  * the same rule. `keepExisting` leaves a job that is already waiting alone.
  */
 export async function reconcileMeetingSyncs(
@@ -309,7 +309,45 @@ export async function reconcileMeetingSyncs(
       });
       queued++;
     }
-    if (page.length < batchSize) return queued;
+    if (page.length < batchSize) break;
     after = page[page.length - 1]?.id;
   }
+  return queued + (await reconcileWisprFlowSyncs(deps, idleBefore));
+}
+
+/** Wispr Flow is an MCP server, so its sync state hangs off the server, not a connection. */
+async function reconcileWisprFlowSyncs(
+  deps: Pick<MeetingSyncJobDeps, "prisma" | "jobs">,
+  idleBefore: Date,
+): Promise<number> {
+  // ponytail: one query, not paged; there is one Flow server per user who connected it.
+  const servers = (
+    await deps.prisma.mcpServer.findMany({
+      where: { enabled: true, endpoint: { contains: "wisprflow.ai" } },
+      select: { id: true, spaceId: true, userId: true, endpoint: true },
+    })
+  ).filter((s) => isWisprFlowEndpoint(s.endpoint));
+  const fresh = new Set(
+    (
+      await deps.prisma.meetingSyncState.findMany({
+        where: { mcpServerId: { in: servers.map((s) => s.id) }, updatedAt: { gte: idleBefore } },
+        select: { mcpServerId: true },
+      })
+    ).map((state) => state.mcpServerId),
+  );
+  let queued = 0;
+  for (const s of servers) {
+    if (fresh.has(s.id)) continue;
+    await deps.jobs.enqueue({
+      ...meetingsSyncJob({
+        spaceId: s.spaceId,
+        userId: s.userId,
+        provider: "wisprflow",
+        mcpServerId: s.id,
+      }),
+      keepExisting: true,
+    });
+    queued++;
+  }
+  return queued;
 }

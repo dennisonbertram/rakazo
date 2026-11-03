@@ -47,6 +47,7 @@ import {
   createJobReconciler,
   createMailProvider,
   createMailUnsubscriber,
+  createMeetingSourceRegistry,
   createMessagingContextLoader,
   createMessagingTeamChatSender,
   createPushChannel,
@@ -716,7 +717,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     mail,
     mailWritesDisabled: env.mailWritesDisabled,
     gmailPush,
-    ...(meetingSources ? { meetingSources } : {}),
+    meetingSources:
+      meetingSources ?? createMeetingSourceRegistry({ mcp: { prisma, connector: mcp } }),
     companyImport,
   });
   if (inMemoryJobs) {

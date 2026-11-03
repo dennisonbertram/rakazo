@@ -45,10 +45,10 @@ import {
 } from "@rakazo/adapter-kit";
 import type { ComputerCommand, MessageBlock, RunPhase, RunStatus } from "@rakazo/contracts";
 import {
-  approvalTitle,
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
   ATTACHMENT_MAX_BYTES,
+  approvalTitle,
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
@@ -500,6 +500,7 @@ import type { McpStdioPolicy } from "./mcp-transport.js";
 import { mcpStdioRefusal } from "./mcp-transport.js";
 import {
   isMeetingSourceAgent,
+  MEETING_AGENT_APPROVAL_TOOLS,
   MEETING_AGENT_BUILTIN_TOOLS,
   MEETING_CONSENT_OFF,
   MEETING_CONSENT_REQUIRED_MESSAGE,
@@ -3390,8 +3391,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           run.trigger !== "routine" &&
           !isBackgroundRunTrigger(run.trigger) &&
           OWNER_INITIATED_TRIGGERS.has(run.trigger);
+        // Routines and to-dos are offered only where the meeting reads are: owner-started runs.
         const meetingAgentToolSet: ReadonlySet<string> = new Set(
-          omiConnection ? OMI_AGENT_BUILTIN_TOOLS : MEETING_AGENT_BUILTIN_TOOLS,
+          (omiConnection ? OMI_AGENT_BUILTIN_TOOLS : MEETING_AGENT_BUILTIN_TOOLS).filter(
+            (name) => meetingsEnabled || !MEETING_AGENT_APPROVAL_TOOLS.has(name),
+          ),
         );
         const financeEnabled =
           financeToolsAllowed({
@@ -5036,10 +5040,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // A run that read a meeting agent's reply holds untrusted meeting text: every call that
           // writes, sends or reaches the network asks, on a card that cannot become a saved rule.
           // Read at each call, so a run that is marked mid-way (a reply arrives) asks from then on.
-          const meetingTaintedCall =
-            !meetingAgent &&
-            !MEETING_TAINT_FREE_TOOLS.has(name) &&
-            (meetingTaint || (await threadMarkedNow()));
+          // A meeting-source agent's own thread is always marked, so it asks only for the few
+          // writes it is offered (routines and to-dos); the rest of its tools only read.
+          const meetingTaintedCall = meetingAgent
+            ? MEETING_AGENT_APPROVAL_TOOLS.has(name)
+            : !MEETING_TAINT_FREE_TOOLS.has(name) && (meetingTaint || (await threadMarkedNow()));
           // Likewise for a run that began with an external bot: everything outside the short free
           // list asks, whether it reads private data or writes. Read at each call so a marked
           // message claimed as steering mid-run counts from then on.
@@ -5367,13 +5372,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
           const needsApproval = gateDecision === "ask";
           // One plain line on the card, only for a background, tainted or rule-caused ask.
-          const approvalCardReason = requiresUnattendedApproval || mailModifyNeedsToolRule
-            ? "Asked because this ran in the background."
-            : externalTaintedCall
-              ? EXTERNAL_REQUEST_REASON
-              : approvalResolved.source === "require_approval" && actionType
-                ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
-                : undefined;
+          const approvalCardReason =
+            requiresUnattendedApproval || mailModifyNeedsToolRule
+              ? "Asked because this ran in the background."
+              : externalTaintedCall
+                ? EXTERNAL_REQUEST_REASON
+                : approvalResolved.source === "require_approval" && actionType
+                  ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
+                  : undefined;
           // Record each decision once; a replay of the same effect already has its event.
           if (
             !applied?.duplicate &&

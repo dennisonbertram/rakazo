@@ -4,6 +4,7 @@ import {
   isGranolaEndpoint,
   isIntegrationAgentForServer,
   isIntegrationAgentSpawnKey,
+  isWisprFlowEndpoint,
   MEETING_TRANSCRIPT_TOOL_MAX_BYTES,
   MEETING_TRUNCATION_MARKER,
   OMI_CONNECTOR_ID,
@@ -18,16 +19,28 @@ export const MEETING_TOOL_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The tools a meeting-source agent may call only after the owner approves each call, on a card
+ * that cannot become a saved rule. They stay here so the Wispr Flow agent keeps the routines and
+ * to-dos it had before it became a meeting-source agent. The executor forces the approval.
+ */
+export const MEETING_AGENT_APPROVAL_TOOLS: ReadonlySet<string> = new Set([
+  "schedule_create",
+  "schedule_list",
+  "scratchpad_add",
+]);
+
+/**
  * The only built-ins a meeting-source agent has on any run. Meeting text is untrusted, so the
  * agent can read it and nothing else: no memory writes, files, shell, browser, web, messaging,
- * delegation, mail or other connectors. There are no exceptions; a new built-in is not added here
- * unless it only reads the user's own stored data.
+ * delegation, mail or other connectors. The one exception is MEETING_AGENT_APPROVAL_TOOLS, which
+ * always asks. A new built-in is not added here unless it only reads the user's own stored data.
  */
 export const MEETING_AGENT_BUILTIN_TOOLS = [
   "meetings_list",
   "meetings_search",
   "meetings_get",
   "recall_memory",
+  ...MEETING_AGENT_APPROVAL_TOOLS,
 ] as const;
 
 /**
@@ -229,6 +242,18 @@ const granolaMcpAgent: MeetingAgentCheck = async (bot, deps) => {
   );
 };
 
+/** The agent of an MCP server whose endpoint is Wispr Flow's. */
+const wisprFlowAgent: MeetingAgentCheck = async (bot, deps) => {
+  if (!isIntegrationAgentSpawnKey(bot.spawnKey)) return false;
+  const servers = await deps.prisma.mcpServer.findMany({
+    where: { spaceId: bot.spaceId, userId: bot.userId, agentBotId: bot.id },
+    select: { id: true, spaceId: true, userId: true, endpoint: true, agentBotId: true },
+  });
+  return servers.some(
+    (server) => isWisprFlowEndpoint(server.endpoint) && isIntegrationAgentForServer(server, bot),
+  );
+};
+
 /**
  * The agent of a Granola API-key connection, found by the connection that names it. The row may be
  * disconnected: the agent still answers from stored meetings.
@@ -286,12 +311,14 @@ export const omiConnectionOf = async (
     select: { id: true },
   });
 
-/**
- * The provider registry: each source that stores meetings declares which agent reads them. Wispr
- * Flow is absent until its MeetingSource is registered; the Granola API-key connection adds its
- * check here.
- */
-const meetingAgentChecks: MeetingAgentCheck[] = [granolaMcpAgent, granolaApiAgent, omiAgent, hexAgent];
+/** The provider registry: each source that stores meetings declares which agent reads them. */
+const meetingAgentChecks: MeetingAgentCheck[] = [
+  granolaMcpAgent,
+  wisprFlowAgent,
+  granolaApiAgent,
+  omiAgent,
+  hexAgent,
+];
 export function registerMeetingSourceAgentCheck(check: MeetingAgentCheck) {
   meetingAgentChecks.push(check);
 }

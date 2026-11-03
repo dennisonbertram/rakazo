@@ -209,7 +209,11 @@ export function createBackgroundJobHandlers(deps: {
     };
   };
 
-  const meetingSources = deps.meetingSources ?? createMeetingSourceRegistry();
+  const meetingSources =
+    deps.meetingSources ??
+    createMeetingSourceRegistry(
+      deps.mcp ? { mcp: { prisma: deps.prisma, connector: deps.mcp } } : {},
+    );
 
   return {
     "run.continue": asOwner(run, async (payload) => {
