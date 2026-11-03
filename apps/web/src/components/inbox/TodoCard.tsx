@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { InboxTodo } from "@rakazo/contracts";
+import type { InboxTodo, InboxTodoDone } from "@rakazo/contracts";
 import { dueTone, localDaysUntil } from "@rakazo/core";
 import { Button, Card, Checkbox } from "@rakazo/ui-web";
 import { ChevronDown } from "lucide-react";
@@ -32,7 +32,7 @@ export function TodoCard({
   meetings,
 }: {
   todos: InboxTodo[];
-  onChange: (todo: InboxTodo) => void;
+  onChange: (todo: InboxTodoDone) => void;
   /** Opens the email a to-do came from. */
   onOpen?: (messageId: string) => void;
   /** The user's meeting source, from the list reply; adds the Syncing and empty lines. */

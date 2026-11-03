@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 331 of 331
-- Web and shared components: 848
+- Web and shared component files with stories: 332 of 332
+- Web and shared components: 849
 - Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 126 in 67 files, native story pending
+- SwiftUI views: 130 in 71 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -250,6 +250,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Section, Item, PersonFacts, ContextPanel | [apps/web/src/components/inbox/ContextPanel.tsx](../../apps/web/src/components/inbox/ContextPanel.tsx) | [ContextPanel.stories.tsx](../../apps/web/src/components/inbox/ContextPanel.stories.tsx) | web |
 | EmailAgentPanel | [apps/web/src/components/inbox/EmailAgentPanel.tsx](../../apps/web/src/components/inbox/EmailAgentPanel.tsx) | [EmailAgentPanel.stories.tsx](../../apps/web/src/components/inbox/EmailAgentPanel.stories.tsx) | web |
 | EmailSidePanel | [apps/web/src/components/inbox/EmailSidePanel.tsx](../../apps/web/src/components/inbox/EmailSidePanel.tsx) | [EmailSidePanel.stories.tsx](../../apps/web/src/components/inbox/EmailSidePanel.stories.tsx) | web |
+| InboxAccountTabs | [apps/web/src/components/inbox/InboxAccountTabs.tsx](../../apps/web/src/components/inbox/InboxAccountTabs.tsx) | [InboxAccountTabs.stories.tsx](../../apps/web/src/components/inbox/InboxAccountTabs.stories.tsx) | web |
 | InboxCleanup, OpenLink | [apps/web/src/components/inbox/InboxCleanup.tsx](../../apps/web/src/components/inbox/InboxCleanup.tsx) | [InboxCleanup.stories.tsx](../../apps/web/src/components/inbox/InboxCleanup.stories.tsx) | web |
 | InboxDigest | [apps/web/src/components/inbox/InboxDigest.tsx](../../apps/web/src/components/inbox/InboxDigest.tsx) | [InboxDigest.stories.tsx](../../apps/web/src/components/inbox/InboxDigest.stories.tsx) | web |
 | Addresses, InboxMessageDialog, InboxMessage, SentMark, ThreadMessages, ThreadMessage | [apps/web/src/components/inbox/InboxMessageDialog.tsx](../../apps/web/src/components/inbox/InboxMessageDialog.tsx) | [InboxMessageDialog.stories.tsx](../../apps/web/src/components/inbox/InboxMessageDialog.stories.tsx) | web |
@@ -604,6 +605,10 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | NewBotSheet, ColorSwatches | [apps/ios/Sources/Praci/Manage/NewBotSheet.swift](../../apps/ios/Sources/Praci/Manage/NewBotSheet.swift) | native story pending | iOS |
 | NewGroupSheet, MemberRows, MemberFooter | [apps/ios/Sources/Praci/Manage/NewGroupSheet.swift](../../apps/ios/Sources/Praci/Manage/NewGroupSheet.swift) | native story pending | iOS |
 | ToastBody | [apps/ios/Sources/Praci/Manage/UndoToast.swift](../../apps/ios/Sources/Praci/Manage/UndoToast.swift) | native story pending | iOS |
+| MeetingDetailScreen | [apps/ios/Sources/Praci/Meetings/MeetingDetailScreen.swift](../../apps/ios/Sources/Praci/Meetings/MeetingDetailScreen.swift) | native story pending | iOS |
+| MeetingsScreen | [apps/ios/Sources/Praci/Meetings/MeetingsScreen.swift](../../apps/ios/Sources/Praci/Meetings/MeetingsScreen.swift) | native story pending | iOS |
+| RecordingBar | [apps/ios/Sources/Praci/Meetings/RecordingBar.swift](../../apps/ios/Sources/Praci/Meetings/RecordingBar.swift) | native story pending | iOS |
+| RecordSheet | [apps/ios/Sources/Praci/Meetings/RecordSheet.swift](../../apps/ios/Sources/Praci/Meetings/RecordSheet.swift) | native story pending | iOS |
 | RoutineScreen | [apps/ios/Sources/Praci/Routines/RoutineScreen.swift](../../apps/ios/Sources/Praci/Routines/RoutineScreen.swift) | native story pending | iOS |
 | RoutinesScreen | [apps/ios/Sources/Praci/Routines/RoutinesScreen.swift](../../apps/ios/Sources/Praci/Routines/RoutinesScreen.swift) | native story pending | iOS |
 | ServerView | [apps/ios/Sources/Praci/ServerView.swift](../../apps/ios/Sources/Praci/ServerView.swift) | native story pending | iOS |

@@ -954,6 +954,10 @@ export const KO_MESSAGES: Record<string, string> = {
   "No data yet": "아직 데이터 없음",
   "Source failed": "소스 실패",
   "Connected.": "연결되었습니다.",
-  "Disconnected {provider}. Bots now use {model}.": "{provider} 연결을 해제했습니다. 이제 봇은 {model}을(를) 사용합니다.",
+  "Disconnected {provider}. Bots now use {model}.":
+    "{provider} 연결을 해제했습니다. 이제 봇은 {model}을(를) 사용합니다.",
   "Source paused": "소스 일시 중지됨",
+  "Needs reply stopped": "답장 필요 중지됨",
+  "No reply needed": "답장 필요 없음",
+  "Stopped Needs reply for {sender}": "{sender}의 답장 필요 표시를 중지했습니다",
 };

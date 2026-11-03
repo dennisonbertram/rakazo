@@ -64,6 +64,11 @@ export type MailToolDeps = {
   jobs: JobPublisher;
   /** Connected accounts of the bot owner. Memoized per run by the caller. */
   accounts: () => Promise<MailAccount[]>;
+  /**
+   * Every connected account of the owner, including ones this agent may not use. Only read to tell
+   * "not connected" from "not allowed" when the model names an account. Never offered for use.
+   */
+  ownerAccounts?: () => Promise<MailAccount[]>;
   /** From the run, never from model input. */
   scope: { spaceId: string; userId: string; botId: string };
   /** Puts blocks in the run's thread. Without it show_emails is unavailable. */
@@ -267,8 +272,14 @@ export function findAccount(accounts: MailAccount[], wanted: string): MailAccoun
   return named.length === 1 ? named[0] : undefined;
 }
 
-function noAccount(wanted: string) {
-  return { error: `No connected mail account ${wanted.trim().slice(0, 200)}` };
+async function noAccount(deps: MailToolDeps, usable: MailAccount[], wanted: string) {
+  const owned = deps.ownerAccounts ? await deps.ownerAccounts().catch(() => []) : [];
+  const forbidden = findAccount(owned, wanted);
+  if (!forbidden) return { error: `No connected mail account ${wanted.trim().slice(0, 200)}` };
+  const can = usable.length > 0 ? ` It can use: ${usable.map(accountName).join(", ")}.` : "";
+  return {
+    error: `This agent isn't allowed to use ${accountName(forbidden)}.${can} Give it access on that account's Integrations page.`,
+  };
 }
 
 async function findOwnedSearch(deps: MailToolDeps, id: unknown) {
@@ -339,7 +350,7 @@ async function mailSearch(
     let chosen = accounts;
     if (typeof args.account === "string" && args.account.trim()) {
       const account = findAccount(accounts, args.account);
-      if (!account) return noAccount(args.account);
+      if (!account) return await noAccount(deps, accounts, args.account);
       chosen = [account];
     }
     if (chosen.length === 0) return { error: "No connected mail account" };
@@ -692,7 +703,7 @@ async function resolveAccount(
   const accounts = await deps.accounts();
   if (typeof args.account === "string" && args.account.trim()) {
     const account = findAccount(accounts, args.account);
-    return account ? { account } : noAccount(args.account);
+    return account ? { account } : await noAccount(deps, accounts, args.account);
   }
   const owner = { spaceId: deps.scope.spaceId, userId: deps.scope.userId };
   const inferred = await inferMailAccount(deps.prisma, owner, accounts, args);
@@ -967,6 +978,28 @@ const CHECK_SENT = "Check the Sent folder before trying again.";
  * replayed call reports the earlier outcome instead of sending again. A send whose outcome is unclear
  * is never repeated. Same record and states as the Inbox composer's send (`ComposeSend`).
  */
+/**
+ * True when no send of this call reached the provider (no record, or one still draft or failed),
+ * so an interrupted call can be run again. A pending, unknown or sent record is not retryable.
+ */
+export async function mailSendNotDispatched(
+  prisma: PrismaClient,
+  scope: { spaceId: string; userId: string },
+  idempotencyKey: string,
+): Promise<boolean> {
+  const row = await prisma.composeSend.findUnique({
+    where: {
+      spaceId_userId_clientId: {
+        spaceId: scope.spaceId,
+        userId: scope.userId,
+        clientId: `agent:${idempotencyKey}`,
+      },
+    },
+    select: { state: true },
+  });
+  return !row || row.state === "draft" || row.state === "failed";
+}
+
 async function mailSend(
   deps: MailToolDeps,
   context: AdapterContext,

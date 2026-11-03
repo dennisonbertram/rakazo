@@ -22,6 +22,7 @@ import {
   ListChecks,
   Mail,
   MailOpen,
+  MessageSquareOff,
   Paperclip,
   ShieldAlert,
   ShieldCheck,
@@ -109,6 +110,8 @@ export type MailMoveOp = "spam" | "notSpam" | "trash";
 export interface RowPicking {
   /** Present when the list can report spam or move to trash. */
   onMove?: (op: MailMoveOp, messageId: string) => void;
+  /** Present when mail waiting on a reply can be marked as needing none; it lives in the More menu only. */
+  onNoReply?: (messageId: string) => void;
   /** The checked rows. */
   pickedIds?: ReadonlySet<string>;
   onPick?: (messageId: string, event: { shift: boolean }) => void;
@@ -126,6 +129,7 @@ export const rowPicking = (id: string, picking: RowPicking) => ({
   hideNewsletter: picking.hideNewsletter,
   query: picking.query,
   ...(picking.onMove ? { onMove: (op: MailMoveOp) => picking.onMove?.(op, id) } : {}),
+  ...(picking.onNoReply ? { onNoReply: () => picking.onNoReply?.(id) } : {}),
   ...(picking.onPick
     ? {
         picked: picking.pickedIds?.has(id) ?? false,
@@ -218,6 +222,7 @@ export function InboxRow({
   anyPicked = false,
   onPick,
   onMove,
+  onNoReply,
   showArchived = true,
   hideNewsletter = false,
   query,
@@ -240,6 +245,8 @@ export function InboxRow({
   onPick?: (event: { shift: boolean }) => void;
   /** Present when the row can be reported as spam or moved to trash; these live in the More menu only. */
   onMove?: (op: MailMoveOp) => void;
+  /** Present when the list can say a Needs reply row needs no reply; shown only on such a row. */
+  onNoReply?: () => void;
   showArchived?: boolean;
   hideNewsletter?: boolean;
   query?: string;
@@ -310,6 +317,15 @@ export function InboxRow({
             Icon: Eye,
             run: () => onTrack(row.id, !row.tracked),
             pressed: row.tracked === true,
+          },
+        ]
+      : []),
+    ...(onNoReply && row.needsReply === true
+      ? [
+          {
+            name: t`No reply needed`,
+            Icon: MessageSquareOff,
+            run: onNoReply,
           },
         ]
       : []),

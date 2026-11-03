@@ -958,3 +958,21 @@ it("offers Track in More and shows a Tracked mark while it is on", async () => {
   await act(async () => (await menuItem("Stop tracking"))?.click());
   expect(onTrack).toHaveBeenLastCalledWith(false);
 });
+
+it("keeps the notice in a live region that is already there, so a screen reader announces it", async () => {
+  get.mockImplementation(async ({ messageId }) => message(messageId));
+  const props = { messageId: "m2", onClose: () => {} };
+  act(() => root.render(<InboxMessageDialog {...props} />));
+  await flush();
+  const region = document.querySelector('[role="status"]');
+  expect(region).not.toBeNull();
+  expect(region?.textContent).toBe("");
+  act(() =>
+    root.render(
+      <InboxMessageDialog {...props} notice={<span>Stopped Needs reply for Sam</span>} />,
+    ),
+  );
+  await flush();
+  expect(document.querySelector('[role="status"]')).toBe(region);
+  expect(region?.textContent).toBe("Stopped Needs reply for Sam");
+});

@@ -965,6 +965,10 @@ export const FR_MESSAGES: Record<string, string> = {
   "No data yet": "Pas encore de données",
   "Source failed": "Échec de la source",
   "Connected.": "Connecté.",
-  "Disconnected {provider}. Bots now use {model}.": "{provider} déconnecté. Les bots utilisent désormais {model}.",
+  "Disconnected {provider}. Bots now use {model}.":
+    "{provider} déconnecté. Les bots utilisent désormais {model}.",
   "Source paused": "Source en pause",
+  "Needs reply stopped": "Réponse attendue désactivée",
+  "No reply needed": "Aucune réponse nécessaire",
+  "Stopped Needs reply for {sender}": "Réponse attendue désactivée pour {sender}",
 };

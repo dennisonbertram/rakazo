@@ -364,6 +364,7 @@ import {
   IN_LINE_BEHIND_SAME_BOT,
   provisionComputer,
   releaseComputerExecutionLease,
+  EXECUTION_LEASE_MS,
   renewComputerExecutionLease,
   screenLeaseIdForRun,
 } from "./computer-lifecycle.js";
@@ -487,6 +488,7 @@ import {
   findAccount,
   inferMailAccount,
   MAIL_TOOL_NAMES,
+  mailSendNotDispatched,
   mailToolFromTool,
   mailToolsAllowed,
   OWNER_INITIATED_TRIGGERS,
@@ -1792,29 +1794,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const fence = nextFence(run.leaseFence);
       const renew = () => renewRunLease(deps, runId, workerId, fence);
       const phases = runPhaseWriter(deps, run, fence);
-      const now = new Date();
-      const leased = await deps.prisma.run.updateMany({
-        where: {
-          id: runId,
-          ...continueRunClaimFence(run),
-          OR: [
-            { status: { in: ["queued", "waiting_input", "waiting_takeover"] } },
-            {
-              status: { in: ["leased", "running"] },
-              leaseExpiresAt: { lte: now },
-            },
-          ],
-        },
-        data: {
-          status: "leased",
-          leaseOwner: workerId,
-          leaseFence: fence,
-          leaseExpiresAt: new Date(Date.now() + RUN_LEASE_MS),
-          error: null,
-          checkpoint: null,
-        },
-      });
-      if (leased.count !== 1) return;
+      if (!(await claimRunLease(deps.prisma, run, workerId, fence))) return;
 
       const current = await deps.prisma.run.findUniqueOrThrow({
         where: { id: runId },
@@ -1920,20 +1900,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
       };
 
       let detachShutdown: (() => void) | undefined;
-      const heartbeat = setInterval(() => {
-        void Promise.all([renew(), renewComputerExecutionLease(deps.prisma, computerLease)])
-          .then(([runRenewed, computerRenewed]) => {
-            if (!runRenewed || !computerRenewed) {
-              leaseValid = false;
-              runAbortController?.abort();
-            }
-          })
-          .catch(() => {
-            leaseValid = false;
-            runAbortController?.abort();
-          });
-      }, 60_000);
-      heartbeat.unref?.();
+      const stopHeartbeat = startLeaseWatchdog(
+        async () => {
+          const [runRenewed, computerRenewed] = await Promise.all([
+            renew(),
+            renewComputerExecutionLease(deps.prisma, computerLease),
+          ]);
+          return runRenewed && computerRenewed;
+        },
+        () => {
+          leaseValid = false;
+          runAbortController?.abort();
+        },
+      );
 
       const runSecrets = [...deps.secrets];
       try {
@@ -3101,6 +3080,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : Promise.resolve([]);
           return mailAccountsPromise;
         };
+        // Every account of the owner, allowed or not, only to word the "not allowed" mail error.
+        const ownerMailAccounts = () =>
+          deps.mail
+            ? deps.mail.listAccounts({ spaceId: run.spaceId, userId: bot.userId }, context)
+            : Promise.resolve([]);
         // Native Google Calendar accounts of the bot owner, looked up once per run.
         let calendarAccountsPromise: Promise<CalendarAccount[]> | undefined;
         const calendarAccounts = () => {
@@ -6693,6 +6677,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 prisma: deps.prisma,
                 jobs: deps.jobs,
                 accounts: () => accountsAllowedNow(mailAccounts(), name),
+                ownerAccounts: ownerMailAccounts,
                 beforeWrite: (account) => writeDenialNow(account, name),
                 publish: (blocks) => publishMessage(deps, run, "bot", blocks),
                 writesDisabled: deps.mailWritesDisabled,
@@ -6701,7 +6686,29 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
               context,
               args,
-            ).finally(tracked.keep);
+            )
+              .catch(async (error: unknown) => {
+                // A stop before the provider was called leaves nothing sent: hand the claim back so
+                // the resumed run sends it, instead of reading the abort as an unknown outcome.
+                if (
+                  claimedEffect &&
+                  applied &&
+                  name === "mail_send" &&
+                  deps.shutdownSignal?.aborted &&
+                  (await mailSendNotDispatched(
+                    deps.prisma,
+                    { spaceId: run.spaceId, userId: bot.userId },
+                    effectKey,
+                  ).catch(() => false))
+                ) {
+                  await deps.prisma.externalEffect.updateMany({
+                    where: { id: applied.effect.id, status: "executing" },
+                    data: { status: "intended" },
+                  });
+                }
+                throw error;
+              })
+              .finally(tracked.keep);
             if (approvedByCard && applied && (name === "mail_send" || name === "mail_draft")) {
               const failedAccount =
                 approvedMailOutcome(name, result).outcome === "failed"
@@ -8647,6 +8654,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             !leaseValid || Boolean(runAbortController?.signal.aborted),
           )
         ) {
+          // A stopping worker still owns the lease: requeue it like any other setup abort.
+          if (deps.shutdownSignal?.aborted && leaseValid) {
+            throw new Error("Run interrupted by shutdown");
+          }
           return;
         }
 
@@ -9748,7 +9759,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
       } finally {
         detachShutdown?.();
-        clearInterval(heartbeat);
+        stopHeartbeat();
         if (!retainComputerLease) {
           if (screenRelease) {
             await deps.sandbox
@@ -10064,7 +10075,80 @@ async function notifyRun(
   }
 }
 
-const RUN_LEASE_MS = 5 * 60_000;
+// A crashed worker's run is taken over once its lease lapses (the reconciler scans every 30 s),
+// so the lease is a few heartbeats long, not minutes. Three missed beats mean the worker is gone.
+export const RUN_LEASE_MS = EXECUTION_LEASE_MS;
+export const RUN_HEARTBEAT_MS = 30_000;
+/** Renewal must succeed within this long, or the run stops locally before the lease can lapse. */
+export const RUN_RENEW_DEADLINE_MS = RUN_LEASE_MS - 30_000;
+
+/**
+ * Renews on an interval and calls `onLost` when a renewal is refused, throws, or has not
+ * succeeded within `deadlineMs` of the last success. The deadline runs on a local timer, so a
+ * database call that hangs still stops the run before another worker can reclaim the lease.
+ */
+export function startLeaseWatchdog(
+  renew: () => Promise<boolean>,
+  onLost: () => void,
+  options = { intervalMs: RUN_HEARTBEAT_MS, deadlineMs: RUN_RENEW_DEADLINE_MS },
+): () => void {
+  let lost = false;
+  const lose = () => {
+    if (lost) return;
+    lost = true;
+    onLost();
+  };
+  let deadline = setTimeout(lose, options.deadlineMs);
+  const timer = setInterval(() => {
+    void renew()
+      .then((ok) => {
+        if (lost) return;
+        if (!ok) return lose();
+        clearTimeout(deadline);
+        deadline = setTimeout(lose, options.deadlineMs);
+      })
+      .catch(lose);
+  }, options.intervalMs);
+  timer.unref?.();
+  deadline.unref?.();
+  return () => {
+    clearInterval(timer);
+    clearTimeout(deadline);
+  };
+}
+
+/**
+ * Takes the run for this worker: from queued or a human wait, or from a worker whose lease has
+ * lapsed. A live lease never matches, so two workers cannot run one run. The observed status and
+ * checkpoint fence a release that raced this claim.
+ */
+export async function claimRunLease(
+  prisma: Pick<PrismaClient, "run">,
+  run: { id: string; status: string; checkpoint: string | null },
+  workerId: string,
+  fence: number,
+  now = new Date(),
+): Promise<boolean> {
+  const leased = await prisma.run.updateMany({
+    where: {
+      id: run.id,
+      ...continueRunClaimFence(run),
+      OR: [
+        { status: { in: ["queued", "waiting_input", "waiting_takeover"] } },
+        { status: { in: ["leased", "running"] }, leaseExpiresAt: { lte: now } },
+      ],
+    },
+    data: {
+      status: "leased",
+      leaseOwner: workerId,
+      leaseFence: fence,
+      leaseExpiresAt: new Date(now.getTime() + RUN_LEASE_MS),
+      error: null,
+      checkpoint: null,
+    },
+  });
+  return leased.count === 1;
+}
 
 async function renewRunLease(
   deps: ExecutorDeps,
