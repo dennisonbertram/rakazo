@@ -85,7 +85,7 @@ export async function ensureLegalRoutine(
         return { routine: existing, created: false };
       const updated = await tx.routine.update({
         where: { id: existing.id },
-        data: { prompt: LEGAL_SCAN_PROMPT },
+        data: { prompt: LEGAL_SCAN_PROMPT, promptUpdatedAt: new Date() },
       });
       return { routine: updated, created: false };
     }

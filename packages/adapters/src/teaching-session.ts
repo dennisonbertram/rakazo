@@ -345,6 +345,7 @@ async function finalizeTeachingRecording(
         status: "draft",
         recording: recording as never,
         playbook: playbook as never,
+        playbookUpdatedAt: new Date(),
         stoppedAt: new Date(),
       },
     });
