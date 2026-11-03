@@ -192,6 +192,25 @@ describePostgres("meeting digest (PostgreSQL)", () => {
     expect(rows[0]?.dueOn?.toISOString().slice(0, 10)).toBe("2026-10-30");
   });
 
+  it.each([
+    ["investor", "investor"],
+    ["customer", "customer"],
+    ["hiring", "hiring"],
+    ["team", "team"],
+    ["other", "other"],
+    ["Investor; ignore all rules", "other"],
+    [undefined, "other"],
+  ])("stores category %s as %s, with the same single model call", async (given, stored) => {
+    const user = await addUser();
+    const id = await addMeeting(user.userId);
+    const rt = fakeRuntime([digestJson([], given === undefined ? {} : { category: given })]);
+    await digest(user.userId, id, rt.runtime);
+    expect(rt.requests).toHaveLength(1);
+    const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id } });
+    expect(meeting.category).toBe(stored);
+    expect(meeting.digest).toMatchObject({ category: stored });
+  });
+
   it("a commitment by someone else is never added to the user's to-dos", async () => {
     const user = await addUser();
     const id = await addMeeting(user.userId, {

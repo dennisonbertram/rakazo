@@ -69,6 +69,9 @@ export const ProductEventType = z.enum([
 ]);
 export type ProductEventType = z.infer<typeof ProductEventType>;
 
+/** The card reason when a call asks only because the chat read a meeting; the web card adds Clear conversation. */
+export const MEETING_MARK_REASON = "This chat read a meeting, so it asks first.";
+
 export const MessageRole = z.enum(["user", "bot", "system"]);
 export const BotMessageIntent = z.enum(["request", "result", "question", "status", "fyi"]);
 export type BotMessageIntent = z.infer<typeof BotMessageIntent>;
@@ -300,7 +303,12 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     title: z.string(),
     farewell: z.string(),
   }),
-  z.object({ kind: z.literal("meta"), text: z.string() }),
+  z.object({
+    kind: z.literal("meta"),
+    text: z.string(),
+    /** A server-written link shown after the text, to an app path such as a Data room item. */
+    link: z.object({ label: z.string(), href: z.string() }).optional(),
+  }),
   z.object({
     kind: z.literal("progress"),
     text: z.string(),

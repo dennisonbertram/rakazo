@@ -925,7 +925,10 @@ describe("routine from a forced skill", () => {
         { crons: ["0 9 * * 1"], timezone: "UTC", nextRunAt: new Date("2026-11-02T09:00:00Z") },
         { prompt: "New prompt" },
       );
-      expect(update.mock.calls[0]![0].data).toEqual({ prompt: "New prompt" });
+      expect(update.mock.calls[0]![0].data).toEqual({
+        prompt: "New prompt",
+        promptUpdatedAt: expect.any(Date),
+      });
     });
 
     it("does not start a watch or a one-time reminder from startAt alone", async () => {

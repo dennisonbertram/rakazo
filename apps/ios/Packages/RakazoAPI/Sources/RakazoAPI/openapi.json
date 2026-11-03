@@ -9094,6 +9094,22 @@
                                                 },
                                                 "text": {
                                                   "type": "string"
+                                                },
+                                                "link": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "label": {
+                                                      "type": "string"
+                                                    },
+                                                    "href": {
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "label",
+                                                    "href"
+                                                  ],
+                                                  "additionalProperties": false
                                                 }
                                               },
                                               "required": [
@@ -45421,6 +45437,22 @@
                                         },
                                         "text": {
                                           "type": "string"
+                                        },
+                                        "link": {
+                                          "type": "object",
+                                          "properties": {
+                                            "label": {
+                                              "type": "string"
+                                            },
+                                            "href": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "label",
+                                            "href"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -62587,6 +62619,22 @@
                                         },
                                         "text": {
                                           "type": "string"
+                                        },
+                                        "link": {
+                                          "type": "object",
+                                          "properties": {
+                                            "label": {
+                                              "type": "string"
+                                            },
+                                            "href": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "label",
+                                            "href"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -121382,6 +121430,22 @@
                                         },
                                         "text": {
                                           "type": "string"
+                                        },
+                                        "link": {
+                                          "type": "object",
+                                          "properties": {
+                                            "label": {
+                                              "type": "string"
+                                            },
+                                            "href": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "label",
+                                            "href"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -123778,6 +123842,22 @@
                                         },
                                         "text": {
                                           "type": "string"
+                                        },
+                                        "link": {
+                                          "type": "object",
+                                          "properties": {
+                                            "label": {
+                                              "type": "string"
+                                            },
+                                            "href": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "label",
+                                            "href"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [

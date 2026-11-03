@@ -3422,6 +3422,7 @@ const MessageBubble = memo(function MessageBubble({
   onPreviewImage: (target: ImageArtifactPreviewTarget) => void;
   actionProps: MessageActionProps;
 }) {
+  const router = useRouter();
   const colorScheme = useResolvedAppearance();
   const tokens = useAccentedTokens();
   const { t } = useI18n();
@@ -3533,6 +3534,15 @@ const MessageBubble = memo(function MessageBubble({
     isCenteredAgentEvent(message.blocks) &&
     message.blocks.every((block) => block.kind === "meta")
   ) {
+    // A server-written link to a Data room item; other paths show as text only.
+    const metaHref = message.blocks.flatMap((block) =>
+      block.kind === "meta" && block.link ? [block.link] : [],
+    )[0];
+    const metaItemId = metaHref?.href.match(/^\/app\/data-room\?item=([^&]+)$/)?.[1];
+    const metaLink =
+      metaHref && metaItemId
+        ? { label: metaHref.label, itemId: decodeURIComponent(metaItemId) }
+        : null;
     return (
       <Pressable
         {...actionProps}
@@ -3540,6 +3550,16 @@ const MessageBubble = memo(function MessageBubble({
       >
         <Text style={{ color: tokens.mutedForeground, fontSize: 13.5, textAlign: "center" }}>
           {message.blocks.map((block) => (block.kind === "meta" ? block.text : "")).join("\n")}
+          {metaLink ? (
+            <Text
+              style={{ textDecorationLine: "underline" }}
+              onPress={() =>
+                router.push({ pathname: "/data-room-item", params: { itemId: metaLink.itemId } })
+              }
+            >
+              {` ${metaLink.label}`}
+            </Text>
+          ) : null}
         </Text>
       </Pressable>
     );

@@ -189,6 +189,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "Meeting",
   "MeetingSyncState",
   "MeetingTombstone",
+  "MeetingHandoff",
   "MeetingCapture",
   "MeetingCaptureChunk",
   "DevinConnectionState",

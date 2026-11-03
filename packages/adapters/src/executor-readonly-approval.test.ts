@@ -12,6 +12,7 @@ import {
   cartaAgentSpawnKey,
   inboxAgentSpawnKey,
   integrationAgentSpawnKey,
+  MEETING_MARK_REASON,
 } from "@rakazo/contracts";
 import type { ActionApprovalRule } from "@rakazo/core";
 import {
@@ -51,6 +52,47 @@ import { McpConnector } from "./mcp-connector.js";
 import { createEmulatedPhotonPlatform, PhotonEmulator } from "./photon-emulator.js";
 import { PipedreamConnector } from "./pipedream-connector.js";
 import { ThirdPartyConnectorEmulator } from "./third-party-connector-emulator.js";
+
+/** Lets a test make the Data room or history tools return text from a meeting. */
+const meetingReads = vi.hoisted(() => ({ dataRoomUntrusted: false, checkpoint: false }));
+vi.mock("./data-room-tools.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./data-room-tools.js")>();
+  return {
+    ...real,
+    dataRoomToolFromTool: async (
+      ...args: Parameters<typeof real.dataRoomToolFromTool>
+    ): ReturnType<typeof real.dataRoomToolFromTool> => {
+      if (!meetingReads.dataRoomUntrusted) return real.dataRoomToolFromTool(...args);
+      await args[1].onUntrustedContent?.();
+      return { untrusted: true, items: [] } as never;
+    },
+  };
+});
+vi.mock("@rakazo/db", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  readHistory: async () => ({ messages: [] }),
+  dropRunTurnCheckpoint: async (...args: unknown[]) =>
+    meetingReads.checkpoint
+      ? undefined
+      : (
+          (await importOriginal<Record<string, (...a: unknown[]) => unknown>>())
+            .dropRunTurnCheckpoint as (...a: unknown[]) => Promise<unknown>
+        )(...args),
+  loadRunTurnCheckpoint: async (...args: unknown[]) =>
+    meetingReads.checkpoint
+      ? JSON.stringify({
+          version: 1,
+          systemPrompt: "",
+          provider: "x",
+          model: "y",
+          pendingToolCallId: "p",
+          messages: [],
+        })
+      : (
+          (await importOriginal<Record<string, (...a: unknown[]) => unknown>>())
+            .loadRunTurnCheckpoint as (...a: unknown[]) => Promise<string | undefined>
+        )(...args),
+}));
 
 vi.mock("./computer-workspace.js", async (importOriginal) => ({
   ...(await importOriginal<typeof ComputerWorkspaceModule>()),
@@ -209,6 +251,14 @@ function fixture({
   knownBots,
   connectionRows = mail ? [mailConnectionRow()] : [],
   googleConnectors = false,
+  dataRoom = false,
+  routineCreatedAt,
+  routinePromptUpdatedAt,
+  routineUpdatedAt,
+  skillPlaybookUpdatedAt,
+  skillUpdatedAt,
+  scratchpadUpdatedAt,
+  memoryUpdatedAt,
   availableTools,
   executeToolName = "demo_execute_tool",
   parallel = false,
@@ -243,6 +293,19 @@ function fixture({
   connectionRows?: Record<string, unknown>[];
   /** Offers the native Google Calendar and Drive tools. */
   googleConnectors?: boolean;
+  /** Offers the Data room tools (their results are stubbed by `meetingReads`). */
+  dataRoom?: boolean;
+  /** When the run's routine row was created (needs `routineManagedKind` to give the run a routine). */
+  routineCreatedAt?: Date;
+  /** When its prompt changed, and its row last changed for any reason (schedule updates). */
+  routinePromptUpdatedAt?: Date;
+  routineUpdatedAt?: Date;
+  /** The routine runs a taught skill; when its playbook changed and when its row last changed. */
+  skillPlaybookUpdatedAt?: Date;
+  skillUpdatedAt?: Date;
+  /** One open to-do updated at this time / one memory document updated at this ISO time. */
+  scratchpadUpdatedAt?: Date;
+  memoryUpdatedAt?: string;
   availableTools?: ConnectorTool[];
   beforeToolCall?: (index: number) => void | Promise<void>;
   /** Messages the run claims as steering, in order, when the runtime asks. */
@@ -395,7 +458,13 @@ function fixture({
   const prisma = {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     routine: {
-      findUnique: vi.fn(async () => ({ managedKind: routineManagedKind ?? null })),
+      findUnique: vi.fn(async () => ({
+        managedKind: routineManagedKind ?? null,
+        createdAt: routineCreatedAt ?? new Date(0),
+        promptUpdatedAt: routinePromptUpdatedAt ?? null,
+        taughtSkillId: skillUpdatedAt ? "skill-1" : null,
+        updatedAt: routineUpdatedAt ?? new Date(0),
+      })),
       findMany: vi.fn(async () => routines),
     },
     run: {
@@ -586,13 +655,34 @@ function fixture({
     spaceBackupModel: {
       findMany: vi.fn(async () => [{ provider: "openrouter", modelId: "backup/model" }]),
     },
-    taughtSkill: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
+    taughtSkill: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+      findUnique: vi.fn(async () => ({
+        createdAt: new Date(0),
+        playbookUpdatedAt: skillPlaybookUpdatedAt ?? null,
+        updatedAt: skillUpdatedAt ?? new Date(0),
+      })),
+    },
     agentSecret: { findMany: vi.fn(async () => []) },
     botSecret: { findMany: vi.fn(async () => []) },
     agentSkill: { findMany: vi.fn(async () => skillRows) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
     scratchpadItem: {
-      findMany: vi.fn(async () => []),
+      findMany: vi.fn(async () =>
+        scratchpadUpdatedAt
+          ? [
+              {
+                id: "todo-1",
+                title: "Follow up",
+                notes: "",
+                status: "open",
+                createdAt: scratchpadUpdatedAt,
+                updatedAt: scratchpadUpdatedAt,
+              },
+            ]
+          : [],
+      ),
       findFirst: vi.fn(async () => scratchpadItem ?? null),
     },
     actionApprovalRule: { findMany: vi.fn(async () => rules) },
@@ -709,7 +799,7 @@ function fixture({
                   path: "MEMORY.md",
                   content: sharedMemoryState.content,
                   revision: sharedMemoryState.revision,
-                  updatedAt: "",
+                  updatedAt: memoryUpdatedAt ?? "",
                 },
               ]
             : [];
@@ -744,6 +834,7 @@ function fixture({
     ...(ticketBoard ? { ticketBoardEnabled: true } : {}),
     ...(messaging ? { messaging } : {}),
     ...(googleConnectors ? { connectors: {} } : {}),
+    ...(dataRoom ? { artifacts: {} } : {}),
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return {
     rules,
@@ -757,6 +848,9 @@ function fixture({
     threadMarked: () => mark.at !== null,
     markThread: () => {
       mark.at = new Date();
+    },
+    clearThreadMark: () => {
+      mark.at = null;
     },
     effects,
     results,
@@ -5271,5 +5365,168 @@ describe("Auto Review of new sites", () => {
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
       expect(f.effects.map((effect) => effect.status)).toEqual(["denied"]);
     });
+  });
+});
+
+describe("the meeting mark follows what the run can see", () => {
+  const card = (f: ReturnType<typeof fixture>) =>
+    (f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: { approvalReason?: string }[] }])[0]
+      .blocks[0]!;
+  const fetchCall = { args: { url: "https://example.invalid" }, executionId: "c" };
+  const siteRule = {
+    effect: "always_allow",
+    matchKind: "site",
+    matchValue: "example.invalid",
+  } as const;
+  const run = (extra: Parameters<typeof fixture>[0] = {}) =>
+    fixture({
+      name: "web_fetch",
+      builtin: true,
+      threadMarkedAtStart: true,
+      autoReview: true,
+      rules: [siteRule],
+      ...extra,
+    });
+
+  afterEach(() => {
+    meetingReads.dataRoomUntrusted = false;
+    meetingReads.checkpoint = false;
+  });
+
+  it("a routine run on a marked thread does not ask about text it never saw", async () => {
+    const f = run({ trigger: "routine" });
+    f.setCalls([fetchCall]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.threadMarked()).toBe(true);
+  });
+
+  it("a user run on a marked thread still asks, with the meeting reason", async () => {
+    const f = run();
+    f.setCalls([fetchCall]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(card(f).approvalReason).toBe(MEETING_MARK_REASON);
+  });
+
+  it("a routine run that reads a meeting asks from then on, and the thread stays marked", async () => {
+    meetingReads.dataRoomUntrusted = true;
+    const f = run({ trigger: "routine", dataRoom: true });
+    f.setCalls([
+      { name: "read_data_room_item", args: { id: "item-1" }, executionId: "c1" },
+      { ...fetchCall, executionId: "c2" },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(f.threadMarked()).toBe(true);
+  });
+
+  it("a routine run that reads a marked thread's history asks from then on", async () => {
+    const f = run({ trigger: "routine" });
+    f.setCalls([
+      { name: "read_history", args: { messageId: "m0" }, executionId: "c1" },
+      { ...fetchCall, executionId: "c2" },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("a routine run is not marked by a meeting agent's reply in the loaded messages", async () => {
+    const f = run({
+      trigger: "routine",
+      threadMarkedAtStart: false,
+      history: [
+        {
+          blocks: [
+            {
+              kind: "bot_message_received",
+              fromBotId: "peer-1",
+              fromBotName: "Granola",
+              text: "Decided X",
+              hop: 1,
+              intent: "result",
+              returnToMessageId: "m0",
+            },
+          ],
+        },
+      ],
+      knownBots: { "peer-1": integrationAgentSpawnKey("server-1") },
+      mcpServers: [
+        { id: "server-1", endpoint: "https://mcp.granola.ai/mcp", agentBotId: "peer-1" },
+      ],
+    });
+    f.setCalls([fetchCall]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  describe("a run without history", () => {
+    const later = new Date(Date.now() + 60_000);
+    const earlier = new Date(0);
+    const routine = (extra: Parameters<typeof fixture>[0] = {}) =>
+      run({ trigger: "routine", routineManagedKind: "custom", ...extra });
+    const asks = async (f: ReturnType<typeof fixture>) => {
+      f.setCalls([fetchCall]);
+      await f.run();
+      return f.pauseRunForInput.mock.calls.length === 1;
+    };
+
+    it("is held when it resumes from a checkpoint on a marked thread", async () => {
+      meetingReads.checkpoint = true;
+      expect(await asks(routine())).toBe(true);
+    });
+
+    it("is held by a routine created after the mark, not one created before", async () => {
+      expect(await asks(routine({ routineCreatedAt: later }))).toBe(true);
+      expect(await asks(routine({ routineCreatedAt: earlier }))).toBe(false);
+    });
+
+    it("is held by an old routine whose prompt was edited after the mark, not by a schedule update", async () => {
+      expect(await asks(routine({ routinePromptUpdatedAt: later }))).toBe(true);
+      expect(
+        await asks(routine({ routinePromptUpdatedAt: earlier, routineUpdatedAt: later })),
+      ).toBe(false);
+    });
+
+    it("is held by a taught skill whose playbook changed after the mark, not by a run of it", async () => {
+      expect(await asks(routine({ skillUpdatedAt: later, skillPlaybookUpdatedAt: later }))).toBe(
+        true,
+      );
+      expect(await asks(routine({ skillUpdatedAt: later, skillPlaybookUpdatedAt: earlier }))).toBe(
+        false,
+      );
+    });
+
+    it("is held by a to-do changed after the mark, not one from before", async () => {
+      expect(await asks(routine({ scratchpadUpdatedAt: later }))).toBe(true);
+      expect(await asks(routine({ scratchpadUpdatedAt: earlier }))).toBe(false);
+    });
+
+    it("is held by memory written after the mark or with no timestamp, not older memory", async () => {
+      const memory = { existingSharedMemory: "Rule" };
+      expect(await asks(routine({ ...memory, memoryUpdatedAt: later.toISOString() }))).toBe(true);
+      expect(await asks(routine(memory))).toBe(true);
+      expect(await asks(routine({ ...memory, memoryUpdatedAt: earlier.toISOString() }))).toBe(
+        false,
+      );
+    });
+  });
+
+  it("a user run that read meeting text still asks after the thread is cleared mid-run", async () => {
+    meetingReads.dataRoomUntrusted = true;
+    let f: ReturnType<typeof fixture>;
+    f = run({
+      threadMarkedAtStart: false,
+      dataRoom: true,
+      afterCall: (index) => {
+        if (index === 0) f.clearThreadMark();
+      },
+    });
+    f.setCalls([
+      { name: "read_data_room_item", args: { id: "item-1" }, executionId: "c1" },
+      { ...fetchCall, executionId: "c2" },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 });

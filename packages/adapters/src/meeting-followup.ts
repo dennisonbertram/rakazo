@@ -4,12 +4,16 @@ import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { createDataRoomRepos } from "@rakazo/db";
 import { createFileDataRoomItem, dataRoomSafeName } from "./data-room-files.js";
+import { MISSING_MODEL_MESSAGE } from "./executor.js";
 import { MeetingDigestSchema } from "./meeting-digest.js";
+import { resolveSourceAgent, sourcePrompt, startMeetingRun } from "./meeting-handoff.js";
 
 export interface MeetingFollowupDeps {
   prisma: PrismaClient;
   jobs: JobPublisher;
   artifacts: ArtifactStore;
+  /** Throws when the agent has no model; the source agent is only woken when this succeeds. */
+  resolveModel?: (scope: { userId: string; spaceId: string; botId: string }) => Promise<unknown>;
 }
 
 /** A meeting that ended longer ago than this is a synced backlog entry, not news. */
@@ -23,6 +27,7 @@ type Meeting = {
   summary: string;
   transcript: string | null;
   digest: unknown;
+  category: string | null;
   provider: string;
   sourceUpdatedAt: Date;
 };
@@ -87,7 +92,10 @@ export async function runMeetingFollowup(
       summary: true,
       transcript: true,
       digest: true,
+      category: true,
       provider: true,
+      connectionId: true,
+      mcpServerId: true,
       sourceUpdatedAt: true,
     },
   });
@@ -120,11 +128,53 @@ export async function runMeetingFollowup(
         docType: "note",
         docDate: meeting.startedAt,
         parties: names,
-        tags: ["meeting"],
+        tags: ["meeting", meeting.category ?? "other"],
       });
     },
     { timeout: 30_000 },
   );
+  await wakeSourceAgent(deps, owner, meeting);
+}
+
+/**
+ * Step 3: wakes the agent that reads the meeting's source, once per meeting. Skipped without an
+ * agent, without a model, when the owner already opened the meeting, when a run is active on the
+ * agent's thread, or when the same call was already handled from another source.
+ */
+async function wakeSourceAgent(
+  deps: MeetingFollowupDeps,
+  owner: { spaceId: string; userId: string },
+  meeting: Meeting & {
+    connectionId: string | null;
+    mcpServerId: string | null;
+    endedAt: Date | null;
+  },
+) {
+  if (!deps.resolveModel) return;
+  const item = await deps.prisma.dataRoomItem.findFirst({
+    where: { ...owner, source: "meeting", externalId: `meeting:${meeting.id}` },
+    select: { id: true },
+  });
+  if (!item) return;
+  const bot = await resolveSourceAgent(deps.prisma, owner, meeting);
+  if (!bot) return;
+  try {
+    await deps.resolveModel({ ...owner, botId: bot.id });
+  } catch (error) {
+    // Only "no model configured" skips the wake; anything else throws so the job retries.
+    if (error instanceof Error && error.message === MISSING_MODEL_MESSAGE) return;
+    throw error;
+  }
+  await startMeetingRun({ prisma: deps.prisma, jobs: deps.jobs }, owner, {
+    meeting,
+    bot,
+    kind: "source",
+    prompt: sourcePrompt(meeting, item.id),
+    meta: {
+      text: "Summarizing your new meeting",
+      link: { label: "Recording", href: `/app/data-room?item=${encodeURIComponent(item.id)}` },
+    },
+  });
 }
 
 /** Meetings digested this long ago and still unfiled are retried (the normal job has had its chance). */
