@@ -45,10 +45,10 @@ import {
 } from "@rakazo/adapter-kit";
 import type { ComputerCommand, MessageBlock, RunPhase, RunStatus } from "@rakazo/contracts";
 import {
-  approvalTitle,
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
   ATTACHMENT_MAX_BYTES,
+  approvalTitle,
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
@@ -10936,7 +10936,8 @@ function identityInstruction(
   trigger: string,
   spawnKey?: string | null,
 ): string {
-  if (isVoiceAgentSpawnKey(spawnKey)) return VOICE_AGENT_INSTRUCTIONS;
+  if (isVoiceAgentSpawnKey(spawnKey))
+    return `${VOICE_AGENT_INSTRUCTIONS} ${STALE_HISTORY_GUIDANCE}`;
   // Stored instructions are fixed at creation; this keeps older agents on the one-approval rule.
   const guide = isIntegrationAgentSpawnKey(spawnKey) || isCartaAgentSpawnKey(spawnKey);
   const inbox = isInboxAgentSpawnKey(spawnKey);
