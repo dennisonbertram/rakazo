@@ -20,6 +20,9 @@ describe("ensureInboxAgent", () => {
       .instructions;
     const earlier = PREVIOUS_INBOX_AGENT_INSTRUCTIONS[0]!;
     expect(earlier).not.toBe(current);
+    // The newest default that said the agent cannot archive is still upgraded.
+    expect(earlier).toContain("Do the reading yourself");
+    expect(earlier).toContain("You cannot archive or change mail.");
     const run = async (instructions: string) => {
       createBot.mockResolvedValueOnce({ id: "bot-1", instructions } as Bot);
       return ensureInboxAgent(repos, actor);
@@ -61,6 +64,10 @@ describe("ensureInboxAgent", () => {
     expect(String(input.instructions)).toContain("call mail_send");
     expect(String(input.instructions)).toContain("approves, edits or discards it");
     expect(String(input.instructions)).not.toContain("not send");
+    // Archiving goes through mail_modify (approved on a card), also from a scheduled routine.
+    expect(String(input.instructions)).not.toContain("cannot archive");
+    expect(String(input.instructions)).toContain("mail_modify");
+    expect(String(input.instructions)).toContain("schedule_create");
     // A reply keeps the message's Cc, counts match the Inbox, and times are never shown in UTC.
     expect(String(input.instructions)).toContain("every other To and Cc recipient");
     expect(String(input.instructions)).toContain("say how many more there are");
