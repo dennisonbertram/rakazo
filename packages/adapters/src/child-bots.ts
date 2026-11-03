@@ -313,18 +313,37 @@ async function releaseAgentServers(
         select: { id: true },
       });
       if (linked.length === 0) return { count: 0 };
-      // A connection Praci made private on connect stays private with no agent; older ones
-      // go back to shared.
-      const stayPrivate = { ...scope, privateByDefault: true };
+      // The connection keeps its access policy: "all agents" stays that, and a list that names other
+      // agents stays a list (minus this agent, removed below). One that only ever named this agent
+      // goes back to shared, unless Praci made it private on connect.
+      const others = new Set(
+        (
+          await tx.botConnectionAccess.findMany({
+            where: {
+              connectionId: { in: linked.map((connection) => connection.id) },
+              botId: { not: bot.id },
+            },
+            select: { connectionId: true },
+          })
+        ).map((entry) => entry.connectionId),
+      );
+      const reshare = (
+        await tx.connection.findMany({
+          where: { ...scope, allAgents: false, privateByDefault: false },
+          select: { id: true },
+        })
+      )
+        .map((connection) => connection.id)
+        .filter((id) => !others.has(id));
       const released = await tx.connection.updateMany({
-        where: stayPrivate,
-        data: { agentBotId: null, writesEnabled: false, allAgents: false },
-      });
-      const shared = await tx.connection.updateMany({
         where: scope,
-        data: { agentBotId: null, writesEnabled: false, allAgents: true },
+        data: { agentBotId: null, writesEnabled: false },
       });
-      released.count += shared.count;
+      if (reshare.length > 0)
+        await tx.connection.updateMany({
+          where: { id: { in: reshare } },
+          data: { allAgents: true },
+        });
       await tx.botConnectionAccess.deleteMany({
         where: {
           botId: bot.id,

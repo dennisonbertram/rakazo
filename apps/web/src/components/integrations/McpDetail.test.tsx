@@ -738,3 +738,31 @@ it("All assigns every other agent and None removes them all except the owner", a
   expect(replaceAssignments.mock.calls.every(([call]) => call.assignments.length === 0)).toBe(true);
   listAssignments.mockResolvedValue([]);
 });
+
+it("All waits for every grant to settle, even after one fails, before the controls come back", async () => {
+  replaceAssignments.mockReset();
+  refresh.mockClear();
+  listAssignments.mockResolvedValue([]);
+  let finishSlow: () => void = () => undefined;
+  replaceAssignments.mockImplementationOnce(async () => {
+    throw new Error("boom");
+  });
+  replaceAssignments.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishSlow = resolve;
+      }),
+  );
+  replaceAssignments.mockResolvedValue([]);
+  await show(false, OTHER, { ...withAgent, agentExclusive: false });
+  const button = (name: string) =>
+    [...container.querySelectorAll("button")].find((b) => b.textContent === name)!;
+  await act(async () => button("All").click());
+  // One grant failed at once and one is still running: nothing is re-enabled or refetched yet.
+  expect(button("All").disabled).toBe(true);
+  expect(refresh).not.toHaveBeenCalled();
+  await act(async () => finishSlow());
+  expect(refresh).toHaveBeenCalled();
+  expect(container.textContent).toContain("boom");
+  expect(button("All").disabled).toBe(false);
+});

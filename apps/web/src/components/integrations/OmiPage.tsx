@@ -230,10 +230,13 @@ export function OmiAgent({
   useEffect(() => {
     latest.current = access;
   }, [access]);
+  const pending = useRef(0);
+  const failed = useRef(false);
   function save(next: { allAgents: boolean; botIds: string[] }) {
     setError(null);
     latest.current = next;
     setAccess(next);
+    pending.current += 1;
     setSaving((count) => count + 1);
     queue.current = queue.current.then(async () => {
       try {
@@ -241,7 +244,14 @@ export function OmiAgent({
         if (latest.current === next) setAccess(saved);
       } catch (err) {
         setError(errorText(err, t`Could not update bot access`));
-        setAccess(await rpc.connections.access({ connectionId }).catch(() => latest.current));
+        failed.current = true;
+      }
+      pending.current -= 1;
+      // A failure only rolls back to the server's answer once no newer selection is queued behind it.
+      if (pending.current === 0 && failed.current) {
+        failed.current = false;
+        const server = await rpc.connections.access({ connectionId }).catch(() => null);
+        if (server) setAccess(server);
       }
       setSaving((count) => count - 1);
     });

@@ -613,7 +613,7 @@ it("All saves allAgents once and None saves the owner alone, once", async () => 
   ]);
 });
 
-it("disables All when every agent is already on", async () => {
+it("keeps All available when every agent is on but access is a chosen list", async () => {
   const access = (ids: string[]) => ({
     conn_app: {
       allAgents: false,
@@ -629,7 +629,7 @@ it("disables All when every agent is already on", async () => {
       access: access(["bot_app", "b", "c"]),
     }),
   );
-  expect(buttonOf("All").disabled).toBe(true);
+  expect(buttonOf("All").disabled).toBe(false);
   expect(buttonOf("None").disabled).toBe(false);
 });
 

@@ -77,3 +77,33 @@ it("All and None each save once, and None keeps the Omi agent", async () => {
     [{ connectionId: "c1", allAgents: false, botIds: ["omi"] }],
   ]);
 });
+
+it("a failed save refetches only after the newer queued save has finished", async () => {
+  setAccess.mockReset();
+  let failFirst: (error: Error) => void = () => undefined;
+  let finishSecond: () => void = () => undefined;
+  const all = ["omi", "ada", "e1", "e2"];
+  setAccess.mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        failFirst = reject;
+      }),
+  );
+  setAccess.mockImplementationOnce(
+    (input: { allAgents: boolean; botIds: string[] }) =>
+      new Promise((resolve) => {
+        finishSecond = () => resolve(input);
+      }),
+  );
+  const container = await show({ allAgents: false, botIds: all });
+  access.mockClear();
+  const sw = (name: string) =>
+    container.querySelector<HTMLElement>(`[aria-label="${name} can use Omi"]`)!;
+  await act(async () => sw("Ada").click());
+  await act(async () => sw("Email chats").click()); // queued behind the first
+  await act(async () => failFirst(new Error("boom")));
+  // The second save is still running, so the failure must not reset the list from the server yet.
+  expect(access).not.toHaveBeenCalled();
+  await act(async () => finishSecond());
+  expect(access).toHaveBeenCalledTimes(1);
+});

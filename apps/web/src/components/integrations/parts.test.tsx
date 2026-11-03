@@ -121,7 +121,8 @@ it("All and None call onSetAll once and disable at their own extreme", () => {
   expect(some.onSetAll.mock.calls).toEqual([[true]]);
 
   const every = renderAllNone({ on: ["chief", "ada"], ownerBotId: "chief" });
-  expect(every.button("All").disabled).toBe(true);
+  // Everyone is on but access is a list: All still switches it to "all agents", future ones included.
+  expect(every.button("All").disabled).toBe(false);
   act(() => every.button("None").click());
   expect(every.onSetAll.mock.calls).toEqual([[false]]);
 

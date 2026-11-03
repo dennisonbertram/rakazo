@@ -941,4 +941,42 @@ describePostgres("agent per connection: provisioning (PostgreSQL)", () => {
     await client(owner).connections.list();
     expect(await row(chosen.id)).toMatchObject({ agentBotId: inbox.id });
   });
+
+  it("archiving the Inbox agent keeps a legacy Gmail account's access policy", async () => {
+    const repos = createRepos(prisma);
+    const helper = await repos.createBot(owner, {
+      name: "Policy helper",
+      title: "",
+      description: "",
+      instructions: "",
+    });
+    const make = (allAgents: boolean) =>
+      create({
+        status: "connected",
+        connectorId: "google",
+        provider: "gmail",
+        allAgents,
+        privateByDefault: false,
+      });
+    const restricted = await make(false);
+    await prisma.botConnectionAccess.create({
+      data: { connectionId: restricted.id, botId: helper.id, spaceId, userId },
+    });
+    const shared = await make(true);
+    await client(owner).connections.list();
+    const linked = await row(restricted.id);
+    expect(linked.agentBotId).toBeTruthy();
+    await archiveBot(
+      lifecycle(),
+      await prisma.bot.findUniqueOrThrow({ where: { id: linked.agentBotId as string } }),
+      { userId, spaceId } as never,
+    );
+    expect(await row(restricted.id)).toMatchObject({ allAgents: false, agentBotId: null });
+    expect((await access(restricted.id)).map((entry) => entry.botId)).toEqual([helper.id]);
+    expect(await row(shared.id)).toMatchObject({ allAgents: true, agentBotId: null });
+    await prisma.connection.updateMany({
+      where: { id: { in: [restricted.id, shared.id] } },
+      data: { status: "revoked" },
+    });
+  });
 });

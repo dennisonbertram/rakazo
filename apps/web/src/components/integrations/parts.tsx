@@ -137,7 +137,6 @@ export function AgentToggleList({
   const locked = (bot: Bot) =>
     bot.id === ownerBotId ||
     (isMailThreadAgentSpawnKey(bot.spawnKey) && isInboxAgentSpawnKey(owner?.spawnKey));
-  const allOn = bots.every((bot) => isOn(bot.id));
   const noneOn = bots.every((bot) => locked(bot) || !isOn(bot.id));
   return (
     <div className="divide-y divide-border rounded-xl border border-border bg-card">
@@ -146,7 +145,7 @@ export function AgentToggleList({
           <Button
             variant="ghost"
             size="sm"
-            disabled={disabled || saving || allOn || everyone}
+            disabled={disabled || saving || everyone}
             onClick={() => onSetAll(true)}
           >
             <Trans>All</Trans>
