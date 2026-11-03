@@ -804,6 +804,7 @@ export interface BackgroundJobPayloads {
   };
   /** Renews the Gmail push watches that are close to expiring; run daily by the worker's cron. */
   "mail.watch.renew": Record<string, never>;
+  "mail.sync.sweep": Record<string, never>;
   /** Refreshes the space's Devin sessions; run every two minutes by cron without a payload (every connection), or for the one server named. */
   "devin.refresh": { serverId?: string };
   "company.import.run": { spaceId: string; userId: string; runId: string };
