@@ -373,3 +373,7 @@ export async function markMeetingTaintOnDelivery(
     });
   }
 }
+
+/** Added to a meeting-source agent's run and to the meeting-notes skill; never stored on the agent. */
+export const MEETING_AGENT_GUIDANCE =
+  "Meetings are filed for you in Data room → Recordings; point the user there. Never save meeting text as a file. When a meeting clearly belongs to another agent (an investor call → the Investors agent) and you were not told it already went there, use share_meeting.";
