@@ -49,6 +49,19 @@ msgstr ", {0} already imported"
 msgid "(opens in Devin)"
 msgstr "(opens in Devin)"
 
+#: src/components/inbox/CleanupSenderRow.tsx
+msgid "Needs reply stopped"
+msgstr "Needs reply stopped"
+
+#: src/components/inbox/InboxRow.tsx
+msgid "No reply needed"
+msgstr "No reply needed"
+
+#. placeholder {0}: status.sender
+#: src/pages/Inbox.tsx
+msgid "Stopped Needs reply for {0}"
+msgstr "Stopped Needs reply for {0}"
+
 #. placeholder {0}: visible.length
 #: src/components/data-room/AutoSortDialog.tsx
 msgid "{0, plural, one {# change} other {# changes}}"
