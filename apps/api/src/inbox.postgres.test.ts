@@ -1528,13 +1528,36 @@ describePostgres("inbox procedures (PostgreSQL)", () => {
             where: { connectionId: connA, senderAddress: sender },
           })
         ).noReplyCount;
-      const asking = (id: string) =>
-        cache(a, connA, id, {
+      const authenticated = {
+        listUnsubscribe: [],
+        oneClick: false,
+        listId: null,
+        bulk: false,
+        autoSubmitted: false,
+        auth: { dkim: "pass", spf: "pass", dmarc: "pass" },
+        dkimCoversUnsubscribe: false,
+        categories: {
+          spam: false,
+          promotions: false,
+          social: false,
+          updates: false,
+          forums: false,
+          important: false,
+        },
+      };
+      const asking = async (id: string) => {
+        const row = await cache(a, connA, id, {
           fromAddress: sender,
           fromName: "Store Bot",
           needsReply: true,
           ...triaged,
         });
+        // Only mail that passed authentication counts toward a sender.
+        return prisma.cachedMailMessage.update({
+          where: { id: row.id },
+          data: { signals: authenticated },
+        });
+      };
       const reset = async () => {
         await wipe();
         await prisma.mailSenderStat.deleteMany({ where: { connectionId: connA } });
@@ -1558,6 +1581,22 @@ describePostgres("inbox procedures (PostgreSQL)", () => {
             })
           ).needsReply,
         ).toBe(false);
+      });
+
+      it("does not count a message whose From failed authentication", async () => {
+        await reset();
+        await stat({ noReplyCount: 2 });
+        const row = await asking("n3b");
+        await prisma.cachedMailMessage.update({
+          where: { id: row.id },
+          data: {
+            signals: { ...authenticated, auth: { dkim: "fail", spf: "fail", dmarc: "fail" } },
+          },
+        });
+
+        expect((await inboxNoReply(deps, a, { messageId: row.id })).stopped).toBeNull();
+
+        expect(await countOf()).toBe(2);
       });
 
       it("Undo sets the sender back to two", async () => {
