@@ -82,6 +82,7 @@ function renderAllNone(props: {
   on: string[];
   ownerBotId?: string;
   saving?: boolean;
+  everyone?: boolean;
   extra?: Bot[];
   ownerKey?: string | null;
 }) {
@@ -103,6 +104,7 @@ function renderAllNone(props: {
         onSetAll={onSetAll}
         ownerBotId={props.ownerBotId}
         saving={props.saving}
+        everyone={props.everyone}
       />,
     ),
   );
@@ -142,4 +144,10 @@ it("email chats do not keep None enabled when the Inbox agent owns the connectio
     ownerKey: inboxAgentSpawnKey("u1"),
   });
   expect(view.button("None").disabled).toBe(true);
+});
+
+it("with access stored as all agents, All is done and None stays available", () => {
+  const view = renderAllNone({ on: ["chief"], ownerBotId: "chief", everyone: true });
+  expect(view.button("All").disabled).toBe(true);
+  expect(view.button("None").disabled).toBe(false);
 });

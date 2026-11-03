@@ -109,6 +109,7 @@ export function AgentToggleList({
   onSetAll,
   ownerBotId,
   saving = false,
+  everyone = false,
 }: {
   bots: Bot[];
   isOn: (botId: string) => boolean;
@@ -121,6 +122,8 @@ export function AgentToggleList({
   ownerBotId?: string | null;
   /** A save is in flight: All and None wait for it. */
   saving?: boolean;
+  /** Access is stored as "all agents" (including future ones): All is already done; None still has work. */
+  everyone?: boolean;
 }) {
   const { t } = useLingui();
   // Each email's own chat is one agent; they share a single row, as in the sidebar.
@@ -143,7 +146,7 @@ export function AgentToggleList({
           <Button
             variant="ghost"
             size="sm"
-            disabled={disabled || saving || allOn}
+            disabled={disabled || saving || allOn || everyone}
             onClick={() => onSetAll(true)}
           >
             <Trans>All</Trans>
@@ -151,7 +154,7 @@ export function AgentToggleList({
           <Button
             variant="ghost"
             size="sm"
-            disabled={disabled || saving || noneOn}
+            disabled={disabled || saving || (noneOn && !everyone)}
             onClick={() => onSetAll(false)}
           >
             <Trans>None</Trans>

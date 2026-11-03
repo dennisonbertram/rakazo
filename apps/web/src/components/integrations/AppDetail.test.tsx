@@ -663,3 +663,27 @@ it("while a save is in flight, switching one agent does not flip an agent the se
   expect(switchOf("bot_app").getAttribute("aria-checked")).toBe("true");
   await act(async () => release());
 });
+
+it("None still saves when everything shown is the owner but access is stored as all agents", async () => {
+  // Only the owner can reach this app, yet it is shared with all agents (including future ones).
+  await show(
+    APP_PAGE,
+    data({
+      bots: sharedBots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app" })],
+      access: {
+        conn_app: {
+          allAgents: true,
+          botIds: [],
+          effectiveAccess: { shared: "all", botIds: ["bot_app"] },
+        },
+      },
+    }),
+  );
+  expect(buttonOf("All").disabled).toBe(true);
+  expect(buttonOf("None").disabled).toBe(false);
+  await act(async () => buttonOf("None").click());
+  expect(setAccess.mock.calls).toEqual([
+    [{ connectionId: "conn_app", allAgents: false, botIds: ["bot_app"] }],
+  ]);
+});

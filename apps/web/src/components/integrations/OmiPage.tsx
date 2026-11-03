@@ -277,6 +277,7 @@ export function OmiAgent({
             isOn={isOn}
             ownerBotId={agentBotId}
             saving={saving > 0}
+            everyone={access?.allAgents ?? false}
             onSetAll={(on) =>
               save(
                 on ? { allAgents: true, botIds: [] } : { allAgents: false, botIds: [agentBotId] },

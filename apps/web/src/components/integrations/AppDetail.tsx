@@ -281,6 +281,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const unsaved = useRef(0);
 
+  const accessOf = (row: Connection) => pendingAccess.current.get(row.id) ?? storedAccess(row);
   /** Who the row shows as on: the server's answer, with this page's unsaved changes applied. */
   const shownNow = (row: Connection) =>
     pendingShown.current.get(row.id) ?? data.access[row.id]?.effectiveAccess.botIds ?? allBotIds;
@@ -544,6 +545,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                         onSetAll={(on) => setAllAgents(row, on)}
                         ownerBotId={row.agentBotId}
                         saving={override?.rowId === row.id}
+                        everyone={accessOf(row).allAgents}
                       />
                     }
                   />
@@ -560,6 +562,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                       onToggle={(botId, on) => setAgent(row, botId, on)}
                       onSetAll={(on) => setAllAgents(row, on)}
                       saving={override?.rowId === row.id}
+                      everyone={accessOf(row).allAgents}
                     />
                   </>
                 ) : null}
@@ -589,6 +592,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                     onToggle={(botId, on) => setAgent(ordinaryAccount, botId, on)}
                     onSetAll={(on) => setAllAgents(ordinaryAccount, on)}
                     saving={override?.rowId === ordinaryAccount?.id}
+                    everyone={ordinaryAccount ? accessOf(ordinaryAccount).allAgents : false}
                   />
                 </>
               ) : null}
