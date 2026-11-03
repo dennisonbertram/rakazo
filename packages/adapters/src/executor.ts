@@ -604,6 +604,7 @@ import {
   findWorkableOpenItem,
   hasApprovedOpenPost,
   hasApprovedOpenSignup,
+  listScratchpadItems,
   listScratchpadItemsFromTool,
   removeScratchpadItemFromTool,
   updateScratchpadItemFromTool,
@@ -2100,9 +2101,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           (meetingSenderIds.size > 0 ||
             (runSeesHistory &&
               (thread as { meetingTaintedAt?: Date | null }).meetingTaintedAt != null));
-        // Set when this run itself reads meeting text (a marked tool result, or history of a marked
-        // thread). A run that sees no history is marked by this alone, not by the thread's mark.
-        let runReadMeetingText = meetingSenderIds.size > 0;
+        // Once true, stays true for the rest of the run, even if the thread's mark is cleared.
+        // Set when the run starts holding meeting text, or reads it (a marked tool result, history
+        // of a marked thread, a resumed transcript, or memory, to-dos or a routine prompt written
+        // after the mark). A run that sees no history is held by this alone, not by the thread's mark.
+        let runReadMeetingText = meetingTaint;
         // A run that began with an external bot (or another Space's agent) is marked. Rebuilt every
         // run from the stored blocks of the triggering message and the loaded history window, so a
         // message that arrives while another run is active still marks the run that answers it.
@@ -2595,6 +2598,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
               }),
           recallPromise,
         ]);
+        // A run without history still loads durable memory, open to-dos and its routine's prompt,
+        // which a marked chat may have written. Held when any of them changed after the mark.
+        const markedAt = (thread as { meetingTaintedAt?: Date | null }).meetingTaintedAt;
+        if (!runSeesHistory && markedAt && !runReadMeetingText && !meetingAgent) {
+          runReadMeetingText = await loadedContextChangedSince(
+            deps,
+            {
+              memory: Boolean(memoryContext),
+              scratchpad: Boolean(scratchpadContext),
+              routineId: run.trigger === "routine" ? run.routineId : null,
+            },
+            { botId: bot.id, spaceId: run.spaceId, userId: run.userId },
+            markedAt,
+            context,
+          );
+        }
         const semanticMemoryEnabled =
           Boolean(semanticMemory) &&
           !messagingChannelRun &&
@@ -3483,8 +3502,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         };
         // A run that sees no history is held only by what it read itself.
-        const threadMarkedNow = async (): Promise<boolean> =>
-          runSeesHistory ? threadRowMarked() : runReadMeetingText;
+        const threadMarkedNow = async (): Promise<boolean> => {
+          if (runReadMeetingText) return true;
+          if (!runSeesHistory || !(await threadRowMarked())) return false;
+          runReadMeetingText = true;
+          return true;
+        };
         // The desktop app tools (docs/local-desktop-control). Read again at each call, from the
         // bot's current settings, so turning the switch off or removing an app takes effect at once.
         // Steering from MCP or a chat can taint the run in the database while this attempt holds an
@@ -4124,6 +4147,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             error instanceof Error ? error : new Error("Unsupported turn checkpoint");
         }
         let storedTurnCheckpoint = Boolean(turnCheckpoint);
+        // A resumed transcript keeps the tool results of the earlier attempt, which may include
+        // meeting text. A routine that read meeting text marked the thread, so the mark stands in.
+        if ((turnCheckpoint || checkpointLoadError) && !runReadMeetingText) {
+          runReadMeetingText = await threadRowMarked();
+        }
         // A restored transcript holds earlier tool results this worker did not see.
         let outsideContentSeen = Boolean(turnCheckpoint) || Boolean(checkpointLoadError);
         let earlierAttemptPromise: Promise<boolean> | undefined;
@@ -10905,6 +10933,44 @@ export function userTurnInstructions(parts: {
 // too: a message that arrives during it waits and is answered afterward.
 export function runSeesThreadHistory(trigger: string) {
   return trigger !== "created" && trigger !== "routine";
+}
+
+/**
+ * Whether anything a run without history loads was written at or after `since`. A memory document
+ * with no usable timestamp counts as changed. A routine's prompt has no edit time of its own
+ * (updatedAt moves with every schedule update), so only a routine created after the mark counts.
+ */
+async function loadedContextChangedSince(
+  deps: { prisma: PrismaClient; memory: MemoryStore },
+  loaded: { memory: boolean; scratchpad: boolean; routineId: string | null | undefined },
+  scope: { botId: string; spaceId: string; userId: string },
+  since: Date,
+  context: AdapterContext,
+): Promise<boolean> {
+  const after = (value: string | Date | null | undefined) => {
+    const at = value instanceof Date ? value.getTime() : Date.parse(value ?? "");
+    return Number.isNaN(at) || at >= since.getTime();
+  };
+  if (loaded.routineId) {
+    const routine = await deps.prisma.routine.findUnique({
+      where: { id: loaded.routineId },
+      select: { createdAt: true },
+    });
+    if (!routine || after(routine.createdAt)) return true;
+  }
+  if (loaded.scratchpad) {
+    const items = await listScratchpadItems(deps, { ...scope, includeDone: false });
+    if (items.some((item) => after(item.updatedAt))) return true;
+  }
+  if (loaded.memory) {
+    const [bot, user] = await Promise.all([
+      deps.memory.read({ scope: "bot", botId: scope.botId }, context),
+      deps.memory.read({ scope: "user" }, context),
+    ]);
+    if ([...bot.documents, ...user.documents].some((document) => after(document.updatedAt)))
+      return true;
+  }
+  return false;
 }
 
 export function threadContextForRun<T>(

@@ -54,7 +54,7 @@ import { PipedreamConnector } from "./pipedream-connector.js";
 import { ThirdPartyConnectorEmulator } from "./third-party-connector-emulator.js";
 
 /** Lets a test make the Data room or history tools return text from a meeting. */
-const meetingReads = vi.hoisted(() => ({ dataRoomUntrusted: false }));
+const meetingReads = vi.hoisted(() => ({ dataRoomUntrusted: false, checkpoint: false }));
 vi.mock("./data-room-tools.js", async (importOriginal) => {
   const real = await importOriginal<typeof import("./data-room-tools.js")>();
   return {
@@ -71,6 +71,27 @@ vi.mock("./data-room-tools.js", async (importOriginal) => {
 vi.mock("@rakazo/db", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   readHistory: async () => ({ messages: [] }),
+  dropRunTurnCheckpoint: async (...args: unknown[]) =>
+    meetingReads.checkpoint
+      ? undefined
+      : (
+          (await importOriginal<Record<string, (...a: unknown[]) => unknown>>())
+            .dropRunTurnCheckpoint as (...a: unknown[]) => Promise<unknown>
+        )(...args),
+  loadRunTurnCheckpoint: async (...args: unknown[]) =>
+    meetingReads.checkpoint
+      ? JSON.stringify({
+          version: 1,
+          systemPrompt: "",
+          provider: "x",
+          model: "y",
+          pendingToolCallId: "p",
+          messages: [],
+        })
+      : (
+          (await importOriginal<Record<string, (...a: unknown[]) => unknown>>())
+            .loadRunTurnCheckpoint as (...a: unknown[]) => Promise<string | undefined>
+        )(...args),
 }));
 
 vi.mock("./computer-workspace.js", async (importOriginal) => ({
@@ -231,6 +252,9 @@ function fixture({
   connectionRows = mail ? [mailConnectionRow()] : [],
   googleConnectors = false,
   dataRoom = false,
+  routineCreatedAt,
+  scratchpadUpdatedAt,
+  memoryUpdatedAt,
   availableTools,
   executeToolName = "demo_execute_tool",
   parallel = false,
@@ -267,6 +291,11 @@ function fixture({
   googleConnectors?: boolean;
   /** Offers the Data room tools (their results are stubbed by `meetingReads`). */
   dataRoom?: boolean;
+  /** When the run's routine row was created (needs `routineManagedKind` to give the run a routine). */
+  routineCreatedAt?: Date;
+  /** One open to-do updated at this time / one memory document updated at this ISO time. */
+  scratchpadUpdatedAt?: Date;
+  memoryUpdatedAt?: string;
   availableTools?: ConnectorTool[];
   beforeToolCall?: (index: number) => void | Promise<void>;
   /** Messages the run claims as steering, in order, when the runtime asks. */
@@ -419,7 +448,10 @@ function fixture({
   const prisma = {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     routine: {
-      findUnique: vi.fn(async () => ({ managedKind: routineManagedKind ?? null })),
+      findUnique: vi.fn(async () => ({
+        managedKind: routineManagedKind ?? null,
+        createdAt: routineCreatedAt ?? new Date(0),
+      })),
       findMany: vi.fn(async () => routines),
     },
     run: {
@@ -616,7 +648,20 @@ function fixture({
     agentSkill: { findMany: vi.fn(async () => skillRows) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
     scratchpadItem: {
-      findMany: vi.fn(async () => []),
+      findMany: vi.fn(async () =>
+        scratchpadUpdatedAt
+          ? [
+              {
+                id: "todo-1",
+                title: "Follow up",
+                notes: "",
+                status: "open",
+                createdAt: scratchpadUpdatedAt,
+                updatedAt: scratchpadUpdatedAt,
+              },
+            ]
+          : [],
+      ),
       findFirst: vi.fn(async () => scratchpadItem ?? null),
     },
     actionApprovalRule: { findMany: vi.fn(async () => rules) },
@@ -733,7 +778,7 @@ function fixture({
                   path: "MEMORY.md",
                   content: sharedMemoryState.content,
                   revision: sharedMemoryState.revision,
-                  updatedAt: "",
+                  updatedAt: memoryUpdatedAt ?? "",
                 },
               ]
             : [];
@@ -782,6 +827,9 @@ function fixture({
     threadMarked: () => mark.at !== null,
     markThread: () => {
       mark.at = new Date();
+    },
+    clearThreadMark: () => {
+      mark.at = null;
     },
     effects,
     results,
@@ -5321,6 +5369,7 @@ describe("the meeting mark follows what the run can see", () => {
 
   afterEach(() => {
     meetingReads.dataRoomUntrusted = false;
+    meetingReads.checkpoint = false;
   });
 
   it("a routine run on a marked thread does not ask about text it never saw", async () => {
@@ -5388,5 +5437,59 @@ describe("the meeting mark follows what the run can see", () => {
     f.setCalls([fetchCall]);
     await f.run();
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  describe("a run without history", () => {
+    const later = new Date(Date.now() + 60_000);
+    const earlier = new Date(0);
+    const routine = (extra: Parameters<typeof fixture>[0] = {}) =>
+      run({ trigger: "routine", routineManagedKind: "custom", ...extra });
+    const asks = async (f: ReturnType<typeof fixture>) => {
+      f.setCalls([fetchCall]);
+      await f.run();
+      return f.pauseRunForInput.mock.calls.length === 1;
+    };
+
+    it("is held when it resumes from a checkpoint on a marked thread", async () => {
+      meetingReads.checkpoint = true;
+      expect(await asks(routine())).toBe(true);
+    });
+
+    it("is held by a routine created after the mark, not one created before", async () => {
+      expect(await asks(routine({ routineCreatedAt: later }))).toBe(true);
+      expect(await asks(routine({ routineCreatedAt: earlier }))).toBe(false);
+    });
+
+    it("is held by a to-do changed after the mark, not one from before", async () => {
+      expect(await asks(routine({ scratchpadUpdatedAt: later }))).toBe(true);
+      expect(await asks(routine({ scratchpadUpdatedAt: earlier }))).toBe(false);
+    });
+
+    it("is held by memory written after the mark or with no timestamp, not older memory", async () => {
+      const memory = { existingSharedMemory: "Rule" };
+      expect(await asks(routine({ ...memory, memoryUpdatedAt: later.toISOString() }))).toBe(true);
+      expect(await asks(routine(memory))).toBe(true);
+      expect(await asks(routine({ ...memory, memoryUpdatedAt: earlier.toISOString() }))).toBe(
+        false,
+      );
+    });
+  });
+
+  it("a user run that read meeting text still asks after the thread is cleared mid-run", async () => {
+    meetingReads.dataRoomUntrusted = true;
+    let f: ReturnType<typeof fixture>;
+    f = run({
+      threadMarkedAtStart: false,
+      dataRoom: true,
+      afterCall: (index) => {
+        if (index === 0) f.clearThreadMark();
+      },
+    });
+    f.setCalls([
+      { name: "read_data_room_item", args: { id: "item-1" }, executionId: "c1" },
+      { ...fetchCall, executionId: "c2" },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 });
