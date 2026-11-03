@@ -828,7 +828,7 @@ const BOT_DIRECTORY_LIMIT = 40;
 const ROUTINE_RETRY_DELAY_MS = 12 * 60_000;
 /** The retry is skipped when the routine's next occurrence is this close; that run covers it. */
 const ROUTINE_RETRY_NEXT_RUN_WINDOW_MS = 30 * 60_000;
-const MISSING_MODEL_MESSAGE = "Connect a model in Settings before running bots.";
+export const MISSING_MODEL_MESSAGE = "Connect a model in Settings before running bots.";
 
 function runtimeFallbackModel(runtime: AgentRuntime) {
   return runtime.describe().capabilities.scripted ? { provider: "scripted", id: "scripted" } : null;
@@ -6720,7 +6720,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
                             deps.prisma,
                             { spaceId: run.spaceId, userId: bot.userId },
                             id,
-                            bot.id,
                           ),
                       }),
                 },

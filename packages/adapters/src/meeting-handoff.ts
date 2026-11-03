@@ -67,15 +67,26 @@ export async function resolveSourceAgent(
   return (await isMeetingSourceAgent(bot, { prisma })) ? bot : null;
 }
 
-/** Records that the owner opened the meeting with this agent, so no later wake repeats it. */
+/**
+ * Records that the owner opened the meeting, against the agent that would be woken for it (not
+ * the agent that read it), so the later wake is skipped.
+ */
 export async function recordOwnerOpened(
-  prisma: Pick<PrismaClient, "meetingHandoff">,
+  prisma: Db,
   scope: Scope,
   meetingId: string,
-  botId: string,
 ): Promise<void> {
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: meetingId, ...scope, deletedAt: null },
+    select: { provider: true, connectionId: true, mcpServerId: true },
+  });
+  if (!meeting) return;
+  const bot = await resolveSourceAgent(prisma, scope, meeting);
+  if (!bot) return;
   await prisma.meetingHandoff.createMany({
-    data: [{ spaceId: scope.spaceId, userId: scope.userId, meetingId, botId, kind: "source" }],
+    data: [
+      { spaceId: scope.spaceId, userId: scope.userId, meetingId, botId: bot.id, kind: "source" },
+    ],
     skipDuplicates: true,
   });
 }
@@ -133,6 +144,10 @@ export async function startMeetingRun(
   const { bot, meeting } = input;
   const runId = await deps.prisma.$transaction(async (tx) => {
     const db = tx as unknown as Db;
+    // One wake decision at a time per user, so two sources of one call cannot both pass the
+    // overlap check; then the thread lock that owner messages take, so the active-run check holds.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('meeting-handoff'), hashtext(${`${scope.spaceId}:${scope.userId}`}))`;
+    await tx.$queryRaw`SELECT id FROM threads WHERE id = ${bot.threadId} FOR UPDATE`;
     if (input.kind === "source" && (await isRecordedTwice(db, scope, meeting))) return null;
     const active = await tx.run.findFirst({
       where: { threadId: bot.threadId, status: { in: [...ACTIVE_RUN_STATUSES] } },

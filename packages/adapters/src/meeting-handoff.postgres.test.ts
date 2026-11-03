@@ -7,6 +7,7 @@ import { createDb, createRepos, upsertMeeting } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { aiRecipient } from "./ai-consent.js";
 import { MemoryArtifacts, RecordingJobs } from "./data-room-test-fakes.js";
+import { MISSING_MODEL_MESSAGE } from "./executor.js";
 import { runMeetingFollowup } from "./meeting-followup.js";
 import { recordOwnerOpened } from "./meeting-handoff.js";
 import { meetingToolFromTool } from "./meeting-tools.js";
@@ -238,7 +239,7 @@ describePostgres("waking the source agent (PostgreSQL)", () => {
     const noModel = await agent(a);
     const noModelId = await omiMeeting(a, noModel);
     await followup(a, noModelId, async () => {
-      throw new Error("no model");
+      throw new Error(MISSING_MODEL_MESSAGE);
     });
     expect(await runsOf(noModel.id)).toHaveLength(0);
     expect(await prisma.dataRoomItem.count({ where: { externalId: `meeting:${noModelId}` } })).toBe(
@@ -268,7 +269,7 @@ describePostgres("waking the source agent (PostgreSQL)", () => {
         },
         { id },
       );
-    await open((meetingId) => recordOwnerOpened(prisma, a, meetingId, bot.id));
+    await open((meetingId) => recordOwnerOpened(prisma, { spaceId, userId: a.userId }, meetingId));
     await followup(a, id);
     expect(await runsOf(bot.id)).toHaveLength(0);
     expect(await prisma.dataRoomItem.count({ where: { externalId: `meeting:${id}` } })).toBe(1);
@@ -325,6 +326,74 @@ describePostgres("waking the source agent (PostgreSQL)", () => {
     });
     await followup(who, later);
     expect(await runsOf(second.id)).toHaveLength(1);
+  });
+
+  it("a model lookup error other than 'no model' fails the job so it retries", async () => {
+    const bot = await agent(a);
+    const id = await omiMeeting(a, bot);
+    await expect(
+      followup(a, id, async () => {
+        throw new Error("database unavailable");
+      }),
+    ).rejects.toThrow("database unavailable");
+    expect(await runsOf(bot.id)).toHaveLength(0);
+    await followup(a, id);
+    expect(await runsOf(bot.id)).toHaveLength(1);
+  });
+
+  it("two jobs for one call from different sources wake one agent", async () => {
+    const who = await addUser("race");
+    const first = await agent(who);
+    const second = await agent(who);
+    const start = new Date(Date.now() - 4 * 3_600_000);
+    const one = await omiMeeting(who, first, { startedAt: start });
+    const two = await omiMeeting(who, second, { startedAt: start });
+    await Promise.all([followup(who, one), followup(who, two)]);
+    expect((await runsOf(first.id)).length + (await runsOf(second.id)).length).toBe(1);
+  });
+
+  it("a run that starts while the wake waits for the thread lock stops the wake", async () => {
+    const bot = await agent(a);
+    const id = await omiMeeting(a, bot);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let locked!: () => void;
+    const hasLock = new Promise<void>((resolve) => (locked = resolve));
+    const owner = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM threads WHERE id = ${bot.threadId} FOR UPDATE`;
+      locked();
+      await held;
+      const task = await tx.task.create({
+        data: {
+          spaceId,
+          userId: a.userId,
+          botId: bot.id,
+          threadId: bot.threadId,
+          prompt: "x",
+          status: "queued",
+        },
+      });
+      await tx.run.create({
+        data: {
+          spaceId,
+          userId: a.userId,
+          botId: bot.id,
+          threadId: bot.threadId,
+          taskId: task.id,
+          status: "queued",
+          trigger: "user",
+          unattended: false,
+        },
+      });
+    });
+    await hasLock;
+    const wake = followup(a, id);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    release();
+    await owner;
+    await wake;
+    expect(await runsOf(bot.id)).toHaveLength(1);
+    expect(await prisma.meetingHandoff.count({ where: { meetingId: id } })).toBe(0);
   });
 
   it("an unattended meeting agent reads meetings without an approval card", () => {

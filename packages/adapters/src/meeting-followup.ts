@@ -4,6 +4,7 @@ import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { createDataRoomRepos } from "@rakazo/db";
 import { createFileDataRoomItem, dataRoomSafeName } from "./data-room-files.js";
+import { MISSING_MODEL_MESSAGE } from "./executor.js";
 import { MeetingDigestSchema } from "./meeting-digest.js";
 import { resolveSourceAgent, sourcePrompt, startMeetingRun } from "./meeting-handoff.js";
 
@@ -159,8 +160,10 @@ async function wakeSourceAgent(
   if (!bot) return;
   try {
     await deps.resolveModel({ ...owner, botId: bot.id });
-  } catch {
-    return;
+  } catch (error) {
+    // Only "no model configured" skips the wake; anything else throws so the job retries.
+    if (error instanceof Error && error.message === MISSING_MODEL_MESSAGE) return;
+    throw error;
   }
   await startMeetingRun({ prisma: deps.prisma, jobs: deps.jobs }, owner, {
     meeting,
