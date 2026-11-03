@@ -33,6 +33,23 @@ type Meeting = {
   sourceUpdatedAt: Date;
 };
 
+/** The meeting fields the filing and the wake need. */
+export const MEETING_FILING_SELECT = {
+  id: true,
+  title: true,
+  startedAt: true,
+  endedAt: true,
+  attendees: true,
+  summary: true,
+  transcript: true,
+  digest: true,
+  category: true,
+  provider: true,
+  connectionId: true,
+  mcpServerId: true,
+  sourceUpdatedAt: true,
+} as const;
+
 const day = (date: Date) => date.toISOString().slice(0, 10);
 
 /** The file's text: title, one line of facts, the source's summary, the digest, then the transcript. */
@@ -73,36 +90,14 @@ const attendeeNames = (attendees: unknown): string[] =>
     : [];
 
 /**
- * The `meetings.followup` job. For a meeting that just ended (within 24 hours) it files one Markdown
- * file in Data room > Recordings, deduped on the meeting id, so a retry returns the same item.
- * Everything is scoped to the meeting's owner. Never logs meeting text.
+ * Files the meeting as one Markdown note in Data room > Recordings (deduped on the meeting id, so
+ * a repeat returns the same item). Nothing is filed when the meeting was deleted meanwhile.
  */
-export async function runMeetingFollowup(
-  deps: MeetingFollowupDeps,
-  payload: { spaceId: string; userId: string; meetingId: string; retry?: number },
+export async function fileRecording(
+  deps: Pick<MeetingFollowupDeps, "prisma" | "jobs" | "artifacts">,
+  owner: { spaceId: string; userId: string },
+  meeting: Meeting,
 ): Promise<void> {
-  const owner = { spaceId: payload.spaceId, userId: payload.userId };
-  const meeting = await deps.prisma.meeting.findFirst({
-    where: { id: payload.meetingId, ...owner, deletedAt: null },
-    select: {
-      id: true,
-      title: true,
-      startedAt: true,
-      endedAt: true,
-      attendees: true,
-      summary: true,
-      transcript: true,
-      digest: true,
-      category: true,
-      provider: true,
-      connectionId: true,
-      mcpServerId: true,
-      sourceUpdatedAt: true,
-    },
-  });
-  if (!meeting) return;
-  if (Date.now() - (meeting.endedAt ?? meeting.startedAt).getTime() > FRESH_MS) return;
-
   const actor: Actor = { ...owner, email: "", isDeploymentOwner: false };
   const names = attendeeNames(meeting.attendees);
   const filing = createFileDataRoomItem(deps, createDataRoomRepos(deps.prisma));
@@ -118,7 +113,7 @@ export async function runMeetingFollowup(
         FOR UPDATE`;
       if (live.length === 0) return;
       const folderId = await filing.folderAt(actor, null, ["Recordings"], [], "agent");
-      await filing.storeAndFile(actor, {
+      const { item } = await filing.storeAndFile(actor, {
         content: { bytes: new TextEncoder().encode(recordingMarkdown(meeting, names)) },
         name: dataRoomSafeName(`${day(meeting.startedAt)} ${meeting.title}.md`, "Meeting.md"),
         mimeType: "text/markdown",
@@ -131,9 +126,42 @@ export async function runMeetingFollowup(
         parties: names,
         tags: ["meeting", meeting.category ?? "other"],
       });
+      // The note is plain text already: store it now so a reader does not wait for extraction
+      // (extraction later writes the same text over it).
+      await tx.dataRoomItemText.createMany({
+        data: [
+          {
+            itemId: item.id,
+            spaceId: owner.spaceId,
+            userId: owner.userId,
+            text: recordingMarkdown(meeting, names),
+          },
+        ],
+        skipDuplicates: true,
+      });
     },
     { timeout: 30_000 },
   );
+}
+
+/**
+ * The `meetings.followup` job. For a meeting that just ended (within 24 hours) it files one Markdown
+ * file in Data room > Recordings, deduped on the meeting id, so a retry returns the same item.
+ * Everything is scoped to the meeting's owner. Never logs meeting text.
+ */
+export async function runMeetingFollowup(
+  deps: MeetingFollowupDeps,
+  payload: { spaceId: string; userId: string; meetingId: string; retry?: number },
+): Promise<void> {
+  const owner = { spaceId: payload.spaceId, userId: payload.userId };
+  const meeting = await deps.prisma.meeting.findFirst({
+    where: { id: payload.meetingId, ...owner, deletedAt: null },
+    select: MEETING_FILING_SELECT,
+  });
+  if (!meeting) return;
+  if (Date.now() - (meeting.endedAt ?? meeting.startedAt).getTime() > FRESH_MS) return;
+
+  await fileRecording(deps, owner, meeting);
   let busy = false;
   const onBusy = () => {
     busy = true;

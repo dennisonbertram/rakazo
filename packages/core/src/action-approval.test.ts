@@ -661,6 +661,19 @@ describe("block rules and per-bot rules", () => {
     expect(toolRuleAllowsAllow("imessage_send")).toBe(false);
     expect(toolRuleAllowsAllow("shell")).toBe(true);
   });
+
+  it("asks for share_meeting every time: attended or not, and no rule can allow it", () => {
+    expect(toolRequiresExplicitApproval("share_meeting")).toBe(true);
+    expect(toolRequiresApproval("share_meeting", false)).toBe(true);
+    expect(unattendedToolRequiresApproval(true, "share_meeting", false)).toBe(true);
+    expect(toolRuleAllowsAllow("share_meeting")).toBe(false);
+    expect(
+      resolveActionApprovalDetail({
+        toolName: "share_meeting",
+        rules: [rule("always_allow", "tool", "share_meeting")],
+      }),
+    ).toMatchObject({ decision: "ask" });
+  });
 });
 
 describe("planActionGate with block and unattended runs", () => {

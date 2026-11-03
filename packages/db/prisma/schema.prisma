@@ -4059,9 +4059,12 @@ model MeetingHandoff {
   bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
   runId     String?
   kind      String
+  /// share only: the run that handed the meeting over; unique, so a run shares at most once.
+  sourceRunId String?
   createdAt DateTime @default(now())
 
   @@unique([meetingId, botId])
+  @@unique([sourceRunId])
   @@index([spaceId, userId, createdAt])
   @@map("meeting_handoffs")
 }
