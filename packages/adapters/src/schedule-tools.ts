@@ -840,6 +840,7 @@ export async function updateScheduleFromTool(
     where: { id: existing.id },
     data: {
       prompt,
+      promptUpdatedAt: new Date(),
       // A prompt-only edit leaves the timing alone, so a run that advanced the routine meanwhile
       // keeps its advance.
       ...(timingChanged

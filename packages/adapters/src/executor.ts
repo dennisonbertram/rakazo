@@ -10938,7 +10938,7 @@ export function runSeesThreadHistory(trigger: string) {
 /**
  * Whether anything a run without history loads was written at or after `since`. A memory document
  * with no usable timestamp counts as changed. A routine's prompt has no edit time of its own
- * (updatedAt moves with every schedule update), so only a routine created after the mark counts.
+ * (updatedAt moves with every schedule update), so Routine.promptUpdatedAt is used.
  */
 async function loadedContextChangedSince(
   deps: { prisma: PrismaClient; memory: MemoryStore },
@@ -10954,9 +10954,9 @@ async function loadedContextChangedSince(
   if (loaded.routineId) {
     const routine = await deps.prisma.routine.findUnique({
       where: { id: loaded.routineId },
-      select: { createdAt: true },
+      select: { createdAt: true, promptUpdatedAt: true },
     });
-    if (!routine || after(routine.createdAt)) return true;
+    if (!routine || after(routine.promptUpdatedAt ?? routine.createdAt)) return true;
   }
   if (loaded.scratchpad) {
     const items = await listScratchpadItems(deps, { ...scope, includeDone: false });

@@ -253,6 +253,8 @@ function fixture({
   googleConnectors = false,
   dataRoom = false,
   routineCreatedAt,
+  routinePromptUpdatedAt,
+  routineUpdatedAt,
   scratchpadUpdatedAt,
   memoryUpdatedAt,
   availableTools,
@@ -293,6 +295,9 @@ function fixture({
   dataRoom?: boolean;
   /** When the run's routine row was created (needs `routineManagedKind` to give the run a routine). */
   routineCreatedAt?: Date;
+  /** When its prompt changed, and its row last changed for any reason (schedule updates). */
+  routinePromptUpdatedAt?: Date;
+  routineUpdatedAt?: Date;
   /** One open to-do updated at this time / one memory document updated at this ISO time. */
   scratchpadUpdatedAt?: Date;
   memoryUpdatedAt?: string;
@@ -451,6 +456,8 @@ function fixture({
       findUnique: vi.fn(async () => ({
         managedKind: routineManagedKind ?? null,
         createdAt: routineCreatedAt ?? new Date(0),
+        promptUpdatedAt: routinePromptUpdatedAt ?? null,
+        updatedAt: routineUpdatedAt ?? new Date(0),
       })),
       findMany: vi.fn(async () => routines),
     },
@@ -5458,6 +5465,13 @@ describe("the meeting mark follows what the run can see", () => {
     it("is held by a routine created after the mark, not one created before", async () => {
       expect(await asks(routine({ routineCreatedAt: later }))).toBe(true);
       expect(await asks(routine({ routineCreatedAt: earlier }))).toBe(false);
+    });
+
+    it("is held by an old routine whose prompt was edited after the mark, not by a schedule update", async () => {
+      expect(await asks(routine({ routinePromptUpdatedAt: later }))).toBe(true);
+      expect(
+        await asks(routine({ routinePromptUpdatedAt: earlier, routineUpdatedAt: later })),
+      ).toBe(false);
     });
 
     it("is held by a to-do changed after the mark, not one from before", async () => {

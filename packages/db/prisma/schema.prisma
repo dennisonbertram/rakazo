@@ -1284,6 +1284,8 @@ model Routine {
   watchState      RoutineWatchState?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  /// When `prompt` last changed (updatedAt also moves with every schedule update); null reads as createdAt.
+  promptUpdatedAt DateTime?
   runs            Run[]
 
   @@index([active, nextRunAt])
