@@ -313,7 +313,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   // A failed upgrade leaves agents on their old text; it must never stop the API from starting.
   await upgradeBuiltInAgentInstructions(prisma).then(
     (counts) => logger.info("built-in agent instructions upgraded", counts),
-    (error: unknown) => logger.warn("built-in agent instruction upgrade failed", { error }),
+    (error: unknown) => logger.warn("built-in agent instruction upgrade failed", {
+      reason: error instanceof Error ? error.name : "error",
+    }),
   );
   const deploymentSettings = await prisma.deploymentSettings.upsert({
     where: { id: "default" },
