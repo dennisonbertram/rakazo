@@ -19,6 +19,9 @@ function matches(row: Row, where: Row): boolean {
   return Object.entries(where).every(([key, want]) => {
     if (want && typeof want === "object" && "in" in want)
       return (want as { in: unknown[] }).in.includes(row[key]);
+    // connections.list hides the Granola, Omi and Hex keys with notIn (192fc490a).
+    if (want && typeof want === "object" && "notIn" in want)
+      return !(want as { notIn: unknown[] }).notIn.includes(row[key]);
     if (want && typeof want === "object" && "not" in want)
       return row[key] !== (want as { not: unknown }).not;
     return row[key] === want;
