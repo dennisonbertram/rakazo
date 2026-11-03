@@ -79,6 +79,11 @@ const payloadSchemas = {
     /** Set on the last job of a batch: when it ends, the rest of the backlog is queued. */
     continue: z.boolean().optional(),
   }),
+  "meetings.followup": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    meetingId: z.string().min(1),
+  }),
   "company.import.run": z.object({
     spaceId: z.string().min(1),
     userId: z.string().min(1),
@@ -135,7 +140,7 @@ const payloadSchemas = {
     entries: z.number().int().positive(),
     importId: z.string().min(1),
     name: z.string().min(1),
-    source: z.enum(["upload", "gmail", "drive", "box", "chat", "omi"]),
+    source: z.enum(["upload", "gmail", "drive", "box", "chat", "omi", "meeting"]),
     folderId: z.string().min(1).nullable(),
     sourceConnectionId: z.string().min(1).optional(),
     externalId: z.string().min(1).optional(),
@@ -471,6 +476,18 @@ export function meetingsDigestJob(
     replaceKey: `meetings.digest:${payload.meetingId}`,
     maxAttempts: 3,
     ...(availableAt ? { availableAt } : {}),
+  };
+}
+
+/** One queued follow-up per meeting. */
+export function meetingsFollowupJob(
+  payload: BackgroundJobPayloads["meetings.followup"],
+): BackgroundJob {
+  return {
+    name: "meetings.followup",
+    payload,
+    replaceKey: `meetings.followup:${payload.meetingId}`,
+    maxAttempts: 3,
   };
 }
 

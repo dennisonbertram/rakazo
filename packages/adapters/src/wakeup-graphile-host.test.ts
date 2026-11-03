@@ -59,6 +59,7 @@ function handlers(): BackgroundJobHandlers {
     "meetings.capture_sweep": vi.fn(async () => undefined),
     "meetings.sync": vi.fn(async () => undefined),
     "meetings.digest": vi.fn(async () => undefined),
+    "meetings.followup": vi.fn(async () => undefined),
     "dataroom.blob.delete": vi.fn(async () => undefined),
     "dataroom.ingest": vi.fn(async () => undefined),
     "dataroom.classify": vi.fn(async () => undefined),

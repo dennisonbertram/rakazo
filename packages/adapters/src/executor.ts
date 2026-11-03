@@ -6733,6 +6733,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ...(omiConnection ? { onlyConnectionId: omiConnection.id } : {}),
                   // Omi recording text is untrusted: the thread is marked before it is returned,
                   // so every later write or send asks (the same mark meeting text sets).
+                  meetingConsentOk: meetingConsentOk,
                   onUntrustedContent: async () => {
                     await deps.prisma.thread.updateMany({
                       where: { id: thread.id, meetingTaintedAt: null },

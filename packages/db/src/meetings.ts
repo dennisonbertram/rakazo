@@ -2,6 +2,7 @@ import type { SourceMeeting } from "@rakazo/contracts";
 import { formatMeetingTranscript } from "@rakazo/contracts";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
+import { deleteMeetingRecordings } from "./omi-outputs.js";
 import { IsolationError } from "./scope.js";
 
 type Scope = { spaceId: string; userId: string };
@@ -154,7 +155,11 @@ export function getMeeting(prisma: PrismaClient, scope: Scope, id: string) {
  * The user deletes a meeting: it, its Inbox to-dos and a tombstone (so sync does not bring it
  * back) change together.
  */
-export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: string) {
+export async function deleteMeeting(
+  prisma: PrismaClient,
+  scope: Scope,
+  id: string,
+): Promise<string[]> {
   const owner = ownerOf(scope);
   const found = await prisma.meeting.findFirst({
     where: { id, ...owner },
@@ -162,7 +167,7 @@ export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: stri
   });
   if (!found) throw new IsolationError();
   const key = { ...owner, provider: found.provider, externalId: found.externalId };
-  await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     await lockMeeting(tx, key);
     const locked = await tx.$queryRaw<{ id: string }[]>(
       Prisma.sql`SELECT "id" FROM "meetings" WHERE "id" = ${id} AND "spaceId" = ${owner.spaceId} AND "userId" = ${owner.userId} FOR UPDATE`,
@@ -174,7 +179,9 @@ export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: stri
       create: key,
       update: {},
     });
+    const keys = await deleteMeetingRecordings(tx, owner, [id]);
     await tx.meeting.delete({ where: { id } });
+    return keys;
   });
 }
 

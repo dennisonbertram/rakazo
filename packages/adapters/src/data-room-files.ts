@@ -40,11 +40,16 @@ export interface FileDataRoomInput {
   mimeType: string;
   folderId: string | null;
   importId?: string;
-  source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi";
+  source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
   sourceConnectionId?: string;
   externalId?: string;
   sourceUrl?: string;
   sourceUpdatedAt?: Date;
+  /** Facets set by the filer; a `meeting` item skips the classify model call. */
+  docType?: string;
+  docDate?: Date;
+  parties?: string[];
+  tags?: string[];
   /** Stored and listed but never read for search (pendant audio). */
   notIndexed?: boolean;
   /** Filed as ready and never sent through the pipeline (pendant audio has nothing to extract). */

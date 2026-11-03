@@ -1,15 +1,44 @@
 import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "./client.js";
 
-/** Deletes meetings with their Inbox to-dos, as `deleteMeeting` does (no tombstone: the user did not delete them). */
+/**
+ * Deletes the Recordings items filed for these meetings and returns their blob keys, which the
+ * caller queues for deletion.
+ */
+export async function deleteMeetingRecordings(
+  db: Pick<PrismaClient, "dataRoomItem">,
+  actor: Pick<Actor, "spaceId" | "userId">,
+  meetingIds: string[],
+): Promise<string[]> {
+  const where = {
+    spaceId: actor.spaceId,
+    userId: actor.userId,
+    source: "meeting",
+    sourceConnectionId: null,
+    externalId: { in: meetingIds.map((id) => `meeting:${id}`) },
+  };
+  const items = await db.dataRoomItem.findMany({
+    where,
+    select: { storageKey: true, thumbnailKey: true },
+  });
+  await db.dataRoomItem.deleteMany({ where });
+  return items.flatMap((i) => [i.storageKey, i.thumbnailKey].filter((k): k is string => !!k));
+}
+
+/**
+ * Deletes meetings with their Inbox to-dos and Recordings items, as `deleteMeeting` does (no
+ * tombstone: the user did not delete them). Returns the blob keys of the removed items.
+ */
 export async function deleteMeetingsWithTodos(
-  db: Pick<PrismaClient, "meeting" | "inboxTodo">,
+  db: Pick<PrismaClient, "meeting" | "inboxTodo" | "dataRoomItem">,
   actor: Pick<Actor, "spaceId" | "userId">,
   ids: string[],
-): Promise<void> {
+): Promise<string[]> {
   const owner = { spaceId: actor.spaceId, userId: actor.userId };
   await db.inboxTodo.deleteMany({ where: { ...owner, meetingId: { in: ids } } });
+  const keys = await deleteMeetingRecordings(db, owner, ids);
   await db.meeting.deleteMany({ where: { ...owner, id: { in: ids } } });
+  return keys;
 }
 
 /**
@@ -32,9 +61,13 @@ export async function deleteOmiOutputs(
     where: { ...owner, id: { in: noteIds } },
     select: { storageKey: true, thumbnailKey: true },
   });
-  await prisma.$transaction(async (tx) => {
-    await deleteMeetingsWithTodos(tx, owner, meetingIds);
+  const recordingKeys = await prisma.$transaction(async (tx) => {
+    const keys = await deleteMeetingsWithTodos(tx, owner, meetingIds);
     await tx.dataRoomItem.deleteMany({ where: { ...owner, id: { in: noteIds } } });
+    return keys;
   });
-  return notes.flatMap((n) => [n.storageKey, n.thumbnailKey].filter((k): k is string => !!k));
+  return [
+    ...notes.flatMap((n) => [n.storageKey, n.thumbnailKey].filter((k): k is string => !!k)),
+    ...recordingKeys,
+  ];
 }
