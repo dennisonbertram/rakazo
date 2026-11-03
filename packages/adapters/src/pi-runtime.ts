@@ -1153,6 +1153,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (finance) return finance;
   const legal = describeLegalActivity(toolName, record);
   if (legal) return legal;
+  if (toolName === "share_meeting") return "Sharing the meeting";
   const dataRoom = describeDataRoomActivity(toolName);
   if (dataRoom) return dataRoom;
   const mcp = toolName.match(/^mcp__(.+?)__(.+)$/);

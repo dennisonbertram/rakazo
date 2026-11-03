@@ -65,6 +65,8 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "imessage_send",
   "company_fact_upsert",
   "company_import_start",
+  // Hands a meeting to another agent; a card every time, also when the owner is chatting.
+  "share_meeting",
 ]);
 
 const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([

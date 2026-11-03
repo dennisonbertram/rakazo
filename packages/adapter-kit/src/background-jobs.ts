@@ -83,6 +83,8 @@ const payloadSchemas = {
     spaceId: z.string().min(1),
     userId: z.string().min(1),
     meetingId: z.string().min(1),
+    /** How many times a busy agent thread has already pushed this follow-up back. */
+    retry: z.number().int().min(0).optional(),
   }),
   "company.import.run": z.object({
     spaceId: z.string().min(1),
@@ -487,6 +489,20 @@ export function meetingsFollowupJob(
     name: "meetings.followup",
     payload,
     replaceKey: `meetings.followup:${payload.meetingId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** Runs the follow-up again later, because an agent's thread was busy. Its own key leaves the running job alone. */
+export function meetingsFollowupRetryJob(
+  payload: BackgroundJobPayloads["meetings.followup"],
+  availableAt: Date,
+): BackgroundJob {
+  return {
+    name: "meetings.followup",
+    payload,
+    replaceKey: `meetings.followup:${payload.meetingId}:retry`,
+    availableAt,
     maxAttempts: 3,
   };
 }

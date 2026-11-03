@@ -481,6 +481,29 @@ it("keeps Alchemy and exchanges that report an error under Finance", async () =>
   expect(container.textContent).toContain("The key was refused");
 });
 
+it("lists Alchemy and exchanges with an error under Needs attention, in the Connected list", async () => {
+  financeRpc.crypto.mockResolvedValue({
+    ...cryptoOn,
+    alchemy: { connected: true, lastError: "The key was refused" },
+  });
+  financeRpc.exchanges.mockResolvedValue([
+    { provider: "kraken", connected: true, lastError: "Read failed" },
+  ]);
+  await show(data(true, true), "/app/integrations?status=attention");
+  for (const id of ["alchemy", "kraken"]) {
+    expect(count(`finance-tile-${id}`)).toBe(1);
+    expect(inConnected(`finance-tile-${id}`)).toBe(true);
+  }
+  expect(count("finance-tile-crypto")).toBe(0);
+});
+
+it("keeps the filter and sort controls while one is set, even with a single card", async () => {
+  await show(data(true, true), "/app/integrations?status=attention");
+  expect(
+    container.querySelector('button[aria-label="Filter by Status"], [aria-label*="Status"]'),
+  ).not.toBeNull();
+});
+
 it("shows one Blockscout tile when its key and MCP server both exist", async () => {
   financeRpc.crypto.mockResolvedValue(cryptoOn);
   const blockscoutServer = {
@@ -546,6 +569,15 @@ const lapsedMercury = () => {
 it("keeps a lapsed bank's reconnect tile when the search matches it", async () => {
   await show(lapsedMercury(), "/app/integrations?q=mercury");
   expect(count("finance-tile-mercury")).toBe(1);
+});
+
+it("lists a lapsed bank under Needs attention and not under Connected", async () => {
+  await show(lapsedMercury(), "/app/integrations?status=attention");
+  expect(count("finance-tile-mercury")).toBe(1);
+  act(() => root.unmount());
+  container.remove();
+  await show(lapsedMercury(), "/app/integrations?status=connected");
+  expect(count("finance-tile-mercury")).toBe(0);
 });
 
 it("scrolls to the reconnect tile, not past it, from ?category=finance", async () => {
@@ -933,4 +965,126 @@ it("shows a Granola tile when only the key is connected, and opens the page from
   expect(container.querySelector('[data-testid="where"]')?.textContent).toBe(
     "/app/integrations/granola",
   );
+});
+
+it("tells two Gmail accounts apart by address, and filters and sorts the connected apps", async () => {
+  const account = (id: string, provider: string, extra: object = {}) => ({
+    id,
+    connectorId: "google",
+    provider,
+    displayName: provider,
+    status: "connected" as const,
+    error: null,
+    capabilities: [],
+    createdAt: "2026-10-01T00:00:00Z",
+    ...extra,
+  });
+  await show({
+    ...data(true, true),
+    connections: [
+      account("g1", "gmail", { account: "one@example.test" }),
+      account("g2", "gmail", { displayName: "Work", account: "two@example.test" }),
+      account("c1", "googlecalendar", { needsReconnect: true }),
+    ],
+  });
+  const lines = [...container.querySelectorAll('[data-testid="account-line"]')].map(
+    (line) => line.textContent,
+  );
+  expect(lines).toEqual(["one@example.test", "Work · two@example.test"]);
+  const names = () =>
+    [...container.querySelectorAll("a[href^='/app/integrations/app/']")].map((a) => a.textContent);
+  // Searching reaches the address.
+  const search = container.querySelector('input[name="integration-search"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(search, "two@");
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(names().join()).toContain("gmail");
+  expect(names().join()).not.toContain("googlecalendar");
+});
+
+it("keeps a status filter in the URL and shows only the apps that need attention", async () => {
+  await show(
+    {
+      ...data(true, true),
+      connections: [
+        {
+          id: "g1",
+          connectorId: "google",
+          provider: "gmail",
+          displayName: "Gmail",
+          status: "connected",
+          error: null,
+          capabilities: [],
+          createdAt: "2026-10-01T00:00:00Z",
+        },
+        {
+          id: "c1",
+          connectorId: "google",
+          provider: "googlecalendar",
+          displayName: "googlecalendar",
+          status: "connected",
+          needsReconnect: true,
+          error: null,
+          capabilities: [],
+          createdAt: "2026-10-01T00:00:00Z",
+        },
+      ],
+    },
+    "/app/integrations?status=attention",
+  );
+  const links = [...container.querySelectorAll("a[href^='/app/integrations/app/']")].map((a) =>
+    a.getAttribute("href"),
+  );
+  expect(links).toEqual(["/app/integrations/app/google/googlecalendar"]);
+});
+
+it("lists one line per account on a card, three at most, then how many more", async () => {
+  const gmail = (id: string, address: string) => ({
+    id,
+    connectorId: "google",
+    provider: "gmail",
+    displayName: "gmail",
+    account: address,
+    status: "connected" as const,
+    error: null,
+    capabilities: [],
+    createdAt: "2026-10-01T00:00:00Z",
+  });
+  await show({
+    ...data(true, true),
+    connections: ["a", "b", "c", "d"].map((id) => gmail(id, `${id}@example.test`)),
+  });
+  const lines = [...container.querySelectorAll('[data-testid="account-line"]')].map(
+    (line) => line.textContent,
+  );
+  expect(lines).toEqual(["a@example.test", "b@example.test", "c@example.test", "+1 more"]);
+});
+
+it("searches, filters and sorts MCP servers with the apps, by their own names and status", async () => {
+  const server = (id: string, name: string, oauthStatus: string) =>
+    ({
+      id,
+      name,
+      endpoint: "https://mcp.mercury.com/mcp",
+      oauthStatus,
+      oauthAttempted: false,
+      hasSecret: false,
+      createdAt: "2026-10-01T00:00:00Z",
+    }) as unknown as IntegrationsData["servers"][number];
+  const value = {
+    ...data(true, true),
+    servers: [
+      server("s1", "Mercury Ops", "connected"),
+      server("s2", "Mercury Payroll", "reconnect"),
+    ],
+  };
+  const cards = () =>
+    [...container.querySelectorAll("a[href^='/app/integrations/mcp/']")].map((a) => a.textContent);
+  await show(value, "/app/integrations?status=attention");
+  expect(cards()).toEqual(["Mercury Payroll"]);
+  act(() => root.unmount());
+  container.remove();
+  await show(value, "/app/integrations?sort=name&dir=desc");
+  expect(cards()).toEqual(["Mercury Payroll", "Mercury Ops"]);
 });
