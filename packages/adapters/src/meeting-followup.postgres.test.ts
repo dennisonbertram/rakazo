@@ -174,7 +174,12 @@ describePostgres("meeting follow-up filing (PostgreSQL)", () => {
         jobs: publisher,
         resolveModel: async () => model,
         runtime: digestRuntime(
-          JSON.stringify({ decisions: ["Close in Q1"], commitments: [], followUps: ["Send deck"] }),
+          JSON.stringify({
+            decisions: ["Close in Q1"],
+            commitments: [],
+            followUps: ["Send deck"],
+            category: "investor",
+          }),
         ),
       },
       { ...a, meetingId: id },
@@ -193,7 +198,7 @@ describePostgres("meeting follow-up filing (PostgreSQL)", () => {
       sourceConnectionId: null,
       docType: "note",
       parties: ["Ada Example"],
-      tags: ["meeting"],
+      tags: ["meeting", "investor"],
     });
     const folder = await prisma.dataRoomFolder.findFirstOrThrow({
       where: { id: item?.folderId as string },
@@ -340,7 +345,7 @@ describePostgres("meeting follow-up filing (PostgreSQL)", () => {
     );
     expect(classifier.calls).toEqual([]);
     const after = await prisma.dataRoomItem.findUniqueOrThrow({ where: { id: item.id } });
-    expect(after).toMatchObject({ status: "indexing", docType: "note", tags: ["meeting"] });
+    expect(after).toMatchObject({ status: "indexing", docType: "note", tags: ["meeting", "other"] });
   });
 
   it("a delete that lands between the job's load and its filing leaves no note", async () => {

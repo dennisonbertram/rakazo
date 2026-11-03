@@ -23,6 +23,7 @@ type Meeting = {
   summary: string;
   transcript: string | null;
   digest: unknown;
+  category: string | null;
   provider: string;
   sourceUpdatedAt: Date;
 };
@@ -87,6 +88,7 @@ export async function runMeetingFollowup(
       summary: true,
       transcript: true,
       digest: true,
+      category: true,
       provider: true,
       sourceUpdatedAt: true,
     },
@@ -120,7 +122,7 @@ export async function runMeetingFollowup(
         docType: "note",
         docDate: meeting.startedAt,
         parties: names,
-        tags: ["meeting"],
+        tags: ["meeting", meeting.category ?? "other"],
       });
     },
     { timeout: 30_000 },
