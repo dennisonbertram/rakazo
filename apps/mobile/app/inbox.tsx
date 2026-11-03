@@ -1,5 +1,6 @@
 import { MenuView } from "@expo/ui/community/menu";
 import type { InboxMoveInput, InboxPile, InboxTodo, MailRow } from "@rakazo/contracts";
+import { accountTabNames } from "@rakazo/contracts";
 import type { SenderGroup } from "@rakazo/core";
 import {
   archivableIds,
@@ -415,9 +416,10 @@ export default function InboxScreen() {
     ].filter((section) => section.data.length > 0);
   }, [pile, rows, expanded, digestOn, digestList, t]);
 
+  const accountNames = accountTabNames(accounts);
   const choices = [
     { key: ALL, label: t("All") },
-    ...accounts.map((account) => ({ key: account.connectionId, label: account.label })),
+    ...accounts.map((account, i) => ({ key: account.connectionId, label: accountNames[i] ?? "" })),
   ];
   const picker =
     accounts.length < 2 ? null : accounts.length <= 3 ? (
