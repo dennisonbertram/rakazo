@@ -3612,7 +3612,7 @@ describe("meeting-source agent", () => {
     const f = meetingRun({ prompt: injection });
     await f.run();
     // The three routine and to-do tools are the exception; they always ask (see the test below).
-    const asking = ["schedule_create", "schedule_list", "scratchpad_add"];
+    const asking = ["schedule_create", "schedule_list"];
     const allowed = new Set([...MEETINGS, ...asking, "recall_memory", granolaTool.name]);
     expect(f.offeredTools.filter((name) => !allowed.has(name))).toEqual([]);
     expect([...f.offeredTools].sort()).toEqual([...MEETINGS, ...asking, granolaTool.name].sort());
@@ -3649,11 +3649,13 @@ describe("meeting-source agent", () => {
     }
   });
 
-  it("keeps routines and to-dos behind a per-call approval that no saved rule can skip", async () => {
-    const OFFERED = ["schedule_create", "schedule_list", "scratchpad_add"];
+  it("keeps routines behind a per-call approval that no saved rule can skip", async () => {
+    const OFFERED = ["schedule_create", "schedule_list"];
     const probe = meetingRun({ builtin: true });
     await probe.run();
     expect(probe.offeredTools).toEqual(expect.arrayContaining(OFFERED));
+    // A to-do with a due date would show in other agents' calendars without the meeting mark.
+    expect(probe.offeredTools).not.toContain("scratchpad_add");
     for (const name of OFFERED) {
       const f = meetingRun({
         name,

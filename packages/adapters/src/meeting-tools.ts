@@ -21,12 +21,11 @@ export const MEETING_TOOL_NAMES: ReadonlySet<string> = new Set([
 /**
  * The tools a meeting-source agent may call only after the owner approves each call, on a card
  * that cannot become a saved rule. They stay here so the Wispr Flow agent keeps the routines and
- * to-dos it had before it became a meeting-source agent. The executor forces the approval.
+ * routines it had before it became a meeting-source agent. The executor forces the approval.
  */
 export const MEETING_AGENT_APPROVAL_TOOLS: ReadonlySet<string> = new Set([
   "schedule_create",
   "schedule_list",
-  "scratchpad_add",
 ]);
 
 /**

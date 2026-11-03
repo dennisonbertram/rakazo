@@ -5022,11 +5022,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             name === "schedule_create" &&
             (!ownerStartedRun || (await isOutsideContentSeen())) &&
             (await routineNamesNewSite(String(args.prompt ?? "")));
+          // A one-time schedule has a card but is no reason to ask on its own.
+          const scheduleAsks = scheduleCard !== undefined && scheduleCard.oneShot !== true;
           const requiresApprovalByDefault =
             requiresUnattendedApproval ||
             siteGate === "new" ||
             connectorReadGated ||
-            scheduleCard !== undefined ||
+            scheduleAsks ||
             toolRequiresApproval(name, viaConnector, declaredReadOnly);
           const callRoute = (resolvedTool ?? connectorTools.get(name))?.route;
           // Integration-agent writes use the shared preset classification and always show the full call.
@@ -5114,7 +5116,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             requiresMandatoryApproval ||
             // A repeating schedule asks unless the owner chose "Always allow" for this tool; Auto
             // Review never clears it, because the saved prompt would run on every fire.
-            (scheduleCard !== undefined && approvalResolved.source !== "always_allow")
+            (scheduleAsks && approvalResolved.source !== "always_allow")
               ? "ask"
               : planActionGate({
                   resolved: gateResolved,

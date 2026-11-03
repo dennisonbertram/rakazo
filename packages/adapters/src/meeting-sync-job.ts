@@ -27,6 +27,8 @@ const MIN_RATE_LIMIT_DELAY_MS = 60_000;
 const PAGES_PER_RUN = 2;
 /** Stored as `Rate limited until <ISO time>`; an agent refresh waits for that time. */
 const RATE_LIMITED = "Rate limited until ";
+/** Stored when a source refuses its sign-in; the scheduler waits for new credentials. */
+const KEY_REJECTED = "Key rejected";
 
 /** What a registry entry needs to build a source for one connection or MCP server. */
 export interface MeetingSourceInput extends Scope {
@@ -213,7 +215,7 @@ export async function runMeetingSyncJob(
             AND EXISTS (
               SELECT 1 FROM meeting_sync_states
               WHERE "connectionId" = ${ref.connectionId} AND "claimToken" = ${token})`;
-      await release({ error: "Key rejected" });
+      await release({ error: KEY_REJECTED });
       return;
     }
     if (error.kind === "rate_limit")
@@ -324,20 +326,20 @@ async function reconcileWisprFlowSyncs(
   const servers = (
     await deps.prisma.mcpServer.findMany({
       where: { enabled: true, endpoint: { contains: "wisprflow.ai" } },
-      select: { id: true, spaceId: true, userId: true, endpoint: true },
+      select: { id: true, spaceId: true, userId: true, endpoint: true, updatedAt: true },
     })
   ).filter((s) => isWisprFlowEndpoint(s.endpoint));
-  const fresh = new Set(
-    (
-      await deps.prisma.meetingSyncState.findMany({
-        where: { mcpServerId: { in: servers.map((s) => s.id) }, updatedAt: { gte: idleBefore } },
-        select: { mcpServerId: true },
-      })
-    ).map((state) => state.mcpServerId),
-  );
+  const states = await deps.prisma.meetingSyncState.findMany({
+    where: { mcpServerId: { in: servers.map((s) => s.id) } },
+    select: { mcpServerId: true, updatedAt: true, error: true },
+  });
+  const stateOf = new Map(states.map((state) => [state.mcpServerId, state]));
   let queued = 0;
   for (const s of servers) {
-    if (fresh.has(s.id)) continue;
+    const state = stateOf.get(s.id);
+    if (state && state.updatedAt >= idleBefore) continue;
+    // Rejected sign-in: retrying cannot work until the server row changes (new credentials).
+    if (state?.error === KEY_REJECTED && s.updatedAt <= state.updatedAt) continue;
     await deps.jobs.enqueue({
       ...meetingsSyncJob({
         spaceId: s.spaceId,

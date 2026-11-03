@@ -221,7 +221,6 @@ describe("meeting tools", () => {
       "recall_memory",
       "schedule_create",
       "schedule_list",
-      "scratchpad_add",
     ]);
   });
 
@@ -255,7 +254,6 @@ describe("meeting tools", () => {
       "recall_memory",
       "schedule_create",
       "schedule_list",
-      "scratchpad_add",
       "search_data_room",
     ]);
   });

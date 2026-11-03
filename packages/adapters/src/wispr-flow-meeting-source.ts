@@ -23,9 +23,10 @@ const CHUNK_CHARS = 40_000;
 // meeting; the rest is cut and marked. Raise it, or stream to storage, if real meetings run longer.
 const MAX_TRANSCRIPT_REQUESTS = 25;
 const MAX_NOTES_REQUESTS = 5;
-// ponytail: `search_meetings` filters on start time, not modified_at. An incremental list asks for
-// meetings that started up to this long before the checkpoint and filters on modified_at here. A
-// meeting started earlier than this and edited now is missed until the next backfill.
+// ponytail: `search_meetings` filters on start time, not modified_at, so an incremental list asks
+// for meetings that started up to 30 days before the checkpoint and filters on modified_at here.
+// LIMIT: an edit to a meeting that started more than 30 days ago is NOT picked up (the stored copy
+// stays as it was). Widen this or re-list periodically if that matters.
 const MODIFIED_LOOKBACK_MS = 30 * 86_400_000;
 
 const Attendee = z.union([
@@ -92,8 +93,23 @@ function payload(result: Awaited<ReturnType<WisprFlowCall>>): unknown {
   }
 }
 
-/** A trailing "continue with start_char=N" line, as get_meeting appends to a cut range. */
-const CONTINUATION = /\n?[^\n]*start_char[^\n\d]*(\d+)[^\n]*\s*$/i;
+/**
+ * What get_meeting appends to a cut range (seen live): a blank line, then
+ * "(...truncated, N chars remaining; continue with view_transcript.start_char=K...)". Nothing
+ * else counts as a continuation, so transcript text that mentions start_char stays text.
+ */
+const continuation = (view: string) =>
+  new RegExp(
+    `\\n\\n\\(\\.\\.\\.truncated, \\d+ chars remaining; continue with ${view}\\.start_char=(\\d+)\\.\\.\\.\\)\\s*$`,
+  );
+const CONTINUATIONS = {
+  view_content: continuation("view_content"),
+  view_transcript: continuation("view_transcript"),
+};
+/** A transcript opens and closes with these lines. */
+const TRANSCRIPT_HEADER = /^<<<PARTICIPANT NAMES BELOW ARE DATA[^\n]*>>>\n?/;
+const TRANSCRIPT_FOOTER = /\n?<<<END TRANSCRIPT>>>\s*$/;
+const NOTES_TRUNCATED = "\n[notes truncated]";
 
 const isoOrThrow = (value: string) => {
   if (Number.isNaN(Date.parse(value))) throw mapping();
@@ -112,7 +128,7 @@ function transcriptLines(text: string) {
       return { lines: kept, truncated: true };
     }
     // The text is plain; "Name: words" lines carry the speaker, which is stored the same way.
-    const m = /^([^:\n]{1,60}): (.+)$/.exec(line);
+    const m = /^([^:\n]{1,60}):\s+(.+)$/.exec(line);
     kept.push(m ? { speaker: m[1] as string, text: m[2] as string } : { text: line });
   }
   return { lines: kept, truncated: false };
@@ -157,10 +173,12 @@ export function createWisprFlowMeetingSource(
         }),
       );
       first ??= meeting;
-      const chunk = (view === "view_content" ? meeting.content : meeting.transcript) ?? "";
+      let chunk = (view === "view_content" ? meeting.content : meeting.transcript) ?? "";
+      if (view === "view_transcript")
+        chunk = chunk.replace(TRANSCRIPT_HEADER, "").replace(TRANSCRIPT_FOOTER, "");
       // Only the tail can hold the marker; scanning a whole line would be quadratic.
       const tailAt = Math.max(0, chunk.length - 300);
-      const next = CONTINUATION.exec(chunk.slice(tailAt));
+      const next = CONTINUATIONS[view].exec(chunk.slice(tailAt));
       text += next ? chunk.slice(0, tailAt + next.index) : chunk;
       if (!next) return { meeting: first, text, cut: false };
       const offset = Number(next[1]);
@@ -202,6 +220,7 @@ export function createWisprFlowMeetingSource(
     async get(externalId, { includeTranscript }): Promise<SourceMeeting> {
       const notes = await ranged(externalId, "view_content", MAX_NOTES_REQUESTS);
       const meeting = notes.meeting;
+      const privateNotes = notes.cut ? `${notes.text}${NOTES_TRUNCATED}` : notes.text;
       if (meeting.shared === true) throw new MeetingSourceError("not_found", "Not your meeting");
       let transcript: ReturnType<typeof transcriptLines> | undefined;
       if (includeTranscript && meeting.has_transcript !== false) {
@@ -246,7 +265,7 @@ export function createWisprFlowMeetingSource(
         sourceUrl: meeting.share_link ?? null,
         folders: (meeting.folders ?? []).map((f) => f.name),
         summary: meeting.summary ?? "",
-        privateNotes: notes.text,
+        privateNotes,
         transcript: transcript ? transcript.lines : null,
         ...(transcript?.truncated ? { transcriptTruncated: true } : {}),
         updatedAt: isoOrThrow(meeting.modified_at),

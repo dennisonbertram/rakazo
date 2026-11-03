@@ -8,10 +8,9 @@ import { createWisprFlowMeetingSource } from "./wispr-flow-meeting-source.js";
 
 /** A failed MCP call as the source error the sync job understands. */
 function mcpSourceError(error: unknown): MeetingSourceError {
-  const message = error instanceof Error ? error.message : "";
-  if (/HTTP (401|403)/.test(message))
-    return new MeetingSourceError("auth", "Wispr Flow rejected the sign-in");
-  if (/HTTP 429/.test(message))
+  if ((error as { expected?: unknown } | null)?.expected === "reconnect")
+    return new MeetingSourceError("auth", "Wispr Flow needs to be signed in again");
+  if (error instanceof Error && /HTTP 429/.test(error.message))
     return new MeetingSourceError("rate_limit", "Wispr Flow rate limit");
   return new MeetingSourceError("unavailable", "Wispr Flow is unavailable");
 }

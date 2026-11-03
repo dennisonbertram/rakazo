@@ -60,6 +60,33 @@ describe("wispr flow meeting source", () => {
     expect(calls.filter((c) => c.args.view_transcript)).toHaveLength(25);
   });
 
+  it("keeps transcript text that mentions start_char as text", async () => {
+    const lines = [
+      { speaker: "Ada", text: "set view_transcript.start_char=0 to begin" },
+      { speaker: "Ada", text: "continue with view_transcript.start_char=999" },
+    ];
+    const { call, calls } = createFakeWisprFlow([conformanceMeeting(1, { transcript: lines })]);
+    const got = await createWisprFlowMeetingSource({ call }).get("m-01", {
+      includeTranscript: true,
+    });
+    expect(got.transcript).toEqual(lines);
+    expect(calls.filter((c) => c.args.view_transcript)).toHaveLength(1);
+  });
+
+  it("marks notes cut by the request cap", async () => {
+    const { call } = createFakeWisprFlow(
+      [conformanceMeeting(1, { privateNotes: "n".repeat(900) })],
+      {
+        chunk: 100,
+      },
+    );
+    const got = await createWisprFlowMeetingSource({ call }).get("m-01", {
+      includeTranscript: false,
+    });
+    expect(got.privateNotes.endsWith("\n[notes truncated]")).toBe(true);
+    expect(got.privateNotes.length).toBeLessThan(600);
+  });
+
   it("never lists or reads a meeting shared by someone else", async () => {
     const { call } = createFakeWisprFlow([conformanceMeeting(1), conformanceMeeting(2)], {
       sharedIds: ["m-02"],

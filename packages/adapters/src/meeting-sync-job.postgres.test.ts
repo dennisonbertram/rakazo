@@ -466,6 +466,55 @@ describePostgres("meetings.sync job (PostgreSQL)", () => {
     await prisma.mcpServer.delete({ where: { id: server.id } });
   });
 
+  it("stops queueing a Wispr Flow server whose sign-in was rejected until its credentials change", async () => {
+    const server = await prisma.mcpServer.create({
+      data: {
+        ...scope,
+        slug: `flow-auth-${suffix}`,
+        name: "Flow",
+        transport: "http",
+        endpoint: "https://api.wisprflow.ai/connect/mcp",
+      },
+    });
+    const queuedFor = () =>
+      enqueued.filter((j) => "mcpServerId" in j.payload && j.payload.mcpServerId === server.id);
+    const rejecting = {
+      ...deps(),
+      registry: createMeetingSourceRegistry({
+        mcp: {
+          prisma,
+          connector: {
+            callServerTool: async () => {
+              throw Object.assign(new Error("MCP authorization expired."), {
+                expected: "reconnect",
+              });
+            },
+          } as never,
+        },
+      }),
+    };
+    await runMeetingSyncJob(rejecting, {
+      ...scope,
+      provider: "wisprflow",
+      mcpServerId: server.id,
+    });
+    expect((await state({ mcpServerId: server.id })).error).toBe("Key rejected");
+    enqueued = [];
+    await prisma.meetingSyncState.updateMany({
+      where: { mcpServerId: server.id },
+      data: { updatedAt: new Date(Date.now() - 3_600_000) },
+    });
+    await prisma.$executeRaw`UPDATE mcp_servers SET "updatedAt" = now() - interval '2 hours' WHERE id = ${server.id}`;
+    await reconcileMeetingSyncs({ prisma, jobs });
+    expect(queuedFor()).toHaveLength(0);
+    // The user signs in again: the server row changes after the rejection.
+    await prisma.mcpServer.update({ where: { id: server.id }, data: { name: "Flow 2" } });
+    await reconcileMeetingSyncs({ prisma, jobs });
+    expect(queuedFor()).toHaveLength(1);
+    await prisma.meetingSyncState.deleteMany({ where: { mcpServerId: server.id } });
+    await prisma.mcpServer.delete({ where: { id: server.id } });
+  });
+
   it("does not recreate or fetch a meeting the user deleted", async () => {
     source.meetings = [meeting("a", 3), meeting("b", 2)];
     const { payload, connectionId } = await connect();
