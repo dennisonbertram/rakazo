@@ -86,7 +86,9 @@ export function buildApprovalAskBlock(
     };
   }
   const fetchSite = webFetchSite(toolName, args);
-  const shareTarget = options?.shareTarget && sanitizeMessagingLabel(options.shareTarget);
+  const shareTarget =
+    options?.shareTarget &&
+    sanitizeMessagingLabel(options.shareTarget).replace(CARD_TITLE_ESCAPED, "\\$&");
   const summary =
     (shareTarget ? `sharing a meeting with ${shareTarget}` : undefined) ??
     options?.schedule?.summary ??

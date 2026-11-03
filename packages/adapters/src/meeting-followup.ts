@@ -112,7 +112,7 @@ export async function fileRecording(
         FOR UPDATE`;
       if (live.length === 0) return;
       const folderId = await filing.folderAt(actor, null, ["Recordings"], [], "agent");
-      await filing.storeAndFile(actor, {
+      const { item } = await filing.storeAndFile(actor, {
         content: { bytes: new TextEncoder().encode(recordingMarkdown(meeting, names)) },
         name: dataRoomSafeName(`${day(meeting.startedAt)} ${meeting.title}.md`, "Meeting.md"),
         mimeType: "text/markdown",
@@ -124,6 +124,19 @@ export async function fileRecording(
         docDate: meeting.startedAt,
         parties: names,
         tags: ["meeting", meeting.category ?? "other"],
+      });
+      // The note is plain text already: store it now so a reader does not wait for extraction
+      // (extraction later writes the same text over it).
+      await tx.dataRoomItemText.createMany({
+        data: [
+          {
+            itemId: item.id,
+            spaceId: owner.spaceId,
+            userId: owner.userId,
+            text: recordingMarkdown(meeting, names),
+          },
+        ],
+        skipDuplicates: true,
       });
     },
     { timeout: 30_000 },

@@ -1,12 +1,30 @@
 import type { ArtifactStore, JobPublisher } from "@rakazo/adapter-kit";
-import { botCanReadDataRoom } from "@rakazo/contracts";
+import {
+  botCanReadDataRoom,
+  isCompanyAgentSpawnKey,
+  isCompanyImporterSpawnKey,
+  isGtmAgentSpawnKey,
+  isVoiceAgentSpawnKey,
+} from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { fileRecording, MEETING_FILING_SELECT } from "./meeting-followup.js";
 import { startMeetingRun } from "./meeting-handoff.js";
 import { isMeetingSourceAgent } from "./meeting-tools.js";
 
 export const SHARE_MEETING_TOOL = "share_meeting";
+const ONE_PER_RUN = "A meeting was already shared in this run.";
 export const SHARE_REFUSAL = "That agent cannot read meetings.";
+
+/**
+ * Whether a routine run of this bot is offered read_data_room_item: the closed tool lists of the
+ * GTM, Company and Company importer agents leave it out, and the voice agent loses it on routine runs.
+ */
+const canReadMeetingItem = (bot: { spawnKey: string | null; disabledBuiltinTools?: string[] }) =>
+  botCanReadDataRoom(bot) &&
+  !isGtmAgentSpawnKey(bot.spawnKey) &&
+  !isCompanyAgentSpawnKey(bot.spawnKey) &&
+  !isCompanyImporterSpawnKey(bot.spawnKey) &&
+  !isVoiceAgentSpawnKey(bot.spawnKey);
 
 type Scope = { spaceId: string; userId: string };
 
@@ -30,14 +48,12 @@ export async function shareMeeting(
 ): Promise<{ ok: true; message: string } | { error: string }> {
   const meetingId = typeof args.meeting_id === "string" ? args.meeting_id : "";
   const botId = typeof args.bot_id === "string" ? args.bot_id : "";
-  // One target per run: a transcript cannot fan a meeting out to every agent.
-  const earlier = await deps.prisma.externalEffect.findMany({
-    where: { runId: source.runId, kind: SHARE_MEETING_TOOL, status: "completed" },
-    select: { result: true },
-  });
-  if (earlier.some((effect) => (effect.result as { ok?: unknown } | null)?.ok === true)) {
-    return { error: "A meeting was already shared in this run." };
-  }
+  // One target per run. The unique sourceRunId on the handoff row makes this atomic with the
+  // handoff itself; this early check only gives the friendly answer.
+  const used = () =>
+    deps.prisma.meetingHandoff.count({ where: { ...scope, sourceRunId: source.runId } });
+  if (await used()) return { error: ONE_PER_RUN };
+
   const meeting = await deps.prisma.meeting.findFirst({
     where: { id: meetingId, ...scope, deletedAt: null },
     select: MEETING_FILING_SELECT,
@@ -65,7 +81,7 @@ export async function shareMeeting(
   if (
     !target?.thread ||
     target.id === source.id ||
-    !botCanReadDataRoom(target) ||
+    !canReadMeetingItem(target) ||
     (await isMeetingSourceAgent(target, { prisma: deps.prisma }))
   ) {
     return { error: SHARE_REFUSAL };
@@ -84,6 +100,7 @@ export async function shareMeeting(
     meeting,
     bot: { id: target.id, threadId: target.thread.id },
     kind: "share",
+    sourceRunId: source.runId,
     prompt: sharePrompt(meeting, item.id),
     meta: {
       text: `${from?.name ?? "A meeting agent"} shared a meeting`,
@@ -91,6 +108,8 @@ export async function shareMeeting(
     },
   });
   if (runId) return { ok: true, message: `Shared the meeting with ${target.name}.` };
+  // Not started: this target already has the meeting, or the run's one share was taken meanwhile.
+  if (await used()) return { error: ONE_PER_RUN };
   const exists = await deps.prisma.meetingHandoff.count({
     where: { ...scope, meetingId: meeting.id, botId: target.id },
   });

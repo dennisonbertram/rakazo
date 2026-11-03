@@ -127,6 +127,8 @@ type StartInput = {
   /** Written by the server; it must hold no meeting text. */
   prompt: string;
   meta: { text: string; link?: { label: string; href: string } };
+  /** share: the run that hands the meeting over; a run can hand over once (unique key). */
+  sourceRunId?: string;
 };
 
 /**
@@ -155,7 +157,15 @@ export async function startMeetingRun(
     });
     if (active) return null;
     const created = await tx.meetingHandoff.createMany({
-      data: [{ ...scope, meetingId: meeting.id, botId: bot.id, kind: input.kind }],
+      data: [
+        {
+          ...scope,
+          meetingId: meeting.id,
+          botId: bot.id,
+          kind: input.kind,
+          sourceRunId: input.sourceRunId ?? null,
+        },
+      ],
       skipDuplicates: true,
     });
     if (created.count === 0) return null;
