@@ -27,24 +27,31 @@ import {
   Input,
   Skeleton,
 } from "@rakazo/ui-web";
-import { Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import type { ConnectedApp } from "../../lib/integrations";
+import type { ConnectedApp, EntryInfo } from "../../lib/integrations";
 import {
+  accountLabels,
+  accountLines,
+  appEntry,
   appPath,
+  EXCHANGES,
   FINANCE_PROVIDERS,
   FIRST_PARTY_MCP,
   filterCatalog,
+  filterEntries,
   groupConnections,
   isSameMcpEndpoint,
   mcpStatus,
   popularApps,
+  sortEntries,
 } from "../../lib/integrations";
+import { useListParams } from "../../lib/list-params";
 import { appReturnPath } from "../../lib/return-to";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
+import { PickFilter, SearchField, SortControl } from "../ListControls";
 import { PAGE_GUTTER_X, PageHeader } from "../PageHeader";
 import { AppLogo } from "./AppLogo";
 import { BrexCardsConnectDialog } from "./BrexCardsConnectDialog";
@@ -53,8 +60,10 @@ import { CustomConnectionDialog } from "./CustomConnectionDialog";
 import { DevinConnectDialog } from "./DevinConnectDialog";
 import {
   connectedFinanceKeys,
+  erroredFinanceKeys,
   FINANCE_TILE_COUNT,
   FinanceSection,
+  lapsedFinanceKeys,
   useFinanceStatus,
 } from "./FinanceSection";
 import { GranolaStatusLine, granolaLine } from "./GranolaMeetingsCard";
@@ -78,6 +87,7 @@ const PHONE_POPULAR = 3;
 /** The filter chips: All, then the section headings that hold tiles of their own. */
 const CHIPS = ["all", "finance", "social", "equity", "tools"] as const;
 type Chip = (typeof CHIPS)[number];
+const SORT_FIELDS = ["default", "name", "status", "connected"] as const;
 const GRANOLA_PATH = "/app/integrations/granola";
 const OMI_PATH = "/app/integrations/omi";
 
@@ -256,10 +266,10 @@ function AppCard({
   onReconnect: (app: ConnectedApp, row: Connection) => void;
 }) {
   // An account labelled with the app's own name says nothing new, so show what the app does instead.
-  const accounts = app.rows
-    .filter((row) => row.status === "connected" && row.displayName !== app.name)
-    .map((row) => row.displayName)
-    .join(", ");
+  const { t } = useLingui();
+  const { lines, more } = accountLines(accountLabels(app), 3);
+  const count = more;
+  const accounts = more ? [...lines, t`+${count} more`] : lines;
   const working = app.rows.find((row) => row.status === "connected");
   const lapsed = app.rows.find((row) => row.status === "connected" && row.needsReconnect);
   const description = data.catalog.find(
@@ -271,7 +281,7 @@ function AppCard({
       <CardHead
         name={app.name}
         logo={app.logo}
-        sub={accounts || description || undefined}
+        sub={accounts.length ? accounts : (description ?? undefined)}
         to={to}
       />
       {app.status === "failed" || app.status === "connecting" ? null : (
@@ -385,6 +395,11 @@ export function IntegrationsHome({
   const { t } = useLingui();
   const [params] = useSearchParams();
   const [query, setQuery] = useState(params.get("q") ?? "");
+  const list = useListParams(SORT_FIELDS, { field: "default", dir: "asc" });
+  const statusParam = list.param("status");
+  // A status filter shows only the connected apps, so it hides everything that is not connected.
+  const status =
+    statusParam === "connected" || statusParam === "attention" ? statusParam : undefined;
   const [category, setCategory] = useState<Chip>(
     params.get("category") === "finance" ? "finance" : "all",
   );
@@ -436,6 +451,12 @@ export function IntegrationsHome({
     tools: t`Tools`,
   };
 
+  const sortNames = {
+    default: t`Default`,
+    name: t`Name`,
+    status: t`Status`,
+    connected: t`Connected`,
+  };
   const apps = useMemo(
     () => groupConnections(data.connections, data.catalog),
     [data.connections, data.catalog],
@@ -447,8 +468,10 @@ export function IntegrationsHome({
   // Only Finance also narrows the Popular catalog; Social, Equity and Tools hold just their own tiles.
   const results = useMemo(
     () =>
-      category === "all" || category === "finance" ? filterCatalog(open, { query, category }) : [],
-    [open, query, category],
+      !status && (category === "all" || category === "finance")
+        ? filterCatalog(open, { query, category })
+        : [],
+    [open, query, category, status],
   );
   const firstPartySections = { social: labels.social, equity: labels.equity, tools: labels.tools };
   const firstPartyDescription = {
@@ -467,6 +490,7 @@ export function IntegrationsHome({
   const financeNames = FINANCE_PROVIDERS.map((entry) => entry.name.toLowerCase());
   const financeMatches = financeNames.some((name) => name.includes(query.trim().toLowerCase()));
   const showFinance =
+    !status &&
     (category === "all" || category === "finance") &&
     financeMatches &&
     connectedKeys.size < FINANCE_TILE_COUNT;
@@ -505,11 +529,13 @@ export function IntegrationsHome({
   );
   const firstPartyMcp = unconnectedFirstParty.filter(
     (entry) =>
+      !status &&
       (category === "all" || category === entry.section || category === entry.category) &&
       entry.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
   // Brex cards has no https endpoint to match a connected server by, so its tile is hidden by its own check.
   const showBrexTile =
+    !status &&
     spaceOwner &&
     !data.servers.some((server) => isBrexCardsEndpoint(server.endpoint)) &&
     (category === "all" || category === "tools" || category === "finance") &&
@@ -541,35 +567,115 @@ export function IntegrationsHome({
   const servers = data.servers.filter(
     (server) => !financeServerIds.includes(server.id) && server !== cryptoServer,
   );
-  const filtering = Boolean(query.trim()) || category !== "all";
+  const filtering = Boolean(query.trim()) || category !== "all" || Boolean(status);
   const phoneCollapsed = !phoneAll && !filtering;
   // Connected narrows to the chip's category and to apps whose name matches the search, so an app
   // that is already connected still turns up when searched for.
-  const searching = Boolean(query.trim());
+  const searching = Boolean(query.trim()) || Boolean(status);
   const chipOnly = category !== "all" && !searching;
-  const connectedApps = filtering
-    ? apps.filter(
+  const wholeList = category === "all";
+  const financeProps = {
+    sources: data.financeSources,
+    status: financeStatus,
+    onChanged: () => void data.refresh(),
+    extras: {
+      ...Object.fromEntries(
+        data.financeSources.flatMap((source) =>
+          source.serverId
+            ? [[source.provider, <UsedBy key="used" bots={botsOn(source.serverId)} />]]
+            : [],
+        ),
+      ),
+      ...(cryptoServer ? { crypto: <UsedBy key="used" bots={botsOn(cryptoServer.id)} /> } : {}),
+    },
+    cryptoManageTo: cryptoServer ? `/app/integrations/mcp/${cryptoServer.id}` : undefined,
+  };
+  const financeLabel: Record<string, string> = {
+    ...Object.fromEntries(FINANCE_PROVIDERS.map((entry) => [entry.provider, entry.name])),
+    ...Object.fromEntries(EXCHANGES.map((entry) => [entry.provider, entry.name])),
+    crypto: "Blockscout",
+    alchemy: "Alchemy",
+  };
+  // Apps, MCP servers and finance tiles share one search, status filter and sort. Cards with
+  // their own layout (Granola's key, Omi, Hex, sources) show only while nothing narrows the list.
+  type Entry = EntryInfo & { key: string; node: ReactNode };
+  const lapsedKeys = lapsedFinanceKeys(data.financeSources);
+  const erroredKeys = erroredFinanceKeys(financeStatus);
+  const entries: Entry[] = [
+    ...apps
+      .filter(
         (app) =>
-          (category === "all" ||
-            data.catalog.find((item) => `${item.connectorId}:${item.slug}` === app.key)
-              ?.category === category) &&
-          app.name.toLowerCase().includes(query.trim().toLowerCase()),
+          category === "all" ||
+          data.catalog.find((item) => `${item.connectorId}:${item.slug}` === app.key)?.category ===
+            category,
       )
-    : apps;
+      .map((app) => ({
+        ...appEntry(app),
+        key: app.key,
+        node: <AppCard key={app.key} app={app} data={data} onRetry={retry} onReconnect={retry} />,
+      })),
+    ...(wholeList ? servers : []).map((server) => ({
+      key: server.id,
+      name: server.name,
+      search: [server.name, hostOf(server.endpoint) ?? "", server.command ?? ""],
+      attention: mcpStatus(server) !== "connected",
+      created: server.createdAt ?? null,
+      node: (
+        <McpCard
+          key={server.id}
+          server={server}
+          data={data}
+          descriptions={firstPartyDescription}
+          onReconnectDevin={() => setDevinDialog("replace")}
+        />
+      ),
+    })),
+    ...(wholeList || category === "finance"
+      ? [
+          ...[...connectedKeys].map((key) => ({ key, attention: false })),
+          // Without a status filter a lapsed bank keeps its own section above Connected.
+          ...(status
+            ? [...lapsedKeys, ...erroredKeys].map((key) => ({ key, attention: true }))
+            : []),
+        ].map(({ key, attention }) => ({
+          key: `finance:${key}`,
+          name: financeLabel[key] ?? key,
+          search: [financeLabel[key] ?? key],
+          attention,
+          created: null,
+          node: (
+            <div key={key} className="contents [&_[data-testid=finance-section]]:contents">
+              <FinanceSection
+                {...financeProps}
+                mode={!attention ? "connected" : erroredKeys.has(key) ? "available" : "lapsed"}
+                only={key}
+              />
+            </div>
+          ),
+        }))
+      : []),
+  ];
+  // Every kind of card counts, and an active filter or sort keeps its controls so it can be cleared.
+  const entryCount =
+    entries.filter((entry) => !entry.key.startsWith("finance:")).length +
+    connectedKeys.size +
+    (status ? 0 : lapsedKeys.size + erroredKeys.size);
+  const connectedEntries = sortEntries(
+    filterEntries(entries, { query, status }),
+    list.sort.field,
+    list.sort.dir,
+  );
   const otherMatches =
     showFinance ||
     firstPartyMcp.length > 0 ||
     showBrexTile ||
     chatMatches > 0 ||
-    (searching && connectedApps.length > 0);
-  const wholeList = category === "all";
+    (searching && connectedEntries.length > 0);
   const anyConnected =
     apps.length + servers.length + data.sources.length + connectedKeys.size > 0 ||
     keyOnlyGranola ||
     omiConnected;
-  const hasConnected = chipOnly
-    ? connectedApps.length > 0 || (category === "finance" && connectedKeys.size > 0)
-    : anyConnected;
+  const hasConnected = chipOnly ? connectedEntries.length > 0 : anyConnected;
   // Native Google items fill the catalog without a managed provider, so ask the setup state. Only
   // the deployment owner is told which providers are configured; a member (whose list is empty)
   // can tell from the catalog itself, and a failed call falls back to whether it has anything.
@@ -602,7 +708,7 @@ export function IntegrationsHome({
     // Wait a frame so the dialog's own focus restore has finished.
     const frame = requestAnimationFrame(() => link.focus());
     return () => cancelAnimationFrame(frame);
-  }, [connecting, connectedApps]);
+  }, [connecting, connectedEntries.length]);
 
   function connectFirstParty(entry: (typeof FIRST_PARTY_MCP)[number]) {
     if (entry.id === "devin") return setDevinDialog("connect");
@@ -681,22 +787,41 @@ export function IntegrationsHome({
           {/* Rendered before the data loads, so only the grid below waits. */}
           {notSetUp ? null : (
             <>
-              <div className="relative mb-3 max-w-[420px]">
-                <Search
-                  aria-hidden="true"
-                  className="pointer-events-none absolute start-2.5 top-2.5 size-4 text-muted-foreground"
-                />
-                <Input
-                  type="search"
-                  className="h-9 ps-8"
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <SearchField
+                  name="integration-search"
+                  className="w-full sm:w-[420px]"
                   value={query}
                   placeholder={t`Search integrations`}
-                  aria-label={t`Search integrations`}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
+                  label={t`Search integrations`}
+                  onChange={(value) => {
+                    setQuery(value);
                     setVisible(CONNECTION_CATALOG_PAGE_SIZE);
                   }}
                 />
+                {entryCount > 1 || status || list.sort.field !== "default" ? (
+                  <>
+                    <PickFilter
+                      label={t`Status`}
+                      value={status}
+                      options={[
+                        ["connected", t`Connected`],
+                        ["attention", t`Needs attention`],
+                      ]}
+                      onChange={(value) => list.setParam("status", value)}
+                    />
+                    <div className="ms-auto flex items-center gap-0.5">
+                      <SortControl
+                        fields={SORT_FIELDS.map((field) => [field, sortNames[field]])}
+                        field={list.sort.field}
+                        fieldLabel={sortNames[list.sort.field]}
+                        direction={list.sort.field === "default" ? undefined : list.sort.dir}
+                        onField={(field) => list.setSort({ field, dir: "asc" })}
+                        onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+                      />
+                    </div>
+                  </>
+                ) : null}
               </div>
               <fieldset
                 aria-label={t`Category`}
@@ -749,7 +874,7 @@ export function IntegrationsHome({
           {data.loaded ? (
             <>
               {/* A lapsed connection is the one thing to fix, so it sits above Connected. */}
-              {(wholeList || category === "finance") && financeMatches ? (
+              {!status && (wholeList || category === "finance") && financeMatches ? (
                 <div ref={lapsedRef} className="mb-3 scroll-mt-4 empty:hidden">
                   <FinanceSection
                     mode="lapsed"
@@ -759,30 +884,13 @@ export function IntegrationsHome({
                   />
                 </div>
               ) : null}
-              {(searching ? connectedApps.length > 0 : hasConnected) ? (
+              {(searching ? connectedEntries.length > 0 : hasConnected) ? (
                 <>
                   <SectionTitle>
                     <Trans>Connected</Trans>
                   </SectionTitle>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-                    {connectedApps.map((app) => (
-                      <AppCard
-                        key={app.key}
-                        app={app}
-                        data={data}
-                        onRetry={retry}
-                        onReconnect={retry}
-                      />
-                    ))}
-                    {(wholeList && !searching ? servers : []).map((server) => (
-                      <McpCard
-                        key={server.id}
-                        server={server}
-                        data={data}
-                        descriptions={firstPartyDescription}
-                        onReconnectDevin={() => setDevinDialog("replace")}
-                      />
-                    ))}
+                    {connectedEntries.map((entry) => entry.node)}
                     {granolaKey && keyOnlyGranola && wholeList && !searching ? (
                       <GranolaKeyCard
                         status={granolaKey}
@@ -798,34 +906,6 @@ export function IntegrationsHome({
                     {(wholeList && !searching ? data.sources : []).map((source) => (
                       <SourceCard key={source.id} source={source} onRemove={setRemoving} />
                     ))}
-                    {!searching && (wholeList || category === "finance") ? (
-                      <FinanceSection
-                        mode="connected"
-                        sources={data.financeSources}
-                        status={financeStatus}
-                        onChanged={() => void data.refresh()}
-                        extras={{
-                          ...Object.fromEntries(
-                            data.financeSources.flatMap((source) =>
-                              source.serverId
-                                ? [
-                                    [
-                                      source.provider,
-                                      <UsedBy key="used" bots={botsOn(source.serverId)} />,
-                                    ],
-                                  ]
-                                : [],
-                            ),
-                          ),
-                          ...(cryptoServer
-                            ? { crypto: <UsedBy key="used" bots={botsOn(cryptoServer.id)} /> }
-                            : {}),
-                        }}
-                        cryptoManageTo={
-                          cryptoServer ? `/app/integrations/mcp/${cryptoServer.id}` : undefined
-                        }
-                      />
-                    ) : null}
                   </div>
                 </>
               ) : null}
@@ -1014,7 +1094,7 @@ export function IntegrationsHome({
                   ) : null;
                 })}
 
-                {category === "all" ? (
+                {category === "all" && !status ? (
                   <IMessageSection
                     query={query}
                     flat={filtering}

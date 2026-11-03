@@ -221,7 +221,7 @@ export class GoogleConnector implements ManagedConnectorProvider {
   async complete(
     request: { state: string; code?: string; redirectUrl?: string; provider?: string },
     context: AdapterContext,
-  ): Promise<{ connectionRef: string; secretId: string; scope: string }> {
+  ): Promise<{ connectionRef: string; secretId: string; scope: string; account?: string }> {
     if (!STATE_PATTERN.test(request.state) || !request.code)
       throw new Error("Google authorization is incomplete");
     // Without a provider the grant is Gmail's, as before providers were passed.
@@ -277,7 +277,12 @@ export class GoogleConnector implements ManagedConnectorProvider {
           ciphertext: stored.ciphertext,
         },
       });
-      return { connectionRef: profile.sub, secretId: stored.id, scope: token.scope };
+      return {
+        connectionRef: profile.sub,
+        secretId: stored.id,
+        scope: token.scope,
+        ...(profile.email ? { account: profile.email } : {}),
+      };
     } catch (error) {
       throw new Error(sanitizeConnectorError(error, secrets));
     }
