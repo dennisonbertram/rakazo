@@ -480,6 +480,7 @@ import {
   failedMailToAgent,
   mailSendRefusal,
 } from "./mail-approval-recovery.js";
+import { threadHasProtectedSender } from "./mail-protected-senders.js";
 import {
   accountName,
   inferMailAccount,
@@ -5105,9 +5106,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   rule.effect === "always_allow",
               )
             );
+          // An archive acts on the whole conversation, so one protected sender in it (marked
+          // important or in Contacts) means a card, whatever saved rule would otherwise allow it.
+          const protectedArchive =
+            name === "mail_modify" &&
+            args.archive === true &&
+            typeof args.id === "string" &&
+            (await threadHasProtectedSender(
+              deps.prisma,
+              { spaceId: run.spaceId, userId: run.userId },
+              args.id.trim(),
+            ));
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
             mailModifyNeedsToolRule ||
+            protectedArchive ||
             scheduleNamesNewSite ||
             desktopReadSearch ||
             // An unattended run has no judge and nobody to ask later: a read on a connector it had
