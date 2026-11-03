@@ -2,6 +2,7 @@ import type { SourceMeeting } from "@rakazo/contracts";
 import { formatMeetingTranscript } from "@rakazo/contracts";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
+import { deleteMeetingRecordings } from "./omi-outputs.js";
 import { IsolationError } from "./scope.js";
 
 type Scope = { spaceId: string; userId: string };
@@ -33,6 +34,7 @@ export async function upsertMeeting(
   source: MeetingSourceRef | null,
   provider: string,
   meeting: SourceMeeting,
+  options: { onRecordingBlobs?: (keys: string[]) => Promise<void> } = {},
 ): Promise<UpsertMeetingResult> {
   const owner = ownerOf(scope);
   const columns = sourceColumns(source);
@@ -59,7 +61,8 @@ export async function upsertMeeting(
   // Inside a caller's transaction (a capture being finalized) it joins that one.
   const inTransaction = (fn: (tx: Prisma.TransactionClient) => Promise<UpsertMeetingResult>) =>
     "$transaction" in prisma ? prisma.$transaction(fn) : fn(prisma);
-  return inTransaction(async (tx) => {
+  const dropped: string[] = [];
+  const result = await inTransaction(async (tx) => {
     await lockMeeting(tx, key);
     if (
       await tx.meetingTombstone.findUnique({ where: { spaceId_userId_provider_externalId: key } })
@@ -79,8 +82,13 @@ export async function upsertMeeting(
       where: { ...key, sourceUpdatedAt: { lt: sourceUpdatedAt } },
       data,
     });
+    // A source-side deletion takes the meeting's Recordings note with it.
+    if (count && meeting.deleted)
+      dropped.push(...(await deleteMeetingRecordings(tx, owner, [existing.id])));
     return count ? "updated" : "stale";
   });
+  if (dropped.length) await options.onRecordingBlobs?.(dropped);
+  return result;
 }
 
 /** Serializes writers of one meeting (upsert vs delete) until the transaction ends. */
@@ -154,7 +162,11 @@ export function getMeeting(prisma: PrismaClient, scope: Scope, id: string) {
  * The user deletes a meeting: it, its Inbox to-dos and a tombstone (so sync does not bring it
  * back) change together.
  */
-export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: string) {
+export async function deleteMeeting(
+  prisma: PrismaClient,
+  scope: Scope,
+  id: string,
+): Promise<string[]> {
   const owner = ownerOf(scope);
   const found = await prisma.meeting.findFirst({
     where: { id, ...owner },
@@ -162,7 +174,7 @@ export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: stri
   });
   if (!found) throw new IsolationError();
   const key = { ...owner, provider: found.provider, externalId: found.externalId };
-  await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     await lockMeeting(tx, key);
     const locked = await tx.$queryRaw<{ id: string }[]>(
       Prisma.sql`SELECT "id" FROM "meetings" WHERE "id" = ${id} AND "spaceId" = ${owner.spaceId} AND "userId" = ${owner.userId} FOR UPDATE`,
@@ -175,6 +187,7 @@ export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: stri
       update: {},
     });
     await tx.meeting.delete({ where: { id } });
+    return deleteMeetingRecordings(tx, owner, [id]);
   });
 }
 

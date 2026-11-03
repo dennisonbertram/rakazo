@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { MeetingSourceError } from "@rakazo/adapter-kit";
+import { dataRoomBlobDeleteJob, MeetingSourceError } from "@rakazo/adapter-kit";
 import type { MeetingSourceRegistry } from "@rakazo/adapters";
 import {
   aiRecipient,
@@ -395,7 +395,15 @@ export async function deleteStoredMeeting(
   meetingId: string,
 ): Promise<{ ok: true }> {
   try {
-    await deleteMeeting(deps.router.prisma, owner(actor), meetingId);
+    const keys = await deleteMeeting(deps.router.prisma, owner(actor), meetingId);
+    // ponytail: a failed enqueue leaves an orphan blob, as dropNotes does; add a sweep if it shows.
+    for (const key of keys) {
+      await deps.router.jobs
+        .enqueue(dataRoomBlobDeleteJob(actor.spaceId, key, new Date(Date.now() + 60_000)))
+        .catch((error: unknown) =>
+          getLogger().error("recording blob delete enqueue failed", error),
+        );
+    }
   } catch (error) {
     if (error instanceof IsolationError)
       throw new ORPCError("NOT_FOUND", { message: "Meeting not found" });

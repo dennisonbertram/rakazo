@@ -45,6 +45,7 @@ import {
   READ_ONLY_AGENT_TOOLS,
   runIdentityInstruction,
   runNotificationsEnabled,
+  STALE_HISTORY_GUIDANCE,
   selectBuiltinToolsForRun,
   settleSteeringAttachmentLoads,
   splitInboxSearchSkill,
@@ -1444,7 +1445,7 @@ describe("voice agent permissions", () => {
         "user",
         voiceAgentSpawnKey("user-1"),
       ),
-    ).toBe(VOICE_AGENT_INSTRUCTIONS);
+    ).toBe(`${VOICE_AGENT_INSTRUCTIONS} ${STALE_HISTORY_GUIDANCE}`);
     expect(
       userTurnInstructions({
         botInstructions: VOICE_AGENT_INSTRUCTIONS,

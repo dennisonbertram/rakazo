@@ -2741,14 +2741,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // of this run's actual model on every trigger (not the Inbox agent's), and unknown means no.
         const meetingConsentOk = async (): Promise<boolean> => {
           try {
-            if (!runModelProvider || !runModelId) return false;
-            const recipient = aiRecipient({
-              provider: runModelProvider,
-              modelId: runModelId,
-              baseUrl: resolved.baseUrl,
-              use: "model",
-            });
-            if (!recipient) return runModelProvider === "scripted";
+            // The model that receives the text now: a backup model after a switch, not the first.
+            const { provider, id, baseUrl } = effectiveRunModel;
+            if (!provider || !id) return false;
+            const recipient = aiRecipient({ provider, modelId: id, baseUrl, use: "model" });
+            if (!recipient) return provider === "scripted";
             const granted = await deps.prisma.aiDataConsent.findFirst({
               where: {
                 userId: bot.userId,
@@ -6741,6 +6738,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ...(omiConnection ? { onlyConnectionId: omiConnection.id } : {}),
                   // Omi recording text is untrusted: the thread is marked before it is returned,
                   // so every later write or send asks (the same mark meeting text sets).
+                  meetingConsentOk: meetingConsentOk,
                   onUntrustedContent: async () => {
                     await deps.prisma.thread.updateMany({
                       where: { id: thread.id, meetingTaintedAt: null },
@@ -10916,6 +10914,10 @@ export const INBOX_OWNER_GUIDANCE =
 export const ONE_APPROVAL_GUIDANCE =
   "Do not ask for your own confirmation before a change; call the tool and the user approves on that card.";
 
+/** Appended to every run's instructions: the thread keeps replies written under older instructions. */
+export const STALE_HISTORY_GUIDANCE =
+  "If an earlier reply in this chat said you could not do something, check your current tools and instructions, because they may have changed.";
+
 /** Profile fields the creation intro is asked to explain. Other runs keep the prior identity line. */
 export function runIdentityInstruction(
   bot: { name: string; title: string; description: string; instructions: string },
@@ -10939,7 +10941,8 @@ function identityInstruction(
   trigger: string,
   spawnKey?: string | null,
 ): string {
-  if (isVoiceAgentSpawnKey(spawnKey)) return VOICE_AGENT_INSTRUCTIONS;
+  if (isVoiceAgentSpawnKey(spawnKey))
+    return `${VOICE_AGENT_INSTRUCTIONS} ${STALE_HISTORY_GUIDANCE}`;
   // Stored instructions are fixed at creation; this keeps older agents on the one-approval rule.
   const guide = isIntegrationAgentSpawnKey(spawnKey) || isCartaAgentSpawnKey(spawnKey);
   const inbox = isInboxAgentSpawnKey(spawnKey);
@@ -10950,12 +10953,15 @@ function identityInstruction(
     if (guide && !text.includes(ONE_APPROVAL_GUIDANCE)) {
       text = `${text} ${ONE_APPROVAL_GUIDANCE}`.trim();
     }
-    return inbox && !text.includes(INBOX_OWNER_GUIDANCE)
-      ? `${text} ${INBOX_OWNER_GUIDANCE}`.trim()
-      : text;
+    if (inbox && !text.includes(INBOX_OWNER_GUIDANCE)) {
+      text = `${text} ${INBOX_OWNER_GUIDANCE}`.trim();
+    }
+    return text;
   };
   if (trigger !== "created") {
-    return withGuide(bot.instructions || `${bot.name}: ${bot.title}\n${bot.description}`);
+    // The creation intro starts an empty thread, so only later runs can see stale replies.
+    const text = withGuide(bot.instructions || `${bot.name}: ${bot.title}\n${bot.description}`);
+    return text.includes(STALE_HISTORY_GUIDANCE) ? text : `${text} ${STALE_HISTORY_GUIDANCE}`;
   }
   const instructions = withGuide(bot.instructions ?? "").trim();
   return [

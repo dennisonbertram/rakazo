@@ -1,5 +1,5 @@
 import type { JobPublisher, MeetingSource } from "@rakazo/adapter-kit";
-import { MeetingSourceError, meetingsDigestJob } from "@rakazo/adapter-kit";
+import { dataRoomBlobDeleteJob, MeetingSourceError, meetingsDigestJob } from "@rakazo/adapter-kit";
 import type { MeetingSourceRef, PrismaClient } from "@rakazo/db";
 import { upsertMeeting } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -119,7 +119,15 @@ export async function runMeetingSyncPass(
       }
       deps.signal?.throwIfAborted();
       if (!(await deps.holdsClaim())) return { done: false, lostClaim: true, fetched };
-      const outcome = await upsertMeeting(prisma, scope, deps.ref, deps.provider, meeting);
+      const outcome = await upsertMeeting(prisma, scope, deps.ref, deps.provider, meeting, {
+        // ponytail: a failed enqueue leaves an orphan blob, as dropNotes does.
+        onRecordingBlobs: async (keys) => {
+          for (const key of keys)
+            await deps.jobs
+              ?.enqueue(dataRoomBlobDeleteJob(scope.spaceId, key, new Date(Date.now() + 60_000)))
+              .catch((error: unknown) => getLogger().error("recording blob delete failed", error));
+        },
+      });
       fetched++;
       if (outcome === "created" || outcome === "updated")
         await queueDigest(deps, meeting.externalId);
