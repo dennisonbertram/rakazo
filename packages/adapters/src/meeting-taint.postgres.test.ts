@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { PrismaClient } from "@rakazo/db";
-import { createDb, createRepos } from "@rakazo/db";
+import { clearThread, createDb, createRepos } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { markMeetingTaintOnDelivery } from "./meeting-tools.js";
 
@@ -92,6 +92,15 @@ describePostgres("meeting taint mark (PostgreSQL)", () => {
 
   it("marks the thread a meeting agent delivers into, and no thread an ordinary agent delivers into", async () => {
     await mark("other", "b");
+    expect(await marked("b")).toBe(false);
+    await mark("meeting", "b");
+    expect(await marked("b")).toBe(true);
+  });
+
+  it("clearing the thread removes the mark, and a later meeting delivery sets it again", async () => {
+    const input = { spaceId: scope.spaceId, threadId: ids("t-b"), botId: ids("b") };
+    expect(await marked("b")).toBe(true);
+    await clearThread(prisma, input);
     expect(await marked("b")).toBe(false);
     await mark("meeting", "b");
     expect(await marked("b")).toBe(true);

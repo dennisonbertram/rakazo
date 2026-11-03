@@ -92,6 +92,7 @@ import {
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  MEETING_MARK_REASON,
   OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   PINNED_CONNECTION_LOST_MESSAGE,
@@ -2063,7 +2064,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // and treat the whole run as holding it (see meetingTaint at the approval gate).
         // Sender ids come from stored blocks, never from message text.
         const replySenderIds = new Set<string>(senderBot ? [senderBot.id] : []);
-        for (const message of loadedMessages) {
+        // Routine and created runs load no history (threadContextForRun), so the thread's mark and
+        // its stored replies do not apply to them; only text they read themselves does.
+        const runSeesHistory = runSeesThreadHistory(run.trigger);
+        for (const message of runSeesHistory ? loadedMessages : []) {
           for (const block of message.blocks as MessageBlock[]) {
             if (block.kind === "bot_message_received") replySenderIds.add(block.fromBotId);
           }
@@ -2094,7 +2098,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const meetingTaint =
           !meetingAgent &&
           (meetingSenderIds.size > 0 ||
-            (thread as { meetingTaintedAt?: Date | null }).meetingTaintedAt != null);
+            (runSeesHistory &&
+              (thread as { meetingTaintedAt?: Date | null }).meetingTaintedAt != null));
+        // Set when this run itself reads meeting text (a marked tool result, or history of a marked
+        // thread). A run that sees no history is marked by this alone, not by the thread's mark.
+        let runReadMeetingText = meetingSenderIds.size > 0;
         // A run that began with an external bot (or another Space's agent) is marked. Rebuilt every
         // run from the stored blocks of the triggering message and the loaded history window, so a
         // message that arrives while another run is active still marks the run that answers it.
@@ -3461,7 +3469,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           trigger: run.trigger,
           messagingChannelRun,
         });
-        const threadMarkedNow = async (): Promise<boolean> => {
+        const threadRowMarked = async (): Promise<boolean> => {
           try {
             const row = await deps.prisma.thread.findUnique({
               where: { id: thread.id },
@@ -3474,6 +3482,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return true;
           }
         };
+        // A run that sees no history is held only by what it read itself.
+        const threadMarkedNow = async (): Promise<boolean> =>
+          runSeesHistory ? threadRowMarked() : runReadMeetingText;
         // The desktop app tools (docs/local-desktop-control). Read again at each call, from the
         // bot's current settings, so turning the switch off or removing an app takes effect at once.
         // Steering from MCP or a chat can taint the run in the database while this attempt holds an
@@ -5376,9 +5387,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ? "Asked because this ran in the background."
               : externalTaintedCall
                 ? EXTERNAL_REQUEST_REASON
-                : approvalResolved.source === "require_approval" && actionType
-                  ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
-                  : undefined;
+                : meetingTaintedCall && !meetingAgent
+                  ? MEETING_MARK_REASON
+                  : approvalResolved.source === "require_approval" && actionType
+                    ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
+                    : undefined;
           // Record each decision once; a replay of the same effect already has its event.
           if (
             !applied?.duplicate &&
@@ -6740,6 +6753,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   // so every later write or send asks (the same mark meeting text sets).
                   meetingConsentOk: meetingConsentOk,
                   onUntrustedContent: async () => {
+                    runReadMeetingText = true;
                     await deps.prisma.thread.updateMany({
                       where: { id: thread.id, meetingTaintedAt: null },
                       data: { meetingTaintedAt: new Date() },
@@ -7406,6 +7420,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               name === "search_history"
                 ? await searchHistory(deps.prisma, scope, HistorySearchInputSchema.parse(args))
                 : await readHistory(deps.prisma, scope, HistoryReadInputSchema.parse(args));
+            // A routine run does not see history, but this tool can read a marked thread's.
+            if (!runSeesHistory && !runReadMeetingText)
+              runReadMeetingText = await threadRowMarked();
             const redacted = redactConnectorPayload(response, runSecrets);
             // Redaction can expand short synthetic credentials; never let Pi clip the JSON.
             if (Buffer.byteLength(JSON.stringify(redacted), "utf8") > 11_000) {
@@ -10884,6 +10901,12 @@ export function userTurnInstructions(parts: {
   ];
 }
 
+// Routine runs stay isolated from thread history. The creation intro does
+// too: a message that arrives during it waits and is answered afterward.
+export function runSeesThreadHistory(trigger: string) {
+  return trigger !== "created" && trigger !== "routine";
+}
+
 export function threadContextForRun<T>(
   trigger: string,
   context: {
@@ -10893,9 +10916,7 @@ export function threadContextForRun<T>(
   },
   messagingChannelRun: boolean,
 ) {
-  // Routine runs stay isolated from thread history. The creation intro does
-  // too: a message that arrives during it waits and is answered afterward.
-  if (trigger === "created" || trigger === "routine") {
+  if (!runSeesThreadHistory(trigger)) {
     return {
       messages: [] as T[],
       summary: null,

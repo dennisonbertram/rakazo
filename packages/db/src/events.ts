@@ -300,7 +300,7 @@ export async function clearThread(
         spaceId: input.spaceId,
         ...(input.groupId ? { groupId: input.groupId } : { botId: input.botId }),
       },
-      data: { unread: false },
+      data: { unread: false, meetingTaintedAt: null },
       select: { nextMessageSeq: true, historyCompactionGeneration: true },
     });
     const activeRuns = await tx.run.findMany({

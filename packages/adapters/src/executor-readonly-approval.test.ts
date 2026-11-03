@@ -12,6 +12,7 @@ import {
   cartaAgentSpawnKey,
   inboxAgentSpawnKey,
   integrationAgentSpawnKey,
+  MEETING_MARK_REASON,
 } from "@rakazo/contracts";
 import type { ActionApprovalRule } from "@rakazo/core";
 import {
@@ -51,6 +52,26 @@ import { McpConnector } from "./mcp-connector.js";
 import { createEmulatedPhotonPlatform, PhotonEmulator } from "./photon-emulator.js";
 import { PipedreamConnector } from "./pipedream-connector.js";
 import { ThirdPartyConnectorEmulator } from "./third-party-connector-emulator.js";
+
+/** Lets a test make the Data room or history tools return text from a meeting. */
+const meetingReads = vi.hoisted(() => ({ dataRoomUntrusted: false }));
+vi.mock("./data-room-tools.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./data-room-tools.js")>();
+  return {
+    ...real,
+    dataRoomToolFromTool: async (
+      ...args: Parameters<typeof real.dataRoomToolFromTool>
+    ): ReturnType<typeof real.dataRoomToolFromTool> => {
+      if (!meetingReads.dataRoomUntrusted) return real.dataRoomToolFromTool(...args);
+      await args[1].onUntrustedContent?.();
+      return { untrusted: true, items: [] } as never;
+    },
+  };
+});
+vi.mock("@rakazo/db", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  readHistory: async () => ({ messages: [] }),
+}));
 
 vi.mock("./computer-workspace.js", async (importOriginal) => ({
   ...(await importOriginal<typeof ComputerWorkspaceModule>()),
@@ -209,6 +230,7 @@ function fixture({
   knownBots,
   connectionRows = mail ? [mailConnectionRow()] : [],
   googleConnectors = false,
+  dataRoom = false,
   availableTools,
   executeToolName = "demo_execute_tool",
   parallel = false,
@@ -243,6 +265,8 @@ function fixture({
   connectionRows?: Record<string, unknown>[];
   /** Offers the native Google Calendar and Drive tools. */
   googleConnectors?: boolean;
+  /** Offers the Data room tools (their results are stubbed by `meetingReads`). */
+  dataRoom?: boolean;
   availableTools?: ConnectorTool[];
   beforeToolCall?: (index: number) => void | Promise<void>;
   /** Messages the run claims as steering, in order, when the runtime asks. */
@@ -744,6 +768,7 @@ function fixture({
     ...(ticketBoard ? { ticketBoardEnabled: true } : {}),
     ...(messaging ? { messaging } : {}),
     ...(googleConnectors ? { connectors: {} } : {}),
+    ...(dataRoom ? { artifacts: {} } : {}),
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return {
     rules,
@@ -5271,5 +5296,97 @@ describe("Auto Review of new sites", () => {
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
       expect(f.effects.map((effect) => effect.status)).toEqual(["denied"]);
     });
+  });
+});
+
+describe("the meeting mark follows what the run can see", () => {
+  const card = (f: ReturnType<typeof fixture>) =>
+    (f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks: { approvalReason?: string }[] }])[0]
+      .blocks[0]!;
+  const fetchCall = { args: { url: "https://example.invalid" }, executionId: "c" };
+  const siteRule = {
+    effect: "always_allow",
+    matchKind: "site",
+    matchValue: "example.invalid",
+  } as const;
+  const run = (extra: Parameters<typeof fixture>[0] = {}) =>
+    fixture({
+      name: "web_fetch",
+      builtin: true,
+      threadMarkedAtStart: true,
+      autoReview: true,
+      rules: [siteRule],
+      ...extra,
+    });
+
+  afterEach(() => {
+    meetingReads.dataRoomUntrusted = false;
+  });
+
+  it("a routine run on a marked thread does not ask about text it never saw", async () => {
+    const f = run({ trigger: "routine" });
+    f.setCalls([fetchCall]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.threadMarked()).toBe(true);
+  });
+
+  it("a user run on a marked thread still asks, with the meeting reason", async () => {
+    const f = run();
+    f.setCalls([fetchCall]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(card(f).approvalReason).toBe(MEETING_MARK_REASON);
+  });
+
+  it("a routine run that reads a meeting asks from then on, and the thread stays marked", async () => {
+    meetingReads.dataRoomUntrusted = true;
+    const f = run({ trigger: "routine", dataRoom: true });
+    f.setCalls([
+      { name: "read_data_room_item", args: { id: "item-1" }, executionId: "c1" },
+      { ...fetchCall, executionId: "c2" },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(f.threadMarked()).toBe(true);
+  });
+
+  it("a routine run that reads a marked thread's history asks from then on", async () => {
+    const f = run({ trigger: "routine" });
+    f.setCalls([
+      { name: "read_history", args: { messageId: "m0" }, executionId: "c1" },
+      { ...fetchCall, executionId: "c2" },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("a routine run is not marked by a meeting agent's reply in the loaded messages", async () => {
+    const f = run({
+      trigger: "routine",
+      threadMarkedAtStart: false,
+      history: [
+        {
+          blocks: [
+            {
+              kind: "bot_message_received",
+              fromBotId: "peer-1",
+              fromBotName: "Granola",
+              text: "Decided X",
+              hop: 1,
+              intent: "result",
+              returnToMessageId: "m0",
+            },
+          ],
+        },
+      ],
+      knownBots: { "peer-1": integrationAgentSpawnKey("server-1") },
+      mcpServers: [
+        { id: "server-1", endpoint: "https://mcp.granola.ai/mcp", agentBotId: "peer-1" },
+      ],
+    });
+    f.setCalls([fetchCall]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
   });
 });

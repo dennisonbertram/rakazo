@@ -1000,7 +1000,7 @@ model Thread {
   unread                      Boolean               @default(false)
   /// Highest message seq the thread's owner has read; -1 before any. Moves forward only, except markUnread.
   lastReadSeq                 Int                   @default(-1)
-  /// Set when meeting-source agent text reached this thread (directly or forwarded). Never cleared.
+  /// Set when meeting-source agent text reached this thread (directly or forwarded). Cleared with the thread; meeting-source agents set it again on their next run.
   meetingTaintedAt            DateTime?
   messages                    Message[]
   events                      Event[]

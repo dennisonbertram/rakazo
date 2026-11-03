@@ -3129,6 +3129,13 @@ export function ShellPage() {
           setComposerDraft(recovered.draft);
         });
       },
+      clearConversation: () => {
+        const groupId = activeGroupId.current;
+        const group = groupId ? groupsRef.current.find((item) => item.id === groupId) : undefined;
+        const bot = botsRef.current.find((item) => item.id === activeBotId.current);
+        if (group) setClearTarget({ kind: "group", chat: group });
+        else if (bot) setClearTarget({ kind: "bot", chat: bot });
+      },
       editableBotName: (botId) => botsRef.current.find((bot) => bot.id === botId)?.name,
       canSend: (botId) => {
         const bot = botsRef.current.find((item) => item.id === botId);
