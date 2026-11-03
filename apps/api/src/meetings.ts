@@ -396,6 +396,7 @@ export async function deleteStoredMeeting(
 ): Promise<{ ok: true }> {
   try {
     const keys = await deleteMeeting(deps.router.prisma, owner(actor), meetingId);
+    // ponytail: a failed enqueue leaves an orphan blob, as dropNotes does; add a sweep if it shows.
     for (const key of keys) {
       await deps.router.jobs
         .enqueue(dataRoomBlobDeleteJob(actor.spaceId, key, new Date(Date.now() + 60_000)))

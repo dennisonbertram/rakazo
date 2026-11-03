@@ -120,6 +120,7 @@ export async function runMeetingSyncPass(
       deps.signal?.throwIfAborted();
       if (!(await deps.holdsClaim())) return { done: false, lostClaim: true, fetched };
       const outcome = await upsertMeeting(prisma, scope, deps.ref, deps.provider, meeting, {
+        // ponytail: a failed enqueue leaves an orphan blob, as dropNotes does.
         onRecordingBlobs: async (keys) => {
           for (const key of keys)
             await deps.jobs
