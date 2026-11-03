@@ -31,7 +31,7 @@ const PRESENTATION_SENTENCE = INVESTORS_AGENT_INSTRUCTIONS.slice(
 );
 
 /** Earlier defaults (before the SAFE guidance, before the presentation rules). A bot still storing one is upgraded; an edited bot is left alone. */
-const PREVIOUS_INVESTORS_AGENT_INSTRUCTIONS = new Set(
+export const PREVIOUS_INVESTORS_AGENT_INSTRUCTIONS = new Set(
   [INVESTORS_AGENT_INSTRUCTIONS, INVESTORS_AGENT_INSTRUCTIONS.replace(SAFE_SENTENCE, "")].flatMap(
     (text) => [text, text.replace(PRESENTATION_SENTENCE, "Keep replies short.")],
   ),
