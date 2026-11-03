@@ -76,6 +76,7 @@ export * from "./outbound-check.js";
 export * from "./pages.js";
 export * from "./quiet-routine.js";
 export * from "./record.js";
+export * from "./redact-for-model.js";
 export * from "./remote-images.js";
 export * from "./response-bytes.js";
 export * from "./run-mode.js";

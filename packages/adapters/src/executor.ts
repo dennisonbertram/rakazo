@@ -481,8 +481,10 @@ import {
   failedMailToAgent,
   mailSendRefusal,
 } from "./mail-approval-recovery.js";
+import { threadHasProtectedSender } from "./mail-protected-senders.js";
 import {
   accountName,
+  findAccount,
   inferMailAccount,
   MAIL_TOOL_NAMES,
   mailToolFromTool,
@@ -5110,9 +5112,35 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   rule.effect === "always_allow",
               )
             );
+          // An archive acts on the whole conversation, so one protected sender in it (marked
+          // important or in Contacts) means a card, whatever saved rule would otherwise allow it.
+          // Removing the INBOX label (by id or name) is the same archive. An unresolved account or
+          // an uncached message leaves the senders unknown, which also asks.
+          const protectedArchive =
+            name === "mail_modify" &&
+            typeof args.id === "string" &&
+            (args.archive === true ||
+              (Array.isArray(args.removeLabels) &&
+                args.removeLabels.some(
+                  (label) => typeof label === "string" && label.trim().toLowerCase() === "inbox",
+                ))) &&
+            (await (async () => {
+              const accounts = await mailAccounts();
+              const owner = { spaceId: run.spaceId, userId: bot.userId };
+              const account =
+                typeof args.account === "string" && args.account.trim()
+                  ? findAccount(accounts, args.account)
+                  : ((await inferMailAccount(deps.prisma, owner, accounts, args).catch(
+                      () => undefined,
+                    )) ?? (accounts.length === 1 ? accounts[0] : undefined));
+              return account
+                ? threadHasProtectedSender(deps.prisma, owner, String(args.id).trim(), account.id)
+                : true;
+            })());
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
             mailModifyNeedsToolRule ||
+            protectedArchive ||
             scheduleNamesNewSite ||
             desktopReadSearch ||
             // An unattended run has no judge and nobody to ask later: a read on a connector it had
