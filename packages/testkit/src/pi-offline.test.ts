@@ -105,7 +105,13 @@ describe("real Pi against an offline model HTTP endpoint", () => {
         { type: "text", text: "Saved." },
       ]);
       expect(events.at(-1)).toEqual({ type: "done", text: "Saved." });
-      expect(delay.mock.calls.map(([delayMs]) => delayMs)).toEqual([2_000, 8_000]);
+      // Each wait is the backoff step plus up to a quarter of it as jitter.
+      const waits = delay.mock.calls.map(([delayMs]) => delayMs);
+      expect(waits).toHaveLength(2);
+      for (const [index, step] of [2_000, 8_000].entries()) {
+        expect(waits[index]).toBeGreaterThanOrEqual(step);
+        expect(waits[index]).toBeLessThan(step * 1.25);
+      }
     } finally {
       delay.mockRestore();
     }

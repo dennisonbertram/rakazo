@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { MentionSpan } from "./composer-inline-mentions.js";
 import {
   findMentionQueryAtCaret,
   findMentionRanges,
@@ -67,7 +68,7 @@ describe("mention spans follow edits per occurrence", () => {
   const first = { kind: "routine", id: "r1", name: "Weekly report" } as const;
   const second = { kind: "routine", id: "r2", name: "Weekly report" } as const;
   const text = "@Weekly report then @Weekly report";
-  const spans = [
+  const spans: MentionSpan<typeof first | typeof second>[] = [
     { mention: first, start: 0, end: 14 },
     { mention: second, start: 20, end: 34 },
   ];
@@ -87,7 +88,7 @@ describe("mention spans follow edits per occurrence", () => {
   it("a span whose text no longer matches is dropped", () => {
     expect(liveSpans("@Weekly repor then", spans)).toEqual([]);
     expect(liveSpans(text, spans)).toEqual(spans);
-    expect(liveSpans("@Weekly reportx then", [spans[0]])).toEqual([]);
+    expect(liveSpans("@Weekly reportx then", spans.slice(0, 1))).toEqual([]);
   });
   it("Backspace removes only the occurrence at the caret", () => {
     const out = mentionDeletionAtCaret(text, 34, spans);

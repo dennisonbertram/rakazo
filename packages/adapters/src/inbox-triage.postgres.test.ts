@@ -402,7 +402,7 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
     expect(stored.dueOn?.toISOString().slice(0, 10)).toBe("2026-10-20");
   });
 
-  it("sets pile from the model only when the free rules left it undecided", async () => {
+  it("sets pile from the model's category, falling back to the free rules without one", async () => {
     const user = await addUser();
     const undecided = await mail(user, "Lunch?", { minutesAgo: 3 });
     const decided = await mail(user, "Fall sale", { minutesAgo: 2 });
@@ -415,7 +415,7 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
     await run(user, rt.runtime);
 
     const rows = Object.fromEntries((await messagesOf(user)).map((m) => [m.id, m]));
-    // The model called both personal, but the rule decision wins where there was one.
+    // The model's category decides the pile (d1b3d3380), so both land in Important; the rule pile is kept.
     expect(rows[undecided.id]).toMatchObject({
       category: "personal",
       rulePile: null,
@@ -424,7 +424,7 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
     expect(rows[decided.id]).toMatchObject({
       category: "personal",
       rulePile: "newsletters",
-      pile: "newsletters",
+      pile: "important",
     });
   });
 
@@ -722,7 +722,9 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
     const sent = rt.prompts().flatMap(idsIn);
     expect(sent).toHaveLength(25);
     expect(new Set(sent).size).toBe(25);
-    expect(rt.maxInFlight()).toBe(1);
+    // The one run that won the lock sends its two batches together (fc3b59c12), so at most two
+    // calls are in flight; overlapping runs add none, which the unique ids above also show.
+    expect(rt.maxInFlight()).toBeLessThanOrEqual(2);
     expect((await messagesOf(user)).every((m) => m.triagedAt !== null)).toBe(true);
     // The three runs that found the user busy come back later in case mail arrived meanwhile.
     const retries = queues.flatMap((q) => q.enqueued);
@@ -1249,7 +1251,7 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
       const unsure = await mail(user, "Hmm", { minutesAgo: 3 });
       const classifier = scriptedClassifier((m) =>
         m.id === ask.id
-          ? { category: "personal", needsReply: true, priority: "important" }
+          ? { category: "reply", needsReply: true, priority: "important" }
           : m.id === bulk.id
             ? { category: "bulk" }
             : "skip",
@@ -1272,7 +1274,7 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
       expect(rt.prompts().map(idsIn)).toEqual([[ask.id, bulk.id, unsure.id]]);
       const rows = Object.fromEntries((await messagesOf(user)).map((m) => [m.id, m]));
       expect(rows[ask.id]).toMatchObject({
-        category: "personal",
+        category: "reply",
         priority: "important",
         needsReply: true,
         reason: "LLM says Lunch?",
@@ -1340,10 +1342,11 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
       expect((await todosOf(user)).map((t) => t.text)).toEqual(["Pay invoice 42"]);
     });
 
-    it("makes a to-do for a personal message the classifier says needs a reply", async () => {
+    // A "personal" label means nothing to answer, so a question the classifier flags is a "reply" (e66002092).
+    it("makes a to-do for a message the classifier says needs a reply", async () => {
       const user = await withTypesafeConsent();
       await mail(user, "Lunch Friday?");
-      const classifier = scriptedClassifier(() => ({ category: "personal", needsReply: true }));
+      const classifier = scriptedClassifier(() => ({ category: "reply", needsReply: true }));
       const rt = fakeRuntime(answerAll(() => ({ category: "fyi", todo: "Reply about lunch" })));
 
       await run(user, rt.runtime, { classifier: classifier.provider });
@@ -1453,7 +1456,8 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
 
       await run(user, fakeRuntime(answerAll()).runtime, { classifier: classifier.provider });
 
-      expect(classifier.batches.map((b) => b.length)).toEqual([20, 20, 5]);
+      // Batches run together (fc3b59c12), so the order they reach the classifier is not fixed.
+      expect(classifier.batches.map((b) => b.length).sort((a, b) => b - a)).toEqual([20, 20, 5]);
     });
 
     it("leaves a labeled message unwritten when the LLM step fails, so the job retries all of it", async () => {
