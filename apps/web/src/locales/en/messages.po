@@ -2092,8 +2092,8 @@ msgid "Back to sign in"
 msgstr "Back to sign in"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything."
-msgstr "Background runs always ask before they send, change or run anything."
+msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed."
+msgstr "Background runs always ask before they send, change or run anything, except mail changes you always allowed."
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Backup models"

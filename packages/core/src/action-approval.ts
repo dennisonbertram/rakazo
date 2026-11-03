@@ -265,6 +265,9 @@ export function externalTaintAllowsTool(toolName: string, args?: Record<string, 
  * In an unattended run (nobody is watching, or the input comes from outside) a call runs without
  * asking only if it is a read-only connector tool or a safe built-in. Everything else asks.
  * An Allow rule never lifts this; the executor treats the result as a mandatory ask.
+ * The one exception is mail_modify: it cannot delete, trash, send or mark spam, and every change
+ * (archive, mark read, label) is reversible, so the rules decide. No rule still asks. The executor further requires a rule for the tool
+ * itself: a category Allow (send_email) does not run it unattended.
  */
 export function unattendedToolRequiresApproval(
   unattended: boolean,
@@ -280,6 +283,7 @@ export function unattendedToolRequiresApproval(
     return !(method === undefined || method === "GET" || method === "HEAD");
   }
   if (UNATTENDED_SCRATCHPAD_TOOLS.has(toolName)) return scratchpadWriteIsGated(toolName, args);
+  if (toolName === "mail_modify") return false;
   return !UNATTENDED_SAFE_BUILTIN_TOOLS.has(toolName);
 }
 
