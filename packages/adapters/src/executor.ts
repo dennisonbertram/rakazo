@@ -508,6 +508,7 @@ import {
   isMeetingSourceAgent,
   MEETING_AGENT_APPROVAL_TOOLS,
   MEETING_AGENT_BUILTIN_TOOLS,
+  MEETING_AGENT_GUIDANCE,
   MEETING_CONSENT_OFF,
   MEETING_CONSENT_REQUIRED_MESSAGE,
   MEETING_TOOL_NAMES,
@@ -5590,7 +5591,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               schedule: scheduleCard,
               moneyNames,
               shareTarget:
-                name === SHARE_MEETING_TOOL ? await shareTargetName(deps.prisma, run, args) : undefined,
+                name === SHARE_MEETING_TOOL
+                  ? await shareTargetName(deps.prisma, run, args)
+                  : undefined,
             });
             return pauseForAsk(block, block.kind === "ask" ? block.text : "", executionId);
           };
@@ -8749,6 +8752,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     mailSortingLine,
                     mailThreadAgent: isMailThreadAgentSpawnKey(bot.spawnKey),
                     dataRoomEnabled: dataRoomEnabled && !legalOnly && !externalBot,
+                    meetingAgent,
                     agentSkillsLine: restrictedContext ? undefined : agentSkillsLine,
                     taughtSkillsLine: restrictedContext ? undefined : taughtSkillsLine,
                     replyGuidance: runReplyGuidance(run.trigger),
@@ -10889,6 +10893,8 @@ export function userTurnInstructions(parts: {
   mailThreadAgent?: boolean;
   /** add_to_data_room is offered in this run. */
   dataRoomEnabled?: boolean;
+  /** This run is a meeting-source agent's. */
+  meetingAgent?: boolean;
   agentSkillsLine: string | undefined;
   taughtSkillsLine: string | undefined;
   replyGuidance: string;
@@ -10948,6 +10954,7 @@ export function userTurnInstructions(parts: {
     parts.dataRoomEnabled
       ? offeredBuiltinClause(parts.disabledBuiltinTools, "add_to_data_room", DATA_ROOM_GUIDANCE)
       : undefined,
+    parts.meetingAgent ? MEETING_AGENT_GUIDANCE : undefined,
     parts.agentSkillsLine,
     parts.taughtSkillsLine,
     offeredBuiltinClause(parts.disabledBuiltinTools, "read_spreadsheet", SPREADSHEET_GUIDANCE),

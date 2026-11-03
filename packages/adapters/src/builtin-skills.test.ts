@@ -3,6 +3,7 @@ import { parseSkillMd } from "@rakazo/core";
 import { expect, it } from "vitest";
 import { BUILTIN_AGENT_SKILLS, PRESENT_CLEARLY_SKILL_NAME } from "./builtin-skills.js";
 import { PRESENTATION_GUIDANCE } from "./executor.js";
+import { MEETING_AGENT_GUIDANCE } from "./meeting-tools.js";
 
 const skill = BUILTIN_AGENT_SKILLS.find((s) => s.name === "devin-sessions");
 
@@ -230,4 +231,9 @@ it("regression: every Brex skill that names terminate_card says it is permanent 
     if (text.includes("terminate_card")) expect(text, name).toContain("permanent");
     if (name !== "brex-card-incident") expect(text, name).not.toContain("unlock");
   }
+});
+
+it("puts the meeting guidance in the meeting-notes skill", () => {
+  const skill = BUILTIN_AGENT_SKILLS.find((s) => s.name === "meeting-notes");
+  expect(skill?.content).toContain(MEETING_AGENT_GUIDANCE);
 });
