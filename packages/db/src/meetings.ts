@@ -34,6 +34,7 @@ export async function upsertMeeting(
   source: MeetingSourceRef | null,
   provider: string,
   meeting: SourceMeeting,
+  options: { onRecordingBlobs?: (keys: string[]) => Promise<void> } = {},
 ): Promise<UpsertMeetingResult> {
   const owner = ownerOf(scope);
   const columns = sourceColumns(source);
@@ -60,7 +61,8 @@ export async function upsertMeeting(
   // Inside a caller's transaction (a capture being finalized) it joins that one.
   const inTransaction = (fn: (tx: Prisma.TransactionClient) => Promise<UpsertMeetingResult>) =>
     "$transaction" in prisma ? prisma.$transaction(fn) : fn(prisma);
-  return inTransaction(async (tx) => {
+  const dropped: string[] = [];
+  const result = await inTransaction(async (tx) => {
     await lockMeeting(tx, key);
     if (
       await tx.meetingTombstone.findUnique({ where: { spaceId_userId_provider_externalId: key } })
@@ -80,8 +82,13 @@ export async function upsertMeeting(
       where: { ...key, sourceUpdatedAt: { lt: sourceUpdatedAt } },
       data,
     });
+    // A source-side deletion takes the meeting's Recordings note with it.
+    if (count && meeting.deleted)
+      dropped.push(...(await deleteMeetingRecordings(tx, owner, [existing.id])));
     return count ? "updated" : "stale";
   });
+  if (dropped.length) await options.onRecordingBlobs?.(dropped);
+  return result;
 }
 
 /** Serializes writers of one meeting (upsert vs delete) until the transaction ends. */

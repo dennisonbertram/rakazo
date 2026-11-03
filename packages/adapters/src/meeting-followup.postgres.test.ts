@@ -19,7 +19,8 @@ import {
 } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { aiRecipient } from "./ai-consent.js";
-import { fakeAi, MemoryArtifacts, RecordingJobs } from "./data-room-test-fakes.js";
+import { runDataRoomClassify } from "./data-room-jobs.js";
+import { FakeClassifier, fakeAi, MemoryArtifacts, RecordingJobs } from "./data-room-test-fakes.js";
 import { dataRoomToolFromTool } from "./data-room-tools.js";
 import { runMeetingDigest } from "./meeting-digest.js";
 import { runMeetingFollowup } from "./meeting-followup.js";
@@ -282,5 +283,62 @@ describePostgres("meeting follow-up filing (PostgreSQL)", () => {
     const sortable = await createDataRoomRepos(prisma).listForSort(a, 500);
     expect(sortable.map((i) => i.id)).not.toContain(item.id);
     await expect(shareDocument(prisma, a, item.id, [])).rejects.toThrow("Document not found");
+  });
+
+  it("a sync that marks the meeting deleted removes its note and reports the blob key", async () => {
+    const id = await addMeeting(a);
+    await followup(a, id);
+    const item = await prisma.dataRoomItem.findFirstOrThrow({
+      where: { externalId: `meeting:${id}` },
+    });
+    const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id } });
+    const connectionId = meeting.connectionId as string;
+    const keys: string[] = [];
+    await upsertMeeting(
+      prisma,
+      a,
+      { connectionId },
+      "granola",
+      {
+        externalId: meeting.externalId,
+        title: meeting.title,
+        startedAt: meeting.startedAt.toISOString(),
+        endedAt: null,
+        attendees: [],
+        organizerEmail: null,
+        sourceUrl: null,
+        folders: [],
+        summary: "",
+        privateNotes: "",
+        transcript: null,
+        updatedAt: new Date(Date.now() + 60_000).toISOString(),
+        deleted: true,
+      },
+      { onRecordingBlobs: async (k) => void keys.push(...k) },
+    );
+    expect(keys).toEqual([item.storageKey]);
+    expect(await prisma.dataRoomItem.count({ where: { externalId: `meeting:${id}` } })).toBe(0);
+  });
+
+  it("the classify step skips a meeting note and keeps its facets", async () => {
+    const id = await addMeeting(a);
+    await followup(a, id);
+    const item = await prisma.dataRoomItem.findFirstOrThrow({
+      where: { externalId: `meeting:${id}` },
+    });
+    await prisma.dataRoomItemText.upsert({
+      where: { itemId: item.id },
+      create: { itemId: item.id, spaceId, userId: a.userId, text: "some text" },
+      update: {},
+    });
+    await prisma.dataRoomItem.update({ where: { id: item.id }, data: { status: "classifying" } });
+    const classifier = new FakeClassifier();
+    await runDataRoomClassify(
+      { prisma, artifacts, jobs, resolveAi: async () => fakeAi(), classifier: () => classifier },
+      { ...a, itemId: item.id },
+    );
+    expect(classifier.calls).toEqual([]);
+    const after = await prisma.dataRoomItem.findUniqueOrThrow({ where: { id: item.id } });
+    expect(after).toMatchObject({ status: "indexing", docType: "note", tags: ["meeting"] });
   });
 });
