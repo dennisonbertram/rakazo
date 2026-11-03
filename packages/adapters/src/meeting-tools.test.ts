@@ -195,7 +195,12 @@ describe("meeting tools", () => {
         prisma: prismaWith([server("https://mcp.granola.ai/mcp")]),
       }),
     ).toBe(true);
-    // Wispr Flow's MCP agent is not a meeting-source agent until its MeetingSource is registered.
+    expect(
+      await isMeetingSourceAgent(bot, {
+        prisma: prismaWith([server("https://api.wisprflow.ai/connect/mcp")]),
+      }),
+    ).toBe(true);
+    // Only Wispr Flow's own endpoint counts.
     expect(
       await isMeetingSourceAgent(bot, {
         prisma: prismaWith([server("https://api.wisprflow.ai/mcp")]),
@@ -214,6 +219,8 @@ describe("meeting tools", () => {
       "meetings_list",
       "meetings_search",
       "recall_memory",
+      "schedule_create",
+      "schedule_list",
     ]);
   });
 
@@ -245,6 +252,8 @@ describe("meeting tools", () => {
       "meetings_search",
       "read_data_room_item",
       "recall_memory",
+      "schedule_create",
+      "schedule_list",
       "search_data_room",
     ]);
   });

@@ -3989,6 +3989,8 @@ model Meeting {
   transcriptIndexed Boolean                  @default(false)
   digest            Json?
   digestStatus      String?
+  /// investor | customer | hiring | team | other; from the digest call.
+  category          String?
   sourceUpdatedAt   DateTime
   /// Only for providers that report deletions.
   deletedAt         DateTime?

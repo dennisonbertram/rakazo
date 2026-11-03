@@ -34,7 +34,7 @@ import {
   isIntegrationAgentSpawnKey,
   isReadTool,
 } from "./integration-agent.js";
-import { WISPR_FLOW_MCP_ENDPOINT } from "./wispr-flow.js";
+import { WISPR_FLOW_MCP_ENDPOINT, WISPR_FLOW_READ_TOOLS } from "./wispr-flow.js";
 import { ZERNIO_MCP_ENDPOINT } from "./zernio.js";
 
 const mercury = INTEGRATION_PRESETS.mercury;
@@ -293,11 +293,14 @@ describe("Granola integration-agent preset", () => {
 describe("Wispr Flow integration-agent preset", () => {
   const wispr = INTEGRATION_PRESETS.wisprflow;
 
-  it("treats read-verb names and read-only hints as reads, everything else as a write", () => {
-    expect(isReadTool({ name: "get_meeting_summary" }, wispr)).toBe(true);
-    expect(isReadTool({ name: "list_tasks" }, wispr)).toBe(true);
-    expect(isReadTool({ name: "anything", annotations: { readOnlyHint: true } }, wispr)).toBe(true);
-    expect(isReadTool({ name: "create_task" }, wispr)).toBe(false);
+  it("reads exactly its 16 listed tools, even unannotated, and hides every other tool", () => {
+    expect(WISPR_FLOW_READ_TOOLS).toHaveLength(16);
+    for (const name of WISPR_FLOW_READ_TOOLS) expect(isReadTool({ name }, wispr)).toBe(true);
+    // A read-looking name Wispr may add later, or a write, is not usable, annotated or not.
+    for (const name of ["get_meeting_summary", "list_tasks", "create_task"]) {
+      expect(isReadTool({ name }, wispr)).toBe(false);
+      expect(isReadTool({ name, annotations: { readOnlyHint: true } }, wispr)).toBe(false);
+    }
   });
 
   it("matches only its endpoint", () => {

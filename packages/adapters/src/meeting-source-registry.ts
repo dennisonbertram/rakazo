@@ -1,6 +1,19 @@
-import { GRANOLA_API_CONNECTOR_ID } from "@rakazo/contracts";
+import { MeetingSourceError } from "@rakazo/adapter-kit";
+import { GRANOLA_API_CONNECTOR_ID, isWisprFlowEndpoint } from "@rakazo/contracts";
+import type { PrismaClient } from "@rakazo/db";
 import { createGranolaMeetingSource } from "./granola-meeting-source.js";
+import type { McpConnector } from "./mcp-connector.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
+import { createWisprFlowMeetingSource } from "./wispr-flow-meeting-source.js";
+
+/** A failed MCP call as the source error the sync job understands. */
+function mcpSourceError(error: unknown): MeetingSourceError {
+  if ((error as { expected?: unknown } | null)?.expected === "reconnect")
+    return new MeetingSourceError("auth", "Wispr Flow needs to be signed in again");
+  if (error instanceof Error && /HTTP 429/.test(error.message))
+    return new MeetingSourceError("rate_limit", "Wispr Flow rate limit");
+  return new MeetingSourceError("unavailable", "Wispr Flow is unavailable");
+}
 
 /**
  * The real providers, keyed by `Meeting.provider`. A new provider adds an entry here and a
@@ -8,9 +21,50 @@ import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
  * emulator) or a whole registry through `createBackgroundJobHandlers({ meetingSources })`.
  */
 export function createMeetingSourceRegistry(
-  options: { granolaBaseUrl?: string; fetch?: typeof fetch } = {},
+  options: {
+    granolaBaseUrl?: string;
+    fetch?: typeof fetch;
+    /** The user's MCP servers; without it there is no Wispr Flow source and its syncs do nothing. */
+    mcp?: { prisma: PrismaClient; connector: Pick<McpConnector, "callServerTool"> };
+  } = {},
 ): MeetingSourceRegistry {
+  const { mcp } = options;
   return {
+    ...(mcp
+      ? {
+          wisprflow: {
+            create: ({ spaceId, userId, mcpServerId }, signal) => {
+              if (!mcpServerId) throw new Error("Wispr Flow needs an MCP server");
+              return createWisprFlowMeetingSource({
+                call: async (tool, args) => {
+                  // Read at each call: a server the user removed or turned off stops the sync.
+                  const server = await mcp.prisma.mcpServer.findFirst({
+                    where: { id: mcpServerId, spaceId, userId, enabled: true },
+                  });
+                  if (!server || !isWisprFlowEndpoint(server.endpoint))
+                    throw new MeetingSourceError("auth", "Wispr Flow is not connected");
+                  try {
+                    return await mcp.connector.callServerTool(
+                      server,
+                      {
+                        operationId: `meetings-sync:${mcpServerId}`,
+                        traceId: `meetings-sync:${mcpServerId}`,
+                        spaceId,
+                        userId,
+                        signal,
+                      },
+                      tool,
+                      args,
+                    );
+                  } catch (error) {
+                    throw mcpSourceError(error);
+                  }
+                },
+              });
+            },
+          },
+        }
+      : {}),
     granola: {
       connectorId: GRANOLA_API_CONNECTOR_ID,
       create: ({ apiKey }, signal) => {

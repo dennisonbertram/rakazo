@@ -6,7 +6,7 @@ import type {
   SecretStore,
 } from "@rakazo/adapter-kit";
 import { MeetingSourceError, meetingsSyncJob } from "@rakazo/adapter-kit";
-import { GRANOLA_API_CONNECTOR_ID } from "@rakazo/contracts";
+import { GRANOLA_API_CONNECTOR_ID, isWisprFlowEndpoint } from "@rakazo/contracts";
 import type { MeetingSourceRef, PrismaClient } from "@rakazo/db";
 import { getMeetingSyncState, upsertMeetingSyncState } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -27,6 +27,8 @@ const MIN_RATE_LIMIT_DELAY_MS = 60_000;
 const PAGES_PER_RUN = 2;
 /** Stored as `Rate limited until <ISO time>`; an agent refresh waits for that time. */
 const RATE_LIMITED = "Rate limited until ";
+/** Stored when a source refuses its sign-in; the scheduler waits for new credentials. */
+const KEY_REJECTED = "Key rejected";
 
 /** What a registry entry needs to build a source for one connection or MCP server. */
 export interface MeetingSourceInput extends Scope {
@@ -213,7 +215,7 @@ export async function runMeetingSyncJob(
             AND EXISTS (
               SELECT 1 FROM meeting_sync_states
               WHERE "connectionId" = ${ref.connectionId} AND "claimToken" = ${token})`;
-      await release({ error: "Key rejected" });
+      await release({ error: KEY_REJECTED });
       return;
     }
     if (error.kind === "rate_limit")
@@ -272,8 +274,8 @@ export async function requestMeetingSync(
 }
 
 /**
- * Scheduler step, run by the elected reconciler: queues a sync for each connected Granola key whose
- * sync state has been idle for 5 minutes (or does not exist yet). A source that failed is retried by
+ * Scheduler step, run by the elected reconciler: queues a sync for each connected Granola key and
+ * each Wispr Flow MCP server whose sync state has been idle for 5 minutes (or does not exist yet). A source that failed is retried by
  * the same rule. `keepExisting` leaves a job that is already waiting alone.
  */
 export async function reconcileMeetingSyncs(
@@ -309,7 +311,45 @@ export async function reconcileMeetingSyncs(
       });
       queued++;
     }
-    if (page.length < batchSize) return queued;
+    if (page.length < batchSize) break;
     after = page[page.length - 1]?.id;
   }
+  return queued + (await reconcileWisprFlowSyncs(deps, idleBefore));
+}
+
+/** Wispr Flow is an MCP server, so its sync state hangs off the server, not a connection. */
+async function reconcileWisprFlowSyncs(
+  deps: Pick<MeetingSyncJobDeps, "prisma" | "jobs">,
+  idleBefore: Date,
+): Promise<number> {
+  // ponytail: one query, not paged; there is one Flow server per user who connected it.
+  const servers = (
+    await deps.prisma.mcpServer.findMany({
+      where: { enabled: true, endpoint: { contains: "wisprflow.ai" } },
+      select: { id: true, spaceId: true, userId: true, endpoint: true, updatedAt: true },
+    })
+  ).filter((s) => isWisprFlowEndpoint(s.endpoint));
+  const states = await deps.prisma.meetingSyncState.findMany({
+    where: { mcpServerId: { in: servers.map((s) => s.id) } },
+    select: { mcpServerId: true, updatedAt: true, error: true },
+  });
+  const stateOf = new Map(states.map((state) => [state.mcpServerId, state]));
+  let queued = 0;
+  for (const s of servers) {
+    const state = stateOf.get(s.id);
+    if (state && state.updatedAt >= idleBefore) continue;
+    // Rejected sign-in: retrying cannot work until the server row changes (new credentials).
+    if (state?.error === KEY_REJECTED && s.updatedAt <= state.updatedAt) continue;
+    await deps.jobs.enqueue({
+      ...meetingsSyncJob({
+        spaceId: s.spaceId,
+        userId: s.userId,
+        provider: "wisprflow",
+        mcpServerId: s.id,
+      }),
+      keepExisting: true,
+    });
+    queued++;
+  }
+  return queued;
 }

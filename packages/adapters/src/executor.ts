@@ -500,6 +500,7 @@ import type { McpStdioPolicy } from "./mcp-transport.js";
 import { mcpStdioRefusal } from "./mcp-transport.js";
 import {
   isMeetingSourceAgent,
+  MEETING_AGENT_APPROVAL_TOOLS,
   MEETING_AGENT_BUILTIN_TOOLS,
   MEETING_CONSENT_OFF,
   MEETING_CONSENT_REQUIRED_MESSAGE,
@@ -3387,8 +3388,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           run.trigger !== "routine" &&
           !isBackgroundRunTrigger(run.trigger) &&
           OWNER_INITIATED_TRIGGERS.has(run.trigger);
+        // Routines and to-dos are offered only where the meeting reads are: owner-started runs.
         const meetingAgentToolSet: ReadonlySet<string> = new Set(
-          omiConnection ? OMI_AGENT_BUILTIN_TOOLS : MEETING_AGENT_BUILTIN_TOOLS,
+          (omiConnection ? OMI_AGENT_BUILTIN_TOOLS : MEETING_AGENT_BUILTIN_TOOLS).filter(
+            (name) => meetingsEnabled || !MEETING_AGENT_APPROVAL_TOOLS.has(name),
+          ),
         );
         const financeEnabled =
           financeToolsAllowed({
@@ -5015,11 +5019,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             name === "schedule_create" &&
             (!ownerStartedRun || (await isOutsideContentSeen())) &&
             (await routineNamesNewSite(String(args.prompt ?? "")));
+          // A one-time schedule has a card but is no reason to ask on its own.
+          const scheduleAsks = scheduleCard !== undefined && scheduleCard.oneShot !== true;
           const requiresApprovalByDefault =
             requiresUnattendedApproval ||
             siteGate === "new" ||
             connectorReadGated ||
-            scheduleCard !== undefined ||
+            scheduleAsks ||
             toolRequiresApproval(name, viaConnector, declaredReadOnly);
           const callRoute = (resolvedTool ?? connectorTools.get(name))?.route;
           // Integration-agent writes use the shared preset classification and always show the full call.
@@ -5033,10 +5039,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // A run that read a meeting agent's reply holds untrusted meeting text: every call that
           // writes, sends or reaches the network asks, on a card that cannot become a saved rule.
           // Read at each call, so a run that is marked mid-way (a reply arrives) asks from then on.
-          const meetingTaintedCall =
-            !meetingAgent &&
-            !MEETING_TAINT_FREE_TOOLS.has(name) &&
-            (meetingTaint || (await threadMarkedNow()));
+          // A meeting-source agent's own thread is always marked, so it asks only for the few
+          // writes it is offered (routines and to-dos); the rest of its tools only read.
+          const meetingTaintedCall = meetingAgent
+            ? MEETING_AGENT_APPROVAL_TOOLS.has(name)
+            : !MEETING_TAINT_FREE_TOOLS.has(name) && (meetingTaint || (await threadMarkedNow()));
           // Likewise for a run that began with an external bot: everything outside the short free
           // list asks, whether it reads private data or writes. Read at each call so a marked
           // message claimed as steering mid-run counts from then on.
@@ -5106,7 +5113,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             requiresMandatoryApproval ||
             // A repeating schedule asks unless the owner chose "Always allow" for this tool; Auto
             // Review never clears it, because the saved prompt would run on every fire.
-            (scheduleCard !== undefined && approvalResolved.source !== "always_allow")
+            (scheduleAsks && approvalResolved.source !== "always_allow")
               ? "ask"
               : planActionGate({
                   resolved: gateResolved,

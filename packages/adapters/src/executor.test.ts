@@ -5320,6 +5320,9 @@ describe("Omi recordings: agent access and meeting taint", () => {
       "meetings_search",
       "read_data_room_item",
       "recall_memory",
+      // Routines are the one write a meeting agent keeps; they always ask.
+      "schedule_create",
+      "schedule_list",
       "search_data_room",
     ]);
   });
