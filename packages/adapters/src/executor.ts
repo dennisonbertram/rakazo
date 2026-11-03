@@ -1792,29 +1792,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const fence = nextFence(run.leaseFence);
       const renew = () => renewRunLease(deps, runId, workerId, fence);
       const phases = runPhaseWriter(deps, run, fence);
-      const now = new Date();
-      const leased = await deps.prisma.run.updateMany({
-        where: {
-          id: runId,
-          ...continueRunClaimFence(run),
-          OR: [
-            { status: { in: ["queued", "waiting_input", "waiting_takeover"] } },
-            {
-              status: { in: ["leased", "running"] },
-              leaseExpiresAt: { lte: now },
-            },
-          ],
-        },
-        data: {
-          status: "leased",
-          leaseOwner: workerId,
-          leaseFence: fence,
-          leaseExpiresAt: new Date(Date.now() + RUN_LEASE_MS),
-          error: null,
-          checkpoint: null,
-        },
-      });
-      if (leased.count !== 1) return;
+      if (!(await claimRunLease(deps.prisma, run, workerId, fence))) return;
 
       const current = await deps.prisma.run.findUniqueOrThrow({
         where: { id: runId },
@@ -1932,7 +1910,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             leaseValid = false;
             runAbortController?.abort();
           });
-      }, 60_000);
+      }, RUN_HEARTBEAT_MS);
       heartbeat.unref?.();
 
       const runSecrets = [...deps.secrets];
@@ -3101,6 +3079,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : Promise.resolve([]);
           return mailAccountsPromise;
         };
+        // Every account of the owner, allowed or not, only to word the "not allowed" mail error.
+        const ownerMailAccounts = () =>
+          deps.mail
+            ? deps.mail.listAccounts({ spaceId: run.spaceId, userId: bot.userId }, context)
+            : Promise.resolve([]);
         // Native Google Calendar accounts of the bot owner, looked up once per run.
         let calendarAccountsPromise: Promise<CalendarAccount[]> | undefined;
         const calendarAccounts = () => {
@@ -6693,6 +6676,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 prisma: deps.prisma,
                 jobs: deps.jobs,
                 accounts: () => accountsAllowedNow(mailAccounts(), name),
+                ownerAccounts: ownerMailAccounts,
                 beforeWrite: (account) => writeDenialNow(account, name),
                 publish: (blocks) => publishMessage(deps, run, "bot", blocks),
                 writesDisabled: deps.mailWritesDisabled,
@@ -10064,7 +10048,43 @@ async function notifyRun(
   }
 }
 
-const RUN_LEASE_MS = 5 * 60_000;
+// A crashed worker's run is taken over once its lease lapses (the reconciler scans every 30 s),
+// so the lease is a few heartbeats long, not minutes. Three missed beats mean the worker is gone.
+export const RUN_LEASE_MS = 90_000;
+export const RUN_HEARTBEAT_MS = 30_000;
+
+/**
+ * Takes the run for this worker: from queued or a human wait, or from a worker whose lease has
+ * lapsed. A live lease never matches, so two workers cannot run one run. The observed status and
+ * checkpoint fence a release that raced this claim.
+ */
+export async function claimRunLease(
+  prisma: Pick<PrismaClient, "run">,
+  run: { id: string; status: string; checkpoint: string | null },
+  workerId: string,
+  fence: number,
+  now = new Date(),
+): Promise<boolean> {
+  const leased = await prisma.run.updateMany({
+    where: {
+      id: run.id,
+      ...continueRunClaimFence(run),
+      OR: [
+        { status: { in: ["queued", "waiting_input", "waiting_takeover"] } },
+        { status: { in: ["leased", "running"] }, leaseExpiresAt: { lte: now } },
+      ],
+    },
+    data: {
+      status: "leased",
+      leaseOwner: workerId,
+      leaseFence: fence,
+      leaseExpiresAt: new Date(now.getTime() + RUN_LEASE_MS),
+      error: null,
+      checkpoint: null,
+    },
+  });
+  return leased.count === 1;
+}
 
 async function renewRunLease(
   deps: ExecutorDeps,
