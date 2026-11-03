@@ -93,6 +93,7 @@ import {
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
   MEETING_MARK_REASON,
+  MEETING_ROUTE_PROMPT_START,
   OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   PINNED_CONNECTION_LOST_MESSAGE,
@@ -3467,10 +3468,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
         // The Investors agent may overwrite the cap table only on the routine sheet read, so text in a
         // document or email cannot steer a chat turn into writing it.
-        // An audit drafting run reads untrusted email, so it never writes the cap table either.
+        // An audit drafting run reads untrusted email, and a routed investor-call run follows an
+        // attacker-influenced category, so neither writes the cap table.
         const capTableWriteBlocked =
           isInvestorsAgentSpawnKey(bot.spawnKey) &&
-          (run.trigger !== "routine" || task.prompt.startsWith(AUDIT_DRAFT_PROMPT_START));
+          (run.trigger !== "routine" ||
+            task.prompt.startsWith(AUDIT_DRAFT_PROMPT_START) ||
+            task.prompt.startsWith(MEETING_ROUTE_PROMPT_START));
         const investorsEnabled = investorUpdateToolsAllowed({
           hasProvider: true,
           groupId: thread.groupId,

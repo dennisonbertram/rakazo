@@ -124,8 +124,8 @@ type StartInput = {
   meeting: { id: string; startedAt: Date; endedAt: Date | null };
   bot: { id: string; threadId: string };
   kind: "source" | "route" | "share";
-  /** Written by the server; it must hold no meeting text. */
-  prompt: string;
+  /** Written by the server; it must hold no meeting text. Null posts the meta line and starts no run. */
+  prompt: string | null;
   meta: { text: string; link?: { label: string; href: string } };
 };
 
@@ -173,6 +173,7 @@ export async function startMeetingRun(
       type: "thread.message.created",
       payload: { messageId: message.id, role: "system", blocks },
     });
+    if (input.prompt === null) return null;
     const task = await tx.task.create({
       data: {
         ...scope,
