@@ -16,9 +16,7 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -33,9 +31,6 @@ import {
   OPEN_DIALOG_SELECTOR,
   Skeleton,
   Spinner,
-  Tabs,
-  TabsList,
-  TabsTrigger,
   Toggle,
   Tooltip,
   TooltipContent,
@@ -69,6 +64,7 @@ import { InboxConsentPrompt } from "../components/AiDataSharing";
 import { AskBotButton } from "../components/AskBotButton";
 import { BotTodos } from "../components/BotTodos";
 import { ComposeEmail, NEW_MESSAGE } from "../components/ComposeEmail";
+import { InboxAccountTabs } from "../components/inbox/InboxAccountTabs";
 import { InboxCleanup } from "../components/inbox/InboxCleanup";
 import { InboxDigest } from "../components/inbox/InboxDigest";
 import { InboxMessageDialog } from "../components/inbox/InboxMessageDialog";
@@ -789,11 +785,6 @@ function InboxListPage({
     };
   }, [paused]);
   const noAccounts = data ? accounts.length === 0 : noGmail;
-  // With two or more accounts the Filter menu picks one; the button then names it.
-  const tabLabel =
-    accounts.length > 1
-      ? accounts.find((account) => account.connectionId === tab)?.label
-      : undefined;
   const failed = error || (shown ? syncErrorText(shown, retried && !retrying) : "");
   const limited =
     !error && Boolean(shown?.rateLimitedAccounts?.length) && !shown?.reconnectAccounts.length;
@@ -1554,26 +1545,17 @@ function InboxListPage({
                             data-testid="inbox-filter"
                             render={
                               <Button
-                                variant={
-                                  filter || (triage && category) || tabLabel
-                                    ? "secondary"
-                                    : "outline"
-                                }
-                                size={tabLabel ? "default" : "icon"}
+                                variant={filter || (triage && category) ? "secondary" : "outline"}
+                                size="icon"
                                 className="pointer-coarse:h-10 pointer-coarse:min-w-10"
                               />
                             }
                             // The button keeps one width: the filter's name is in the results bar.
                             aria-label={
-                              tabLabel
-                                ? undefined
-                                : activeFilterLabel
-                                  ? `${t`Filter`}: ${activeFilterLabel}`
-                                  : t`Filter`
+                              activeFilterLabel ? `${t`Filter`}: ${activeFilterLabel}` : t`Filter`
                             }
                           >
                             <ListFilter aria-hidden="true" />
-                            {tabLabel}
                           </DropdownMenuTrigger>
                         }
                       />
@@ -1627,35 +1609,6 @@ function InboxListPage({
                           </DropdownMenuSub>
                         ) : null}
                       </DropdownMenuRadioGroup>
-                      {accounts.length > 1 ? (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuGroup>
-                            <DropdownMenuLabel>
-                              <Trans>Account</Trans>
-                            </DropdownMenuLabel>
-                            <DropdownMenuRadioGroup
-                              value={tab ?? ALL}
-                              onValueChange={(value) =>
-                                setTab(value === ALL ? undefined : String(value))
-                              }
-                            >
-                              <DropdownMenuRadioItem value={ALL} closeOnClick>
-                                <Trans>All</Trans>
-                              </DropdownMenuRadioItem>
-                              {accounts.map((account) => (
-                                <DropdownMenuRadioItem
-                                  key={account.connectionId}
-                                  value={account.connectionId}
-                                  closeOnClick
-                                >
-                                  {account.label}
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
-                          </DropdownMenuGroup>
-                        </>
-                      ) : null}
                       {filter || (triage && category) ? (
                         <>
                           <DropdownMenuSeparator />
@@ -1691,13 +1644,16 @@ function InboxListPage({
               </>
             }
           />
-          {tools && !query ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <InboxPileTabs
-                value={pile}
-                counts={pileCounts}
-                onChange={(next) => setParam("pile", next === "important" ? "" : next)}
-              />
+          {tools && (!query || accounts.length > 1) ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0">
+              {query ? null : (
+                <InboxPileTabs
+                  value={pile}
+                  counts={pileCounts}
+                  onChange={(next) => setParam("pile", next === "important" ? "" : next)}
+                />
+              )}
+              <InboxAccountTabs accounts={accounts} value={tab} onChange={setTab} />
               {pile === "newsletters" ? (
                 <Toggle
                   size="sm"

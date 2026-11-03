@@ -267,13 +267,12 @@ const press = (key: string, target: Element | Document = document.body) =>
     vi.setSystemTime(Date.now() + 200); // j/k are throttled to one step per 150ms
     target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
   });
-// The account choice lives in the Filter menu, as a radio group under "Account".
+// The account choice is a tab row at the top of the list.
 const pickAccount = async (name: string) => {
-  await click(document.querySelector('[data-testid="inbox-filter"]'));
-  const item = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+  const tab = [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find(
     (el) => el.textContent === name,
   );
-  await click(item);
+  await click(tab);
 };
 
 const click = (el: Element | null | undefined) =>
@@ -1687,7 +1686,9 @@ it("keeps the chosen account tab after leaving the Inbox and coming back", async
   ] as InboxListOutput["accounts"];
   rpcMock.list.mockResolvedValue(list([row("a")], { accounts }));
   const c = await render();
-  expect(c.querySelectorAll('[role="tab"]')).toHaveLength(3);
+  expect([...c.querySelectorAll('[role="tab"]')].map((el) => el.textContent)).toEqual(
+    expect.arrayContaining(["All", "Me", "Sales"]),
+  );
   await pickAccount("Sales");
   expect(rpcMock.list).toHaveBeenLastCalledWith(expect.objectContaining({ connectionId: "c2" }));
   for (const cleanup of cleanups.splice(0)) await cleanup();
@@ -1696,6 +1697,34 @@ it("keeps the chosen account tab after leaving the Inbox and coming back", async
   expect(rpcMock.list).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "c2" }));
   // Back to All for the tests that follow.
   await pickAccount("All");
+});
+
+it("shows no account tabs with one account", async () => {
+  const c = await render();
+  expect(c.textContent).not.toContain("Me");
+  expect([...c.querySelectorAll('[role="tab"]')].map((el) => el.textContent)).not.toContain("All");
+});
+
+it("falls back to All when the chosen account is gone", async () => {
+  const accounts = [
+    { connectionId: "c1", label: "Me" },
+    { connectionId: "c2", label: "Sales" },
+  ] as InboxListOutput["accounts"];
+  rpcMock.list.mockResolvedValue(list([row("a")], { accounts }));
+  const c = await render();
+  await pickAccount("Sales");
+  rpcMock.list.mockImplementation(async (input: { connectionId?: string }) => {
+    if (input.connectionId === "c2") throw new Error("gone");
+    return list([row("a")], { accounts });
+  });
+  await pickAccount("Me");
+  await pickAccount("Sales");
+  expect(rpcMock.list).toHaveBeenLastCalledWith(
+    expect.not.objectContaining({ connectionId: "c2" }),
+  );
+  const all = [...c.querySelectorAll('[role="tab"]')].find((el) => el.textContent === "All");
+  expect(all?.getAttribute("aria-selected")).toBe("true");
+  rpcMock.list.mockResolvedValue(list([row("a")]));
 });
 
 it("polls refresh while it reports syncing and reloads the list once when it stops", async () => {
