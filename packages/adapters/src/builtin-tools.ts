@@ -1605,6 +1605,19 @@ export const builtinAgentTools: ConnectorTool[] = [
     readOnly: true,
   },
   {
+    name: "share_meeting",
+    description:
+      "Hand one stored meeting to one other agent of the user, by reference. Use it when the meeting clearly belongs to that agent (an investor call, the Investors agent) and you were not told it already went there. bot_id is from your teammate list. The user approves every share. The other agent reads the meeting itself; you cannot send it any text. One share per run.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        meeting_id: { type: "string", description: "The id from meetings_list or meetings_get." },
+        bot_id: { type: "string", description: "The target agent's id from your teammate list." },
+      },
+      required: ["meeting_id", "bot_id"],
+    },
+  },
+  {
     name: "read_spreadsheet",
     description:
       'Read an Excel (.xlsx, .xlsm) or CSV/TSV file: a chat attachment (artifact_id) or a Data room item (item_id). Returns the sheets with their dimensions, then for one sheet the columns (letters), the header row and the rows, each row as [sheet row number, ...cells]. Formulas appear as their last calculated values; dates are ISO strings; macros are never run. Defaults to the first sheet and 200 rows; pass sheet, range (for example "A1:F200") and max_rows (up to 1000) to read more. If truncated is true, read the next range.',

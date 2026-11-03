@@ -87,6 +87,7 @@ export const BUILTIN_TOOL_NAMES = [
   "meetings_list",
   "meetings_search",
   "meetings_get",
+  "share_meeting",
   "add_to_data_room",
   "read_spreadsheet",
   "create_spreadsheet",

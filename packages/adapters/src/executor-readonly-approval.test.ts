@@ -3772,7 +3772,7 @@ describe("meeting-source agent", () => {
     const f = meetingRun({ prompt: injection });
     await f.run();
     // The three routine and to-do tools are the exception; they always ask (see the test below).
-    const asking = ["schedule_create", "schedule_list"];
+    const asking = ["schedule_create", "schedule_list", "share_meeting"];
     const allowed = new Set([...MEETINGS, ...asking, "recall_memory", granolaTool.name]);
     expect(f.offeredTools.filter((name) => !allowed.has(name))).toEqual([]);
     expect([...f.offeredTools].sort()).toEqual([...MEETINGS, ...asking, granolaTool.name].sort());
@@ -3782,6 +3782,8 @@ describe("meeting-source agent", () => {
     expect(ordinary.offeredTools).toEqual(
       expect.arrayContaining(["save_shared_memory", "web_fetch", "shell"]),
     );
+    // share_meeting is offered to meeting-source agents only.
+    expect(ordinary.offeredTools).not.toContain("share_meeting");
     // A call the model makes anyway is refused before any effect.
     for (const name of [
       "save_shared_memory",

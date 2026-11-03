@@ -26,6 +26,8 @@ export const MEETING_TOOL_NAMES: ReadonlySet<string> = new Set([
 export const MEETING_AGENT_APPROVAL_TOOLS: ReadonlySet<string> = new Set([
   "schedule_create",
   "schedule_list",
+  // The one handoff exception: it sends a reference to one of the owner's meetings, never text.
+  "share_meeting",
 ]);
 
 /**

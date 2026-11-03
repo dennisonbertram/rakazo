@@ -221,6 +221,7 @@ describe("meeting tools", () => {
       "recall_memory",
       "schedule_create",
       "schedule_list",
+      "share_meeting",
     ]);
   });
 
@@ -255,6 +256,7 @@ describe("meeting tools", () => {
       "schedule_create",
       "schedule_list",
       "search_data_room",
+      "share_meeting",
     ]);
   });
 });
