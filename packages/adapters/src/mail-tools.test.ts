@@ -193,6 +193,30 @@ describe("mail_search arguments", () => {
       }),
     ).toEqual({ error: "No connected mail account nobody@example.test" });
   });
+
+  it("says an owner account is not allowed, listing the accounts the agent can use", async () => {
+    const { deps } = setup({
+      a: [{ ...base, id: "m1", date: "2026-01-01T00:00:00Z", subject: "Hi" }],
+      b: [],
+    });
+    const b = account("b", "b@example.test");
+    const restricted = {
+      ...deps,
+      accounts: async () => (await deps.accounts()).filter((a) => a.accountRef !== "b"),
+      ownerAccounts: async () => [...(await deps.accounts()), b],
+    };
+    const wanted = { queries: ["hi"], account: "b@example.test" };
+    expect(await mailToolFromTool("mail_search", restricted, context(), wanted)).toEqual({
+      error:
+        "This agent isn't allowed to use b@example.test. It can use: a@example.test. Give it access on that account's Integrations page.",
+    });
+    expect(
+      await mailToolFromTool("mail_search", restricted, context(), {
+        ...wanted,
+        account: "nobody@example.test",
+      }),
+    ).toEqual({ error: "No connected mail account nobody@example.test" });
+  });
 });
 
 describe("mail_get", () => {
