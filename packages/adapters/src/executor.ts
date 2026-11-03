@@ -362,11 +362,11 @@ import type { ComputerExecutionLease } from "./computer-lifecycle.js";
 import {
   acquireComputerExecutionLease,
   ComputerBusyError,
+  EXECUTION_LEASE_MS,
   holdComputerExecutionLeaseForTakeover,
   IN_LINE_BEHIND_SAME_BOT,
   provisionComputer,
   releaseComputerExecutionLease,
-  EXECUTION_LEASE_MS,
   renewComputerExecutionLease,
   screenLeaseIdForRun,
 } from "./computer-lifecycle.js";
@@ -429,7 +429,7 @@ import {
 import {
   firewallDraftIsWithinThread,
   firewallMailReadDecision,
-  firewallModifyIsSoleGrant,
+  firewallModifyIsFree,
 } from "./firewall-mail.js";
 import {
   FIREWALL_CONTENT_READERS,
@@ -2117,12 +2117,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
           });
         };
         // The switch as it is now, so turning it on or off applies to the next call of a live run.
-        const firewallNow = async () =>
-          (
-            await deps.prisma.bot
-              .findUniqueOrThrow({ where: { id: bot.id }, select: { firewall: true } })
-              .catch(() => null)
-          )?.firewall === true || bot.firewall === true;
+        // A lookup that fails counts as Firewall on.
+        const firewallNow = async () => {
+          try {
+            const current = await deps.prisma.bot.findUniqueOrThrow({
+              where: { id: bot.id },
+              select: { firewall: true },
+            });
+            return current.firewall === true || bot.firewall === true;
+          } catch {
+            return true;
+          }
+        };
         if (
           run.externalTaint !== true &&
           (bot.firewall === true ||
@@ -2620,6 +2626,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : loadAgentTicketContext(deps, {
                 spaceId: run.spaceId,
                 text: task.prompt,
+                // Tickets a firewalled agent wrote are untrusted; a firewalled run is tainted anyway.
+                ...(bot.firewall === true
+                  ? {}
+                  : { firewalled: () => firewalledBotIds(deps.prisma, run.spaceId) }),
               }),
           recallPromise,
         ]);
@@ -3281,9 +3291,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               : DRIVE_TOOL_NAMES.has(toolName)
                 ? driveAccounts()
                 : undefined;
-        const connectionRowsNow = async () => {
-          const firewalled = await firewallNow();
-          return deps.prisma.connection
+        const connectionRowsStored = () =>
+          deps.prisma.connection
             .findMany({
               where: { userId: run.userId, spaceId: run.spaceId },
               select: {
@@ -3302,13 +3311,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 agentBot: { select: { spawnKey: true } },
               },
             })
-            .then((rows) =>
-              connectionRowsForAudience(
-                rows.map((row) => withInboxAgentStandIn(row, bot)),
-                bot.audience,
-                firewalled,
-              ),
-            );
+            .then((rows) => rows.map((row) => withInboxAgentStandIn(row, bot)));
+        // What the access rules see: "all agents" does not reach an external or firewalled bot.
+        const connectionRowsNow = async () => {
+          const firewalled = await firewallNow();
+          return connectionRowsForAudience(await connectionRowsStored(), bot.audience, firewalled);
         };
         // The account must exist in this space and user, be connected, be open to this bot, and for
         // a write follow the agent rule.
@@ -4450,6 +4457,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return { error: `Tool ${name} is not available to this bot.` };
             }
             // The to-do's stored botId becomes the recipient, so the firewalled author would be lost.
+            // A draftId sends the stored draft, which the card would not show.
+            if (name === "mail_send" && typeof args.draftId === "string" && args.draftId.trim()) {
+              return {
+                error:
+                  "Send the full message: pass to, subject and body, not a draftId, so the card shows exactly what is sent.",
+              };
+            }
             if (name === "scratchpad_add" && args.forAgent != null) {
               return { error: "forAgent is not available while Firewall is on." };
             }
@@ -4985,25 +4999,28 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   owner: { spaceId: run.spaceId, userId: bot.userId },
                   botId: bot.id,
                   accounts: await accountsAllowedNow(mailAccounts(), name),
-                  rows: await connectionRowsNow(),
+                  rows: await connectionRowsStored(),
                 }
               : undefined;
           let firewallLifted = false;
+          let firewallScopeLabelIds: Record<string, string> = {};
           let firewallAskCall = false;
           if (firewalled) {
             if (firewallToolClass(name) === "ask") {
               firewallLifted =
                 firewallMail !== undefined &&
                 (name === "mail_modify"
-                  ? await firewallModifyIsSoleGrant(args, firewallMail)
+                  ? await firewallModifyIsFree(args, firewallMail)
                   : name === "mail_draft"
                     ? await firewallDraftIsWithinThread(args, firewallMail)
                     : false);
               firewallAskCall = !firewallLifted;
             } else if (firewallMail && MAIL_READ_TOOL_NAMES.has(name)) {
               const scope = await firewallMailReadDecision(name, args, firewallMail);
-              if (scope.free) args = scope.args;
-              else firewallAskCall = true;
+              if (scope.free) {
+                args = scope.args;
+                firewallScopeLabelIds = scope.labelIds;
+              } else firewallAskCall = true;
             }
           }
           const requiresUnattendedApproval = unattendedToolRequiresApproval(
@@ -6801,6 +6818,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 jobs: deps.jobs,
                 accounts: () => accountsAllowedNow(mailAccounts(), name),
                 ownerAccounts: ownerMailAccounts,
+                scopeLabelIds: (accountId) => firewallScopeLabelIds[accountId],
                 beforeWrite: (account) => writeDenialNow(account, name),
                 publish: (blocks) => publishMessage(deps, run, "bot", blocks),
                 writesDisabled: deps.mailWritesDisabled,

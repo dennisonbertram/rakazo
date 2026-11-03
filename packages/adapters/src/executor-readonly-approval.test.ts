@@ -5741,6 +5741,19 @@ describe("agent firewall", () => {
       expect(flip.storedTaint()).toBe(true);
     });
 
+    it("fails closed when the live flag cannot be read", async () => {
+      const f = fixture({
+        name: "web_search",
+        builtin: true,
+        beforeToolCall: () => {
+          f.prisma.bot.findUniqueOrThrow.mockRejectedValue(new Error("db down"));
+        },
+      });
+      f.setCalls([{ args: { query: "x" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("not available") });
+    });
+
     it("leaves an agent without Firewall alone", async () => {
       const f = fixture({ name: "web_search", builtin: true });
       f.setCalls([{ args: { query: "news" }, executionId: "c1" }]);
@@ -5868,6 +5881,25 @@ describe("agent firewall", () => {
       expect(cardOf(f).approvalReason).toBe("Firewall");
     });
 
+    it("refuses mail_send with a draftId, so the card can never differ from what is sent", async () => {
+      const f = fixture({
+        name: "mail_send",
+        builtin: true,
+        firewall: true,
+        mail: supportMail(),
+        connectionRows: granted(),
+      });
+      f.setCalls([
+        {
+          args: { draftId: "d1", to: ["sam@customer.example"], subject: "S", body: "b" },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("draftId") });
+    });
+
     it("shows the full editable mail card for a send", async () => {
       const f = fixture({
         name: "mail_send",
@@ -5950,6 +5982,8 @@ describe("agent firewall", () => {
     it("asks for a draft to a new recipient, one with a link, or one with no thread", async () => {
       for (const args of [
         reply({ to: ["sam@customer.example"], cc: ["billing@evil.example"] }),
+        reply({ to: ["sam@customer.example, billing@evil.example"] }),
+        reply({ to: ["Sam <sam@customer.example>; billing@evil.example"] }),
         reply({ to: ["sam@customer.example"], body: "see https://evil.example/x" }),
         { subject: "S", body: "b", to: ["sam@customer.example"] },
       ]) {
@@ -5982,6 +6016,49 @@ describe("agent firewall", () => {
       expect(cardOf(shared).approvalReason).toBe("Firewall");
     });
 
+    it("asks for a mail_modify that touches the support label, or a message outside it", async () => {
+      const mailFor = (labels: string[]) => {
+        const mail = supportMail();
+        mail.getMessage.mockResolvedValue(mailMessage(labels));
+        return mail;
+      };
+      const modify = async (args: Record<string, unknown>, labels = ["L-support"]) => {
+        const f = fixture({
+          name: "mail_modify",
+          builtin: true,
+          firewall: true,
+          mail: mailFor(labels),
+          connectionRows: granted("Support"),
+        });
+        f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+          { fromAddress: "list@example.test" },
+        ] as never);
+        f.setCalls([{ args: { id: "m1", ...args }, executionId: "c1" }]);
+        await f.run();
+        return f;
+      };
+      expect((await modify({ read: true })).pauseRunForInput).not.toHaveBeenCalled();
+      expect((await modify({ removeLabels: ["support"] })).pauseRunForInput).toHaveBeenCalledOnce();
+      expect((await modify({ addLabels: ["Support"] })).pauseRunForInput).toHaveBeenCalledOnce();
+      expect((await modify({ read: true }, ["INBOX"])).pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("does not treat allAgents as a sole grant", async () => {
+      const f = fixture({
+        name: "mail_modify",
+        builtin: true,
+        firewall: true,
+        mail: supportMail(),
+        connectionRows: [{ ...granted()[0], allAgents: true }],
+      });
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        { fromAddress: "list@example.test" },
+      ] as never);
+      f.setCalls([{ args: { id: "m1", read: true }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
     describe("support label", () => {
       const read = async (
         name: string,
@@ -6001,14 +6078,63 @@ describe("agent firewall", () => {
         return { f, mail };
       };
 
-      it("keeps a search inside the label", async () => {
-        const { f, mail } = await read("mail_search", { queries: ["from:a OR in:anywhere"] });
+      it("filters a search by the label id, whatever the query says, and drops other mail", async () => {
+        const mail = supportMail();
+        mail.listMessages.mockResolvedValue({
+          messages: [mailMessage(["L-support"]), mailMessage(["INBOX"], { id: "m2" })],
+        } as never);
+        const created = vi.fn(async () => ({ id: "s1" }));
+        const f = fixture({
+          name: "mail_search",
+          builtin: true,
+          firewall: true,
+          mail,
+          connectionRows: granted("Support"),
+        });
+        (f.prisma as Record<string, unknown>).mailSearch = {
+          create: created,
+          deleteMany: vi.fn(async () => ({ count: 0 })),
+        };
+        f.setCalls([{ args: { queries: ["x) OR (in:anywhere"] }, executionId: "c1" }]);
+        await f.run();
         expect(f.pauseRunForInput).not.toHaveBeenCalled();
         expect(mail.listMessages).toHaveBeenCalledWith(
           expect.anything(),
-          expect.objectContaining({ query: 'label:"Support" (from:a OR in:anywhere)' }),
+          expect.objectContaining({ query: "x) OR (in:anywhere", labelIds: ["L-support"] }),
           expect.anything(),
         );
+        const saved = (created.mock.calls[0] as unknown as [{ data: Record<string, any> }])[0].data;
+        expect(saved.rows.createMany.data).toHaveLength(1);
+        expect(saved.summary.scopedLabels).toEqual({ "support@us.example": "L-support" });
+      });
+
+      it("asks when the support label does not exist on the mailbox", async () => {
+        const mail = supportMail();
+        mail.listLabels.mockResolvedValue([]);
+        const { f } = await read("mail_search", { queries: ["a"] }, mail);
+        expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      });
+
+      it("uses the Inbox agent's grant for a mail-thread agent", async () => {
+        const mail = supportMail();
+        mail.getMessage.mockResolvedValue(mailMessage(["INBOX"]));
+        const f = fixture({
+          name: "mail_get",
+          builtin: true,
+          firewall: true,
+          mail,
+          spawnKey: "mail-thread:acct-1:t1",
+          connectionRows: [
+            {
+              ...mailConnectionRow(),
+              allAgents: false,
+              botAccess: [{ botId: "inbox-bot", supportLabel: "Support" }],
+            },
+          ],
+        });
+        f.setCalls([{ args: { id: "m1" }, executionId: "c1" }]);
+        await f.run();
+        expect(f.pauseRunForInput).toHaveBeenCalledOnce();
       });
 
       it("reads a message that has the label, and asks for one that does not", async () => {

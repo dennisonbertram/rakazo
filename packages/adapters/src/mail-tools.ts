@@ -69,6 +69,11 @@ export type MailToolDeps = {
    * "not connected" from "not allowed" when the model names an account. Never offered for use.
    */
   ownerAccounts?: () => Promise<MailAccount[]>;
+  /**
+   * A firewalled agent's support label id for an account, from the grant. Searches of that account
+   * are filtered by it at the provider and any message without it is dropped.
+   */
+  scopeLabelIds?: (accountId: string) => string | undefined;
   /** From the run, never from model input. */
   scope: { spaceId: string; userId: string; botId: string };
   /** Puts blocks in the run's thread. Without it show_emails is unavailable. */
@@ -312,7 +317,7 @@ function parseResume(value: unknown): ResumeEntry[] {
   });
 }
 
-type Task = { account: MailAccount; query: string; start?: ResumeEntry };
+type Task = { account: MailAccount; query: string; start?: ResumeEntry; labelIds?: string[] };
 
 async function mailSearch(
   deps: MailToolDeps,
@@ -357,6 +362,10 @@ async function mailSearch(
     tasks = chosen.flatMap((account) => queries.map((query) => ({ account, query })));
   }
 
+  tasks = tasks.map((task) => {
+    const labelId = deps.scopeLabelIds?.(task.account.id);
+    return labelId ? { ...task, labelIds: [labelId] } : task;
+  });
   const involved = [...new Map(tasks.map((task) => [task.account.id, task.account])).values()];
   const maxMessages = clampInt(args.maxMessages, 1, MAX_MESSAGES, DEFAULT_MAX_MESSAGES);
   const share = Math.ceil(maxMessages / involved.length);
@@ -390,6 +399,8 @@ async function mailSearch(
           deps.progress,
           () => left,
           (message) => {
+            const required = deps.scopeLabelIds?.(account.id);
+            if (required && !message.labelIds.includes(required)) return false;
             if (seen.has(message.id)) return false;
             seen.add(message.id);
             saved.push({ account, message });
@@ -437,12 +448,22 @@ async function mailSearch(
     text: tasks.length > 1 ? `${found(rows.length)} in total` : found(rows.length),
     summary: `Searched mail · ${rows.length === 0 ? "none found" : `${rows.length} found`}${failed.size > 0 ? " · incomplete" : ""}`,
   });
-  const summary = summarizeResults({
-    rows,
-    accounts: involved.map(accountName),
-    queries: outcomes,
-    failedAccounts: [...failed],
-  });
+  const scopedLabels = Object.fromEntries(
+    involved.flatMap((account) => {
+      const labelId = deps.scopeLabelIds?.(account.id);
+      return labelId ? [[accountName(account), labelId]] : [];
+    }),
+  );
+  const summary = {
+    ...summarizeResults({
+      rows,
+      accounts: involved.map(accountName),
+      queries: outcomes,
+      failedAccounts: [...failed],
+    }),
+    // Which label filter each account's results went through; a firewalled mail_grep reads it.
+    ...(Object.keys(scopedLabels).length > 0 ? { scopedLabels } : {}),
+  };
 
   const createdAt = currentTime(deps);
   const expiresAt = new Date(createdAt.getTime() + SEARCH_TTL_MS);
@@ -480,6 +501,7 @@ async function runTask(
   save: (message: MailMessageSummary) => boolean,
 ): Promise<{ outcome: MailQueryOutcome; resume?: ResumeEntry; reason?: string }> {
   const { account, query } = task;
+  const labelIds = task.labelIds ? { labelIds: task.labelIds } : {};
   let ids = task.start?.unhydratedIds ?? [];
   let token = task.start?.pageToken;
   // A fresh query, or a resumed one that still has a page to list.
@@ -526,12 +548,17 @@ async function runTask(
       const listed = fromIds
         ? await mail.listMessages(
             account,
-            { query, pageSize: PAGE_SIZE, ids: ids.slice(0, room) },
+            { query, ...labelIds, pageSize: PAGE_SIZE, ids: ids.slice(0, room) },
             context,
           )
         : await mail.listMessages(
             account,
-            { query, pageSize: Math.min(PAGE_SIZE, room), ...(token ? { pageToken: token } : {}) },
+            {
+              query,
+              ...labelIds,
+              pageSize: Math.min(PAGE_SIZE, room),
+              ...(token ? { pageToken: token } : {}),
+            },
             context,
           );
       for (const message of listed.messages) {

@@ -65,13 +65,67 @@ describePostgres("firewall content taint queries (PostgreSQL)", () => {
     const set = await firewalledBotIds(prisma, ids.space);
     expect(await readsFirewalledContent(prisma, scope, "calendar_agenda", {}, set)).toBe(false);
     await prisma.scratchpadItem.create({
-      data: { ...scope, botId: plain, title: "Mine", dueAt: new Date() },
+      data: { ...scope, botId: plain, title: "Mine", dueAt: new Date(Date.now() + 86_400_000) },
     });
     expect(await readsFirewalledContent(prisma, scope, "calendar_agenda", {}, set)).toBe(false);
     await prisma.scratchpadItem.create({
-      data: { ...scope, botId: firewalled, title: "Pay 4411", dueAt: new Date() },
+      data: {
+        ...scope,
+        botId: firewalled,
+        title: "Pay 4411",
+        dueAt: new Date(Date.now() + 86_400_000),
+      },
     });
     expect(await readsFirewalledContent(prisma, scope, "calendar_agenda", {}, set)).toBe(true);
+  });
+
+  it("ignores a firewalled to-do outside the requested range", async () => {
+    const set = await firewalledBotIds(prisma, ids.space);
+    const far = new Date(Date.now() + 90 * 86_400_000).toISOString();
+    const farEnd = new Date(Date.now() + 91 * 86_400_000).toISOString();
+    expect(
+      await readsFirewalledContent(
+        prisma,
+        scope,
+        "calendar_agenda",
+        { from: far, to: farEnd },
+        set,
+      ),
+    ).toBe(false);
+  });
+
+  it("flags only the ticket the call names", async () => {
+    const set = await firewalledBotIds(prisma, ids.space);
+    const board = await prisma.board.create({ data: { spaceId: ids.space } });
+    await prisma.ticket.create({
+      data: {
+        boardId: board.id,
+        spaceId: ids.space,
+        number: 1,
+        title: "Clean",
+        createdByBotId: plain,
+      },
+    });
+    expect(await readsFirewalledContent(prisma, scope, "ticket_get", { ref: "RAK-1" }, set)).toBe(
+      false,
+    );
+    await prisma.ticket.create({
+      data: {
+        boardId: board.id,
+        spaceId: ids.space,
+        number: 2,
+        title: "Bad",
+        createdByBotId: firewalled,
+      },
+    });
+    expect(await readsFirewalledContent(prisma, scope, "ticket_get", { ref: "RAK-2" }, set)).toBe(
+      true,
+    );
+    expect(await readsFirewalledContent(prisma, scope, "ticket_get", { ref: "RAK-1" }, set)).toBe(
+      false,
+    );
+    await prisma.ticket.deleteMany({ where: { boardId: board.id } });
+    await prisma.board.delete({ where: { id: board.id } });
   });
 
   it("flags the ticket board once a firewalled agent wrote a ticket", async () => {
@@ -88,7 +142,9 @@ describePostgres("firewall content taint queries (PostgreSQL)", () => {
       },
     });
     expect(await readsFirewalledContent(prisma, scope, "board_tickets", {}, set)).toBe(true);
-    expect(await readsFirewalledContent(prisma, scope, "ticket_get", {}, set)).toBe(true);
+    expect(await readsFirewalledContent(prisma, scope, "ticket_get", { ref: "RAK-1" }, set)).toBe(
+      true,
+    );
   });
 
   it("stores a support label on an access grant and leaves it null by default", async () => {

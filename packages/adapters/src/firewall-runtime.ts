@@ -45,9 +45,9 @@ const AGENT_RECORD_TOOLS = new Set(["agent_context", "search_agent_history", "re
 
 /**
  * Whether a call reads records a firewalled agent wrote. Pages, pins and an agent's own to-do list
- * are scoped to the calling agent, so they only cross agents through the readers below: the
- * calendar agenda (to-dos and routines of every agent), the ticket board, and the voice agent's
- * views of another agent. Checked by author, so the records carry no mark.
+ * are scoped to the calling agent, so they only cross agents through the readers below. Each is
+ * narrowed to what the call asks for: the agenda's date range, the board's status and owner
+ * filters, the one ticket named. Checked by author, so the records carry no mark.
  */
 export async function readsFirewalledContent(
   prisma: Pick<PrismaClient, "scratchpadItem" | "routine" | "ticket" | "ticketComment">,
@@ -63,37 +63,77 @@ export async function readsFirewalledContent(
   if (AGENT_RECORD_TOOLS.has(name))
     return typeof args.botId === "string" && firewalled.has(args.botId);
   if (name === "calendar_agenda") {
+    const from = args.from ? new Date(String(args.from)) : new Date();
+    const to = args.to ? new Date(String(args.to)) : new Date(from.getTime() + 7 * 86_400_000);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return false;
     const [items, routines] = await Promise.all([
       prisma.scratchpadItem.findMany({
-        where: { ...scope, botId: { in: authors }, status: { not: "done" }, dueAt: { not: null } },
+        where: {
+          ...scope,
+          botId: { in: authors },
+          status: { not: "done" },
+          dueAt: { gte: from, lt: to },
+        },
         select: { botId: true },
         take: 50,
       }),
       prisma.routine.findMany({
-        where: { ...scope, botId: { in: authors }, active: true },
+        where: {
+          ...scope,
+          botId: { in: authors },
+          active: true,
+          managedKind: null,
+          nextRunAt: { not: null, lt: to },
+        },
         select: { botId: true },
         take: 50,
       }),
     ]);
     return written(items) || written(routines);
   }
-  if (name === "board_tickets" || name === "ticket_get") {
-    const [tickets, comments] = await Promise.all([
-      prisma.ticket.findMany({
-        where: { spaceId: scope.spaceId, createdByBotId: { in: authors } },
-        select: { createdByBotId: true },
-        take: 50,
-      }),
-      prisma.ticketComment.findMany({
-        where: { spaceId: scope.spaceId, authorBotId: { in: authors } },
-        select: { authorBotId: true },
-        take: 50,
-      }),
-    ]);
-    return (
-      tickets.some((row) => row.createdByBotId != null && firewalled.has(row.createdByBotId)) ||
-      comments.some((row) => row.authorBotId != null && firewalled.has(row.authorBotId))
-    );
+  if (name === "board_tickets") {
+    const rows = await prisma.ticket.findMany({
+      where: {
+        spaceId: scope.spaceId,
+        createdByBotId: { in: authors },
+        ...(typeof args.status === "string" && args.status
+          ? { status: args.status }
+          : { status: { not: "closed" } }),
+        ...(typeof args.ownerBotId === "string" && args.ownerBotId
+          ? { assigneeBotId: args.ownerBotId }
+          : {}),
+      },
+      select: { createdByBotId: true },
+      take: 50,
+    });
+    return rows.some((row) => row.createdByBotId != null && firewalled.has(row.createdByBotId));
+  }
+  if (name === "ticket_get") {
+    const ref = typeof args.ref === "string" ? args.ref.trim() : "";
+    if (!ref) return false;
+    const number = Number(/(\d+)$/.exec(ref)?.[1]);
+    const tickets = await prisma.ticket.findMany({
+      where: {
+        spaceId: scope.spaceId,
+        OR: [{ id: ref }, ...(Number.isInteger(number) ? [{ number }] : [])],
+      },
+      select: { id: true, createdByBotId: true },
+      take: 5,
+    });
+    if (tickets.some((row) => row.createdByBotId != null && firewalled.has(row.createdByBotId))) {
+      return true;
+    }
+    if (tickets.length === 0) return false;
+    const comments = await prisma.ticketComment.findMany({
+      where: {
+        spaceId: scope.spaceId,
+        ticketId: { in: tickets.map((row) => row.id) },
+        authorBotId: { in: authors },
+      },
+      select: { authorBotId: true },
+      take: 50,
+    });
+    return comments.some((row) => row.authorBotId != null && firewalled.has(row.authorBotId));
   }
   return false;
 }

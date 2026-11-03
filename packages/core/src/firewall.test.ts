@@ -5,8 +5,6 @@ import {
   FIREWALL_FREE_TOOLS,
   firewallDraftIsFree,
   firewallToolClass,
-  isSupportScopedQuery,
-  supportScopeQuery,
 } from "./firewall.js";
 
 describe("firewallToolClass", () => {
@@ -63,14 +61,14 @@ describe("firewallToolClass", () => {
 });
 
 describe("firewallDraftIsFree", () => {
-  const participants = ["Sam Customer <sam@customer.example>", "support@us.example"];
+  const participants = ["sam@customer.example", "support@us.example"];
   it("is free when every recipient is a thread participant and the body has no link", () => {
     expect(
       firewallDraftIsFree({ to: ["sam@customer.example"], body: "Thanks, fixed.", participants }),
     ).toBe(true);
     expect(
       firewallDraftIsFree({
-        to: ["Sam <SAM@customer.example>"],
+        to: ["SAM@customer.example"],
         cc: ["support@us.example"],
         body: "ok",
         participants,
@@ -97,19 +95,5 @@ describe("firewallDraftIsFree", () => {
     for (const body of ["see http://evil.example/x", "www.evil.example", "https://a.example"]) {
       expect(firewallDraftIsFree({ to: ["sam@customer.example"], body, participants })).toBe(false);
     }
-  });
-});
-
-describe("supportScopeQuery", () => {
-  it("wraps the model's query so an OR cannot leave the label", () => {
-    expect(supportScopeQuery("Support", "from:a OR in:anywhere")).toBe(
-      'label:"Support" (from:a OR in:anywhere)',
-    );
-  });
-  it("recognises its own output only", () => {
-    expect(isSupportScopedQuery("Support", supportScopeQuery("Support", "x"))).toBe(true);
-    expect(isSupportScopedQuery("Support", 'label:"Support" OR in:anywhere')).toBe(false);
-    expect(isSupportScopedQuery("Support", "x")).toBe(false);
-    expect(isSupportScopedQuery("Support", 'label:"Support" (a) OR (in:anywhere)')).toBe(false);
   });
 });

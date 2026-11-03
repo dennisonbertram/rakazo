@@ -75,11 +75,12 @@ export function firewallToolClass(name: string): FirewallToolClass {
 /** The reason line on a card the firewall forced. */
 export const FIREWALL_CARD_REASON = "Firewall";
 
-const bareAddress = (value: string) =>
-  (/<([^<>]+)>/.exec(value)?.[1] ?? value).trim().toLowerCase();
+const bareAddress = (value: string) => value.trim().toLowerCase();
 
 /**
- * A draft is free when it names at least one recipient, every To, Cc and Bcc address is already a
+ * `to`, `cc`, `bcc` and `participants` are bare addresses: the caller splits each field with the
+ * same parser the draft handler uses (`parseRecipients`), so one entry cannot hide a second
+ * recipient. A draft is free when it names at least one recipient, every To, Cc and Bcc address is already a
  * participant in the thread being answered, and the body has no link (the site list that would
  * allow a link arrives with slice S3, so until then any link asks).
  */
@@ -97,31 +98,4 @@ export function firewallDraftIsFree(input: {
   const known = new Set(input.participants.map(bareAddress));
   if (!recipients.every((address) => known.has(address))) return false;
   return !/https?:\/\/|www\./i.test(input.body ?? "");
-}
-
-const scopePrefix = (label: string) => `label:"${label.replaceAll('"', "")}" (`;
-
-/** The model's Gmail query, held inside the support label. The parentheses stop an OR leaving it. */
-export function supportScopeQuery(label: string, query: string): string {
-  return `${scopePrefix(label)}${query})`;
-}
-
-/** Whether a query is one `supportScopeQuery` produced for this label. */
-export function isSupportScopedQuery(label: string, query: string): boolean {
-  const prefix = scopePrefix(label);
-  if (!query.startsWith(prefix)) return false;
-  // The parenthesis opened by the prefix must close at the very end, outside any quoted text.
-  let depth = 1;
-  let quoted = false;
-  for (let i = prefix.length; i < query.length; i += 1) {
-    const char = query[i];
-    if (char === '"') quoted = !quoted;
-    else if (quoted) continue;
-    else if (char === "(") depth += 1;
-    else if (char === ")") {
-      depth -= 1;
-      if (depth === 0) return i === query.length - 1;
-    }
-  }
-  return false;
 }

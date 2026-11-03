@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   firewalledBotIds,
   groupHasFirewalledMember,
@@ -70,11 +70,26 @@ describe("readsFirewalledContent", () => {
   it("taints board_tickets and ticket_get on a firewalled ticket or comment author", async () => {
     const ticket = prisma({ ticket: { findMany: rows([{ createdByBotId: "fw" }]) } });
     const comment = prisma({ ticketComment: { findMany: rows([{ authorBotId: "fw" }]) } });
-    for (const name of ["board_tickets", "ticket_get"]) {
-      expect(await reads(ticket, name)).toBe(true);
-      expect(await reads(comment, name)).toBe(true);
-      expect(await reads(prisma(), name)).toBe(false);
-    }
+    const args = { ref: "RK-1" };
+    const withTicket = prisma({
+      ticket: { findMany: rows([{ id: "t1", createdByBotId: "fw" }]) },
+    });
+    const withComment = prisma({
+      ticket: { findMany: rows([{ id: "t1", createdByBotId: null }]) },
+      ticketComment: { findMany: rows([{ authorBotId: "fw" }]) },
+    });
+    expect(await reads(ticket, "board_tickets")).toBe(true);
+    expect(await reads(prisma(), "board_tickets")).toBe(false);
+    expect(await reads(withTicket, "ticket_get", args)).toBe(true);
+    expect(await reads(withComment, "ticket_get", args)).toBe(true);
+    expect(await reads(prisma(), "ticket_get", args)).toBe(false);
+    void comment;
+  });
+  it("asks the database only about the ticket the call names", async () => {
+    const find = vi.fn(async () => [] as { createdByBotId: string | null }[]);
+    const p = prisma({ ticket: { findMany: find } });
+    await reads(p, "ticket_get", { ref: "RK-7" });
+    expect(JSON.stringify(find.mock.calls[0])).toContain("7");
   });
   it("taints a read of a firewalled agent's context or history by botId", async () => {
     for (const name of ["agent_context", "search_agent_history", "read_agent_history"]) {
