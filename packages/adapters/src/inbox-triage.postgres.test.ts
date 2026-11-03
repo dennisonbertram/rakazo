@@ -312,6 +312,23 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
     expect(usage[0]).toMatchObject({ operationKind: "triage", inputTokens: 100 });
   });
 
+  it("removes card numbers and labelled passwords from snippets sent to the model, keeping the rest", async () => {
+    const user = await addUser();
+    await mail(user, "Billing", {
+      snippet: "Card 4111 1111 1111 1111, order 4111111111111112, password: hunter2 code 482913",
+    });
+    const rt = fakeRuntime(answerAll());
+
+    await run(user, rt.runtime);
+
+    const [sent] = promptMessages(rt.requests[0]!.prompt);
+    expect(sent?.snippet).toBe(
+      "Card [card], order 4111111111111112, password: [secret] code 482913",
+    );
+    // The cached message itself is untouched.
+    expect((await messagesOf(user))[0]?.snippet).toContain("4111 1111 1111 1111");
+  });
+
   it("classifies only untriaged, connected, inbound, in-window inbox mail of the user", async () => {
     const user = await addUser();
     const fresh = await mail(user, "Fresh", { minutesAgo: 1 });

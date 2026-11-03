@@ -17,6 +17,7 @@ import {
   NO_REPLY_STOP_AT,
   needsLlmDetail,
   planTodoSync,
+  redactForModel,
   replyGuard,
   resolvePile,
   selectTodoCandidates,
@@ -30,7 +31,7 @@ import { recordUsage } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { aiRecipient } from "./ai-consent.js";
 import { LlmInboxClassifier } from "./llm-inbox-classifier.js";
-import { protectedSenders } from "./protected-senders.js";
+import { protectedSenders } from "./mail-protected-senders.js";
 
 const WINDOW_MS = 14 * 86_400_000;
 // A first sort of the demo mailbox took about 39 seconds, and 30 seconds per batch aborted runs.
@@ -435,7 +436,7 @@ async function toInput(
       to: m.toAddresses,
       cc: m.ccAddresses,
       subject: m.subject,
-      snippet: m.snippet,
+      snippet: redactForModel(m.snippet),
       receivedAt: m.receivedAt.toISOString(),
       addressedToMe: mine !== "" && m.toAddresses.some((a) => a.toLowerCase() === mine),
       threadLength: length.get(`${m.connectionId}\0${m.threadId}`) ?? 1,

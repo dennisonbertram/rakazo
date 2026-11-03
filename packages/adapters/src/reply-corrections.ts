@@ -1,6 +1,6 @@
 import { NO_REPLY_STOP_AT } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
-import { protectedSenders } from "./protected-senders.js";
+import { protectedSenders } from "./mail-protected-senders.js";
 
 type Scope = { spaceId: string; userId: string };
 
