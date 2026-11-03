@@ -1471,6 +1471,55 @@ describe("unattended mail_modify and mail_send", () => {
     expect(isApprovalPausedResult(f.results[0])).toBe(false);
   });
 
+  it("asks for mail_modify in a routine under only a send_email or email category Allow", async () => {
+    for (const matchValue of ["send_email", "email"]) {
+      const f = mailFixture("mail_modify", [
+        { effect: "always_allow", matchKind: "category", matchValue } as ActionApprovalRule,
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      const block = f.pauseRunForInput.mock.calls[0]![0] as { blocks?: unknown };
+      expect(JSON.stringify(block)).toContain("Always allow this tool");
+    }
+  });
+
+  it("keeps an attended mail_modify under a category Allow running without a card", async () => {
+    const mail = {
+      listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+    };
+    const f = fixture({
+      name: "mail_modify",
+      builtin: true,
+      mail,
+      rules: [{ effect: "always_allow", matchKind: "category", matchValue: "send_email" }],
+    });
+    f.setCalls([{ args: { id: "m1", archive: true }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("keeps a check-in read-only even under a mail_modify tool Allow", async () => {
+    const mail = {
+      listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+    };
+    const f = fixture({
+      name: "mail_modify",
+      builtin: true,
+      mail,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: "check_in",
+      rules: allow("mail_modify"),
+    });
+    f.setCalls([{ args: { id: "m1", archive: true }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.effects).toEqual([]);
+    expect(f.results[0]).toEqual({
+      error: "Check-ins only read and report. Mention this in your message instead.",
+    });
+  });
+
   it("still asks for mail_send in a routine despite a tool or send_email Allow rule", async () => {
     for (const rules of [
       allow("mail_send"),

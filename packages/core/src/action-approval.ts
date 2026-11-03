@@ -266,7 +266,8 @@ export function externalTaintAllowsTool(toolName: string, args?: Record<string, 
  * asking only if it is a read-only connector tool or a safe built-in. Everything else asks.
  * An Allow rule never lifts this; the executor treats the result as a mandatory ask.
  * The one exception is mail_modify: it cannot delete, trash, send or mark spam, and every change
- * (archive, mark read, label) is reversible, so the rules decide. No rule still asks.
+ * (archive, mark read, label) is reversible, so the rules decide. No rule still asks. The executor further requires a rule for the tool
+ * itself: a category Allow (send_email) does not run it unattended.
  */
 export function unattendedToolRequiresApproval(
   unattended: boolean,
