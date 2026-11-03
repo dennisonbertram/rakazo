@@ -28,6 +28,23 @@ const describePostgres =
   process.env.VERIFY_DATABASE && databaseUrl ? describe.sequential : describe.skip;
 
 const MINUTE = 60_000;
+const signalsWith = (extra: { dmarc?: string; autoSubmitted?: boolean } = {}) => ({
+  listUnsubscribe: [],
+  oneClick: false,
+  listId: null,
+  bulk: false,
+  autoSubmitted: extra.autoSubmitted ?? false,
+  auth: { dkim: "pass", spf: "pass", dmarc: extra.dmarc ?? "pass" },
+  dkimCoversUnsubscribe: false,
+  categories: {
+    spam: false,
+    promotions: false,
+    social: false,
+    updates: false,
+    forums: false,
+    important: false,
+  },
+});
 const model: AgentRunModel = { provider: "openrouter", id: "test-model", apiKey: "test-key" };
 const modelKey = aiRecipient({ provider: "openrouter", modelId: "test-model", use: "model" })?.key;
 const typesafeKey = aiRecipient({ provider: "typesafe", use: "model" })?.key;
@@ -199,6 +216,7 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
       snippet?: string;
       triaged?: boolean;
       from?: string;
+      signals?: object;
     } = {},
   ) {
     counter += 1;
@@ -220,6 +238,7 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
         inInbox: extra.inInbox ?? !fromSelf,
         fromSelf,
         seenAt: new Date(),
+        ...(extra.signals ? { signals: extra.signals } : {}),
         ...(extra.triaged ? { triagedAt: new Date(), triageVersion: TRIAGE_VERSION } : {}),
       },
     });
@@ -1033,9 +1052,21 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
           },
         },
       });
-      const bulk = await mail(user, "Quick question", { from: "sales@store.test" });
+      const bulk = await mail(user, "Quick question", {
+        from: "sales@store.test",
+        signals: signalsWith(),
+      });
       const person = await mail(user, "Lunch?", { from: "sam@friend.test" });
       await stat(user, "sales@store.test", { priorContact: false, messageCount: 12 });
+      // Nine earlier authenticated messages, so the sender has ten with this one.
+      for (let i = 0; i < 9; i++)
+        await mail(user, `Earlier ${i}`, {
+          from: "sales@store.test",
+          inInbox: false,
+          triaged: true,
+          minutesAgo: 100 + i,
+          signals: signalsWith(),
+        });
       await stat(user, "sam@friend.test", { priorContact: true, messageCount: 12 });
 
       await run(user, fakeRuntime(answerAll()).runtime);
@@ -1044,6 +1075,66 @@ describePostgres("inbox triage job (PostgreSQL)", () => {
       expect(await needsReplyOf(auto.id)).toBe(false);
       expect(await needsReplyOf(bulk.id)).toBe(false);
       expect(await needsReplyOf(person.id)).toBe(true);
+    });
+
+    it("counts only authenticated messages toward the ten-message guard", async () => {
+      const user = await addUser();
+      const row = await mail(user, "Quick question", { from: "forged@store.test" });
+      await stat(user, "forged@store.test", { priorContact: false, messageCount: 12 });
+      // Nine more messages from the same From that failed DMARC: anyone can send those.
+      for (let i = 0; i < 9; i++)
+        await mail(user, `Forged ${i}`, {
+          from: "forged@store.test",
+          inInbox: false,
+          triaged: true,
+          minutesAgo: 100 + i,
+          signals: signalsWith({ dmarc: "fail" }),
+        });
+      await run(user, fakeRuntime(answerAll()).runtime);
+      expect(await needsReplyOf(row.id)).toBe(true);
+    });
+
+    it("keeps the to-do of a message the guard took out of Needs reply", async () => {
+      const user = await addUser();
+      const row = await mail(user, "Please confirm", { from: "no-reply@shop.test" });
+      await run(user, fakeRuntime(answerAll()).runtime);
+      expect(await needsReplyOf(row.id)).toBe(false);
+      expect((await todosOf(user)).map((t) => t.text)).toEqual(["Reply to Please confirm"]);
+    });
+
+    it("does not overwrite a dismissal made while the model was answering", async () => {
+      const user = await addUser();
+      const row = await mail(user, "Dismissed mid-run", { from: "ann@example.test" });
+      const base = fakeRuntime(answerAll());
+      const runtime = {
+        run: async function* (request: AgentRunRequest) {
+          await prisma.cachedMailMessage.update({
+            where: { id: row.id },
+            data: { replyDismissedAt: new Date(), needsReply: false },
+          });
+          yield* base.runtime.run(request);
+        },
+      } as unknown as AgentRuntime;
+      await run(user, runtime);
+      expect(await needsReplyOf(row.id)).toBe(false);
+    });
+
+    it("stops Needs reply for a sender corrected a third time while the model was answering", async () => {
+      const user = await addUser();
+      const row = await mail(user, "Third mid-run", { from: "deals@store.test" });
+      await stat(user, "deals@store.test", { noReplyCount: 2 });
+      const base = fakeRuntime(answerAll());
+      const runtime = {
+        run: async function* (request: AgentRunRequest) {
+          await prisma.mailSenderStat.updateMany({
+            where: { connectionId: user.connectionId, senderAddress: "deals@store.test" },
+            data: { noReplyCount: 3 },
+          });
+          yield* base.runtime.run(request);
+        },
+      } as unknown as AgentRuntime;
+      await run(user, runtime);
+      expect(await needsReplyOf(row.id)).toBe(false);
     });
 
     it("does not guard a sender whose prior contact is not checked yet", async () => {

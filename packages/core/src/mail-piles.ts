@@ -99,7 +99,7 @@ export const NO_REPLY_LOCAL = /^(no[-_.]?reply|do[-_.]?not[-_.]?reply|notificati
 const failed = (result: string | null) => result === "fail";
 
 /** DMARC passed (so the passing DKIM or SPF aligns with the From domain) and nothing failed. */
-const authPassed = (signals: MailSignals) =>
+export const authPassed = (signals: MailSignals) =>
   !Object.values(signals.auth).some(failed) && signals.auth.dmarc === "pass";
 
 function claimsBrandItIsNot(input: PileInput): boolean {

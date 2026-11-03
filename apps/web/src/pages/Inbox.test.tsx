@@ -509,6 +509,30 @@ it("completes a hidden reply to-do from the open mail", async () => {
   expect(rpcMock.setDone).toHaveBeenCalledWith({ id: "t1", done: true });
 });
 
+it("lists the mail again after a to-do is finished, so the row leaves Needs reply", async () => {
+  const hidden = {
+    id: "t1",
+    connectionId: "c1",
+    messageId: "a",
+    text: "Reply to Morgan about section 9",
+    detail: null,
+    from: "Dana",
+    priority: null,
+    dueOn: null,
+    doneAt: null,
+  };
+  rpcMock.list.mockResolvedValue(list([row("a", { needsReply: true })]));
+  rpcMock.todos.mockResolvedValue({ todos: [hidden] });
+  rpcMock.setDone.mockResolvedValue({ ...hidden, doneAt: new Date().toISOString() });
+  const c = await render();
+  await click(c.querySelector('[data-row-id="a"]'));
+  const before = rpcMock.list.mock.calls.length;
+  rpcMock.list.mockResolvedValue(list([row("a", { needsReply: false })]));
+  await click(byText(document.body, "dialog reply done"));
+  await dwell(50);
+  expect(rpcMock.list.mock.calls.length).toBeGreaterThan(before);
+});
+
 it("names the due date on the open mail's completion control", async () => {
   const dated = {
     id: "t1",

@@ -1,4 +1,5 @@
-import { NO_REPLY_STOP_AT } from "@rakazo/core";
+import { MailSignalsSchema } from "@rakazo/contracts";
+import { authPassed, NO_REPLY_STOP_AT } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { protectedSenders } from "./mail-protected-senders.js";
 
@@ -33,6 +34,7 @@ export async function dismissReply(
       receivedAt: true,
       fromAddress: true,
       fromName: true,
+      signals: true,
     },
   });
   if (!message) return { stopped: null };
@@ -49,13 +51,17 @@ export async function dismissReply(
   if (answered) return { stopped: null };
 
   const address = message.fromAddress.trim().toLowerCase();
+  // Anyone can write another person's address in From. A message that did not authenticate is
+  // dismissed on its own, but cannot count toward a sender-wide stop.
+  const parsed = MailSignalsSchema.safeParse(message.signals);
+  const authenticated = parsed.success && authPassed(parsed.data);
   const count = await prisma.$transaction(async (tx) => {
     // The guarded update is the once-per-message check: a second call finds nothing to change.
     const { count: changed } = await tx.cachedMailMessage.updateMany({
       where: shown,
       data: { replyDismissedAt: new Date(), needsReply: false },
     });
-    if (changed === 0) return null;
+    if (changed === 0 || !authenticated) return null;
     const [row] = await tx.$queryRaw<Array<{ noReplyCount: number }>>`
       UPDATE mail_sender_stats SET "noReplyCount" = "noReplyCount" + 1, "noReplyAt" = now()
       WHERE "connectionId" = ${message.connectionId} AND "senderAddress" = ${address}

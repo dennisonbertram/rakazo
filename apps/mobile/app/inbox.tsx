@@ -308,6 +308,8 @@ export default function InboxScreen() {
     completeMailTodo(todo.id)
       .then(({ stoppedSender }) => {
         if (stoppedSender && todo.messageId) announceStop(todo.messageId, stoppedSender);
+        // The server also took the mail out of Needs reply; list it again.
+        if (todo.messageId) void load(tabRef.current, false);
       })
       .catch((cause: unknown) => {
         setTodos((current) =>

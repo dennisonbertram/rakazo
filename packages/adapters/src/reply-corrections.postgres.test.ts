@@ -19,6 +19,23 @@ describePostgres("reply corrections (PostgreSQL)", () => {
   let n = 0;
 
   const scope = { spaceId, userId };
+  const signalsWith = (dmarc: string) => ({
+    listUnsubscribe: [],
+    oneClick: false,
+    listId: null,
+    bulk: false,
+    autoSubmitted: false,
+    auth: { dkim: "pass", spf: "pass", dmarc },
+    dkimCoversUnsubscribe: false,
+    categories: {
+      spam: false,
+      promotions: false,
+      social: false,
+      updates: false,
+      forums: false,
+      important: false,
+    },
+  });
   const message = (from: string, extra: Record<string, unknown> = {}) => {
     n += 1;
     return prisma.cachedMailMessage.create({
@@ -37,6 +54,7 @@ describePostgres("reply corrections (PostgreSQL)", () => {
         unread: true,
         inInbox: true,
         needsReply: true,
+        signals: signalsWith("pass"),
         seenAt: new Date(),
         ...extra,
       },
@@ -148,6 +166,25 @@ describePostgres("reply corrections (PostgreSQL)", () => {
     for (const row of [quiet, answered, later]) await dismissReply(prisma, scope, row.id);
 
     expect(await countOf("c@store.test")).toBe(0);
+  });
+
+  it("clears a message whose sender did not authenticate but does not count it against the sender", async () => {
+    await stat("f@store.test", { noReplyCount: 2 });
+    const forged = [
+      await message("f@store.test", { signals: signalsWith("fail") }),
+      await message("f@store.test", { signals: null }),
+      await message("f@store.test", { signals: signalsWith("none") }),
+    ];
+
+    for (const row of forged)
+      expect(await dismissReply(prisma, scope, row.id)).toEqual({ stopped: null });
+
+    expect(await countOf("f@store.test")).toBe(2);
+    for (const row of forged) {
+      const saved = await prisma.cachedMailMessage.findUniqueOrThrow({ where: { id: row.id } });
+      expect(saved.needsReply).toBe(false);
+      expect(saved.replyDismissedAt).not.toBeNull();
+    }
   });
 
   it("does not report a stop for a protected sender", async () => {

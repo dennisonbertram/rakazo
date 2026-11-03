@@ -470,6 +470,21 @@ it("removes a completed to-do at once and puts it back with an alert when the ca
   expect(state.alert).toHaveBeenCalledTimes(1);
 });
 
+it("lists the mail again after a to-do is finished, so the row leaves Needs reply", async () => {
+  todosReply = () => ({
+    enabled: true,
+    todos: [{ ...todo("t1", "Send the invoice"), messageId: "n1" }],
+  });
+  listReply = () => inboxList({ rows: [mailRow("n1", { needsReply: true })] });
+  await render();
+  state.rpc.mockClear();
+  listReply = () => inboxList({ rows: [mailRow("n1", { needsReply: false })] });
+  await act(async () =>
+    (container.querySelector('button[aria-label="Send the invoice"]') as HTMLElement).click(),
+  );
+  expect(procs()).toContain("inbox/list");
+});
+
 it("keeps a completed to-do removed when the call succeeds", async () => {
   todosReply = () => ({ enabled: true, todos: [todo("t1", "Send the invoice")] });
   await render();
@@ -1024,7 +1039,8 @@ describe("no reply needed from the row menu", () => {
       expect.objectContaining({ text: "Undo" }),
       expect.objectContaining({ text: "Done" }),
     ]);
-    const undo = (state.alert.mock.calls[0]?.[2] as { text: string; onPress?: () => void }[])[0];
+    const buttons = state.alert.mock.calls[0]?.[2] as { text: string; onPress?: () => void }[];
+    const undo = buttons[0];
     await act(async () => undo?.onPress?.());
     expect(state.rpc).toHaveBeenCalledWith("inbox/noReply", { messageId: "n1", undo: true });
   });

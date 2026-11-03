@@ -1199,6 +1199,8 @@ function InboxListPage({
     // Finishing a to-do for mail that needed no reply can be the third such correction.
     if (stoppedSender && next.messageId)
       setStatus({ kind: "stopped", messageId: next.messageId, sender: stoppedSender });
+    // Finishing the to-do also clears the mail from Needs reply on the server; list it again.
+    if (next.doneAt && next.messageId) setReload((n) => n + 1);
     const swap = (items: InboxTodo[]) => items.map((item) => (item.id === next.id ? next : item));
     // A held answer must not bring the old state back when it is applied.
     if (heldTodos.current) heldTodos.current.todos = swap(heldTodos.current.todos);

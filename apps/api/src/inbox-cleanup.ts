@@ -156,7 +156,13 @@ export async function inboxCleanupList(
   const where = { spaceId: actor.spaceId, userId: actor.userId, connectionId: { in: ids } };
   const [decisions, stats, feedback, states, contacts] = await Promise.all([
     prisma.mailSenderDecision.findMany({ where }),
-    prisma.mailSenderStat.findMany({ where: { ...where, messageCount: { gt: 0 } } }),
+    // A stopped sender stays listed after its mail left the cache, so Forget stays reachable.
+    prisma.mailSenderStat.findMany({
+      where: {
+        ...where,
+        OR: [{ messageCount: { gt: 0 } }, { noReplyCount: { gte: NO_REPLY_STOP_AT } }],
+      },
+    }),
     prisma.inboxSenderFeedback.findMany({
       where: { spaceId: actor.spaceId, userId: actor.userId },
       select: { senderAddress: true, mark: true },
@@ -175,7 +181,26 @@ export async function inboxCleanupList(
     ...decisions.filter((d) => d.skipInboxAt),
     ...stats.filter((s) => s.learnedPile !== null || s.noReplyCount >= NO_REPLY_STOP_AT),
   ].map((row) => ({ connectionId: row.connectionId, address: row.senderAddress }));
-  const facts = await senderFacts(prisma, actor, ids, undefined, true, skipped);
+  const mailFacts = await senderFacts(prisma, actor, ids, undefined, true, skipped);
+  const seen = new Set(mailFacts.map((fact) => `${fact.connectionId}:${fact.address}`));
+  // Stopped senders with no cached mail have no facts from mail; they list with empty ones.
+  const facts = [
+    ...mailFacts,
+    ...stats
+      .filter(
+        (s) =>
+          s.noReplyCount >= NO_REPLY_STOP_AT && !seen.has(`${s.connectionId}:${s.senderAddress}`),
+      )
+      .map((s) => ({
+        connectionId: s.connectionId,
+        address: s.senderAddress,
+        name: null,
+        inboxThreads: 0,
+        newestPile: null,
+        signals: null,
+        spamLike: false,
+      })),
+  ];
   const key = (connectionId: string, address: string) => `${connectionId}:${address}`;
   const statOf = new Map(stats.map((s) => [key(s.connectionId, s.senderAddress), s]));
   const decisionOf = new Map(decisions.map((d) => [key(d.connectionId, d.senderAddress), d]));

@@ -276,6 +276,18 @@ async function triagePass(
       // An id the model skipped is stamped too, with null fields, so it is not paid for again.
       // Interactive, not a batch array: row-level security cannot carry its context into a batch.
       await prisma.$transaction(async (tx) => {
+        // The model call can take a minute. Read the dismissals and counters again here, so a
+        // correction made meanwhile is not written over.
+        const now = await tx.cachedMailMessage.findMany({
+          where: { id: { in: batch.map((m) => m.id) }, userId, spaceId },
+          select: { id: true, replyDismissedAt: true },
+        });
+        const dismissed = new Map(now.map((m) => [m.id, m.replyDismissedAt]));
+        const current = await senderContext(
+          tx,
+          scope,
+          batch.map((m) => ({ ...m, replyDismissedAt: dismissed.get(m.id) ?? m.replyDismissedAt })),
+        );
         for (const row of batch) {
           const item = byId.get(row.id);
           await tx.cachedMailMessage.updateMany({
@@ -283,7 +295,7 @@ async function triagePass(
             data: {
               triagedAt: new Date(),
               triageVersion: TRIAGE_VERSION,
-              needsReply: item ? item.needsReply && senders.allowsReply(row) : null,
+              needsReply: item ? item.needsReply && current.allowsReply(row.id) : null,
               priority: item?.priority ?? null,
               category: item?.category ?? null,
               // The model category decides the pile when there is one; the free rules are the fallback.
@@ -342,14 +354,19 @@ type SenderRow = {
  * which senders are protected. `allowsReply` is false for a message the user dismissed or the
  * guard blocks.
  */
-async function senderContext(prisma: PrismaClient, { userId, spaceId }: Scope, batch: SenderRow[]) {
+async function senderContext(
+  prisma: Prisma.TransactionClient,
+  { userId, spaceId }: Scope,
+  batch: SenderRow[],
+) {
   const addresses = [...new Set(batch.map((m) => m.fromAddress.toLowerCase()))];
-  const [stats, safe] = await Promise.all([
+  const connectionIds = [...new Set(batch.map((m) => m.connectionId))];
+  const [stats, safe, authenticated] = await Promise.all([
     prisma.mailSenderStat.findMany({
       where: {
         spaceId,
         userId,
-        connectionId: { in: [...new Set(batch.map((m) => m.connectionId))] },
+        connectionId: { in: connectionIds },
         senderAddress: { in: addresses },
       },
       select: {
@@ -361,7 +378,22 @@ async function senderContext(prisma: PrismaClient, { userId, spaceId }: Scope, b
       },
     }),
     protectedSenders(prisma, { spaceId, userId }, addresses),
+    // Only mail that passed authentication counts toward "10 messages and never answered": anyone
+    // can put another person's address in From, and the stat counts those messages too.
+    prisma.$queryRaw<Array<{ connectionId: string; sender: string; n: number }>>`
+      SELECT "connectionId", lower("fromAddress") AS sender, COUNT(*)::int AS n
+      FROM mail_messages
+      WHERE "spaceId" = ${spaceId} AND "userId" = ${userId}
+        AND "connectionId" = ANY(${connectionIds}::text[])
+        AND lower("fromAddress") = ANY(${addresses}::text[])
+        AND NOT "fromSelf" AND NOT "isSpam"
+        AND signals->'auth'->>'dmarc' = 'pass'
+        AND COALESCE(signals->'auth'->>'dkim', '') <> 'fail'
+        AND COALESCE(signals->'auth'->>'spf', '') <> 'fail'
+      GROUP BY 1, 2`,
   ]);
+  const authCount = new Map(authenticated.map((a) => [`${a.connectionId}\0${a.sender}`, a.n]));
+  const byId = new Map(batch.map((m) => [m.id, m]));
   const statOf = new Map(stats.map((s) => [`${s.connectionId}\0${s.senderAddress}`, s]));
   const of = (m: SenderRow) => {
     const address = m.fromAddress.toLowerCase();
@@ -369,7 +401,8 @@ async function senderContext(prisma: PrismaClient, { userId, spaceId }: Scope, b
     return { address, stat, protectedSender: safe.has(address) };
   };
   return {
-    allowsReply: (m: SenderRow) => {
+    allowsReply: (id: string) => {
+      const m = byId.get(id) as SenderRow;
       if (m.replyDismissedAt) return false;
       const { address, stat, protectedSender } = of(m);
       return (
@@ -377,7 +410,10 @@ async function senderContext(prisma: PrismaClient, { userId, spaceId }: Scope, b
           fromAddress: address,
           autoSubmitted: MailSignalsSchema.safeParse(m.signals).data?.autoSubmitted === true,
           priorContact: stat?.priorContact ?? null,
-          messageCount: stat?.messageCount ?? 0,
+          messageCount: Math.min(
+            stat?.messageCount ?? 0,
+            authCount.get(`${m.connectionId}\0${address}`) ?? 0,
+          ),
           noReplyCount: stat?.noReplyCount ?? 0,
           protectedSender,
         }) === null

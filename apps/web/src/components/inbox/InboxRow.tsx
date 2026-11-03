@@ -326,7 +326,6 @@ export function InboxRow({
             name: t`No reply needed`,
             Icon: MessageSquareOff,
             run: onNoReply,
-            menuOnly: true,
           },
         ]
       : []),
