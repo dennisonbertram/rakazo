@@ -40,7 +40,7 @@ import {
   resolveCatalogCall,
 } from "./lazy-tool-catalog.js";
 import type { McpOAuthBroker, OAuthMaterial } from "./mcp-oauth.js";
-import { oauthMaterialSecrets } from "./mcp-oauth.js";
+import { McpReauthorizationRequiredError, oauthMaterialSecrets } from "./mcp-oauth.js";
 import { McpSession, mcpStdioRefusal } from "./mcp-transport.js";
 import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
@@ -92,6 +92,16 @@ function expectedFailure(error: unknown, depth = 0): ExpectedFailure | undefined
     if (kind) return kind;
   }
   return undefined;
+}
+
+/**
+ * The error a server-side call throws: the sanitized message, plus `expected: "reconnect"` when
+ * the sign-in was refused or has expired, so a caller can tell that from an outage.
+ */
+export function connectorFailure(error: unknown, message: string): Error {
+  const expected =
+    error instanceof McpReauthorizationRequiredError ? "reconnect" : expectedFailure(error);
+  return Object.assign(new Error(withHttpStatus(error, message)), expected ? { expected } : {});
 }
 
 const TOOL_LIST_TTL_MS = 30_000;
@@ -685,7 +695,7 @@ export class McpConnector implements ConnectorProvider {
     } catch (error) {
       const secrets = material ? oauthMaterialSecrets(material) : [];
       await this.evict(sessionKey);
-      throw new Error(withHttpStatus(error, sanitizeConnectorError(error, secrets)));
+      throw connectorFailure(error, sanitizeConnectorError(error, secrets));
     }
     await options.beforeCall?.();
     try {
@@ -707,7 +717,7 @@ export class McpConnector implements ConnectorProvider {
     } catch (error) {
       const secrets = material ? oauthMaterialSecrets(material) : [];
       await this.evict(sessionKey);
-      throw new Error(withHttpStatus(error, sanitizeConnectorError(error, secrets)));
+      throw connectorFailure(error, sanitizeConnectorError(error, secrets));
     }
   }
 
