@@ -62,8 +62,8 @@ import {
   BOTS_POLL_MS,
   Composer,
   chatIsOpening,
-  findDocumentsAndArtifacts,
   findChats,
+  findDocumentsAndArtifacts,
   firstThreadRoute,
   isRoutinesOnlyPanel,
   retryAfterStop,
@@ -317,7 +317,7 @@ describe("Composer", () => {
       rerenderComposer({ mentionTargets: [researcher, writer] });
       expect(selected()).toContain("Research Writer");
       pressKey(textarea, "Enter");
-      expect(chips()).toEqual(["Research Writer"]);
+      expect(chips()).toEqual(["@Research Writer"]);
     });
 
     it("follows the highlighted option when an option is inserted before it", () => {
@@ -325,7 +325,7 @@ describe("Composer", () => {
       rerenderComposer({ mentionTargets: [routine, researcher, writer] });
       expect(selected()).toContain("Research Writer");
       pressKey(textarea, "Enter");
-      expect(chips()).toEqual(["Research Writer"]);
+      expect(chips()).toEqual(["@Research Writer"]);
     });
 
     it("keeps the default highlight on the first option when an option is inserted before it", () => {
@@ -335,7 +335,7 @@ describe("Composer", () => {
       rerenderComposer({ mentionTargets: [routine, researcher, writer] });
       expect(selected()).toContain("Researcher");
       pressKey(textarea, "Enter");
-      expect(chips()).toEqual(["Researcher"]);
+      expect(chips()).toEqual(["@Researcher"]);
     });
 
     it("falls back to the first option when the highlighted option disappears", () => {
@@ -343,7 +343,7 @@ describe("Composer", () => {
       rerenderComposer({ mentionTargets: [researcher] });
       expect(selected()).toContain("Researcher");
       pressKey(textarea, "Enter");
-      expect(chips()).toEqual(["Researcher"]);
+      expect(chips()).toEqual(["@Researcher"]);
     });
   });
 
@@ -429,7 +429,7 @@ describe("Composer", () => {
     act(() => {
       textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     });
-    expect(chips()).toEqual(["Legal"]);
+    expect(chips()).toEqual(["@Legal"]);
     act(() => root?.unmount());
     container?.remove();
     renderComposer(vi.fn(), { draftKey: "bot:carta", mentionTargets: [legal] });
@@ -437,7 +437,7 @@ describe("Composer", () => {
     act(() => root?.unmount());
     container?.remove();
     renderComposer(vi.fn(), { draftKey: "group:g1", mentionTargets: [legal] });
-    expect(chips()).toEqual(["Legal"]);
+    expect(chips()).toEqual(["@Legal"]);
     sessionStorage.clear();
   });
 
@@ -508,14 +508,109 @@ describe("Composer", () => {
       );
     type(textarea, "@Bo");
     pressEnter(textarea);
-    type(textarea, "hello");
+    expect(textarea.value).toBe("@Bob ");
+    type(textarea, "@Bob hello");
     pressEnter(textarea);
     expect(onSend).toHaveBeenCalledWith("@Bob hello", [bob], expect.any(String));
     expect(textarea.value).toBe("");
     expect(mentionChips()).toEqual([]);
     await act(async () => finishSend(false));
-    expect(textarea.value).toBe("hello");
-    expect(mentionChips()).toEqual(["Bob"]);
+    expect(textarea.value).toBe("@Bob hello");
+    expect(mentionChips()).toEqual(["@Bob"]);
+  });
+
+  it("puts a mention at the caret mid-sentence and sends the sentence as written", () => {
+    const onSend = vi.fn();
+    const textarea = renderComposer(onSend);
+    const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    const typed = "share with @Bo and put it away";
+    act(() => {
+      setValue?.call(textarea, typed);
+      textarea.setSelectionRange(14, 14);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    pressEnter(textarea);
+    expect(textarea.value).toBe("share with @Bob and put it away");
+    const chips = [...(container?.querySelectorAll("[data-testid='mention-chip']") ?? [])];
+    expect(chips.map((chip) => chip.textContent)).toEqual(["@Bob"]);
+    // The picked name sits between the surrounding words, and nothing leads the text.
+    pressEnter(textarea);
+    expect(onSend).toHaveBeenCalledWith(
+      "share with @Bob and put it away",
+      [bob],
+      expect.any(String),
+    );
+  });
+
+  it("drops a mention when its text is edited, and Backspace removes it whole", () => {
+    const textarea = renderComposer(vi.fn());
+    const chips = () =>
+      [...(container?.querySelectorAll("[data-testid='mention-chip']") ?? [])].length;
+    type(textarea, "@Bo");
+    pressEnter(textarea);
+    expect(chips()).toBe(1);
+    type(textarea, "@Bo hello");
+    expect(chips()).toBe(0);
+    type(textarea, "@Bo");
+    pressEnter(textarea);
+    expect(textarea.value).toBe("@Bob ");
+    act(() => {
+      textarea.setSelectionRange(4, 4);
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Backspace", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(textarea.value).toBe(" ");
+    expect(chips()).toBe(0);
+  });
+
+  it("keeps two same-name mentions apart and sends each one's own id", () => {
+    const first: ComposerMention = { kind: "routine", id: "r1", name: "Weekly report" };
+    const second: ComposerMention = { kind: "routine", id: "r2", name: "Weekly report" };
+    const onSend = vi.fn();
+    const textarea = renderComposer(onSend, { mentionTargets: [first, second] });
+    type(textarea, "@Weekly");
+    pressEnter(textarea);
+    type(textarea, `${textarea.value}and @Weekly`);
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>("[role=option]:last-child")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(textarea.value).toBe("@Weekly report and @Weekly report ");
+    // Deleting the first leaves the second with its own id.
+    act(() => {
+      textarea.setSelectionRange(14, 14);
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Backspace", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(container?.querySelectorAll("[data-testid='mention-chip']").length).toBe(1);
+    type(textarea, `${textarea.value}go`);
+    pressEnter(textarea);
+    expect(onSend).toHaveBeenCalledWith("and @Weekly report go", [second], expect.any(String));
+  });
+
+  it("does not remove a mention on Backspace while composing", () => {
+    const textarea = renderComposer(vi.fn());
+    type(textarea, "@Bo");
+    pressEnter(textarea);
+    act(() => {
+      textarea.setSelectionRange(4, 4);
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Backspace", keyCode: 229, bubbles: true }),
+      );
+    });
+    expect(textarea.value).toBe("@Bob ");
+  });
+
+  it("names the status of a routine mention under the field", () => {
+    const routine: ComposerMention = { kind: "routine", id: "r1", name: "Digest" };
+    const textarea = renderComposer(vi.fn(), { mentionTargets: [routine] });
+    type(textarea, "@Dig");
+    pressEnter(textarea);
+    const status = document.getElementById(textarea.getAttribute("aria-describedby") ?? "");
+    expect(status?.textContent).toBe("Digest · Runs on send");
   });
 
   it("restores the chosen skill when the send fails", async () => {
