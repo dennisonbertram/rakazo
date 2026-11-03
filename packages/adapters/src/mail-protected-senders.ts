@@ -38,19 +38,22 @@ export async function protectedSenders(
 }
 
 /**
- * True when any inbound sender in the conversation of the cached message `providerMessageId` is
- * protected. An archive acts on the whole thread, so every sender counts, not only the newest.
+ * True when any inbound sender in the conversation of the cached message `providerMessageId` (on
+ * `connectionId`, when given) is protected. An archive acts on the whole thread, so every sender
+ * counts, not only the newest. A message that is not cached means the senders are unknown, which
+ * also answers true so the caller asks.
  */
 export async function threadHasProtectedSender(
   prisma: Pick<PrismaClient, "cachedMailMessage" | "inboxSenderFeedback" | "contact">,
   scope: Scope,
   providerMessageId: string,
+  connectionId?: string,
 ): Promise<boolean> {
   const row = await prisma.cachedMailMessage.findFirst({
-    where: { ...scope, providerMessageId },
+    where: { ...scope, providerMessageId, ...(connectionId ? { connectionId } : {}) },
     select: { threadId: true, connectionId: true },
   });
-  if (!row) return false;
+  if (!row) return true;
   const messages = await prisma.cachedMailMessage.findMany({
     where: { ...scope, connectionId: row.connectionId, threadId: row.threadId, fromSelf: false },
     select: { fromAddress: true },

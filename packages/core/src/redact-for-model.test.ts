@@ -29,4 +29,18 @@ describe("redactForModel", () => {
       "Your verification code is 482913",
     );
   });
+
+  it("finds a card next to an expiry or CVV, and across odd separators and digit forms", () => {
+    expect(redactForModel("4111 1111 1111 1111 1226")).toBe("[card] 1226");
+    expect(redactForModel("4111111111111111 123")).toBe("[card] 123");
+    expect(redactForModel("41111111111111111226")).toBe("[card]1226");
+    expect(redactForModel("4111\u00a01111\u20091111.1111")).toBe("[card]");
+    expect(redactForModel("４１１１１１１１１１１１１１１１")).toBe("[card]");
+  });
+
+  it("redacts a quoted password whole", () => {
+    expect(redactForModel('password: "correct horse battery" ok')).toBe("password: [secret] ok");
+    expect(redactForModel("PIN = 'a b' ok")).toBe("PIN = [secret] ok");
+    expect(redactForModel("passcode: \u201cx y\u201d.")).toBe("passcode: [secret].");
+  });
 });

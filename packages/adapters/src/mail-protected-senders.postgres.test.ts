@@ -131,6 +131,32 @@ describePostgres("protected senders (PostgreSQL)", () => {
     await msg(t, "me@example.test", { fromSelf: true, pid: "mine" });
     await msg(t, "list@example.test", { pid: "theirs" });
     expect(await threadHasProtectedSender(prisma, t.scope, "theirs")).toBe(false);
-    expect(await threadHasProtectedSender(prisma, t.scope, "unknown-id")).toBe(false);
+  });
+
+  it("treats a message that is not cached as protected, since the thread is unknown", async () => {
+    const t = await tenant();
+    expect(await threadHasProtectedSender(prisma, t.scope, "unknown-id", t.connectionId)).toBe(
+      true,
+    );
+  });
+
+  it("checks only the given account's copy of a thread", async () => {
+    const t = await tenant();
+    const other = await prisma.connection.create({
+      data: {
+        ...t.scope,
+        provider: "gmail",
+        displayName: "Other",
+        status: "connected",
+        providerRef: randomUUID(),
+        metadata: {},
+      },
+    });
+    await contact(t, "friend@example.test");
+    await msg(t, "friend@example.test", { pid: "a1" });
+    await msg({ ...t, connectionId: other.id }, "list@example.test", { pid: "b1" });
+    expect(await threadHasProtectedSender(prisma, t.scope, "a1", t.connectionId)).toBe(true);
+    expect(await threadHasProtectedSender(prisma, t.scope, "b1", other.id)).toBe(false);
+    expect(await threadHasProtectedSender(prisma, t.scope, "a1", other.id)).toBe(true);
   });
 });

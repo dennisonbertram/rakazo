@@ -483,6 +483,7 @@ import {
 import { threadHasProtectedSender } from "./mail-protected-senders.js";
 import {
   accountName,
+  findAccount,
   inferMailAccount,
   MAIL_TOOL_NAMES,
   mailToolFromTool,
@@ -5108,15 +5109,29 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
           // An archive acts on the whole conversation, so one protected sender in it (marked
           // important or in Contacts) means a card, whatever saved rule would otherwise allow it.
+          // Removing the INBOX label (by id or name) is the same archive. An unresolved account or
+          // an uncached message leaves the senders unknown, which also asks.
           const protectedArchive =
             name === "mail_modify" &&
-            args.archive === true &&
             typeof args.id === "string" &&
-            (await threadHasProtectedSender(
-              deps.prisma,
-              { spaceId: run.spaceId, userId: run.userId },
-              args.id.trim(),
-            ));
+            (args.archive === true ||
+              (Array.isArray(args.removeLabels) &&
+                args.removeLabels.some(
+                  (label) => typeof label === "string" && label.trim().toLowerCase() === "inbox",
+                ))) &&
+            (await (async () => {
+              const accounts = await mailAccounts();
+              const owner = { spaceId: run.spaceId, userId: bot.userId };
+              const account =
+                typeof args.account === "string" && args.account.trim()
+                  ? findAccount(accounts, args.account)
+                  : ((await inferMailAccount(deps.prisma, owner, accounts, args).catch(
+                      () => undefined,
+                    )) ?? (accounts.length === 1 ? accounts[0] : undefined));
+              return account
+                ? threadHasProtectedSender(deps.prisma, owner, String(args.id).trim(), account.id)
+                : true;
+            })());
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
             mailModifyNeedsToolRule ||

@@ -1580,6 +1580,26 @@ describe("unattended mail_modify and mail_send", () => {
     expect(isApprovalPausedResult(f.results[0])).toBe(true);
   });
 
+  it("asks when INBOX is removed by label name, since that archives the thread too", async () => {
+    for (const label of ["INBOX", "inbox"]) {
+      const f = mailFixture("mail_modify", allow("mail_modify"));
+      f.setCalls([{ args: { id: "m1", removeLabels: [label] }, executionId: "call-1" }]);
+      f.prisma.contact.findMany.mockResolvedValue([{ email: "friend@example.test" }]);
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        { fromAddress: "friend@example.test" },
+      ] as never);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("asks for an archive of a message that is not cached, since its thread is unknown", async () => {
+    const f = mailFixture("mail_modify", allow("mail_modify"));
+    f.prisma.cachedMailMessage.findFirst.mockResolvedValue(null as never);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
   it("asks for a protected archive even when the call is attended and under a tool Allow", async () => {
     const mail = {
       listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
