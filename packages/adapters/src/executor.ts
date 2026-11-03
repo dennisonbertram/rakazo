@@ -2740,14 +2740,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // of this run's actual model on every trigger (not the Inbox agent's), and unknown means no.
         const meetingConsentOk = async (): Promise<boolean> => {
           try {
-            if (!runModelProvider || !runModelId) return false;
-            const recipient = aiRecipient({
-              provider: runModelProvider,
-              modelId: runModelId,
-              baseUrl: resolved.baseUrl,
-              use: "model",
-            });
-            if (!recipient) return runModelProvider === "scripted";
+            // The model that receives the text now: a backup model after a switch, not the first.
+            const { provider, id, baseUrl } = effectiveRunModel;
+            if (!provider || !id) return false;
+            const recipient = aiRecipient({ provider, modelId: id, baseUrl, use: "model" });
+            if (!recipient) return provider === "scripted";
             const granted = await deps.prisma.aiDataConsent.findFirst({
               where: {
                 userId: bot.userId,
@@ -6734,6 +6731,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ...(omiConnection ? { onlyConnectionId: omiConnection.id } : {}),
                   // Omi recording text is untrusted: the thread is marked before it is returned,
                   // so every later write or send asks (the same mark meeting text sets).
+                  meetingConsentOk: meetingConsentOk,
                   onUntrustedContent: async () => {
                     await deps.prisma.thread.updateMany({
                       where: { id: thread.id, meetingTaintedAt: null },

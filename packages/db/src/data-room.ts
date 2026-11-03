@@ -34,6 +34,8 @@ export interface DataRoomFilters {
   docDateTo?: Date;
   status?: string;
   source?: string;
+  /** Hides items of this source (agents never search meeting text). */
+  excludeSource?: string;
   /** Only ready items with no Legal analysis at their current revision (as Legal counts them). */
   legalUnchecked?: boolean;
   /** Hides items imported through these connections. Items with no connection stay visible. */
@@ -201,6 +203,7 @@ export function eligibleWhere(
     ...(filters.tag ? { tags: { has: filters.tag } } : {}),
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.source ? { source: filters.source } : {}),
+    ...(filters.excludeSource ? { NOT: { source: filters.excludeSource } } : {}),
     ...(filters.onlyConnectionId ? { sourceConnectionId: filters.onlyConnectionId } : {}),
     ...(filters.excludeConnectionIds?.length
       ? {
@@ -234,12 +237,13 @@ function eligibleSql(actor: Actor, filters: DataRoomFilters = {}): Prisma.Sql {
   if (filters.tag) parts.push(Prisma.sql`${filters.tag} = ANY(i."tags")`);
   if (filters.status) parts.push(Prisma.sql`i."status" = ${filters.status}`);
   if (filters.source) parts.push(Prisma.sql`i."source" = ${filters.source}`);
+  if (filters.excludeSource) parts.push(Prisma.sql`i."source" <> ${filters.excludeSource}`);
   if (filters.onlyConnectionId) {
     parts.push(Prisma.sql`i."sourceConnectionId" = ${filters.onlyConnectionId}`);
   }
   if (filters.legalUnchecked) {
     parts.push(
-      Prisma.sql`i."status" = 'ready' AND NOT EXISTS (
+      Prisma.sql`i."status" = 'ready' AND i."source" <> 'meeting' AND NOT EXISTS (
         SELECT 1 FROM legal_contracts c
         WHERE c."dataRoomItemId" = i.id AND c."spaceId" = i."spaceId" AND c."userId" = i."userId"
           AND c."analyzedRevision" >= i.revision)`,
@@ -571,7 +575,10 @@ export function createDataRoomRepos(prisma: PrismaClient) {
     /** What a tidy-up looks at: classified items only, with the facets that say where they belong. */
     listForSort: (actor: Actor, limit: number) =>
       prisma.dataRoomItem.findMany({
-        where: { ...eligibleWhere(actor), classifiedAt: { not: null } },
+        where: {
+          ...eligibleWhere(actor, { excludeSource: "meeting" }),
+          classifiedAt: { not: null },
+        },
         select: {
           id: true,
           name: true,
@@ -590,7 +597,7 @@ export function createDataRoomRepos(prisma: PrismaClient) {
     async createItem(
       actor: Actor,
       input: {
-        source: "upload" | "drive" | "box" | "gmail" | "chat" | "finance" | "omi";
+        source: "upload" | "drive" | "box" | "gmail" | "chat" | "finance" | "omi" | "meeting";
         sha256: string;
         name: string;
         mimeType: string;

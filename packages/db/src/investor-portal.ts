@@ -266,7 +266,8 @@ export async function shareDocument(
 ): Promise<string[]> {
   const scope = ownerOf(actor);
   const item = await prisma.dataRoomItem.findFirst({
-    where: { id: itemId, ...scope, storageKey: { not: null } },
+    // Meeting notes are never shared with an investor from here.
+    where: { id: itemId, ...scope, storageKey: { not: null }, source: { not: "meeting" } },
     select: { id: true },
   });
   if (!item) throw new IsolationError("Document not found");

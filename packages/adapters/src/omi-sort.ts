@@ -96,15 +96,25 @@ async function dropNotes(
     where: owner,
     select: { storageKey: true, thumbnailKey: true },
   });
-  for (const { storageKey, thumbnailKey } of items) {
-    for (const key of [storageKey, thumbnailKey]) {
-      if (key) {
-        const at = new Date(Date.now() + NOTE_BLOB_DELAY_MS);
-        await deps.jobs.enqueue(dataRoomBlobDeleteJob(actor.spaceId, key, at));
-      }
-    }
-  }
+  await dropBlobs(
+    deps,
+    actor,
+    items.flatMap((i) => [i.storageKey, i.thumbnailKey]),
+  );
   await deps.prisma.dataRoomItem.deleteMany({ where: owner });
+}
+
+/** Queues blob deletes, a minute out so a retried sort can still find them. */
+async function dropBlobs(
+  deps: Pick<OmiSortDeps, "jobs">,
+  actor: Actor,
+  keys: (string | null)[],
+): Promise<void> {
+  for (const key of keys) {
+    if (!key) continue;
+    const at = new Date(Date.now() + NOTE_BLOB_DELAY_MS);
+    await deps.jobs.enqueue(dataRoomBlobDeleteJob(actor.spaceId, key, at));
+  }
 }
 
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
@@ -273,6 +283,7 @@ async function applyStretches(
     if (s.kind === "note") notes.set(s.start, await ensureNote(deps, actor, rec, s));
 
   const queued: string[] = [];
+  const recordingKeys: string[] = [];
   const staleNotes = await prisma.$transaction(async (tx) => {
     const old = await tx.omiSegment.findMany({ where: { ...owner, sortedBy: "agent" } });
     await tx.omiSegment.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
@@ -288,7 +299,7 @@ async function applyStretches(
     const gone = old.flatMap((o) =>
       o.meetingId && !meetingIds.has(o.meetingId) ? [o.meetingId] : [],
     );
-    await deleteMeetingsWithTodos(tx, actor, gone);
+    recordingKeys.push(...(await deleteMeetingsWithTodos(tx, actor, gone)));
     await tx.omiSegment.createMany({
       data: rows.map(({ s, meetingId }) => ({
         ...owner,
@@ -307,6 +318,7 @@ async function applyStretches(
     return old.flatMap((o) => (o.noteItemId && !keep.has(o.noteItemId) ? [o.noteItemId] : []));
   });
   await dropNotes(deps, actor, staleNotes);
+  await dropBlobs(deps, actor, recordingKeys);
   for (const id of queued) await queueDigest(deps, actor, id);
 }
 
@@ -335,11 +347,12 @@ export async function moveOmiSegment(
     noteItemId = await ensureNote(deps, actor, rec, s);
   else if (input.kind === "note") noteItemId = segment.noteItemId;
 
+  const recordingKeys: string[] = [];
   const { updated, meetingId } = await prisma.$transaction(async (tx) => {
     const meetingId =
       input.kind === "meeting" ? await upsertOmiMeeting(tx, actor, rec, s, false) : null;
     if (segment.meetingId && segment.meetingId !== meetingId) {
-      await deleteMeetingsWithTodos(tx, actor, [segment.meetingId]);
+      recordingKeys.push(...(await deleteMeetingsWithTodos(tx, actor, [segment.meetingId])));
     }
     const updated = await tx.omiSegment.update({
       where: { id: segment.id },
@@ -350,6 +363,7 @@ export async function moveOmiSegment(
   if (segment.noteItemId && segment.noteItemId !== noteItemId) {
     await dropNotes(deps, actor, [segment.noteItemId]);
   }
+  await dropBlobs(deps, actor, recordingKeys);
   if (meetingId) await queueDigest(deps, actor, meetingId);
   return segmentDto(updated, rec.startedAt);
 }

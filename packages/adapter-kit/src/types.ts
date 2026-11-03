@@ -826,6 +826,8 @@ export interface BackgroundJobPayloads {
   };
   /** Extracts commitments from a stored meeting; the handler is filled in by the digest slice. */
   "meetings.digest": { spaceId: string; userId: string; meetingId: string; continue?: boolean };
+  /** Files a freshly digested meeting in Data room > Recordings. Ids only. */
+  "meetings.followup": { spaceId: string; userId: string; meetingId: string };
   "finance.sync": { userId: string; spaceId: string };
   /** Turns a pendant connection's uploaded records into audio recordings in the Data room. Ids only. */
   /** Transcribes one chunk of a meeting capture. Ids only. */
@@ -862,7 +864,7 @@ export interface BackgroundJobPayloads {
     /** The import that reports progress. */
     importId: string;
     name: string;
-    source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi";
+    source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
     folderId: string | null;
     sourceConnectionId?: string;
     externalId?: string;
