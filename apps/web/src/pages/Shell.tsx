@@ -169,6 +169,7 @@ import { useAgentApp } from "../lib/agent-app";
 import { dismissApprovalToasts } from "../lib/approval-toasts";
 import { artifactDisplayName } from "../lib/artifact-name";
 import type { ArtifactTarget } from "../lib/artifact-open";
+import { fetchArtifactBytes } from "../lib/artifact-open";
 import { authClient } from "../lib/auth";
 import { takeInitialBootstrap } from "../lib/bootstrap";
 import {
@@ -3229,6 +3230,30 @@ export function ShellPage() {
     revokePendingAttachmentPreviews([attachment]);
     setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id));
   }, []);
+  // The stored file is fetched through the same scoped artifact read the Download button uses,
+  // then attached to the other agent's composer as the owner's own upload.
+  const sendMessageFilesToAgent = useCallback(
+    async (message: ThreadMessage, agent: SendTarget) => {
+      const bot = botsRef.current.find((candidate) => candidate.id === agent.id);
+      if (!bot) return;
+      keepNoticeFor.current = bot.id;
+      navigate(`/app/${bot.id}`);
+      const files: File[] = [];
+      const failed: string[] = [];
+      for (const block of message.blocks) {
+        if (block.kind !== "file" && block.kind !== "image") continue;
+        try {
+          const bytes = await fetchArtifactBytes(transcriptArtifactTarget, block.artifactId);
+          files.push(new File([new Uint8Array(bytes)], block.name, { type: block.mimeType }));
+        } catch {
+          failed.push(block.name);
+        }
+      }
+      onAttachmentPick(files, bot.id);
+      if (failed.length) setAttachmentNotice(t`Skipped ${failed.join(", ")}`);
+    },
+    [navigate, onAttachmentPick, t, transcriptArtifactTarget],
+  );
   const sendFilesToAgent = useCallback(
     async (items: DataRoomApiItem[], agent: SendTarget) => {
       const bot = botsRef.current.find((candidate) => candidate.id === agent.id);
@@ -4568,6 +4593,8 @@ export function ShellPage() {
                   setReplyQuote(null);
                 }}
                 onMarkUnread={markMessageUnread}
+                sendTargets={sendToAgentTargets}
+                onSendFiles={(message, agent) => void sendMessageFilesToAgent(message, agent)}
                 onQuote={(message, quote) => {
                   setReplyTarget(message);
                   setReplyQuote(quote);
