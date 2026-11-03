@@ -3,6 +3,7 @@ import type { ConnectionAccessRow } from "./connection-access.js";
 import {
   appStatus,
   botMayUseConnection,
+  connectionRowsForAudience,
   deniedConnectionIds,
   effectiveAccessByConnection,
 } from "./connection-access.js";
@@ -141,6 +142,27 @@ describe("effectiveAccessByConnection for an external bot", () => {
     );
     expect(result.open?.botIds).toEqual(["chief"]);
     expect(result.granted?.botIds).toEqual(["chief", "support"]);
+  });
+});
+
+describe("effectiveAccessByConnection for a firewalled bot", () => {
+  const bots = [
+    { id: "chief", spawnKey: null, archivedAt: null },
+    { id: "support", spawnKey: null, archivedAt: null, firewall: true },
+  ];
+  it("shared with all agents does not reach it; an explicit grant does", () => {
+    const result = effectiveAccessByConnection(
+      [
+        row("open", "connected", true),
+        { ...row("granted", "connected", true), provider: "slack", botAccess: grant("support") },
+      ],
+      bots,
+    );
+    expect(result.open?.botIds).toEqual(["chief"]);
+    expect(result.granted?.botIds).toEqual(["chief", "support"]);
+    expect(connectionRowsForAudience([{ allAgents: true }], "internal", true)).toEqual([
+      { allAgents: false },
+    ]);
   });
 });
 

@@ -1,0 +1,88 @@
+import { describe, expect, it } from "vitest";
+import {
+  firewalledBotIds,
+  groupHasFirewalledMember,
+  readsFirewalledContent,
+} from "./firewall-runtime.js";
+
+const scope = { spaceId: "space-1", userId: "user-1" };
+const rows =
+  <T>(list: T[]) =>
+  async () =>
+    list;
+
+describe("firewalledBotIds", () => {
+  it("keeps only bots whose switch is on", async () => {
+    const prisma = {
+      bot: {
+        findMany: rows([{ id: "a", firewall: true }, { id: "b", firewall: false }, { id: "c" }]),
+      },
+    };
+    expect([...(await firewalledBotIds(prisma as never, "space-1"))]).toEqual(["a"]);
+  });
+});
+
+describe("groupHasFirewalledMember", () => {
+  const prisma = (members: string[]) => ({
+    chatGroupMember: { findMany: rows(members.map((botId) => ({ botId }))) },
+  });
+  it("is true when a member is firewalled and false otherwise", async () => {
+    expect(await groupHasFirewalledMember(prisma(["x", "a"]) as never, "g", new Set(["a"]))).toBe(
+      true,
+    );
+    expect(await groupHasFirewalledMember(prisma(["x"]) as never, "g", new Set(["a"]))).toBe(false);
+    expect(await groupHasFirewalledMember(prisma(["a"]) as never, "g", new Set())).toBe(false);
+  });
+});
+
+describe("readsFirewalledContent", () => {
+  const ids = new Set(["fw"]);
+  const prisma = (over: Record<string, unknown> = {}) => ({
+    scratchpadItem: { findMany: rows([] as { botId: string }[]) },
+    routine: { findMany: rows([] as { botId: string }[]) },
+    ticket: { findMany: rows([] as { createdByBotId: string | null }[]) },
+    ticketComment: { findMany: rows([] as { authorBotId: string | null }[]) },
+    ...over,
+  });
+  const reads = (p: object, name: string, args: Record<string, unknown> = {}, set = ids) =>
+    readsFirewalledContent(p as never, scope, name, args, set);
+
+  it("never taints when no agent has Firewall on", async () => {
+    expect(await reads(prisma(), "calendar_agenda", {}, new Set())).toBe(false);
+  });
+  it("taints calendar_agenda when a firewalled agent's to-do or routine is in range", async () => {
+    expect(
+      await reads(
+        prisma({ scratchpadItem: { findMany: rows([{ botId: "fw" }]) } }),
+        "calendar_agenda",
+      ),
+    ).toBe(true);
+    expect(
+      await reads(prisma({ routine: { findMany: rows([{ botId: "fw" }]) } }), "calendar_agenda"),
+    ).toBe(true);
+    expect(
+      await reads(
+        prisma({ scratchpadItem: { findMany: rows([{ botId: "other" }]) } }),
+        "calendar_agenda",
+      ),
+    ).toBe(false);
+  });
+  it("taints board_tickets and ticket_get on a firewalled ticket or comment author", async () => {
+    const ticket = prisma({ ticket: { findMany: rows([{ createdByBotId: "fw" }]) } });
+    const comment = prisma({ ticketComment: { findMany: rows([{ authorBotId: "fw" }]) } });
+    for (const name of ["board_tickets", "ticket_get"]) {
+      expect(await reads(ticket, name)).toBe(true);
+      expect(await reads(comment, name)).toBe(true);
+      expect(await reads(prisma(), name)).toBe(false);
+    }
+  });
+  it("taints a read of a firewalled agent's context or history by botId", async () => {
+    for (const name of ["agent_context", "search_agent_history", "read_agent_history"]) {
+      expect(await reads(prisma(), name, { botId: "fw" })).toBe(true);
+      expect(await reads(prisma(), name, { botId: "other" })).toBe(false);
+    }
+  });
+  it("ignores tools that read nothing an agent wrote", async () => {
+    expect(await reads(prisma(), "mail_get", { botId: "fw" })).toBe(false);
+  });
+});

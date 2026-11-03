@@ -970,7 +970,13 @@ async function allEffectiveAccess(prisma: PrismaClient, actor: Actor) {
     }),
     prisma.bot.findMany({
       where: { ...scope, archivedAt: null },
-      select: { id: true, spawnKey: true, archivedAt: true, audience: true },
+      select: {
+        id: true,
+        spawnKey: true,
+        archivedAt: true,
+        audience: true,
+        firewall: true,
+      },
     }),
   ]);
   return effectiveAccessByConnection(rows, bots);

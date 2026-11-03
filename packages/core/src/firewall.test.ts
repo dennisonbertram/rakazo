@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { EXTERNAL_TAINT_SAFE_TOOLS } from "./action-approval.js";
-import { FIREWALL_ASK_TOOLS, FIREWALL_FREE_TOOLS, firewallToolClass } from "./firewall.js";
+import {
+  FIREWALL_ASK_TOOLS,
+  FIREWALL_FREE_TOOLS,
+  firewallDraftIsFree,
+  firewallToolClass,
+  isSupportScopedQuery,
+  supportScopeQuery,
+} from "./firewall.js";
 
 describe("firewallToolClass", () => {
   it("classifies the plan's examples", () => {
@@ -52,5 +59,57 @@ describe("firewallToolClass", () => {
     for (const name of EXTERNAL_TAINT_SAFE_TOOLS) {
       expect(firewallToolClass(name), name).toBe(narrowed.get(name) ?? "free");
     }
+  });
+});
+
+describe("firewallDraftIsFree", () => {
+  const participants = ["Sam Customer <sam@customer.example>", "support@us.example"];
+  it("is free when every recipient is a thread participant and the body has no link", () => {
+    expect(
+      firewallDraftIsFree({ to: ["sam@customer.example"], body: "Thanks, fixed.", participants }),
+    ).toBe(true);
+    expect(
+      firewallDraftIsFree({
+        to: ["Sam <SAM@customer.example>"],
+        cc: ["support@us.example"],
+        body: "ok",
+        participants,
+      }),
+    ).toBe(true);
+  });
+  it("asks for a new recipient in to, cc or bcc", () => {
+    for (const field of ["to", "cc", "bcc"] as const) {
+      expect(
+        firewallDraftIsFree({
+          to: ["sam@customer.example"],
+          [field]: ["billing@evil.example"],
+          body: "x",
+          participants,
+        }),
+      ).toBe(false);
+    }
+  });
+  it("asks without recipients or without known participants, and for any link", () => {
+    expect(firewallDraftIsFree({ to: [], body: "x", participants })).toBe(false);
+    expect(firewallDraftIsFree({ to: ["sam@customer.example"], body: "x", participants: [] })).toBe(
+      false,
+    );
+    for (const body of ["see http://evil.example/x", "www.evil.example", "https://a.example"]) {
+      expect(firewallDraftIsFree({ to: ["sam@customer.example"], body, participants })).toBe(false);
+    }
+  });
+});
+
+describe("supportScopeQuery", () => {
+  it("wraps the model's query so an OR cannot leave the label", () => {
+    expect(supportScopeQuery("Support", "from:a OR in:anywhere")).toBe(
+      'label:"Support" (from:a OR in:anywhere)',
+    );
+  });
+  it("recognises its own output only", () => {
+    expect(isSupportScopedQuery("Support", supportScopeQuery("Support", "x"))).toBe(true);
+    expect(isSupportScopedQuery("Support", 'label:"Support" OR in:anywhere')).toBe(false);
+    expect(isSupportScopedQuery("Support", "x")).toBe(false);
+    expect(isSupportScopedQuery("Support", 'label:"Support" (a) OR (in:anywhere)')).toBe(false);
   });
 });

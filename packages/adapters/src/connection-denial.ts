@@ -16,7 +16,7 @@ export async function connectionDenial(
   input: {
     spaceId: string;
     userId: string;
-    bot: { id: string; audience: string | null };
+    bot: { id: string; audience: string | null; firewall?: boolean };
     route: { connectorId: string; connectionId?: string };
     /** The connection ids of this connector that were offered to the call. */
     availableIds: string[];
@@ -47,7 +47,7 @@ export async function connectionDenial(
     },
   });
   const deniedCurrentIds = deniedConnectionIds(
-    connectionRowsForAudience(currentConnections, input.bot.audience),
+    connectionRowsForAudience(currentConnections, input.bot.audience, input.bot.firewall),
   );
   if (route.connectionId) {
     const current = currentConnections.find((connection) => connection.id === route.connectionId);
