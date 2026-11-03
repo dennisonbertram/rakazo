@@ -82,6 +82,8 @@ export type MeetingToolDeps = {
   scope: Scope;
   /** Read on every call, so revoking AI data sharing applies at once. */
   consentAllowed: () => Promise<boolean>;
+  /** Called with the id of a meeting the agent just read in full (an owner-attended run only). */
+  onOpened?: (meetingId: string) => Promise<void>;
 };
 
 function capBytes(text: string, maxBytes: number): { text: string; truncated: boolean } {
@@ -155,6 +157,7 @@ export async function meetingToolFromTool(
     if (!meeting) {
       return { error: states.some((s) => !s.syncedThrough) ? STILL_SYNCING : "no such meeting" };
     }
+    await deps.onOpened?.(meeting.id);
     const lines = [
       `Title: ${meeting.title}`,
       `Attendees: ${attendeeLine(meeting) || "none listed"}`,

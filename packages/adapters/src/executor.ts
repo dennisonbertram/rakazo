@@ -499,6 +499,7 @@ import {
 } from "./mcp-server-tool.js";
 import type { McpStdioPolicy } from "./mcp-transport.js";
 import { mcpStdioRefusal } from "./mcp-transport.js";
+import { recordOwnerOpened } from "./meeting-handoff.js";
 import {
   isMeetingSourceAgent,
   MEETING_AGENT_APPROVAL_TOOLS,
@@ -829,7 +830,7 @@ const BOT_DIRECTORY_LIMIT = 40;
 const ROUTINE_RETRY_DELAY_MS = 12 * 60_000;
 /** The retry is skipped when the routine's next occurrence is this close; that run covers it. */
 const ROUTINE_RETRY_NEXT_RUN_WINDOW_MS = 30 * 60_000;
-const MISSING_MODEL_MESSAGE = "Connect a model in Settings before running bots.";
+export const MISSING_MODEL_MESSAGE = "Connect a model in Settings before running bots.";
 
 function runtimeFallbackModel(runtime: AgentRuntime) {
   return runtime.describe().capabilities.scripted ? { provider: "scripted", id: "scripted" } : null;
@@ -6751,6 +6752,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   // From the run, never from model input.
                   scope: { spaceId: run.spaceId, userId: bot.userId },
                   consentAllowed: meetingConsentOk,
+                  // The owner reading it first means the follow-up must not summarize it again.
+                  ...(run.unattended
+                    ? {}
+                    : {
+                        onOpened: (id: string) =>
+                          recordOwnerOpened(
+                            deps.prisma,
+                            { spaceId: run.spaceId, userId: bot.userId },
+                            id,
+                          ),
+                      }),
                 },
                 args,
               ),

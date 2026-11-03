@@ -14,6 +14,7 @@ import {
 import {
   deleteMeeting,
   getMeetingSyncState,
+  isDuplicateSpan,
   upsertMeeting,
   upsertMeetingSyncState,
 } from "@rakazo/db";
@@ -31,8 +32,6 @@ const owner = (actor: Actor) => ({
   userId: actor.userId,
 });
 const SOURCE = "hex";
-/** A Hex call and a Praci recording of the same call overlap by at least this share of the shorter one. */
-const DUPLICATE_SHARE = 0.5;
 
 const findConnection = (deps: MeetingsDeps, actor: Actor, connected: boolean) =>
   deps.router.prisma.connection.findFirst({
@@ -133,13 +132,12 @@ async function recordedInPraci(deps: MeetingsDeps, actor: Actor, meeting: Source
     },
     select: { startedAt: true, endedAt: true },
   });
-  return rows.some((row) => {
-    const rowStart = row.startedAt.getTime();
-    const rowEnd = (row.endedAt as Date).getTime();
-    const overlap = Math.min(end, rowEnd) - Math.max(start, rowStart);
-    const shorter = Math.min(end - start, rowEnd - rowStart);
-    return shorter > 0 && overlap >= shorter * DUPLICATE_SHARE;
-  });
+  return rows.some((row) =>
+    isDuplicateSpan(
+      { start, end },
+      { start: row.startedAt.getTime(), end: (row.endedAt as Date).getTime() },
+    ),
+  );
 }
 
 export async function importLocal(

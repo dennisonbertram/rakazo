@@ -63,6 +63,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import { ArtifactFileCard } from "../../components/ArtifactFileCard";
 import { AskCard } from "../../components/AskCard";
 import { ActiveBotGlyph, CollaborationMarker } from "../../components/ai/CollaborationMarker";
@@ -1786,6 +1787,11 @@ const MessageView = memo(function MessageView({
             >
               <span className="text-warning">◷</span>
               <span>{maskCurrencyWhenHidden(block.text)}</span>
+              {block.link?.href.startsWith("/app/") ? (
+                <Link to={block.link.href} className="underline underline-offset-2">
+                  {block.link.label}
+                </Link>
+              ) : null}
             </div>
           );
         }

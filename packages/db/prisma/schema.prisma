@@ -72,6 +72,7 @@ model User {
   meetingCaptures             MeetingCapture[]
   meetingSyncStates           MeetingSyncState[]
   meetingTombstones           MeetingTombstone[]
+  meetingHandoffs             MeetingHandoff[]
   inboxSenderFeedback         InboxSenderFeedback[]
   composeSends                ComposeSend[]
   members                     Member[]
@@ -574,6 +575,7 @@ model Space {
   meetings                    Meeting[]
   meetingSyncStates           MeetingSyncState[]
   meetingTombstones           MeetingTombstone[]
+  meetingHandoffs             MeetingHandoff[]
   inboxSenderFeedback         InboxSenderFeedback[]
   composeSends                ComposeSend[]
   capabilities                CapabilityInstall[]
@@ -902,6 +904,8 @@ model Bot {
   contacts               Contact[]
 
   externalConversations ExternalConversation[]
+
+  meetingHandoffs MeetingHandoff[]
 
   @@unique([spaceId, spawnKey])
   @@index([spaceId, userId, archivedAt, pinned, updatedAt])
@@ -4005,6 +4009,7 @@ model Meeting {
   inboxTodos        InboxTodo[]
   omiSegments       OmiSegment[]
   captures          MeetingCapture[]
+  handoffs          MeetingHandoff[]
 
   @@unique([spaceId, userId, provider, externalId])
   @@index([spaceId, userId, startedAt])
@@ -4037,6 +4042,28 @@ model MeetingSyncState {
   updatedAt         DateTime    @updatedAt
 
   @@map("meeting_sync_states")
+}
+
+/// One row per (meeting, agent) that was woken or handed the meeting. It is the guard that keeps
+/// the follow-up job from starting a second run, and it is also written when the owner opens the
+/// meeting first. kind: source | route | share.
+model MeetingHandoff {
+  id        String   @id @default(cuid())
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  botId     String
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  runId     String?
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@unique([meetingId, botId])
+  @@index([spaceId, userId, createdAt])
+  @@map("meeting_handoffs")
 }
 
 /// A meeting the user deleted; sync skips it so it does not come back.

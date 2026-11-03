@@ -303,7 +303,12 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     title: z.string(),
     farewell: z.string(),
   }),
-  z.object({ kind: z.literal("meta"), text: z.string() }),
+  z.object({
+    kind: z.literal("meta"),
+    text: z.string(),
+    /** A server-written link shown after the text, to an app path such as a Data room item. */
+    link: z.object({ label: z.string(), href: z.string() }).optional(),
+  }),
   z.object({
     kind: z.literal("progress"),
     text: z.string(),

@@ -90,6 +90,10 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "calendar_query",
   "read_spreadsheet",
   "skill_read",
+  // The owner's own stored meetings, like mail_get; the text is wrapped and marks the thread.
+  "meetings_list",
+  "meetings_search",
+  "meetings_get",
   // A pure function in a sandbox with no I/O, and only the source the owner approved (hash-checked).
   "tool_run",
   "web_fetch",

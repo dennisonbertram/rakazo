@@ -349,7 +349,12 @@ export function createBackgroundJobHandlers(deps: {
     "meetings.followup": asPayloadTenant(async (payload) => {
       if (!deps.artifacts) throw new Error("Artifact store is not configured");
       await runMeetingFollowup(
-        { prisma: deps.prisma, jobs: deps.jobs, artifacts: deps.artifacts },
+        {
+          prisma: deps.prisma,
+          jobs: deps.jobs,
+          artifacts: deps.artifacts,
+          resolveModel: deps.executor.resolveModel,
+        },
         payload,
       );
     }),
