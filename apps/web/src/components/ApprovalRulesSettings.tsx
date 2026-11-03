@@ -71,7 +71,7 @@ export function ApprovalRulesSettings() {
         <ApprovalActionsTable />
       </div>
       <p className="mt-3 text-[13px] text-muted-foreground">
-        <Trans>Background runs always ask before they send, change or run anything.</Trans>
+        <Trans>Background runs always ask before they send, change or run anything, except mail changes you always allowed.</Trans>
       </p>
       {error ? <p className="mt-3 text-[13px] text-destructive">{error}</p> : null}
       {listedRules.length > 0 ? (

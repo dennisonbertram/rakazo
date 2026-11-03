@@ -5047,8 +5047,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // A search query is an outbound channel that site gating does not cover, so once the
           // run has read an app on the owner's computer, every search asks.
           const desktopReadSearch = name === "web_search" && (await desktopReadSeen());
+          // An unattended mail_modify runs without a card only under a rule for that tool itself
+          // (the "Always allow this tool" answer); a category rule such as send_email is too broad.
+          const mailModifyNeedsToolRule =
+            run.unattended === true &&
+            name === "mail_modify" &&
+            !(
+              approvalResolved.source === "always_allow" &&
+              approvalResolved.matchingRules.some(
+                (rule) =>
+                  rule.matchKind === "tool" &&
+                  rule.matchValue === name &&
+                  rule.effect === "always_allow",
+              )
+            );
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
+            mailModifyNeedsToolRule ||
             scheduleNamesNewSite ||
             desktopReadSearch ||
             // An unattended run has no judge and nobody to ask later: a read on a connector it had
@@ -5105,8 +5120,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   newDestination: siteGate === "new",
                 });
           // A check-in only reads and reports: a call that would ask fails at once, with no card and no pause.
+          // mail_modify changes mail, so a check-in never runs it, whatever the rules say.
           if (
-            (plan === "ask" || plan === "judge") &&
+            (plan === "ask" || plan === "judge" || name === "mail_modify") &&
             run.routineId &&
             (
               await deps.prisma.routine.findUnique({
@@ -5351,7 +5367,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
           const needsApproval = gateDecision === "ask";
           // One plain line on the card, only for a background, tainted or rule-caused ask.
-          const approvalCardReason = requiresUnattendedApproval
+          const approvalCardReason = requiresUnattendedApproval || mailModifyNeedsToolRule
             ? "Asked because this ran in the background."
             : externalTaintedCall
               ? EXTERNAL_REQUEST_REASON

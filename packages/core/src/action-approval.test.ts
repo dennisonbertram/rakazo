@@ -471,7 +471,10 @@ describe("mail write tools", () => {
     "%s needs approval, also on an unattended run",
     (name) => {
       expect(toolRequiresApproval(name, false)).toBe(true);
-      expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(true);
+      // mail_modify is reversible and cannot send or delete, so an unattended run follows its rules.
+      expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(
+        name !== "mail_modify",
+      );
       expect(toolRequiresExplicitApproval(name)).toBe(false);
     },
   );
@@ -713,7 +716,6 @@ describe("unattendedToolRequiresApproval", () => {
     "contacts_add",
     "cap_table_update",
     "mail_draft",
-    "mail_modify",
     "drive_create_file",
     "drive_update_file",
     "calendar_create_event",
@@ -722,6 +724,11 @@ describe("unattendedToolRequiresApproval", () => {
     "contacts_save",
   ])("asks for %s in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+  });
+
+  it("leaves mail_modify to the rules: it cannot delete, send or mark spam, and is reversible", () => {
+    expect(unattendedToolRequiresApproval(true, "mail_modify", false)).toBe(false);
+    expect(toolRequiresApproval("mail_modify", false)).toBe(true);
   });
 
   it.each([
