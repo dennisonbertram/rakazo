@@ -498,6 +498,7 @@ import {
 } from "./mcp-server-tool.js";
 import type { McpStdioPolicy } from "./mcp-transport.js";
 import { mcpStdioRefusal } from "./mcp-transport.js";
+import { recordOwnerOpened } from "./meeting-handoff.js";
 import {
   isMeetingSourceAgent,
   MEETING_AGENT_APPROVAL_TOOLS,
@@ -6710,6 +6711,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   // From the run, never from model input.
                   scope: { spaceId: run.spaceId, userId: bot.userId },
                   consentAllowed: meetingConsentOk,
+                  // The owner reading it first means the follow-up must not summarize it again.
+                  ...(run.unattended
+                    ? {}
+                    : {
+                        onOpened: (id: string) =>
+                          recordOwnerOpened(
+                            deps.prisma,
+                            { spaceId: run.spaceId, userId: bot.userId },
+                            id,
+                            bot.id,
+                          ),
+                      }),
                 },
                 args,
               ),

@@ -240,3 +240,16 @@ export async function upsertMeetingSyncState(
     },
   });
 }
+
+/** Two recordings of one call overlap by at least this share of the shorter one. */
+const DUPLICATE_SHARE = 0.5;
+
+/** Whether two time spans cover the same call: the overlap is at least half of the shorter span. */
+export function isDuplicateSpan(
+  a: { start: number; end: number },
+  b: { start: number; end: number },
+): boolean {
+  const overlap = Math.min(a.end, b.end) - Math.max(a.start, b.start);
+  const shorter = Math.min(a.end - a.start, b.end - b.start);
+  return shorter > 0 && overlap >= shorter * DUPLICATE_SHARE;
+}
