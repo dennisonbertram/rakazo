@@ -93,6 +93,7 @@ import {
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
   MEETING_MARK_REASON,
+  MEETING_ROUTE_PROMPT_START,
   OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   PINNED_CONNECTION_LOST_MESSAGE,
@@ -499,7 +500,7 @@ import {
 } from "./mcp-server-tool.js";
 import type { McpStdioPolicy } from "./mcp-transport.js";
 import { mcpStdioRefusal } from "./mcp-transport.js";
-import { recordOwnerOpened } from "./meeting-handoff.js";
+import { recordOwnerOpened, routedRunReadRefusal } from "./meeting-handoff.js";
 import { SHARE_MEETING_TOOL, shareMeeting } from "./meeting-share.js";
 import {
   isMeetingSourceAgent,
@@ -3468,10 +3469,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
         // The Investors agent may overwrite the cap table only on the routine sheet read, so text in a
         // document or email cannot steer a chat turn into writing it.
-        // An audit drafting run reads untrusted email, so it never writes the cap table either.
+        // An audit drafting run reads untrusted email, and a routed investor-call run follows an
+        // attacker-influenced category, so neither writes the cap table.
         const capTableWriteBlocked =
           isInvestorsAgentSpawnKey(bot.spawnKey) &&
-          (run.trigger !== "routine" || task.prompt.startsWith(AUDIT_DRAFT_PROMPT_START));
+          (run.trigger !== "routine" ||
+            task.prompt.startsWith(AUDIT_DRAFT_PROMPT_START) ||
+            task.prompt.startsWith(MEETING_ROUTE_PROMPT_START));
         const investorsEnabled = investorUpdateToolsAllowed({
           hasProvider: true,
           groupId: thread.groupId,
@@ -6746,6 +6750,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : await read(),
             );
           }
+          const routedRefusal = await routedRunReadRefusal(
+            deps.prisma,
+            { spaceId: run.spaceId, userId: bot.userId },
+            task.prompt,
+            name,
+            args,
+          );
+          if (routedRefusal) return finish({ error: routedRefusal });
           if (MEETING_TOOL_NAMES.has(name) && meetingsEnabled) {
             return finish(
               await meetingToolFromTool(

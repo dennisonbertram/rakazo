@@ -1,5 +1,9 @@
 import type { AgentRunRequest } from "@rakazo/adapter-kit";
-import { AI_DISCLOSURE_VERSION, INVESTORS_AGENT_BUILTIN_TOOLS } from "@rakazo/contracts";
+import {
+  AI_DISCLOSURE_VERSION,
+  INVESTORS_AGENT_BUILTIN_TOOLS,
+  MEETING_ROUTE_PROMPT_START,
+} from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import { createRunExecutor } from "./executor.js";
@@ -227,6 +231,17 @@ describe("Investors agent runs", () => {
     const names = (audit.request?.tools ?? []).map((tool) => tool.name);
     expect(names).not.toContain("cap_table_update");
     expect(names).toContain("audit_request_upsert");
+  });
+
+  it("does not offer cap_table_update on a routed investor call run", async () => {
+    const routed = await runInvestors(
+      "routine",
+      "investors-agent:user-1",
+      `${MEETING_ROUTE_PROMPT_START}meeting m1.`,
+    );
+    const names = (routed.request?.tools ?? []).map((tool) => tool.name);
+    expect(names).not.toContain("cap_table_update");
+    expect(names).toContain("contacts_list");
   });
 
   it("offers investor_update_draft to the Investors agent and to no other bot", async () => {
