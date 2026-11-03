@@ -564,6 +564,55 @@ describe("Composer", () => {
     expect(chips()).toBe(0);
   });
 
+  it("keeps two same-name mentions apart and sends each one's own id", () => {
+    const first: ComposerMention = { kind: "routine", id: "r1", name: "Weekly report" };
+    const second: ComposerMention = { kind: "routine", id: "r2", name: "Weekly report" };
+    const onSend = vi.fn();
+    const textarea = renderComposer(onSend, { mentionTargets: [first, second] });
+    type(textarea, "@Weekly");
+    pressEnter(textarea);
+    type(textarea, `${textarea.value}and @Weekly`);
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>("[role=option]:last-child")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(textarea.value).toBe("@Weekly report and @Weekly report ");
+    // Deleting the first leaves the second with its own id.
+    act(() => {
+      textarea.setSelectionRange(14, 14);
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Backspace", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(container?.querySelectorAll("[data-testid='mention-chip']").length).toBe(1);
+    type(textarea, `${textarea.value}go`);
+    pressEnter(textarea);
+    expect(onSend).toHaveBeenCalledWith("and @Weekly report go", [second], expect.any(String));
+  });
+
+  it("does not remove a mention on Backspace while composing", () => {
+    const textarea = renderComposer(vi.fn());
+    type(textarea, "@Bo");
+    pressEnter(textarea);
+    act(() => {
+      textarea.setSelectionRange(4, 4);
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Backspace", keyCode: 229, bubbles: true }),
+      );
+    });
+    expect(textarea.value).toBe("@Bob ");
+  });
+
+  it("names the status of a routine mention under the field", () => {
+    const routine: ComposerMention = { kind: "routine", id: "r1", name: "Digest" };
+    const textarea = renderComposer(vi.fn(), { mentionTargets: [routine] });
+    type(textarea, "@Dig");
+    pressEnter(textarea);
+    const status = document.getElementById(textarea.getAttribute("aria-describedby") ?? "");
+    expect(status?.textContent).toBe("Digest · Runs on send");
+  });
+
   it("restores the chosen skill when the send fails", async () => {
     let finishSend = (_sent: boolean) => {};
     const onSend = vi.fn(

@@ -2,20 +2,22 @@ import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AgentSkillCatalogEntry, ThreadMessage } from "@rakazo/contracts";
 import { ATTACHMENT_ALLOWED_MIME_TYPES } from "@rakazo/contracts";
-import type { ComposerMention, runErrorAction, SlashActionId } from "@rakazo/core";
+import type { ComposerMention, MentionSpan, runErrorAction, SlashActionId } from "@rakazo/core";
 import {
   findMentionQueryAtCaret,
   findMentionRanges,
   insertInlineMention,
+  liveSpans,
+  mapSpans,
   mentionChipKey,
   mentionDeletionAtCaret,
   newClientId,
-  pruneMentions,
   rankMentionOptions,
   replyAttachment,
   resolveMentionPickerKey,
   SLASH_ACTIONS,
   serializeComposerPrompt,
+  shiftSpans,
   truncateSlashDescription,
 } from "@rakazo/core";
 import { Button } from "@rakazo/ui-web";
@@ -163,14 +165,8 @@ export const Composer = memo(function Composer({
 }) {
   useHideAmounts();
   const { t } = useLingui();
-  const [draft, setDraft] = useState(() => {
-    // A draft saved before mentions were inline holds them only as chips; write them into the text.
-    const saved = readChatDraft(draftKey);
-    const missing = readChatDraftMentions<ComposerMention>(draftKey).filter(
-      (mention) => findMentionRanges(saved, [mention]).length === 0,
-    );
-    return missing.length ? `${missing.map((m) => `@${m.name}`).join(" ")} ${saved}` : saved;
-  });
+  const [initialDraft] = useState(() => loadDraft(draftKey));
+  const [draft, setDraft] = useState(initialDraft.draft);
   useEffect(() => {
     writeChatDraft(draftKey, draft);
   }, [draftKey, draft]);
@@ -178,7 +174,18 @@ export const Composer = memo(function Composer({
   draftRef.current = draft;
   const historyIndex = useRef<number | null>(null);
   const historyDraft = useRef("");
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionQuery, setMentionState] = useState<string | null>(null);
+  const mentionQueryRef = useRef<string | null>(null);
+  function setMentionQuery(next: string | null) {
+    if (mentionQueryRef.current === null && next !== null) onMentionOpen?.();
+    mentionQueryRef.current = next;
+    setMentionState(next);
+  }
+  /** Re-reads the "@query" at the caret; a moved caret must not keep a stale picker. */
+  function syncMentionQuery(field: HTMLTextAreaElement) {
+    if (field.selectionStart !== field.selectionEnd) return setMentionQuery(null);
+    setMentionQuery(findMentionQueryAtCaret(field.value, field.selectionStart)?.query ?? null);
+  }
   // Highlight is tracked by option identity so late-loading targets cannot shift it to another item.
   const [mentionHighlightKey, setMentionHighlightKey] = useState<string | null>(null);
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
@@ -188,12 +195,27 @@ export const Composer = memo(function Composer({
   useEffect(() => {
     writeChatDraftSkill(draftKey, selectedSkill);
   }, [draftKey, selectedSkill]);
-  const [selectedMentions, setSelectedMentions] = useState<ComposerMention[]>(() =>
-    readChatDraftMentions<ComposerMention>(draftKey),
+  // Each picked mention is tracked by where its token sits, so two with the same name stay distinct.
+  const [mentionSpans, setMentionSpans] = useState<MentionSpan<ComposerMention>[]>(
+    initialDraft.spans,
+  );
+  const liveMentionSpans = useMemo(() => liveSpans(draft, mentionSpans), [draft, mentionSpans]);
+  const selectedMentions = useMemo(
+    () =>
+      liveMentionSpans
+        .map((span) => span.mention)
+        .filter(
+          (mention, index, all) =>
+            all.findIndex((other) => mentionChipKey(other) === mentionChipKey(mention)) === index,
+        ),
+    [liveMentionSpans],
   );
   useEffect(() => {
-    writeChatDraftMentions(draftKey, selectedMentions);
-  }, [draftKey, selectedMentions]);
+    writeChatDraftMentions(draftKey, liveMentionSpans);
+  }, [draftKey, liveMentionSpans]);
+  useEffect(() => {
+    if (draft === "") setMentionSpans((current) => (current.length ? [] : current));
+  }, [draft]);
   const editRevision = useRef(0);
   const retryNonce = useRef<string | null>(null);
   const replyId = replyTarget?.id ?? null;
@@ -208,14 +230,10 @@ export const Composer = memo(function Composer({
   }, [replyId, quote]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionBackdropRef = useRef<HTMLDivElement>(null);
-  const mentionRanges = useMemo(
-    () => findMentionRanges(draft, selectedMentions),
-    [draft, selectedMentions],
-  );
   useLayoutEffect(() => {
     const field = textareaRef.current;
     if (field && mentionBackdropRef.current) mentionBackdropRef.current.scrollTop = field.scrollTop;
-  }, [draft, mentionRanges]);
+  }, [draft, liveMentionSpans]);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const attachButtonRef = useRef<HTMLButtonElement>(null);
   const composerActionsRef = useRef<HTMLDivElement>(null);
@@ -232,6 +250,15 @@ export const Composer = memo(function Composer({
   const runErrorRef = useRef<HTMLDivElement>(null);
   const presentedRunErrorIdRef = useRef<string | null>(null);
   const mentionListboxId = useId();
+  const mentionStatusId = useId();
+  // The chip cannot carry a label without changing the text width, so the status sits under the field.
+  const mentionStatuses = selectedMentions.flatMap((mention) =>
+    mention.kind === "routine"
+      ? [{ mention, label: t`Runs on send` }]
+      : mention.kind === "connector" && mention.authStatus === "needs_auth"
+        ? [{ mention, label: t`Needs sign-in` }]
+        : [],
+  );
   const slashListboxId = useId();
   const dragDepth = useRef(0);
   const [draggingFiles, setDraggingFiles] = useState(false);
@@ -347,6 +374,7 @@ export const Composer = memo(function Composer({
       next === null ? historyDraft.current : (sentHistory[sentHistory.length - 1 - next] ?? "");
     markEdited();
     setDraft(value);
+    setMentionSpans([]);
     requestAnimationFrame(() => textareaRef.current?.setSelectionRange(value.length, value.length));
     return true;
   }
@@ -354,18 +382,14 @@ export const Composer = memo(function Composer({
   function updateDraft(value: string) {
     historyIndex.current = null;
     markEdited();
+    const previous = draftRef.current;
     setDraft(value);
-    // Editing a mention's text un-mentions it.
-    setSelectedMentions((current) => {
-      const kept = pruneMentions(value, current);
-      return kept.length === current.length ? current : kept;
-    });
+    // Editing a mention's text un-mentions that occurrence only.
+    setMentionSpans((current) => shiftSpans(current, previous, value));
     // The textarea holds the new value (and its caret) only for typing; programmatic edits end the text.
     const field = textareaRef.current;
     const caret = field && field.value === value ? field.selectionStart : value.length;
-    const nextMentionQuery = findMentionQueryAtCaret(value, caret)?.query ?? null;
-    if (mentionQuery === null && nextMentionQuery !== null) onMentionOpen?.();
-    setMentionQuery(nextMentionQuery);
+    setMentionQuery(findMentionQueryAtCaret(value, caret)?.query ?? null);
     // `/` only at the start of the draft so forced skills expand (`Use skill:` / `/Name` prefix).
     const slashMatch = selectedSkill === null ? /^\/([^\n]*)$/.exec(value) : null;
     const nextSlash = slashMatch ? (slashMatch[1] ?? "") : null;
@@ -427,11 +451,11 @@ export const Composer = memo(function Composer({
     );
     setMentionQuery(null);
     setMentionHighlightKey(null);
-    setSelectedMentions((current) =>
-      current.some((selected) => mentionChipKey(selected) === mentionChipKey(mention))
-        ? current
-        : [...current, mention],
-    );
+    const delta = inserted.text.length - draftRef.current.length;
+    setMentionSpans((current) => [
+      ...mapSpans(current, inserted.start, caret, delta),
+      { mention, start: inserted.start, end: inserted.end },
+    ]);
     focusComposer();
   }
 
@@ -534,7 +558,8 @@ export const Composer = memo(function Composer({
     setSlashQuery(null);
     setSelectedSkill(null);
     const mentions = selectedMentions;
-    setSelectedMentions([]);
+    const spans = liveMentionSpans;
+    setMentionSpans([]);
     try {
       if ((await onSend(text, mentions, clientNonce)) !== false) return;
     } catch {
@@ -546,7 +571,7 @@ export const Composer = memo(function Composer({
     retryNonce.current = clientNonce;
     setDraft(draft);
     setSelectedSkill(selectedSkill);
-    setSelectedMentions(mentions);
+    setMentionSpans(spans);
   }
 
   function handleDragEnter(event: DragEvent<HTMLFieldSetElement>) {
@@ -616,9 +641,8 @@ export const Composer = memo(function Composer({
   // A textarea clips its placeholder without an ellipsis, so cut a long name here.
   const placeholderName =
     activeName && activeName.length > 32 ? `${activeName.slice(0, 31).trimEnd()}…` : activeName;
-  const showComposerPlaceholder =
-    draft.length === 0 && selectedSkill === null && selectedMentions.length === 0;
-  const expanded = composerExpanded || selectedSkill !== null || selectedMentions.length > 0;
+  const showComposerPlaceholder = draft.length === 0 && selectedSkill === null;
+  const expanded = composerExpanded || selectedSkill !== null;
 
   useLayoutEffect(() => {
     if (previousExpandedRef.current === expanded) return;
@@ -1043,193 +1067,211 @@ export const Composer = memo(function Composer({
               </button>
             </span>
           ) : null}
-          <div className="relative min-w-[8rem] flex-1">
-            {mentionRanges.length > 0 ? (
-              <div
-                ref={mentionBackdropRef}
-                aria-hidden="true"
-                data-testid="mention-backdrop"
-                dir="auto"
-                className="rk-scroll pointer-events-none absolute inset-0 overflow-y-auto whitespace-pre-wrap break-words py-0.5 text-[15.5px] pointer-coarse:text-base leading-6 text-foreground"
-              >
-                {mentionSegments(draft, mentionRanges)}
-              </div>
-            ) : null}
-            <textarea
-              ref={textareaRef}
-              data-composer-input
-              value={draft}
-              onChange={(event) => updateDraft(event.target.value)}
-              onScroll={(event) => {
-                if (mentionBackdropRef.current)
-                  mentionBackdropRef.current.scrollTop = event.currentTarget.scrollTop;
-              }}
-              onSelect={(event) => {
-                // Moving the caret out of an "@query" closes the picker.
-                const field = event.currentTarget;
-                if (field.selectionStart !== field.selectionEnd) return;
-                const next =
-                  findMentionQueryAtCaret(field.value, field.selectionStart)?.query ?? null;
-                if (next === null) setMentionQuery(null);
-              }}
-              onPaste={handlePaste}
-              enterKeyHint={isCoarsePointer() ? "enter" : undefined}
-              onFocus={(event) =>
-                revealAboveKeyboard(event.currentTarget.closest("fieldset") ?? event.currentTarget)
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Backspace" && draft.length === 0 && selectedSkill !== null) {
-                  event.preventDefault();
-                  removeLastChip();
-                  return;
+          <div className="min-w-[8rem] flex-1">
+            <div className="relative">
+              {liveMentionSpans.length > 0 ? (
+                <div
+                  ref={mentionBackdropRef}
+                  aria-hidden="true"
+                  data-testid="mention-backdrop"
+                  dir="auto"
+                  className="rk-scroll pointer-events-none absolute inset-0 overflow-y-auto whitespace-pre-wrap break-words py-0.5 text-[15.5px] pointer-coarse:text-base leading-6 text-foreground"
+                >
+                  {mentionSegments(draft, liveMentionSpans)}
+                </div>
+              ) : null}
+              <textarea
+                ref={textareaRef}
+                data-composer-input
+                value={draft}
+                onChange={(event) => updateDraft(event.target.value)}
+                onScroll={(event) => {
+                  if (mentionBackdropRef.current)
+                    mentionBackdropRef.current.scrollTop = event.currentTarget.scrollTop;
+                }}
+                onSelect={(event) => syncMentionQuery(event.currentTarget)}
+                onKeyUp={(event) => syncMentionQuery(event.currentTarget)}
+                onClick={(event) => syncMentionQuery(event.currentTarget)}
+                onPaste={handlePaste}
+                enterKeyHint={isCoarsePointer() ? "enter" : undefined}
+                onFocus={(event) =>
+                  revealAboveKeyboard(
+                    event.currentTarget.closest("fieldset") ?? event.currentTarget,
+                  )
                 }
-                const field = event.currentTarget;
-                if (
-                  event.key === "Backspace" &&
-                  !event.nativeEvent.isComposing &&
-                  field.selectionStart === field.selectionEnd
-                ) {
-                  const removed = mentionDeletionAtCaret(
-                    draft,
-                    field.selectionStart,
-                    selectedMentions,
-                  );
-                  if (removed) {
+                onKeyDown={(event) => {
+                  if (event.key === "Backspace" && draft.length === 0 && selectedSkill !== null) {
                     event.preventDefault();
-                    updateDraft(removed.text);
-                    requestAnimationFrame(() =>
-                      textareaRef.current?.setSelectionRange(removed.caret, removed.caret),
-                    );
+                    removeLastChip();
                     return;
                   }
-                }
-                const composing = event.nativeEvent.isComposing || event.keyCode === 229;
-                if (showSlashPicker) {
-                  const slashKey = resolveMentionPickerKey({
+                  const composing = event.nativeEvent.isComposing || event.keyCode === 229;
+                  const field = event.currentTarget;
+                  if (
+                    event.key === "Backspace" &&
+                    !composing &&
+                    field.selectionStart === field.selectionEnd
+                  ) {
+                    const removed = mentionDeletionAtCaret(
+                      draft,
+                      field.selectionStart,
+                      liveMentionSpans,
+                    );
+                    if (removed) {
+                      event.preventDefault();
+                      historyIndex.current = null;
+                      markEdited();
+                      setDraft(removed.text);
+                      setMentionSpans(removed.spans);
+                      setMentionQuery(null);
+                      requestAnimationFrame(() =>
+                        textareaRef.current?.setSelectionRange(removed.caret, removed.caret),
+                      );
+                      return;
+                    }
+                  }
+                  if (showSlashPicker) {
+                    const slashKey = resolveMentionPickerKey({
+                      key: event.key,
+                      shiftKey: event.shiftKey,
+                      isComposing: composing,
+                      optionCount: slashOptionCount,
+                      highlightedIndex: activeSlashIndex,
+                    });
+                    if (slashKey.type === "move") {
+                      event.preventDefault();
+                      setSlashHighlight(slashKey.index);
+                      return;
+                    }
+                    if (slashKey.type === "complete") {
+                      event.preventDefault();
+                      pickSlashOption(slashKey.index);
+                      return;
+                    }
+                    if (slashKey.type === "dismiss") {
+                      event.preventDefault();
+                      setSlashQuery(null);
+                      return;
+                    }
+                  }
+                  const action = resolveMentionPickerKey({
                     key: event.key,
                     shiftKey: event.shiftKey,
                     isComposing: composing,
-                    optionCount: slashOptionCount,
-                    highlightedIndex: activeSlashIndex,
+                    optionCount: mentionOptions.length,
+                    highlightedIndex: activeMentionIndex,
                   });
-                  if (slashKey.type === "move") {
-                    event.preventDefault();
-                    setSlashHighlight(slashKey.index);
-                    return;
-                  }
-                  if (slashKey.type === "complete") {
-                    event.preventDefault();
-                    pickSlashOption(slashKey.index);
-                    return;
-                  }
-                  if (slashKey.type === "dismiss") {
-                    event.preventDefault();
-                    setSlashQuery(null);
-                    return;
-                  }
-                }
-                const action = resolveMentionPickerKey({
-                  key: event.key,
-                  shiftKey: event.shiftKey,
-                  isComposing: composing,
-                  optionCount: mentionOptions.length,
-                  highlightedIndex: activeMentionIndex,
-                });
-                if (mentionNoMatches && !composing && event.key === "Enter" && !event.shiftKey) {
-                  // Escape dismisses the empty state first; Enter then sends the text as typed.
-                  event.preventDefault();
-                  return;
-                }
-                if (mentionNoMatches && !composing && event.key === "Escape") {
-                  event.preventDefault();
-                  setMentionQuery(null);
-                  return;
-                }
-                if (action.type === "complete") {
-                  const mention = mentionOptions[action.index];
-                  if (!mention) return;
-                  event.preventDefault();
-                  insertMention(mention);
-                  return;
-                }
-                if (action.type === "move") {
-                  event.preventDefault();
-                  const target = mentionOptions[action.index];
-                  if (target) setMentionHighlightKey(mentionChipKey(target));
-                  return;
-                }
-                if (action.type === "dismiss") {
-                  event.preventDefault();
-                  setMentionQuery(null);
-                  setMentionHighlightKey(null);
-                  return;
-                }
-                if (
-                  (event.key === "ArrowUp" || event.key === "ArrowDown") &&
-                  action.type === "none" &&
-                  slashQuery === null &&
-                  !event.shiftKey &&
-                  !event.altKey &&
-                  !event.metaKey &&
-                  !event.ctrlKey
-                ) {
-                  const field = event.currentTarget;
-                  const up = event.key === "ArrowUp";
-                  // Start only from an empty draft; then step whenever the caret is on the edge line.
-                  const canStep =
-                    field.selectionStart === field.selectionEnd &&
-                    (historyIndex.current === null
-                      ? up && draft.length === 0
-                      : up
-                        ? !draft.slice(0, field.selectionStart).includes("\n")
-                        : !draft.slice(field.selectionEnd).includes("\n"));
-                  if (canStep && recallHistory(up ? "older" : "newer")) {
+                  if (mentionNoMatches && !composing && event.key === "Enter" && !event.shiftKey) {
+                    // Escape dismisses the empty state first; Enter then sends the text as typed.
                     event.preventDefault();
                     return;
                   }
-                }
-                if (action.type === "send") {
-                  // A phone keyboard has no Shift+Return, so Return adds a line and Send sends.
-                  if (isCoarsePointer()) return;
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-              disabled={disabled}
-              placeholder={
-                showComposerPlaceholder
-                  ? disabled && disabledPlaceholder
-                    ? disabledPlaceholder
-                    : (placeholderText ??
-                      // On a phone the header already names the agent, and a long name wraps.
-                      (activeName && !window.matchMedia?.("(max-width: 480px)").matches
-                        ? t`Message ${placeholderName}`
-                        : t`Message…`))
-                  : undefined
-              }
-              // A name cut short with "…" would be read aloud as part of the label.
-              aria-label={activeName ? t`Message ${activeName.replace(/…$/, "")}` : t`Message`}
-              aria-autocomplete="list"
-              aria-haspopup="listbox"
-              aria-controls={
-                mentionPickerOpen || mentionNoMatches
-                  ? mentionListboxId
-                  : showSlashPicker
-                    ? slashListboxId
+                  if (mentionNoMatches && !composing && event.key === "Escape") {
+                    event.preventDefault();
+                    setMentionQuery(null);
+                    return;
+                  }
+                  if (action.type === "complete") {
+                    const mention = mentionOptions[action.index];
+                    if (!mention) return;
+                    event.preventDefault();
+                    insertMention(mention);
+                    return;
+                  }
+                  if (action.type === "move") {
+                    event.preventDefault();
+                    const target = mentionOptions[action.index];
+                    if (target) setMentionHighlightKey(mentionChipKey(target));
+                    return;
+                  }
+                  if (action.type === "dismiss") {
+                    event.preventDefault();
+                    setMentionQuery(null);
+                    setMentionHighlightKey(null);
+                    return;
+                  }
+                  if (
+                    (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+                    action.type === "none" &&
+                    slashQuery === null &&
+                    !event.shiftKey &&
+                    !event.altKey &&
+                    !event.metaKey &&
+                    !event.ctrlKey
+                  ) {
+                    const field = event.currentTarget;
+                    const up = event.key === "ArrowUp";
+                    // Start only from an empty draft; then step whenever the caret is on the edge line.
+                    const canStep =
+                      field.selectionStart === field.selectionEnd &&
+                      (historyIndex.current === null
+                        ? up && draft.length === 0
+                        : up
+                          ? !draft.slice(0, field.selectionStart).includes("\n")
+                          : !draft.slice(field.selectionEnd).includes("\n"));
+                    if (canStep && recallHistory(up ? "older" : "newer")) {
+                      event.preventDefault();
+                      return;
+                    }
+                  }
+                  if (action.type === "send") {
+                    // A phone keyboard has no Shift+Return, so Return adds a line and Send sends.
+                    if (isCoarsePointer()) return;
+                    event.preventDefault();
+                    void send();
+                  }
+                }}
+                disabled={disabled}
+                placeholder={
+                  showComposerPlaceholder
+                    ? disabled && disabledPlaceholder
+                      ? disabledPlaceholder
+                      : (placeholderText ??
+                        // On a phone the header already names the agent, and a long name wraps.
+                        (activeName && !window.matchMedia?.("(max-width: 480px)").matches
+                          ? t`Message ${placeholderName}`
+                          : t`Message…`))
                     : undefined
-              }
-              aria-activedescendant={
-                activeMentionOptionId ??
-                (showSlashPicker ? `${slashListboxId}-option-${activeSlashIndex}` : undefined)
-              }
-              name="chat-message"
-              autoComplete="off"
-              dir="auto"
-              rows={1}
-              className={`rk-scroll relative block max-h-25 min-h-[24px] w-full resize-none overflow-y-auto bg-transparent py-0.5 text-[15.5px] pointer-coarse:text-base leading-6 outline-none placeholder:text-muted-foreground disabled:opacity-40 ${
-                mentionRanges.length > 0 ? "caret-foreground text-transparent" : "text-foreground"
-              }`}
-            />
+                }
+                // A name cut short with "…" would be read aloud as part of the label.
+                aria-label={activeName ? t`Message ${activeName.replace(/…$/, "")}` : t`Message`}
+                aria-describedby={mentionStatuses.length > 0 ? mentionStatusId : undefined}
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                aria-controls={
+                  mentionPickerOpen || mentionNoMatches
+                    ? mentionListboxId
+                    : showSlashPicker
+                      ? slashListboxId
+                      : undefined
+                }
+                aria-activedescendant={
+                  activeMentionOptionId ??
+                  (showSlashPicker ? `${slashListboxId}-option-${activeSlashIndex}` : undefined)
+                }
+                name="chat-message"
+                autoComplete="off"
+                dir="auto"
+                rows={1}
+                className={`rk-scroll relative block max-h-25 min-h-[24px] w-full resize-none overflow-y-auto bg-transparent py-0.5 text-[15.5px] pointer-coarse:text-base leading-6 outline-none placeholder:text-muted-foreground disabled:opacity-40 ${
+                  liveMentionSpans.length > 0
+                    ? "caret-foreground text-transparent"
+                    : "text-foreground"
+                }`}
+              />
+            </div>
+            {mentionStatuses.length > 0 ? (
+              <div
+                id={mentionStatusId}
+                className="flex flex-wrap gap-x-3 text-[12px] leading-5 text-muted-foreground"
+              >
+                {mentionStatuses.map(({ mention, label }) => (
+                  <span key={mentionChipKey(mention)}>
+                    {mention.name} · {label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
         <div
@@ -1346,33 +1388,46 @@ function slashActionLabel(id: SlashActionId) {
   }
 }
 
-/** The draft text with each mention drawn as a chip. The "@" keeps its width and the icon sits on it, so lines wrap exactly like the textarea. */
-function mentionSegments(
-  draft: string,
-  ranges: ReturnType<typeof findMentionRanges<ComposerMention>>,
-) {
+/** The draft text with each mention drawn as a chip. The token stays plain inline text and the icon sits over its "@", so lines break exactly like the textarea. */
+function mentionSegments(draft: string, spans: MentionSpan<ComposerMention>[]) {
   const parts: ReactNode[] = [];
   let at = 0;
-  for (const range of ranges) {
-    parts.push(draft.slice(at, range.start));
+  for (const span of spans) {
+    parts.push(draft.slice(at, span.start));
     parts.push(
       <span
-        key={range.start}
+        key={span.start}
         data-testid="mention-chip"
-        data-mention-kind={range.mention.kind}
+        data-mention-kind={span.mention.kind}
         className="rounded-sm bg-accent box-decoration-clone"
       >
-        <span className="relative inline-block text-transparent">
+        <span className="relative text-transparent">
           @
-          <span className="absolute inset-0 flex items-center justify-center">
-            <MentionIcon mention={range.mention} variant="chip" />
+          <span className="absolute top-1/2 left-0 -translate-y-1/2">
+            <MentionIcon mention={span.mention} variant="chip" />
           </span>
         </span>
-        {draft.slice(range.start + 1, range.end)}
+        {draft.slice(span.start + 1, span.end)}
       </span>,
     );
-    at = range.end;
+    at = span.end;
   }
   parts.push(draft.slice(at), "\u200b");
   return parts;
+}
+
+/** A saved draft. Drafts from before mentions were inline kept chips apart from the text; write those into it. */
+function loadDraft(draftKey: string | undefined): {
+  draft: string;
+  spans: MentionSpan<ComposerMention>[];
+} {
+  const saved = readChatDraft(draftKey);
+  const entries = readChatDraftMentions<MentionSpan<ComposerMention> | ComposerMention>(draftKey);
+  if (entries.every((entry) => "start" in entry)) {
+    return { draft: saved, spans: entries as MentionSpan<ComposerMention>[] };
+  }
+  const mentions = entries.map((entry) => ("mention" in entry ? entry.mention : entry));
+  const missing = mentions.filter((mention) => findMentionRanges(saved, [mention]).length === 0);
+  const draft = missing.length ? `${missing.map((m) => `@${m.name}`).join(" ")} ${saved}` : saved;
+  return { draft, spans: findMentionRanges(draft, mentions) };
 }
