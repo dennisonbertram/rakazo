@@ -1670,7 +1670,7 @@ describe("unattended mail_modify and mail_send", () => {
       ]);
       await f.run();
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
-      const block = f.pauseRunForInput.mock.calls[0]![0] as { blocks?: unknown };
+      const [block] = f.pauseRunForInput.mock.calls[0] as unknown as [{ blocks?: unknown }];
       expect(JSON.stringify(block)).toContain("Always allow this tool");
     }
   });
@@ -2354,8 +2354,9 @@ describe("Google agents and linked accounts", () => {
     });
 
   it.each([
-    ["googlecalendar", /^calendar_/, /^(mail_|drive_)/],
-    ["googledrive", /^drive_/, /^(mail_|calendar_)/],
+    // calendar_agenda is the built-in schedule view (9223847a2), not a Google Calendar connector tool.
+    ["googlecalendar", /^calendar_(?!agenda$)/, /^(mail_|drive_)/],
+    ["googledrive", /^drive_/, /^(mail_|calendar_(?!agenda$))/],
   ])("offers a %s agent only its own service", async (provider, own, others) => {
     const f = googleAgent(provider);
     await f.run();
@@ -3538,7 +3539,9 @@ describe("Inbox agent asked by another bot", () => {
     await f.run();
     expect(f.offeredTools).toContain("mail_search");
     expect(
-      f.offeredTools.filter((n) => n.startsWith("calendar_") || n.startsWith("drive_")),
+      f.offeredTools.filter(
+        (n) => (n.startsWith("calendar_") && n !== "calendar_agenda") || n.startsWith("drive_"),
+      ),
     ).toEqual([]);
   });
 

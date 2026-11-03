@@ -54,7 +54,8 @@ function fixture() {
     $queryRaw: vi.fn(async () => []),
     message: { findMany: findMessages },
     event: { findFirst: vi.fn(async () => null) },
-    run: { findFirst: vi.fn(async () => null) },
+    // findMany backs the delegated-approval lookup threads/get makes (f91a2ca17).
+    run: { findFirst: vi.fn(async () => null), findMany: vi.fn(async () => []) },
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prisma)),
   };
   const deps = {

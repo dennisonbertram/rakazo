@@ -1010,6 +1010,10 @@ export const RU_MESSAGES: Record<string, string> = {
   "No data yet": "Данных пока нет",
   "Source failed": "Источник не сработал",
   "Connected.": "Подключено.",
-  "Disconnected {provider}. Bots now use {model}.": "{provider} отключён. Теперь боты используют {model}.",
+  "Disconnected {provider}. Bots now use {model}.":
+    "{provider} отключён. Теперь боты используют {model}.",
   "Source paused": "Источник приостановлен",
+  "Needs reply stopped": "Ответ не требуется: остановлено",
+  "No reply needed": "Ответ не нужен",
+  "Stopped Needs reply for {sender}": "Остановлено «Нужен ответ» для {sender}",
 };

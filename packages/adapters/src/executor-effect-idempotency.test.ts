@@ -143,7 +143,10 @@ function fixture(
   const connectorDiscoverTools = vi.fn(async () => []);
   const prisma = {
     run: {
-      findUnique: vi.fn(async () => run),
+      findUnique: vi.fn(async (args?: { select?: { leaseOwner?: boolean } }) => {
+        if (args?.select?.leaseOwner) abortBeforeModel?.();
+        return run;
+      }),
       findUniqueOrThrow: vi.fn(async () => run),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
@@ -240,6 +243,7 @@ function fixture(
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
   let calls: ToolCall[] = [];
   let afterCalls: (() => void) | undefined;
+  let abortBeforeModel: (() => void) | undefined;
   let shutdownSignal: AbortSignal | undefined;
   const enqueue = vi.fn(async () => undefined);
   let runtimeRequest: AgentRunRequest | undefined;
@@ -289,6 +293,9 @@ function fixture(
     runRow: run,
     enqueue,
     finalizeRun,
+    setAbortBeforeModel(next: () => void) {
+      abortBeforeModel = next;
+    },
     setShutdown(next: AbortSignal | undefined, onToolsDone?: () => void) {
       shutdownSignal = next;
       afterCalls = onToolsDone;
@@ -646,6 +653,18 @@ describe("mutating tool effect idempotency keys", () => {
     expect(f.effects).toHaveLength(1);
     expect(f.results[1]).toEqual({ ok: true });
     expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+  });
+
+  it("requeues a run that shutdown interrupts during setup, before the model opens", async () => {
+    const f = fixture("run-setup-abort");
+    const shutdown = new AbortController();
+    f.setShutdown(shutdown.signal);
+    f.setAbortBeforeModel(() => shutdown.abort(new Error("Worker shutting down")));
+    await f.continueRaw();
+
+    expect(f.runRow).toMatchObject({ status: "queued", leaseOwner: null, error: null });
+    expect(f.enqueue).toHaveBeenCalledWith(expect.objectContaining({ name: "run.continue" }));
+    expect(f.finalizeRun).not.toHaveBeenCalled();
   });
 
   it("does not claim a run once shutdown has started", async () => {

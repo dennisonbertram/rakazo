@@ -36,6 +36,7 @@ function bot(id = "bot-1"): Bot {
     teamChatRules: "",
     disabledBuiltinTools: [],
     audience: "internal",
+    firewall: false,
     externalMessageTargets: [],
     externalComputerTools: false,
     webhookConfigured: false,

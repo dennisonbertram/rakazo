@@ -958,6 +958,10 @@ export const TR_MESSAGES: Record<string, string> = {
   "No data yet": "Henüz veri yok",
   "Source failed": "Kaynak başarısız",
   "Connected.": "Bağlandı.",
-  "Disconnected {provider}. Bots now use {model}.": "{provider} bağlantısı kesildi. Botlar artık {model} kullanacak.",
+  "Disconnected {provider}. Bots now use {model}.":
+    "{provider} bağlantısı kesildi. Botlar artık {model} kullanacak.",
   "Source paused": "Kaynak duraklatıldı",
+  "Needs reply stopped": "Yanıt gerekli durduruldu",
+  "No reply needed": "Yanıt gerekmiyor",
+  "Stopped Needs reply for {sender}": "{sender} için Yanıt gerekli durduruldu",
 };

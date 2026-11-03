@@ -963,6 +963,10 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   "No data yet": "Ainda sem dados",
   "Source failed": "Falha na fonte",
   "Connected.": "Conectado.",
-  "Disconnected {provider}. Bots now use {model}.": "{provider} desconectado. Os bots agora usam {model}.",
+  "Disconnected {provider}. Bots now use {model}.":
+    "{provider} desconectado. Os bots agora usam {model}.",
   "Source paused": "Fonte pausada",
+  "Needs reply stopped": "Resposta pendente desativada",
+  "No reply needed": "Não precisa de resposta",
+  "Stopped Needs reply for {sender}": "Resposta pendente desativada para {sender}",
 };

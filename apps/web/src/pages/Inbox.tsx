@@ -6,6 +6,7 @@ import type {
   InboxMark,
   InboxPileCounts,
   InboxTodo,
+  InboxTodoDone,
   MailRow,
 } from "@rakazo/contracts";
 import { InboxFilterSchema, InboxViewCategorySchema } from "@rakazo/contracts";
@@ -15,9 +16,7 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -32,9 +31,6 @@ import {
   OPEN_DIALOG_SELECTOR,
   Skeleton,
   Spinner,
-  Tabs,
-  TabsList,
-  TabsTrigger,
   Toggle,
   Tooltip,
   TooltipContent,
@@ -68,6 +64,7 @@ import { InboxConsentPrompt } from "../components/AiDataSharing";
 import { AskBotButton } from "../components/AskBotButton";
 import { BotTodos } from "../components/BotTodos";
 import { ComposeEmail, NEW_MESSAGE } from "../components/ComposeEmail";
+import { InboxAccountTabs } from "../components/inbox/InboxAccountTabs";
 import { InboxCleanup } from "../components/inbox/InboxCleanup";
 import { InboxDigest } from "../components/inbox/InboxDigest";
 import { InboxMessageDialog } from "../components/inbox/InboxMessageDialog";
@@ -184,7 +181,8 @@ type Status =
       batches: Promise<string[]>;
     }
   | { kind: "moved"; messageId: string; subject: string }
-  | { kind: "replied" };
+  | { kind: "replied" }
+  | { kind: "stopped"; messageId: string; sender: string };
 
 type InboxFilter = (typeof InboxFilterSchema.options)[number];
 type InboxViewCategory = (typeof InboxViewCategorySchema.options)[number];
@@ -787,11 +785,6 @@ function InboxListPage({
     };
   }, [paused]);
   const noAccounts = data ? accounts.length === 0 : noGmail;
-  // With two or more accounts the Filter menu picks one; the button then names it.
-  const tabLabel =
-    accounts.length > 1
-      ? accounts.find((account) => account.connectionId === tab)?.label
-      : undefined;
   const failed = error || (shown ? syncErrorText(shown, retried && !retrying) : "");
   const limited =
     !error && Boolean(shown?.rateLimitedAccounts?.length) && !shown?.reconnectAccounts.length;
@@ -943,6 +936,24 @@ function InboxListPage({
       .then(onRefreshed)
       .catch((cause) => setError(errorText(cause)))
       .then(() => setReload((n) => n + 1));
+  };
+  // The row leaves Needs reply at once; the server counts it and says when this was the third.
+  const noReply = (messageId: string) => {
+    setError("");
+    patchRows((list) =>
+      list.map((row) => (row.id === messageId ? { ...row, needsReply: false } : row)),
+    );
+    rpc.inbox
+      .noReply({ messageId })
+      .then(({ stopped }) =>
+        setStatus(stopped ? { kind: "stopped", messageId, sender: stopped } : null),
+      )
+      .catch((cause) => setError(errorText(cause)))
+      .then(() => setReload((n) => n + 1));
+  };
+  const undoStop = (messageId: string) => {
+    setStatus(null);
+    rpc.inbox.noReply({ messageId, undo: true }).catch((cause) => setError(errorText(cause)));
   };
   const spamView = pile === "spam";
   // Checked rows that are still listed, so a reload never leaves a count for rows that are gone.
@@ -1175,7 +1186,12 @@ function InboxListPage({
   const openReplyTodo = openId
     ? todos?.find((todo) => todo.messageId === openId && repeatsRow(todo))
     : undefined;
-  const changeTodo = (next: InboxTodo) => {
+  const changeTodo = ({ stoppedSender, ...next }: InboxTodoDone) => {
+    // Finishing a to-do for mail that needed no reply can be the third such correction.
+    if (stoppedSender && next.messageId)
+      setStatus({ kind: "stopped", messageId: next.messageId, sender: stoppedSender });
+    // Finishing the to-do also clears the mail from Needs reply on the server; list it again.
+    if (next.doneAt && next.messageId) setReload((n) => n + 1);
     const swap = (items: InboxTodo[]) => items.map((item) => (item.id === next.id ? next : item));
     // A held answer must not bring the old state back when it is applied.
     if (heldTodos.current) heldTodos.current.todos = swap(heldTodos.current.todos);
@@ -1369,6 +1385,10 @@ function InboxListPage({
         )
       ) : status.kind === "replied" ? (
         <Trans>Sent. Moved out of Needs reply</Trans>
+      ) : status.kind === "stopped" ? (
+        <span className="min-w-0 truncate" dir="auto">
+          <Trans>Stopped Needs reply for {status.sender}</Trans>
+        </span>
       ) : status.kind === "moved" ? (
         <span className="min-w-0 truncate" dir="auto">
           <Trans>Moved "{maskCurrencyWhenHidden(status.subject)}" to Inbox</Trans>
@@ -1393,7 +1413,9 @@ function InboxListPage({
                     ? unarchive(status.messageId)
                     : status.kind === "moved"
                       ? archive(status.messageId)
-                      : mark(status.messageId, null)
+                      : status.kind === "stopped"
+                        ? undoStop(status.messageId)
+                        : mark(status.messageId, null)
           }
         >
           <Trans>Undo</Trans>
@@ -1523,26 +1545,17 @@ function InboxListPage({
                             data-testid="inbox-filter"
                             render={
                               <Button
-                                variant={
-                                  filter || (triage && category) || tabLabel
-                                    ? "secondary"
-                                    : "outline"
-                                }
-                                size={tabLabel ? "default" : "icon"}
+                                variant={filter || (triage && category) ? "secondary" : "outline"}
+                                size="icon"
                                 className="pointer-coarse:h-10 pointer-coarse:min-w-10"
                               />
                             }
                             // The button keeps one width: the filter's name is in the results bar.
                             aria-label={
-                              tabLabel
-                                ? undefined
-                                : activeFilterLabel
-                                  ? `${t`Filter`}: ${activeFilterLabel}`
-                                  : t`Filter`
+                              activeFilterLabel ? `${t`Filter`}: ${activeFilterLabel}` : t`Filter`
                             }
                           >
                             <ListFilter aria-hidden="true" />
-                            {tabLabel}
                           </DropdownMenuTrigger>
                         }
                       />
@@ -1596,35 +1609,6 @@ function InboxListPage({
                           </DropdownMenuSub>
                         ) : null}
                       </DropdownMenuRadioGroup>
-                      {accounts.length > 1 ? (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuGroup>
-                            <DropdownMenuLabel>
-                              <Trans>Account</Trans>
-                            </DropdownMenuLabel>
-                            <DropdownMenuRadioGroup
-                              value={tab ?? ALL}
-                              onValueChange={(value) =>
-                                setTab(value === ALL ? undefined : String(value))
-                              }
-                            >
-                              <DropdownMenuRadioItem value={ALL} closeOnClick>
-                                <Trans>All</Trans>
-                              </DropdownMenuRadioItem>
-                              {accounts.map((account) => (
-                                <DropdownMenuRadioItem
-                                  key={account.connectionId}
-                                  value={account.connectionId}
-                                  closeOnClick
-                                >
-                                  {account.label}
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
-                          </DropdownMenuGroup>
-                        </>
-                      ) : null}
                       {filter || (triage && category) ? (
                         <>
                           <DropdownMenuSeparator />
@@ -1660,13 +1644,16 @@ function InboxListPage({
               </>
             }
           />
-          {tools && !query ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <InboxPileTabs
-                value={pile}
-                counts={pileCounts}
-                onChange={(next) => setParam("pile", next === "important" ? "" : next)}
-              />
+          {tools && (!query || accounts.length > 1) ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0">
+              {query ? null : (
+                <InboxPileTabs
+                  value={pile}
+                  counts={pileCounts}
+                  onChange={(next) => setParam("pile", next === "important" ? "" : next)}
+                />
+              )}
+              <InboxAccountTabs accounts={accounts} value={tab} onChange={setTab} />
               {pile === "newsletters" ? (
                 <Toggle
                   size="sm"
@@ -1960,6 +1947,7 @@ function InboxListPage({
                             pickedIds={pickedSet}
                             onPick={pick}
                             onMove={moveOne}
+                            onNoReply={triage ? noReply : undefined}
                             hideNewsletter={pile === "newsletters"}
                           />
                         </Fragment>
@@ -1979,6 +1967,7 @@ function InboxListPage({
                   pickedIds={pickedSet}
                   onPick={pick}
                   onMove={moveOne}
+                  onNoReply={triage ? noReply : undefined}
                   showArchived={false}
                 />
               ) : (
@@ -1998,6 +1987,7 @@ function InboxListPage({
                     pickedIds={pickedSet}
                     onPick={pick}
                     onMove={moveOne}
+                    onNoReply={triage ? noReply : undefined}
                   />
                   {hiddenReplies > 0 ? (
                     <Button
@@ -2022,6 +2012,7 @@ function InboxListPage({
                       pickedIds={pickedSet}
                       onPick={pick}
                       onMove={moveOne}
+                      onNoReply={triage ? noReply : undefined}
                     />
                   ) : (
                     <>
@@ -2044,6 +2035,7 @@ function InboxListPage({
                         pickedIds={pickedSet}
                         onPick={pick}
                         onMove={moveOne}
+                        onNoReply={triage ? noReply : undefined}
                       />
                       <InboxGroup
                         title={<Trans>Earlier</Trans>}
@@ -2057,6 +2049,7 @@ function InboxListPage({
                         pickedIds={pickedSet}
                         onPick={pick}
                         onMove={moveOne}
+                        onNoReply={triage ? noReply : undefined}
                       />
                     </>
                   )}

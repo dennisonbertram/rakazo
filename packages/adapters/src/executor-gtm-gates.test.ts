@@ -454,11 +454,14 @@ function gtmFixture(options: FixtureOptions = {}) {
     computer: { updateMany: vi.fn(async () => ({ count: 1 })) },
     connection: { findMany: vi.fn(async () => []) },
     actionApprovalRule: {
-      findMany: vi.fn(async () =>
-        options.blockGtmPost
+      // example.test is an allowed site: browser_navigate to a new site asks first (8e44bc64e,
+      // 0a870b70b), and these tests are about the signup-approval gate, not the site gate.
+      findMany: vi.fn(async () => [
+        { effect: "always_allow", matchKind: "site", matchValue: "example.test", botId: null },
+        ...(options.blockGtmPost
           ? [{ effect: "block", matchKind: "tool", matchValue: "gtm_post", botId: null }]
-          : [],
-      ),
+          : []),
+      ]),
     },
     actionAutoReviewPreference: {
       findUnique: vi.fn(async () => ({ enabled: options.autoReview === true })),
@@ -1059,7 +1062,8 @@ describe("GTM executor gates", () => {
       proof: "zernio:post-123",
       scheduledFor: new Date(Date.now() + 60 * 60_000),
     };
-    const selected = gtmFixture().item;
+    // Goals are standing context, not work (b871b0133), so the selected item is not a goal.
+    const selected = { ...gtmFixture().item, category: "create_account" };
     const laterItem = {
       ...selected,
       id: "later-item",

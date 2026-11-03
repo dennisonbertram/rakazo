@@ -86,7 +86,7 @@ describe("bot avatar encoding", () => {
 });
 
 describe("update_bot tool schema", () => {
-  it("exposes avatar and notifyOnFinish fields the executor applies", () => {
+  it("exposes avatar, instructions and notifyOnFinish fields the executor applies", () => {
     const tool = builtinAgentTools.find((entry) => entry.name === "update_bot");
     if (!tool) throw new Error("missing update_bot");
     const properties =
@@ -95,6 +95,7 @@ describe("update_bot tool schema", () => {
       "artifact_id",
       "color",
       "description",
+      "instructions",
       "name",
       "notifyOnFinish",
       "title",

@@ -26,6 +26,7 @@ if [[ "\$1" == info ]]; then
 fi
 [[ " \$* " == *" config "* ]] && cat >/dev/null && cat <<'EOF'
 POSTGRES_PASSWORD=p
+POSTGRES_APP_PASSWORD=a
 BETTER_AUTH_SECRET=b
 ENCRYPTION_KEY=e
 SCREEN_PROXY_SECRET=s

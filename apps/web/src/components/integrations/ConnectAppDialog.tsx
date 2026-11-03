@@ -150,7 +150,14 @@ export function ConnectAppDialog({
         provider: item.slug,
         displayName:
           accountName ??
-          nextAccountLabel(item.name, rows.filter((entry) => entry.status === "connected").length),
+          // Gmail accounts are told apart by address (the mail tools take it); Calendar and Drive
+          // tools only know the name, so those keep their number.
+          (item.connectorId === "google" && item.slug === "gmail"
+            ? item.name
+            : nextAccountLabel(
+                item.name,
+                rows.filter((entry) => entry.status === "connected").length,
+              )),
         ...(viaSystemBrowser ? { redirect: "desktop" as const } : {}),
         ...(replacesConnectionId ? { replacesConnectionId } : {}),
         ...(permission ? { permission } : {}),

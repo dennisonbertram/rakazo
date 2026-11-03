@@ -508,7 +508,13 @@ describe.skipIf(!databaseAvailable)("legal tools (PostgreSQL)", () => {
     expect(stored.prompt).toBe(LEGAL_SCAN_PROMPT);
     await prisma.routine.update({
       where: { id: stored.id },
-      data: { prompt: LEGAL_SCAN_PROMPT.replace(/ Write every date like.*?Keep/, " Keep") },
+      // The previous default ended "Keep the reply short." (replaced in dac204829).
+      data: {
+        prompt: LEGAL_SCAN_PROMPT.replace(
+          / Keep the reply to the headline.*$/,
+          " Keep the reply short.",
+        ),
+      },
     });
     expect((await ensureLegalRoutine(api, c, bot.id)).prompt).toBe(LEGAL_SCAN_PROMPT);
     await prisma.routine.update({ where: { id: stored.id }, data: { prompt: "my own prompt" } });
