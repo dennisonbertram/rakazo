@@ -59,6 +59,33 @@ export const ToggleList: StoryObj = {
   },
 };
 
+/** All and None set every agent at once; None leaves the owning agent on. */
+export const ToggleListAllNone: StoryObj = {
+  render: () => {
+    const owner = mockBots[0]!.id;
+    const [on, setOn] = useState(new Set([owner]));
+    return (
+      <div className="w-80">
+        <AgentToggleList
+          bots={mockBots}
+          appName="Sample app"
+          ownerBotId={owner}
+          isOn={(id) => on.has(id)}
+          onToggle={(id, next) =>
+            setOn((cur) => {
+              const out = new Set(cur);
+              if (next) out.add(id);
+              else out.delete(id);
+              return out;
+            })
+          }
+          onSetAll={(next) => setOn(new Set(next ? mockBots.map((b) => b.id) : [owner]))}
+        />
+      </div>
+    );
+  },
+};
+
 export const ToggleListDisabled: StoryObj = {
   render: () => (
     <div className="w-80">

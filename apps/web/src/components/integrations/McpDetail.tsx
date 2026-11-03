@@ -205,6 +205,14 @@ export function McpDetail({
           () => rpc.mcp.servers.setWrites({ id: server.id, enabled: false }).then(() => undefined),
           t`Could not update changes`,
         );
+  /** All: every agent gets the server. None: only the owning agent keeps it. */
+  const setAllAgents = (on: boolean) =>
+    run(async () => {
+      const targets = data.bots.filter(
+        (bot) => bot.id !== server.agentBotId && assigned(bot.id) !== on,
+      );
+      await Promise.all(targets.map((bot) => assign(bot.id, on)));
+    }, t`Could not update bot access`);
   const usedBy = (
     <AgentToggleList
       bots={[...data.bots].sort(
@@ -214,6 +222,8 @@ export function McpDetail({
       disabled={busy}
       isOn={assigned}
       onToggle={(botId, on) => void toggle(botId, on)}
+      onSetAll={(on) => void setAllAgents(on)}
+      ownerBotId={server.agentBotId}
     />
   );
   return (

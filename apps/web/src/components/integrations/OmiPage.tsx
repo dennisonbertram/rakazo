@@ -9,7 +9,7 @@ import {
 } from "@rakazo/ui-web";
 import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toggleAccess } from "../../lib/integrations";
 import type { OmiSyncState } from "../../lib/omi/useOmiSync";
@@ -196,7 +196,7 @@ export function OmiView({
 }
 
 /** Who can read recordings: the Omi agent, plus any agent the owner switches on. */
-function OmiAgent({
+export function OmiAgent({
   connectionId,
   agentBotId,
   data,
@@ -223,13 +223,28 @@ function OmiAgent({
   const shared = access
     ? !(!access.allAgents && access.botIds.every((id) => id === agentBotId))
     : false;
-  async function save(next: { allAgents: boolean; botIds: string[] }) {
+  // Each change builds on the one before it, not on the last server answer, and saves run in click order.
+  const latest = useRef(access);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const [saving, setSaving] = useState(0);
+  useEffect(() => {
+    latest.current = access;
+  }, [access]);
+  function save(next: { allAgents: boolean; botIds: string[] }) {
     setError(null);
-    try {
-      setAccess(await rpc.connections.setAccess({ connectionId, ...next }));
-    } catch (err) {
-      setError(errorText(err, t`Could not update bot access`));
-    }
+    latest.current = next;
+    setAccess(next);
+    setSaving((count) => count + 1);
+    queue.current = queue.current.then(async () => {
+      try {
+        const saved = await rpc.connections.setAccess({ connectionId, ...next });
+        if (latest.current === next) setAccess(saved);
+      } catch (err) {
+        setError(errorText(err, t`Could not update bot access`));
+        setAccess(await rpc.connections.access({ connectionId }).catch(() => latest.current));
+      }
+      setSaving((count) => count - 1);
+    });
   }
   return (
     <div className="mt-6">
@@ -260,10 +275,22 @@ function OmiAgent({
             bots={data.bots}
             appName="Omi"
             isOn={isOn}
+            ownerBotId={agentBotId}
+            saving={saving > 0}
+            onSetAll={(on) =>
+              save(
+                on ? { allAgents: true, botIds: [] } : { allAgents: false, botIds: [agentBotId] },
+              )
+            }
             onToggle={(botId, on) => {
               if (botId === agentBotId) return;
-              void save(
-                toggleAccess(access ?? { allAgents: false, botIds: [] }, allBotIds, botId, on),
+              save(
+                toggleAccess(
+                  latest.current ?? { allAgents: false, botIds: [] },
+                  allBotIds,
+                  botId,
+                  on,
+                ),
               );
             }}
           />

@@ -706,3 +706,35 @@ it("Brex cards: Replace token shows the API error and the cards stay as they wer
   expect(navigate).not.toHaveBeenCalled();
   expect(container.textContent).toContain("Figma");
 });
+
+it("All assigns every other agent and None removes them all except the owner", async () => {
+  replaceAssignments.mockClear();
+  listAssignments.mockResolvedValue([]);
+  await show(false, OTHER, { ...withAgent, agentExclusive: false });
+  const names = () => [...container.querySelectorAll("button")].map((b) => b.textContent);
+  expect(names()).toContain("All");
+  await press("All");
+  const given = replaceAssignments.mock.calls.map(([call]) => call.botId);
+  expect(given.length).toBeGreaterThan(0);
+  expect(given).not.toContain("bot_ada");
+  expect(replaceAssignments.mock.calls.every(([call]) => call.assignments.length === 1)).toBe(true);
+
+  replaceAssignments.mockClear();
+  const entry = (botId: string) => ({
+    botId,
+    serverId: "s1",
+    allowAllTools: true,
+    allowedTools: [],
+    id: `a_${botId}`,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  });
+  listAssignments.mockImplementation(async ({ botId }: { botId: string }) => [entry(botId)]);
+  const everyone = given.concat("bot_ada").map(entry);
+  await show(false, OTHER, { ...withAgent, agentExclusive: false }, everyone);
+  await press("None");
+  const removed = replaceAssignments.mock.calls.map(([call]) => call.botId);
+  expect(removed.sort()).toEqual([...given].sort());
+  expect(replaceAssignments.mock.calls.every(([call]) => call.assignments.length === 0)).toBe(true);
+  listAssignments.mockResolvedValue([]);
+});
