@@ -26,7 +26,7 @@ export function InboxAccountTabs({
       onValueChange={(next) => onChange(next === ALL ? undefined : String(next))}
     >
       <TabsList className="max-w-full overflow-x-auto rounded-full [scrollbar-width:none] pointer-coarse:h-auto [&::-webkit-scrollbar]:hidden">
-        <TabsTrigger value={ALL} className="rounded-full px-3 pointer-coarse:h-11">
+        <TabsTrigger value={ALL} className="flex-none rounded-full px-3 pointer-coarse:h-11">
           {t`All`}
         </TabsTrigger>
         {accounts.map((account, i) => (
@@ -34,7 +34,7 @@ export function InboxAccountTabs({
             key={account.connectionId}
             value={account.connectionId}
             title={names[i]}
-            className="min-w-0 rounded-full px-3 pointer-coarse:h-11"
+            className="flex-none rounded-full px-3 pointer-coarse:h-11"
           >
             <span className="max-w-40 truncate">{names[i]}</span>
           </TabsTrigger>
