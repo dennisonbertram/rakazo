@@ -1437,6 +1437,52 @@ describe("mail_send for the Carta agent", () => {
   });
 });
 
+describe("unattended mail_modify and mail_send", () => {
+  const mailFixture = (name: string, rules: ActionApprovalRule[]) => {
+    const mail = {
+      listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+    };
+    const f = fixture({ name, builtin: true, rules, mail, unattended: true });
+    f.setCalls([
+      {
+        args:
+          name === "mail_send"
+            ? { to: ["a@example.test"], subject: "Hi", body: "Hello" }
+            : { id: "m1", archive: true },
+        executionId: "call-1",
+      },
+    ]);
+    return f;
+  };
+  const allow = (matchValue: string): ActionApprovalRule[] => [
+    { effect: "always_allow", matchKind: "tool", matchValue },
+  ];
+
+  it("asks for mail_modify in a routine when no rule exists", async () => {
+    const f = mailFixture("mail_modify", []);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("runs mail_modify in a routine without a card under a tool Allow rule", async () => {
+    const f = mailFixture("mail_modify", allow("mail_modify"));
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(isApprovalPausedResult(f.results[0])).toBe(false);
+  });
+
+  it("still asks for mail_send in a routine despite a tool or send_email Allow rule", async () => {
+    for (const rules of [
+      allow("mail_send"),
+      [{ effect: "always_allow", matchKind: "category", matchValue: "send_email" } as ActionApprovalRule],
+    ]) {
+      const f = mailFixture("mail_send", rules);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    }
+  });
+});
+
 describe("built-in mail on a connection with an integration agent", () => {
   beforeEach(() => {
     reviewMock.mockReset();
