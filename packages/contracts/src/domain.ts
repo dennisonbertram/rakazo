@@ -892,6 +892,8 @@ export const ConnectionSchema = z.object({
   connectorId: z.string(),
   provider: z.string(),
   displayName: z.string(),
+  /** The account's own address (the mailbox), when known: what tells two accounts of one app apart. */
+  account: z.string().optional(),
   status: z.enum(["pending", "connected", "revoked", "error"]),
   /** Short user-safe reason when status is "error"; null otherwise. */
   error: z.string().nullable(),

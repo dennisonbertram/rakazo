@@ -3,17 +3,20 @@ import type { Connection, ConnectionCatalogItem, McpServer } from "@rakazo/contr
 import { ZERNIO_MCP_ENDPOINT } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import {
+  accountLabels,
   appPath,
   appStatus,
   classifyTool,
   FINANCE_PROVIDERS,
   FIRST_PARTY_MCP,
   filterCatalog,
+  filterConnectedApps,
   groupConnections,
   groupTools,
   isSameMcpEndpoint,
   mcpStatus,
   popularApps,
+  sortConnectedApps,
   toggleAccess,
   toolLabel,
 } from "./integrations";
@@ -267,5 +270,64 @@ describe("Devin tile", () => {
     const devin = FIRST_PARTY_MCP.find((entry) => entry.id === "devin");
     expect(devin).toBeDefined();
     expect(devin).not.toHaveProperty("apiKey");
+  });
+});
+
+describe("connected app list: labels, filter and sort", () => {
+  const gmail = (id: string, displayName: string, extra: Partial<Connection> = {}) =>
+    row("connected", { id, provider: "gmail", displayName, ...extra });
+  const apps = groupConnections(
+    [
+      gmail("g1", "Gmail", { account: "one@example.test", createdAt: "2026-10-01T00:00:00Z" }),
+      gmail("g2", "Work", { account: "two@example.test", createdAt: "2026-10-05T00:00:00Z" }),
+      row("connected", {
+        id: "s1",
+        provider: "slack",
+        displayName: "Slack",
+        createdAt: "2026-10-03T00:00:00Z",
+      }),
+      row("connected", {
+        id: "n1",
+        provider: "notion",
+        displayName: "Notion",
+        needsReconnect: true,
+        createdAt: "2026-10-02T00:00:00Z",
+      }),
+    ],
+    [],
+  );
+  const names = (list: typeof apps) => list.map((app) => app.name);
+
+  it("labels each account by its own name and address, not by the app's name", () => {
+    const gm = apps.find((app) => app.provider === "gmail")!;
+    expect(accountLabels(gm)).toEqual(["one@example.test", "Work · two@example.test"]);
+    expect(accountLabels(apps.find((app) => app.provider === "slack")!)).toEqual([]);
+  });
+
+  it("searches the name, an account's label and its address", () => {
+    const find = (query: string) => names(filterConnectedApps(apps, { query, status: undefined }));
+    expect(find("two@")).toEqual(["Gmail"]);
+    expect(find("work")).toEqual(["Gmail"]);
+    expect(find("slack")).toEqual(["Slack"]);
+  });
+
+  it("filters by status: connected, or needs attention", () => {
+    expect(names(filterConnectedApps(apps, { query: "", status: "attention" }))).toEqual([
+      "Notion",
+    ]);
+    expect(names(filterConnectedApps(apps, { query: "", status: "connected" }))).toEqual([
+      "Gmail",
+      "Slack",
+    ]);
+  });
+
+  it("sorts by name, by status with problems first, and by newest connection", () => {
+    expect(names(sortConnectedApps(apps, "name", "asc"))).toEqual(["Gmail", "Notion", "Slack"]);
+    expect(names(sortConnectedApps(apps, "status", "asc"))[0]).toBe("Notion");
+    expect(names(sortConnectedApps(apps, "connected", "desc"))).toEqual([
+      "Gmail",
+      "Slack",
+      "Notion",
+    ]);
   });
 });

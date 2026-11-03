@@ -19,6 +19,8 @@ function matches(row: Row, where: Row): boolean {
   return Object.entries(where).every(([key, want]) => {
     if (want && typeof want === "object" && "in" in want)
       return (want as { in: unknown[] }).in.includes(row[key]);
+    if (want && typeof want === "object" && "notIn" in want)
+      return !(want as { notIn: unknown[] }).notIn.includes(row[key]);
     if (want && typeof want === "object" && "not" in want)
       return row[key] !== (want as { not: unknown }).not;
     return row[key] === want;
@@ -133,7 +135,12 @@ const bot = (id: string, userId = "u1", extra: Row = {}): Row => ({
 describe("connections.list", () => {
   it("returns connected, pending and error rows with a reason, never revoked", async () => {
     const h = harness(
-      [conn("a", "connected"), conn("b", "pending"), conn("c", "error"), conn("d", "revoked")],
+      [
+        conn("a", "connected"),
+        conn("b", "pending", { createdAt: new Date() }),
+        conn("c", "error"),
+        conn("d", "revoked"),
+      ],
       [],
     );
     const { json } = await h.call("connections/list", undefined);
@@ -165,6 +172,66 @@ describe("connections.list", () => {
   it("does not list another user's rows", async () => {
     const h = harness([conn("a", "connected")], []);
     expect((await h.call("connections/list", undefined, stranger)).json).toEqual([]);
+  });
+
+  it("shows the account address stored at connect time or by the mail sync", async () => {
+    const h = harness(
+      [
+        conn("a", "connected", { metadata: { accountAddress: "one@example.test" } }),
+        conn("b", "connected", { metadata: { mailAddress: "two@example.test" } }),
+        conn("c", "connected", { metadata: {} }),
+      ],
+      [],
+    );
+    const { json } = await h.call("connections/list", undefined);
+    expect(json.map((r: Row) => [r.id, r.account])).toEqual([
+      ["a", "one@example.test"],
+      ["b", "two@example.test"],
+      ["c", undefined],
+    ]);
+  });
+
+  it("hides a sign-in that was started over an hour ago and never finished", async () => {
+    const old = new Date(Date.now() - 2 * 3_600_000);
+    const h = harness(
+      [
+        conn("stale", "pending", { createdAt: old }),
+        conn("fresh", "pending", { createdAt: new Date() }),
+      ],
+      [],
+    );
+    const { json } = await h.call("connections/list", undefined);
+    expect(json.map((r: Row) => r.id)).toEqual(["fresh"]);
+  });
+});
+
+describe("connections.rename", () => {
+  it("renames the caller's own connection", async () => {
+    const h = harness([conn("a", "connected")], []);
+    const { json } = await h.call("connections/rename", {
+      connectionId: "a",
+      displayName: "  Work Gmail ",
+    });
+    expect(json.displayName).toBe("Work Gmail");
+    expect(h.connections[0]?.displayName).toBe("Work Gmail");
+  });
+
+  it("rejects another user's connection and leaves its name alone", async () => {
+    const h = harness([conn("a", "connected")], []);
+    const { status } = await h.call(
+      "connections/rename",
+      { connectionId: "a", displayName: "Mine now" },
+      stranger,
+    );
+    expect(status).not.toBe(200);
+    expect(h.connections[0]?.displayName).toBe("a");
+  });
+
+  it.each(["", "   ", "x".repeat(61)])("rejects the name %j", async (displayName) => {
+    const h = harness([conn("a", "connected")], []);
+    const { status } = await h.call("connections/rename", { connectionId: "a", displayName });
+    expect(status).not.toBe(200);
+    expect(h.connections[0]?.displayName).toBe("a");
   });
 });
 

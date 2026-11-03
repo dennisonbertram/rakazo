@@ -934,3 +934,72 @@ it("shows a Granola tile when only the key is connected, and opens the page from
     "/app/integrations/granola",
   );
 });
+
+it("tells two Gmail accounts apart by address, and filters and sorts the connected apps", async () => {
+  const account = (id: string, provider: string, extra: object = {}) => ({
+    id,
+    connectorId: "google",
+    provider,
+    displayName: provider === "gmail" ? "Gmail" : "Google Calendar",
+    status: "connected" as const,
+    error: null,
+    capabilities: [],
+    createdAt: "2026-10-01T00:00:00Z",
+    ...extra,
+  });
+  await show({
+    ...data(true, true),
+    connections: [
+      account("g1", "gmail", { account: "one@example.test" }),
+      account("g2", "gmail", { displayName: "Work", account: "two@example.test" }),
+      account("c1", "googlecalendar", { needsReconnect: true }),
+    ],
+  });
+  expect(container.textContent).toContain("one@example.test, Work · two@example.test");
+  const names = () =>
+    [...container.querySelectorAll("a[href^='/app/integrations/app/']")].map((a) => a.textContent);
+  // Searching reaches the address.
+  const search = container.querySelector('input[name="integration-search"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(search, "two@");
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(names().join()).toContain("gmail");
+  expect(names().join()).not.toContain("googlecalendar");
+});
+
+it("keeps a status filter in the URL and shows only the apps that need attention", async () => {
+  await show(
+    {
+      ...data(true, true),
+      connections: [
+        {
+          id: "g1",
+          connectorId: "google",
+          provider: "gmail",
+          displayName: "Gmail",
+          status: "connected",
+          error: null,
+          capabilities: [],
+          createdAt: "2026-10-01T00:00:00Z",
+        },
+        {
+          id: "c1",
+          connectorId: "google",
+          provider: "googlecalendar",
+          displayName: "googlecalendar",
+          status: "connected",
+          needsReconnect: true,
+          error: null,
+          capabilities: [],
+          createdAt: "2026-10-01T00:00:00Z",
+        },
+      ],
+    },
+    "/app/integrations?status=attention",
+  );
+  const links = [...container.querySelectorAll("a[href^='/app/integrations/app/']")].map((a) =>
+    a.getAttribute("href"),
+  );
+  expect(links).toEqual(["/app/integrations/app/google/googlecalendar"]);
+});

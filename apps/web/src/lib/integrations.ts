@@ -14,6 +14,8 @@ import {
 } from "@rakazo/contracts";
 import type { StatusKind } from "@rakazo/core";
 import { appStatus, matchFeaturedConnectorId } from "@rakazo/core";
+import type { SortDir } from "./list-params";
+import { sortBy } from "./list-params";
 
 export type { StatusKind };
 
@@ -324,6 +326,58 @@ export function groupConnections(
       },
     ];
   });
+}
+
+/**
+ * What names each connected account of an app: its own label (left out when it is just the app's
+ * name) and its address, so two accounts of one app can be told apart.
+ */
+export function accountLabels(app: ConnectedApp): string[] {
+  return app.rows
+    .filter((row) => row.status === "connected")
+    .flatMap((row) => {
+      const own = row.displayName === app.name ? null : row.displayName;
+      const text = [own, row.account].filter(Boolean).join(" · ");
+      return text ? [text] : [];
+    });
+}
+
+export type AppStatusFilter = "connected" | "attention";
+export type AppSortField = "default" | "name" | "status" | "connected";
+
+/** Search matches the app, each account's label and its address; status is Connected or Needs attention. */
+export function filterConnectedApps(
+  apps: readonly ConnectedApp[],
+  { query, status }: { query: string; status: AppStatusFilter | undefined },
+): ConnectedApp[] {
+  const needle = query.trim().toLowerCase();
+  return apps.filter(
+    (app) =>
+      (!status || (status === "connected") === (app.status === "connected")) &&
+      (!needle ||
+        [app.name, ...app.rows.flatMap((row) => [row.displayName, row.account ?? ""])].some(
+          (text) => text.toLowerCase().includes(needle),
+        )),
+  );
+}
+
+/** Status sorts problems first when ascending; "connected" is the newest account's date. */
+export function sortConnectedApps(
+  apps: readonly ConnectedApp[],
+  field: AppSortField,
+  dir: SortDir,
+): ConnectedApp[] {
+  if (field === "default") return [...apps];
+  const pick = {
+    name: (app: ConnectedApp) => app.name,
+    status: (app: ConnectedApp) => (app.status === "connected" ? 1 : 0),
+    connected: (app: ConnectedApp) =>
+      app.rows
+        .map((row) => row.createdAt)
+        .sort()
+        .at(-1),
+  }[field];
+  return sortBy(apps, pick, dir);
 }
 
 /** Catalog apps with no account row yet, featured apps first. */

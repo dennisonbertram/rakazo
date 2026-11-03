@@ -27,24 +27,28 @@ import {
   Input,
   Skeleton,
 } from "@rakazo/ui-web";
-import { Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import type { ConnectedApp } from "../../lib/integrations";
 import {
+  accountLabels,
   appPath,
   FINANCE_PROVIDERS,
   FIRST_PARTY_MCP,
   filterCatalog,
+  filterConnectedApps,
   groupConnections,
   isSameMcpEndpoint,
   mcpStatus,
   popularApps,
+  sortConnectedApps,
 } from "../../lib/integrations";
+import { useListParams } from "../../lib/list-params";
 import { appReturnPath } from "../../lib/return-to";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
+import { PickFilter, SearchField, SortControl } from "../ListControls";
 import { PAGE_GUTTER_X, PageHeader } from "../PageHeader";
 import { AppLogo } from "./AppLogo";
 import { BrexCardsConnectDialog } from "./BrexCardsConnectDialog";
@@ -78,6 +82,7 @@ const PHONE_POPULAR = 3;
 /** The filter chips: All, then the section headings that hold tiles of their own. */
 const CHIPS = ["all", "finance", "social", "equity", "tools"] as const;
 type Chip = (typeof CHIPS)[number];
+const SORT_FIELDS = ["default", "name", "status", "connected"] as const;
 const GRANOLA_PATH = "/app/integrations/granola";
 const OMI_PATH = "/app/integrations/omi";
 
@@ -256,10 +261,7 @@ function AppCard({
   onReconnect: (app: ConnectedApp, row: Connection) => void;
 }) {
   // An account labelled with the app's own name says nothing new, so show what the app does instead.
-  const accounts = app.rows
-    .filter((row) => row.status === "connected" && row.displayName !== app.name)
-    .map((row) => row.displayName)
-    .join(", ");
+  const accounts = accountLabels(app).join(", ");
   const working = app.rows.find((row) => row.status === "connected");
   const lapsed = app.rows.find((row) => row.status === "connected" && row.needsReconnect);
   const description = data.catalog.find(
@@ -385,6 +387,11 @@ export function IntegrationsHome({
   const { t } = useLingui();
   const [params] = useSearchParams();
   const [query, setQuery] = useState(params.get("q") ?? "");
+  const list = useListParams(SORT_FIELDS, { field: "default", dir: "asc" });
+  const statusParam = list.param("status");
+  // A status filter shows only the connected apps, so it hides everything that is not connected.
+  const status =
+    statusParam === "connected" || statusParam === "attention" ? statusParam : undefined;
   const [category, setCategory] = useState<Chip>(
     params.get("category") === "finance" ? "finance" : "all",
   );
@@ -436,6 +443,12 @@ export function IntegrationsHome({
     tools: t`Tools`,
   };
 
+  const sortNames = {
+    default: t`Default`,
+    name: t`Name`,
+    status: t`Status`,
+    connected: t`Connected`,
+  };
   const apps = useMemo(
     () => groupConnections(data.connections, data.catalog),
     [data.connections, data.catalog],
@@ -447,8 +460,10 @@ export function IntegrationsHome({
   // Only Finance also narrows the Popular catalog; Social, Equity and Tools hold just their own tiles.
   const results = useMemo(
     () =>
-      category === "all" || category === "finance" ? filterCatalog(open, { query, category }) : [],
-    [open, query, category],
+      !status && (category === "all" || category === "finance")
+        ? filterCatalog(open, { query, category })
+        : [],
+    [open, query, category, status],
   );
   const firstPartySections = { social: labels.social, equity: labels.equity, tools: labels.tools };
   const firstPartyDescription = {
@@ -467,6 +482,7 @@ export function IntegrationsHome({
   const financeNames = FINANCE_PROVIDERS.map((entry) => entry.name.toLowerCase());
   const financeMatches = financeNames.some((name) => name.includes(query.trim().toLowerCase()));
   const showFinance =
+    !status &&
     (category === "all" || category === "finance") &&
     financeMatches &&
     connectedKeys.size < FINANCE_TILE_COUNT;
@@ -505,11 +521,13 @@ export function IntegrationsHome({
   );
   const firstPartyMcp = unconnectedFirstParty.filter(
     (entry) =>
+      !status &&
       (category === "all" || category === entry.section || category === entry.category) &&
       entry.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
   // Brex cards has no https endpoint to match a connected server by, so its tile is hidden by its own check.
   const showBrexTile =
+    !status &&
     spaceOwner &&
     !data.servers.some((server) => isBrexCardsEndpoint(server.endpoint)) &&
     (category === "all" || category === "tools" || category === "finance") &&
@@ -541,21 +559,27 @@ export function IntegrationsHome({
   const servers = data.servers.filter(
     (server) => !financeServerIds.includes(server.id) && server !== cryptoServer,
   );
-  const filtering = Boolean(query.trim()) || category !== "all";
+  const filtering = Boolean(query.trim()) || category !== "all" || Boolean(status);
   const phoneCollapsed = !phoneAll && !filtering;
   // Connected narrows to the chip's category and to apps whose name matches the search, so an app
   // that is already connected still turns up when searched for.
-  const searching = Boolean(query.trim());
+  const searching = Boolean(query.trim()) || Boolean(status);
   const chipOnly = category !== "all" && !searching;
-  const connectedApps = filtering
-    ? apps.filter(
-        (app) =>
-          (category === "all" ||
-            data.catalog.find((item) => `${item.connectorId}:${item.slug}` === app.key)
-              ?.category === category) &&
-          app.name.toLowerCase().includes(query.trim().toLowerCase()),
-      )
-    : apps;
+  const connectedApps = sortConnectedApps(
+    filtering || status
+      ? filterConnectedApps(
+          apps.filter(
+            (app) =>
+              category === "all" ||
+              data.catalog.find((item) => `${item.connectorId}:${item.slug}` === app.key)
+                ?.category === category,
+          ),
+          { query, status },
+        )
+      : apps,
+    list.sort.field,
+    list.sort.dir,
+  );
   const otherMatches =
     showFinance ||
     firstPartyMcp.length > 0 ||
@@ -681,22 +705,41 @@ export function IntegrationsHome({
           {/* Rendered before the data loads, so only the grid below waits. */}
           {notSetUp ? null : (
             <>
-              <div className="relative mb-3 max-w-[420px]">
-                <Search
-                  aria-hidden="true"
-                  className="pointer-events-none absolute start-2.5 top-2.5 size-4 text-muted-foreground"
-                />
-                <Input
-                  type="search"
-                  className="h-9 ps-8"
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <SearchField
+                  name="integration-search"
+                  className="w-full sm:w-[420px]"
                   value={query}
                   placeholder={t`Search integrations`}
-                  aria-label={t`Search integrations`}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
+                  label={t`Search integrations`}
+                  onChange={(value) => {
+                    setQuery(value);
                     setVisible(CONNECTION_CATALOG_PAGE_SIZE);
                   }}
                 />
+                {apps.length > 1 ? (
+                  <>
+                    <PickFilter
+                      label={t`Status`}
+                      value={status}
+                      options={[
+                        ["connected", t`Connected`],
+                        ["attention", t`Needs attention`],
+                      ]}
+                      onChange={(value) => list.setParam("status", value)}
+                    />
+                    <div className="ms-auto flex items-center gap-0.5">
+                      <SortControl
+                        fields={SORT_FIELDS.map((field) => [field, sortNames[field]])}
+                        field={list.sort.field}
+                        fieldLabel={sortNames[list.sort.field]}
+                        direction={list.sort.field === "default" ? undefined : list.sort.dir}
+                        onField={(field) => list.setSort({ field, dir: "asc" })}
+                        onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+                      />
+                    </div>
+                  </>
+                ) : null}
               </div>
               <fieldset
                 aria-label={t`Category`}
@@ -1014,7 +1057,7 @@ export function IntegrationsHome({
                   ) : null;
                 })}
 
-                {category === "all" ? (
+                {category === "all" && !status ? (
                   <IMessageSection
                     query={query}
                     flat={filtering}
