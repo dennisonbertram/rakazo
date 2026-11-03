@@ -17,6 +17,7 @@ describe("RECURRING_JOBS", () => {
       "pages.refresh.tick",
       "pages.snapshots.retention",
       "mail.watch.renew",
+      "mail.sync.sweep",
       "meetings.capture_sweep",
       "devin.refresh",
     ]);

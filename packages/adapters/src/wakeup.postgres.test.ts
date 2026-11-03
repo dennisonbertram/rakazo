@@ -41,6 +41,7 @@ function handlers(overrides: Partial<BackgroundJobHandlers> = {}): BackgroundJob
     "contacts.photos": vi.fn(async () => undefined),
     "audit.intake": vi.fn(async () => undefined),
     "mail.watch.renew": vi.fn(async () => undefined),
+    "mail.sync.sweep": vi.fn(async () => undefined),
     "devin.refresh": vi.fn(async () => undefined),
     "finance.sync": vi.fn(async () => undefined),
     "omi.assemble": vi.fn(async () => undefined),

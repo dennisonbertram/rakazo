@@ -56,7 +56,7 @@ import { compactHistory } from "./history-compaction.js";
 import { createInboxClassifierProvider } from "./inbox-classifier-factory.js";
 import { runInboxTriage, triageReadiness } from "./inbox-triage.js";
 import { runMailAttachmentFiling } from "./mail-attachment-filing.js";
-import { runMailSyncJob } from "./mail-sync-job.js";
+import { runMailSyncJob, sweepMailSyncs } from "./mail-sync-job.js";
 import { expireMailSearch } from "./mail-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
 import { runCaptureFinalize, runCaptureSweep, runCaptureTranscribe } from "./meeting-capture.js";
@@ -361,6 +361,9 @@ export function createBackgroundJobHandlers(deps: {
         payload,
       );
     }),
+    "mail.sync.sweep": async () => {
+      await sweepMailSyncs({ prisma: deps.prisma, jobs: deps.jobs });
+    },
     "audit.intake": asPayloadTenant(async (payload) => {
       const { mail, artifacts } = deps;
       if (!mail || !artifacts) throw new Error("Audit intake is not configured");

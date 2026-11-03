@@ -59,6 +59,7 @@ const payloadSchemas = {
     messageId: z.string().min(1),
   }),
   "mail.watch.renew": z.object({}),
+  "mail.sync.sweep": z.object({}),
   "devin.refresh": z.object({ serverId: z.string().min(1).optional() }),
   "meetings.sync": z
     .object({
