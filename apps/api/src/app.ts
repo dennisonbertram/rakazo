@@ -143,6 +143,7 @@ import { MarkdownMemoryStore } from "@rakazo/memory";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { mountAccountExportDownload } from "./account-export.js";
+import { upgradeBuiltInAgentInstructions } from "./agent-instruction-upgrades.js";
 import { mountArtifactShare, prismaShareStore } from "./artifact-share.js";
 import { createBillingService } from "./billing.js";
 import { mountBillingRoutes } from "./billing-webhook.js";
@@ -309,6 +310,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const boardEvents = createBoardEvents(realtime);
   const notificationEvents = createNotificationEvents(realtime);
   const environmentSignupPolicy = signupPolicyFromEnv(env);
+  logger.info("built-in agent instructions upgraded", await upgradeBuiltInAgentInstructions(prisma));
   const deploymentSettings = await prisma.deploymentSettings.upsert({
     where: { id: "default" },
     create: {
