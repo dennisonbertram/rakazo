@@ -246,7 +246,12 @@ import { resolveRouteBot, shouldClearMissingBot, useGiveUpOnMissingBot } from ".
 import { rpc, selectedSpaceId, selectSpace } from "../lib/rpc";
 import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-storage";
 import type { DataRoomRef } from "../lib/send-to-agent";
-import { planSendToAgent, sendTargets } from "../lib/send-to-agent";
+import {
+  acceptAttachments,
+  fetchMessageFiles,
+  planSendToAgent,
+  sendTargets,
+} from "../lib/send-to-agent";
 import { sharedInflight } from "../lib/shared-inflight";
 import {
   PANEL_DOCKED_QUERY,
@@ -3197,45 +3202,53 @@ export function ShellPage() {
     { botId: inGroup ? undefined : active?.id, groupId },
     useCallback((error: unknown) => setSendError(errorText(error, t`Could not remember`)), [t]),
   );
+  const pendingAttachmentsRef = useRef(pendingAttachments);
+  pendingAttachmentsRef.current = pendingAttachments;
   const onAttachmentPick = useCallback(
-    (files: ArrayLike<File> | null, targetThreadKey?: string) => {
+    (files: ArrayLike<File> | null, targetThreadKey?: string, priorSkipped: string[] = []) => {
       const threadKey = targetThreadKey ?? activeGroupId.current ?? activeBotId.current;
-      if (!threadKey || !files?.length) return false;
-      const existing = attachmentsForThread(pendingAttachments, threadKey);
-      const next: PendingAttachment[] = [];
-      const skipped: string[] = [];
-      for (const file of Array.from(files)) {
-        if (existing.length + next.length >= ATTACHMENT_MAX_COUNT) {
-          skipped.push(t`${file.name} (max ${ATTACHMENT_MAX_COUNT} attachments)`);
-          continue;
-        }
-        if (file.size > ATTACHMENT_MAX_BYTES) {
-          skipped.push(t`${file.name} (over 10 MB)`);
-          continue;
-        }
-        const mimeType = inferAttachmentMimeType(file.name, file.type);
-        if (!mimeType) {
-          skipped.push(file.name);
-          continue;
-        }
-        next.push({
-          id: `${file.name}-${file.size}-${file.lastModified}-${next.length}`,
-          threadKey,
-          file,
-          previewUrl: mimeType.startsWith("image/") ? URL.createObjectURL(file) : undefined,
-        });
-      }
+      if (!threadKey || (!files?.length && !priorSkipped.length)) return false;
+      // Read the attachments as they are now: a forward finishes long after it started.
+      const existing = attachmentsForThread(pendingAttachmentsRef.current, threadKey);
+      const { accepted, skipped } = acceptAttachments(existing.length, files ?? [], {
+        count: (name) => t`${name} (max ${ATTACHMENT_MAX_COUNT} attachments)`,
+        size: (name) => t`${name} (over 10 MB)`,
+      });
+      const next: PendingAttachment[] = accepted.map((file, index) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+        threadKey,
+        file,
+        previewUrl: inferAttachmentMimeType(file.name, file.type)?.startsWith("image/")
+          ? URL.createObjectURL(file)
+          : undefined,
+      }));
       if (next.length) setPendingAttachments((current) => [...current, ...next]);
-      setAttachmentNotice(skipped.length ? t`Skipped ${skipped.join(", ")}` : null);
+      const notSent = [...priorSkipped, ...skipped];
+      setAttachmentNotice(notSent.length ? t`Skipped ${notSent.join(", ")}` : null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return next.length > 0;
     },
-    [pendingAttachments, t],
+    [t],
   );
   const removeAttachment = useCallback((attachment: PendingAttachment) => {
     revokePendingAttachmentPreviews([attachment]);
     setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id));
   }, []);
+  // The stored file is fetched through the same scoped artifact read the Download button uses,
+  // then attached to the other agent's composer as the owner's own upload.
+  const sendMessageFilesToAgent = useCallback(
+    async (message: ThreadMessage, agent: SendTarget) => {
+      const bot = botsRef.current.find((candidate) => candidate.id === agent.id);
+      if (!bot) return;
+      // Read the files first and stay in this chat: opening the other one early would let the
+      // owner send before the files arrive.
+      const { files, failed } = await fetchMessageFiles(transcriptArtifactTarget, message.blocks);
+      keepNoticeFor.current = bot.id;
+      navigate(`/app/${bot.id}`);
+      onAttachmentPick(files, bot.id, failed);
+    },
+    [navigate, onAttachmentPick, transcriptArtifactTarget],
+  );
   const sendFilesToAgent = useCallback(
     async (items: DataRoomApiItem[], agent: SendTarget) => {
       const bot = botsRef.current.find((candidate) => candidate.id === agent.id);
@@ -4575,6 +4588,8 @@ export function ShellPage() {
                   setReplyQuote(null);
                 }}
                 onMarkUnread={markMessageUnread}
+                sendTargets={sendToAgentTargets}
+                onSendFiles={(message, agent) => void sendMessageFilesToAgent(message, agent)}
                 onQuote={(message, quote) => {
                   setReplyTarget(message);
                   setReplyQuote(quote);
