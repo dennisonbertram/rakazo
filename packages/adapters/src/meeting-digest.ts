@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { AgentRuntime, JobPublisher } from "@rakazo/adapter-kit";
-import { meetingsDigestJob } from "@rakazo/adapter-kit";
+import { meetingsDigestJob, meetingsFollowupJob } from "@rakazo/adapter-kit";
 import type { Prisma, PrismaClient } from "@rakazo/db";
 import { recordUsage } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -375,6 +375,10 @@ async function digestOne(deps: MeetingDigestDeps, scope: Scope, meetingId: strin
       });
       await createTodos(tx, scope, meeting, digest, identity);
     });
+    // After the digest is stored; the job files the meeting, and a failed enqueue never undoes it.
+    await deps.jobs
+      ?.enqueue(meetingsFollowupJob({ ...scope, meetingId: meeting.id }))
+      .catch((error: unknown) => getLogger().error("meeting follow-up enqueue failed", error));
   } catch (error) {
     // The transaction rolled back, so nothing was stored: let the next run start over.
     await release(null);

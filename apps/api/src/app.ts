@@ -143,6 +143,7 @@ import { MarkdownMemoryStore } from "@rakazo/memory";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { mountAccountExportDownload } from "./account-export.js";
+import { upgradeBuiltInAgentInstructions } from "./agent-instruction-upgrades.js";
 import { mountArtifactShare, prismaShareStore } from "./artifact-share.js";
 import { createBillingService } from "./billing.js";
 import { mountBillingRoutes } from "./billing-webhook.js";
@@ -309,6 +310,14 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const boardEvents = createBoardEvents(realtime);
   const notificationEvents = createNotificationEvents(realtime);
   const environmentSignupPolicy = signupPolicyFromEnv(env);
+  // Not awaited: a slow or failed upgrade leaves agents on their old text but never delays startup.
+  void upgradeBuiltInAgentInstructions(prisma).then(
+    (counts) => logger.info("built-in agent instructions upgraded", counts),
+    (error: unknown) =>
+      logger.warn("built-in agent instruction upgrade failed", {
+        reason: error instanceof Error ? error.name : "error",
+      }),
+  );
   const deploymentSettings = await prisma.deploymentSettings.upsert({
     where: { id: "default" },
     create: {
