@@ -1356,7 +1356,7 @@ export const appContract = {
       )
       .output(ConnectionSchema),
     rename: oc
-      .input(z.object({ connectionId: Id, displayName: z.string().trim().min(1).max(80) }))
+      .input(z.object({ connectionId: Id, displayName: z.string().trim().min(1).max(60) }))
       .output(ConnectionSchema),
     revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
     /** Which agents may use this connection's tools. */

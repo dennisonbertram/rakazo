@@ -996,13 +996,19 @@ function connectionDto(row: {
   createdAt: Date;
   writesEnabled: boolean;
   agentBotId: string | null;
+  metadata?: unknown;
   mailSyncState?: { needsReconnect: boolean; lastErrorAt: Date | null } | null;
 }) {
+  const stored = row.metadata as { mailAddress?: unknown; accountAddress?: unknown } | null;
+  const account = [stored?.mailAddress, stored?.accountAddress].find(
+    (value): value is string => typeof value === "string" && value !== "",
+  );
   return {
     id: row.id,
     connectorId: row.connectorId,
     provider: row.provider,
     displayName: row.displayName,
+    ...(account ? { account } : {}),
     status: row.status as "pending" | "connected" | "revoked" | "error",
     error: connectionError(row),
     ...(row.mailSyncState?.needsReconnect && row.mailSyncState.lastErrorAt

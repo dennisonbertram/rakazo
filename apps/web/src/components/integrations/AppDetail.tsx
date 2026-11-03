@@ -88,7 +88,7 @@ function AccountRow({
             autoFocus
             aria-label={t`Account name`}
             className="h-8"
-            maxLength={80}
+            maxLength={60}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => void save()}
@@ -103,6 +103,7 @@ function AccountRow({
             }}
           />
         )}
+        {row.account ? <small className="block text-xs break-all">{row.account}</small> : null}
         <small className={`block text-xs ${lapsed ? "text-destructive" : "text-muted-foreground"}`}>
           {lapsed ? (
             <Trans>Signed out. Reconnect to keep reading this account's mail.</Trans>

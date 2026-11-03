@@ -52,7 +52,7 @@ export async function completeNativeOAuth(options: {
   } catch (error) {
     throw new ORPCError("BAD_REQUEST", { message: connectionFailureMessage(error) });
   }
-  const { connectionRef, secretId, scope } = completed;
+  const { connectionRef, secretId, scope, account } = completed;
   if (!secretId)
     throw new ORPCError("BAD_REQUEST", { message: "Connection did not return a credential" });
 
@@ -136,7 +136,11 @@ export async function completeNativeOAuth(options: {
             providerRef: connectionRef,
             secretId,
             // The granted scopes tell the mail provider whether it may manage Gmail filters.
-            metadata: scope ? { scope } : {},
+            metadata: {
+              ...(scope ? { scope } : {}),
+              // What tells two accounts of one app apart in the list.
+              ...(account ? { accountAddress: account } : {}),
+            },
             ...carried,
           },
         });

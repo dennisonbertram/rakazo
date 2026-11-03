@@ -218,3 +218,25 @@ it("shows only the title once connected, without repeating the result", async ()
   expect(text()).not.toContain("is ready");
   expect(text()).not.toContain("now appears under Connected");
 });
+
+it("names a second Gmail account plainly, since its address tells it apart, but numbers other apps", async () => {
+  vi.spyOn(window, "open").mockReturnValue({ closed: false, close: vi.fn() } as unknown as Window);
+  const gmail = { ...item, connectorId: "google", slug: "gmail", name: "Gmail" };
+  const connected = pendingRow("connected", {
+    connectorId: "google",
+    provider: "gmail",
+    displayName: "Gmail",
+  });
+  await mount([connected], false, { item: gmail });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(api.begin.mock.calls[0]?.[0]).toMatchObject({ displayName: "Gmail" });
+  api.begin.mockClear();
+  document.body.innerHTML = "";
+  await mount([pendingRow("connected")]);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(api.begin.mock.calls[0]?.[0]).toMatchObject({ displayName: "Slack 2" });
+});
