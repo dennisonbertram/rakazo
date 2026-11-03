@@ -6,7 +6,7 @@
 
 /** Offered and called without a card. Some are narrowed further at call time (see the plan). */
 export const FIREWALL_FREE_TOOLS: ReadonlySet<string> = new Set([
-  // Tainted-run safe tools (EXTERNAL_TAINT_SAFE_TOOLS) except attach_file: the profile has no files.
+  // Tainted-run safe tools (EXTERNAL_TAINT_SAFE_TOOLS) except attach_file and list_secrets: the profile has no files and no secrets, not even names.
   "ask_user",
   "skill_read",
   "tool_run",
@@ -28,7 +28,6 @@ export const FIREWALL_FREE_TOOLS: ReadonlySet<string> = new Set([
   "task_catalog",
   "schedule_list",
   "schedule_runs",
-  "list_secrets",
   // Its own pages and pins.
   "page_list",
   "page_read",

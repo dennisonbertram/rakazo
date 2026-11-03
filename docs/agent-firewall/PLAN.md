@@ -256,6 +256,7 @@ connections as for external bots; non-mail connector reads ask; `mail_modify` so
 `mail_draft` rule; full mail card; "Firewall" card reason. Taint follows content: page, agent
 history, task and scratchpad reads of a firewalled agent's records, and group runs with a
 firewalled member, store `externalTaint`. Injection fixture tests below.
+Content taint also covers calendar_agenda and any other reader of the firewalled agent's to-dos (scratchpad items with dueAt surface there), pages and pins.
 
 **S3. Output safety.** Exact-host site list, trusted-sites path off, per-hop redirect check,
 query-string rule; the three mail card tags; click-to-load images and full link hosts in
