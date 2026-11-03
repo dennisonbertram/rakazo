@@ -186,9 +186,8 @@ export async function deleteMeeting(
       create: key,
       update: {},
     });
-    const keys = await deleteMeetingRecordings(tx, owner, [id]);
     await tx.meeting.delete({ where: { id } });
-    return keys;
+    return deleteMeetingRecordings(tx, owner, [id]);
   });
 }
 

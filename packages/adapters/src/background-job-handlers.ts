@@ -61,7 +61,7 @@ import { expireMailSearch } from "./mail-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
 import { runCaptureFinalize, runCaptureSweep, runCaptureTranscribe } from "./meeting-capture.js";
 import { runMeetingDigest } from "./meeting-digest.js";
-import { runMeetingFollowup } from "./meeting-followup.js";
+import { runFollowupSweep, runMeetingFollowup } from "./meeting-followup.js";
 import { createMeetingSourceRegistry } from "./meeting-source-registry.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
 import { runMeetingSyncJob } from "./meeting-sync-job.js";
@@ -429,6 +429,7 @@ export function createBackgroundJobHandlers(deps: {
     ),
     "meetings.capture_sweep": async () => {
       await runCaptureSweep({ prisma: deps.prisma, jobs: deps.jobs });
+      await runFollowupSweep({ prisma: deps.prisma, jobs: deps.jobs });
     },
     "omi.assemble": asPayloadTenant(async (payload) => {
       if (!deps.artifacts) throw new Error("Artifact store is not configured");

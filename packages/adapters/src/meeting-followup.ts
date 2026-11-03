@@ -1,4 +1,5 @@
 import type { ArtifactStore, JobPublisher } from "@rakazo/adapter-kit";
+import { meetingsFollowupJob } from "@rakazo/adapter-kit";
 import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { createDataRoomRepos } from "@rakazo/db";
@@ -96,18 +97,65 @@ export async function runMeetingFollowup(
   const actor: Actor = { ...owner, email: "", isDeploymentOwner: false };
   const names = attendeeNames(meeting.attendees);
   const filing = createFileDataRoomItem(deps, createDataRoomRepos(deps.prisma));
-  const folderId = await filing.folderAt(actor, null, ["Recordings"], [], "agent");
-  await filing.storeAndFile(actor, {
-    content: { bytes: new TextEncoder().encode(recordingMarkdown(meeting, names)) },
-    name: dataRoomSafeName(`${day(meeting.startedAt)} ${meeting.title}.md`, "Meeting.md"),
-    mimeType: "text/markdown",
-    folderId,
-    source: "meeting",
-    externalId: `meeting:${meeting.id}`,
-    sourceUpdatedAt: meeting.sourceUpdatedAt,
-    docType: "note",
-    docDate: meeting.startedAt,
-    parties: names,
-    tags: ["meeting"],
-  });
+  // The meeting row stays locked while the note is filed, and every delete path writes the row
+  // before it looks for the note. So a delete either finishes first (the meeting is gone and
+  // nothing is filed) or finds the filed note. ponytail: an aborted filing can leave a stored blob.
+  await deps.prisma.$transaction(
+    async (tx) => {
+      const live = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "meetings"
+        WHERE "id" = ${meeting.id} AND "spaceId" = ${owner.spaceId} AND "userId" = ${owner.userId}
+          AND "deletedAt" IS NULL
+        FOR UPDATE`;
+      if (live.length === 0) return;
+      const folderId = await filing.folderAt(actor, null, ["Recordings"], [], "agent");
+      await filing.storeAndFile(actor, {
+        content: { bytes: new TextEncoder().encode(recordingMarkdown(meeting, names)) },
+        name: dataRoomSafeName(`${day(meeting.startedAt)} ${meeting.title}.md`, "Meeting.md"),
+        mimeType: "text/markdown",
+        folderId,
+        source: "meeting",
+        externalId: `meeting:${meeting.id}`,
+        sourceUpdatedAt: meeting.sourceUpdatedAt,
+        docType: "note",
+        docDate: meeting.startedAt,
+        parties: names,
+        tags: ["meeting"],
+      });
+    },
+    { timeout: 30_000 },
+  );
+}
+
+/** Meetings digested this long ago and still unfiled are retried (the normal job has had its chance). */
+const SWEEP_GRACE_MS = 5 * 60_000;
+const SWEEP_BATCH = 100;
+
+/**
+ * Recovers follow-ups whose enqueue was lost after the digest was stored: fresh meetings with a
+ * done digest and no Recordings note. One bounded query across owners; the job's replaceKey makes
+ * a repeat harmless. Returns the number queued.
+ */
+export async function runFollowupSweep(
+  deps: { prisma: PrismaClient; jobs: JobPublisher },
+  now = new Date(),
+): Promise<number> {
+  const fresh = new Date(now.getTime() - FRESH_MS);
+  const settled = new Date(now.getTime() - SWEEP_GRACE_MS);
+  const rows = await deps.prisma.$queryRaw<{ id: string; spaceId: string; userId: string }[]>`
+      SELECT m."id", m."spaceId", m."userId" FROM "meetings" m
+      WHERE m."digestStatus" = 'done' AND m."deletedAt" IS NULL
+        AND COALESCE(m."endedAt", m."startedAt") > ${fresh}
+        AND m."updatedAt" < ${settled}
+        AND NOT EXISTS (
+          SELECT 1 FROM "data_room_items" i
+          WHERE i."spaceId" = m."spaceId" AND i."userId" = m."userId"
+            AND i."source" = 'meeting' AND i."externalId" = 'meeting:' || m."id")
+      ORDER BY m."updatedAt" ASC LIMIT ${SWEEP_BATCH}`;
+  for (const row of rows) {
+    await deps.jobs.enqueue(
+      meetingsFollowupJob({ spaceId: row.spaceId, userId: row.userId, meetingId: row.id }),
+    );
+  }
+  return rows.length;
 }

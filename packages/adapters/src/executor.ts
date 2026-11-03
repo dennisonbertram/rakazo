@@ -45,10 +45,10 @@ import {
 } from "@rakazo/adapter-kit";
 import type { ComputerCommand, MessageBlock, RunPhase, RunStatus } from "@rakazo/contracts";
 import {
-  approvalTitle,
   AI_CONSENT_EFFECT_KIND,
   AI_DISCLOSURE_VERSION,
   ATTACHMENT_MAX_BYTES,
+  approvalTitle,
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
@@ -2740,14 +2740,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // of this run's actual model on every trigger (not the Inbox agent's), and unknown means no.
         const meetingConsentOk = async (): Promise<boolean> => {
           try {
-            if (!runModelProvider || !runModelId) return false;
-            const recipient = aiRecipient({
-              provider: runModelProvider,
-              modelId: runModelId,
-              baseUrl: resolved.baseUrl,
-              use: "model",
-            });
-            if (!recipient) return runModelProvider === "scripted";
+            // The model that receives the text now: a backup model after a switch, not the first.
+            const { provider, id, baseUrl } = effectiveRunModel;
+            if (!provider || !id) return false;
+            const recipient = aiRecipient({ provider, modelId: id, baseUrl, use: "model" });
+            if (!recipient) return provider === "scripted";
             const granted = await deps.prisma.aiDataConsent.findFirst({
               where: {
                 userId: bot.userId,
@@ -5367,13 +5364,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
           const needsApproval = gateDecision === "ask";
           // One plain line on the card, only for a background, tainted or rule-caused ask.
-          const approvalCardReason = requiresUnattendedApproval || mailModifyNeedsToolRule
-            ? "Asked because this ran in the background."
-            : externalTaintedCall
-              ? EXTERNAL_REQUEST_REASON
-              : approvalResolved.source === "require_approval" && actionType
-                ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
-                : undefined;
+          const approvalCardReason =
+            requiresUnattendedApproval || mailModifyNeedsToolRule
+              ? "Asked because this ran in the background."
+              : externalTaintedCall
+                ? EXTERNAL_REQUEST_REASON
+                : approvalResolved.source === "require_approval" && actionType
+                  ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
+                  : undefined;
           // Record each decision once; a replay of the same effect already has its event.
           if (
             !applied?.duplicate &&

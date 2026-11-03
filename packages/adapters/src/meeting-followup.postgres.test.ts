@@ -13,6 +13,7 @@ import type { PrismaClient } from "@rakazo/db";
 import {
   createDataRoomRepos,
   createDb,
+  createLegalRepos,
   deleteMeeting,
   shareDocument,
   upsertMeeting,
@@ -23,7 +24,7 @@ import { runDataRoomClassify } from "./data-room-jobs.js";
 import { FakeClassifier, fakeAi, MemoryArtifacts, RecordingJobs } from "./data-room-test-fakes.js";
 import { dataRoomToolFromTool } from "./data-room-tools.js";
 import { runMeetingDigest } from "./meeting-digest.js";
-import { runMeetingFollowup } from "./meeting-followup.js";
+import { runFollowupSweep, runMeetingFollowup } from "./meeting-followup.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describePostgres =
@@ -340,5 +341,63 @@ describePostgres("meeting follow-up filing (PostgreSQL)", () => {
     expect(classifier.calls).toEqual([]);
     const after = await prisma.dataRoomItem.findUniqueOrThrow({ where: { id: item.id } });
     expect(after).toMatchObject({ status: "indexing", docType: "note", tags: ["meeting"] });
+  });
+
+  it("a delete that lands between the job's load and its filing leaves no note", async () => {
+    const id = await addMeeting(a);
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let locked: () => void = () => {};
+    const gotLock = new Promise<void>((resolve) => (locked = resolve));
+    // Another transaction holds the meeting row, as a delete in progress does.
+    const deleting = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "meetings" WHERE "id" = ${id} FOR UPDATE`;
+      locked();
+      await held;
+      await tx.meeting.delete({ where: { id } });
+    });
+    await gotLock;
+    const filing = followup(a, id);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    release();
+    await deleting;
+    await filing;
+    expect(await prisma.dataRoomItem.count({ where: { externalId: `meeting:${id}` } })).toBe(0);
+  });
+
+  it("the sweep queues only fresh, digested, unfiled meetings", async () => {
+    const queued: BackgroundJob[] = [];
+    const publisher = {
+      enqueue: async (job: BackgroundJob) => void queued.push(job),
+      cancel: async () => {},
+      close: async () => {},
+    } as JobPublisher;
+    const settle = (id: string) =>
+      prisma.$executeRaw`UPDATE "meetings" SET "digestStatus" = 'done', "updatedAt" = now() - interval '10 minutes' WHERE "id" = ${id}`;
+    const unfiled = await addMeeting(a);
+    const filed = await addMeeting(a);
+    const old = await addMeeting(a, new Date(Date.now() - 25 * 3_600_000));
+    const undigested = await addMeeting(a);
+    for (const id of [unfiled, filed, old]) await settle(id);
+    await followup(a, filed);
+    await runFollowupSweep({ prisma, jobs: publisher });
+    const ids = queued.map((j) => (j.payload as { meetingId: string }).meetingId);
+    expect(ids).toContain(unfiled);
+    expect(ids).not.toContain(filed);
+    expect(ids).not.toContain(old);
+    expect(ids).not.toContain(undigested);
+  });
+
+  it("Legal's unreviewed list leaves meeting notes out", async () => {
+    const id = await addMeeting(a);
+    await followup(a, id);
+    const item = await prisma.dataRoomItem.findFirstOrThrow({
+      where: { externalId: `meeting:${id}` },
+    });
+    await prisma.dataRoomItem.update({ where: { id: item.id }, data: { status: "ready" } });
+    const legal = createLegalRepos(prisma);
+    const listed = await legal.unreviewedItems(a, 100);
+    expect(JSON.stringify(listed)).not.toContain(item.id);
+    expect(await legal.countUnreviewed(a)).toBe(0);
   });
 });

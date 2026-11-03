@@ -243,7 +243,7 @@ function eligibleSql(actor: Actor, filters: DataRoomFilters = {}): Prisma.Sql {
   }
   if (filters.legalUnchecked) {
     parts.push(
-      Prisma.sql`i."status" = 'ready' AND NOT EXISTS (
+      Prisma.sql`i."status" = 'ready' AND i."source" <> 'meeting' AND NOT EXISTS (
         SELECT 1 FROM legal_contracts c
         WHERE c."dataRoomItemId" = i.id AND c."spaceId" = i."spaceId" AND c."userId" = i."userId"
           AND c."analyzedRevision" >= i.revision)`,

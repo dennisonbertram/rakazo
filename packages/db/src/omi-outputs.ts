@@ -36,9 +36,10 @@ export async function deleteMeetingsWithTodos(
 ): Promise<string[]> {
   const owner = { spaceId: actor.spaceId, userId: actor.userId };
   await db.inboxTodo.deleteMany({ where: { ...owner, meetingId: { in: ids } } });
-  const keys = await deleteMeetingRecordings(db, owner, ids);
+  // The meeting rows go first: a follow-up filing holds their lock, so it finishes before the
+  // note is looked for and cannot leave one behind.
   await db.meeting.deleteMany({ where: { ...owner, id: { in: ids } } });
-  return keys;
+  return deleteMeetingRecordings(db, owner, ids);
 }
 
 /**
