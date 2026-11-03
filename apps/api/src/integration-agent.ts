@@ -5,8 +5,8 @@ import {
   cartaAgentSpawnKey,
   financeProviderForEndpoint,
   GRANOLA_API_CONNECTOR_ID,
-  HEX_CONNECTOR_ID,
   granolaAgentSpawnKey,
+  HEX_CONNECTOR_ID,
   INTEGRATION_PRESETS,
   inboxAgentSpawnKey,
   integrationAgentSpawnKey,
@@ -319,8 +319,9 @@ export async function ensureConnectedAppAgent(
 }
 
 /**
- * Gives a connection created private its own agent (Gmail links to the Inbox agent). Does nothing
- * for older connections, for one that already has an agent, or one not yet connected, so it is
+ * Gives a connection created private its own agent, and links every Gmail account to the Inbox
+ * agent. Linking changes no one's access: a shared account stays shared and a private one stays
+ * private (the owner just joins the list). Does nothing for other older connections, for one that already has an agent, or one not yet connected, so it is
  * safe to call on every complete and on a reconnect. Best-effort: Create agent is the repair path.
  */
 export async function provisionConnectionAgent(
@@ -334,9 +335,10 @@ export async function provisionConnectionAgent(
     try {
       const row = await deps.prisma.connection.findFirst({
         where: { ...scope(actor, connectionId), status: "connected" },
-        select: { privateByDefault: true, agentBotId: true },
+        select: { privateByDefault: true, agentBotId: true, provider: true },
       });
-      if (!row?.privateByDefault || row.agentBotId) return;
+      // Every Gmail account belongs to the Inbox agent, including ones connected before that link existed.
+      if (!row || row.agentBotId || !(row.privateByDefault || isGmailConnection(row))) return;
       await ensureConnectedAppAgent(deps, actor, connectionId);
       return;
     } catch (error) {

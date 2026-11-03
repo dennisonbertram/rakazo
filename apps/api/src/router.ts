@@ -6665,7 +6665,19 @@ export function createRouter(deps: RouterDeps): AppRouter {
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           include: { mailSyncState: { select: { needsReconnect: true, lastErrorAt: true } } },
         });
-        return rows.map(connectionDto);
+        // Gmail accounts connected before the Inbox agent link existed join it now, once.
+        const unlinked = rows.filter(
+          (row) =>
+            row.status === "connected" && !row.agentBotId && row.provider.toLowerCase() === "gmail",
+        );
+        if (unlinked.length === 0) return rows.map(connectionDto);
+        for (const row of unlinked) await provisionForActor(context.actor, row.id);
+        const fresh = await deps.prisma.connection.findMany({
+          where: { id: { in: unlinked.map((row) => row.id) }, spaceId: context.actor.spaceId },
+          select: { id: true, agentBotId: true, writesEnabled: true, allAgents: true },
+        });
+        const byId = new Map(fresh.map((row) => [row.id, row]));
+        return rows.map((row) => connectionDto({ ...row, ...(byId.get(row.id) ?? {}) }));
       }),
       begin: authed.connections.begin.handler(async ({ context, input }) => {
         if (input.redirect === "desktop" && input.connectorId !== "google") {

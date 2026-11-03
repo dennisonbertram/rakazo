@@ -486,7 +486,8 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                 onChanged={() => void data.refresh()}
                 busy={busy}
                 onCreateAgent={
-                  row.status === "connected" && !row.needsReconnect && !row.agentBotId
+                  // Every Gmail account belongs to the Inbox agent, which the server links on its own.
+                  !isGmail && row.status === "connected" && !row.needsReconnect && !row.agentBotId
                     ? () =>
                         void updateAgent(async () => {
                           const { botId } = await rpc.connections.createAgent({

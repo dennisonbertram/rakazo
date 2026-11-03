@@ -6,6 +6,7 @@ import type { PrismaClient } from "@rakazo/db";
 import { createDb, createRepos } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { completeNativeOAuth } from "./connection-oauth.js";
+import { ensureInboxAgent } from "./inbox-agent.js";
 import { provisionConnectionAgent } from "./integration-agent.js";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";
@@ -894,5 +895,50 @@ describePostgres("agent per connection: provisioning (PostgreSQL)", () => {
     const mine = await create({ provider: "intercom" });
     await expect(complete(mine.id, other)).rejects.toBeTruthy();
     expect(await row(mine.id)).toMatchObject({ status: "pending", agentBotId: null });
+  });
+
+  it("listing links older Gmail accounts to the Inbox agent without changing who can use them", async () => {
+    const repos = createRepos(prisma);
+    const inbox = await ensureInboxAgent(repos, owner);
+    const helper = await repos.createBot(owner, {
+      name: "Gmail helper",
+      title: "",
+      description: "",
+      instructions: "",
+    });
+    const legacy = (allAgents: boolean) =>
+      create({
+        status: "connected",
+        connectorId: "google",
+        provider: "gmail",
+        allAgents,
+        privateByDefault: false,
+      });
+    const botsOf = async (connectionId: string) =>
+      new Set((await client(owner).connections.effectiveAccess())[connectionId]?.botIds);
+
+    // Shared with everyone: the same agents can use it afterwards, and it stays shared.
+    const shared = await legacy(true);
+    const sharedBefore = await botsOf(shared.id);
+    expect(sharedBefore.has(inbox.id)).toBe(true);
+    await client(owner).connections.list();
+    expect(await row(shared.id)).toMatchObject({ agentBotId: inbox.id, allAgents: true });
+    expect(await botsOf(shared.id)).toEqual(sharedBefore);
+    await prisma.connection.update({ where: { id: shared.id }, data: { status: "revoked" } });
+
+    // Limited to a chosen agent: that list is kept. The Inbox agent joins it, because an account
+    // linked to the Inbox agent always keeps it.
+    const chosen = await legacy(false);
+    await prisma.botConnectionAccess.create({
+      data: { connectionId: chosen.id, botId: helper.id, spaceId, userId },
+    });
+    expect(await botsOf(chosen.id)).toEqual(new Set([helper.id]));
+    await client(owner).connections.list();
+    expect(await row(chosen.id)).toMatchObject({ agentBotId: inbox.id, allAgents: false });
+    expect(await botsOf(chosen.id)).toEqual(new Set([helper.id, inbox.id]));
+
+    // Listing again links nothing new.
+    await client(owner).connections.list();
+    expect(await row(chosen.id)).toMatchObject({ agentBotId: inbox.id });
   });
 });

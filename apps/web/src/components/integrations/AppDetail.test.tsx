@@ -176,14 +176,14 @@ it("creates an agent for the selected connected account and opens its chat", asy
   expect(where()).toBe("/app/bot_app");
 });
 
-it("offers Create agent for a native Google account", async () => {
+it("never offers Create agent for Gmail: every account belongs to the Inbox agent", async () => {
   await show(
     PAGE,
     data({
       connections: [appConnection({ id: "conn_google", connectorId: "google", provider: "gmail" })],
     }),
   );
-  expect(container.textContent).toContain("Create agent");
+  expect(container.textContent).not.toContain("Create agent");
 });
 
 it("hides the ordinary access list and Used by while a private agent connection is not shared", async () => {
