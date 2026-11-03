@@ -4,6 +4,12 @@ import { Id, IsoDate } from "./ids.js";
 /** The one place the Investors agent's spawn key is built. */
 export const investorsAgentSpawnKey = (userId: string) => `investors-agent:${userId}`;
 
+/**
+ * How a routed investor-call run's task starts. The executor never gives such a run
+ * cap_table_update, and the run is told not to read the meeting.
+ */
+export const MEETING_ROUTE_PROMPT_START = "Investor call routed from a meeting: ";
+
 export const isInvestorsAgentSpawnKey = (spawnKey: string | null | undefined) =>
   Boolean(spawnKey?.startsWith(investorsAgentSpawnKey("")));
 

@@ -1,7 +1,7 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
 import { runContinueJob } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
-import { HEX_CONNECTOR_ID } from "@rakazo/contracts";
+import { HEX_CONNECTOR_ID, MEETING_ROUTE_PROMPT_START } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES, newRunUnattended } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import {
@@ -91,18 +91,23 @@ export async function recordOwnerOpened(
   });
 }
 
-/** True when another meeting of this owner that overlaps this one by half or more was already woken. */
+/**
+ * True when another meeting of this owner that overlaps this one by half or more was already woken
+ * (a source wake) or already routed to the same agent.
+ */
 async function isRecordedTwice(
   prisma: Db,
   scope: Scope,
   meeting: { id: string; startedAt: Date; endedAt: Date | null },
+  match: { kind: "source" | "route"; botId?: string },
 ): Promise<boolean> {
   if (!meeting.endedAt) return false;
   const span = { start: meeting.startedAt.getTime(), end: meeting.endedAt.getTime() };
   const rows = await prisma.meetingHandoff.findMany({
     where: {
       ...scope,
-      kind: "source",
+      kind: match.kind,
+      ...(match.botId ? { botId: match.botId } : {}),
       meetingId: { not: meeting.id },
       meeting: {
         deletedAt: null,
@@ -124,8 +129,10 @@ type StartInput = {
   meeting: { id: string; startedAt: Date; endedAt: Date | null };
   bot: { id: string; threadId: string };
   kind: "source" | "route" | "share";
-  /** Written by the server; it must hold no meeting text. */
-  prompt: string;
+  /** Written by the server; it must hold no meeting text. Null posts the meta line and starts no run. */
+  prompt: string | null;
+  /** Called when a run is active on the agent's thread, so the caller can try again later. */
+  onBusy?: () => void;
   meta: { text: string; link?: { label: string; href: string } };
 };
 
@@ -142,18 +149,29 @@ export async function startMeetingRun(
   input: StartInput,
 ): Promise<string | null> {
   const { bot, meeting } = input;
+  let wasBusy = false;
   const runId = await deps.prisma.$transaction(async (tx) => {
     const db = tx as unknown as Db;
     // One wake decision at a time per user, so two sources of one call cannot both pass the
     // overlap check; then the thread lock that owner messages take, so the active-run check holds.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('meeting-handoff'), hashtext(${`${scope.spaceId}:${scope.userId}`}))`;
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${bot.threadId} FOR UPDATE`;
-    if (input.kind === "source" && (await isRecordedTwice(db, scope, meeting))) return null;
+    if (
+      input.kind !== "share" &&
+      (await isRecordedTwice(db, scope, meeting, {
+        kind: input.kind,
+        ...(input.kind === "route" ? { botId: bot.id } : {}),
+      }))
+    )
+      return null;
     const active = await tx.run.findFirst({
       where: { threadId: bot.threadId, status: { in: [...ACTIVE_RUN_STATUSES] } },
       select: { id: true },
     });
-    if (active) return null;
+    if (active) {
+      wasBusy = true;
+      return null;
+    }
     const created = await tx.meetingHandoff.createMany({
       data: [{ ...scope, meetingId: meeting.id, botId: bot.id, kind: input.kind }],
       skipDuplicates: true,
@@ -173,6 +191,7 @@ export async function startMeetingRun(
       type: "thread.message.created",
       payload: { messageId: message.id, role: "system", blocks },
     });
+    if (input.prompt === null) return null;
     const task = await tx.task.create({
       data: {
         ...scope,
@@ -200,8 +219,35 @@ export async function startMeetingRun(
     });
     return run.id;
   });
+  if (wasBusy) input.onBusy?.();
   if (runId) await deps.jobs.enqueue(runContinueJob(runId)).catch(() => undefined);
   return runId;
+}
+
+/**
+ * A routed investor-call run never reads meeting text: the server refuses meetings_* and any
+ * Recordings item for it (a read would mark the Investors agent's single thread for good).
+ * Returns the refusal, or null when the call is allowed.
+ */
+export async function routedRunReadRefusal(
+  prisma: Pick<PrismaClient, "dataRoomItem">,
+  scope: Scope,
+  taskPrompt: string,
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<string | null> {
+  if (!taskPrompt.startsWith(MEETING_ROUTE_PROMPT_START)) return null;
+  const refusal = "Reading meetings is not allowed in this run.";
+  if (toolName.startsWith("meetings_")) return refusal;
+  if (toolName !== "read_data_room_item") return null;
+  const id = typeof args.item_id === "string" ? args.item_id : "";
+  const item = id
+    ? await prisma.dataRoomItem.findFirst({
+        where: { id, ...scope, source: "meeting" },
+        select: { id: true },
+      })
+    : null;
+  return item ? refusal : null;
 }
 
 /** The task prompt: ids, date and category only. Meeting text, even the title, never goes in. */
