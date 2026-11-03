@@ -4,19 +4,21 @@ import { ZERNIO_MCP_ENDPOINT } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import {
   accountLabels,
+  accountLines,
+  appEntry,
   appPath,
   appStatus,
   classifyTool,
   FINANCE_PROVIDERS,
   FIRST_PARTY_MCP,
   filterCatalog,
-  filterConnectedApps,
+  filterEntries,
   groupConnections,
   groupTools,
   isSameMcpEndpoint,
   mcpStatus,
   popularApps,
-  sortConnectedApps,
+  sortEntries,
   toggleAccess,
   toolLabel,
 } from "./integrations";
@@ -273,7 +275,7 @@ describe("Devin tile", () => {
   });
 });
 
-describe("connected app list: labels, filter and sort", () => {
+describe("connected list: labels, filter and sort", () => {
   const gmail = (id: string, displayName: string, extra: Partial<Connection> = {}) =>
     row("connected", { id, provider: "gmail", displayName, ...extra });
   const apps = groupConnections(
@@ -296,7 +298,18 @@ describe("connected app list: labels, filter and sort", () => {
     ],
     [],
   );
-  const names = (list: typeof apps) => list.map((app) => app.name);
+  // Servers and finance tiles sit in the same list as the apps.
+  const entries = [
+    ...apps.map(appEntry),
+    { name: "Mercury", search: ["Mercury"], attention: true, created: "2026-10-04T00:00:00Z" },
+    {
+      name: "Mercury 2",
+      search: ["Mercury 2", "mcp.example.test"],
+      attention: false,
+      created: null,
+    },
+  ];
+  const names = (list: { name: string }[]) => list.map((entry) => entry.name);
 
   it("labels each account by its own name and address, not by the app's name", () => {
     const gm = apps.find((app) => app.provider === "gmail")!;
@@ -304,30 +317,52 @@ describe("connected app list: labels, filter and sort", () => {
     expect(accountLabels(apps.find((app) => app.provider === "slack")!)).toEqual([]);
   });
 
-  it("searches the name, an account's label and its address", () => {
-    const find = (query: string) => names(filterConnectedApps(apps, { query, status: undefined }));
+  it("searches the name, an account's label and its address, on apps and servers alike", () => {
+    const find = (query: string) => names(filterEntries(entries, { query, status: undefined }));
     expect(find("two@")).toEqual(["Gmail"]);
     expect(find("work")).toEqual(["Gmail"]);
-    expect(find("slack")).toEqual(["Slack"]);
+    expect(find("mercury")).toEqual(["Mercury", "Mercury 2"]);
+    expect(find("mcp.example")).toEqual(["Mercury 2"]);
   });
 
   it("filters by status: connected, or needs attention", () => {
-    expect(names(filterConnectedApps(apps, { query: "", status: "attention" }))).toEqual([
+    expect(names(filterEntries(entries, { query: "", status: "attention" }))).toEqual([
       "Notion",
+      "Mercury",
     ]);
-    expect(names(filterConnectedApps(apps, { query: "", status: "connected" }))).toEqual([
+    expect(names(filterEntries(entries, { query: "", status: "connected" }))).toEqual([
       "Gmail",
       "Slack",
+      "Mercury 2",
     ]);
   });
 
-  it("sorts by name, by status with problems first, and by newest connection", () => {
-    expect(names(sortConnectedApps(apps, "name", "asc"))).toEqual(["Gmail", "Notion", "Slack"]);
-    expect(names(sortConnectedApps(apps, "status", "asc"))[0]).toBe("Notion");
-    expect(names(sortConnectedApps(apps, "connected", "desc"))).toEqual([
+  it("sorts by name, by status with problems first, and by newest connection, undated last", () => {
+    expect(names(sortEntries(entries, "name", "asc"))).toEqual([
       "Gmail",
+      "Mercury",
+      "Mercury 2",
+      "Notion",
+      "Slack",
+    ]);
+    expect(
+      names(sortEntries(entries, "status", "asc"))
+        .slice(0, 2)
+        .sort(),
+    ).toEqual(["Mercury", "Notion"]);
+    expect(names(sortEntries(entries, "connected", "desc"))).toEqual([
+      "Gmail",
+      "Mercury",
       "Slack",
       "Notion",
+      "Mercury 2",
     ]);
+  });
+});
+
+describe("accountLines", () => {
+  it("lists up to three accounts and counts the rest", () => {
+    expect(accountLines(["a", "b"], 3)).toEqual({ lines: ["a", "b"], more: 0 });
+    expect(accountLines(["a", "b", "c", "d", "e"], 3)).toEqual({ lines: ["a", "b", "c"], more: 2 });
   });
 });

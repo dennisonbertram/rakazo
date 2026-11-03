@@ -30,19 +30,22 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import type { ConnectedApp } from "../../lib/integrations";
+import type { ConnectedApp, EntryInfo } from "../../lib/integrations";
 import {
   accountLabels,
+  accountLines,
+  appEntry,
   appPath,
+  EXCHANGES,
   FINANCE_PROVIDERS,
   FIRST_PARTY_MCP,
   filterCatalog,
-  filterConnectedApps,
+  filterEntries,
   groupConnections,
   isSameMcpEndpoint,
   mcpStatus,
   popularApps,
-  sortConnectedApps,
+  sortEntries,
 } from "../../lib/integrations";
 import { useListParams } from "../../lib/list-params";
 import { appReturnPath } from "../../lib/return-to";
@@ -59,6 +62,7 @@ import {
   connectedFinanceKeys,
   FINANCE_TILE_COUNT,
   FinanceSection,
+  lapsedFinanceKeys,
   useFinanceStatus,
 } from "./FinanceSection";
 import { GranolaStatusLine, granolaLine } from "./GranolaMeetingsCard";
@@ -261,7 +265,10 @@ function AppCard({
   onReconnect: (app: ConnectedApp, row: Connection) => void;
 }) {
   // An account labelled with the app's own name says nothing new, so show what the app does instead.
-  const accounts = accountLabels(app).join(", ");
+  const { t } = useLingui();
+  const { lines, more } = accountLines(accountLabels(app), 3);
+  const count = more;
+  const accounts = more ? [...lines, t`+${count} more`] : lines;
   const working = app.rows.find((row) => row.status === "connected");
   const lapsed = app.rows.find((row) => row.status === "connected" && row.needsReconnect);
   const description = data.catalog.find(
@@ -273,7 +280,7 @@ function AppCard({
       <CardHead
         name={app.name}
         logo={app.logo}
-        sub={accounts || description || undefined}
+        sub={accounts.length ? accounts : (description ?? undefined)}
         to={to}
       />
       {app.status === "failed" || app.status === "connecting" ? null : (
@@ -565,18 +572,87 @@ export function IntegrationsHome({
   // that is already connected still turns up when searched for.
   const searching = Boolean(query.trim()) || Boolean(status);
   const chipOnly = category !== "all" && !searching;
-  const connectedApps = sortConnectedApps(
-    filtering || status
-      ? filterConnectedApps(
-          apps.filter(
-            (app) =>
-              category === "all" ||
-              data.catalog.find((item) => `${item.connectorId}:${item.slug}` === app.key)
-                ?.category === category,
+  const wholeList = category === "all";
+  const financeProps = {
+    sources: data.financeSources,
+    status: financeStatus,
+    onChanged: () => void data.refresh(),
+    extras: {
+      ...Object.fromEntries(
+        data.financeSources.flatMap((source) =>
+          source.serverId
+            ? [[source.provider, <UsedBy key="used" bots={botsOn(source.serverId)} />]]
+            : [],
+        ),
+      ),
+      ...(cryptoServer ? { crypto: <UsedBy key="used" bots={botsOn(cryptoServer.id)} /> } : {}),
+    },
+    cryptoManageTo: cryptoServer ? `/app/integrations/mcp/${cryptoServer.id}` : undefined,
+  };
+  const financeLabel: Record<string, string> = {
+    ...Object.fromEntries(FINANCE_PROVIDERS.map((entry) => [entry.provider, entry.name])),
+    ...Object.fromEntries(EXCHANGES.map((entry) => [entry.provider, entry.name])),
+    crypto: "Blockscout",
+    alchemy: "Alchemy",
+  };
+  // Apps, MCP servers and finance tiles share one search, status filter and sort. Cards with
+  // their own layout (Granola's key, Omi, Hex, sources) show only while nothing narrows the list.
+  type Entry = EntryInfo & { key: string; node: ReactNode };
+  const lapsedKeys = lapsedFinanceKeys(data.financeSources);
+  const entries: Entry[] = [
+    ...apps
+      .filter(
+        (app) =>
+          category === "all" ||
+          data.catalog.find((item) => `${item.connectorId}:${item.slug}` === app.key)?.category ===
+            category,
+      )
+      .map((app) => ({
+        ...appEntry(app),
+        key: app.key,
+        node: <AppCard key={app.key} app={app} data={data} onRetry={retry} onReconnect={retry} />,
+      })),
+    ...(wholeList ? servers : []).map((server) => ({
+      key: server.id,
+      name: server.name,
+      search: [server.name, hostOf(server.endpoint) ?? "", server.command ?? ""],
+      attention: mcpStatus(server) !== "connected",
+      created: server.createdAt ?? null,
+      node: (
+        <McpCard
+          key={server.id}
+          server={server}
+          data={data}
+          descriptions={firstPartyDescription}
+          onReconnectDevin={() => setDevinDialog("replace")}
+        />
+      ),
+    })),
+    ...(wholeList || category === "finance"
+      ? [
+          ...[...connectedKeys].map((key) => ({ key, attention: false })),
+          // Without a status filter a lapsed bank keeps its own section above Connected.
+          ...(status ? [...lapsedKeys].map((key) => ({ key, attention: true })) : []),
+        ].map(({ key, attention }) => ({
+          key: `finance:${key}`,
+          name: financeLabel[key] ?? key,
+          search: [financeLabel[key] ?? key],
+          attention,
+          created: null,
+          node: (
+            <div key={key} className="contents [&_[data-testid=finance-section]]:contents">
+              <FinanceSection
+                {...financeProps}
+                mode={attention ? "lapsed" : "connected"}
+                only={key}
+              />
+            </div>
           ),
-          { query, status },
-        )
-      : apps,
+        }))
+      : []),
+  ];
+  const connectedEntries = sortEntries(
+    filterEntries(entries, { query, status }),
     list.sort.field,
     list.sort.dir,
   );
@@ -585,15 +661,12 @@ export function IntegrationsHome({
     firstPartyMcp.length > 0 ||
     showBrexTile ||
     chatMatches > 0 ||
-    (searching && connectedApps.length > 0);
-  const wholeList = category === "all";
+    (searching && connectedEntries.length > 0);
   const anyConnected =
     apps.length + servers.length + data.sources.length + connectedKeys.size > 0 ||
     keyOnlyGranola ||
     omiConnected;
-  const hasConnected = chipOnly
-    ? connectedApps.length > 0 || (category === "finance" && connectedKeys.size > 0)
-    : anyConnected;
+  const hasConnected = chipOnly ? connectedEntries.length > 0 : anyConnected;
   // Native Google items fill the catalog without a managed provider, so ask the setup state. Only
   // the deployment owner is told which providers are configured; a member (whose list is empty)
   // can tell from the catalog itself, and a failed call falls back to whether it has anything.
@@ -626,7 +699,7 @@ export function IntegrationsHome({
     // Wait a frame so the dialog's own focus restore has finished.
     const frame = requestAnimationFrame(() => link.focus());
     return () => cancelAnimationFrame(frame);
-  }, [connecting, connectedApps]);
+  }, [connecting, connectedEntries.length]);
 
   function connectFirstParty(entry: (typeof FIRST_PARTY_MCP)[number]) {
     if (entry.id === "devin") return setDevinDialog("connect");
@@ -792,7 +865,7 @@ export function IntegrationsHome({
           {data.loaded ? (
             <>
               {/* A lapsed connection is the one thing to fix, so it sits above Connected. */}
-              {(wholeList || category === "finance") && financeMatches ? (
+              {!status && (wholeList || category === "finance") && financeMatches ? (
                 <div ref={lapsedRef} className="mb-3 scroll-mt-4 empty:hidden">
                   <FinanceSection
                     mode="lapsed"
@@ -802,30 +875,13 @@ export function IntegrationsHome({
                   />
                 </div>
               ) : null}
-              {(searching ? connectedApps.length > 0 : hasConnected) ? (
+              {(searching ? connectedEntries.length > 0 : hasConnected) ? (
                 <>
                   <SectionTitle>
                     <Trans>Connected</Trans>
                   </SectionTitle>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-                    {connectedApps.map((app) => (
-                      <AppCard
-                        key={app.key}
-                        app={app}
-                        data={data}
-                        onRetry={retry}
-                        onReconnect={retry}
-                      />
-                    ))}
-                    {(wholeList && !searching ? servers : []).map((server) => (
-                      <McpCard
-                        key={server.id}
-                        server={server}
-                        data={data}
-                        descriptions={firstPartyDescription}
-                        onReconnectDevin={() => setDevinDialog("replace")}
-                      />
-                    ))}
+                    {connectedEntries.map((entry) => entry.node)}
                     {granolaKey && keyOnlyGranola && wholeList && !searching ? (
                       <GranolaKeyCard
                         status={granolaKey}
@@ -841,34 +897,6 @@ export function IntegrationsHome({
                     {(wholeList && !searching ? data.sources : []).map((source) => (
                       <SourceCard key={source.id} source={source} onRemove={setRemoving} />
                     ))}
-                    {!searching && (wholeList || category === "finance") ? (
-                      <FinanceSection
-                        mode="connected"
-                        sources={data.financeSources}
-                        status={financeStatus}
-                        onChanged={() => void data.refresh()}
-                        extras={{
-                          ...Object.fromEntries(
-                            data.financeSources.flatMap((source) =>
-                              source.serverId
-                                ? [
-                                    [
-                                      source.provider,
-                                      <UsedBy key="used" bots={botsOn(source.serverId)} />,
-                                    ],
-                                  ]
-                                : [],
-                            ),
-                          ),
-                          ...(cryptoServer
-                            ? { crypto: <UsedBy key="used" bots={botsOn(cryptoServer.id)} /> }
-                            : {}),
-                        }}
-                        cryptoManageTo={
-                          cryptoServer ? `/app/integrations/mcp/${cryptoServer.id}` : undefined
-                        }
-                      />
-                    ) : null}
                   </div>
                 </>
               ) : null}

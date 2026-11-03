@@ -339,6 +339,7 @@ export function FinanceSection({
   mode = "all",
   extras,
   cryptoManageTo,
+  only,
 }: {
   sources: FinanceSource[];
   status: FinanceStatus;
@@ -347,6 +348,8 @@ export function FinanceSection({
   extras?: Partial<Record<FinanceProvider | "crypto", ReactNode>>;
   /** Where Blockscout's agents are chosen, once its MCP server exists. */
   cryptoManageTo?: string;
+  /** Renders just this tile (a provider, "crypto", "alchemy" or an exchange), so the page can order tiles itself. */
+  only?: string;
 }) {
   const { t } = useLingui();
   const [busy, setBusy] = useState<FinanceProvider | null>(null);
@@ -364,11 +367,12 @@ export function FinanceSection({
   };
   const lapsedKeys = lapsedFinanceKeys(sources);
   const shown = (key: string) =>
-    mode === "all" ||
-    (mode === "lapsed"
-      ? lapsedKeys.has(key)
-      : (mode === "connected") === connectedKeys.has(key) &&
-        (mode === "connected" || !lapsedKeys.has(key)));
+    (!only || key === only) &&
+    (mode === "all" ||
+      (mode === "lapsed"
+        ? lapsedKeys.has(key)
+        : (mode === "connected") === connectedKeys.has(key) &&
+          (mode === "connected" || !lapsedKeys.has(key))));
 
   async function connect(provider: FinanceProvider, reconnect: boolean) {
     setBusy(provider);

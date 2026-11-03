@@ -169,7 +169,8 @@ export function CardHead({
 }: {
   name: string;
   logo?: string | null;
-  sub?: string;
+  /** One line, or several (each truncated on its own), such as the accounts of an app. */
+  sub?: string | string[];
   to?: string;
 }) {
   return (
@@ -186,7 +187,18 @@ export function CardHead({
         ) : (
           <div className="truncate font-semibold">{name}</div>
         )}
-        {sub ? (
+        {Array.isArray(sub) ? (
+          sub.map((line) => (
+            <div
+              key={line}
+              data-testid="account-line"
+              className="truncate text-xs text-muted-foreground"
+              title={line}
+            >
+              {line}
+            </div>
+          ))
+        ) : sub ? (
           <div className="line-clamp-2 text-xs text-muted-foreground" title={sub}>
             {sub}
           </div>
