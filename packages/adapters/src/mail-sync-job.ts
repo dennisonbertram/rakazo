@@ -131,7 +131,7 @@ function plannedDelay(mode: MailSyncRequestMode, state: RequestState): number | 
 const SWEEP_STALE = Prisma.sql`interval '10 minutes'`;
 /** After a failed sync the sweep waits this long before trying again. */
 const SWEEP_RETRY_WAIT = Prisma.sql`interval '2 minutes'`;
-/** Connections one sweep requests, oldest sync first. */
+/** Connections one sweep requests, oldest attempt first. */
 const SWEEP_BATCH = 200;
 
 /**
@@ -158,7 +158,8 @@ export async function sweepMailSyncs(deps: {
       AND (s."lastSyncedAt" IS NULL
         OR s."lastSyncedAt" < ${DB_NOW} - ${SWEEP_STALE}
         OR s."lastErrorAt" > s."lastSyncedAt")
-    ORDER BY s."lastSyncedAt" ASC NULLS FIRST
+    -- Oldest attempt first, so accounts that keep failing cannot hold every slot.
+    ORDER BY GREATEST(s."lastSyncedAt", s."lastErrorAt") ASC NULLS FIRST
     LIMIT ${SWEEP_BATCH}`;
   const results = await Promise.allSettled(
     rows.map((row) => requestMailSync(deps, row, "refresh")),
