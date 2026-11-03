@@ -68,6 +68,7 @@ const bot: Bot = {
   audience: "internal",
   externalMessageTargets: [],
   externalComputerTools: false,
+  firewall: false,
   webhookConfigured: false,
   spawnKey: null,
   runPhase: null,
