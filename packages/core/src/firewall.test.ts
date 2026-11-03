@@ -53,5 +53,4 @@ describe("firewallToolClass", () => {
       expect(firewallToolClass(name), name).toBe(narrowed.get(name) ?? "free");
     }
   });
-
 });
