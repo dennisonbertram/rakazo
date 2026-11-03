@@ -57,6 +57,8 @@ export function buildApprovalAskBlock(
     schedule?: { summary: string; detail: string };
     /** Who and which account a money request names, looked up from the provider (see resolveMoneyNames). */
     moneyNames?: MoneyNames;
+    /** share_meeting: the agent that would receive the meeting. */
+    shareTarget?: string;
   },
 ): MessageBlock {
   if (toolName === "respond_agent_connection") {
@@ -84,7 +86,11 @@ export function buildApprovalAskBlock(
     };
   }
   const fetchSite = webFetchSite(toolName, args);
+  const shareTarget =
+    options?.shareTarget &&
+    sanitizeMessagingLabel(options.shareTarget).replace(CARD_TITLE_ESCAPED, "\\$&");
   const summary =
+    (shareTarget ? `sharing a meeting with ${shareTarget}` : undefined) ??
     options?.schedule?.summary ??
     describeApprovalAction(
       toolName,
@@ -99,7 +105,9 @@ export function buildApprovalAskBlock(
     options?.imessage ||
     options?.schedule;
   const fullDetailOpen = options?.fullMail || options?.imessage || options?.schedule;
-  const detail = options?.schedule
+  const detail = shareTarget
+    ? `${shareTarget} will ask before every action after it reads the meeting.`
+    : options?.schedule
     ? [options.reviewReason?.trim(), options.schedule.detail].filter(Boolean).join("\n")
     : options?.imessage
       ? imessageSendDetail(args, options.imessage, options.reviewReason)

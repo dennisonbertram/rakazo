@@ -638,6 +638,8 @@ function fixture({
       findMany: vi.fn(async () => [{ id: "cached-1" }]),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
+    inboxSenderFeedback: { findMany: vi.fn(async () => [] as Array<{ senderAddress: string }>) },
+    contact: { findMany: vi.fn(async () => [] as Array<{ email: string | null }>) },
     aiDataConsent: {
       // The chat's own gate reads findUnique and is always consented here; findFirst is the
       // tool-time check, which a test can withdraw after the run has started.
@@ -858,6 +860,7 @@ function fixture({
     commit,
     sharedMemoryState,
     pauseRunForInput,
+    prisma,
     setCalls(next: typeof calls) {
       calls = next;
     },
@@ -1563,6 +1566,69 @@ describe("unattended mail_modify and mail_send", () => {
     await f.run();
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
     expect(isApprovalPausedResult(f.results[0])).toBe(false);
+  });
+
+  it("asks for a mail_modify archive under a tool Allow when an earlier sender in the thread is a Contact", async () => {
+    const f = mailFixture("mail_modify", allow("mail_modify"));
+    f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+      { fromAddress: "Friend@example.test" },
+      { fromAddress: "list@example.test" },
+    ] as never);
+    f.prisma.contact.findMany.mockResolvedValue([{ email: "friend@example.test" }]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+  });
+
+  it("asks when INBOX is removed by label name, since that archives the thread too", async () => {
+    for (const label of ["INBOX", "inbox"]) {
+      const f = mailFixture("mail_modify", allow("mail_modify"));
+      f.setCalls([{ args: { id: "m1", removeLabels: [label] }, executionId: "call-1" }]);
+      f.prisma.contact.findMany.mockResolvedValue([{ email: "friend@example.test" }]);
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        { fromAddress: "friend@example.test" },
+      ] as never);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("asks for an archive of a message that is not cached, since its thread is unknown", async () => {
+    const f = mailFixture("mail_modify", allow("mail_modify"));
+    f.prisma.cachedMailMessage.findFirst.mockResolvedValue(null as never);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks for a protected archive even when the call is attended and under a tool Allow", async () => {
+    const mail = {
+      listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+    };
+    const f = fixture({ name: "mail_modify", builtin: true, rules: allow("mail_modify"), mail });
+    f.setCalls([{ args: { id: "m1", archive: true }, executionId: "call-1" }]);
+    f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+      { fromAddress: "vip@example.test" },
+    ] as never);
+    f.prisma.inboxSenderFeedback.findMany.mockResolvedValue([
+      { senderAddress: "vip@example.test" },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("still runs a tool-Allowed archive of an unprotected thread and a protected thread's mark-read", async () => {
+    const f = mailFixture("mail_modify", allow("mail_modify"));
+    f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+      { fromAddress: "list@example.test" },
+    ] as never);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+
+    const g = mailFixture("mail_modify", allow("mail_modify"));
+    g.setCalls([{ args: { id: "m1", read: true }, executionId: "call-1" }]);
+    g.prisma.contact.findMany.mockResolvedValue([{ email: "list@example.test" }]);
+    await g.run();
+    expect(g.pauseRunForInput).not.toHaveBeenCalled();
   });
 
   it("asks for mail_modify in a routine under only a send_email or email category Allow", async () => {
@@ -3706,7 +3772,7 @@ describe("meeting-source agent", () => {
     const f = meetingRun({ prompt: injection });
     await f.run();
     // The three routine and to-do tools are the exception; they always ask (see the test below).
-    const asking = ["schedule_create", "schedule_list"];
+    const asking = ["schedule_create", "schedule_list", "share_meeting"];
     const allowed = new Set([...MEETINGS, ...asking, "recall_memory", granolaTool.name]);
     expect(f.offeredTools.filter((name) => !allowed.has(name))).toEqual([]);
     expect([...f.offeredTools].sort()).toEqual([...MEETINGS, ...asking, granolaTool.name].sort());
@@ -3716,6 +3782,8 @@ describe("meeting-source agent", () => {
     expect(ordinary.offeredTools).toEqual(
       expect.arrayContaining(["save_shared_memory", "web_fetch", "shell"]),
     );
+    // share_meeting is offered to meeting-source agents only.
+    expect(ordinary.offeredTools).not.toContain("share_meeting");
     // A call the model makes anyway is refused before any effect.
     for (const name of [
       "save_shared_memory",

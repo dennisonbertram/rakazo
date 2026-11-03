@@ -13,6 +13,7 @@ import {
   selectBuiltinToolsForRun,
   userTurnInstructions,
 } from "./executor.js";
+import { MEETING_AGENT_GUIDANCE } from "./meeting-tools.js";
 
 const run = {
   graphicalToolsAllowed: false,
@@ -119,6 +120,30 @@ describe("Data room guidance", () => {
     expect(instructions({ dataRoomEnabled: true, disabled: ["add_to_data_room"] })).not.toContain(
       DATA_ROOM_GUIDANCE,
     );
+  });
+});
+
+describe("Meeting agent guidance", () => {
+  it("is added to meeting-source agent runs only", () => {
+    const base = {
+      botInstructions: "Bot",
+      computerInstruction: "Computer",
+      pageBrowserAllowed: false,
+      workspaceInstruction: "Home",
+      replyGuidance: "Reply",
+      groupContext: undefined,
+      messagingContext: undefined,
+      redactedMemoryContext: undefined,
+      redactedScratchpadContext: undefined,
+      hasHistoricalContext: false,
+      agentEnvironmentInstruction: undefined,
+      botDirectory: undefined,
+      pluginLine: undefined,
+      agentSkillsLine: undefined,
+      taughtSkillsLine: undefined,
+    };
+    expect(userTurnInstructions({ ...base, meetingAgent: true })).toContain(MEETING_AGENT_GUIDANCE);
+    expect(userTurnInstructions(base)).not.toContain(MEETING_AGENT_GUIDANCE);
   });
 });
 

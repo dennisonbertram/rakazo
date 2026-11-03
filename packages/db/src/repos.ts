@@ -105,6 +105,7 @@ function mapBot(
     appControlHeaded?: boolean;
     disabledBuiltinTools?: string[];
     audience?: string;
+    firewall?: boolean;
     externalMessageTargets?: string[];
     externalComputerTools?: boolean;
     webhookSecretId?: string | null;
@@ -161,6 +162,7 @@ function mapBot(
     },
     disabledBuiltinTools: bot.disabledBuiltinTools ?? [],
     audience: bot.audience === "external" ? "external" : "internal",
+    firewall: bot.firewall ?? false,
     externalMessageTargets: bot.externalMessageTargets ?? [],
     externalComputerTools: bot.externalComputerTools ?? false,
     webhookConfigured: Boolean(bot.webhookSecretId),
@@ -501,6 +503,8 @@ export function createRepos(prisma: PrismaClient) {
         disabledBuiltinTools?: string[];
         /** A copy keeps the original's audience; every other new bot is internal. */
         audience?: "internal" | "external";
+        /** A copy keeps the original's firewall flag. */
+        firewall?: boolean;
         externalMessageTargets?: string[];
         externalComputerTools?: boolean;
         initialMessage?: {
@@ -579,6 +583,7 @@ export function createRepos(prisma: PrismaClient) {
               thinkingLevel,
               disabledBuiltinTools,
               audience: input.audience ?? "internal",
+              firewall: input.firewall ?? false,
               externalMessageTargets: input.externalMessageTargets ?? [],
               externalComputerTools: input.externalComputerTools ?? false,
             },

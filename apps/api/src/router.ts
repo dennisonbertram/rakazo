@@ -2651,6 +2651,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             thinkingLevel: source.thinkingLevel,
             disabledBuiltinTools: source.disabledBuiltinTools,
             audience: source.audience === "external" ? "external" : "internal",
+            firewall: source.firewall,
             externalMessageTargets: source.externalMessageTargets,
             externalComputerTools: source.externalComputerTools,
           })
@@ -2903,6 +2904,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
               : {}),
             ...(input.runsOn !== undefined ? { runsOn: input.runsOn } : {}),
             ...(input.audience !== undefined ? { audience: input.audience } : {}),
+            ...(input.firewall !== undefined ? { firewall: input.firewall } : {}),
             ...(messageTargets !== undefined ? { externalMessageTargets: messageTargets } : {}),
             ...(input.externalComputerTools !== undefined
               ? { externalComputerTools: input.externalComputerTools }

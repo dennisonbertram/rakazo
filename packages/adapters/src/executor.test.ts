@@ -5324,6 +5324,7 @@ describe("Omi recordings: agent access and meeting taint", () => {
       "schedule_create",
       "schedule_list",
       "search_data_room",
+      "share_meeting",
     ]);
   });
 
