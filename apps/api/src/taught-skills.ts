@@ -382,7 +382,7 @@ async function rewriteSteps(
   const steps = playbook.steps.map((step, index) => edits.get(index) ?? step);
   const row = await deps.prisma.taughtSkill.update({
     where: { id: skill.id },
-    data: { playbook: { ...playbook, steps } as never },
+    data: { playbook: { ...playbook, steps } as never, playbookUpdatedAt: new Date() },
   });
   await updateSkillDraftMessage(deps, actor, row, {
     name: row.name,
@@ -587,6 +587,7 @@ export function createTaughtSkillsService(deps: TaughtSkillsDeps) {
         data: {
           name: input.name ?? skill.name,
           playbook: input.playbook as never,
+          playbookUpdatedAt: new Date(),
           status: skill.status === "saved" ? "saved" : "draft",
         },
       });

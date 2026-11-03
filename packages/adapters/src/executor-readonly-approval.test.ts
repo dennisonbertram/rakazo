@@ -255,6 +255,8 @@ function fixture({
   routineCreatedAt,
   routinePromptUpdatedAt,
   routineUpdatedAt,
+  skillPlaybookUpdatedAt,
+  skillUpdatedAt,
   scratchpadUpdatedAt,
   memoryUpdatedAt,
   availableTools,
@@ -298,6 +300,9 @@ function fixture({
   /** When its prompt changed, and its row last changed for any reason (schedule updates). */
   routinePromptUpdatedAt?: Date;
   routineUpdatedAt?: Date;
+  /** The routine runs a taught skill; when its playbook changed and when its row last changed. */
+  skillPlaybookUpdatedAt?: Date;
+  skillUpdatedAt?: Date;
   /** One open to-do updated at this time / one memory document updated at this ISO time. */
   scratchpadUpdatedAt?: Date;
   memoryUpdatedAt?: string;
@@ -457,6 +462,7 @@ function fixture({
         managedKind: routineManagedKind ?? null,
         createdAt: routineCreatedAt ?? new Date(0),
         promptUpdatedAt: routinePromptUpdatedAt ?? null,
+        taughtSkillId: skillUpdatedAt ? "skill-1" : null,
         updatedAt: routineUpdatedAt ?? new Date(0),
       })),
       findMany: vi.fn(async () => routines),
@@ -649,7 +655,15 @@ function fixture({
     spaceBackupModel: {
       findMany: vi.fn(async () => [{ provider: "openrouter", modelId: "backup/model" }]),
     },
-    taughtSkill: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
+    taughtSkill: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+      findUnique: vi.fn(async () => ({
+        createdAt: new Date(0),
+        playbookUpdatedAt: skillPlaybookUpdatedAt ?? null,
+        updatedAt: skillUpdatedAt ?? new Date(0),
+      })),
+    },
     agentSecret: { findMany: vi.fn(async () => []) },
     botSecret: { findMany: vi.fn(async () => []) },
     agentSkill: { findMany: vi.fn(async () => skillRows) },
@@ -5472,6 +5486,15 @@ describe("the meeting mark follows what the run can see", () => {
       expect(
         await asks(routine({ routinePromptUpdatedAt: earlier, routineUpdatedAt: later })),
       ).toBe(false);
+    });
+
+    it("is held by a taught skill whose playbook changed after the mark, not by a run of it", async () => {
+      expect(await asks(routine({ skillUpdatedAt: later, skillPlaybookUpdatedAt: later }))).toBe(
+        true,
+      );
+      expect(await asks(routine({ skillUpdatedAt: later, skillPlaybookUpdatedAt: earlier }))).toBe(
+        false,
+      );
     });
 
     it("is held by a to-do changed after the mark, not one from before", async () => {

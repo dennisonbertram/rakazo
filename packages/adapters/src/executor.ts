@@ -10954,9 +10954,17 @@ async function loadedContextChangedSince(
   if (loaded.routineId) {
     const routine = await deps.prisma.routine.findUnique({
       where: { id: loaded.routineId },
-      select: { createdAt: true, promptUpdatedAt: true },
+      select: { createdAt: true, promptUpdatedAt: true, taughtSkillId: true },
     });
     if (!routine || after(routine.promptUpdatedAt ?? routine.createdAt)) return true;
+    if (routine.taughtSkillId) {
+      // The routine runs the skill's playbook instead of its prompt.
+      const skill = await deps.prisma.taughtSkill.findUnique({
+        where: { id: routine.taughtSkillId },
+        select: { createdAt: true, playbookUpdatedAt: true },
+      });
+      if (skill && after(skill.playbookUpdatedAt ?? skill.createdAt)) return true;
+    }
   }
   if (loaded.scratchpad) {
     const items = await listScratchpadItems(deps, { ...scope, includeDone: false });
