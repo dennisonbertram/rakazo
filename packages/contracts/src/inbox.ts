@@ -38,6 +38,22 @@ export const MailAccountSchema = z.object({
 
 export type MailAccountSummary = z.infer<typeof MailAccountSchema>;
 
+/** The renamed label, or the address when two labels read the same (or no label is set). */
+export function accountTabNames(accounts: MailAccountSummary[]): string[] {
+  const seen = new Map<string, number>();
+  for (const { label } of accounts) {
+    const key = label.trim().toLowerCase();
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  return accounts.map(
+    ({ label, address }) =>
+      ((seen.get(label.trim().toLowerCase()) ?? 0) > 1 ? address : undefined) ||
+      label ||
+      address ||
+      "",
+  );
+}
+
 export const InboxPrioritySchema = z.enum(["critical", "important", "normal", "low"]);
 export type InboxPriority = z.infer<typeof InboxPrioritySchema>;
 
