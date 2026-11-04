@@ -2,6 +2,13 @@ import { BOT_PAGE_MAX_CHARS, BOT_PAGE_MAX_CHARTS, MAX_CHART_DATA_ROWS } from "@r
 import { pageGtmFence } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
+
+const addSidebarBotPage = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => ({})));
+vi.mock("@rakazo/db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@rakazo/db")>()),
+  addSidebarBotPage,
+}));
+
 import {
   createBotPage,
   listBotPages,
@@ -482,5 +489,46 @@ describe("named pages", () => {
     expect(pageCardBlock("page_edit", scope, edited)).toBeNull();
     const duplicate = await run("page_create", { title: "cash" });
     expect(pageCardBlock("page_create", scope, duplicate)).toBeNull();
+  });
+
+  describe("sidebar for agent-created pages", () => {
+    const run = (
+      t: ReturnType<typeof setup>,
+      name: Parameters<typeof pageToolFromTool>[0],
+      args: Record<string, unknown>,
+    ) =>
+      pageToolFromTool(
+        name,
+        { prisma: t.prisma, events: t.events },
+        { ...scope, runId: "run-1" },
+        args,
+      );
+
+    it("adds a created page to its owner's sidebar once; a duplicate, write and edit add nothing", async () => {
+      addSidebarBotPage.mockClear();
+      const t = setup();
+      const created = await run(t, "page_create", { title: "Cash" });
+      expect(addSidebarBotPage).toHaveBeenCalledExactlyOnceWith(
+        t.prisma,
+        { spaceId: "space-1", userId: "user-1" },
+        created.pageId,
+      );
+      await run(t, "page_create", { title: "cash" });
+      await run(t, "page_write", { page: "Cash", content: "c", baseRevision: 1 });
+      await run(t, "page_edit", {
+        page: "Cash",
+        old_string: "c",
+        new_string: "d",
+        baseRevision: 2,
+      });
+      expect(addSidebarBotPage).toHaveBeenCalledTimes(1);
+    });
+
+    it("still creates the page when the sidebar cannot be updated", async () => {
+      addSidebarBotPage.mockRejectedValueOnce(new Error("db down"));
+      const t = setup();
+      expect(await run(t, "page_create", { title: "Cash" })).toMatchObject({ ok: true });
+      expect(t.pages).toHaveLength(1);
+    });
   });
 });

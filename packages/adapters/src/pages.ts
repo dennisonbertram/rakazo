@@ -23,7 +23,7 @@ import {
   splitPage,
 } from "@rakazo/core";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { isUniqueViolation } from "@rakazo/db";
+import { addSidebarBotPage, isUniqueViolation } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import type { PlotSpec } from "./plot-tool.js";
 import { renderPlotSpecToSvg, unknownPlotSpecKey } from "./plot-tool.js";
@@ -501,6 +501,18 @@ export async function pageToolFromTool(
         kind: args.kind === "html" ? "html" : "blocks",
         sourceRunId: scope.runId,
       });
+      // An agent's new page goes in its owner's sidebar. Adding is idempotent, the owner can remove
+      // it, and a failure here must not undo the page.
+      await addSidebarBotPage(
+        deps.prisma,
+        { spaceId: scope.spaceId, userId: scope.userId },
+        page.id,
+      ).catch((error) =>
+        getLogger().warn("sidebar add for created page failed", {
+          error: error instanceof Error ? error.message : String(error),
+          botId: scope.botId,
+        }),
+      );
       return {
         ok: true,
         pageId: page.id,
