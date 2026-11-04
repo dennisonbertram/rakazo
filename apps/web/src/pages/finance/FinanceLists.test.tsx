@@ -76,7 +76,8 @@ const show = async (node: ReactNode, url: string) => {
   await act(async () => root.render(<MemoryRouter initialEntries={[url]}>{node}</MemoryRouter>));
   await act(async () => {});
 };
-const order = () => [...(container.textContent ?? "").matchAll(/Vendor ([a-z]+)/g)].map((m) => m[1]);
+const order = () =>
+  [...(container.textContent ?? "").matchAll(/Vendor ([a-z]+)/g)].map((m) => m[1]);
 
 it("lists upcoming by date, and sorts, searches and filters by type from the URL", async () => {
   await show(<FinanceUpcomingPage />, "/app/finance/upcoming");

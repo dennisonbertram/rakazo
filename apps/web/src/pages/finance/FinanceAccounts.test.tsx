@@ -510,3 +510,43 @@ it("renames a statement account and shows the new name, and offers no rename on 
     false,
   );
 });
+
+it("shows 3 cash accounts on a phone and expands the rest in place", async () => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: true,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  try {
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      id: `m${i}`,
+      name: `Account ${i}`,
+      lastFour: null,
+      balanceCents: 1_000_000 - i * 1_000,
+      annualYieldPct: null,
+    }));
+    act(() => root.unmount());
+    root = createRoot(container);
+    await show();
+    rpcMock.accounts.mockResolvedValue({ ...accounts, cash: many });
+    act(() => root.unmount());
+    root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <FinanceAccountsPage />
+        </MemoryRouter>,
+      ),
+    );
+    await flush();
+    const rows = () => container.querySelectorAll('a[href^="/app/finance/account/m"]').length;
+    expect(rows()).toBe(3);
+    const seeAll = [...container.querySelectorAll("button")].find(
+      (b) => b.textContent === "See all (5)",
+    );
+    await act(async () => seeAll?.click());
+    expect(rows()).toBe(5);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
