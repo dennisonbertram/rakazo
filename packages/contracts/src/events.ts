@@ -231,6 +231,47 @@ export const MAIL_REPLY_FLAGS = [
 export const MailReplyFlagSchema = z.enum(MAIL_REPLY_FLAGS);
 export type MailReplyFlag = z.infer<typeof MailReplyFlagSchema>;
 
+/** One row of a reply batch card. Recipients are bare addresses: a display name can say anything. */
+export const MailBatchRowSchema = z.object({
+  itemId: Id,
+  replyToId: z.string(),
+  to: z.array(z.string()),
+  cc: z.array(z.string()),
+  bcc: z.array(z.string()),
+  subject: z.string(),
+  body: z.string(),
+  /** Of the stored row; posted back with the press. */
+  hash: z.string().length(64),
+  /** The newest inbound message now; posting it back acknowledges it. */
+  seenMessageId: z.string().nullable(),
+  flags: z.array(MailReplyFlagSchema),
+  /** A row with a flag other than a link starts unticked. */
+  startsUnticked: z.boolean(),
+  state: z.enum(["reviewing", "sending", "sent", "not_sent", "unknown", "skipped", "composer"]),
+  /** Why a row is not sent, when it was held before any send attempt. */
+  error: z.string().nullable(),
+  /** Retry failed can pick this row up. */
+  retryable: z.boolean(),
+});
+export type MailBatchRow = z.infer<typeof MailBatchRowSchema>;
+
+export const MailBatchSchema = z.object({
+  /** The address every row goes out from. */
+  account: z.string().nullable(),
+  effectStatus: z.string(),
+  rows: z.array(MailBatchRowSchema),
+});
+export type MailBatch = z.infer<typeof MailBatchSchema>;
+
+/** One ticked row of Send selected. Edits replace the row's fields before its hash is approved. */
+export const MailBatchPressRowSchema = z.object({
+  itemId: Id,
+  hash: z.string().length(64),
+  seenMessageId: z.string().max(500).nullable(),
+  edits: MailEditsSchema.omit({ account: true, send: true }).optional(),
+});
+export type MailBatchPressRow = z.infer<typeof MailBatchPressRowSchema>;
+
 /** The effect kind of a bot-to-bot message held for the owner before it reaches an external bot. */
 export const BOT_SHARE_EFFECT_KIND = "bot_message_share";
 /** Server-written replies to the external bot; never model text. */

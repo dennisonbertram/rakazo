@@ -583,6 +583,7 @@ import {
 } from "./legal.js";
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
 import { sendSavedMailDraft } from "./mail-draft-send.js";
+import { readMailBatch, retryMailBatch, sendMailBatch } from "./mail-reply-batch.js";
 import {
   dismissMcpServerApprovals,
   resolveMcpApprovalCards,
@@ -3813,6 +3814,36 @@ export function createRouter(deps: RouterDeps): AppRouter {
           getLogger().error("call end enqueue", error);
         });
         return { ok: true as const };
+      }),
+      mailBatch: authed.threads.mailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return readMailBatch(deps, context.actor, target, input);
+      }),
+      sendMailBatch: authed.threads.sendMailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        await sendMailBatch(
+          { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
+          context.actor,
+          target,
+          input,
+        );
+        // The card is answered, so its "needs approval" notification has nothing left to ask.
+        await markSeen(deps.prisma, {
+          ...context.actor,
+          surface: "thread",
+          threadId: target.threadId,
+        }).catch((error) => getLogger().error("thread mail batch notification", error));
+        return { ok: true as const };
+      }),
+      retryMailBatch: authed.threads.retryMailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        const count = await retryMailBatch(
+          { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
+          context.actor,
+          target,
+          input,
+        );
+        return { ok: true as const, count };
       }),
       sendDraft: authed.threads.sendDraft.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);

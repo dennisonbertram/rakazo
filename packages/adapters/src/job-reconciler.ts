@@ -9,6 +9,7 @@ import { returnBotMessageOutcome } from "./bot-messages.js";
 import { scheduleComputerControlExpiry } from "./computer-control.js";
 import { expireExternalActions, pruneMcpCallLog } from "./external-actions.js";
 import { reconcileMailApprovals } from "./mail-approval-recovery.js";
+import { reconcileMailReplyBatches } from "./mail-reply-batch.js";
 import { notifyPastDueItems } from "./past-due.js";
 import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
@@ -204,6 +205,17 @@ export function createJobReconciler(
           });
         } catch (error) {
           getLogger().error("mail approval reconciliation", error);
+        }
+        try {
+          await reconcileMailReplyBatches({
+            prisma: deps.prisma,
+            jobs: deps.jobs,
+            events: deps.events,
+            now,
+            batchSize,
+          });
+        } catch (error) {
+          getLogger().error("mail reply batch reconciliation", error);
         }
       }
       controlScanDeadline ??= new Date(now.getTime() + CONTROL_LOOKAHEAD_MS);

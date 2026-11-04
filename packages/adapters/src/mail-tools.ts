@@ -90,6 +90,13 @@ export type MailToolDeps = {
   writesDisabled?: boolean;
   /** Stable per tool call, from the run; mail_send keys its send record on it so a replay never sends twice. */
   idempotencyKey?: string;
+  /**
+   * A reply batch's send: a failed record is never claimed (only the owner's Retry makes it sendable
+   * again), and every attempt overwrites the draft with the approved message right before the send,
+   * so a draft changed in the mailbox after a failed attempt is not what goes out. Nothing waits for
+   * a mail sync between rows.
+   */
+  sendOnce?: boolean;
   deadlineMs?: number;
   /** How long the inbox overview waits for the queued sync; defaults to 8 seconds. */
   syncWaitMs?: number;
@@ -1078,7 +1085,7 @@ async function mailSend(
     select: { id: true, connectionId: true, draftId: true, state: true },
   });
   const claim = await table.updateMany({
-    where: { id: row.id, state: { in: ["draft", "failed"] } },
+    where: { id: row.id, state: { in: deps.sendOnce ? ["draft"] : ["draft", "failed"] } },
     data: { state: "pending" },
   });
   if (claim.count === 0) {
@@ -1095,6 +1102,19 @@ async function mailSend(
   let sending = false;
   try {
     let draftId = given || row.draftId;
+    if (deps.sendOnce && draftId) {
+      await allowWrite(deps, account);
+      draftId = await deps.mail
+        .updateDraft(account, draftId, draft, writeContext(deps, account, context))
+        .then(
+          (saved) => saved.draftId,
+          (error: unknown) => {
+            // Gone from the mailbox: a new draft below.
+            if (error instanceof MailProviderError && error.kind === "not_found") return null;
+            throw error;
+          },
+        );
+    }
     if (!draftId) {
       await allowWrite(deps, account);
       draftId = (await deps.mail.createDraft(account, draft, writeContext(deps, account, context)))
@@ -1111,11 +1131,16 @@ async function mailSend(
       threadId: sent.threadId || null,
     });
     // So the Inbox shows the reply in its conversation, and the thread leaves Needs reply.
-    await syncAfterSend({ prisma: deps.prisma, jobs: deps.jobs }, account, {
-      ...context,
-      spaceId: deps.scope.spaceId,
-      userId: deps.scope.userId,
-    });
+    await syncAfterSend(
+      { prisma: deps.prisma, jobs: deps.jobs },
+      account,
+      {
+        ...context,
+        spaceId: deps.scope.spaceId,
+        userId: deps.scope.userId,
+      },
+      deps.sendOnce ? 0 : undefined,
+    );
     return {
       ok: true,
       account: accountName(account),

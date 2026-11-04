@@ -23,6 +23,12 @@ import {
   CrossSpaceCommunicationBlockedError,
   crossSpaceCommunicationAllowed,
 } from "./cross-space-communication.js";
+import type { AcceptMailReplyBatchInput, AcceptMailReplyBatchResult } from "./mail-reply-batch.js";
+import {
+  acceptMailReplyBatch,
+  setMailBatchCounts,
+  settleMailReplyBatch,
+} from "./mail-reply-batch.js";
 import {
   assertRunCanWriteHistory,
   assertRunIsCancelled,
@@ -68,6 +74,13 @@ export interface ThreadEvents {
   answerRunInput(input: AnswerRunInput): Promise<boolean>;
   findMailApprovalForEdit(input: FindMailApprovalInput): Promise<PendingMailApproval | null>;
   setMailApprovalOutcome(input: SetMailApprovalOutcomeInput): Promise<void>;
+  acceptMailReplyBatch(input: AcceptMailReplyBatchInput): Promise<AcceptMailReplyBatchResult>;
+  setMailBatchCounts(input: { spaceId: string; userId: string; effectId: string }): Promise<void>;
+  settleMailReplyBatch(input: {
+    spaceId: string;
+    userId: string;
+    effectId: string;
+  }): Promise<{ settled: boolean; resumeRunId?: string }>;
   setApprovalWaitsFor(input: SetApprovalWaitsForInput): Promise<void>;
   append(input: AppendEventInput): Promise<ProductEvent>;
   claimSteering(input: ClaimSteeringInput): Promise<ClaimedSteeringMessage[]>;
@@ -275,6 +288,9 @@ export function createThreadEvents(
     answerRunInput: (input) => answerRunInput(prisma, input, realtime, options.runSecretWriter),
     findMailApprovalForEdit: (input) => findMailApprovalForEdit(prisma, input),
     setMailApprovalOutcome: (input) => setMailApprovalOutcome(prisma, input, realtime),
+    acceptMailReplyBatch: (input) => acceptMailReplyBatch(prisma, input, realtime),
+    setMailBatchCounts: (input) => setMailBatchCounts(prisma, input, realtime),
+    settleMailReplyBatch: (input) => settleMailReplyBatch(prisma, input, realtime),
     setApprovalWaitsFor: (input) => setApprovalWaitsFor(prisma, input, realtime),
     append: (input) => appendEvent(prisma, input, realtime),
     claimSteering: (input) => claimSteering(prisma, input),
