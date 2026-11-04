@@ -220,7 +220,7 @@ export function ConnectAppDialog({
     if (finished.current) onConnected?.();
   }
 
-  async function saveAccess(botIds: string[]) {
+  async function saveAccess(botIds: string[], skipped = false) {
     if (!row) return;
     setSaving(true);
     setAccessError(null);
@@ -232,7 +232,10 @@ export function ConnectAppDialog({
         botIds: all ? [] : botIds,
       });
       void refresh();
-      setPhase({ kind: "done", agents: all ? "all" : botIds.length > 0 ? "some" : "none" });
+      setPhase({
+        kind: "done",
+        agents: skipped ? "skipped" : all ? "all" : botIds.length > 0 ? "some" : "none",
+      });
     } catch (err) {
       setAccessError(errorText(err, t`Could not save bot access`));
     } finally {
@@ -293,7 +296,8 @@ export function ConnectAppDialog({
             busy={saving}
             error={accessError}
             onContinue={(ids) => void saveAccess(ids)}
-            onSkip={() => setPhase({ kind: "done", agents: "skipped" })}
+            // Skip still saves least access: the database default would share it with every bot.
+            onSkip={() => void saveAccess([], true)}
           />
         ) : (
           <div>
