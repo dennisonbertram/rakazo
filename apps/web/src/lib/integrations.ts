@@ -468,6 +468,7 @@ export function setOthersAccess(
     (current.allAgents ? allBotIds : current.botIds).filter((id) => kept.has(id)),
   );
   if (on) for (const id of allBotIds) if (!kept.has(id)) ids.add(id);
-  const all = allBotIds.every((id) => ids.has(id));
+  // None stays an explicit list even when it covers today's agents, so future agents start off.
+  const all = on && allBotIds.every((id) => ids.has(id));
   return { allAgents: all, botIds: all ? [] : [...ids] };
 }
