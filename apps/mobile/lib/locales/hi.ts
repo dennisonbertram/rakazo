@@ -955,4 +955,8 @@ export const HI_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "जवाब की ज़रूरत बंद",
   "No reply needed": "जवाब की ज़रूरत नहीं",
   "Stopped Needs reply for {sender}": "{sender} के लिए जवाब की ज़रूरत बंद की गई",
+  "See all ({count})": "सभी देखें ({count})",
+  Overdue: "अतिदेय",
+  Upcoming: "आगामी",
+  "No date": "कोई तिथि नहीं",
 };

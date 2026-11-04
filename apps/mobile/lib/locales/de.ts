@@ -1014,4 +1014,8 @@ export const DE_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "Antwort-Hinweis beendet",
   "No reply needed": "Keine Antwort nötig",
   "Stopped Needs reply for {sender}": "Antwort-Hinweis für {sender} beendet",
+  "See all ({count})": "Alle anzeigen ({count})",
+  Overdue: "Überfällig",
+  Upcoming: "Anstehend",
+  "No date": "Ohne Datum",
 };

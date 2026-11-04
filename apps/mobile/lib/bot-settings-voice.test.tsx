@@ -107,6 +107,15 @@ vi.mock("./i18n", () => {
   return { useI18n: () => ({ t }) };
 });
 vi.mock("../components/bot-avatar", () => ({ BotAvatar: () => null }));
+vi.mock("../components/capped-list", () => ({
+  CappedList: ({
+    items,
+    renderItem,
+  }: {
+    items: unknown[];
+    renderItem: (item: unknown) => ReactNode;
+  }) => createElement("div", null, items.map(renderItem)),
+}));
 vi.mock("../components/computer-mode-picker", () => ({ ComputerModePicker: () => null }));
 vi.mock("../components/native-action-button", () => ({ NativeActionButton: () => null }));
 vi.mock("../components/native-switch", () => ({ NativeSwitch: () => null }));

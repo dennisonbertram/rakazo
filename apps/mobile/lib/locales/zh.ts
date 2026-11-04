@@ -989,4 +989,8 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "已停止待回复",
   "No reply needed": "无需回复",
   "Stopped Needs reply for {sender}": "已停止对 {sender} 的待回复提示",
+  "See all ({count})": "查看全部（{count}）",
+  Overdue: "已逾期",
+  Upcoming: "即将到期",
+  "No date": "无日期",
 };
