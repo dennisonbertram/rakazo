@@ -964,4 +964,8 @@ export const TR_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "Yanıt gerekli durduruldu",
   "No reply needed": "Yanıt gerekmiyor",
   "Stopped Needs reply for {sender}": "{sender} için Yanıt gerekli durduruldu",
+  "See all ({count})": "Tümünü gör ({count})",
+  Overdue: "Gecikmiş",
+  Upcoming: "Yaklaşan",
+  "No date": "Tarihsiz",
 };

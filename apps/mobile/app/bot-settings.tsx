@@ -18,6 +18,7 @@ import type { Voice } from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { BotAvatar } from "../components/bot-avatar";
+import { CappedList } from "../components/capped-list";
 import { ComputerModePicker } from "../components/computer-mode-picker";
 import { glassHeaderOptions } from "../components/glass-title";
 import type { MenuPickerChoice } from "../components/menu-picker";
@@ -617,18 +618,24 @@ export default function BotSettingsScreen() {
         {skills.length || skillsError ? (
           <View style={{ marginTop: 20 }}>
             <Text style={{ color: tokens.mutedForeground, fontSize: 14 }}>{t("Skills")}</Text>
-            {skills.map((skill) => (
-              <View key={skill.id} style={styles.row}>
-                <Text numberOfLines={1} style={[styles.rowLabel, { color: tokens.foreground }]}>
-                  {skill.name}
-                </Text>
-                <NativeSwitch
-                  accessibilityLabel={t("Use {name}", { name: skill.name })}
-                  onValueChange={(enabled) => void setSkillEnabled(skill, enabled)}
-                  value={skill.enabled}
-                />
-              </View>
-            ))}
+            <CappedList
+              items={skills}
+              title={t("Skills")}
+              keyOf={(skill) => skill.id}
+              searchFields={(skill) => [skill.name]}
+              renderItem={(skill) => (
+                <View key={skill.id} style={styles.row}>
+                  <Text numberOfLines={1} style={[styles.rowLabel, { color: tokens.foreground }]}>
+                    {skill.name}
+                  </Text>
+                  <NativeSwitch
+                    accessibilityLabel={t("Use {name}", { name: skill.name })}
+                    onValueChange={(enabled) => void setSkillEnabled(skill, enabled)}
+                    value={skill.enabled}
+                  />
+                </View>
+              )}
+            />
             {skillsError ? (
               <Text style={{ color: tokens.destructive, marginTop: 8 }}>{skillsError}</Text>
             ) : null}

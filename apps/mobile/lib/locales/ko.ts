@@ -960,4 +960,8 @@ export const KO_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "답장 필요 중지됨",
   "No reply needed": "답장 필요 없음",
   "Stopped Needs reply for {sender}": "{sender}의 답장 필요 표시를 중지했습니다",
+  "See all ({count})": "모두 보기 ({count})",
+  Overdue: "기한 초과",
+  Upcoming: "예정",
+  "No date": "날짜 없음",
 };
