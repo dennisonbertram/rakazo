@@ -17,6 +17,8 @@ final class AuthenticationModel {
   private(set) var isSignedIn = false
   private(set) var busy = false
   private(set) var capabilities: AuthCapabilities?
+  /// False on a release build that has no saved server yet; the first screen asks for one.
+  private(set) var hasServer: Bool
   private(set) var errorMessage: String?
   private(set) var notice: String?
 
@@ -29,7 +31,9 @@ final class AuthenticationModel {
 
   init(client: AuthClient? = nil, defaults: UserDefaults = .standard) {
     let saved = defaults.string(forKey: Self.endpointKey)
-    let endpoint = saved.flatMap { try? ServerEndpoint.normalize($0) } ?? ServerEndpoint.defaultURL
+    let launch = ServerEndpoint.launchEndpoint(saved: saved)
+    let endpoint = launch ?? ServerEndpoint.defaultURL
+    hasServer = launch != nil
     self.endpoint = endpoint
     self.defaults = defaults
     self.client = client ?? AuthClient(endpoint: endpoint, storage: KeychainSessionStorage())
@@ -38,6 +42,7 @@ final class AuthenticationModel {
   func start() async {
     guard !started else { return }
     started = true
+    guard hasServer else { return }
     busy = true
     defer { busy = false }
     do {
@@ -149,6 +154,7 @@ final class AuthenticationModel {
       try await client.changeServer(to: endpoint)
       await sync()
       defaults.set(self.endpoint.absoluteString, forKey: Self.endpointKey)
+      hasServer = true
       page = .signIn
       password = ""
       email = ""
@@ -202,6 +208,10 @@ final class AuthenticationModel {
   }
 
   private func show(_ error: any Error) {
+    if case AuthClientError.serverUnavailable = error {
+      errorMessage = "Couldn’t reach \(endpoint.serverName)."
+      return
+    }
     errorMessage =
       (error as? any LocalizedError)?.errorDescription ?? "Couldn’t connect. Try again."
   }

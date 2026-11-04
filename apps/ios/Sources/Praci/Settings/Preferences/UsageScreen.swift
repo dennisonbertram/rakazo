@@ -17,6 +17,16 @@ final class UsageModel {
   }
 }
 
+extension UsageSummary {
+  /// The server leaves the total empty when some records lack one; input plus output is then
+  /// the best figure, as long as both are known.
+  var displayTotal: Int? {
+    if let totalTokens { return totalTokens }
+    guard let inputTokens, let outputTokens else { return nil }
+    return inputTokens + outputTokens
+  }
+}
+
 struct UsageScreen: View {
   @Environment(AppModel.self) private var app
   @State private var model = UsageModel()
@@ -24,11 +34,14 @@ struct UsageScreen: View {
   var body: some View {
     LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { usage in
       List {
-        row("Runs", usage.runs)
-        row("Model calls", usage.modelCalls)
-        row("Input tokens", usage.inputTokens)
-        row("Output tokens", usage.outputTokens)
-        row("Total tokens", usage.totalTokens)
+        // The server totals every record for this person in this space, with no date limit.
+        Section("All time in this space") {
+          row("Runs", usage.runs)
+          row("Model calls", usage.modelCalls)
+          row("Input tokens", usage.inputTokens)
+          row("Output tokens", usage.outputTokens)
+          row("Total tokens", usage.displayTotal)
+        }
       }
     })
     .navigationTitle("Usage")
