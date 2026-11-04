@@ -180,7 +180,16 @@ final class AccessModel {
     AccessLogic.keptIDs(agents: agents, ownerID: subject.ownerBotID)
   }
 
-  var everyone: Bool { grant.allAgents }
+  /// Every agent can use it. A server has no "all agents" grant, so it is read from the assignments.
+  var everyone: Bool {
+    if case .server = subject { return agents.allSatisfy { on.contains($0.id) } }
+    return grant.allAgents
+  }
+  /// An email chat has the Inbox agent's access, so on an account it only follows. MCP
+  /// assignments are independent of the Inbox agent.
+  var chatsLocked: Bool {
+    if case .connection = subject { true } else { false }
+  }
   var noneOn: Bool {
     agents.allSatisfy { keptIDs.contains($0.id) || !on.contains($0.id) }
   }
@@ -259,8 +268,11 @@ final class AccessModel {
     let keep = Set(keptIDs)
     let ids = agents.map(\.id).filter { !keep.contains($0) }
     let changing = ids.filter { on.contains($0) != next }
+    // "All agents" does not reach a restricted agent, so it is not shown on.
+    let restricted = Set(agents.filter(\.restricted).map(\.id))
+    let reached = ids.filter { !next || !restricted.contains($0) }
     await save(app) {
-      self.setLocal(ids, next)
+      self.setLocal(reached, next)
       switch self.subject {
       case .connection(let id, _):
         let value = AccessLogic.setOthers(
@@ -310,7 +322,12 @@ final class AccessModel {
       self.error = settingsErrorText(error)
     }
     // Rows stay where they are; only the switches follow the server.
-    try? await fetch(app)
+    do {
+      try await fetch(app)
+    } catch where self.error == nil {
+      // The change landed but the switches no longer show what the server has.
+      self.error = String(localized: "Saved, but the list could not be refreshed")
+    } catch {}
     saving = false
   }
 }

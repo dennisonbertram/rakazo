@@ -63,14 +63,18 @@ final class AgentAccessModel {
     else { return }
     saving = true
     error = nil
+    let before = rows[index].write?.on
     rows[index].write?.on = next
+    var saved = true
     do {
       try await AccessClient.setAgentAccess(
         app, connection: row.refID, botID: agent.id, on: true, canWrite: next)
     } catch {
+      saved = false
+      rows[index].write?.on = before ?? false
       self.error = settingsErrorText(error)
     }
-    try? await fetch(app)
+    await refresh(app, saved: saved)
     saving = false
   }
 
@@ -80,7 +84,9 @@ final class AgentAccessModel {
     }
     saving = true
     error = nil
+    let before = rows[index].on
     rows[index].on = next
+    var saved = true
     do {
       switch row.kind {
       case .connection:
@@ -90,11 +96,21 @@ final class AgentAccessModel {
         try await AccessClient.assign(app, botID: agent.id, serverID: row.refID, on: next)
       }
     } catch {
+      saved = false
+      rows[index].on = before
       self.error = settingsErrorText(error)
     }
-    // The switch follows the server: a failed save puts it back.
-    try? await fetch(app)
+    await refresh(app, saved: saved)
     saving = false
+  }
+
+  /// The switches follow the server. If that read fails after a save that landed, say so.
+  private func refresh(_ app: AppModel, saved: Bool) async {
+    do {
+      try await fetch(app)
+    } catch where saved {
+      self.error = String(localized: "Saved, but the list could not be refreshed")
+    } catch {}
   }
 }
 

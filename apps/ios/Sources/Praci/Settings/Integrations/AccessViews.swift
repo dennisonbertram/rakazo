@@ -138,8 +138,7 @@ struct AccessSections: View {
         Text(chats.count.formatted()).font(.caption).foregroundStyle(Color.token(.mutedForeground))
       }
     }
-    // An email's chat has the Inbox agent's access, so it only follows.
-    .disabled(true)
+    .disabled(model.saving || model.chatsLocked)
     .accessibilityIdentifier("accessChats")
   }
 }

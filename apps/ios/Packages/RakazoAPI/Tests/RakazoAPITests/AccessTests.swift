@@ -63,6 +63,10 @@ func allAndNoneActOnTheOtherAgentsOnly() {
   let owned = AccessLogic.setOthers(
     AccessGrant(allAgents: false, botIds: ["b"]), allBotIDs: everyone, keep: ["inbox"], on: false)
   #expect(owned.botIds.isEmpty && !owned.allAgents)
+  // None stays an explicit list even when the kept agents are the whole roster.
+  let solo = AccessLogic.setOthers(
+    AccessGrant(allAgents: true, botIds: []), allBotIDs: ["inbox"], keep: ["inbox"], on: false)
+  #expect(!solo.allAgents && solo.botIds == ["inbox"])
   // Only a mail account keeps the email chats; other owners keep themselves.
   #expect(AccessLogic.keptIDs(agents: roster, ownerID: "b") == ["b"])
   #expect(AccessLogic.keptIDs(agents: roster, ownerID: nil).isEmpty)

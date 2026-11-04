@@ -30,6 +30,8 @@ private actor Routes: HTTPTransport {
     calls.append((name, request.body.map { String(decoding: $0, as: UTF8.self) } ?? ""))
     return answers[name] ?? HTTPResponse(statusCode: 500)
   }
+  /// From now on this procedure fails, like a dropped connection.
+  func drop(_ name: String) { answers[name] = nil }
   func bodies(_ name: String) -> [String] { calls.filter { $0.path == name }.map(\.body) }
 }
 
@@ -207,6 +209,116 @@ func agentAccessRevertsAFailedSwitch() async throws {
   await model.toggle(app, row, on: true)  // setAccess is not routed: the save fails
   #expect(model.rows.first?.on == false && model.error != nil)
   #expect(await routes.bodies("connections/access").isEmpty)  // one batched read, not one per account
+}
+
+@MainActor
+private func agentSide(_ routes: Routes) async throws -> (AgentAccessModel, AppModel) {
+  let app = try await makeApp(routes)
+  let model = AgentAccessModel(agent: AccessAgent(id: "c", name: "Alpha"))
+  await model.load(app)
+  return (model, app)
+}
+
+private let agentSideRoutes: [String: String] = [
+  "connections/list": #"{"json":[{"id":"c1","connectorId":"composio","provider":"GMAIL","displayName":"Work","account":"me@example.com","status":"connected","error":null,"agentBotId":"inbox","writesEnabled":true,"capabilities":[],"createdAt":"x"}]}"#,
+  "mcp/servers/list": #"{"json":[]}"#, "bots/list": agentsJSON(roster),
+  "connections/effectiveAccess": #"{"json":{"c1":{"shared":"some","botIds":["c"]}}}"#,
+  "mcp/assignments/list": #"{"json":[]}"#,
+  "connections/accessAll": #"{"json":{"c1":{"allAgents":false,"botIds":["c"],"agentShared":true,"writeBotIds":["c"]}}}"#,
+]
+
+@MainActor
+@Test
+func aFailedSaveAndRefreshStillRestoresTheAgentSwitch() async throws {
+  let routes = Routes(agentSideRoutes)
+  let (model, app) = try await agentSide(routes)
+  let row = try #require(model.rows.first)
+  #expect(row.on)
+  await routes.drop("connections/setAgentAccess")
+  await routes.drop("connections/effectiveAccess")  // the refresh fails too
+  await model.toggle(app, row, on: false)
+  #expect(model.rows.first?.on == true && model.error != nil)
+  await model.toggleWrite(app, try #require(model.rows.first), on: false)
+  #expect(model.rows.first?.write?.on == true && model.error != nil)
+}
+
+@MainActor
+@Test
+func aSaveThatLandedButCouldNotRefreshSaysSo() async throws {
+  let routes = Routes(agentSideRoutes.merging(["connections/setAgentAccess": accessJSON]) { $1 })
+  let (model, app) = try await agentSide(routes)
+  await routes.drop("connections/effectiveAccess")
+  await model.toggle(app, try #require(model.rows.first), on: false)
+  #expect(model.error == "Saved, but the list could not be refreshed")
+  let list = Routes([
+    "bots/list": agentsJSON(roster), "connections/access": accessJSON,
+    "connections/effectiveAccess": effectiveJSON, "connections/setAgentAccess": accessJSON,
+  ])
+  let account = AccessModel(subject: .connection(id: "c1", ownerBotID: "inbox"))
+  let listApp = try await makeApp(list)
+  await account.load(listApp)
+  await list.drop("connections/effectiveAccess")
+  await account.toggle(listApp, try #require(account.agents.first { $0.id == "c" }), on: true)
+  #expect(account.error == "Saved, but the list could not be refreshed")
+}
+
+@MainActor
+@Test
+func allOnAnAccountDoesNotShowARestrictedAgentOn() async throws {
+  let agents = [
+    AccessAgent(id: "inbox", name: "Inbox agent", spawnKey: "inbox-agent:u1"),
+    AccessAgent(id: "n", name: "Normal"), AccessAgent(id: "r", name: "Fire", restricted: true),
+  ]
+  let routes = Routes([
+    "connections/setAccess": accessJSON, "connections/access": accessJSON,
+    "connections/effectiveAccess": #"{"json":{}}"#,
+  ])
+  let app = try await makeApp(routes)
+  let model = AccessModel(
+    subject: .connection(id: "c1", ownerBotID: "inbox"), agents: agents, on: ["inbox"],
+    grant: AccessGrant(allAgents: false, botIds: ["inbox"]), shared: true)
+  await routes.drop("connections/access")  // the refresh fails: the guess has to be right
+  await model.setAll(app, on: true)
+  #expect(model.isOn(agents[1]) && !model.isOn(agents[2]))
+}
+
+@MainActor
+@Test
+func noneAlwaysSendsAnExplicitList() async throws {
+  let routes = Routes([
+    "bots/list": agentsJSON([("inbox", "Inbox agent", "inbox-agent:u1")]),
+    "connections/access": accessJSON, "connections/effectiveAccess": effectiveJSON,
+    "connections/setAccess": accessJSON,
+  ])
+  let app = try await makeApp(routes)
+  let model = AccessModel(subject: .connection(id: "c1", ownerBotID: "inbox"))
+  await model.load(app)
+  await model.setAll(app, on: false)
+  let sent = try #require(await routes.bodies("connections/setAccess").first)
+  #expect(sent.contains(#""allAgents":false"#) && sent.contains(#""botIds":["inbox"]"#))
+}
+
+@MainActor
+@Test
+func serversDeriveEveryoneFromAssignmentsAndDoNotLockChats() async throws {
+  let server = McpServer(id: "s1", name: "Example", agentBotId: "b")
+  let everyoneIn = Routes([
+    "bots/list": agentsJSON(roster),
+    "mcp/assignments/all": #"{"json":[{"botId":"inbox","serverId":"s1","allowAllTools":true,"allowedTools":[]},{"botId":"chat","serverId":"s1","allowAllTools":true,"allowedTools":[]},{"botId":"c","serverId":"s1","allowAllTools":true,"allowedTools":[]}]}"#,
+    "mcp/servers/list": #"{"json":[{"id":"s1","name":"Example","agentBotId":"b"}]}"#,
+  ])
+  let app = try await makeApp(everyoneIn)
+  let model = AccessModel(subject: .server(server))
+  await model.load(app)
+  #expect(model.everyone && !model.chatsLocked)  // the owner b is always on
+  let some = Routes([
+    "bots/list": agentsJSON(roster), "mcp/assignments/all": #"{"json":[]}"#,
+    "mcp/servers/list": #"{"json":[{"id":"s1","name":"Example","agentBotId":"b"}]}"#,
+  ])
+  let partial = AccessModel(subject: .server(server))
+  await partial.load(try await makeApp(some))
+  #expect(!partial.everyone)
+  #expect(AccessModel(subject: .connection(id: "c1", ownerBotID: "inbox")).chatsLocked)
 }
 
 // MARK: Screenshots

@@ -20,7 +20,8 @@ public enum AccessLogic {
     let kept = Set(keep)
     var ids = Set((current.allAgents ? allBotIDs : current.botIds).filter(kept.contains))
     if on { ids.formUnion(allBotIDs.filter { !kept.contains($0) }) }
-    return collapse(ids, allBotIDs)
+    // None is always an explicit list, so agents made later are not eligible.
+    return on ? collapse(ids, allBotIDs) : AccessGrant(allAgents: false, botIds: ids.sorted())
   }
 
   private static func collapse(_ ids: Set<String>, _ allBotIDs: [String]) -> AccessGrant {
