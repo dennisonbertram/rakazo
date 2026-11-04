@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { EXTERNAL_TAINT_SAFE_TOOLS } from "./action-approval.js";
-import { FIREWALL_ASK_TOOLS, FIREWALL_FREE_TOOLS, firewallToolClass } from "./firewall.js";
+import {
+  FIREWALL_ASK_TOOLS,
+  FIREWALL_FREE_TOOLS,
+  firewallDraftIsFree,
+  firewallToolClass,
+} from "./firewall.js";
 
 describe("firewallToolClass", () => {
   it("classifies the plan's examples", () => {
@@ -51,6 +56,44 @@ describe("firewallToolClass", () => {
     ]);
     for (const name of EXTERNAL_TAINT_SAFE_TOOLS) {
       expect(firewallToolClass(name), name).toBe(narrowed.get(name) ?? "free");
+    }
+  });
+});
+
+describe("firewallDraftIsFree", () => {
+  const participants = ["sam@customer.example", "support@us.example"];
+  it("is free when every recipient is a thread participant and the body has no link", () => {
+    expect(
+      firewallDraftIsFree({ to: ["sam@customer.example"], body: "Thanks, fixed.", participants }),
+    ).toBe(true);
+    expect(
+      firewallDraftIsFree({
+        to: ["SAM@customer.example"],
+        cc: ["support@us.example"],
+        body: "ok",
+        participants,
+      }),
+    ).toBe(true);
+  });
+  it("asks for a new recipient in to, cc or bcc", () => {
+    for (const field of ["to", "cc", "bcc"] as const) {
+      expect(
+        firewallDraftIsFree({
+          to: ["sam@customer.example"],
+          [field]: ["billing@evil.example"],
+          body: "x",
+          participants,
+        }),
+      ).toBe(false);
+    }
+  });
+  it("asks without recipients or without known participants, and for any link", () => {
+    expect(firewallDraftIsFree({ to: [], body: "x", participants })).toBe(false);
+    expect(firewallDraftIsFree({ to: ["sam@customer.example"], body: "x", participants: [] })).toBe(
+      false,
+    );
+    for (const body of ["see http://evil.example/x", "www.evil.example", "https://a.example"]) {
+      expect(firewallDraftIsFree({ to: ["sam@customer.example"], body, participants })).toBe(false);
     }
   });
 });

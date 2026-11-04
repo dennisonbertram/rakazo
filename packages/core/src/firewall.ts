@@ -71,3 +71,31 @@ export function firewallToolClass(name: string): FirewallToolClass {
   if (FIREWALL_ASK_TOOLS.has(name)) return "ask";
   return "dropped";
 }
+
+/** The reason line on a card the firewall forced. */
+export const FIREWALL_CARD_REASON = "Firewall";
+
+const bareAddress = (value: string) => value.trim().toLowerCase();
+
+/**
+ * `to`, `cc`, `bcc` and `participants` are bare addresses: the caller splits each field with the
+ * same parser the draft handler uses (`parseRecipients`), so one entry cannot hide a second
+ * recipient. A draft is free when it names at least one recipient, every To, Cc and Bcc address is already a
+ * participant in the thread being answered, and the body has no link (the site list that would
+ * allow a link arrives with slice S3, so until then any link asks).
+ */
+export function firewallDraftIsFree(input: {
+  to?: readonly string[];
+  cc?: readonly string[];
+  bcc?: readonly string[];
+  body?: string;
+  participants: readonly string[];
+}): boolean {
+  const recipients = [...(input.to ?? []), ...(input.cc ?? []), ...(input.bcc ?? [])].map(
+    bareAddress,
+  );
+  if (recipients.length === 0) return false;
+  const known = new Set(input.participants.map(bareAddress));
+  if (!recipients.every((address) => known.has(address))) return false;
+  return !/https?:\/\/|www\./i.test(input.body ?? "");
+}

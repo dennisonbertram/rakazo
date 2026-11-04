@@ -79,6 +79,23 @@ export async function sendSavedMailDraft(
   }
   if (!found) throw new ORPCError("CONFLICT", { message: "There is no saved draft to send" });
 
+  // A later mail_draft that replaced this draft's content would otherwise be sent on this card's
+  // approval, which was for the content the card showed.
+  const replaced = await deps.prisma.externalEffect.findMany({
+    where: {
+      spaceId: actor.spaceId,
+      kind: "mail_draft",
+      status: { in: ["completed", "executing"] },
+      createdAt: { gt: effect.createdAt },
+      request: { path: ["draftId"], equals: found.draftId },
+    },
+    select: { id: true },
+    take: 1,
+  });
+  if (replaced.length > 0) {
+    throw new ORPCError("CONFLICT", { message: "This draft changed since you approved it" });
+  }
+
   const result = await send(deps, actor, { clientId, ...found });
   if (result.status === "sent" || result.status === "unknown") {
     await deps.events.setMailApprovalOutcome({

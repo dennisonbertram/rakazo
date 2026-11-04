@@ -93,6 +93,7 @@ export async function resolveWatchTool(
       id: true,
       spawnKey: true,
       audience: true,
+      firewall: true,
       userId: true,
       spaceId: true,
       archivedAt: true,
@@ -124,7 +125,9 @@ export async function resolveWatchTool(
       },
     })
   ).map((row) => withInboxAgentStandIn(row, bot));
-  const deniedIds = deniedConnectionIds(connectionRowsForAudience(rows, bot.audience));
+  const deniedIds = deniedConnectionIds(
+    connectionRowsForAudience(rows, bot.audience, bot.firewall),
+  );
   // A connection linked to an agent is not offered to an ordinary bot's watch at all.
   const usable = rows.filter(
     (row) =>
