@@ -98,10 +98,10 @@ func aFailedSaveRevertsTheSwitchAndShowsTheError() async throws {
 
 @MainActor
 @Test
-func switchingAgentsSendsTheWholeGrantAndKeepsRowsStill() async throws {
+func switchingOneAgentSendsOnlyThatAgentAndKeepsRowsStill() async throws {
   let routes = Routes([
     "bots/list": agentsJSON(roster), "connections/access": accessJSON,
-    "connections/effectiveAccess": effectiveJSON, "connections/setAccess": accessJSON,
+    "connections/effectiveAccess": effectiveJSON, "connections/setAgentAccess": accessJSON,
   ])
   let app = try await makeApp(routes)
   let model = AccessModel(subject: .connection(id: "c1", ownerBotID: "inbox"))
@@ -109,10 +109,32 @@ func switchingAgentsSendsTheWholeGrantAndKeepsRowsStill() async throws {
   let order = model.layout.others.map(\.id)
   let alpha = try #require(model.agents.first { $0.id == "c" })
   await model.toggle(app, alpha, on: true)
-  let sent = try #require(await routes.bodies("connections/setAccess").first)
-  #expect(sent.contains(#""allAgents":true"#))  // inbox, chat, b and c is everyone
+  let sent = try #require(await routes.bodies("connections/setAgentAccess").first)
+  #expect(sent.contains(#""botId":"c""#) && sent.contains(#""on":true"#))
+  #expect(sent.contains(#""connectionId":"c1""#) && !sent.contains("canWrite"))
   #expect(model.layout.others.map(\.id) == order)
   #expect(model.error == nil)
+}
+
+@MainActor
+@Test
+func allowChangesSendsCanWriteAndRevertsOnFailure() async throws {
+  let granted = #"{"json":{"allAgents":false,"botIds":["inbox","chat","b"],"agentShared":true,"writeBotIds":["b"]}}"#
+  let routes = Routes([
+    "bots/list": agentsJSON(roster), "connections/access": granted,
+    "connections/effectiveAccess": effectiveJSON,
+  ])
+  let app = try await makeApp(routes)
+  let model = AccessModel(subject: .connection(id: "c1", ownerBotID: "inbox"))
+  await model.load(app)
+  let beta = try #require(model.agents.first { $0.id == "b" })
+  #expect(model.isWriting(beta))
+  await model.toggleWrite(app, beta, on: false)  // setAgentAccess is not routed: the save fails
+  #expect(model.isWriting(beta) && model.error != nil)
+  // The owner's switch is not editable here.
+  let inbox = try #require(model.agents.first { $0.id == "inbox" })
+  await model.toggleWrite(app, inbox, on: true)
+  #expect(await routes.bodies("connections/setAgentAccess").count == 1)
 }
 
 @MainActor
@@ -133,23 +155,21 @@ func noneKeepsTheOwnerAndEmailChats() async throws {
 
 @MainActor
 @Test
-func serverAccessReplacesTheAgentsListFromWhatItHas() async throws {
+func serverAccessSendsOneAgentAssignment() async throws {
   let server = McpServer(id: "s1", name: "Example", agentBotId: "b", agentExclusive: false)
   let routes = Routes([
     "bots/list": agentsJSON(roster), "mcp/assignments/all": #"{"json":[]}"#,
     "mcp/servers/list": #"{"json":[{"id":"s1","name":"Example","agentBotId":"b","agentExclusive":false}]}"#,
-    "mcp/assignments/list":
-      #"{"json":[{"botId":"c","serverId":"other","allowAllTools":false,"allowedTools":["read"]}]}"#,
-    "mcp/assignments/replace": #"{"json":[]}"#,
+    "mcp/servers/setAgentAssignment": #"{"json":{"ok":true}}"#,
   ])
   let app = try await makeApp(routes)
   let model = AccessModel(subject: .server(server))
   await model.load(app)
   #expect(model.isOn(try #require(model.agents.first { $0.id == "b" })))  // the owner is always on
   await model.toggle(app, try #require(model.agents.first { $0.id == "c" }), on: true)
-  let sent = try #require(await routes.bodies("mcp/assignments/replace").first)
-  #expect(sent.contains(#""serverId":"other""#) && sent.contains(#""allowedTools":["read"]"#))
-  #expect(sent.contains(#""serverId":"s1""#) && sent.contains(#""allowAllTools":true"#))
+  let sent = try #require(await routes.bodies("mcp/servers/setAgentAssignment").first)
+  #expect(sent.contains(#""serverId":"s1""#) && sent.contains(#""botId":"c""#) && sent.contains(#""on":true"#))
+  #expect(await routes.bodies("mcp/assignments/replace").isEmpty)
 }
 
 @MainActor
@@ -177,7 +197,7 @@ func agentAccessRevertsAFailedSwitch() async throws {
     "mcp/servers/list": #"{"json":[]}"#, "bots/list": agentsJSON(roster),
     "connections/effectiveAccess": #"{"json":{"c1":{"shared":"none","botIds":[]}}}"#,
     "mcp/assignments/list": #"{"json":[]}"#,
-    "connections/access": #"{"json":{"allAgents":false,"botIds":[],"agentShared":true}}"#,
+    "connections/accessAll": #"{"json":{"c1":{"allAgents":false,"botIds":[],"agentShared":true,"writeBotIds":[]}}}"#,
   ])
   let app = try await makeApp(routes)
   let model = AgentAccessModel(agent: AccessAgent(id: "c", name: "Alpha"))
@@ -186,6 +206,7 @@ func agentAccessRevertsAFailedSwitch() async throws {
   #expect(row.address == "me@example.com" && !row.on && !row.locked)
   await model.toggle(app, row, on: true)  // setAccess is not routed: the save fails
   #expect(model.rows.first?.on == false && model.error != nil)
+  #expect(await routes.bodies("connections/access").isEmpty)  // one batched read, not one per account
 }
 
 // MARK: Screenshots
@@ -237,10 +258,11 @@ func rendersTheAccessScreens() async throws {
     let few = AccessModel(
       subject: .connection(id: "c1", ownerBotID: "inbox"), agents: mail + manyAgents(4),
       on: ["inbox", "chat1", "a0", "a2"],
-      grant: AccessGrant(allAgents: false, botIds: ["inbox", "chat1", "a0", "a2"]), shared: true)
+      grant: AccessGrant(allAgents: false, botIds: ["inbox", "chat1", "a0", "a2"]), shared: true,
+      writers: ["a0"])
     await shot(
       NavigationStack {
-        Form { AccessSections(model: few, name: "Founder mail", subtext: "Which agents can use this account.") }
+        Form { AccessSections(model: few, name: "Founder mail", subtext: "Which agents can use this account.", writesEnabled: true) }
           .navigationTitle("Founder mail").navigationBarTitleDisplayMode(.inline)
       }.environment(app),
       name: "account-access", large: large, height: large ? 1900 : 1100)
@@ -268,7 +290,8 @@ func rendersTheAccessScreens() async throws {
       name: "server-access-private", large: large, height: large ? 900 : 500)
     // The agent's own Access list.
     let rows = [
-      AccessLogic.Row(id: "connection:c1", kind: .connection, refID: "c1", name: "Founder mail", address: "founder@example.com", on: true, locked: true),
+      AccessLogic.Row(id: "connection:c1", kind: .connection, refID: "c1", name: "Founder mail", address: "founder@example.com", on: true, locked: true, write: .init(on: true, fixed: true, enabled: true)),
+      AccessLogic.Row(id: "connection:c3", kind: .connection, refID: "c3", name: "Sales mail", address: "sales@example.com", on: true, limited: true, locked: false, write: .init(on: false, fixed: false, enabled: true)),
       AccessLogic.Row(id: "connection:c2", kind: .connection, refID: "c2", name: "Support mail", address: "support@example.com", on: false, locked: false),
       AccessLogic.Row(id: "server:s1", kind: .server, refID: "s1", name: "Example MCP", address: nil, on: true, locked: false),
     ]

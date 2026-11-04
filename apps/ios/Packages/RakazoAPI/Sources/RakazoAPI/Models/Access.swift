@@ -7,6 +7,24 @@ public struct AccessAgent: Sendable, Hashable, Decodable, Identifiable {
   public let color: String?
   public let spawnKey: String?
   public let archivedAt: String?
+  /// A firewalled or external agent: "all agents" does not reach it, it needs an explicit grant.
+  public let restricted: Bool
+
+  private enum CodingKeys: String, CodingKey {
+    case id, name, color, spawnKey, archivedAt, audience, firewall
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    name = try c.decode(String.self, forKey: .name)
+    color = try c.decodeIfPresent(String.self, forKey: .color)
+    spawnKey = try c.decodeIfPresent(String.self, forKey: .spawnKey)
+    archivedAt = try c.decodeIfPresent(String.self, forKey: .archivedAt)
+    let audience = try c.decodeIfPresent(String.self, forKey: .audience)
+    let firewall = try c.decodeIfPresent(Bool.self, forKey: .firewall) ?? false
+    restricted = audience == "external" || firewall
+  }
 
   /// The agent made for one email conversation.
   public var isMailChat: Bool { spawnKey?.hasPrefix("mail-thread:") ?? false }
@@ -14,8 +32,9 @@ public struct AccessAgent: Sendable, Hashable, Decodable, Identifiable {
 
   public init(
     id: String, name: String, color: String? = nil, spawnKey: String? = nil,
-    archivedAt: String? = nil
+    archivedAt: String? = nil, restricted: Bool = false
   ) {
+    self.restricted = restricted
     self.id = id
     self.name = name
     self.color = color
@@ -30,11 +49,25 @@ public struct ConnectionAccess: Sendable, Hashable, Decodable {
   public let botIds: [String]
   /// The "Let other agents use it" switch of an agent-linked connection.
   public let agentShared: Bool
+  /// Granted agents that may also make changes (each still asks), while the connection's own
+  /// "Allow changes" switch is on.
+  public let writeBotIds: [String]
 
-  public init(allAgents: Bool, botIds: [String], agentShared: Bool) {
+  public init(allAgents: Bool, botIds: [String], agentShared: Bool, writeBotIds: [String] = []) {
     self.allAgents = allAgents
     self.botIds = botIds
     self.agentShared = agentShared
+    self.writeBotIds = writeBotIds
+  }
+
+  private enum CodingKeys: String, CodingKey { case allAgents, botIds, agentShared, writeBotIds }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    allAgents = try c.decode(Bool.self, forKey: .allAgents)
+    botIds = try c.decode([String].self, forKey: .botIds)
+    agentShared = try c.decodeIfPresent(Bool.self, forKey: .agentShared) ?? true
+    writeBotIds = try c.decodeIfPresent([String].self, forKey: .writeBotIds) ?? []
   }
 
   public var grant: AccessGrant { AccessGrant(allAgents: allAgents, botIds: botIds) }
@@ -44,6 +77,11 @@ public struct ConnectionAccess: Sendable, Hashable, Decodable {
 public struct EffectiveAccess: Sendable, Hashable, Decodable {
   public let shared: String
   public let botIds: [String]
+
+  public init(shared: String, botIds: [String]) {
+    self.shared = shared
+    self.botIds = botIds
+  }
 }
 
 /// The `allAgents` and `botIds` pair that `rpc_connections_setAccess` takes.
@@ -64,14 +102,17 @@ public struct McpServer: Sendable, Hashable, Decodable, Identifiable {
   public let enabled: Bool
   public let writesEnabled: Bool
   public let oauthStatus: String
+  public let endpoint: String?
   public let agentBotId: String?
   /// While true, only the agent may use the server.
   public let agentExclusive: Bool
 
   public init(
     id: String, name: String, enabled: Bool = true, writesEnabled: Bool = false,
-    oauthStatus: String = "none", agentBotId: String? = nil, agentExclusive: Bool = false
+    oauthStatus: String = "none", endpoint: String? = nil, agentBotId: String? = nil,
+    agentExclusive: Bool = false
   ) {
+    self.endpoint = endpoint
     self.id = id
     self.name = name
     self.enabled = enabled
@@ -81,8 +122,20 @@ public struct McpServer: Sendable, Hashable, Decodable, Identifiable {
     self.agentExclusive = agentExclusive
   }
 
+  private func host(is name: String) -> Bool {
+    guard let endpoint, let url = URL(string: endpoint) else { return false }
+    return url.scheme == "https" && url.host == name
+  }
+
+  /// The "Let other agents use … directly" switch is not offered for Zernio and Brex cards.
+  public var hidesSharing: Bool { host(is: "mcp.zernio.com") || endpoint == "rakazo+brex://cards" }
+  /// The "Allow changes" switch is not offered for Devin, Granola and Zernio.
+  public var hidesWrites: Bool {
+    host(is: "mcp.devin.ai") || host(is: "mcp.granola.ai") || host(is: "mcp.zernio.com")
+  }
+
   private enum CodingKeys: String, CodingKey {
-    case id, name, enabled, writesEnabled, oauthStatus, agentBotId, agentExclusive
+    case id, name, enabled, writesEnabled, oauthStatus, endpoint, agentBotId, agentExclusive
   }
 
   public init(from decoder: Decoder) throws {
@@ -92,6 +145,7 @@ public struct McpServer: Sendable, Hashable, Decodable, Identifiable {
     enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
     writesEnabled = try c.decodeIfPresent(Bool.self, forKey: .writesEnabled) ?? false
     oauthStatus = try c.decodeIfPresent(String.self, forKey: .oauthStatus) ?? "none"
+    endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint)
     agentBotId = try c.decodeIfPresent(String.self, forKey: .agentBotId)
     agentExclusive = try c.decodeIfPresent(Bool.self, forKey: .agentExclusive) ?? false
   }

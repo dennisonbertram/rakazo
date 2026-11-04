@@ -13,15 +13,6 @@ public enum AccessLogic {
     return (1...limit).contains(name.count) ? name : nil
   }
 
-  /// The grant after switching one agent on or off. Everyone collapses back to `allAgents`.
-  public static func toggled(
-    _ current: AccessGrant, allBotIDs: [String], botID: String, on: Bool
-  ) -> AccessGrant {
-    var ids = Set(current.allAgents ? allBotIDs : current.botIds)
-    if on { ids.insert(botID) } else { ids.remove(botID) }
-    return collapse(ids, allBotIDs)
-  }
-
   /// All or None for the agents outside `keep`. The kept agents stay exactly as they are.
   public static func setOthers(
     _ current: AccessGrant, allBotIDs: [String], keep: [String], on: Bool
@@ -95,19 +86,37 @@ public enum AccessLogic {
   /// One account or server in an agent's own Access list.
   public struct Row: Sendable, Hashable, Identifiable {
     public enum Kind: Sendable, Hashable { case connection, server }
+    /// "Allow changes" under an account that has its own agent.
+    public struct Write: Sendable, Hashable {
+      public var on: Bool
+      /// The account's own agent follows the account's switch and cannot be edited here.
+      public let fixed: Bool
+      /// The account's own "Allow changes" switch gates every agent's.
+      public let enabled: Bool
+
+      public init(on: Bool, fixed: Bool, enabled: Bool) {
+        self.on = on
+        self.fixed = fixed
+        self.enabled = enabled
+      }
+    }
+
     public let id: String
     public let kind: Kind
     public let refID: String
     public let name: String
     public let address: String?
     public var on: Bool
-    /// The agent cannot change it: it is the account's own agent, an email chat that follows the
-    /// Inbox agent, or the account is not shared with other agents.
+    /// The grant is saved but another account of the same app limits access, so it has no effect.
+    public let limited: Bool
+    /// The agent cannot change it: it is the account's own agent, an email chat (which follows the
+    /// Inbox agent), an account not shared with other agents, or a server only its agent may use.
     public let locked: Bool
+    public var write: Write?
 
     public init(
       id: String, kind: Kind, refID: String, name: String, address: String?, on: Bool,
-      locked: Bool
+      limited: Bool = false, locked: Bool, write: Write? = nil
     ) {
       self.id = id
       self.kind = kind
@@ -115,34 +124,52 @@ public enum AccessLogic {
       self.name = name
       self.address = address
       self.on = on
+      self.limited = limited
       self.locked = locked
+      self.write = write
     }
   }
 
-  /// The accounts and servers one agent can reach, ordered by name then address.
+  /// The accounts and servers one agent can reach, ordered by name then address. An account's
+  /// switch shows the stored grant, so it can always be revoked; "all agents" does not reach a
+  /// restricted agent. Email chats only follow the Inbox agent; they have no switches of their own.
   public static func rows(
-    for agent: AccessAgent, agents: [AccessAgent], connections: [Connection],
-    servers: [McpServer], effective: [String: EffectiveAccess],
-    accesses: [String: ConnectionAccess], assigned: Set<String>
+    for agent: AccessAgent, connections: [Connection], servers: [McpServer],
+    effective: [String: EffectiveAccess], accesses: [String: ConnectionAccess],
+    assigned: Set<String>
   ) -> [Row] {
+    let mailChat = agent.isMailChat
     let accounts = connections.filter { $0.isConnected && !$0.needsReconnect }.map { connection in
-      let ownerKey = agents.first { $0.id == connection.agentBotId }
       let own = connection.agentBotId == agent.id
-      let mailChat = agent.isMailChat && ownerKey?.isInboxAgent == true
-      let privateToOwner =
-        connection.agentBotId != nil && !own && !(accesses[connection.id]?.agentShared ?? true)
+      let stored = accesses[connection.id]
+      let privateToOwner = connection.agentBotId != nil && !own && stored?.agentShared == false
+      let effectiveOn = effective[connection.id]?.botIds.contains(agent.id) ?? false
+      let granted =
+        own
+        || (stored.map {
+          ($0.allAgents && !agent.restricted) || $0.botIds.contains(agent.id)
+        } ?? effectiveOn)
+      let on = mailChat || privateToOwner ? effectiveOn : granted
+      let write: Row.Write? =
+        connection.agentBotId != nil && !mailChat
+        ? Row.Write(
+          on: own ? connection.writesEnabled : stored?.writeBotIds.contains(agent.id) ?? false,
+          fixed: own, enabled: connection.writesEnabled)
+        : nil
       return Row(
         id: "connection:\(connection.id)", kind: .connection, refID: connection.id,
-        name: connection.displayName, address: connection.account,
-        on: effective[connection.id]?.botIds.contains(agent.id) ?? false,
-        locked: own || mailChat || privateToOwner)
+        name: connection.displayName, address: connection.account, on: on,
+        limited: on && !effectiveOn && !mailChat && !privateToOwner,
+        locked: own || mailChat || privateToOwner, write: write)
     }
     let mcp = servers.filter(\.enabled).map { server in
       let own = server.agentBotId == agent.id
+      // Only its agent may use an exclusive server, whatever the saved assignments say.
+      let exclusiveOther = server.agentBotId != nil && server.agentExclusive && !own
       return Row(
         id: "server:\(server.id)", kind: .server, refID: server.id, name: server.name,
-        address: nil, on: own || assigned.contains(server.id),
-        locked: own || (server.agentBotId != nil && server.agentExclusive))
+        address: nil, on: own || (!exclusiveOther && assigned.contains(server.id)),
+        locked: own || exclusiveOther)
     }
     return (accounts + mcp).sorted {
       let byName = $0.name.localizedCaseInsensitiveCompare($1.name)

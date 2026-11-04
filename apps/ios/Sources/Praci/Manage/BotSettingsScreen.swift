@@ -108,7 +108,8 @@ struct BotSettingsScreen: View {
       state = .loaded(bot)
       sections = (try? await ManageClient.agents(app: app).botSections) ?? []
       let model = AgentAccessModel(
-        agent: AccessAgent(id: bot.id, name: bot.name, spawnKey: bot.spawnKey))
+        agent: AccessAgent(
+          id: bot.id, name: bot.name, spawnKey: bot.spawnKey, restricted: bot.restricted))
       access = model
       await model.load(app)
     } catch {

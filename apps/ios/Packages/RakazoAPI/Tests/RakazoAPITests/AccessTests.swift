@@ -23,6 +23,7 @@ func decodesAccountAddressAndSharing() throws {
   #expect(list[1].account == nil && list[1].agentBotId == nil && !list[1].writesEnabled)
   let access = try decode(ConnectionAccess.self, "connections-access")
   #expect(!access.allAgents && access.botIds == ["bot-inbox", "bot-b"] && access.agentShared)
+  #expect(access.writeBotIds == ["bot-b"])
   let effective = try decode([String: EffectiveAccess].self, "connections-effective-access")
   #expect(effective["conn-second"]?.shared == "all" && effective["conn-placeholder"]?.botIds.count == 2)
 }
@@ -31,7 +32,7 @@ func decodesAccountAddressAndSharing() throws {
 func decodesAgentsServersAndAssignments() throws {
   let agents = try decode([AccessAgent].self, "bots-list-access")
   #expect(agents[0].isInboxAgent && agents[1].isMailChat && !agents[2].isMailChat)
-  #expect(agents[3].archivedAt == nil)
+  #expect(agents[3].archivedAt == nil && agents[3].restricted && agents[4].restricted && !agents[2].restricted)
   let servers = try decode([McpServer].self, "mcp-servers-list")
   #expect(servers[0].agentBotId == "bot-b" && servers[0].agentExclusive)
   #expect(servers[1].agentBotId == nil && !servers[1].enabled && !servers[1].agentExclusive)
@@ -47,19 +48,6 @@ func namesAreOneToSixtyCharactersAfterTrimming() {
   #expect(AccessLogic.validName(String(repeating: "a", count: 60)) != nil)
   #expect(AccessLogic.validName(String(repeating: "a", count: 61)) == nil)
   #expect(AccessLogic.validName(String(repeating: "a", count: 61), limit: 120) != nil)
-}
-
-@Test
-func switchingOneAgentBuildsOnWhatItHas() {
-  let some = AccessGrant(allAgents: false, botIds: ["inbox"])
-  let on = AccessLogic.toggled(some, allBotIDs: everyone, botID: "b", on: true)
-  #expect(!on.allAgents && Set(on.botIds) == ["inbox", "b"])
-  #expect(AccessLogic.toggled(on, allBotIDs: everyone, botID: "b", on: false) == some)
-  // Everyone minus one is a list; the last one back collapses to "all agents".
-  let all = AccessGrant(allAgents: true, botIds: [])
-  let minusB = AccessLogic.toggled(all, allBotIDs: everyone, botID: "b", on: false)
-  #expect(!minusB.allAgents && Set(minusB.botIds) == ["inbox", "chat", "c", "d"])
-  #expect(AccessLogic.toggled(minusB, allBotIDs: everyone, botID: "b", on: true) == all)
 }
 
 @Test
@@ -101,28 +89,118 @@ func listSearchesAndFiltersTheOthers() {
   #expect(AccessLogic.layout(agents: roster, ownerID: nil, on: on).chats.count == 1)
 }
 
+private func connection(_ id: String, owner: String? = nil, writes: Bool = false) throws -> Connection {
+  let json = """
+    {"id":"\(id)","connectorId":"c","provider":"GMAIL","displayName":"Mail \(id)","account":"\(id)@example.com","status":"connected","error":null,"writesEnabled":\(writes),"agentBotId":\(owner.map { "\"\($0)\"" } ?? "null")}
+    """
+  return try JSONDecoder().decode(Connection.self, from: Data(json.utf8))
+}
+
+private func rows(
+  _ agent: AccessAgent, _ connections: [Connection], servers: [McpServer] = [],
+  accesses: [String: ConnectionAccess] = [:], effective: [String: [String]] = [:],
+  assigned: Set<String> = []
+) -> [AccessLogic.Row] {
+  AccessLogic.rows(
+    for: agent, connections: connections, servers: servers,
+    effective: effective.mapValues { EffectiveAccess(shared: "some", botIds: $0) },
+    accesses: accesses, assigned: assigned)
+}
+
 @Test
 func anAgentSeesItsAccountsAndServers() throws {
-  let connections = try decode([Connection].self, "connections-list")
+  let list = try decode([Connection].self, "connections-list")
   let servers = try decode([McpServer].self, "mcp-servers-list")
-  let effective = try decode([String: EffectiveAccess].self, "connections-effective-access")
-  let agents = [
-    AccessAgent(id: "bot-inbox", name: "Inbox agent", spawnKey: "inbox-agent:u1"),
-    AccessAgent(id: "bot-b", name: "Beta"),
-  ]
-  func rows(_ agent: AccessAgent, shared: Bool = true, assigned: Set<String> = []) -> [AccessLogic.Row] {
-    let access = ConnectionAccess(allAgents: false, botIds: [], agentShared: shared)
-    return AccessLogic.rows(
-      for: agent, agents: agents, connections: connections, servers: servers,
-      effective: effective, accesses: ["conn-placeholder": access], assigned: assigned)
-  }
-  let beta = rows(agents[1])
-  #expect(beta.map(\.name) == ["Example MCP", "Founder mail", "Support mail"])
-  #expect(beta[0].on && beta[0].locked)  // Beta is that server's own agent
-  #expect(beta[1].on && !beta[1].locked && beta[1].address == "founder@example.com")
-  #expect(rows(agents[1], shared: false)[1].locked)  // not shared with other agents
-  #expect(rows(agents[0])[1].locked)  // its own account
+  let beta = AccessAgent(id: "bot-b", name: "Beta")
+  let access = ConnectionAccess(allAgents: false, botIds: ["bot-b"], agentShared: true)
+  let result = rows(
+    beta, list, servers: servers, accesses: ["conn-placeholder": access],
+    effective: ["conn-placeholder": ["bot-b"]])
+  #expect(result.map(\.name) == ["Example MCP", "Founder mail", "Support mail"])
+  #expect(result[0].on && result[0].locked)  // Beta is that server's own agent
+  #expect(result[1].on && !result[1].locked && result[1].address == "founder@example.com")
   #expect(servers.filter(\.enabled).count == 1)  // the disabled server is not listed
-  let chat = AccessAgent(id: "bot-chat", name: "Re: Lunch", spawnKey: "mail-thread:c:t")
-  #expect(rows(chat)[1].locked)  // an email chat follows the Inbox agent
+}
+
+@Test
+func anAccountNotSharedWithOtherAgentsIsLockedAndFollowsTheServer() throws {
+  let list = [try connection("a", owner: "owner")]
+  let hidden = ConnectionAccess(allAgents: true, botIds: [], agentShared: false)
+  let row = rows(AccessAgent(id: "x", name: "X"), list, accesses: ["a": hidden])[0]
+  #expect(row.locked && !row.on)  // the stored "all agents" does not count while private
+  let own = rows(AccessAgent(id: "owner", name: "Owner"), list, accesses: ["a": hidden])[0]
+  #expect(own.locked && own.on)
+}
+
+@Test
+func emailChatsFollowTheInboxAgentOnEveryAccount() throws {
+  let chat = AccessAgent(id: "chat", name: "Re: Lunch", spawnKey: "mail-thread:a:t")
+  let plain = [try connection("a"), try connection("b", owner: "inbox", writes: true)]
+  let grant = ConnectionAccess(allAgents: true, botIds: [], agentShared: true)
+  let result = rows(
+    chat, plain, accesses: ["a": grant, "b": grant], effective: ["a": [], "b": ["chat"]])
+  #expect(result.map(\.locked) == [true, true])
+  #expect(result.map(\.on) == [false, true])  // the real access, not the stored grant
+  #expect(result.map(\.write) == [nil, nil])  // chats get no "Allow changes"
+}
+
+@Test
+func allAgentsDoesNotReachARestrictedAgent() throws {
+  let list = [try connection("a")]
+  let everyone = ConnectionAccess(allAgents: true, botIds: [], agentShared: true)
+  let listed = ConnectionAccess(allAgents: false, botIds: ["x"], agentShared: true)
+  let firewalled = AccessAgent(id: "x", name: "X", restricted: true)
+  #expect(!rows(firewalled, list, accesses: ["a": everyone])[0].on)
+  #expect(rows(AccessAgent(id: "x", name: "X"), list, accesses: ["a": everyone])[0].on)
+  #expect(rows(firewalled, list, accesses: ["a": listed], effective: ["a": ["x"]])[0].on)
+}
+
+@Test
+func aSavedGrantThatIsNotEffectiveSaysSo() throws {
+  let list = [try connection("a")]
+  let grant = ConnectionAccess(allAgents: false, botIds: ["x"], agentShared: true)
+  let saved = rows(AccessAgent(id: "x", name: "X"), list, accesses: ["a": grant])[0]
+  #expect(saved.on && saved.limited && !saved.locked)  // can still be switched off
+  let working = rows(
+    AccessAgent(id: "x", name: "X"), list, accesses: ["a": grant], effective: ["a": ["x"]])[0]
+  #expect(working.on && !working.limited)
+}
+
+@Test
+func anExclusiveServerIsOffAndLockedForOtherAgents() {
+  let server = McpServer(id: "s", name: "S", agentBotId: "owner", agentExclusive: true)
+  let other = rows(AccessAgent(id: "x", name: "X"), [], servers: [server], assigned: ["s"])[0]
+  #expect(!other.on && other.locked)
+  let own = rows(AccessAgent(id: "owner", name: "O"), [], servers: [server])[0]
+  #expect(own.on && own.locked)
+  let open = McpServer(id: "s", name: "S", agentBotId: "owner", agentExclusive: false)
+  let shared = rows(AccessAgent(id: "x", name: "X"), [], servers: [open], assigned: ["s"])[0]
+  #expect(shared.on && !shared.locked)
+}
+
+@Test
+func allowChangesFollowsTheAccountsOwnSwitch() throws {
+  let off = [try connection("a", owner: "owner", writes: false)]
+  let on = [try connection("a", owner: "owner", writes: true)]
+  let grant = ConnectionAccess(
+    allAgents: false, botIds: ["x"], agentShared: true, writeBotIds: ["x"])
+  let x = AccessAgent(id: "x", name: "X")
+  let granted = try #require(rows(x, on, accesses: ["a": grant])[0].write)
+  #expect(granted.on && !granted.fixed && granted.enabled)
+  let gated = try #require(rows(x, off, accesses: ["a": grant])[0].write)
+  #expect(gated.on && !gated.enabled)  // the account's own switch gates it
+  let owner = try #require(rows(AccessAgent(id: "owner", name: "O"), on, accesses: ["a": grant])[0].write)
+  #expect(owner.on && owner.fixed)  // shows the account's switch, not editable
+  let bare = try connection("b")
+  #expect(rows(x, [bare])[0].write == nil)  // no agent, no switch
+}
+
+@Test
+func someServersHideSharingOrChanges() {
+  func server(_ endpoint: String) -> McpServer { McpServer(id: "s", name: "S", endpoint: endpoint) }
+  #expect(server("https://mcp.zernio.com/mcp").hidesSharing && server("https://mcp.zernio.com/mcp").hidesWrites)
+  #expect(server("rakazo+brex://cards").hidesSharing && !server("rakazo+brex://cards").hidesWrites)
+  #expect(server("https://mcp.granola.ai/mcp").hidesWrites && !server("https://mcp.granola.ai/mcp").hidesSharing)
+  #expect(server("https://mcp.devin.ai/mcp").hidesWrites)
+  #expect(!server("https://mcp.example.com/").hidesSharing && !McpServer(id: "s", name: "S").hidesWrites)
 }

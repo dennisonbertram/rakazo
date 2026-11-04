@@ -17,18 +17,21 @@ private struct ServerExclusiveInput: Encodable, Sendable {
   let serverId: String
   let exclusive: Bool
 }
+private struct AgentAccessInput: Encodable, Sendable {
+  let connectionId: String
+  let botId: String
+  let on: Bool
+  /// Left out, an agent already on keeps its setting and a new one starts read-only.
+  var canWrite: Bool?
+}
+private struct AgentAssignmentInput: Encodable, Sendable {
+  let serverId: String
+  let botId: String
+  let on: Bool
+}
 private struct ServerWritesInput: Encodable, Sendable {
   let id: String
   let enabled: Bool
-}
-private struct ReplaceInput: Encodable, Sendable {
-  struct Entry: Encodable, Sendable {
-    let serverId: String
-    let allowAllTools: Bool
-    let allowedTools: [String]
-  }
-  let botId: String
-  let assignments: [Entry]
 }
 
 /// Procedure calls shared by the account, server and agent Access lists.
@@ -54,38 +57,30 @@ enum AccessClient {
         connectionId: connection, allAgents: grant.allAgents, botIds: grant.botIds))
   }
 
-  /// Switches one agent on or off for one account.
-  /// ponytail: reads the grant and writes it back, which can lose a concurrent change. The server
-  /// is adding `connections.setAgentAccess({ connectionId, botId, on })`; swap this body for it.
+  /// The stored access of every live connection, in one call.
+  static func accessAll(_ app: AppModel) async throws -> [String: ConnectionAccess] {
+    try await app.call("connections/accessAll")
+  }
+
+  /// Switches one agent on or off for one account, or sets its "Allow changes", atomically on the
+  /// server. Only this agent's grant changes.
   static func setAgentAccess(
-    _ app: AppModel, connection: String, botID: String, on: Bool, allBotIDs: [String]
+    _ app: AppModel, connection: String, botID: String, on: Bool, canWrite: Bool? = nil
   ) async throws {
-    let current = try await access(app, connection: connection)
-    let next = AccessLogic.toggled(current.grant, allBotIDs: allBotIDs, botID: botID, on: on)
-    try await setAccess(app, connection: connection, next)
+    let _: ConnectionAccess = try await app.call(
+      "connections/setAgentAccess",
+      input: AgentAccessInput(connectionId: connection, botId: botID, on: on, canWrite: canWrite))
   }
 
   static func servers(_ app: AppModel) async throws -> [McpServer] {
     try await app.call("mcp/servers/list")
   }
 
-  /// Gives one agent a server or takes it away.
-  /// ponytail: `replace` overwrites the agent's whole list, so this reads it first and can lose a
-  /// concurrent change. The server is adding `mcp.servers.setAgentAssignment({ serverId, botId, on })`.
+  /// Gives one agent a server or takes it away, atomically on the server.
   static func assign(_ app: AppModel, botID: String, serverID: String, on: Bool) async throws {
-    let current: [McpAssignment] = try await app.call(
-      "mcp/assignments/list", input: BotRef(botId: botID))
-    var entries = current.filter { $0.serverId != serverID }.map(entry)
-    if on {
-      let kept = current.first { $0.serverId == serverID }
-      entries.append(kept.map(entry) ?? .init(serverId: serverID, allowAllTools: true, allowedTools: []))
-    }
-    let _: [McpAssignment] = try await app.call(
-      "mcp/assignments/replace", input: ReplaceInput(botId: botID, assignments: entries))
-  }
-
-  private static func entry(_ item: McpAssignment) -> ReplaceInput.Entry {
-    .init(serverId: item.serverId, allowAllTools: item.allowAllTools, allowedTools: item.allowedTools)
+    let _: OKResult = try await app.call(
+      "mcp/servers/setAgentAssignment",
+      input: AgentAssignmentInput(serverId: serverID, botId: botID, on: on))
   }
 
   static func assigned(_ app: AppModel, botID: String) async throws -> Set<String> {
@@ -144,6 +139,8 @@ final class AccessModel {
   private(set) var phase = Phase.loading
   private(set) var agents: [AccessAgent] = []
   private(set) var on: Set<String> = []
+  /// Agents granted "Allow changes" on this account.
+  private(set) var writers: Set<String> = []
   private(set) var grant = AccessGrant(allAgents: true, botIds: [])
   /// "Let other agents use it": only meaningful when the subject has its own agent.
   private(set) var shared = true
@@ -157,8 +154,10 @@ final class AccessModel {
 
   /// For previews and tests: a loaded model without a server.
   init(
-    subject: Subject, agents: [AccessAgent], on: Set<String>, grant: AccessGrant, shared: Bool
+    subject: Subject, agents: [AccessAgent], on: Set<String>, grant: AccessGrant, shared: Bool,
+    writers: Set<String> = []
   ) {
+    self.writers = writers
     self.subject = subject
     self.agents = agents
     self.on = on
@@ -168,9 +167,13 @@ final class AccessModel {
     arrange()
   }
 
+  /// Zernio and Brex cards have no "Let other agents use … directly" choice.
+  var sharingHidden: Bool {
+    if case .server(let server) = subject { server.hidesSharing } else { false }
+  }
   var hasOwner: Bool { subject.ownerBotID != nil }
   /// With its own agent an account lists agents only while it is shared.
-  var showsList: Bool { !hasOwner || shared }
+  var showsList: Bool { !hasOwner || (shared && !sharingHidden) }
   var showsControls: Bool { agents.count > AccessLogic.controlsMinimum }
   private var allBotIDs: [String] { agents.map(\.id) }
   private var keptIDs: [String] {
@@ -205,6 +208,7 @@ final class AccessModel {
       let stored = try await access
       grant = stored.grant
       shared = stored.agentShared
+      writers = Set(stored.writeBotIds)
       on = Set(try await effective[id]?.botIds ?? agents.map(\.id))
     case .server(let server):
       let all: [McpAssignment] = try await app.call("mcp/assignments/all")
@@ -228,6 +232,18 @@ final class AccessModel {
     await save(app) {
       self.setLocal([agent.id], next)
       try await self.write(app, agents: [agent.id], on: next)
+    }
+  }
+
+  func isWriting(_ agent: AccessAgent) -> Bool { writers.contains(agent.id) }
+
+  /// "Allow changes" for one granted agent.
+  func toggleWrite(_ app: AppModel, _ agent: AccessAgent, on next: Bool) async {
+    guard case .connection(let id, _) = subject, agent.id != subject.ownerBotID else { return }
+    await save(app) {
+      if next { self.writers.insert(agent.id) } else { self.writers.remove(agent.id) }
+      try await AccessClient.setAgentAccess(
+        app, connection: id, botID: agent.id, on: true, canWrite: next)
     }
   }
 
@@ -274,8 +290,7 @@ final class AccessModel {
     switch subject {
     case .connection(let id, _):
       for botID in ids {
-        try await AccessClient.setAgentAccess(
-          app, connection: id, botID: botID, on: next, allBotIDs: allBotIDs)
+        try await AccessClient.setAgentAccess(app, connection: id, botID: botID, on: next)
       }
     case .server(let server):
       for botID in ids { try await AccessClient.assign(app, botID: botID, serverID: server.id, on: next) }
@@ -287,11 +302,11 @@ final class AccessModel {
     guard !saving else { return }
     saving = true
     error = nil
-    let (before, sharedBefore) = (on, shared)
+    let (before, sharedBefore, writersBefore) = (on, shared, writers)
     do {
       try await work()
     } catch {
-      (on, shared) = (before, sharedBefore)
+      (on, shared, writers) = (before, sharedBefore, writersBefore)
       self.error = settingsErrorText(error)
     }
     // Rows stay where they are; only the switches follow the server.

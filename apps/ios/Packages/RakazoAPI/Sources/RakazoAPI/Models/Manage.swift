@@ -13,9 +13,11 @@ public struct BotDetail: Sendable, Identifiable, Hashable, Decodable {
   public let archivedAt: String?
   public let threadId: String?
   public let spawnKey: String?
+  /// A firewalled or external agent is not reached through "all agents".
+  public let restricted: Bool
 
   private enum CodingKeys: String, CodingKey {
-    case id, name, title, color, pinned, sectionId, autoSpeak, archivedAt, threadId, spawnKey
+    case id, name, title, color, pinned, sectionId, autoSpeak, archivedAt, threadId, spawnKey, audience, firewall
   }
 
   public init(from decoder: Decoder) throws {
@@ -30,6 +32,9 @@ public struct BotDetail: Sendable, Identifiable, Hashable, Decodable {
     archivedAt = try container.decodeIfPresent(String.self, forKey: .archivedAt)
     threadId = try container.decodeIfPresent(String.self, forKey: .threadId)
     spawnKey = try container.decodeIfPresent(String.self, forKey: .spawnKey)
+    let audience = try container.decodeIfPresent(String.self, forKey: .audience)
+    let firewall = try container.decodeIfPresent(Bool.self, forKey: .firewall) ?? false
+    restricted = audience == "external" || firewall
   }
 }
 

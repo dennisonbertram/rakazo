@@ -199,7 +199,8 @@ private struct ConnectionDetailScreen: View {
       }
       if current.isConnected && !current.needsReconnect {
         AccessSections(
-          model: access, name: current.displayName, subtext: "Which agents can use this account.")
+          model: access, name: current.displayName, subtext: "Which agents can use this account.",
+          writesEnabled: current.agentBotId == nil ? nil : current.writesEnabled)
       }
       if current.needsReconnect {
         Section {
@@ -269,7 +270,7 @@ private struct McpServerDetailScreen: View {
       } footer: {
         if let error = model.error { Text(error).foregroundStyle(Color.token(.destructive)) }
       }
-      if current.agentBotId != nil {
+      if current.agentBotId != nil, !current.hidesWrites {
         Section {
           Toggle(
             "Allow changes",

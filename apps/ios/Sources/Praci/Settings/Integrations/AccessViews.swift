@@ -8,6 +8,8 @@ struct AccessSections: View {
   /// What the agents get, as in "Let other agents use Founder mail directly".
   let name: String
   let subtext: String
+  /// The account's own "Allow changes" switch. Nil where agents have no change switch of their own.
+  var writesEnabled: Bool?
 
   var body: some View {
     switch model.phase {
@@ -30,7 +32,7 @@ struct AccessSections: View {
     if let error = model.error {
       Section { Text(error).foregroundStyle(Color.token(.destructive)) }
     }
-    if model.hasOwner {
+    if model.hasOwner, !model.sharingHidden {
       Section {
         Toggle(
           "Let other agents use \(name) directly",
@@ -40,8 +42,6 @@ struct AccessSections: View {
         )
         .disabled(model.saving)
         .accessibilityIdentifier("accessShared")
-      } footer: {
-        Text("Other agents can read \(name); changes still go through this agent.")
       }
     }
     if model.showsList { list }
@@ -91,7 +91,31 @@ struct AccessSections: View {
     .buttonStyle(.bordered)
   }
 
+  @ViewBuilder
   private func row(_ agent: AccessAgent) -> some View {
+    toggle(agent)
+    if let writesEnabled, model.isOn(agent) { writeRow(agent, writesEnabled) }
+  }
+
+  private func writeRow(_ agent: AccessAgent, _ enabled: Bool) -> some View {
+    let owner = agent.id == model.subject.ownerBotID
+    return Toggle(
+      isOn: Binding(
+        get: { owner ? enabled : model.isWriting(agent) },
+        set: { value in Task { await model.toggleWrite(app, agent, on: value) } })
+    ) {
+      VStack(alignment: .leading) {
+        Text("Allow changes")
+        Text("The agent asks you before each change.")
+          .font(.caption).foregroundStyle(Color.token(.mutedForeground))
+      }
+    }
+    .disabled(model.saving || owner || !enabled)
+    .padding(.leading, 20)
+    .accessibilityIdentifier("accessWrite-\(agent.id)")
+  }
+
+  private func toggle(_ agent: AccessAgent) -> some View {
     Toggle(
       agent.name,
       isOn: Binding(
@@ -114,7 +138,8 @@ struct AccessSections: View {
         Text(chats.count.formatted()).font(.caption).foregroundStyle(Color.token(.mutedForeground))
       }
     }
-    .disabled(model.saving)
+    // An email's chat has the Inbox agent's access, so it only follows.
+    .disabled(true)
     .accessibilityIdentifier("accessChats")
   }
 }

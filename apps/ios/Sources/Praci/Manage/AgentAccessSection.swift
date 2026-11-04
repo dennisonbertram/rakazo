@@ -45,22 +45,33 @@ final class AgentAccessModel {
     }
   }
 
-  private var allBotIDs: [String] = []
-
   private func fetch(_ app: AppModel) async throws {
     let connections: [Connection] = try await app.call("connections/list")
     let servers = try await AccessClient.servers(app)
-    let agents = try await AccessClient.agents(app)
     let effective = try await AccessClient.effective(app)
+    let accesses = try await AccessClient.accessAll(app)
     let assigned = try await AccessClient.assigned(app, botID: agent.id)
-    var accesses: [String: ConnectionAccess] = [:]
-    for connection in connections where connection.isConnected && !connection.needsReconnect {
-      accesses[connection.id] = try await AccessClient.access(app, connection: connection.id)
-    }
-    allBotIDs = agents.map(\.id)
     rows = AccessLogic.rows(
-      for: agent, agents: agents, connections: connections, servers: servers,
-      effective: effective, accesses: accesses, assigned: assigned)
+      for: agent, connections: connections, servers: servers, effective: effective,
+      accesses: accesses, assigned: assigned)
+  }
+
+  /// "Allow changes" for this agent on one account.
+  func toggleWrite(_ app: AppModel, _ row: AccessLogic.Row, on next: Bool) async {
+    guard !saving, row.kind == .connection, let write = row.write, !write.fixed, write.enabled,
+      let index = rows.firstIndex(where: { $0.id == row.id })
+    else { return }
+    saving = true
+    error = nil
+    rows[index].write?.on = next
+    do {
+      try await AccessClient.setAgentAccess(
+        app, connection: row.refID, botID: agent.id, on: true, canWrite: next)
+    } catch {
+      self.error = settingsErrorText(error)
+    }
+    try? await fetch(app)
+    saving = false
   }
 
   func toggle(_ app: AppModel, _ row: AccessLogic.Row, on next: Bool) async {
@@ -74,7 +85,7 @@ final class AgentAccessModel {
       switch row.kind {
       case .connection:
         try await AccessClient.setAgentAccess(
-          app, connection: row.refID, botID: agent.id, on: next, allBotIDs: allBotIDs)
+          app, connection: row.refID, botID: agent.id, on: next)
       case .server:
         try await AccessClient.assign(app, botID: agent.id, serverID: row.refID, on: next)
       }
@@ -125,10 +136,30 @@ struct AgentAccessSection: View {
             if let address = row.address {
               Text(address).font(.caption).foregroundStyle(Color.token(.mutedForeground))
             }
+            if row.limited {
+              Text("Saved, but another account of this app limits access")
+                .font(.caption).foregroundStyle(Color.token(.mutedForeground))
+            }
           }
         }
         .disabled(model.saving || row.locked)
         .accessibilityIdentifier("agentAccess-\(row.id)")
+        if let write = row.write, row.on {
+          Toggle(
+            isOn: Binding(
+              get: { write.on },
+              set: { value in Task { await model.toggleWrite(app, row, on: value) } })
+          ) {
+            VStack(alignment: .leading) {
+              Text("Allow changes")
+              Text("The agent asks you before each change.")
+                .font(.caption).foregroundStyle(Color.token(.mutedForeground))
+            }
+          }
+          .disabled(model.saving || write.fixed || !write.enabled)
+          .padding(.leading, 20)
+          .accessibilityIdentifier("agentWrite-\(row.id)")
+        }
       }
       if model.shown.isEmpty {
         Text("No matching accounts").foregroundStyle(Color.token(.mutedForeground))
