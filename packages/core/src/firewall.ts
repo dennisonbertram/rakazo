@@ -64,11 +64,22 @@ export const FIREWALL_ASK_TOOLS: ReadonlySet<string> = new Set([
   "ticket_comment",
 ]);
 
+/**
+ * Read-only queries an email thread's own agent may make. For that agent only (see
+ * `firewallToolClass`) they ask on a card instead of being dropped. Writes stay dropped.
+ */
+export const FIREWALL_MAIL_THREAD_ASK_TOOLS: ReadonlySet<string> = new Set([
+  "search_data_room",
+  "read_data_room_item",
+  "contacts_list",
+]);
+
 export type FirewallToolClass = "free" | "ask" | "dropped";
 
-export function firewallToolClass(name: string): FirewallToolClass {
+export function firewallToolClass(name: string, mailThreadAgent = false): FirewallToolClass {
   if (FIREWALL_FREE_TOOLS.has(name)) return "free";
   if (FIREWALL_ASK_TOOLS.has(name)) return "ask";
+  if (mailThreadAgent && FIREWALL_MAIL_THREAD_ASK_TOOLS.has(name)) return "ask";
   return "dropped";
 }
 
