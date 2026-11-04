@@ -38,11 +38,13 @@ struct ServerView: View {
           Text("Server address")
         }
         Section {
-          Button("Use default server") {
-            address = ServerEndpoint.defaultURL.absoluteString
-            prepareSave()
+          if let builtIn = ServerEndpoint.builtInURL {
+            Button("Use default server") {
+              address = builtIn.absoluteString
+              prepareSave()
+            }
+            .disabled(model.busy)
           }
-          .disabled(model.busy)
           if model.busy { ProgressView("Checking server…") }
           AuthStatus(error: error, notice: nil)
         }
@@ -68,7 +70,7 @@ struct ServerView: View {
       } message: {
         Text(warning)
       }
-      .onAppear { address = model.endpoint.absoluteString }
+      .onAppear { address = model.hasServer ? model.endpoint.absoluteString : "" }
       .interactiveDismissDisabled(model.busy)
     }
   }

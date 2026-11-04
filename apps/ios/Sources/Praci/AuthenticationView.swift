@@ -5,8 +5,13 @@ import SwiftUI
 struct AuthenticationView: View {
   @Bindable var model: AuthenticationModel
   @Environment(\.colorScheme) private var colorScheme
-  @State private var showingServer = false
+  @State private var showingServer: Bool
   @State private var passwordVisible = false
+
+  init(model: AuthenticationModel) {
+    self.model = model
+    _showingServer = State(initialValue: !model.hasServer)
+  }
 
   private var title: String {
     switch model.page {

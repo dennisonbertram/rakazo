@@ -55,12 +55,13 @@ struct AccountScreen: View {
 
 struct Initials: View {
   let name: String
+  @ScaledMetric private var size = 40.0
 
   var body: some View {
     Text(initials)
       .font(.subheadline.weight(.semibold))
       .foregroundStyle(Color.token(.secondaryForeground))
-      .frame(width: 40, height: 40)
+      .frame(width: size, height: size)
       .background(Color.token(.secondary), in: Circle())
       .accessibilityHidden(true)
   }
