@@ -183,7 +183,45 @@ describe("fundraising write cards", () => {
     });
     const lines = (block as { detail: string }).detail.split("\n");
     expect(lines).toHaveLength(12);
-    expect(lines[11]).toBe("Firm 12: target, Wave 1");
+    expect(lines[11]).toBe("Firm 12: target; next step: Wave 1");
+  });
+
+  it("shows overwrite in the visible text and every written field in the details", () => {
+    const rows = [
+      {
+        name: "Jane Doe",
+        firm: "Harbor Angels",
+        email: "jane@example.test",
+        stage: "intro",
+        amountUsd: 250_000,
+        nextStep: "Wave 2",
+        notes: "Met at demo day",
+      },
+    ];
+    const block = buildApprovalAskBlock(
+      "e3",
+      "fundraising_prospects_save",
+      { rows, overwrite: true },
+      [],
+    ) as { text: string; detail: string };
+    expect(block.text).toBe(
+      "Review before Add or update 1 prospect, replacing fields already set (Harbor Angels)",
+    );
+    expect(block.detail).toBe(
+      "Harbor Angels: Jane Doe; jane@example.test; intro; $250,000.00; next step: Wave 2; notes: Met at demo day",
+    );
+  });
+
+  it("offers no Always allow for either write", () => {
+    for (const [tool, args] of [
+      ["fundraising_round_save", { name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 }],
+      ["fundraising_prospects_save", { rows: [{ firm: "A" }] }],
+    ] as const) {
+      const block = buildApprovalAskBlock("e4", tool, args, []) as {
+        actions: { id: string }[];
+      };
+      expect(block.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
+    }
   });
 });
 

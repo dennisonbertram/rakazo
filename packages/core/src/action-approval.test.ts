@@ -41,7 +41,9 @@ describe("toolRequiresApproval", () => {
     expect(toolRequiresApproval("contacts_add", false)).toBe(false);
     expect(toolRequiresApproval("fundraising_round_save", false)).toBe(true);
     expect(toolRequiresApproval("fundraising_prospects_save", false)).toBe(true);
-    expect(toolRequiresExplicitApproval("fundraising_round_save")).toBe(false);
+    // No saved Allow rule or Auto Review may pass them: the executor's mandatory gate follows this.
+    expect(toolRequiresExplicitApproval("fundraising_round_save")).toBe(true);
+    expect(toolRequiresExplicitApproval("fundraising_prospects_save")).toBe(true);
     expect(toolRequiresApproval("cap_table_update", false)).toBe(false);
     expect(toolRequiresExplicitApproval("contacts_save")).toBe(false);
     expect(toolRequiresExplicitApproval("create_space")).toBe(true);

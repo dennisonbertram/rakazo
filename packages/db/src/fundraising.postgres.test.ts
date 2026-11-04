@@ -252,19 +252,174 @@ describePostgres("fundraising (PostgreSQL)", () => {
       ).toBe("vendor");
     });
 
+    it("keeps the other rows when the database itself rejects one", async () => {
+      const result = await importProspects(prisma, team, [
+        { firm: "Db Good One" },
+        { firm: "Db Bad", stage: "not-a-stage" as never, checkSizeCents: 2 ** 70 },
+        { firm: "Db Good Two" },
+      ]);
+      expect(result).toMatchObject({ added: 2 });
+      expect(result.failed.map((f) => f.row)).toEqual([2]);
+      const names = (await prospectsOf(team)).map((p) => p.name);
+      expect(names).toEqual(expect.arrayContaining(["Db Good One", "Db Good Two"]));
+    });
+
+    it("does not merge different people at the same firm, and matches the same person again", async () => {
+      const people = { spaceId: mine.spaceId, userId: `fund-user-d-${suffix}` };
+      await prisma.user.create({
+        data: { id: people.userId, name: "d", email: `${people.userId}@example.test` },
+      });
+      try {
+        const rows = [
+          { name: "Alice", firm: "Same Fund" },
+          { name: "Bob", firm: "Same Fund" },
+        ];
+        expect(await importProspects(prisma, people, rows)).toMatchObject({ added: 2 });
+        expect(await importProspects(prisma, people, rows)).toMatchObject({ added: 0, updated: 0 });
+        // A firm-only row is a different record from the people at that firm.
+        expect(await importProspects(prisma, people, [{ firm: "Same Fund" }])).toMatchObject({
+          added: 1,
+        });
+        expect(await importProspects(prisma, people, [{ firm: "same fund" }])).toMatchObject({
+          added: 0,
+        });
+        expect(await prospectsOf(people)).toHaveLength(3);
+      } finally {
+        await prisma.user.deleteMany({ where: { id: people.userId } });
+      }
+    });
+
+    it("does not give a firm record two emails: the second email is another person", async () => {
+      const owner = { spaceId: mine.spaceId, userId: `fund-user-e-${suffix}` };
+      await prisma.user.create({
+        data: { id: owner.userId, name: "e", email: `${owner.userId}@example.test` },
+      });
+      try {
+        const result = await importProspects(prisma, owner, [
+          { firm: "Two Mail Fund" },
+          { firm: "Two Mail Fund", email: "a@example.test" },
+          { firm: "Two Mail Fund", email: "b@example.test" },
+        ]);
+        expect(result).toMatchObject({ added: 2, updated: 1 });
+        const saved = await prospectsOf(owner);
+        expect(saved.map((p) => p.email).sort()).toEqual(["a@example.test", "b@example.test"]);
+      } finally {
+        await prisma.user.deleteMany({ where: { id: owner.userId } });
+      }
+    });
+
+    it("serializes concurrent imports so an email-less prospect is added once", async () => {
+      const owner = { spaceId: mine.spaceId, userId: `fund-user-f-${suffix}` };
+      await prisma.user.create({
+        data: { id: owner.userId, name: "f", email: `${owner.userId}@example.test` },
+      });
+      try {
+        const results = await Promise.all(
+          Array.from({ length: 6 }, () => importProspects(prisma, owner, [{ firm: "Racy Fund" }])),
+        );
+        expect(results.reduce((n, r) => n + r.added, 0)).toBe(1);
+        expect(await prospectsOf(owner)).toHaveLength(1);
+      } finally {
+        await prisma.user.deleteMany({ where: { id: owner.userId } });
+      }
+    });
+
+    it("never replaces a value the owner set after the import read it", async () => {
+      const owner = { spaceId: mine.spaceId, userId: `fund-user-g-${suffix}` };
+      await prisma.user.create({
+        data: { id: owner.userId, name: "g", email: `${owner.userId}@example.test` },
+      });
+      try {
+        await importProspects(prisma, owner, [{ firm: "Edited Fund" }]);
+        // The owner types a next step between the import's read and its write.
+        let edited = false;
+        const racing = {
+          $transaction: (run: (tx: never) => Promise<unknown>, options?: object) =>
+            prisma.$transaction(
+              (tx) =>
+                run({
+                  $executeRaw: tx.$executeRaw.bind(tx),
+                  $executeRawUnsafe: tx.$executeRawUnsafe.bind(tx),
+                  fundraiseRound: tx.fundraiseRound,
+                  contact: {
+                    findMany: tx.contact.findMany.bind(tx.contact),
+                    create: tx.contact.create.bind(tx.contact),
+                    findFirst: async (args: never) => {
+                      const row = await tx.contact.findFirst(args);
+                      if (!edited) {
+                        edited = true;
+                        await prisma.contact.updateMany({
+                          where: { ...owner, name: "Edited Fund" },
+                          data: { nextStep: "Owner typed this" },
+                        });
+                      }
+                      return row;
+                    },
+                    updateMany: tx.contact.updateMany.bind(tx.contact),
+                  },
+                } as never),
+              options,
+            ),
+        } as never;
+        const result = await importProspects(racing, owner, [
+          { firm: "Edited Fund", nextStep: "Wave 3" },
+        ]);
+        expect(result).toMatchObject({ added: 0, updated: 0 });
+        expect(result.skipped).toHaveLength(1);
+        expect((await prospectsOf(owner))[0]).toMatchObject({ nextStep: "Owner typed this" });
+      } finally {
+        await prisma.user.deleteMany({ where: { id: owner.userId } });
+      }
+    });
+
+    it("leaves a contact that stopped being a prospect alone", async () => {
+      const owner = { spaceId: mine.spaceId, userId: `fund-user-h-${suffix}` };
+      await prisma.user.create({
+        data: { id: owner.userId, name: "h", email: `${owner.userId}@example.test` },
+      });
+      try {
+        await importProspects(prisma, owner, [{ firm: "Turned Fund" }]);
+        await prisma.contact.updateMany({
+          where: { ...owner, name: "Turned Fund" },
+          data: { kind: "investor" },
+        });
+        const result = await importProspects(
+          prisma,
+          owner,
+          [{ firm: "Turned Fund", email: "t@example.test" }],
+          {
+            overwrite: true,
+          },
+        );
+        expect(result.added + result.updated).toBe(1);
+        const rows = await prisma.contact.findMany({ where: { ...owner } });
+        expect(rows.find((r) => r.kind === "investor")?.email).toBeNull();
+      } finally {
+        await prisma.user.deleteMany({ where: { id: owner.userId } });
+      }
+    });
+
     it("reports a row that fails and still saves the others, scoped to the user", async () => {
       const failing = {
-        contact: {
-          findMany: prisma.contact.findMany.bind(prisma.contact),
-          findFirst: prisma.contact.findFirst.bind(prisma.contact),
-          updateMany: prisma.contact.updateMany.bind(prisma.contact),
-          create: (args: { data: { name: string } }) => {
-            if (args.data.name === "Clash") throw new Error("connection lost");
-            return prisma.contact.create(args as never);
-          },
-        },
-        fundraiseRound: prisma.fundraiseRound,
-        safe: prisma.safe,
+        $transaction: (run: (tx: never) => Promise<unknown>, options?: object) =>
+          prisma.$transaction(
+            (tx) =>
+              run({
+                $executeRaw: tx.$executeRaw.bind(tx),
+                $executeRawUnsafe: tx.$executeRawUnsafe.bind(tx),
+                contact: {
+                  findMany: tx.contact.findMany.bind(tx.contact),
+                  findFirst: tx.contact.findFirst.bind(tx.contact),
+                  updateMany: tx.contact.updateMany.bind(tx.contact),
+                  create: (args: { data: { name: string } }) => {
+                    if (args.data.name === "Clash") throw new Error("connection lost");
+                    return tx.contact.create(args as never);
+                  },
+                },
+                fundraiseRound: tx.fundraiseRound,
+              } as never),
+            options,
+          ),
       } as never;
       const result = await importProspects(failing, team, [
         { firm: "Good One" },

@@ -193,6 +193,7 @@ export function buildApprovalAskBlock(
             },
             ...(options?.fullMail ||
             options?.fullCompany ||
+            FUNDRAISING_WRITES.has(toolName) ||
             options?.integrationWriteTool !== undefined ||
             options?.noAlwaysAllow ||
             toolName === "imessage_send"
@@ -551,7 +552,8 @@ export function describeApprovalAction(
   if (toolName === "fundraising_prospects_save") {
     const rows = prospectRows(args);
     const names = rows.slice(0, 3).map(prospectLabel).join(", ");
-    return `Add or update ${rows.length} ${rows.length === 1 ? "prospect" : "prospects"}${names ? ` (${names}${rows.length > 3 ? ` and ${rows.length - 3} more` : ""})` : ""}`;
+    const replacing = args.overwrite === true ? ", replacing fields already set" : "";
+    return `Add or update ${rows.length} ${rows.length === 1 ? "prospect" : "prospects"}${replacing}${names ? ` (${names}${rows.length > 3 ? ` and ${rows.length - 3} more` : ""})` : ""}`;
   }
   const target = webFetchSite(toolName, args) ?? pickScopeLabel(args);
   const label = serviceName
@@ -574,27 +576,28 @@ const HAND_WRITTEN_TOOLS = new Set([
   "fundraising_prospects_save",
 ]);
 
+const FUNDRAISING_WRITES = new Set(["fundraising_round_save", "fundraising_prospects_save"]);
 const prospectRows = (args: Record<string, unknown>): Record<string, unknown>[] =>
   Array.isArray(args.rows)
     ? args.rows.filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
     : [];
 const prospectLabel = (row: Record<string, unknown>) => String(row.firm ?? row.name ?? "Unnamed");
 
-/** One line per row, so the card shows exactly which firms are saved and how. */
+/** One line per row with every field the call writes, so the card shows exactly what is saved. */
 function prospectsDetail(args: Record<string, unknown>): string {
-  const lines = prospectRows(args).map((row) => {
-    const parts = [
-      row.name && row.firm ? String(row.name) : undefined,
-      row.email ? String(row.email) : undefined,
-      row.stage ? String(row.stage) : undefined,
-      row.amountUsd != null ? formatAmount(row.amountUsd, "USD") : undefined,
-      row.nextStep ? String(row.nextStep) : undefined,
-    ].filter(Boolean);
-    return `${prospectLabel(row)}${parts.length ? `: ${parts.join(", ")}` : ""}`;
-  });
-  return args.overwrite === true
-    ? ["Replaces fields the rows give, also ones already set.", ...lines].join("\n")
-    : lines.join("\n");
+  return prospectRows(args)
+    .map((row) => {
+      const parts = [
+        row.name && row.firm ? String(row.name) : undefined,
+        row.email ? String(row.email) : undefined,
+        row.stage ? String(row.stage) : undefined,
+        row.amountUsd != null ? formatAmount(row.amountUsd, "USD") : undefined,
+        row.nextStep ? `next step: ${String(row.nextStep)}` : undefined,
+        row.notes ? `notes: ${String(row.notes)}` : undefined,
+      ].filter(Boolean);
+      return `${prospectLabel(row)}${parts.length ? `: ${parts.join("; ")}` : ""}`;
+    })
+    .join("\n");
 }
 
 /** The scope an email thread agent's read asks about, so the card shows what would be looked up. */

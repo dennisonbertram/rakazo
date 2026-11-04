@@ -260,7 +260,8 @@ describe("fundraising_prospects_save argument handling", () => {
 
   it("reports bad rows as failed with their position and saves the rest", async () => {
     const created: Record<string, unknown>[] = [];
-    const prisma = {
+    const tx = {
+      $executeRaw: async () => 0,
       contact: {
         findMany: async () => [],
         findFirst: async () => null,
@@ -270,7 +271,8 @@ describe("fundraising_prospects_save argument handling", () => {
         },
       },
       fundraiseRound: { findFirst: async () => null },
-    } as never;
+    };
+    const prisma = { $transaction: async (run: (t: typeof tx) => unknown) => run(tx) } as never;
     const result = await fundraisingToolFromTool(
       "fundraising_prospects_save",
       { prisma, scope, botId: "bot-1" },

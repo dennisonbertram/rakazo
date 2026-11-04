@@ -3,6 +3,7 @@ import type {
   FundraiseRound,
   FundraiseRoundSaveInput,
   FundraisingOverview,
+  ContactStage,
   ProspectImportResult,
   ProspectImportRow,
   ProspectSaveInput,
@@ -195,54 +196,83 @@ export async function saveProspect(
 const normalized = (value: string | null | undefined) =>
   (value ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 
+type Known = { id: string; name: string; organization: string | null; email: string | null };
+type ImportDb = Pick<PrismaClient, "$transaction" | "contact" | "fundraiseRound">;
+
+/**
+ * Finds the saved prospect a row means. A firm-only row (no person, or the firm as the name) means
+ * the firm-only record; a person means the person of that name at that firm. A saved prospect
+ * with another email is another person, never the same one.
+ */
+function matchKnown(known: Known[], row: ProspectImportRow): Known | undefined {
+  const firmKey = normalized(row.firm);
+  const key = normalized(row.name ?? row.firm);
+  const person = Boolean(row.name) && key !== firmKey;
+  return known.find((k) => {
+    if (row.email && k.email) return false;
+    if (normalized(k.name) !== key) return false;
+    if (!person) return !k.organization || normalized(k.organization) === key;
+    return !firmKey || !k.organization || normalized(k.organization) === firmKey;
+  });
+}
+
 /**
  * Adds prospects, or updates the ones already saved, matched by email and otherwise by normalized
- * name or firm, so running the same list again adds nobody. A saved prospect keeps whatever the
- * owner set: a row fills only its empty fields unless `overwrite` is true. A contact that is not a
- * prospect is left alone. Rows are saved one by one; a row that fails is reported, the rest stay.
+ * name (see matchKnown), so running the same list again adds nobody. Imports for one space and user
+ * run one at a time. A saved prospect keeps whatever the owner set: a row fills only fields that
+ * are still empty when the write happens, unless `overwrite` is true. A contact that is not a
+ * prospect is left alone. Each row has its own savepoint: a row that fails is reported and the
+ * rest stay.
  */
 export async function importProspects(
-  prisma: Db,
+  prisma: ImportDb,
   actor: Scope,
   rows: ProspectImportRow[],
   options: { overwrite?: boolean; botId?: string | null } = {},
 ): Promise<ProspectImportResult> {
   const scope = ownerOf(actor);
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`prospects:${scope.spaceId}:${scope.userId}`}, 0))`;
+      return importRows(tx as ImportDb, scope, rows, options);
+    },
+    { timeout: 60_000 },
+  );
+}
+
+async function importRows(
+  tx: ImportDb,
+  scope: Scope,
+  rows: ProspectImportRow[],
+  options: { overwrite?: boolean; botId?: string | null },
+): Promise<ProspectImportResult> {
   const result: ProspectImportResult = { added: 0, updated: 0, skipped: [], failed: [] };
-  const known = await prisma.contact.findMany({
+  const known: Known[] = await tx.contact.findMany({
     where: { ...scope, kind: "prospect" },
     select: { id: true, name: true, organization: true, email: true },
   });
-  const fresh = (row: ProspectImportRow) => ({
-    name: (row.name ?? row.firm) as string,
-    organization: row.firm ?? null,
-  });
-  for (const [row, input] of rows.entries()) {
-    const { name, organization } = fresh(input);
+  for (const [index, input] of rows.entries()) {
+    const name = (input.name ?? input.firm) as string;
+    const organization = input.firm ?? null;
     const report = (list: "skipped" | "failed", reason: string) =>
-      result[list].push({ row: row + 1, name, reason });
+      result[list].push({ row: index + 1, name, reason });
+    // A failed statement aborts a PostgreSQL transaction, so each row can roll back on its own.
+    await tx.$executeRaw`SAVEPOINT import_row`;
     try {
-      const key = normalized(name);
-      const firmKey = normalized(organization);
       let existing = input.email
-        ? await prisma.contact.findFirst({ where: { ...scope, email: input.email } })
+        ? await tx.contact.findFirst({ where: { ...scope, email: input.email } })
         : null;
       if (existing && existing.kind !== "prospect") {
         report("skipped", `Already saved as ${existing.kind}.`);
         continue;
       }
       if (!existing) {
-        // Another email on a saved prospect is a different person at the same firm.
-        const match = known.find(
-          (k) =>
-            (!input.email || !k.email) &&
-            (normalized(k.name) === key || (firmKey && normalized(k.organization) === firmKey)),
-        );
-        if (match) existing = await prisma.contact.findFirst({ where: { id: match.id, ...scope } });
+        const match = matchKnown(known, input);
+        if (match) existing = await tx.contact.findFirst({ where: { id: match.id, ...scope } });
       }
       if (!existing) {
         const stage = input.stage ?? "target";
-        const created = await prisma.contact.create({
+        const created = await tx.contact.create({
           data: {
             ...scope,
             name,
@@ -253,7 +283,7 @@ export async function importProspects(
             checkSizeCents: input.checkSizeCents ?? null,
             kind: "prospect",
             stage,
-            roundId: await roundIdForStage(prisma, scope, stage),
+            roundId: await roundIdForStage(tx, scope, stage),
             botId: options.botId ?? null,
           },
         });
@@ -261,30 +291,61 @@ export async function importProspects(
         result.added += 1;
         continue;
       }
-      const fill = <T>(current: T | null, next: T | null | undefined) =>
-        next != null && next !== current && (options.overwrite || current == null || current === "")
-          ? next
-          : undefined;
-      const stage = fill(existing.stage, input.stage);
-      const data = {
-        organization: fill(existing.organization, organization),
-        email: fill(existing.email, input.email),
-        notes: fill(existing.notes, input.notes),
-        nextStep: fill(existing.nextStep, input.nextStep),
-        checkSizeCents: fill(
-          existing.checkSizeCents == null ? null : Number(existing.checkSizeCents),
-          input.checkSizeCents,
-        ),
-        stage,
-        roundId: await roundIdForStage(prisma, scope, stage as ProspectImportRow["stage"]),
+      const current = {
+        organization: existing.organization,
+        email: existing.email,
+        notes: existing.notes,
+        nextStep: existing.nextStep,
+        checkSizeCents: existing.checkSizeCents == null ? null : Number(existing.checkSizeCents),
+        stage: existing.stage,
       };
-      if (Object.values({ ...data, roundId: undefined }).every((v) => v === undefined)) {
+      const wanted = {
+        organization,
+        email: input.email,
+        notes: input.notes,
+        nextStep: input.nextStep,
+        checkSizeCents: input.checkSizeCents,
+        stage: input.stage,
+      };
+      const changes: Partial<Record<keyof typeof wanted, string | number | null>> = {};
+      for (const key of Object.keys(wanted) as (keyof typeof wanted)[]) {
+        const next = wanted[key];
+        if (next == null || next === current[key]) continue;
+        if (options.overwrite || current[key] == null || current[key] === "") changes[key] = next;
+      }
+      if (Object.keys(changes).length === 0) {
         report("skipped", "Already saved; nothing to change.");
         continue;
       }
-      await prisma.contact.updateMany({ where: { id: existing.id, ...scope }, data });
+      // Without overwrite, a field is written only while it is still empty in the database, so an
+      // owner's edit made after the read above is never replaced.
+      const stillEmpty = options.overwrite
+        ? []
+        : Object.keys(changes).map((key) => ({
+            OR: [
+              { [key]: null },
+              ...(typeof changes[key as keyof typeof changes] === "string" ? [{ [key]: "" }] : []),
+            ],
+          }));
+      const { count } = await tx.contact.updateMany({
+        where: { id: existing.id, ...scope, kind: "prospect", AND: stillEmpty },
+        data: {
+          ...changes,
+          ...(changes.stage
+            ? { roundId: await roundIdForStage(tx, scope, changes.stage as ContactStage) }
+            : {}),
+        },
+      });
+      if (count === 0) {
+        report("skipped", "Changed while importing; left as it is.");
+        continue;
+      }
+      const at = known.findIndex((k) => k.id === existing.id);
+      const at0 = known[at];
+      if (at0) known[at] = { ...at0, email: (changes.email as string) ?? at0.email };
       result.updated += 1;
     } catch {
+      await tx.$executeRaw`ROLLBACK TO SAVEPOINT import_row`;
       report("failed", "Could not be saved.");
     }
   }
