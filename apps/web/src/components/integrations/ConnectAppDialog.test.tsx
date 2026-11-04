@@ -205,6 +205,20 @@ it("still asks which bots get a connection that has no agent", async () => {
   expect(text()).toContain("Which bots can use Slack?");
 });
 
+it("saves least access when the bot step is skipped, so no other bot gets the connection", async () => {
+  api.setAccess.mockResolvedValue({});
+  await connect(pendingRow("connected"));
+  await act(async () => {
+    [...document.querySelectorAll("button")].find((b) => b.textContent === "Skip")?.click();
+  });
+  expect(api.setAccess).toHaveBeenCalledWith({
+    connectionId: "conn-1",
+    allAgents: false,
+    botIds: [],
+  });
+  expect(text()).toContain("Slack connected");
+});
+
 it("does not promise a bot choice before sign-in", async () => {
   vi.spyOn(window, "open").mockReturnValue(null);
   await mount([], true);

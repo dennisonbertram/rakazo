@@ -103,6 +103,7 @@ export const WithConnections: Story = {
       access: {
         conn_1: {
           allAgents: false,
+          agentShared: false,
           botIds: ["bot_ada", "bot_bram"],
           effectiveAccess: { shared: "some", botIds: ["bot_ada", "bot_bram"] },
         },

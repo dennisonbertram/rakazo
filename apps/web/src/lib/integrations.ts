@@ -1,4 +1,5 @@
 import type {
+  Bot,
   Connection,
   ConnectionCatalogItem,
   ConnectionCategory,
@@ -9,6 +10,8 @@ import {
   BOX_OAUTH_SCOPE,
   DEVIN_MCP_ENDPOINT,
   GRANOLA_MCP_ENDPOINT,
+  isInboxAgentSpawnKey,
+  isMailThreadAgentSpawnKey,
   isZernioEndpoint,
   WISPR_FLOW_MCP_ENDPOINT,
 } from "@rakazo/contracts";
@@ -439,6 +442,32 @@ export function toggleAccess(
   const ids = new Set(current.allAgents ? allBotIds : current.botIds);
   if (on) ids.add(botId);
   else ids.delete(botId);
+  const all = allBotIds.every((id) => ids.has(id));
+  return { allAgents: all, botIds: all ? [] : [...ids] };
+}
+
+/** On a mail connection, the Inbox agent and every email chat; otherwise just the owning agent. All and None leave these alone. */
+export function keptAgentIds(bots: Bot[], ownerBotId: string | null | undefined): string[] {
+  if (!ownerBotId) return [];
+  const owner = bots.find((bot) => bot.id === ownerBotId);
+  const chats = isInboxAgentSpawnKey(owner?.spawnKey)
+    ? bots.filter((bot) => isMailThreadAgentSpawnKey(bot.spawnKey)).map((bot) => bot.id)
+    : [];
+  return [ownerBotId, ...chats];
+}
+
+/** All or None for the agents outside `keepIds`; the kept agents stay exactly as they are. */
+export function setOthersAccess(
+  current: { allAgents: boolean; botIds: string[] },
+  allBotIds: string[],
+  keepIds: string[],
+  on: boolean,
+): { allAgents: boolean; botIds: string[] } {
+  const kept = new Set(keepIds);
+  const ids = new Set(
+    (current.allAgents ? allBotIds : current.botIds).filter((id) => kept.has(id)),
+  );
+  if (on) for (const id of allBotIds) if (!kept.has(id)) ids.add(id);
   const all = allBotIds.every((id) => ids.has(id));
   return { allAgents: all, botIds: all ? [] : [...ids] };
 }

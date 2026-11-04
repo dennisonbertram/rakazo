@@ -824,6 +824,34 @@ describePostgres("agent per connection: provisioning (PostgreSQL)", () => {
     }
   });
 
+  it("a Google replacement keeps the old connection's sharing switch", async () => {
+    const provider = "googlecalendar";
+    const ref = `shared-acct-${suffix}`;
+    const state = `shared-state-${suffix}`;
+    const old = await create({ connectorId: "google", provider, status: "connected" });
+    await prisma.connection.update({ where: { id: old.id }, data: { providerRef: ref } });
+    await client(owner).connections.createAgent({ connectionId: old.id });
+    await client(owner).connections.setExclusive({ connectionId: old.id, exclusive: false });
+    const next = await create({ connectorId: "google", provider });
+    await prisma.connection.update({
+      where: { id: next.id },
+      data: { providerRef: state, metadata: { replacesConnectionId: old.id } },
+    });
+    await completeNativeOAuth({
+      prisma,
+      actor: owner,
+      connector: {
+        complete: async () => ({ connectionRef: ref, secretId: `shared-secret-${suffix}` }),
+      } as never,
+      connectorId: "google",
+      state,
+      code: "c",
+      context: {} as never,
+      lock: async () => undefined,
+    });
+    expect(await row(next.id)).toMatchObject({ allAgents: false, agentShared: true });
+  });
+
   it("a Google replacement of a private connection without an agent provisions one", async () => {
     const provider = "googlecalendar";
     const ref = `noagent-acct-${suffix}`;

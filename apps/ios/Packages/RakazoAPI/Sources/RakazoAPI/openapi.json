@@ -32362,11 +32362,15 @@
                             "type": "string",
                             "minLength": 1
                           }
+                        },
+                        "agentShared": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "allAgents",
-                        "botIds"
+                        "botIds",
+                        "agentShared"
                       ],
                       "additionalProperties": false
                     }
@@ -34256,11 +34260,15 @@
                             "type": "string",
                             "minLength": 1
                           }
+                        },
+                        "agentShared": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "allAgents",
-                        "botIds"
+                        "botIds",
+                        "agentShared"
                       ],
                       "additionalProperties": false
                     }

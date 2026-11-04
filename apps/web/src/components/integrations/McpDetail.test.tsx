@@ -275,20 +275,16 @@ it("offers Create agent for Carta without a linked agent, with no writes switch"
   expect(navigate).toHaveBeenCalledWith("/app/bot_carta");
 });
 
-it("turning Share on lifts exclusivity before assigning every agent, and off returns to the owner alone", async () => {
+it("turning Share on grants no other agent, and off returns to the owner alone", async () => {
   setExclusive.mockResolvedValue({});
   replaceAssignments.mockClear();
   replaceAssignments.mockResolvedValue([]);
   listAssignments.mockResolvedValue([]);
   await show(false, OTHER, { ...withAgent, agentExclusive: true });
   await act(async () => container.querySelector<HTMLElement>("#server-shared")?.click());
-  const assigned = replaceAssignments.mock.calls.map(([call]) => call.botId);
-  expect(assigned.length).toBeGreaterThan(1);
   expect(setExclusive).toHaveBeenLastCalledWith({ serverId: "s1", exclusive: false });
-  // The server refuses to grant an exclusive server to other agents, so this must come first.
-  expect(setExclusive.mock.invocationCallOrder[0]).toBeLessThan(
-    replaceAssignments.mock.invocationCallOrder[0] ?? 0,
-  );
+  // Sharing starts with every other agent off; the owner adds them one by one.
+  expect(replaceAssignments).not.toHaveBeenCalled();
 
   replaceAssignments.mockClear();
   setExclusive.mockClear();
@@ -736,6 +732,9 @@ it("All assigns every other agent and None removes them all except the owner", a
   const removed = replaceAssignments.mock.calls.map(([call]) => call.botId);
   expect(removed.sort()).toEqual([...given].sort());
   expect(replaceAssignments.mock.calls.every(([call]) => call.assignments.length === 0)).toBe(true);
+  // None never turns sharing off.
+  expect(setExclusive).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("Used by");
   listAssignments.mockResolvedValue([]);
 });
 
