@@ -90,6 +90,9 @@ function harness(connections: Row[], bots: Row[], access: Row[] = []) {
       })),
     },
     botConnectionAccess: {
+      findMany: vi.fn(async ({ where }: { where: { connectionId: { in: string[] } } }) =>
+        access.filter((r) => where.connectionId.in.includes(String(r.connectionId))),
+      ),
       deleteMany: vi.fn(async ({ where }: { where: Row }) => {
         for (let i = access.length - 1; i >= 0; i--)
           if (matches(access[i] as Row, where)) access.splice(i, 1);
@@ -236,6 +239,7 @@ describe("connections.access and setAccess", () => {
     expect((await h.call("connections/access", { connectionId: "a" })).json).toEqual({
       allAgents: true,
       botIds: [],
+      writeBotIds: [],
       agentShared: true,
     });
   });
@@ -291,14 +295,19 @@ describe("connections.access and setAccess", () => {
       allAgents: false,
       botIds: ["b1", "b2", "b1"],
     });
-    expect(set.json).toEqual({ allAgents: false, botIds: ["b1", "b2"], agentShared: true });
+    expect(set.json).toEqual({
+      allAgents: false,
+      botIds: ["b1", "b2"],
+      writeBotIds: [],
+      agentShared: true,
+    });
     expect((await h.call("connections/access", { connectionId: "a" })).json).toEqual(set.json);
     const reset = await h.call("connections/setAccess", {
       connectionId: "a",
       allAgents: true,
       botIds: [],
     });
-    expect(reset.json).toEqual({ allAgents: true, botIds: [], agentShared: true });
+    expect(reset.json).toEqual({ allAgents: true, botIds: [], writeBotIds: [], agentShared: true });
   });
 
   it("rejects another user's connection and another user's bot", async () => {

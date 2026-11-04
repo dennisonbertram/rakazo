@@ -193,6 +193,13 @@ describe("toggleAccess", () => {
 });
 
 describe("setOthersAccess", () => {
+  it("keeps None explicit when the kept agents are the whole roster", () => {
+    expect(setOthersAccess({ allAgents: true, botIds: [] }, ["inbox"], ["inbox"], false)).toEqual({
+      allAgents: false,
+      botIds: ["inbox"],
+    });
+  });
+
   const all = ["inbox", "chat", "a", "b"];
   const keep = ["inbox", "chat"];
   it("None leaves the kept agents exactly as they were and turns the others off", () => {

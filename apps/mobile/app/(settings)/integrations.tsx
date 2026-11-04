@@ -23,6 +23,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { CappedList } from "../../components/capped-list";
 import { ConnectionAgent } from "../../components/connection-agent";
 import { ConnectorIcon } from "../../components/connector-icon";
 import { GranolaKeyGroup } from "../../components/granola-key-group";
@@ -669,33 +670,50 @@ export default function Integrations() {
 
         <View style={styles.card}>
           <Text style={styles.section}>{t("Accounts")}</Text>
-          {accounts.map((row) => (
-            <View key={row.id} style={styles.accountBlock}>
-              <View style={styles.accountRow}>
-                <TextInput
-                  value={labelDrafts[row.id] ?? row.displayName}
-                  onChangeText={(value) =>
-                    setLabelDrafts((current) => ({ ...current, [row.id]: value }))
-                  }
-                  onEndEditing={() => void renameAccount(row)}
-                  accessibilityLabel={t("Account label")}
-                  style={styles.accountLabel}
-                />
-                <NativeActionButton
-                  accessibilityLabel={t("Remove {name}", { name: row.displayName })}
-                  disabled={pending === row.id || uninstalling}
-                  fill={false}
-                  label={pending === row.id ? t("Working…") : t("Remove")}
-                  onPress={() => void revokeAccount(row)}
-                  prominence="destructive"
-                />
+          <CappedList
+            items={accounts}
+            title={t("Accounts")}
+            error={catalogError}
+            keyOf={(row) => row.id}
+            searchFields={(row) => [row.displayName, row.account ?? ""]}
+            filter={{
+              label: t("Accounts"),
+              options: [
+                { value: "all", label: t("All") },
+                { value: "connected", label: t("Connected") },
+                { value: "error", label: t("Error") },
+              ],
+              apply: (list, value) =>
+                value === "all" ? list : list.filter((row) => row.status === value),
+            }}
+            renderItem={(row) => (
+              <View key={row.id} style={styles.accountBlock}>
+                <View style={styles.accountRow}>
+                  <TextInput
+                    value={labelDrafts[row.id] ?? row.displayName}
+                    onChangeText={(value) =>
+                      setLabelDrafts((current) => ({ ...current, [row.id]: value }))
+                    }
+                    onEndEditing={() => void renameAccount(row)}
+                    accessibilityLabel={t("Account label")}
+                    style={styles.accountLabel}
+                  />
+                  <NativeActionButton
+                    accessibilityLabel={t("Remove {name}", { name: row.displayName })}
+                    disabled={pending === row.id || uninstalling}
+                    fill={false}
+                    label={pending === row.id ? t("Working…") : t("Remove")}
+                    onPress={() => void revokeAccount(row)}
+                    prominence="destructive"
+                  />
+                </View>
+                {row.account ? <Text style={styles.secondary}>{row.account}</Text> : null}
+                {row.agentBotId ? (
+                  <ConnectionAgent connectionId={row.id} botId={row.agentBotId} />
+                ) : null}
               </View>
-              {row.account ? <Text style={styles.secondary}>{row.account}</Text> : null}
-              {row.agentBotId ? (
-                <ConnectionAgent connectionId={row.id} botId={row.agentBotId} />
-              ) : null}
-            </View>
-          ))}
+            )}
+          />
           <NativeActionButton
             accessibilityLabel={t("Add another {name}", { name: item.name })}
             disabled={connecting || uninstalling}
@@ -984,22 +1002,29 @@ export default function Integrations() {
                 {sources.length === 0 ? (
                   <Text style={styles.secondary}>{t("No custom sources installed.")}</Text>
                 ) : null}
-                {sources.map((source) => (
-                  <View key={source.id} style={styles.row}>
-                    <View style={styles.grow}>
-                      <Text style={styles.title}>{source.name}</Text>
-                      <Text numberOfLines={1} style={styles.secondary}>
-                        {source.kind.toUpperCase()} · {source.source}
-                      </Text>
+                <CappedList
+                  items={sources}
+                  title={t("Tool sources")}
+                  error={sourceError}
+                  keyOf={(source) => source.id}
+                  searchFields={(source) => [source.name, source.kind, source.source]}
+                  renderItem={(source) => (
+                    <View key={source.id} style={styles.row}>
+                      <View style={styles.grow}>
+                        <Text style={styles.title}>{source.name}</Text>
+                        <Text numberOfLines={1} style={styles.secondary}>
+                          {source.kind.toUpperCase()} · {source.source}
+                        </Text>
+                      </View>
+                      <NativeActionButton
+                        fill={false}
+                        label={pending === source.id ? t("Removing…") : t("Remove")}
+                        onPress={() => void removeSource(source)}
+                        prominence="destructive"
+                      />
                     </View>
-                    <NativeActionButton
-                      fill={false}
-                      label={pending === source.id ? t("Removing…") : t("Remove")}
-                      onPress={() => void removeSource(source)}
-                      prominence="destructive"
-                    />
-                  </View>
-                ))}
+                  )}
+                />
               </View>
             ) : null}
           </>

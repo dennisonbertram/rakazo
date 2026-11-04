@@ -57,6 +57,22 @@ export function connectionRowsForAudience<T extends { allAgents: boolean }>(
     : rows;
 }
 
+/**
+ * Whether a bot that is NOT the connection's own agent may make changes on an agent-linked
+ * connection: only with its own write grant, only while the connection's changes switch is on, and
+ * never for an external bot. `botAccess` holds the grants being considered for this bot.
+ */
+export function nonOwnerMayWrite(
+  row: { writesEnabled?: boolean; botAccess: { canWrite?: boolean }[] },
+  bot: { audience?: string | null },
+): boolean {
+  return (
+    row.writesEnabled === true &&
+    bot.audience !== "external" &&
+    row.botAccess.some((entry) => entry.canWrite === true)
+  );
+}
+
 /** A connection limited to chosen agents is usable only by a bot with an access row. */
 export function botMayUseConnection(row: {
   allAgents: boolean;

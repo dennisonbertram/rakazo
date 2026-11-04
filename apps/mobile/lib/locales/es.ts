@@ -970,4 +970,8 @@ export const ES_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "Aviso de respuesta detenido",
   "No reply needed": "No requiere respuesta",
   "Stopped Needs reply for {sender}": "Se detuvo el aviso de respuesta para {sender}",
+  "See all ({count})": "Ver todo ({count})",
+  Overdue: "Vencidas",
+  Upcoming: "Próximas",
+  "No date": "Sin fecha",
 };
