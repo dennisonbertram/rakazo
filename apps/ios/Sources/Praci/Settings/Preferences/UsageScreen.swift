@@ -18,12 +18,12 @@ final class UsageModel {
 }
 
 extension UsageSummary {
-  /// The server leaves the total empty when some records lack one; input plus output is then
-  /// the best figure, as long as both are known.
+  /// The server leaves the total empty when some records lack one; the sum of the input, output
+  /// and cache counts it sent is then the best figure. Nil only when it sent none of them.
   var displayTotal: Int? {
     if let totalTokens { return totalTokens }
-    guard let inputTokens, let outputTokens else { return nil }
-    return inputTokens + outputTokens
+    let known = [inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens].compactMap { $0 }
+    return known.isEmpty ? nil : known.reduce(0, +)
   }
 }
 

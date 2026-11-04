@@ -118,8 +118,15 @@ final class ComputerModel {
       }
     } catch {
       actionError = error.localizedDescription
-      if takeControl, case RPCError.server(_, 409, _) = error { botBlocksTakeover = true }
+      if takeControl, Self.isBotBlockingTakeover(error) { botBlocksTakeover = true }
     }
+  }
+
+  /// Only the server's "Stop the bot first" conflict offers Stop and take control; other 409s
+  /// (such as a control race) just show their message.
+  nonisolated static func isBotBlockingTakeover(_ error: any Error) -> Bool {
+    guard case RPCError.server(_, 409, let message) = error else { return false }
+    return message == "Stop the bot first"
   }
 
   /// Stops the bot's run (the same call as Stop in the thread), then takes control.

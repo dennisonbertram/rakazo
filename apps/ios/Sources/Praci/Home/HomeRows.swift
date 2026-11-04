@@ -10,17 +10,19 @@ struct AgentRowView: View {
     HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: 12) {
       BotAvatarView(name: row.name, avatar: row.color, size: avatarSize)
       VStack(alignment: .leading, spacing: 2) {
-        let stamp = Text(rowTimestamp(row.updatedAt)).font(.subheadline)
-          .foregroundStyle(Color.token(.mutedForeground))
+        let muted = Color.token(.mutedForeground)
+        let stamp = Text(rowTimestamp(row.updatedAt)).font(.subheadline).foregroundColor(muted)
         let dot = Circle().fill(Color.token(.primary)).frame(width: 8, height: 8)
           .accessibilityLabel("Unread")
         if dynamicTypeSize.isAccessibilitySize {
-          // Large text: name gets the full width, time and unread dot sit on their own line.
+          // Large text: name gets the full width; the time follows the preview on the same line.
           Text(row.name).font(.headline).lineLimit(2)
-          HStack(spacing: 6) {
+          HStack(alignment: .firstTextBaseline, spacing: 6) {
             if row.unread { dot }
-            stamp
+            Text(subtitle).font(.subheadline).foregroundColor(muted) + Text(verbatim: " · ").font(.subheadline)
+              .foregroundColor(muted) + stamp
           }
+          .lineLimit(2)
         } else {
           HStack {
             Text(row.name).font(.headline).lineLimit(1)
@@ -28,9 +30,8 @@ struct AgentRowView: View {
             if row.unread { dot }
             stamp
           }
+          Text(subtitle).font(.subheadline).lineLimit(1).foregroundStyle(muted)
         }
-        Text(subtitle).font(.subheadline).lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-          .foregroundStyle(Color.token(.mutedForeground))
       }
     }
     .accessibilityElement(children: .combine)

@@ -64,11 +64,13 @@ public struct UsageSummary: Sendable, Hashable, Decodable {
   public let inputTokens: Int?
   public let outputTokens: Int?
   public let totalTokens: Int?
+  public let cacheReadTokens: Int?
+  public let cacheWriteTokens: Int?
   public let modelCalls: Int?
   public let runs: Int
 
   private enum CodingKeys: String, CodingKey {
-    case inputTokens, outputTokens, totalTokens, modelCalls, runs
+    case inputTokens, outputTokens, totalTokens, cacheReadTokens, cacheWriteTokens, modelCalls, runs
   }
 
   public init(from decoder: Decoder) throws {
@@ -76,6 +78,8 @@ public struct UsageSummary: Sendable, Hashable, Decodable {
     inputTokens = try Self.count(container, .inputTokens)
     outputTokens = try Self.count(container, .outputTokens)
     totalTokens = try Self.count(container, .totalTokens)
+    cacheReadTokens = try Self.count(container, .cacheReadTokens)
+    cacheWriteTokens = try Self.count(container, .cacheWriteTokens)
     modelCalls = try Self.count(container, .modelCalls)
     runs = try Self.count(container, .runs) ?? 0
   }

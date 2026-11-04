@@ -9,9 +9,12 @@ enum SettingsDestination: Hashable {
 struct SettingsSheet: View {
   @Environment(AppModel.self) private var app
   @State private var path: [SettingsDestination]
+  @State private var detent: PresentationDetent
 
   init(destination: SettingsDestination?) {
     _path = State(initialValue: destination.map { [$0] } ?? [])
+    // A short screen opened directly (Connect a model) starts at half height; Settings starts full.
+    _detent = State(initialValue: destination == .models ? .medium : .large)
   }
 
   var body: some View {
@@ -27,6 +30,7 @@ struct SettingsSheet: View {
             }
         }
     }
+    .presentationDetents([.medium, .large], selection: $detent)
   }
 
   @ViewBuilder

@@ -39,6 +39,7 @@ private struct ComposeContent: View {
   @State private var showsQuote = false
   @State private var asking = false
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.dynamicTypeSize) private var typeSize
   @FocusState private var focus: Field?
 
   // swiftlint:disable:next identifier_name
@@ -90,11 +91,15 @@ private struct ComposeContent: View {
       Section {
         if model.accounts.count > 1 {
           Picker("From", selection: $model.connectionID) {
-            ForEach(model.accounts) { Text($0.address ?? $0.label).tag($0.connectionId) }
+            ForEach(model.accounts) {
+              Text($0.address ?? $0.label).lineLimit(1).truncationMode(.tail).tag($0.connectionId)
+            }
           }
+          .lineLimit(1)
         } else {
           LabeledContent("From") {
             Text(model.account?.address ?? model.account?.label ?? "")
+              .lineLimit(1).truncationMode(.tail)
               .foregroundStyle(Color.token(.mutedForeground))
           }
         }
@@ -134,7 +139,7 @@ private struct ComposeContent: View {
       Section {
         TextEditor(text: $model.body)
           .focused($focus, equals: .body)
-          .frame(minHeight: model.quote.isEmpty ? 220 : 120)
+          .frame(minHeight: model.quote.isEmpty && !typeSize.isAccessibilitySize ? 220 : 120)
           .accessibilityIdentifier("composeBody")
         if !model.quote.isEmpty {
           Button { showsQuote.toggle() } label: {

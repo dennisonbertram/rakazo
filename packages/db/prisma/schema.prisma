@@ -1652,6 +1652,8 @@ model BotConnectionAccess {
   bot          Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
   /// Firewalled agents: the Gmail label this agent may read. Null means the whole connection.
   supportLabel String?
+  /// Besides reading, this agent may make changes (each still asks the owner) while the connection's changes switch is on.
+  canWrite     Boolean    @default(false)
   createdAt    DateTime   @default(now())
 
   @@unique([connectionId, botId])

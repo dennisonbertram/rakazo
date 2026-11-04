@@ -81,7 +81,11 @@ struct ServerView: View {
     do {
       let endpoint = try ServerEndpoint.normalize(address)
       if endpoint == model.endpoint {
-        dismiss()
+        // On a release first launch the screen holds the default address unsaved; save it.
+        Task {
+          await model.confirmCurrentServer()
+          dismiss()
+        }
       } else if endpoint.scheme == "http" || model.isSignedIn {
         pendingEndpoint = endpoint
         confirming = true

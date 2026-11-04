@@ -155,6 +155,7 @@ import {
   newSiteOutcome,
   nextFence,
   nextRoutineRunDateAcross,
+  nonOwnerMayWrite,
   outboundSiteGate,
   ownsLine,
   PrivateFragments,
@@ -1985,7 +1986,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 writesEnabled: true,
                 agentBotId: true,
                 privateByDefault: true,
-                botAccess: { where: connectionAccessFilter(bot), select: { botId: true } },
+                botAccess: {
+                  where: connectionAccessFilter(bot),
+                  select: { botId: true, canWrite: true },
+                },
                 agentBot: { select: { spawnKey: true } },
               },
             })
@@ -2509,13 +2513,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   // The catalog's execute wrapper has no effect of its own. It resolves to an
                   // underlying tool, and the per-tool rules are enforced at dispatch on that tool.
                   if (isLazyCatalogControlRoute(tool.route)) return true;
-                  const linked = storedConnections.some(
+                  // An agent-linked connection takes changes only from its own agent, or from a bot
+                  // with a write grant (each call still asks, whatever the route).
+                  const blocked = storedConnections.some(
                     (connection) =>
                       connection.agentBotId &&
                       connection.connectorId === tool.route?.connectorId &&
-                      (!tool.route?.connectionId || connection.id === tool.route.connectionId),
+                      (!tool.route?.connectionId || connection.id === tool.route.connectionId) &&
+                      (connection.agentBotId === bot.id || !nonOwnerMayWrite(connection, bot)),
                   );
-                  return !linked;
+                  return !blocked;
                 });
               })()
             : Promise.resolve([]);
@@ -3307,7 +3314,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 privateByDefault: true,
                 botAccess: {
                   where: connectionAccessFilter(bot),
-                  select: { botId: true, supportLabel: true },
+                  select: { botId: true, supportLabel: true, canWrite: true },
                 },
                 agentBot: { select: { spawnKey: true } },
               },
@@ -3329,7 +3336,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (!row || row.status !== "connected" || deniedConnectionIds(rows).has(row.id))
             return false;
           if (!GOOGLE_BUILTIN_WRITES.has(toolName) || row.agentBotId === null) return true;
-          return row.agentBotId === bot.id && row.writesEnabled;
+          if (row.agentBotId === bot.id) return row.writesEnabled;
+          // Another agent changes it only with its own write grant, still asking before each change.
+          return nonOwnerMayWrite(row, bot);
         };
         const accountsAllowedNow = async <T extends { id: string }>(
           accounts: Promise<T[]> | T[],
@@ -3353,6 +3362,31 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const linked = (await connectionRowsNow()).some(
             (row) => row.agentBotId !== null && all.some((account) => account.id === row.id),
           );
+          if (GOOGLE_BUILTIN_WRITES.has(toolName)) {
+            const rows = await connectionRowsNow();
+            const readable = all.filter((account) => accountAllowedIn(rows, account.id, "read"));
+            if (readable.length > 0) {
+              const nameOf = (account: { id: string }) =>
+                (account as { address?: string; label?: string }).address ??
+                (account as { label?: string }).label ??
+                "that account";
+              // The changes switch of the connection is its own reason: say which one to turn on.
+              const off = readable.filter(
+                (account) => rows.find((row) => row.id === account.id)?.writesEnabled === false,
+              );
+              const readOnly = readable.filter((account) => !off.includes(account));
+              return [
+                off.length > 0
+                  ? `Changes are off for ${off.map(nameOf).join(", ")}. Turn on Allow changes on that account's Integrations page.`
+                  : "",
+                readOnly.length > 0
+                  ? `This agent can read but not change ${readOnly.map(nameOf).join(", ")}. Change that under Access on that account's Integrations page.`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+            }
+          }
           return GOOGLE_BUILTIN_WRITES.has(toolName) && linked
             ? "Only this connected account's agent can make changes to it, and only while changes are on."
             : "This connected account is no longer available to this bot.";
@@ -3370,7 +3404,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const accounts = await pending.catch(() => [] as { id: string }[]);
           const wanted = typeof callArgs.account === "string" ? callArgs.account.trim() : "";
           let targets = accounts;
-          if (wanted) {
+          if (wanted && MAIL_TOOL_NAMES.has(toolName)) {
+            // The same resolver the mail tools use, so "Sales" (a unique label prefix) is the
+            // account they will write to. A name that fits none is a possible write to any account.
+            const found = findAccount(accounts as MailAccount[], wanted);
+            targets = found ? [found] : accounts;
+          } else if (wanted) {
             targets = accounts.filter((account) =>
               Object.values(account).some(
                 (value) =>
@@ -5193,6 +5232,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
               scheduleAsks ||
               toolRequiresApproval(name, viaConnector, declaredReadOnly));
           const callRoute = (resolvedTool ?? connectorTools.get(name))?.route;
+          // A write through a connector (Composio, Pipedream, also via the catalog wrapper) on a
+          // connection that has its own agent is by another bot: it always asks, whatever saved rule matches.
+          const connectorWriteOnAgentConnection = await (async () => {
+            if (!viaConnector || appAgentIdentity || declaredReadOnly === true) return false;
+            const route = callRoute ?? connectorCall.route;
+            if (!route?.connectorId) return false;
+            const rows = (await connectionRowsStored()).filter(
+              (row) =>
+                row.status === "connected" &&
+                (route.connectionId
+                  ? row.id === route.connectionId
+                  : row.connectorId === route.connectorId),
+            );
+            return rows.some((row) => row.agentBotId !== null);
+          })();
           // Integration-agent writes use the shared preset classification and always show the full call.
           const integrationWriteTool = isIntegrationAgentWrite(
             bot.spawnKey,
@@ -5275,6 +5329,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             // Integration-agent writes require approval for every call.
             integrationWriteTool !== undefined ||
             writeOnAgentConnection ||
+            connectorWriteOnAgentConnection ||
             // An owner agent's writes on a peer's request never pass on a saved rule or Auto Review.
             (ownerAgentPeer && OWNER_PEER_WRITE_TOOLS.has(name));
           const gateResolved = requiresMandatoryApproval
@@ -6821,6 +6876,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 jobs: deps.jobs,
                 accounts: () => accountsAllowedNow(mailAccounts(), name),
                 ownerAccounts: ownerMailAccounts,
+                readableAccounts: () => accountsAllowedNow(mailAccounts(), "mail_search"),
                 scopeLabelIds: (accountId) => firewallScopeLabelIds[accountId],
                 beforeWrite: (account) => writeDenialNow(account, name),
                 publish: (blocks) => publishMessage(deps, run, "bot", blocks),

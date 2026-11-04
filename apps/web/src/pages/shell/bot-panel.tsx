@@ -48,6 +48,7 @@ import { thinkingLevelLabel } from "../../lib/model-catalog";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { AvatarStudioPopover } from "./avatar-studio-popover";
+import { BotAccessSection } from "./BotAccessSection";
 import { BotSkillsSection } from "./BotSkillsSection";
 import { BotCredentialsSection } from "./bot-credentials";
 
@@ -768,6 +769,7 @@ export function BotSettings({
             onSkillsChange={onSkillsChange}
           />
           <BotCredentialsSection botId={bot.id} />
+          <BotAccessSection bot={bot} />
           <section data-testid="bot-approvals" className="mt-6">
             <div className="mb-2 text-[13.5px] font-medium text-foreground">
               <Trans>Approvals</Trans>

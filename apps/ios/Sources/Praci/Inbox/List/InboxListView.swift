@@ -143,7 +143,7 @@ private struct EmptyInbox: View {
         } description: {
           Text("Connect Gmail to see your inbox here.")
         } actions: {
-          Button("Connect Gmail", action: goToSettings).buttonStyle(.borderedProminent)
+          PrimaryActionButton("Connect Gmail", action: goToSettings)
         }
       } else if let problem = model.problem {
         problemView(problem)
@@ -177,7 +177,7 @@ private struct EmptyInbox: View {
       } description: {
         Text("Reconnect to see new mail.")
       } actions: {
-        Button("Reconnect", action: goToSettings).buttonStyle(.borderedProminent)
+        PrimaryActionButton("Reconnect", action: goToSettings)
           .accessibilityIdentifier("inboxReconnect")
       }
     case .rateLimited:
@@ -186,14 +186,14 @@ private struct EmptyInbox: View {
       } description: {
         Text("Try again in a moment.")
       } actions: {
-        Button("Try again") { Task { await model.retry() } }.buttonStyle(.borderedProminent)
+        PrimaryActionButton("Try again") { Task { await model.retry() } }
           .accessibilityIdentifier("inboxRetry")
       }
     case .unreachable:
       ContentUnavailableView {
         Label("Couldn’t reach Gmail", systemImage: "exclamationmark.triangle")
       } actions: {
-        Button("Try again") { Task { await model.retry() } }.buttonStyle(.borderedProminent)
+        PrimaryActionButton("Try again") { Task { await model.retry() } }
           .accessibilityIdentifier("inboxRetry")
       }
     }

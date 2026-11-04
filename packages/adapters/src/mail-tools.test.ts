@@ -244,6 +244,25 @@ describe("mail_get", () => {
     },
   ];
 
+  it("tells a read-only agent how to allow changes on the account", async () => {
+    const { deps } = setup({ a: [], b: [] });
+    const b = account("b", "b@example.test");
+    const readOnly = {
+      ...deps,
+      accounts: async () => [],
+      ownerAccounts: async () => [b],
+      readableAccounts: async () => [b],
+    };
+    const result = await mailToolFromTool("mail_search", readOnly, context(), {
+      queries: ["hi"],
+      account: "b@example.test",
+    });
+    expect(result).toEqual({
+      error:
+        "This agent can read but not change b@example.test. Change that under Access on that account's Integrations page.",
+    });
+  });
+
   it("returns the header block and strips the quoted reply", async () => {
     const { deps } = setup({ a: messages });
     const result = (await mailToolFromTool("mail_get", deps, context(), { id: "m1" })) as {

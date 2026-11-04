@@ -45,6 +45,9 @@ struct DataRoomItemScreen: View {
         } else if item.isProcessing {
           Label("Reading…", systemImage: "hourglass")
         }
+        if item.isFailed || item.isProcessing {
+          Button("Try again") { Task { await retry() } }.accessibilityIdentifier("retryFile")
+        }
         LabeledContent("Type", value: DataRoomFormat.kind(item))
         LabeledContent("Size", value: Int64(item.size).formatted(.byteCount(style: .file)))
         if let date = InboxRow.parseDate(item.createdAt) {
@@ -90,7 +93,7 @@ struct DataRoomItemScreen: View {
         thumbnail = UIImage(data: data)
       }
     }
-    .task {
+    .task(id: item.status) {
       while item.isProcessing, !Task.isCancelled {
         try? await Task.sleep(for: .seconds(4))
         if let fresh: DataRoomItem = try? await app.call("dataRoom/item", input: DataRoomIDInput(id: item.id)) {
@@ -105,6 +108,15 @@ struct DataRoomItemScreen: View {
     defer { opening = false }
     do {
       preview = try await DataRoomTransfer(app: app).download(item)
+    } catch {
+      errorMessage = settingsErrorText(error)
+    }
+  }
+
+  /// Starts a failed or stuck file over; the server refuses one that is still being read.
+  private func retry() async {
+    do {
+      item = try await app.call("dataRoom/itemRetry", input: DataRoomIDInput(id: item.id))
     } catch {
       errorMessage = settingsErrorText(error)
     }

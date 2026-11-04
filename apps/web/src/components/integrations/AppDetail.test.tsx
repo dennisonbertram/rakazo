@@ -20,6 +20,7 @@ const createAgent = vi.fn().mockResolvedValue({ botId: "bot_app" });
 const setWrites = vi.fn().mockResolvedValue({});
 const setExclusive = vi.fn().mockResolvedValue({});
 const setAccess = vi.fn().mockResolvedValue({});
+const setAgentAccess = vi.fn().mockResolvedValue({});
 vi.mock("../../lib/rpc", () => ({
   rpc: {
     connections: {
@@ -29,6 +30,7 @@ vi.mock("../../lib/rpc", () => ({
       setWrites: (...a: unknown[]) => setWrites(...a),
       setExclusive: (...a: unknown[]) => setExclusive(...a),
       setAccess: (...a: unknown[]) => setAccess(...a),
+      setAgentAccess: (...a: unknown[]) => setAgentAccess(...a),
     },
   },
 }));
@@ -139,6 +141,7 @@ afterEach(() => {
   setWrites.mockClear();
   setExclusive.mockClear();
   setAccess.mockClear();
+  setAgentAccess.mockClear();
 });
 
 const PAGE = "/app/integrations/app/google/gmail";
@@ -187,9 +190,9 @@ it("never offers Create agent for Gmail: every account belongs to the Inbox agen
   expect(container.textContent).not.toContain("Create agent");
 });
 
-it("hides the ordinary access list and Used by while a private agent connection is not shared", async () => {
+it("hides the ordinary access list and the Access list while a private agent connection is not shared", async () => {
   await show(APP_PAGE, data({ connections: [appConnection({ agentBotId: "bot_app" })] }));
-  expect(container.textContent).not.toContain("Used by");
+  expect(container.textContent).not.toContain("Which agents can use");
   expect(container.textContent).not.toContain("Only this agent");
   expect(container.textContent).not.toContain("Other agents ask");
 });
@@ -265,7 +268,7 @@ it("lists who can use a shared connection from the server, owner first, and save
       },
     }),
   );
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   const toggles = [
     ...container.querySelectorAll<HTMLElement>('[aria-label$="can use Sample workspace"]'),
   ];
@@ -274,24 +277,54 @@ it("lists who can use a shared connection from the server, owner first, and save
     "Other can use Sample workspace",
   ]);
   await act(async () => toggles[1]!.click());
-  expect(setAccess).toHaveBeenCalledWith({
+  expect(setAgentAccess).toHaveBeenCalledWith({
     connectionId: "conn_app",
-    allAgents: false,
-    botIds: ["bot_app"],
+    botId: "bot_other",
+    on: false,
   });
 });
 
-it("builds each quick toggle on the previous one and saves them in order", async () => {
+it("Allow changes under a shared agent sets only that agent's write grant", async () => {
+  const bots = ["bot_app", "b"].map((id) => ({ id, name: id, color: "#000000" }));
+  await show(
+    APP_PAGE,
+    data({
+      bots: bots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app", writesEnabled: true })],
+      access: {
+        conn_app: {
+          allAgents: true,
+          agentShared: true,
+          botIds: [],
+          effectiveAccess: { shared: "all", botIds: ["bot_app", "b"] },
+        },
+      },
+    }),
+  );
+  const nested = container.querySelector<HTMLElement>(
+    '[aria-label="b can make changes in Sample workspace"]',
+  )!;
+  expect(nested.getAttribute("aria-checked")).toBe("false");
+  await act(async () => nested.click());
+  expect(setAgentAccess).toHaveBeenCalledWith({
+    connectionId: "conn_app",
+    botId: "b",
+    on: true,
+    canWrite: true,
+  });
+});
+
+it("saves each quick toggle as its own single-agent change, in order", async () => {
   const bots = ["bot_app", "b", "c"].map((id) => ({ id, name: id, color: "#000000" }));
   const saved: unknown[] = [];
   let release: () => void = () => undefined;
-  setAccess.mockImplementationOnce(async (input: unknown) => {
+  setAgentAccess.mockImplementationOnce(async (input: unknown) => {
     saved.push(input);
     await new Promise<void>((resolve) => {
       release = resolve;
     });
   });
-  setAccess.mockImplementation(async (input: unknown) => void saved.push(input));
+  setAgentAccess.mockImplementation(async (input: unknown) => void saved.push(input));
   await show(
     APP_PAGE,
     data({
@@ -314,8 +347,8 @@ it("builds each quick toggle on the previous one and saves them in order", async
   expect(saved).toHaveLength(1);
   await act(async () => release());
   expect(saved).toEqual([
-    { connectionId: "conn_app", allAgents: false, botIds: ["bot_app", "c"] },
-    { connectionId: "conn_app", allAgents: false, botIds: ["bot_app"] },
+    { connectionId: "conn_app", botId: "b", on: false },
+    { connectionId: "conn_app", botId: "c", on: false },
   ]);
 });
 
@@ -618,7 +651,7 @@ it("All saves allAgents once and None saves the owner alone, once", async () => 
   ]);
 });
 
-it("None leaves Let other agents use on with Used by listed and every other agent off", async () => {
+it("None leaves Let other agents use on with Access listed and every other agent off", async () => {
   await show(
     APP_PAGE,
     data({
@@ -634,7 +667,7 @@ it("None leaves Let other agents use on with Used by listed and every other agen
       },
     }),
   );
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   expect(container.querySelector<HTMLInputElement>("#connection-conn_app-shared")?.checked).toBe(
     true,
   );
@@ -693,7 +726,7 @@ it("keeps All available when every agent is on but access is a chosen list", asy
 it("while a save is in flight, switching one agent does not flip an agent the server says cannot use it", async () => {
   // "c" is stored as allowed (all agents) but cannot reach this app, so the server lists it as off.
   let release: () => void = () => undefined;
-  setAccess.mockImplementationOnce(
+  setAgentAccess.mockImplementationOnce(
     () =>
       new Promise<void>((resolve) => {
         release = resolve;

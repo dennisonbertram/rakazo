@@ -31,7 +31,12 @@ final class AuthenticationModel {
 
   init(client: AuthClient? = nil, defaults: UserDefaults = .standard) {
     let saved = defaults.string(forKey: Self.endpointKey)
-    let launch = ServerEndpoint.launchEndpoint(saved: saved)
+    var launch = ServerEndpoint.launchEndpoint(saved: saved)
+    // An update from a build that never saved a server: keep the server its session belongs to.
+    if launch == nil, client == nil, let stored = (try? KeychainSessionStorage().load())?.endpoint {
+      launch = stored
+      defaults.set(stored.absoluteString, forKey: Self.endpointKey)
+    }
     let endpoint = launch ?? ServerEndpoint.defaultURL
     hasServer = launch != nil
     self.endpoint = endpoint
@@ -142,6 +147,16 @@ final class AuthenticationModel {
   /// Runs before the session ends (sign-out, server change, account deletion), while the server
   /// still accepts the session. The notification router uses it to unregister push.
   var beforeSessionEnds: (() async -> Void)?
+
+  /// The person entered the address the screen already holds (the local default on a release
+  /// first launch): keep it as their server and start up against it.
+  func confirmCurrentServer() async {
+    guard !hasServer, !busy else { return }
+    defaults.set(endpoint.absoluteString, forKey: Self.endpointKey)
+    hasServer = true
+    started = false
+    await start()
+  }
 
   func changeServer(to endpoint: URL) async -> Bool {
     guard !busy else { return false }
