@@ -20,6 +20,8 @@ type Props<T> = {
   renderItem: (item: T) => ReactNode;
   /** Optional segmented filter in the sheet; the first option is the default. */
   filter?: Filter<T>;
+  /** The screen's current action error; the sheet covers the screen, so it shows it too. */
+  error?: string | null;
 };
 
 /** Shows the first three rows inline; "See all (N)" opens a sheet with search and the filter. */
@@ -27,11 +29,13 @@ export function CappedList<T>(props: Props<T>) {
   const { t } = useI18n();
   const tokens = mobileTokens();
   const [open, setOpen] = useState(false);
+  // Inline rows load their own state; remounting them after the sheet closes refreshes it.
+  const [generation, setGeneration] = useState(0);
   const { shown, total, capped } = capItems(props.items);
   return (
     <>
       {shown.map((item) => (
-        <View key={props.keyOf(item)}>{props.renderItem(item)}</View>
+        <View key={`${props.keyOf(item)}:${generation}`}>{props.renderItem(item)}</View>
       ))}
       {capped ? (
         <Pressable
@@ -45,7 +49,15 @@ export function CappedList<T>(props: Props<T>) {
           </Text>
         </Pressable>
       ) : null}
-      {open ? <CappedListSheet {...props} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <CappedListSheet
+          {...props}
+          onClose={() => {
+            setOpen(false);
+            setGeneration((n) => n + 1);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -58,6 +70,7 @@ function CappedListSheet<T>({
   searchFields,
   renderItem,
   filter,
+  error,
   onClose,
 }: Props<T> & { onClose: () => void }) {
   const { t } = useI18n();
@@ -73,11 +86,19 @@ function CappedListSheet<T>({
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: tokens.background }}>
         <View style={{ padding: 16, gap: 12 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ color: tokens.foreground, fontSize: 17, fontWeight: "600" }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <Text
+              numberOfLines={1}
+              style={{ flex: 1, color: tokens.foreground, fontSize: 17, fontWeight: "600" }}
+            >
               {title}
             </Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={t("Done")} onPress={onClose}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("Done")}
+              onPress={onClose}
+              style={{ flexShrink: 0 }}
+            >
               <Text style={{ color: tokens.primary, fontSize: 17 }}>{t("Done")}</Text>
             </Pressable>
           </View>
@@ -107,8 +128,10 @@ function CappedListSheet<T>({
               options={filter.options}
             />
           ) : null}
+          {error ? <Text style={{ color: tokens.destructive, fontSize: 14 }}>{error}</Text> : null}
         </View>
         <FlatList
+          automaticallyAdjustKeyboardInsets
           data={results}
           keyExtractor={keyOf}
           keyboardShouldPersistTaps="handled"

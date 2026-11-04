@@ -621,6 +621,7 @@ export default function BotSettingsScreen() {
             <CappedList
               items={skills}
               title={t("Skills")}
+              error={skillsError}
               keyOf={(skill) => skill.id}
               searchFields={(skill) => [skill.name]}
               renderItem={(skill) => (

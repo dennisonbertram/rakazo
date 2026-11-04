@@ -673,6 +673,7 @@ export default function Integrations() {
           <CappedList
             items={accounts}
             title={t("Accounts")}
+            error={catalogError}
             keyOf={(row) => row.id}
             searchFields={(row) => [row.displayName, row.account ?? ""]}
             filter={{
@@ -1004,6 +1005,7 @@ export default function Integrations() {
                 <CappedList
                   items={sources}
                   title={t("Tool sources")}
+                  error={sourceError}
                   keyOf={(source) => source.id}
                   searchFields={(source) => [source.name, source.kind, source.source]}
                   renderItem={(source) => (
