@@ -95,8 +95,9 @@ struct ThreadScreen: View {
           height: geometry.contentSize.height)
       } action: { old, new in
         edgeNearBottom = new.nearBottom
-        if new.height != old.height && atBottom {
-          // New content makes the bottom move away; keep following when the reader was there.
+        if new.height != old.height && atBottom && old.nearBottom {
+          // New content makes the bottom move away; keep following only while the reader had not
+          // dragged up. Without the old.nearBottom check a streaming reply pulled every drag back down.
           proxy.scrollTo(Self.bottomID, anchor: .bottom)
         } else {
           atBottom = new.nearBottom
