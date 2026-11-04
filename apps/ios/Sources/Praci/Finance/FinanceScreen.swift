@@ -63,15 +63,15 @@ struct FinanceScreen: View {
       }
       accounts(data.accounts, hidden: hidden)
       if !data.overview.upcoming.isEmpty {
-        Section("Upcoming") {
-          ForEach(data.overview.upcoming) { item in
-            LabeledContent {
-              Text(financeMoney(item.amountCents, hidden: hidden))
-            } label: {
-              Text(item.name)
-              if let date = item.dates.first {
-                Text(financeDay(date)).foregroundStyle(Color.token(.mutedForeground))
-              }
+        CappedSection(
+          title: "Upcoming", items: data.overview.upcoming, spec: upcomingSpec()
+        ) { item in
+          LabeledContent {
+            Text(financeMoney(item.amountCents, hidden: hidden))
+          } label: {
+            Text(item.name)
+            if let date = item.dates.first {
+              Text(financeDay(date)).foregroundStyle(Color.token(.mutedForeground))
             }
           }
         }
@@ -95,14 +95,12 @@ struct FinanceScreen: View {
   private func accounts(_ accounts: FinanceAccounts, hidden: Bool) -> some View {
     let rows = accounts.cash + accounts.cards
     if !rows.isEmpty {
-      Section("Accounts") {
-        ForEach(rows) { account in
-          LabeledContent {
-            Text(financeMoney(account.balanceCents, currency: account.currency, hidden: hidden))
-          } label: {
-            Text(account.name)
-            Text(accountSubtitle(account)).foregroundStyle(Color.token(.mutedForeground))
-          }
+      CappedSection(title: "Accounts", items: rows, spec: accountsSpec(rows)) { account in
+        LabeledContent {
+          Text(financeMoney(account.balanceCents, currency: account.currency, hidden: hidden))
+        } label: {
+          Text(account.name)
+          Text(accountSubtitle(account)).foregroundStyle(Color.token(.mutedForeground))
         }
       }
     }
@@ -130,20 +128,18 @@ struct FinanceScreen: View {
     }
     if let spend = model.spend {
       if !spend.categories.isEmpty {
-        Section("Where it went") {
-          ForEach(spend.categories) { category in
-            LabeledContent(category.label, value: financeMoney(category.cents, hidden: hidden))
-          }
+        CappedSection(title: "Where it went", items: spend.categories, spec: categoriesSpec()) { category in
+          LabeledContent(category.label, value: financeMoney(category.cents, hidden: hidden))
         }
       }
       if !spend.transactions.isEmpty {
-        Section("Transactions") {
-          ForEach(spend.transactions) { transaction in
-            NavigationLink {
-              FinanceTransactionScreen(id: transaction.id, model: model, hidden: hidden)
-            } label: {
-              TransactionRow(transaction: transaction, hidden: hidden)
-            }
+        CappedSection(
+          title: "Transactions", items: spend.transactions, spec: transactionsSpec(spend.transactions)
+        ) { transaction in
+          NavigationLink {
+            FinanceTransactionScreen(id: transaction.id, model: model, hidden: hidden)
+          } label: {
+            TransactionRow(transaction: transaction, hidden: hidden)
           }
         }
       }
