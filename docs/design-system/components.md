@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 336 of 336
-- Web and shared components: 855
+- Web and shared component files with stories: 337 of 337
+- Web and shared components: 856
 - Mobile components: 153 in 102 files, mobile — native story pending
-- SwiftUI views: 138 in 76 files, native story pending
+- SwiftUI views: 139 in 76 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -451,6 +451,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | GroupIntro | [apps/web/src/pages/shell/GroupIntro.tsx](../../apps/web/src/pages/shell/GroupIntro.tsx) | [GroupIntro.stories.tsx](../../apps/web/src/pages/shell/GroupIntro.stories.tsx) | web |
 | MentionIcon | [apps/web/src/pages/shell/mention-icon.tsx](../../apps/web/src/pages/shell/mention-icon.tsx) | [mention-icon.stories.tsx](../../apps/web/src/pages/shell/mention-icon.stories.tsx) | web |
 | ResultCard, ChoiceCard, OnboardingFocusQuestion, OnboardingFocusOptionHint, OnboardingFocusOptionLabel, AppConnectCard, ChartCanvas, ChartCanvasPlot, McpApprovalCard, ChartBlockView, ArtifactImage, ArtifactImageGrid | [apps/web/src/pages/shell/message-cards.tsx](../../apps/web/src/pages/shell/message-cards.tsx) | [message-cards.stories.tsx](../../apps/web/src/pages/shell/message-cards.stories.tsx) | web |
+| PageCard | [apps/web/src/pages/shell/page-card.tsx](../../apps/web/src/pages/shell/page-card.tsx) | [page-card.stories.tsx](../../apps/web/src/pages/shell/page-card.stories.tsx) | web |
 | SidebarHeaderRow | [apps/web/src/pages/shell/sidebar-header-row.tsx](../../apps/web/src/pages/shell/sidebar-header-row.tsx) | [sidebar-header-row.stories.tsx](../../apps/web/src/pages/shell/sidebar-header-row.stories.tsx) | web |
 | SpaceSidebar | [apps/web/src/pages/shell/space-sidebar.tsx](../../apps/web/src/pages/shell/space-sidebar.tsx) | [space-sidebar.stories.tsx](../../apps/web/src/pages/shell/space-sidebar.stories.tsx) | web |
 | ThreadMarkdown, ThreadUiBlock, UnreadDivider, Transcript, QuoteSelectionButton, MessageHoverActions, SpeakerHeader, MessageView | [apps/web/src/pages/shell/transcript.tsx](../../apps/web/src/pages/shell/transcript.tsx) | [transcript.stories.tsx](../../apps/web/src/pages/shell/transcript.stories.tsx) | web |
@@ -651,7 +652,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ComposerView | [apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift](../../apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift) | native story pending | iOS |
 | PendingSendsView | [apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift](../../apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift) | native story pending | iOS |
 | MessageActions | [apps/ios/Sources/Praci/Thread/MessageActions.swift](../../apps/ios/Sources/Praci/Thread/MessageActions.swift) | native story pending | iOS |
-| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
+| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, PageCardView, ImageBlockView, FileBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
 | ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |
 | ThreadScreen, UnreadDivider | [apps/ios/Sources/Praci/Thread/ThreadScreen.swift](../../apps/ios/Sources/Praci/Thread/ThreadScreen.swift) | native story pending | iOS |
 | CallButton, CallView | [apps/ios/Sources/Praci/Voice/CallView.swift](../../apps/ios/Sources/Praci/Voice/CallView.swift) | native story pending | iOS |

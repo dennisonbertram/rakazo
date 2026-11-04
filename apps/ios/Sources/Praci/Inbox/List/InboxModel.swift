@@ -43,6 +43,8 @@ final class InboxModel {
   private(set) var connectionID: String?
 
   @ObservationIgnored private let client: InboxClient
+  /// Rows this list archived, so Undo can show one again before the server answers.
+  @ObservationIgnored private var archivedRows: [String: (row: InboxRow, index: Int)] = [:]
   @ObservationIgnored private var generation = 0
 
   init(client: InboxClient) { self.client = client }
@@ -97,6 +99,7 @@ final class InboxModel {
   }
 
   func archive(_ row: InboxRow) async {
+    if let index = rows.firstIndex(where: { $0.id == row.id }) { archivedRows[row.id] = (row, index) }
     await remove(row) {
       try await client.archive(row.id)
       return Toast(undo: .unarchive(messageID: row.id))
@@ -126,14 +129,21 @@ final class InboxModel {
 
   func undo(_ toast: Toast) async {
     self.toast = nil
+    var shown: String?
     do {
       switch toast.undo {
-      case .unarchive(let id): try await client.unarchive(id)
+      case .unarchive(let id):
+        if let saved = archivedRows.removeValue(forKey: id), !rows.contains(where: { $0.id == id }) {
+          update { $0.rows.insert(saved.row, at: min(saved.index, $0.rows.count)) }
+          shown = id
+        }
+        try await client.unarchive(id)
       case .batch(let id): _ = try await client.undoBatch(id)
       case .note: return
       }
       await reload()
     } catch {
+      if let shown { update { $0.rows.removeAll { $0.id == shown } } }
       actionError = message(for: error)
     }
   }

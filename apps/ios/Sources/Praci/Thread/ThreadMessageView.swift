@@ -78,6 +78,7 @@ struct ThreadMessageView: View {
       }
     case .steps: StepsBlockView(block: block)
     case .subagent: SubagentRowView(block: block)
+    case .page: PageCardView(block: block)
     case .image: ImageBlockView(block: block)
     case .file: FileBlockView(block: block)
     case .ask, .choice, .mcpApproval, .appConnect, .connect, .card:

@@ -104,7 +104,9 @@ export function buildApprovalAskBlock(
       options?.serviceName,
       options?.moneyNames,
     );
+  const prospectsCard = toolName === "fundraising_prospects_save";
   const fullDetail =
+    prospectsCard ||
     options?.fullMail ||
     options?.fullCompany ||
     options?.integrationWriteTool !== undefined ||
@@ -157,7 +159,10 @@ export function buildApprovalAskBlock(
     ),
     // Raw tool arguments sit behind a Details disclosure; a card the person reads to decide stays open.
     detailFolded:
-      (options?.integrationWriteTool !== undefined || isSendMoney(toolName) || options?.schedule) &&
+      (options?.integrationWriteTool !== undefined ||
+        isSendMoney(toolName) ||
+        options?.schedule ||
+        prospectsCard) &&
       !options?.fullMail &&
       !options?.imessage
         ? true
@@ -194,6 +199,7 @@ export function buildApprovalAskBlock(
             },
             ...(options?.fullMail ||
             options?.fullCompany ||
+            FUNDRAISING_WRITES.has(toolName) ||
             options?.integrationWriteTool !== undefined ||
             options?.noAlwaysAllow ||
             toolName === "imessage_send"
@@ -594,6 +600,15 @@ export function describeApprovalAction(
   if (toolName === "contacts_save") {
     return `Save contact “${args.name ? String(args.name) : "Untitled"}”`;
   }
+  if (toolName === "fundraising_round_save") {
+    return `${args.id ? "Change" : "Start"} round “${args.name ? String(args.name) : "Untitled"}”`;
+  }
+  if (toolName === "fundraising_prospects_save") {
+    const rows = prospectRows(args);
+    const names = rows.slice(0, 3).map(prospectLabel).join(", ");
+    const replacing = args.overwrite === true ? ", replacing fields already set" : "";
+    return `Add or update ${rows.length} ${rows.length === 1 ? "prospect" : "prospects"}${replacing}${names ? ` (${names}${rows.length > 3 ? ` and ${rows.length - 3} more` : ""})` : ""}`;
+  }
   const target = webFetchSite(toolName, args) ?? pickScopeLabel(args);
   const label = serviceName
     ? `${serviceName}: ${humanizeToolName(toolName)}`
@@ -612,7 +627,33 @@ const HAND_WRITTEN_TOOLS = new Set([
   "archive_bot",
   "create_space",
   "contacts_save",
+  "fundraising_round_save",
+  "fundraising_prospects_save",
 ]);
+
+const FUNDRAISING_WRITES = new Set(["fundraising_round_save", "fundraising_prospects_save"]);
+const prospectRows = (args: Record<string, unknown>): Record<string, unknown>[] =>
+  Array.isArray(args.rows)
+    ? args.rows.filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+    : [];
+const prospectLabel = (row: Record<string, unknown>) => String(row.firm ?? row.name ?? "Unnamed");
+
+/** One line per row with every field the call writes, so the card shows exactly what is saved. */
+function prospectsDetail(args: Record<string, unknown>): string {
+  return prospectRows(args)
+    .map((row) => {
+      const parts = [
+        row.name && row.firm ? String(row.name) : undefined,
+        row.email ? String(row.email) : undefined,
+        row.stage ? String(row.stage) : undefined,
+        row.amountUsd != null ? formatAmount(row.amountUsd, "USD") : undefined,
+        row.nextStep ? `next step: ${String(row.nextStep)}` : undefined,
+        row.notes ? `notes: ${String(row.notes)}` : undefined,
+      ].filter(Boolean);
+      return `${prospectLabel(row)}${parts.length ? `: ${parts.join("; ")}` : ""}`;
+    })
+    .join("\n");
+}
 
 /** The scope an email thread agent's read asks about, so the card shows what would be looked up. */
 const READ_SCOPE_KEYS: Record<string, string[]> = {
@@ -634,6 +675,22 @@ function formatApprovalDetail(
     lines.push(
       "Bots, groups, chats, files, memory, and integrations in this space stay separate from other spaces.",
     );
+  }
+  if (toolName === "fundraising_round_save") {
+    for (const [label, key] of [
+      ["Name", "name"],
+      ["Target", "targetUsd"],
+      ["Post-money cap", "postMoneyCapUsd"],
+    ] as const) {
+      const value = args[key];
+      if (value == null || value === "") continue;
+      lines.push(`${label}: ${key === "name" ? String(value) : formatAmount(value, "USD")}`);
+    }
+    return lines.join("\n") || undefined;
+  }
+  if (toolName === "fundraising_prospects_save") {
+    lines.push(prospectsDetail(args));
+    return lines.join("\n");
   }
   // A fetch carries data in its path and query, so the card shows the whole URL.
   const keys =

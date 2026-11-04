@@ -79,6 +79,8 @@ export const BUILTIN_TOOL_NAMES = [
   "investor_update_draft",
   "audit_request_upsert",
   "fundraising_read",
+  "fundraising_round_save",
+  "fundraising_prospects_save",
   "drive_search",
   "drive_read",
   "drive_create_file",

@@ -373,6 +373,14 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     farewell: z.string(),
   }),
   z.object({
+    /** Left in the thread when the agent creates a page. Ids only; the client reads the page through the page routes. */
+    kind: z.literal("page"),
+    botId: Id,
+    pageId: Id,
+    /** The title when the page was created; clients show the current one when they can. */
+    title: z.string(),
+  }),
+  z.object({
     kind: z.literal("meta"),
     text: z.string(),
     /** A server-written link shown after the text, to an app path such as a Data room item. */

@@ -473,6 +473,29 @@ code-b
       },
     ];
   }
+  // "fundraising fixture round|prospects <json>": the Investors agent's writes, for demo and tests.
+  const fundraisingFixture = /fundraising fixture (round|prospects)\s+(\{[\s\S]*\})/i.exec(prompt);
+  if (fundraisingFixture) {
+    try {
+      const args = JSON.parse(fundraisingFixture[2] as string) as Record<string, unknown>;
+      return [
+        {
+          toolCalls: [
+            {
+              name:
+                fundraisingFixture[1]?.toLowerCase() === "round"
+                  ? "fundraising_round_save"
+                  : "fundraising_prospects_save",
+              args,
+            },
+          ],
+          complete: true,
+        },
+      ];
+    } catch {
+      // Not JSON: fall through to the other intents.
+    }
+  }
   if (
     lower.includes("create a space") ||
     lower.includes("create space") ||
@@ -487,6 +510,33 @@ code-b
         complete: true,
       },
     ];
+  }
+  const pageTitle = /\bpage called ([^.\n]+)/i.exec(prompt)?.[1]?.trim();
+  if (pageTitle && lower.includes("make a page called")) {
+    return [
+      {
+        assistant: `the ${pageTitle} page is ready.`,
+        toolCalls: [{ name: "page_create", args: { title: pageTitle } }],
+        complete: true,
+      },
+    ];
+  }
+  if (pageTitle && lower.includes("write the page called")) {
+    return [
+      {
+        assistant: "saved.",
+        toolCalls: [
+          {
+            name: "page_write",
+            args: { page: pageTitle, content: "# Notes\n\nHello", baseRevision: 1 },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
+  if (lower.startsWith("say: ")) {
+    return [{ assistant: prompt.slice(5), complete: true }];
   }
   if (
     lower.includes("spawn a bot") ||

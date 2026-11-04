@@ -75,6 +75,10 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "share_meeting",
   // Several replies on one card, sent only by the owner's press. Its card has no Allow to save.
   "mail_reply_batch",
+  // Writes to the owner's fundraising records. A spreadsheet or email the agent read is untrusted,
+  // so no saved Allow rule or Auto Review may pass them.
+  "fundraising_round_save",
+  "fundraising_prospects_save",
 ]);
 
 const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
