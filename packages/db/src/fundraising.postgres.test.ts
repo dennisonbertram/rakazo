@@ -6,6 +6,7 @@ import {
   closeRound,
   FundraiseRoundOpenError,
   getFundraisingOverview,
+  importProspects,
   reopenRound,
   saveProspect,
   saveRound,
@@ -156,6 +157,131 @@ describePostgres("fundraising (PostgreSQL)", () => {
       fundedCents: 0,
       prospects: [],
       safes: [],
+    });
+  });
+
+  describe("importProspects", () => {
+    const team = { spaceId: mine.spaceId, userId: `fund-user-c-${suffix}` };
+    beforeAll(async () => {
+      await prisma.user.create({
+        data: { id: team.userId, name: "c", email: `${team.userId}@example.test` },
+      });
+    });
+    afterAll(async () => {
+      await prisma.user.deleteMany({ where: { id: team.userId } });
+    });
+    const firms = (count: number, extra: Record<string, unknown> = {}) =>
+      Array.from({ length: count }, (_, i) => ({ firm: `Firm ${i + 1}`, ...extra }));
+    const prospectsOf = (scope: typeof team) =>
+      prisma.contact.findMany({ where: { ...scope, kind: "prospect" }, orderBy: { name: "asc" } });
+
+    it("adds 173 firms in three calls, and a second run adds nobody", async () => {
+      const rows = firms(173, { nextStep: "Call, wave 1" });
+      const waves = [rows.slice(0, 60), rows.slice(60, 120), rows.slice(120)];
+      const first = await Promise.all(waves.map((w) => importProspects(prisma, team, w)));
+      expect(first.reduce((n, r) => n + r.added, 0)).toBe(173);
+      expect(await prospectsOf(team)).toHaveLength(173);
+      const again = [];
+      for (const wave of waves) again.push(await importProspects(prisma, team, wave));
+      expect(again.map((r) => [r.added, r.updated, r.skipped.length])).toEqual([
+        [0, 0, 60],
+        [0, 0, 60],
+        [0, 0, 53],
+      ]);
+      expect(await prospectsOf(team)).toHaveLength(173);
+    });
+
+    it("matches by email, else by normalized name, and keeps what the owner edited", async () => {
+      const [fund] = await prospectsOf(team);
+      await prisma.contact.update({
+        where: { id: fund!.id },
+        data: { stage: "meeting", nextStep: "Owner note", checkSizeCents: 100n },
+      });
+      const result = await importProspects(prisma, team, [
+        // Same firm in other case and punctuation: matched, stage and note kept, empty email filled.
+        {
+          firm: "  firm 1. ",
+          email: "one@example.test",
+          stage: "target",
+          nextStep: "Wave 2",
+          checkSizeCents: 999,
+        },
+        // A new row with the same email as the match is the same prospect.
+        { firm: "Renamed", email: "one@example.test" },
+      ]);
+      expect(result).toMatchObject({ added: 0, updated: 1 });
+      expect(result.skipped).toHaveLength(1);
+      const after = await prisma.contact.findUniqueOrThrow({ where: { id: fund!.id } });
+      expect(after).toMatchObject({
+        email: "one@example.test",
+        stage: "meeting",
+        nextStep: "Owner note",
+        checkSizeCents: 100n,
+      });
+      // Told to change them, the row wins.
+      await importProspects(prisma, team, [{ firm: "Firm 1", nextStep: "Wave 2" }], {
+        overwrite: true,
+      });
+      expect((await prisma.contact.findUniqueOrThrow({ where: { id: fund!.id } })).nextStep).toBe(
+        "Wave 2",
+      );
+    });
+
+    it("attaches a Committed prospect to the open round and leaves other contacts alone", async () => {
+      const round = await saveRound(prisma, team, input);
+      await saveContact(prisma, team, {
+        name: "Vendor Co",
+        email: "v@example.test",
+        kind: "vendor",
+      });
+      const result = await importProspects(prisma, team, [
+        { firm: "Committed Fund", stage: "committed", checkSizeCents: 5_000_00 },
+        { firm: "Vendor Co", email: "v@example.test" },
+      ]);
+      expect(result).toMatchObject({ added: 1, updated: 0 });
+      expect(result.skipped).toEqual([
+        { row: 2, name: "Vendor Co", reason: "Already saved as vendor." },
+      ]);
+      expect(
+        (await prisma.contact.findFirstOrThrow({ where: { ...team, name: "Committed Fund" } }))
+          .roundId,
+      ).toBe(round.id);
+      expect(
+        (await prisma.contact.findFirstOrThrow({ where: { ...team, email: "v@example.test" } }))
+          .kind,
+      ).toBe("vendor");
+    });
+
+    it("reports a row that fails and still saves the others, scoped to the user", async () => {
+      const failing = {
+        contact: {
+          findMany: prisma.contact.findMany.bind(prisma.contact),
+          findFirst: prisma.contact.findFirst.bind(prisma.contact),
+          updateMany: prisma.contact.updateMany.bind(prisma.contact),
+          create: (args: { data: { name: string } }) => {
+            if (args.data.name === "Clash") throw new Error("connection lost");
+            return prisma.contact.create(args as never);
+          },
+        },
+        fundraiseRound: prisma.fundraiseRound,
+        safe: prisma.safe,
+      } as never;
+      const result = await importProspects(failing, team, [
+        { firm: "Good One" },
+        { firm: "Clash" },
+        { firm: "Good Two" },
+      ]);
+      expect(result).toMatchObject({ added: 2, updated: 0 });
+      expect(result.failed).toEqual([{ row: 2, name: "Clash", reason: "Could not be saved." }]);
+      expect(await prospectsOf(team)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "Good One" }),
+          expect.objectContaining({ name: "Good Two" }),
+        ]),
+      );
+      expect(await prospectsOf({ ...team, userId: mine.userId })).not.toContainEqual(
+        expect.objectContaining({ name: "Good One" }),
+      );
     });
   });
 });

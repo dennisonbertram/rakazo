@@ -155,6 +155,38 @@ describe("buildApprovalAskBlock schedule card", () => {
   });
 });
 
+describe("fundraising write cards", () => {
+  it("shows the round name, target and post-money cap in dollars", () => {
+    const args = { name: "Seed", targetUsd: 5_000_000, postMoneyCapUsd: 20_000_000 };
+    expect(describeApprovalAction("fundraising_round_save", args)).toBe("Start round “Seed”");
+    expect(describeApprovalAction("fundraising_round_save", { ...args, id: "r1" })).toBe(
+      "Change round “Seed”",
+    );
+    const block = buildApprovalAskBlock("e1", "fundraising_round_save", args, []);
+    expect(block).toMatchObject({
+      text: "Review before Start round “Seed”",
+      detail: "Name: Seed\nTarget: $5,000,000.00\nPost-money cap: $20,000,000.00",
+      toolId: undefined,
+    });
+  });
+
+  it("names the count and first firms, with every row behind the Details fold", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => ({
+      firm: `Firm ${i + 1}`,
+      stage: "target",
+      nextStep: "Wave 1",
+    }));
+    const block = buildApprovalAskBlock("e2", "fundraising_prospects_save", { rows }, []);
+    expect(block).toMatchObject({
+      text: "Review before Add or update 12 prospects (Firm 1, Firm 2, Firm 3 and 9 more)",
+      detailFolded: true,
+    });
+    const lines = (block as { detail: string }).detail.split("\n");
+    expect(lines).toHaveLength(12);
+    expect(lines[11]).toBe("Firm 12: target, Wave 1");
+  });
+});
+
 describe("buildApprovalAskBlock", () => {
   it("binds the approval to its effect and redacts secrets", () => {
     const block = buildApprovalAskBlock(

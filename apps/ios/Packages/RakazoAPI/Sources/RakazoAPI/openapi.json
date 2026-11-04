@@ -134496,7 +134496,7 @@
         ]
       },
       "RpcBotsUpdateInputSchema22": {
-        "maxItems": 138,
+        "maxItems": 140,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"

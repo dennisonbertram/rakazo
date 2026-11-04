@@ -1,5 +1,5 @@
 import * as z from "zod";
-import { ContactSchema, ContactStageSchema } from "./contacts.js";
+import { ContactEmailSchema, ContactSchema, ContactStageSchema } from "./contacts.js";
 import { Id, IsoDate } from "./ids.js";
 
 /** Money is integer cents. */
@@ -89,6 +89,34 @@ export const FundraiseRoundSaveInputSchema = z.object({
   capCents: Cents,
 });
 export type FundraiseRoundSaveInput = z.infer<typeof FundraiseRoundSaveInputSchema>;
+
+/** Rows one prospects import takes; a longer list is split across calls. */
+export const PROSPECT_IMPORT_MAX = 60;
+
+/**
+ * One firm or person to add to the pipeline. It names only fields the owner could type on the
+ * Fundraising page: no kind, id or round, so a spreadsheet row cannot reach anything else.
+ */
+export const ProspectImportRowSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    firm: z.string().trim().min(1).max(200).optional(),
+    email: ContactEmailSchema.nullish(),
+    stage: ContactStageSchema.optional(),
+    checkSizeCents: Cents.nullish(),
+    nextStep: z.string().trim().max(500).nullish(),
+    notes: z.string().trim().max(5000).nullish(),
+  })
+  .refine((row) => row.name || row.firm, { message: "Each row needs a name or a firm." });
+export type ProspectImportRow = z.infer<typeof ProspectImportRowSchema>;
+
+export type ProspectImportResult = {
+  added: number;
+  updated: number;
+  /** Already saved with nothing to change, or a contact that is not a prospect. */
+  skipped: { row: number; name: string; reason: string }[];
+  failed: { row: number; name: string; reason: string }[];
+};
 
 /** Changes only the pipeline fields of an existing prospect. Null clears the check size or next step. */
 export const ProspectSaveInputSchema = z.object({

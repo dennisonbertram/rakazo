@@ -3,6 +3,8 @@ import type {
   FundraiseRound,
   FundraiseRoundSaveInput,
   FundraisingOverview,
+  ProspectImportResult,
+  ProspectImportRow,
   ProspectSaveInput,
 } from "@rakazo/contracts";
 import { isActiveSafe } from "@rakazo/core";
@@ -187,4 +189,104 @@ export async function saveProspect(
     include: { bot: { select: { id: true, name: true } } },
   });
   return toContact(row);
+}
+
+/** Lowercase letters and digits only, so "Harbor Angels, LLC" and "harbor angels llc" match. */
+const normalized = (value: string | null | undefined) =>
+  (value ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+/**
+ * Adds prospects, or updates the ones already saved, matched by email and otherwise by normalized
+ * name or firm, so running the same list again adds nobody. A saved prospect keeps whatever the
+ * owner set: a row fills only its empty fields unless `overwrite` is true. A contact that is not a
+ * prospect is left alone. Rows are saved one by one; a row that fails is reported, the rest stay.
+ */
+export async function importProspects(
+  prisma: Db,
+  actor: Scope,
+  rows: ProspectImportRow[],
+  options: { overwrite?: boolean; botId?: string | null } = {},
+): Promise<ProspectImportResult> {
+  const scope = ownerOf(actor);
+  const result: ProspectImportResult = { added: 0, updated: 0, skipped: [], failed: [] };
+  const known = await prisma.contact.findMany({
+    where: { ...scope, kind: "prospect" },
+    select: { id: true, name: true, organization: true, email: true },
+  });
+  const fresh = (row: ProspectImportRow) => ({
+    name: (row.name ?? row.firm) as string,
+    organization: row.firm ?? null,
+  });
+  for (const [row, input] of rows.entries()) {
+    const { name, organization } = fresh(input);
+    const report = (list: "skipped" | "failed", reason: string) =>
+      result[list].push({ row: row + 1, name, reason });
+    try {
+      const key = normalized(name);
+      const firmKey = normalized(organization);
+      let existing = input.email
+        ? await prisma.contact.findFirst({ where: { ...scope, email: input.email } })
+        : null;
+      if (existing && existing.kind !== "prospect") {
+        report("skipped", `Already saved as ${existing.kind}.`);
+        continue;
+      }
+      if (!existing) {
+        // Another email on a saved prospect is a different person at the same firm.
+        const match = known.find(
+          (k) =>
+            (!input.email || !k.email) &&
+            (normalized(k.name) === key || (firmKey && normalized(k.organization) === firmKey)),
+        );
+        if (match) existing = await prisma.contact.findFirst({ where: { id: match.id, ...scope } });
+      }
+      if (!existing) {
+        const stage = input.stage ?? "target";
+        const created = await prisma.contact.create({
+          data: {
+            ...scope,
+            name,
+            organization,
+            email: input.email ?? null,
+            notes: input.notes ?? null,
+            nextStep: input.nextStep ?? null,
+            checkSizeCents: input.checkSizeCents ?? null,
+            kind: "prospect",
+            stage,
+            roundId: await roundIdForStage(prisma, scope, stage),
+            botId: options.botId ?? null,
+          },
+        });
+        known.push({ id: created.id, name, organization, email: input.email ?? null });
+        result.added += 1;
+        continue;
+      }
+      const fill = <T>(current: T | null, next: T | null | undefined) =>
+        next != null && next !== current && (options.overwrite || current == null || current === "")
+          ? next
+          : undefined;
+      const stage = fill(existing.stage, input.stage);
+      const data = {
+        organization: fill(existing.organization, organization),
+        email: fill(existing.email, input.email),
+        notes: fill(existing.notes, input.notes),
+        nextStep: fill(existing.nextStep, input.nextStep),
+        checkSizeCents: fill(
+          existing.checkSizeCents == null ? null : Number(existing.checkSizeCents),
+          input.checkSizeCents,
+        ),
+        stage,
+        roundId: await roundIdForStage(prisma, scope, stage as ProspectImportRow["stage"]),
+      };
+      if (Object.values({ ...data, roundId: undefined }).every((v) => v === undefined)) {
+        report("skipped", "Already saved; nothing to change.");
+        continue;
+      }
+      await prisma.contact.updateMany({ where: { id: existing.id, ...scope }, data });
+      result.updated += 1;
+    } catch {
+      report("failed", "Could not be saved.");
+    }
+  }
+  return result;
 }

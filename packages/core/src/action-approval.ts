@@ -53,6 +53,8 @@ const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "drive_create_file",
   "drive_update_file",
   "contacts_save",
+  "fundraising_round_save",
+  "fundraising_prospects_save",
 ]);
 /** Built-in mail tools that write; the "email" approval category covers them. */
 const BUILTIN_MAIL_WRITE_TOOLS = new Set(["mail_draft", "mail_modify", "mail_send"]);

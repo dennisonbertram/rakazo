@@ -39,6 +39,9 @@ describe("toolRequiresApproval", () => {
     expect(toolRequiresApproval("create_space", false)).toBe(true);
     expect(toolRequiresApproval("contacts_save", false)).toBe(true);
     expect(toolRequiresApproval("contacts_add", false)).toBe(false);
+    expect(toolRequiresApproval("fundraising_round_save", false)).toBe(true);
+    expect(toolRequiresApproval("fundraising_prospects_save", false)).toBe(true);
+    expect(toolRequiresExplicitApproval("fundraising_round_save")).toBe(false);
     expect(toolRequiresApproval("cap_table_update", false)).toBe(false);
     expect(toolRequiresExplicitApproval("contacts_save")).toBe(false);
     expect(toolRequiresExplicitApproval("create_space")).toBe(true);
@@ -735,6 +738,8 @@ describe("unattendedToolRequiresApproval", () => {
     "calendar_update_event",
     "calendar_delete_event",
     "contacts_save",
+    "fundraising_round_save",
+    "fundraising_prospects_save",
   ])("asks for %s in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
   });

@@ -60,6 +60,7 @@ describe("fundraising_read", () => {
     const result = await fundraisingToolFromTool("fundraising_read", { prisma, scope });
     expect(result).toEqual({
       round: {
+        id: "r1",
         name: "Seed",
         status: "open",
         targetUsd: 2_000_000,
@@ -150,5 +151,161 @@ describe("fundraising_read", () => {
     expect(fundraisingToolsAllowed({ ...base, botSpawnKey: "carta-agent:u" })).toBe(false);
     expect(fundraisingToolsAllowed({ ...base, botSpawnKey: null })).toBe(false);
     expect(fundraisingToolsAllowed({ ...base, trigger: "bot_message" })).toBe(false);
+  });
+});
+
+describe("fundraising_round_save", () => {
+  const stored = (data: Record<string, unknown>) => ({
+    id: "r9",
+    ...data,
+    closedAt: null,
+  });
+
+  it("stores dollars as cents through saveRound, scoped to the run owner", async () => {
+    const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => stored(data));
+    const prisma = { fundraiseRound: { create } } as never;
+    const result = await fundraisingToolFromTool(
+      "fundraising_round_save",
+      { prisma, scope },
+      // Extra keys a model might add are not stored.
+      { name: " Seed ", targetUsd: 5_000_000, postMoneyCapUsd: 20_000_000, spaceId: "other" },
+    );
+    expect(create).toHaveBeenCalledWith({
+      data: { ...scope, name: "Seed", targetCents: 500_000_000, capCents: 2_000_000_000 },
+    });
+    expect(result).toEqual({
+      ok: true,
+      round: {
+        id: "r9",
+        name: "Seed",
+        status: "open",
+        targetUsd: 5_000_000,
+        postMoneyCapUsd: 20_000_000,
+      },
+    });
+  });
+
+  it("edits the open round by id and refuses a closed or foreign one", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const findUniqueOrThrow = vi.fn(async () =>
+      stored({ name: "Seed", targetCents: 1n, capCents: 2n }),
+    );
+    const prisma = { fundraiseRound: { updateMany, findUniqueOrThrow } } as never;
+    await fundraisingToolFromTool(
+      "fundraising_round_save",
+      { prisma, scope },
+      { id: "r9", name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 },
+    );
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "r9", ...scope, closedAt: null },
+      data: { name: "Seed", targetCents: 100, capCents: 200 },
+    });
+    updateMany.mockResolvedValueOnce({ count: 0 });
+    expect(
+      await fundraisingToolFromTool(
+        "fundraising_round_save",
+        { prisma, scope },
+        { id: "r9", name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 },
+      ),
+    ).toEqual({ error: "That round was not found, or it is closed and cannot be edited." });
+  });
+
+  it("tells the agent a round is already open instead of returning a raw error", async () => {
+    const create = vi.fn(async () => {
+      throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+    });
+    const result = await fundraisingToolFromTool(
+      "fundraising_round_save",
+      { prisma: { fundraiseRound: { create } } as never, scope },
+      { name: "Seed", targetUsd: 5_000_000, postMoneyCapUsd: 20_000_000 },
+    );
+    expect(result).toEqual({
+      error: expect.stringContaining("A round is already open. Call fundraising_read"),
+    });
+    expect(JSON.stringify(result)).not.toContain("Unique constraint");
+  });
+
+  it("rejects missing, zero, negative and text amounts without writing", async () => {
+    const create = vi.fn();
+    const prisma = { fundraiseRound: { create } } as never;
+    for (const bad of [
+      { name: "Seed", targetUsd: 0, postMoneyCapUsd: 1 },
+      { name: "Seed", targetUsd: -5, postMoneyCapUsd: 1 },
+      { name: "Seed", targetUsd: "$5M", postMoneyCapUsd: 1 },
+      { name: "", targetUsd: 5, postMoneyCapUsd: 1 },
+      { name: "Seed", targetUsd: 5 },
+    ]) {
+      expect(
+        await fundraisingToolFromTool("fundraising_round_save", { prisma, scope }, bad),
+      ).toEqual({
+        error: "Pass name, targetUsd and postMoneyCapUsd as whole US dollars above zero.",
+      });
+    }
+    expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("fundraising_prospects_save argument handling", () => {
+  it("refuses more than 60 rows, and names the split", async () => {
+    const rows = Array.from({ length: 173 }, (_, i) => ({ firm: `Firm ${i}` }));
+    const result = await fundraisingToolFromTool(
+      "fundraising_prospects_save",
+      { prisma: {} as never, scope },
+      { rows },
+    );
+    expect(result).toEqual({
+      error: "At most 60 rows per call; you passed 173. Split the list and call again.",
+    });
+  });
+
+  it("reports bad rows as failed with their position and saves the rest", async () => {
+    const created: Record<string, unknown>[] = [];
+    const prisma = {
+      contact: {
+        findMany: async () => [],
+        findFirst: async () => null,
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          created.push(data);
+          return { id: `c${created.length}` };
+        },
+      },
+      fundraiseRound: { findFirst: async () => null },
+    } as never;
+    const result = await fundraisingToolFromTool(
+      "fundraising_prospects_save",
+      { prisma, scope, botId: "bot-1" },
+      {
+        rows: [
+          {
+            firm: "Harbor Angels",
+            amountUsd: 250_000,
+            nextStep: "Wave 1",
+            kind: "customer",
+            id: "x",
+            roundId: "y",
+          },
+          { firm: "Broken", email: "not-an-email" },
+          { firm: "Cents Fund", amountUsd: "lots" },
+          { notes: "no name" },
+        ],
+      },
+    );
+    expect(result).toMatchObject({ added: 1, updated: 0, skipped: [] });
+    expect((result as { failed: { row: number }[] }).failed.map((f) => f.row)).toEqual([2, 3, 4]);
+    // $250,000 is 25,000,000 cents; kind, id and round from the row never reach the record.
+    expect(created).toEqual([
+      expect.objectContaining({
+        ...scope,
+        name: "Harbor Angels",
+        organization: "Harbor Angels",
+        kind: "prospect",
+        stage: "target",
+        checkSizeCents: 25_000_000,
+        nextStep: "Wave 1",
+        botId: "bot-1",
+        roundId: null,
+      }),
+    ]);
+    expect(created[0]).not.toHaveProperty("id");
   });
 });
