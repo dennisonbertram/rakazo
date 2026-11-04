@@ -168,10 +168,10 @@ describe("fundraising_round_save", () => {
       "fundraising_round_save",
       { prisma, scope },
       // Extra keys a model might add are not stored.
-      { name: " Seed ", targetUsd: 5_000_000, postMoneyCapUsd: 20_000_000, spaceId: "other" },
+      { name: " Seed ", targetUsd: 3_000_000, postMoneyCapUsd: 15_000_000, spaceId: "other" },
     );
     expect(create).toHaveBeenCalledWith({
-      data: { ...scope, name: "Seed", targetCents: 500_000_000, capCents: 2_000_000_000 },
+      data: { ...scope, name: "Seed", targetCents: 300_000_000, capCents: 1_500_000_000 },
     });
     expect(result).toEqual({
       ok: true,
@@ -179,8 +179,8 @@ describe("fundraising_round_save", () => {
         id: "r9",
         name: "Seed",
         status: "open",
-        targetUsd: 5_000_000,
-        postMoneyCapUsd: 20_000_000,
+        targetUsd: 3_000_000,
+        postMoneyCapUsd: 15_000_000,
       },
     });
   });
@@ -217,7 +217,7 @@ describe("fundraising_round_save", () => {
     const result = await fundraisingToolFromTool(
       "fundraising_round_save",
       { prisma: { fundraiseRound: { create } } as never, scope },
-      { name: "Seed", targetUsd: 5_000_000, postMoneyCapUsd: 20_000_000 },
+      { name: "Seed", targetUsd: 3_000_000, postMoneyCapUsd: 15_000_000 },
     );
     expect(result).toEqual({
       error: expect.stringContaining("A round is already open. Call fundraising_read"),
@@ -231,7 +231,7 @@ describe("fundraising_round_save", () => {
     for (const bad of [
       { name: "Seed", targetUsd: 0, postMoneyCapUsd: 1 },
       { name: "Seed", targetUsd: -5, postMoneyCapUsd: 1 },
-      { name: "Seed", targetUsd: "$5M", postMoneyCapUsd: 1 },
+      { name: "Seed", targetUsd: "$3M", postMoneyCapUsd: 1 },
       { name: "", targetUsd: 5, postMoneyCapUsd: 1 },
       { name: "Seed", targetUsd: 5 },
     ]) {
@@ -247,14 +247,14 @@ describe("fundraising_round_save", () => {
 
 describe("fundraising_prospects_save argument handling", () => {
   it("refuses more than 60 rows, and names the split", async () => {
-    const rows = Array.from({ length: 173 }, (_, i) => ({ firm: `Firm ${i}` }));
+    const rows = Array.from({ length: 140 }, (_, i) => ({ firm: `Firm ${i}` }));
     const result = await fundraisingToolFromTool(
       "fundraising_prospects_save",
       { prisma: {} as never, scope },
       { rows },
     );
     expect(result).toEqual({
-      error: "At most 60 rows per call; you passed 173. Split the list and call again.",
+      error: "At most 60 rows per call; you passed 140. Split the list and call again.",
     });
   });
 

@@ -175,20 +175,20 @@ describePostgres("fundraising (PostgreSQL)", () => {
     const prospectsOf = (scope: typeof team) =>
       prisma.contact.findMany({ where: { ...scope, kind: "prospect" }, orderBy: { name: "asc" } });
 
-    it("adds 173 firms in three calls, and a second run adds nobody", async () => {
-      const rows = firms(173, { nextStep: "Call, wave 1" });
+    it("adds 140 firms in three calls, and a second run adds nobody", async () => {
+      const rows = firms(140, { nextStep: "Call, wave 1" });
       const waves = [rows.slice(0, 60), rows.slice(60, 120), rows.slice(120)];
       const first = await Promise.all(waves.map((w) => importProspects(prisma, team, w)));
-      expect(first.reduce((n, r) => n + r.added, 0)).toBe(173);
-      expect(await prospectsOf(team)).toHaveLength(173);
+      expect(first.reduce((n, r) => n + r.added, 0)).toBe(140);
+      expect(await prospectsOf(team)).toHaveLength(140);
       const again = [];
       for (const wave of waves) again.push(await importProspects(prisma, team, wave));
       expect(again.map((r) => [r.added, r.updated, r.skipped.length])).toEqual([
         [0, 0, 60],
         [0, 0, 60],
-        [0, 0, 53],
+        [0, 0, 20],
       ]);
-      expect(await prospectsOf(team)).toHaveLength(173);
+      expect(await prospectsOf(team)).toHaveLength(140);
     });
 
     it("matches by email, else by normalized name, and keeps what the owner edited", async () => {
