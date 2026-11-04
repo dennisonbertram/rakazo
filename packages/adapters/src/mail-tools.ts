@@ -501,7 +501,8 @@ async function runTask(
   save: (message: MailMessageSummary) => boolean,
 ): Promise<{ outcome: MailQueryOutcome; resume?: ResumeEntry; reason?: string }> {
   const { account, query } = task;
-  const labelIds = task.labelIds ? { labelIds: task.labelIds } : {};
+  // Cached metadata keeps only some labels, so a label-scoped search always reads the provider.
+  const labelIds = task.labelIds ? { labelIds: task.labelIds, useCache: false } : {};
   let ids = task.start?.unhydratedIds ?? [];
   let token = task.start?.pageToken;
   // A fresh query, or a resumed one that still has a page to list.
@@ -624,6 +625,12 @@ async function mailGrep(deps: MailToolDeps, args: Record<string, unknown>) {
   const search = await findOwnedSearch(deps, args.searchId);
   if (!search) return NO_SEARCH;
   if (search.expiresAt <= currentTime(deps)) return EXPIRED;
+  // Rows saved from an account the agent can no longer use are not readable: fail closed.
+  const allowed = new Set((await deps.accounts()).map(accountName));
+  const saved = (search.summary as { accounts?: unknown } | null)?.accounts;
+  if (Array.isArray(saved) && saved.some((name) => !allowed.has(String(name)))) {
+    return { error: "A mailbox in these results is no longer available to this agent." };
+  }
 
   const patterns = Array.isArray(args.patterns) ? args.patterns : undefined;
   const dateFrom = datePrefix(args.dateFrom);

@@ -434,7 +434,7 @@ import {
 import {
   FIREWALL_CONTENT_READERS,
   firewalledBotIds,
-  groupHasFirewalledMember,
+  groupTaintedByFirewall,
   readsFirewalledContent,
 } from "./firewall-runtime.js";
 import {
@@ -2133,9 +2133,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           run.externalTaint !== true &&
           (bot.firewall === true ||
             (thread.groupId &&
-              (await groupHasFirewalledMember(
+              (await groupTaintedByFirewall(
                 deps.prisma,
                 thread.groupId,
+                loadedMessages.map((message) => message.botId),
                 await firewalledBotIds(deps.prisma, run.spaceId),
               ))))
         ) {

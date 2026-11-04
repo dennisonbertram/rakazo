@@ -103,7 +103,8 @@ async function searchStaysInScope(
   } | null;
   return (summary?.perQuery ?? []).every((entry) => {
     const account = deps.accounts.find((a) => accountName(a) === entry.account);
-    if (!account) return true;
+    // An account the agent can no longer use fails closed.
+    if (!account) return false;
     const own = scope.get(account.id);
     if (own === "unresolved") return false;
     return !own?.labelId || summary?.scopedLabels?.[accountName(account)] === own.labelId;
@@ -195,10 +196,9 @@ export async function firewallDraftIsWithinThread(
   deps: Pick<FirewallMailDeps, "prisma" | "owner" | "accounts">,
 ): Promise<boolean> {
   const replyTo = typeof args.replyToId === "string" ? args.replyToId.trim() : "";
-  if (!replyTo) return false;
-  const account = await inferMailAccount(deps.prisma, deps.owner, deps.accounts, args).catch(
-    () => undefined,
-  );
+  // Changing a saved draft could change one the owner already approved.
+  if (!replyTo || (typeof args.draftId === "string" && args.draftId.trim())) return false;
+  const account = await accountFor(deps, args).catch(() => undefined);
   if (!account) return false;
   const row = await deps.prisma.cachedMailMessage.findFirst({
     where: { ...deps.owner, providerMessageId: replyTo, connectionId: account.id },
@@ -246,13 +246,35 @@ export async function firewallModifyIsFree(
   const scope = (await scopes(deps)).get(account.id);
   if (scope === undefined || scope === "unresolved") return false;
   if (!scope.labelId) return true;
-  const named = [...strings(args.addLabels), ...strings(args.removeLabels)].map((l) =>
-    l.trim().toLowerCase(),
-  );
+  // Archiving removes INBOX and marking read removes UNREAD, which matters when the support
+  // label is one of those system labels.
+  const named = [
+    ...strings(args.addLabels),
+    ...strings(args.removeLabels),
+    ...(typeof args.archive === "boolean" ? ["INBOX"] : []),
+    ...(typeof args.read === "boolean" ? ["UNREAD"] : []),
+  ].map((l) => l.trim().toLowerCase());
   if (named.includes(scope.label!.toLowerCase()) || named.includes(scope.labelId.toLowerCase())) {
     return false;
   }
-  return (
-    typeof args.id === "string" && (await messageHasLabel(deps, account, args.id, scope.labelId))
-  );
+  if (typeof args.id !== "string") return false;
+  // The change applies to the whole conversation, so every message of it must be in scope. The
+  // conversation is read from synced mail; one that is not synced asks.
+  const known = await deps.prisma.cachedMailMessage.findFirst({
+    where: { ...deps.owner, providerMessageId: args.id, connectionId: account.id },
+    select: { threadId: true, connectionId: true },
+  });
+  if (!known) return false;
+  const thread = await deps.prisma.cachedMailMessage.findMany({
+    where: { ...deps.owner, connectionId: known.connectionId, threadId: known.threadId },
+    select: { providerMessageId: true },
+  });
+  const ids = new Set([
+    args.id,
+    ...thread.map((row) => row.providerMessageId).filter((id): id is string => Boolean(id)),
+  ]);
+  for (const id of ids) {
+    if (!(await messageHasLabel(deps, account, id, scope.labelId))) return false;
+  }
+  return true;
 }

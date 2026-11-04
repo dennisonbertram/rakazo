@@ -41,6 +41,21 @@ export const FIREWALL_CONTENT_READERS: ReadonlySet<string> = new Set([
   "ticket_get",
 ]);
 
+/**
+ * A group run is tainted when a firewalled agent is a member, or wrote any message in the history
+ * the run loaded (a member that has since left still wrote what the others read).
+ */
+export async function groupTaintedByFirewall(
+  prisma: Pick<PrismaClient, "chatGroupMember">,
+  groupId: string,
+  historyAuthors: readonly (string | null | undefined)[],
+  firewalled: ReadonlySet<string>,
+): Promise<boolean> {
+  if (firewalled.size === 0) return false;
+  if (historyAuthors.some((id) => id != null && firewalled.has(id))) return true;
+  return groupHasFirewalledMember(prisma, groupId, firewalled);
+}
+
 const AGENT_RECORD_TOOLS = new Set(["agent_context", "search_agent_history", "read_agent_history"]);
 
 /**

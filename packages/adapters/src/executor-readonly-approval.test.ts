@@ -5979,6 +5979,16 @@ describe("agent firewall", () => {
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
     });
 
+    it("is free when the call names its account, and asks to change an existing draft", async () => {
+      const named = await draft(
+        reply({ to: ["sam@customer.example"], account: "support@us.example" }),
+      );
+      expect(named.pauseRunForInput).not.toHaveBeenCalled();
+      const update = await draft(reply({ to: ["sam@customer.example"], draftId: "d1" }));
+      expect(update.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(cardOf(update).approvalReason).toBe("Firewall");
+    });
+
     it("asks for a draft to a new recipient, one with a link, or one with no thread", async () => {
       for (const args of [
         reply({ to: ["sam@customer.example"], cc: ["billing@evil.example"] }),
@@ -6043,6 +6053,49 @@ describe("agent firewall", () => {
       expect((await modify({ read: true }, ["INBOX"])).pauseRunForInput).toHaveBeenCalledOnce();
     });
 
+    it("asks for a mail_modify when another message of the thread lacks the label", async () => {
+      const mail = supportMail();
+      mail.getMessage.mockImplementation((async (_a: unknown, id: string) =>
+        mailMessage(id === "m2" ? ["INBOX"] : ["L-support"], { id })) as never);
+      const f = fixture({
+        name: "mail_modify",
+        builtin: true,
+        firewall: true,
+        mail,
+        connectionRows: granted("Support"),
+      });
+      f.prisma.cachedMailMessage.findFirst.mockResolvedValue({
+        threadId: "t1",
+        connectionId: "acct-1",
+      } as never);
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        { providerMessageId: "m1", fromAddress: "list@example.test" },
+        { providerMessageId: "m2", fromAddress: "list@example.test" },
+      ] as never);
+      f.setCalls([{ args: { id: "m1", read: true }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("treats a support label named INBOX as changed by archiving", async () => {
+      const mail = supportMail();
+      mail.listLabels.mockResolvedValue([{ id: "INBOX", name: "INBOX", type: "system" }]);
+      mail.getMessage.mockResolvedValue(mailMessage(["INBOX"]));
+      const f = fixture({
+        name: "mail_modify",
+        builtin: true,
+        firewall: true,
+        mail,
+        connectionRows: granted("INBOX"),
+      });
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        { providerMessageId: "m1", fromAddress: "list@example.test" },
+      ] as never);
+      f.setCalls([{ args: { id: "m1", archive: true }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
     it("does not treat allAgents as a sole grant", async () => {
       const f = fixture({
         name: "mail_modify",
@@ -6100,7 +6153,11 @@ describe("agent firewall", () => {
         expect(f.pauseRunForInput).not.toHaveBeenCalled();
         expect(mail.listMessages).toHaveBeenCalledWith(
           expect.anything(),
-          expect.objectContaining({ query: "x) OR (in:anywhere", labelIds: ["L-support"] }),
+          expect.objectContaining({
+            query: "x) OR (in:anywhere",
+            labelIds: ["L-support"],
+            useCache: false,
+          }),
           expect.anything(),
         );
         const saved = (created.mock.calls[0] as unknown as [{ data: Record<string, any> }])[0].data;

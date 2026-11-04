@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   firewalledBotIds,
   groupHasFirewalledMember,
+  groupTaintedByFirewall,
   readsFirewalledContent,
 } from "./firewall-runtime.js";
 
@@ -99,5 +100,17 @@ describe("readsFirewalledContent", () => {
   });
   it("ignores tools that read nothing an agent wrote", async () => {
     expect(await reads(prisma(), "mail_get", { botId: "fw" })).toBe(false);
+  });
+});
+
+describe("groupTaintedByFirewall", () => {
+  const prisma = (members: string[]) => ({
+    chatGroupMember: { findMany: rows(members.map((botId) => ({ botId }))) },
+  });
+  it("taints on a firewalled message author even after the member left", async () => {
+    const ids = new Set(["fw"]);
+    expect(await groupTaintedByFirewall(prisma([]) as never, "g", ["fw", null], ids)).toBe(true);
+    expect(await groupTaintedByFirewall(prisma([]) as never, "g", ["x", null], ids)).toBe(false);
+    expect(await groupTaintedByFirewall(prisma(["fw"]) as never, "g", [], ids)).toBe(true);
   });
 });
