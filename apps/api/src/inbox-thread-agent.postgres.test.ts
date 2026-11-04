@@ -212,6 +212,21 @@ describePostgres("Ask agent on an email thread (PostgreSQL)", () => {
     });
     const ordinary = await repos.createBot(owner, { ...base, name: "Ordinary" });
     expect(legacy.firewall).toBe(false);
+    // An archived thread agent that a newer one replaced has lost its spawn key; it is found by
+    // its first message, and stays firewalled when restored.
+    const retiredKey = mailThreadAgentSpawnKey(ownerConnection, "retired");
+    const retired = await repos.createBot(owner, {
+      ...base,
+      name: "Retired thread",
+      spawnKey: retiredKey,
+      initialMessage: {
+        role: "system",
+        blocks: [{ kind: "mail_thread", subject: "Old", messages: [] }],
+      },
+    });
+    await prisma.bot.update({ where: { id: retired.id }, data: { archivedAt: new Date() } });
+    await repos.createBot(owner, { ...base, name: "Replacement", spawnKey: retiredKey });
+    expect((await prisma.bot.findUniqueOrThrow({ where: { id: retired.id } })).spawnKey).toBeNull();
     const sql = readFileSync(
       new URL(
         "../../../packages/db/prisma/migrations/20261231000047_firewall_mail_thread_agents/migration.sql",
@@ -227,6 +242,9 @@ describePostgres("Ask agent on an email thread (PostgreSQL)", () => {
       (await prisma.bot.findUniqueOrThrow({ where: { id }, select: { firewall: true } })).firewall;
     expect(await flag(legacy.id)).toBe(true);
     expect(await flag(ordinary.id)).toBe(false);
+    expect(await flag(retired.id)).toBe(true);
+    await prisma.bot.update({ where: { id: retired.id }, data: { archivedAt: null } });
+    expect(await flag(retired.id)).toBe(true);
   });
 
   it("returns the same agent when asked again, without reading the mail again", async () => {

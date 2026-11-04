@@ -72,10 +72,6 @@ export const FIREWALL_MAIL_THREAD_ASK_TOOLS: ReadonlySet<string> = new Set([
   "search_data_room",
   "read_data_room_item",
   "contacts_list",
-  "drive_search",
-  "drive_read",
-  "calendar_list_events",
-  "calendar_get_event",
 ]);
 
 export type FirewallToolClass = "free" | "ask" | "dropped";

@@ -6284,6 +6284,41 @@ describe("agent firewall", () => {
       expect(cardOf(f).approvalReason).toBe("Firewall");
     });
 
+    it.each([
+      [
+        "search_data_room",
+        { query: "cap table", filters: { folderId: "f1" } },
+        ["query: cap table", "folderId"],
+      ],
+      ["read_data_room_item", { item_id: "item-9" }, ["item_id: item-9"]],
+      ["contacts_list", { query: "Ada", kind: "investor" }, ["query: Ada", "kind: investor"]],
+    ] as const)("shows the requested scope on the %s card", async (name, args, shown) => {
+      const f = threadFixture(name);
+      f.setCalls([{ args: { ...args }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      for (const text of shown) expect(cardOf(f).detail).toContain(text);
+    });
+
+    it("still asks for a send after an approved read", async () => {
+      const f = threadFixture("search_data_room");
+      f.setCalls([{ args: { query: "cap table" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.effects).toHaveLength(1);
+      f.effects[0]!.status = "approved";
+      f.setCalls([
+        { args: { query: "cap table" }, executionId: "c2" },
+        {
+          name: "mail_send",
+          args: { to: ["a@b.example"], subject: "Hi", body: "Hello" },
+          executionId: "c3",
+        },
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledTimes(2);
+      expect(cardOf(f).approvalReason).toBe("Firewall");
+    });
+
     it("still drops a data room write", async () => {
       const f = threadFixture("add_to_data_room");
       f.setCalls([{ args: {}, executionId: "c1" }]);
