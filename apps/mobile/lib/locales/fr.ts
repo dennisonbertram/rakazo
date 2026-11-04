@@ -971,4 +971,8 @@ export const FR_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "Réponse attendue désactivée",
   "No reply needed": "Aucune réponse nécessaire",
   "Stopped Needs reply for {sender}": "Réponse attendue désactivée pour {sender}",
+  "See all ({count})": "Tout afficher ({count})",
+  Overdue: "En retard",
+  Upcoming: "À venir",
+  "No date": "Sans date",
 };

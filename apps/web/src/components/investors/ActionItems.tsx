@@ -14,6 +14,7 @@ import {
 import { ChevronDown, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { shortDay } from "../../lib/finance-format";
+import { SeeAll, useCappedRows } from "../CappedList";
 import { SectionCard } from "../SectionCard";
 
 const day = (iso: string) => shortDay(iso.slice(0, 10), new Date(), i18n.locale || "en");
@@ -132,6 +133,12 @@ export function ActionItems({
   // On a phone the card is one line until opened; from sm up the list always shows.
   const [open, setOpen] = useState(false);
   const count = drafts.length + audits.length;
+  // A phone shows 3 of them once opened; "See all" opens the rest in place.
+  const items = [
+    ...audits.map((audit) => ({ audit }) as { audit: AuditRequest; draft?: undefined }),
+    ...drafts.map((draft) => ({ draft }) as { draft: InvestorUpdate; audit?: undefined }),
+  ];
+  const list = useCappedRows(items);
   if (count === 0) return null;
   return (
     <SectionCard
@@ -153,37 +160,41 @@ export function ActionItems({
       }
     >
       <ul className={open ? "" : "max-sm:hidden"}>
-        {audits.map((audit) => (
-          <AuditRow
-            key={audit.id}
-            audit={audit}
-            draftEnded={draftEnded.has(audit.id)}
-            onDraft={onDraftAudit}
-            onClose={onCloseAudit}
-          />
-        ))}
-        {drafts.map((draft) => (
-          <li
-            key={draft.id}
-            className="flex min-h-11 flex-wrap items-center gap-x-2 border-t border-border first:border-t-0 sm:flex-nowrap"
-          >
-            <div className="min-w-0 basis-full py-1.5 sm:flex-1 sm:basis-0">
-              <span className="line-clamp-2 text-sm font-medium" title={draft.subject}>
-                {draft.subject}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {t`Drafted ${day(draft.createdAt)}`}
-              </span>
-            </div>
-            <Badge variant="secondary">
-              <Trans>Draft</Trans>
-            </Badge>
-            <Button variant="outline" size="sm" onClick={() => onOpen(draft)}>
-              <Trans>Open</Trans>
-            </Button>
-          </li>
-        ))}
+        {list.rows.map(({ audit, draft }) =>
+          audit ? (
+            <AuditRow
+              key={audit.id}
+              audit={audit}
+              draftEnded={draftEnded.has(audit.id)}
+              onDraft={onDraftAudit}
+              onClose={onCloseAudit}
+            />
+          ) : draft ? (
+            <li
+              key={draft.id}
+              className="flex min-h-11 flex-wrap items-center gap-x-2 border-t border-border first:border-t-0 sm:flex-nowrap"
+            >
+              <div className="min-w-0 basis-full py-1.5 sm:flex-1 sm:basis-0">
+                <span className="line-clamp-2 text-sm font-medium" title={draft.subject}>
+                  {draft.subject}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {t`Drafted ${day(draft.createdAt)}`}
+                </span>
+              </div>
+              <Badge variant="secondary">
+                <Trans>Draft</Trans>
+              </Badge>
+              <Button variant="outline" size="sm" onClick={() => onOpen(draft)}>
+                <Trans>Open</Trans>
+              </Button>
+            </li>
+          ) : null,
+        )}
       </ul>
+      <div className={open ? "mt-1 flex justify-end sm:hidden" : "hidden"}>
+        <SeeAll list={list} />
+      </div>
     </SectionCard>
   );
 }

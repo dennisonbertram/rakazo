@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
+import { CappedList } from "../components/capped-list";
 import { MenuPicker } from "../components/menu-picker";
 import { NativeSymbol } from "../components/native-symbol";
 import { SandboxedHtmlPreview } from "../components/sandboxed-html-preview";
@@ -241,16 +242,24 @@ export default function AgentPageScreen() {
             <Text style={styles.caption}>{block.name}</Text>
             {block.hasRows ? (
               <View style={styles.group}>
-                {block.rows.map((row, rowIndex) => (
-                  <View key={rowIndex} style={styles.tableRow}>
-                    <Text style={styles.rowTitle}>{cellText(row.title)}</Text>
-                    {row.details.length > 0 ? (
-                      <Text style={styles.detail}>
-                        {row.details.map((detail) => cellText(detail)).join(" · ")}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
+                <CappedList
+                  items={block.rows.map((row, rowIndex) => ({ row, rowIndex }))}
+                  title={block.name}
+                  keyOf={({ rowIndex }) => String(rowIndex)}
+                  searchFields={({ row }) =>
+                    [row.title, ...row.details].map((cell) => cellText(cell))
+                  }
+                  renderItem={({ row }) => (
+                    <View style={styles.tableRow}>
+                      <Text style={styles.rowTitle}>{cellText(row.title)}</Text>
+                      {row.details.length > 0 ? (
+                        <Text style={styles.detail}>
+                          {row.details.map((detail) => cellText(detail)).join(" · ")}
+                        </Text>
+                      ) : null}
+                    </View>
+                  )}
+                />
               </View>
             ) : (
               <Text style={styles.detail}>{placeholder(block.status)}</Text>
