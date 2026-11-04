@@ -62,8 +62,9 @@ struct RecordSheet: View {
         }
       }
     }
-    // Sized to the form: title and notice, plus the consent toggle when the space asks for it.
-    .presentationDetents([.height(model.options?.policy == "confirm" ? 280 : 230)])
+    // Fixed heights cut off Voice settings and large text, so use the system sizes: the form at
+    // half height, and full height while Voice settings can be opened.
+    .presentationDetents(model.options?.serverTranscribes == true ? [.medium, .large] : [.large])
   }
 
   private func form(_ options: RecordModel.Options) -> some View {

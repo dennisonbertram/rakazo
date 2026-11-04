@@ -227,16 +227,3 @@ struct FileBlockView: View {
     .accessibilityElement(children: .combine)
   }
 }
-
-/// Kinds this version of the app cannot draw yet.
-struct UnsupportedBlockView: View {
-  var body: some View {
-    Label("This content isn’t available in this version.", systemImage: "square.dashed")
-      .font(.footnote)
-      .foregroundStyle(Color.token(.mutedForeground))
-      .padding(12)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color.token(.card), in: RoundedRectangle(cornerRadius: 14))
-      .accessibilityIdentifier("unsupportedBlock")
-  }
-}

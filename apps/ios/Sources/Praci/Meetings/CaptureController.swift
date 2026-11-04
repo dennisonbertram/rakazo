@@ -57,6 +57,9 @@ final class CaptureController {
   private(set) var starting = false
   /// Grows each time a recording becomes a stored meeting, so lists know to reload.
   private(set) var storedCount = 0
+  /// A stored meeting the user has not been taken to; the bar offers Open for a few seconds.
+  private(set) var savedMeetingID: String?
+  @ObservationIgnored private var savedTask: Task<Void, Never>?
   /// Set when the server closed the recording; shown as an alert.
   var closedAlert: String?
 
@@ -110,8 +113,9 @@ final class CaptureController {
   /// Opens a stored meeting when the list is on screen, and stops and wipes a recording before the
   /// session ends (sign-out, server change, account deletion), after the hooks already set.
   func attach(to app: AppModel) {
-    onStored = { id in
-      if let id, app.path.last == .meetings { app.open(.meeting(id: id)) }
+    onStored = { [weak self] id in
+      guard let id else { return }
+      if app.path.last == .meetings { app.open(.meeting(id: id)) } else { self?.showSaved(id) }
     }
     watchSignIn(app)
     let previous = app.authentication.beforeSessionEnds
@@ -119,6 +123,20 @@ final class CaptureController {
       await previous?()
       self?.sessionEnding(apiBase: app.authentication.endpoint.absoluteString, userID: app.userID)
     }
+  }
+
+  func showSaved(_ id: String) {
+    savedMeetingID = id
+    savedTask?.cancel()
+    savedTask = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(6))
+      if !Task.isCancelled { self?.savedMeetingID = nil }
+    }
+  }
+
+  func dismissSaved() {
+    savedTask?.cancel()
+    savedMeetingID = nil
   }
 
   /// Any change to signed-out (revalidation, an expired token, a rejected upload) ends the

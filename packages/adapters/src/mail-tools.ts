@@ -69,6 +69,8 @@ export type MailToolDeps = {
    * "not connected" from "not allowed" when the model names an account. Never offered for use.
    */
   ownerAccounts?: () => Promise<MailAccount[]>;
+  /** The accounts this agent may read, to tell "read only" from "no access" on a refused change. */
+  readableAccounts?: () => Promise<MailAccount[]>;
   /**
    * A firewalled agent's support label id for an account, from the grant. Searches of that account
    * are filtered by it at the provider and any message without it is dropped.
@@ -281,6 +283,11 @@ async function noAccount(deps: MailToolDeps, usable: MailAccount[], wanted: stri
   const owned = deps.ownerAccounts ? await deps.ownerAccounts().catch(() => []) : [];
   const forbidden = findAccount(owned, wanted);
   if (!forbidden) return { error: `No connected mail account ${wanted.trim().slice(0, 200)}` };
+  const readable = deps.readableAccounts ? await deps.readableAccounts().catch(() => []) : [];
+  if (readable.some((account) => account.accountRef === forbidden.accountRef))
+    return {
+      error: `This agent can read but not change ${accountName(forbidden)}. Change that under Access on that account's Integrations page.`,
+    };
   const can = usable.length > 0 ? ` It can use: ${usable.map(accountName).join(", ")}.` : "";
   return {
     error: `This agent isn't allowed to use ${accountName(forbidden)}.${can} Give it access on that account's Integrations page.`,

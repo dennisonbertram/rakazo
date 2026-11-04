@@ -6,6 +6,7 @@ import SwiftUI
 struct InboxRowView: View {
   let row: InboxRow
   let now: Date
+  @Environment(\.dynamicTypeSize) private var typeSize
 
   var body: some View {
     HStack(alignment: .top, spacing: 10) {
@@ -15,7 +16,8 @@ struct InboxRowView: View {
         .padding(.top, 6)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
-        HStack(spacing: 6) {
+        let large = typeSize.isAccessibilitySize
+        let header = HStack(spacing: 6) {
           if row.isSuspicious {
             Image(systemName: "exclamationmark.triangle.fill")
               .font(.footnote)
@@ -25,16 +27,18 @@ struct InboxRowView: View {
           Text(row.from)
             .font(.headline.weight(row.unread ? .semibold : .regular))
             .foregroundStyle(Color.token(.foreground))
-            .lineLimit(1)
+            .lineLimit(large ? 2 : 1)
           if let label = inboxLabel(for: row) { LabelText(label: label) }
           Spacer(minLength: 4)
-          TimeText(row: row, now: now)
+          if !large { TimeText(row: row, now: now) }
         }
+        header
+        if large { TimeText(row: row, now: now) }
         Text(row.subject)
           .font(.subheadline)
           .foregroundStyle(Color.token(.foreground))
-          .lineLimit(1)
-        if !row.summary.isEmpty {
+          .lineLimit(large ? 2 : 1)
+        if !row.summary.isEmpty, !large {
           Text(row.summary)
             .font(.subheadline)
             .foregroundStyle(Color.token(.mutedForeground))

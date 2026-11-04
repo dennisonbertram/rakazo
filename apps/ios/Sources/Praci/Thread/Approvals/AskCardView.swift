@@ -74,7 +74,7 @@ struct AskCardView: View {
   }
 }
 
-/// Raw tool arguments in an inset well, at most four lines, or behind a "Details" disclosure.
+/// Raw tool arguments in an inset well, in full, or behind a "Details" disclosure.
 private struct DetailWell: View {
   let text: String
   let folded: Bool
@@ -91,7 +91,6 @@ private struct DetailWell: View {
   private var well: some View {
     Text(text)
       .font(.footnote.monospaced())
-      .lineLimit(4)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(10)
       .background(Color.token(.muted), in: RoundedRectangle(cornerRadius: 12))
