@@ -106,6 +106,16 @@ private enum SystemAlert {
   }
 }
 
+/// Holds the text-change observer so the alert's buttons can remove it when the alert closes.
+@MainActor
+private final class ObserverBox {
+  var token: (any NSObjectProtocol)?
+  func remove() {
+    if let token { NotificationCenter.default.removeObserver(token) }
+    token = nil
+  }
+}
+
 @MainActor
 private enum RenameAlert {
   static func present(current: String, save: @escaping @MainActor (String) -> Void) {
@@ -115,18 +125,23 @@ private enum RenameAlert {
         field.autocapitalizationType = .words
         field.accessibilityIdentifier = "renameField"
       }
-      alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
+      let observer = ObserverBox()
+      alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel) { _ in observer.remove() })
       let saveAction = UIAlertAction(title: String(localized: "Save"), style: .default) { _ in
+        observer.remove()
         if let value = ManageClient.renamed(alert.textFields?.first?.text ?? "", from: current) { save(value) }
       }
       saveAction.isEnabled = false
       alert.addAction(saveAction)
       // Save stays disabled for a blank or unchanged name, so the alert cannot close without saving.
       if let field = alert.textFields?.first {
-        NotificationCenter.default.addObserver(
+        observer.token = NotificationCenter.default.addObserver(
           forName: UITextField.textDidChangeNotification, object: field, queue: .main
         ) { _ in
-          saveAction.isEnabled = ManageClient.renamed(field.text ?? "", from: current) != nil
+          // The handler runs on the main queue; tell the compiler so it may touch UIKit.
+          MainActor.assumeIsolated {
+            saveAction.isEnabled = ManageClient.renamed(field.text ?? "", from: current) != nil
+          }
         }
       }
     }

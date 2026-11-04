@@ -8,6 +8,8 @@ final class AppModel {
   let authentication: AuthenticationModel
   var path: [Route] = []
   var showingSettings = false
+  /// A message archived from a screen with no Inbox list behind it; the shell offers Undo.
+  var archivedMessageID: String?
   /// The Settings screen to open first, or nil for the top level.
   private(set) var settingsDestination: SettingsDestination?
   /// Counts Settings closings. Pages that Settings can change reload with `.task(id:)` on it.
@@ -118,7 +120,10 @@ final class AppModel {
     showingSettings = true
   }
 
-  func settingsDidClose() { settingsClosings += 1 }
+  func settingsDidClose() {
+    settingsClosings += 1
+    settingsDestination = nil
+  }
 
   func open(_ url: URL) {
     if let route = Route(url: url) { open(route) }
@@ -133,6 +138,7 @@ final class AppModel {
   func reset() {
     path = []
     showingSettings = false
+    archivedMessageID = nil
     spaceID = nil
     forgetUser()
   }

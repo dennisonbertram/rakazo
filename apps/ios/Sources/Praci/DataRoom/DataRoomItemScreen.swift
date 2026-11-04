@@ -93,7 +93,7 @@ struct DataRoomItemScreen: View {
         thumbnail = UIImage(data: data)
       }
     }
-    .task {
+    .task(id: item.status) {
       while item.isProcessing, !Task.isCancelled {
         try? await Task.sleep(for: .seconds(4))
         if let fresh: DataRoomItem = try? await app.call("dataRoom/item", input: DataRoomIDInput(id: item.id)) {

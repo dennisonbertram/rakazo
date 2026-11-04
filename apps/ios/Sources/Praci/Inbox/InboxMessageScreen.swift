@@ -152,6 +152,8 @@ private struct MessageContent: View {
     await model.archive()
     guard model.archived else { return }
     NotificationCenter.default.post(name: .inboxMessageArchived, object: messageID)
+    // Opened from a to-do or a link: no Inbox list will show Undo, so the shell does.
+    if !app.path.contains(.inbox) { app.archivedMessageID = messageID }
     dismiss()
   }
 

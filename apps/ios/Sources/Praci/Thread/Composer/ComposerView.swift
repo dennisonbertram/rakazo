@@ -83,7 +83,9 @@ struct ComposerView: View {
   }
 
   @ViewBuilder private var trailing: some View {
-    if !model.runningRuns.isEmpty {
+    let hasDraft = !composer.text.isEmpty || !composer.attachments.isEmpty
+    // While an agent runs, Stop shows only when there is nothing to send, so a correction can be queued.
+    if !model.runningRuns.isEmpty && !hasDraft {
       Button { Task { await composer.stop(app) } } label: {
         if composer.stopping {
           ProgressView().frame(width: 30, height: 30)
@@ -96,7 +98,7 @@ struct ComposerView: View {
       .disabled(composer.stopping)
       .accessibilityLabel("Stop")
       .accessibilityIdentifier("stop")
-    } else if dictation.listening || (composer.text.isEmpty && composer.attachments.isEmpty) {
+    } else if dictation.listening || !hasDraft {
       DictationButton(model: dictation, text: Bindable(composer).text)
     } else {
       Button { composer.send(app) } label: {
@@ -105,6 +107,7 @@ struct ComposerView: View {
       .buttonStyle(.glassProminent)
       .buttonBorderShape(.circle)
       .disabled(!composer.canSend)
+      .keyboardShortcut(.return, modifiers: .command)
       .accessibilityLabel("Send")
       .accessibilityIdentifier("send")
     }

@@ -86,6 +86,7 @@ struct ThreadScreen: View {
                 || messages[index + 1].botId != message.botId
             )
             .id(message.id)
+            .modifier(DismissesKeyboardOnTap(enabled: !message.hasInput))
           }
           PendingSendsView(model: model)
           footer
@@ -93,14 +94,11 @@ struct ThreadScreen: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        // A layer behind the rows: only the gaps between them reach it, never a field on top.
+        .background { Color.clear.contentShape(Rectangle()).modifier(DismissesKeyboardOnTap(enabled: true)) }
       }
       .defaultScrollAnchor(.bottom)
       .scrollDismissesKeyboard(.interactively)
-      .simultaneousGesture(
-        TapGesture().onEnded {
-          UIApplication.shared.sendAction(
-            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        })
       .onScrollPhaseChange { _, phase in
         userScrolling = phase == .tracking || phase == .interacting || phase == .decelerating
       }
@@ -272,5 +270,29 @@ private struct UnreadDivider: View {
 
   private var line: some View {
     Rectangle().fill(Color.token(.border)).frame(height: 1)
+  }
+}
+
+/// Taps on read-only content close the keyboard. Cards with answer fields are left out so a tap
+/// on a field is never competing with this one.
+private struct DismissesKeyboardOnTap: ViewModifier {
+  let enabled: Bool
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content.onTapGesture {
+        UIApplication.shared.sendAction(
+          #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+      }
+    } else {
+      content
+    }
+  }
+}
+
+extension ThreadMessage {
+  /// True when a block can hold a text field (an answer, a username or a password).
+  fileprivate var hasInput: Bool {
+    blocks.contains { [.ask, .choice, .mcpApproval, .appConnect, .connect, .card].contains($0.kind) }
   }
 }

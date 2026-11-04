@@ -43,12 +43,18 @@ final class DataRoomModel {
 
   var hasProcessing: Bool { items.contains { $0.isProcessing } }
 
-  /// Re-reads the list every few seconds while a file is still being read. Errors stay quiet.
+  /// Re-reads each file that is still being read every few seconds, in place, so loaded pages and
+  /// the scroll position stay as they are. Errors stay quiet.
   func pollWhileReading(_ app: AppModel) async {
     while hasProcessing, !Task.isCancelled {
       try? await Task.sleep(for: .seconds(4))
       if Task.isCancelled { return }
-      await load(app, quiet: true)
+      for id in items.filter(\.isProcessing).prefix(20).map(\.id) {
+        guard let fresh: DataRoomItem = try? await app.call("dataRoom/item", input: DataRoomIDInput(id: id)),
+          let index = items.firstIndex(where: { $0.id == id })
+        else { continue }
+        items[index] = fresh
+      }
     }
   }
 

@@ -131,7 +131,10 @@ private func usage(_ json: String) throws -> UsageSummary {
 func usageTotalFallsBackToInputPlusOutput() throws {
   #expect(try usage(#"{"inputTokens":12,"outputTokens":40,"totalTokens":null,"runs":1}"#).displayTotal == 52)
   #expect(try usage(#"{"inputTokens":12,"outputTokens":40,"totalTokens":99,"runs":1}"#).displayTotal == 99)
-  #expect(try usage(#"{"inputTokens":null,"outputTokens":40,"totalTokens":null,"runs":1}"#).displayTotal == nil)
+  #expect(
+    try usage(#"{"inputTokens":12,"outputTokens":40,"cacheReadTokens":100,"cacheWriteTokens":8,"totalTokens":null,"runs":1}"#)
+      .displayTotal == 160)
+  #expect(try usage(#"{"inputTokens":null,"outputTokens":null,"totalTokens":null,"runs":1}"#).displayTotal == nil)
 }
 
 @Test
@@ -145,10 +148,20 @@ func settingsOpensAtItsDestinationAndCountsClosings() async throws {
   let before = app.settingsClosings
   app.settingsDidClose()
   #expect(app.settingsClosings == before + 1)
+  app.openSettings(.models)
+  app.settingsDidClose()
+  #expect(app.settingsDestination == nil)
 }
 
 @Test
 func serverNameShowsHostAndPort() {
   #expect(URL(string: "https://app.example.com/x")!.serverName == "app.example.com")
   #expect(URL(string: "http://127.0.0.1:3100")!.serverName == "127.0.0.1:3100")
+}
+
+@Test
+func onlyTheStopTheBotConflictBlocksTakeover() {
+  #expect(ComputerModel.isBotBlockingTakeover(RPCError.server(code: "CONFLICT", status: 409, message: "Stop the bot first")))
+  #expect(!ComputerModel.isBotBlockingTakeover(RPCError.server(code: "CONFLICT", status: 409, message: "Control changed")))
+  #expect(!ComputerModel.isBotBlockingTakeover(RPCError.server(code: "BAD_REQUEST", status: 400, message: "Stop the bot first")))
 }
