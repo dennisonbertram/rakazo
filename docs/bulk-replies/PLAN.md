@@ -23,20 +23,17 @@ message to a mailing list.
 
 ## What the code does today
 
-- **Parallel sends do not share a card.** `requestApproval` in `executor.ts`: "Only the first saves
-  the turn and shows its card; the others wait for that pause." A paused message answers one pending
-  `ask` block (`commitAnswerRunInput`, `run-pauses.ts`).
-- **Send record.** `mailSend` claims a `ComposeSend` row (`agent:<idempotencyKey>`) from draft or
-  failed to pending. Sent and unknown never send again. Retrying reuses the row's Gmail draft.
-- **Edited approvals are the person's own send.** `answerEditedMailApproval` denies the pending call
-  with a cautious note, sends through compose, stores the outcome, and then enqueues
-  `runContinueJob`. The agent reads the note through `resolveDuplicateEffectGate`.
-- **Recovery.** `reconcileMailApprovals` settles claims older than `MAIL_APPROVAL_STALE_MS` (2
-  minutes). A failed run closes its cards (`closeApprovalCardsInTransaction`). I found no time limit
-  on a direct card left waiting.
-- **Firewall.** `firewallToolClass` is a closed list. `firewallDraftIsWithinThread` already works out
-  a thread's participants from `cachedMailMessage`. The tags in the firewall plan ("New recipient"
-  and others) are not on main: the strings appear nowhere in `apps` or `packages`.
+- **Parallel sends do not share a card.** `requestApproval`: "Only the first saves the turn and shows
+  its card; the others wait for that pause."
+- **Send record.** `mailSend` claims a `ComposeSend` (`agent:<idempotencyKey>`) from draft or failed to
+  pending, so any caller can resend a failed row, and it sends an existing `draftId` without comparing
+  or replacing it.
+- **Edited approvals.** `answerEditedMailApproval` denies the call with a note and sends inside the
+  request. A batch cannot reuse this: a denied effect makes `askUnlessDenied` refuse later calls of the
+  tool in the run, and `commitAnswerRunInput` queues the run at once, so it can resume mid-send.
+- **Firewall.** `firewallDraftIsWithinThread` works out a thread's participants. The firewall plan's
+  tags ("New recipient" and others) are not on main: the strings appear nowhere in `apps` or `packages`.
+- **Waiting cards.** I found no time limit on a direct card left waiting.
 
 ## 1. Tool shape
 
@@ -96,13 +93,23 @@ flagged address. Subject and first line on the row; the whole body when opened.
 3. In one transaction with the card's claim, the server compares each hash to the stored row, applies
    edits, stores `approvedHash` from the final text, and marks unticked rows `skipped`. Any mismatch
    rejects the whole press, nothing changes, and the card reloads.
-4. The worker recomputes the hash right before each send and refuses the row on a difference.
+4. The worker recomputes the hash and builds the outbound message from that same row. Every attempt
+   writes this message to the Gmail draft (`updateDraft`, or `createDraft` if there is none or it is
+   gone) right before `sendDraft`, so a draft changed in Gmail after a failed attempt is overwritten.
+   A difference holds the row (section 3). Ceiling: an edit in Gmail between those two calls still
+   goes out, because `MailProvider` has no send without a draft. See the open question.
+
+**Validation before the approval is used.** Before the claim, the server runs `mailRequestIsValid`
+with kind `mail_send` on each ticked row as it will be sent, edits merged. `normalizeMailEdits` checks
+only the fields changed and allows a draft with no recipient, so it is not enough alone. An invalid
+row rejects the whole press with that row's error, and the card stays answerable.
 
 **No standing permission.** The tool is on `EXPLICIT_APPROVAL_BUILTIN_TOOLS`, so no saved Allow, Auto
 Review or background run lifts the ask. The card has one action, `deny` ("Discard"); Send selected is
 a separate RPC. So no Always allow can exist for any run, tainted or not, and because
-`commitAnswerRunInput` rejects an answer not in `actions`, an older client cannot approve what it cannot show. A saved Block still wins: that check
-runs before the gate. Firewalled runs show the existing "Firewall" reason.
+`commitAnswerRunInput` rejects an answer not in `actions`, an older client cannot approve what it
+cannot show. A saved Block still wins: that check runs before the gate. Firewalled runs show the
+existing "Firewall" reason.
 
 **Flags, computed on the server** (tool call, card load and press). A flag informs the owner and does
 not block. Rows with an untick flag come first and start unticked, so sending one takes a deliberate
@@ -126,36 +133,73 @@ glance, and an owner can still approve a persuasive reply. The single card has t
 
 ## 3. Reliability
 
-**Flow.** Press → one transaction (claim the effect, deny with a cautious note as the edited path
-does, store approved rows) → enqueue `mail.reply.batch { effectId, spaceId, userId }` → a worker sends
-rows in order → store the summary note and enqueue `runContinueJob`.
+**Flow.**
 
-A job, not the API request or the run: 20 rows are too long for a request (the edited path sends
-inside one), and Retry has to work after the run has ended. A second press cannot claim the effect,
-because it is no longer `intended`.
+1. Press: one new transaction, `acceptMailReplyBatch` (not `answerRunInput`), locks the thread and
+   requires a run in `waiting_input` and an effect in `intended`. It moves the effect to `executing`,
+   marks the block answered, and stores approved rows as `queued` and unticked rows as `skipped`. The
+   run stays in `waiting_input`, which `job-reconciler` does not resume. A second press finds no
+   `intended` effect.
+2. Enqueue `mail.reply.batch { effectId, spaceId, userId }`. A worker sends rows in order. It is a job
+   because 20 rows are too long for a request and Retry must work after the run has ended.
+3. Settle, when no row is `queued` or `claimed` and no `ComposeSend` is `pending`: one transaction
+   moves the effect from `executing` to `completed` with the per-row summary as its result, and the
+   run from `waiting_input` to `queued` if it still waits. Then enqueue `runContinueJob`. On resume
+   `resolveDuplicateEffectGate` returns the stored result.
 
-**Per-message send record.** The worker calls the existing `mailSend` once per row with
-`idempotencyKey: batch_<itemId>`. That gives one `ComposeSend` per reply with the existing claim and
-states, so two workers, a retried job or a restart cannot send a row twice. A row in `pending` makes
-`mailSend` answer "may or may not", which the row shows as unknown and never resends.
+**Accepted and discarded stay apart.** A press ends `completed`, so `askUnlessDenied` lets the agent
+call the tool again in the same run, to split over 20 replies or use a second account. Discard still
+goes through `answerRunInput` as `deny`, so a reworded repeat of a discarded batch gets no new card.
+
+**If the run stops first.** `closeApprovalCardsInTransaction` changes only `intended` effects, so a
+stop does not touch a pressed batch. Approved rows still send, settlement wakes nothing, and the card
+holds the results. See the open question. What clearing the thread does to a batch is not yet checked.
+
+**Row states (`dispatch`), durable on `mail_reply_items`:**
+
+| State | Meaning | Automatic recovery |
+| --- | --- | --- |
+| `reviewing` | Before the press | None |
+| `skipped` | Unticked | None |
+| `queued` | Approved, waiting for a worker | Enqueue the job again |
+| `claimed` | A worker took it; `ComposeSend` holds the send state | See below |
+| `held` | Stopped before any send attempt; `error` says why | None |
+| `composer` | The owner took a failed row to the composer | None |
+
+**Per-message send record.** A worker claims a row with a conditional `queued` to `claimed`, then
+checks it in this order: hash, account, grant, bot switch, stale thread, message validity. Any refusal
+sets `held` with its reason, and no provider call happens. Otherwise it sends through `mailSend` with
+`idempotencyKey: batch_<itemId>` and two new options for this caller: claim only from `draft`, and
+replace the draft as in section 2. So there is one `ComposeSend` per reply, and only one worker can
+move it to `pending`. If `mailSend` returns without creating a `ComposeSend`, the row is `held`.
+
+**Automatic replay and Retry use different claims.** A worker never claims a `failed` record, so a
+delayed duplicate worker cannot resend a failed row. It finds the record not in `draft` and reports
+the stored state. Only **Retry failed** can make a failed row sendable again.
 
 **Recovery, in `job-reconciler` beside `reconcileMailApprovals`, same 2-minute staleness:**
 
-- Approved row with no `ComposeSend`, or still `draft` (the job was lost): enqueue again.
-- `pending` and stale: set `unknown`.
-- All rows settled but the effect still has the claim note: store the summary and wake the run.
+- `queued`: enqueue again.
+- `claimed` with no `ComposeSend`, or one in `draft`: back to `queued`. The `draft` claim stops two
+  workers from both sending.
+- `claimed` with `pending`: set `unknown`, never resend.
+- `claimed` with `sent`, `failed` or `unknown`, and `held`, `skipped`, `composer`: left alone.
+- Nothing waiting but the effect still `executing`: settle as above. Settling is conditional on
+  `executing`, so it is safe to repeat.
 
-If the run wakes early, the agent reads the cautious note, as with an edited approval today.
-
-**Partial failure.** Each row ends as sent, failed, unknown or skipped, and one row's error never ends
-the job. A failed row keeps its reason in `error`. **Retry failed** (`threads.retryMailBatch`) touches
-failed rows only, needs no waiting run, and repeats stale, hash and grant checks; it is answered like
-`threads.sendDraft`. Unknown rows are never retried. A failed row cannot be edited, because a retry
-reuses its saved Gmail draft; it offers Open in composer, as the single card does.
+**Partial failure.** One row's error never ends the job. To the owner a row is sent, not sent (`held`
+or `failed`), unknown or skipped. **Retry failed** (`threads.retryMailBatch`) appears after settlement
+and needs no waiting run; only `run.userId` may press it, as with `threads.sendDraft`. In one
+transaction it moves each `failed` `ComposeSend` to `draft` and each `failed` or `held` row to `queued`,
+then enqueues the job. The worker repeats every check, so a revoked grant holds the row again. The
+press carries `seenMessageId`, which is the owner's acknowledgement of a new message. A hash difference
+is never retried. Unknown rows are never retried. A retry sends the approved text; to change it, Open
+in composer moves the row to `composer`, so a later Retry cannot send it twice. A retry does not wake
+the agent or change its stored result; the card shows the current state.
 
 **Stale threads.** At press, a mismatch with the client's `seenMessageId` rejects the press and the
 card reloads with the row flagged and unticked. Ticking it again is the owner's acknowledgement. Just
-before each send the worker checks again and fails that row with "New message". This uses synced mail,
+before each send the worker checks again and holds that row with "New message". This uses synced mail,
 so it is only as fresh as the last sync. A deleted thread fails through the provider's `not_found`.
 
 **Scope and authorization.** All reads and writes filter on `spaceId` and `userId`; the RPC goes
@@ -203,6 +247,7 @@ agent.
 | "{n} sent · {m} not sent · {k} unknown" (empty parts dropped) | Card header after sending | The result at a glance. | Replaces "Needs approval". |
 | "Skipped" | Row after sending | Tells it apart from a failure. | Shown only for unticked rows. |
 | "Retry failed" | Button | The only recovery for those rows. | Shown only with a failed row. |
+| "Opened in composer" | Row after that action | Explains why Retry skips it. | Shown only for that row. |
 | "Review" | iPhone card button | Opens the sheet. | The list does not fit in the thread. |
 | "Include reply to {address}" | Accessible name of a tick | Screen readers need it. | Not visible. |
 
@@ -225,9 +270,14 @@ the lists above; flags; `ask` block with `mailBatch`, `detail` and Discard; scri
 
 **S2. Send path.** Press and retry RPCs, hash checks, job, reconciler, repeat guard, agent note.
 - Tests (Postgres, Gmail emulator's `failNext`): only ticked rows send; an edit is what sends; changed
-  hash rejects the press; second press or job sends nothing twice; killed worker leaves `pending` as
-  unknown; row 2 failing does not stop row 3; Retry sends only failed rows; revoked grant stops later
-  rows; new message fails that row; repeat `mail_send` refused.
+  hash rejects the press; an edit clearing all recipients or over `MAX_RECIPIENTS` rejects the press and
+  the card stays answerable; second press or job sends nothing twice; killed worker leaves `pending` as
+  unknown; row 2 failing does not stop row 3; Retry sends only failed rows; a delayed worker cannot
+  resend a `failed` record; a draft changed after a failed attempt is overwritten on Retry; each
+  refusal ends `held` and recovery leaves it; revoked grant and new message hold later rows; the run
+  stays `waiting_input` through sending, including a reconciler pass, and resumes once with the final
+  per-row result; a stopped run does not lose results; after a press the tool can be called again in
+  the run, while after Discard it is refused; repeat `mail_send` refused.
 - Hand check: real HTTP against the demo: send two of three rows; each reply is in its own thread and
   the skipped thread has nothing.
 
@@ -264,4 +314,11 @@ model key, ask a firewalled test agent to answer three invented emails on the em
   before the job's first send, at the cost of one more provider pass.
 - **TBD: failing one row in the demo.** `failNext` works in tests, but I found no demo control for it.
   Default: tests cover this case and the S3 PR says it was not hand-checked. Alternative: a demo control.
+- **TBD: send without a draft.** Default: replace the draft right before each send (a very short gap
+  remains). Stronger: add a direct send to `MailProvider`, which closes the gap but needs its own
+  no-retry rule and a check of the granted Gmail scopes and the emulator, neither verified.
+- **TBD: Stop during sending.** Default: rows already approved still send, because the owner approved
+  them and the run is only waiting. Alternative: Stop holds the rows not yet started.
+- **TBD: a new owner message during sending.** The message path treats `waiting_input` as active. The
+  exact behaviour with an answered card must be checked in S2. Default: same as Stop above.
 - **TBD: Expo editing.** Default: none. Alternative: the composer screen.
