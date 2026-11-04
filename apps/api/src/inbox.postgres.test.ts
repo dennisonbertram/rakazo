@@ -1690,7 +1690,11 @@ describePostgres("inbox procedures (PostgreSQL)", () => {
       const mine = await todo(a, connA, { text: "Mine" });
       const theirs = await todo(b, connB, { text: "Theirs" });
       const client = createRouterClient(
-        createRouter({ ...deps, ...ready } as unknown as RouterDeps),
+        createRouter({
+          ...deps,
+          ...ready,
+          env: { mailWritesDisabled: false },
+        } as unknown as RouterDeps),
         { context: { actor: a } as never },
       );
 
@@ -2675,6 +2679,7 @@ describePostgres("inbox procedures (PostgreSQL)", () => {
       const client = createRouterClient(
         createRouter({
           prisma,
+          env: { mailWritesDisabled: false },
           mail,
           connectors: { managed: () => connector },
         } as unknown as RouterDeps),
@@ -2726,6 +2731,7 @@ describePostgres("inbox procedures (PostgreSQL)", () => {
         createRouterClient(
           createRouter({
             prisma,
+            env: { mailWritesDisabled: false },
             mail: {
               listAccounts: mail.listAccounts.bind(mail),
               stopWatch: async (account: MailAccount) => stop(account.id),
@@ -2788,6 +2794,7 @@ describePostgres("inbox procedures (PostgreSQL)", () => {
       const client = createRouterClient(
         createRouter({
           prisma,
+          env: { mailWritesDisabled: false },
           mail,
           connectors: { managed: () => connector },
         } as unknown as RouterDeps),
