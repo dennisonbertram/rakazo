@@ -1370,14 +1370,14 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "fundraising_round_save",
     description:
-      "Start the user's fundraising round, or change the open one (this asks the user first). Pass name, targetUsd and postMoneyCapUsd in whole US dollars: $5M is 5000000. Without id it starts a round and is refused while one is open; pass the open round's id from fundraising_read to change it. It adds no prospects and no SAFEs: SAFEs come from Mercury.",
+      "Start the user's fundraising round, or change the open one (this asks the user first). Pass name, targetUsd and postMoneyCapUsd in whole US dollars: $3M is 3000000. Without id it starts a round and is refused while one is open; pass the open round's id from fundraising_read to change it. It adds no prospects and no SAFEs: SAFEs come from Mercury.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string", description: "The open round's id, to change it." },
         name: { type: "string" },
-        targetUsd: { type: "number", description: "US dollars, for example 5000000." },
-        postMoneyCapUsd: { type: "number", description: "US dollars, for example 20000000." },
+        targetUsd: { type: "number", description: "US dollars, for example 3000000." },
+        postMoneyCapUsd: { type: "number", description: "US dollars, for example 15000000." },
       },
       required: ["name", "targetUsd", "postMoneyCapUsd"],
     },

@@ -157,7 +157,7 @@ describe("buildApprovalAskBlock schedule card", () => {
 
 describe("fundraising write cards", () => {
   it("shows the round name, target and post-money cap in dollars", () => {
-    const args = { name: "Seed", targetUsd: 5_000_000, postMoneyCapUsd: 20_000_000 };
+    const args = { name: "Seed", targetUsd: 3_000_000, postMoneyCapUsd: 15_000_000 };
     expect(describeApprovalAction("fundraising_round_save", args)).toBe("Start round “Seed”");
     expect(describeApprovalAction("fundraising_round_save", { ...args, id: "r1" })).toBe(
       "Change round “Seed”",
@@ -165,7 +165,7 @@ describe("fundraising write cards", () => {
     const block = buildApprovalAskBlock("e1", "fundraising_round_save", args, []);
     expect(block).toMatchObject({
       text: "Review before Start round “Seed”",
-      detail: "Name: Seed\nTarget: $5,000,000.00\nPost-money cap: $20,000,000.00",
+      detail: "Name: Seed\nTarget: $3,000,000.00\nPost-money cap: $15,000,000.00",
       toolId: undefined,
     });
   });
