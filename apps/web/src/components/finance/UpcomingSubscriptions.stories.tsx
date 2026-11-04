@@ -37,7 +37,7 @@ const subs: Subscription[] = items.map((item, i) => ({
   paidWith: [{ provider: "brex", kind: "card", name: "Card", lastFour: "1111" }],
 }));
 
-const meta = { title: "Components/Finance/UpcomingSubscriptions" } satisfies Meta;
+const meta = { title: "Finance/UpcomingSubscriptions" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
