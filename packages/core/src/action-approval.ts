@@ -67,6 +67,10 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "company_import_start",
   // Hands a meeting to another agent; a card every time, also when the owner is chatting.
   "share_meeting",
+  // Writes to the owner's fundraising records. A spreadsheet or email the agent read is untrusted,
+  // so no saved Allow rule or Auto Review may pass them.
+  "fundraising_round_save",
+  "fundraising_prospects_save",
 ]);
 
 const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([

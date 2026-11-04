@@ -7146,10 +7146,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (FUNDRAISING_TOOL_NAMES.has(name) && fundraisingEnabled) {
             return finish(
-              await fundraisingToolFromTool(name, {
-                prisma: deps.prisma,
-                scope: { spaceId: run.spaceId, userId: bot.userId },
-              }),
+              await fundraisingToolFromTool(
+                name,
+                {
+                  prisma: deps.prisma,
+                  scope: { spaceId: run.spaceId, userId: bot.userId },
+                  botId: bot.id,
+                },
+                args,
+              ),
             );
           }
           if (DRIVE_TOOL_NAMES.has(name) && deps.connectors && driveEnabled) {

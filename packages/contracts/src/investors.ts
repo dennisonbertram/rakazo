@@ -23,6 +23,8 @@ export const INVESTORS_AGENT_BUILTIN_TOOLS = [
   "cap_table_read",
   "cap_table_update",
   "fundraising_read",
+  "fundraising_round_save",
+  "fundraising_prospects_save",
   "contacts_list",
   "contacts_add",
   "contacts_save",
