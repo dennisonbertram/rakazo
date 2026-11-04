@@ -216,6 +216,7 @@ export * from "./private-endpoint.js";
 export * from "./realtime.js";
 export * from "./release-watch.js";
 export * from "./remote-mcp.js";
+export * from "./reply-corrections.js";
 export * from "./rpc-crypto-source.js";
 export * from "./rpc-crypto-sync.js";
 export * from "./run-secret.js";

@@ -44,14 +44,17 @@ export type ConnectionAccessRow = {
 };
 
 /**
- * What an external bot sees of the connection rows: "all agents" does not reach it, only an
- * explicit access row does. Every place that reads connection rows for a run applies this.
+ * What an external or firewalled bot sees of the connection rows: "all agents" does not reach it,
+ * only an explicit access row does. Every place that reads connection rows for a run applies this.
  */
 export function connectionRowsForAudience<T extends { allAgents: boolean }>(
   rows: T[],
   audience: string | null | undefined,
+  firewall?: boolean,
 ): T[] {
-  return audience === "external" ? rows.map((row) => ({ ...row, allAgents: false })) : rows;
+  return audience === "external" || firewall === true
+    ? rows.map((row) => ({ ...row, allAgents: false }))
+    : rows;
 }
 
 /** A connection limited to chosen agents is usable only by a bot with an access row. */
@@ -175,7 +178,13 @@ export type EffectiveAccess = { shared: "all" | "some" | "none"; botIds: string[
  */
 export function effectiveAccessByConnection(
   rows: ConnectionAccessRow[],
-  bots: { id: string; spawnKey: string | null; archivedAt: Date | null; audience?: string }[],
+  bots: {
+    id: string;
+    spawnKey: string | null;
+    archivedAt: Date | null;
+    audience?: string;
+    firewall?: boolean;
+  }[],
 ): Record<string, EffectiveAccess> {
   const active = bots.filter((bot) => !bot.archivedAt);
   // An email's own agent is judged by the Inbox agent's grants alone, as the executor reads them.
@@ -189,6 +198,7 @@ export function effectiveAccessByConnection(
         botAccess: row.botAccess.filter((entry) => entry.botId === grantee),
       })),
       bot.audience,
+      bot.firewall,
     );
     const denied = deniedConnectionIds(own);
     for (const row of own) {

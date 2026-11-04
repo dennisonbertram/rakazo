@@ -131,7 +131,9 @@ import {
   expandSkillReferencesInPrompt,
   externalOriginNotice,
   externalTaintAllowsTool,
+  FIREWALL_CARD_REASON,
   findSkillByName,
+  firewallToolClass,
   formatSkillRunPrompt,
   formatSkillsCatalogInstruction,
   GTM_PAGE_INSTRUCTIONS,
@@ -360,11 +362,11 @@ import type { ComputerExecutionLease } from "./computer-lifecycle.js";
 import {
   acquireComputerExecutionLease,
   ComputerBusyError,
+  EXECUTION_LEASE_MS,
   holdComputerExecutionLeaseForTakeover,
   IN_LINE_BEHIND_SAME_BOT,
   provisionComputer,
   releaseComputerExecutionLease,
-  EXECUTION_LEASE_MS,
   renewComputerExecutionLease,
   screenLeaseIdForRun,
 } from "./computer-lifecycle.js";
@@ -424,6 +426,17 @@ import {
   financeToolsAllowed,
   hasFinanceSource,
 } from "./finance-tools.js";
+import {
+  firewallDraftIsWithinThread,
+  firewallMailReadDecision,
+  firewallModifyIsFree,
+} from "./firewall-mail.js";
+import {
+  FIREWALL_CONTENT_READERS,
+  firewalledBotIds,
+  groupTaintedByFirewall,
+  readsFirewalledContent,
+} from "./firewall-runtime.js";
 import {
   FUNDRAISING_TOOL_NAMES,
   fundraisingToolFromTool,
@@ -2095,6 +2108,40 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // run from the stored blocks of the triggering message and the loaded history window, so a
         // message that arrives while another run is active still marks the run that answers it.
         // An external bot is held by its fixed tool list instead.
+        // Agent firewall: the taint is stored on the run so every chained run inherits it.
+        const storeExternalTaint = async () => {
+          run.externalTaint = true;
+          await deps.prisma.run.updateMany({
+            where: { id: run.id },
+            data: { externalTaint: true },
+          });
+        };
+        // The switch as it is now, so turning it on or off applies to the next call of a live run.
+        // A lookup that fails counts as Firewall on.
+        const firewallNow = async () => {
+          try {
+            const current = await deps.prisma.bot.findUniqueOrThrow({
+              where: { id: bot.id },
+              select: { firewall: true },
+            });
+            return current.firewall === true || bot.firewall === true;
+          } catch {
+            return true;
+          }
+        };
+        if (
+          run.externalTaint !== true &&
+          (bot.firewall === true ||
+            (thread.groupId &&
+              (await groupTaintedByFirewall(
+                deps.prisma,
+                thread.groupId,
+                loadedMessages.map((message) => message.botId),
+                await firewalledBotIds(deps.prisma, run.spaceId),
+              ))))
+        ) {
+          await storeExternalTaint();
+        }
         const externalChain =
           bot.audience === "external"
             ? undefined
@@ -2268,7 +2315,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Connections limited to chosen agents stay out of this run unless the bot was granted access.
         // An external bot reaches a connection only through an explicit access row.
         const deniedIds = deniedConnectionIds(
-          connectionRowsForAudience(storedConnections, bot.audience),
+          connectionRowsForAudience(storedConnections, bot.audience, bot.firewall),
         );
         // Omi recordings are anyone's speech: an agent reads them only with a grant on the Omi
         // connection, whatever its status (a disconnected connection keeps its recordings).
@@ -2580,6 +2627,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : loadAgentTicketContext(deps, {
                 spaceId: run.spaceId,
                 text: task.prompt,
+                // Tickets a firewalled agent wrote are untrusted; a firewalled run is tainted anyway.
+                ...(bot.firewall === true
+                  ? {}
+                  : { firewalled: () => firewalledBotIds(deps.prisma, run.spaceId) }),
               }),
           recallPromise,
         ]);
@@ -3241,7 +3292,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               : DRIVE_TOOL_NAMES.has(toolName)
                 ? driveAccounts()
                 : undefined;
-        const connectionRowsNow = () =>
+        const connectionRowsStored = () =>
           deps.prisma.connection
             .findMany({
               where: { userId: run.userId, spaceId: run.spaceId },
@@ -3254,16 +3305,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 writesEnabled: true,
                 agentBotId: true,
                 privateByDefault: true,
-                botAccess: { where: connectionAccessFilter(bot), select: { botId: true } },
+                botAccess: {
+                  where: connectionAccessFilter(bot),
+                  select: { botId: true, supportLabel: true },
+                },
                 agentBot: { select: { spawnKey: true } },
               },
             })
-            .then((rows) =>
-              connectionRowsForAudience(
-                rows.map((row) => withInboxAgentStandIn(row, bot)),
-                bot.audience,
-              ),
-            );
+            .then((rows) => rows.map((row) => withInboxAgentStandIn(row, bot)));
+        // What the access rules see: "all agents" does not reach an external or firewalled bot.
+        const connectionRowsNow = async () => {
+          const firewalled = await firewallNow();
+          return connectionRowsForAudience(await connectionRowsStored(), bot.audience, firewalled);
+        };
         // The account must exist in this space and user, be connected, be open to this bot, and for
         // a write follow the agent rule.
         const accountAllowedIn = (
@@ -3770,7 +3824,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               scope: { spaceId: run.spaceId, userId: run.userId, botId: bot.id },
             }),
           );
-        const tools = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])];
+        // Agent firewall: only tools on the two closed lists are offered. The model is not told the
+        // others exist, and a call to one is refused (see applyToolCall).
+        const tools = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])].filter(
+          (tool) => !bot.firewall || firewallToolClass(tool.name) !== "dropped",
+        );
         const offeredToolNames = new Set(tools.map((tool) => tool.name));
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
@@ -4391,6 +4449,41 @@ export function createRunExecutor(deps: ExecutorDeps) {
               error: "This stage was handed off. End the turn without more tool calls.",
             };
           }
+          // Agent firewall: the switch is read on every call, so turning it on applies to a run
+          // already in progress. A tool outside the two lists is refused whatever the model was told.
+          const firewalled = await firewallNow();
+          if (firewalled) {
+            if (run.externalTaint !== true) await storeExternalTaint();
+            if (firewallToolClass(name) === "dropped") {
+              return { error: `Tool ${name} is not available to this bot.` };
+            }
+            // The to-do's stored botId becomes the recipient, so the firewalled author would be lost.
+            // A draftId sends the stored draft, which the card would not show.
+            if (name === "mail_send" && typeof args.draftId === "string" && args.draftId.trim()) {
+              return {
+                error:
+                  "Send the full message: pass to, subject and body, not a draftId, so the card shows exactly what is sent.",
+              };
+            }
+            if (name === "scratchpad_add" && args.forAgent != null) {
+              return { error: "forAgent is not available while Firewall is on." };
+            }
+          }
+          // Records a firewalled agent wrote are untrusted: reading them taints this run.
+          if (run.externalTaint !== true && FIREWALL_CONTENT_READERS.has(name)) {
+            const authors = await firewalledBotIds(deps.prisma, run.spaceId);
+            if (
+              await readsFirewalledContent(
+                deps.prisma,
+                { spaceId: run.spaceId, userId: run.userId },
+                name,
+                args,
+                authors,
+              )
+            ) {
+              await storeExternalTaint();
+            }
+          }
           if (disabledBuiltinTools.has(name)) {
             return { error: "This tool is disabled for this bot." };
           }
@@ -4896,6 +4989,41 @@ export function createRunExecutor(deps: ExecutorDeps) {
               .catch(() => null);
             policyArgs = { ...args, category: item ? (item.category ?? "none") : undefined };
           }
+          // Agent firewall. The mail reads are held to the support scope, mail_modify and mail_draft
+          // are lifted to free under their conditions, and every other listed tool asks.
+          const firewallMail =
+            firewalled && deps.mail && mailEnabled
+              ? {
+                  prisma: deps.prisma,
+                  mail: deps.mail,
+                  context,
+                  owner: { spaceId: run.spaceId, userId: bot.userId },
+                  botId: bot.id,
+                  accounts: await accountsAllowedNow(mailAccounts(), name),
+                  rows: await connectionRowsStored(),
+                }
+              : undefined;
+          let firewallLifted = false;
+          let firewallScopeLabelIds: Record<string, string> = {};
+          let firewallAskCall = false;
+          if (firewalled) {
+            if (firewallToolClass(name) === "ask") {
+              firewallLifted =
+                firewallMail !== undefined &&
+                (name === "mail_modify"
+                  ? await firewallModifyIsFree(args, firewallMail)
+                  : name === "mail_draft"
+                    ? await firewallDraftIsWithinThread(args, firewallMail)
+                    : false);
+              firewallAskCall = !firewallLifted;
+            } else if (firewallMail && MAIL_READ_TOOL_NAMES.has(name)) {
+              const scope = await firewallMailReadDecision(name, args, firewallMail);
+              if (scope.free) {
+                args = scope.args;
+                firewallScopeLabelIds = scope.labelIds;
+              } else firewallAskCall = true;
+            }
+          }
           const requiresUnattendedApproval = unattendedToolRequiresApproval(
             run.unattended,
             name,
@@ -5053,12 +5181,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (await routineNamesNewSite(String(args.prompt ?? "")));
           // A one-time schedule has a card but is no reason to ask on its own.
           const scheduleAsks = scheduleCard !== undefined && scheduleCard.oneShot !== true;
+          // A call the firewall lifted (see above) is not consequential: it sends nothing and only
+          // changes mail the agent alone may change.
           const requiresApprovalByDefault =
-            requiresUnattendedApproval ||
-            siteGate === "new" ||
-            connectorReadGated ||
-            scheduleAsks ||
-            toolRequiresApproval(name, viaConnector, declaredReadOnly);
+            !firewallLifted &&
+            (requiresUnattendedApproval ||
+              siteGate === "new" ||
+              connectorReadGated ||
+              scheduleAsks ||
+              toolRequiresApproval(name, viaConnector, declaredReadOnly));
           const callRoute = (resolvedTool ?? connectorTools.get(name))?.route;
           // Integration-agent writes use the shared preset classification and always show the full call.
           const integrationWriteTool = isIntegrationAgentWrite(
@@ -5079,7 +5210,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // Likewise for a run that began with an external bot: everything outside the short free
           // list asks, whether it reads private data or writes. Read at each call so a marked
           // message claimed as steering mid-run counts from then on.
-          const externalTaintedCall = runTainted && !externalTaintAllowsTool(name, policyArgs);
+          // A firewalled agent follows its own profile instead: free tools run, listed asks card below.
+          const externalTaintedCall =
+            !firewalled && runTainted && !externalTaintAllowsTool(name, policyArgs);
           // A search query is an outbound channel that site gating does not cover, so once the
           // run has read an app on the owner's computer, every search asks.
           const desktopReadSearch = name === "web_search" && (await desktopReadSeen());
@@ -5133,6 +5266,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (connectorReadGated && run.unattended === true) ||
             meetingTaintedCall ||
             externalTaintedCall ||
+            firewallAskCall ||
             toolRequiresExplicitApproval(name) ||
             // No saved rule or Auto Review may send mail for the Carta agent (investor email).
             isCartaMailSend(bot.spawnKey, name) ||
@@ -5147,7 +5281,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 source: "default" as const,
                 matchingRules: [],
               }
-            : approvalResolved;
+            : firewallLifted && !approvalResolved.matchingRules.length
+              ? { decision: "allow" as const, source: "default" as const, matchingRules: [] }
+              : approvalResolved;
           const autoReviewPref =
             requiresMandatoryApproval || run.unattended ? false : await loadAutoReviewPreference();
           const injectedReview =
@@ -5429,8 +5565,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
           const needsApproval = gateDecision === "ask";
           // One plain line on the card, only for a background, tainted or rule-caused ask.
-          const approvalCardReason =
-            requiresUnattendedApproval || mailModifyNeedsToolRule
+          const approvalCardReason = firewallAskCall
+            ? FIREWALL_CARD_REASON
+            : requiresUnattendedApproval || mailModifyNeedsToolRule
               ? "Asked because this ran in the background."
               : externalTaintedCall
                 ? EXTERNAL_REQUEST_REASON
@@ -5450,11 +5587,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               gateDecision,
               requiresUnattendedApproval
                 ? "unattended"
-                : externalTaintedCall
-                  ? "external_taint"
-                  : requiresMandatoryApproval
-                    ? "mandatory"
-                    : approvalResolved.source,
+                : firewallAskCall
+                  ? "firewall"
+                  : externalTaintedCall
+                    ? "external_taint"
+                    : requiresMandatoryApproval
+                      ? "mandatory"
+                      : approvalResolved.source,
             );
           }
           const bypassApproval = gateDecision === "allow" && requiresApprovalByDefault;
@@ -5555,7 +5694,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 externalTaintedCall && approvalCardReason !== EXTERNAL_REQUEST_REASON
                   ? [EXTERNAL_REQUEST_REASON, reviewReason].filter(Boolean).join("\n")
                   : reviewReason,
-              fullMail: isCartaMailSend(bot.spawnKey, name),
+              fullMail:
+                isCartaMailSend(bot.spawnKey, name) ||
+                (firewallAskCall && (name === "mail_send" || name === "mail_draft")),
               fullCompany:
                 (name === "company_fact_upsert" || name === "company_import_start") &&
                 COMPANY_TOOL_NAMES.has(name),
@@ -6678,6 +6819,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 jobs: deps.jobs,
                 accounts: () => accountsAllowedNow(mailAccounts(), name),
                 ownerAccounts: ownerMailAccounts,
+                scopeLabelIds: (accountId) => firewallScopeLabelIds[accountId],
                 beforeWrite: (account) => writeDenialNow(account, name),
                 publish: (blocks) => publishMessage(deps, run, "bot", blocks),
                 writesDisabled: deps.mailWritesDisabled,
@@ -10207,6 +10349,15 @@ const ACTION_TYPE_LABELS: Record<NonNullable<ReturnType<typeof actionTypeForTool
 
 /** First line of the reason on a card for a call in a run that began with an external bot. */
 export const EXTERNAL_REQUEST_REASON = "Requested by an external bot";
+
+/** The mail reads the firewall holds to the support scope. */
+const MAIL_READ_TOOL_NAMES = new Set([
+  "mail_search",
+  "mail_grep",
+  "mail_get",
+  "inbox_overview",
+  "show_emails",
+]);
 
 /** Last in the final instruction string, after everything else, so nothing assembled later can countermand it. */
 export function withExternalChainNotice(

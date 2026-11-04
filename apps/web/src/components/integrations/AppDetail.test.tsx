@@ -176,14 +176,14 @@ it("creates an agent for the selected connected account and opens its chat", asy
   expect(where()).toBe("/app/bot_app");
 });
 
-it("offers Create agent for a native Google account", async () => {
+it("never offers Create agent for Gmail: every account belongs to the Inbox agent", async () => {
   await show(
     PAGE,
     data({
       connections: [appConnection({ id: "conn_google", connectorId: "google", provider: "gmail" })],
     }),
   );
-  expect(container.textContent).toContain("Create agent");
+  expect(container.textContent).not.toContain("Create agent");
 });
 
 it("hides the ordinary access list and Used by while a private agent connection is not shared", async () => {
@@ -579,4 +579,111 @@ it("gives the back link a phone tap size and writes the connected date in words"
   await show(APP_PAGE, data({ connections: [appConnection()] }));
   expect(container.querySelector('a[href="/app/integrations"]')?.className).toContain("rk-tap");
   expect(container.textContent).toMatch(/Connected (Dec 31, 2025|Jan 1, 2026)/);
+});
+
+const sharedBots = ["bot_app", "b", "c"].map((id) => ({ id, name: id, color: "#000000" }));
+const switchOf = (name: string) =>
+  container.querySelector<HTMLElement>(`[aria-label="${name} can use Sample workspace"]`)!;
+const buttonOf = (name: string) =>
+  [...container.querySelectorAll("button")].find((b) => b.textContent === name)!;
+
+it("All saves allAgents once and None saves the owner alone, once", async () => {
+  await show(
+    APP_PAGE,
+    data({
+      bots: sharedBots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app" })],
+      access: {
+        conn_app: {
+          allAgents: false,
+          botIds: ["bot_app", "b"],
+          effectiveAccess: { shared: "some", botIds: ["bot_app", "b"] },
+        },
+      },
+    }),
+  );
+  await act(async () => buttonOf("All").click());
+  expect(setAccess.mock.calls).toEqual([
+    [{ connectionId: "conn_app", allAgents: true, botIds: [] }],
+  ]);
+  setAccess.mockClear();
+  await act(async () => buttonOf("None").click());
+  expect(setAccess.mock.calls).toEqual([
+    [{ connectionId: "conn_app", allAgents: false, botIds: ["bot_app"] }],
+  ]);
+});
+
+it("keeps All available when every agent is on but access is a chosen list", async () => {
+  const access = (ids: string[]) => ({
+    conn_app: {
+      allAgents: false,
+      botIds: ids,
+      effectiveAccess: { shared: "some" as const, botIds: ids },
+    },
+  });
+  await show(
+    APP_PAGE,
+    data({
+      bots: sharedBots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app" })],
+      access: access(["bot_app", "b", "c"]),
+    }),
+  );
+  expect(buttonOf("All").disabled).toBe(false);
+  expect(buttonOf("None").disabled).toBe(false);
+});
+
+it("while a save is in flight, switching one agent does not flip an agent the server says cannot use it", async () => {
+  // "c" is stored as allowed (all agents) but cannot reach this app, so the server lists it as off.
+  let release: () => void = () => undefined;
+  setAccess.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  await show(
+    APP_PAGE,
+    data({
+      bots: sharedBots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app" })],
+      access: {
+        conn_app: {
+          allAgents: true,
+          botIds: [],
+          effectiveAccess: { shared: "all", botIds: ["bot_app", "b"] },
+        },
+      },
+    }),
+  );
+  expect(switchOf("c").getAttribute("aria-checked")).toBe("false");
+  await act(async () => switchOf("b").click());
+  expect(switchOf("b").getAttribute("aria-checked")).toBe("false");
+  expect(switchOf("c").getAttribute("aria-checked")).toBe("false");
+  expect(switchOf("bot_app").getAttribute("aria-checked")).toBe("true");
+  await act(async () => release());
+});
+
+it("None still saves when everything shown is the owner but access is stored as all agents", async () => {
+  // Only the owner can reach this app, yet it is shared with all agents (including future ones).
+  await show(
+    APP_PAGE,
+    data({
+      bots: sharedBots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app" })],
+      access: {
+        conn_app: {
+          allAgents: true,
+          botIds: [],
+          effectiveAccess: { shared: "all", botIds: ["bot_app"] },
+        },
+      },
+    }),
+  );
+  expect(buttonOf("All").disabled).toBe(true);
+  expect(buttonOf("None").disabled).toBe(false);
+  await act(async () => buttonOf("None").click());
+  expect(setAccess.mock.calls).toEqual([
+    [{ connectionId: "conn_app", allAgents: false, botIds: ["bot_app"] }],
+  ]);
 });

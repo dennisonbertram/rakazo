@@ -962,6 +962,20 @@ describe("mail progress", () => {
     ]);
   });
 
+  it("lists a label-scoped search by label id and never from the metadata cache", async () => {
+    const { deps } = withProgress();
+    const listMessages = vi.fn().mockResolvedValue({ messages: [] });
+    deps.mail = { ...deps.mail, listMessages } as never;
+    const [account] = await deps.accounts();
+    deps.scopeLabelIds = (id) => (id === account?.id ? "L1" : undefined);
+    await mailToolFromTool("mail_search", deps, context(), { queries: ["x"] });
+    expect(listMessages).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ query: "x", labelIds: ["L1"], useCache: false }),
+      expect.anything(),
+    );
+  });
+
   it("reports a rate limit as a retry line", async () => {
     const { deps, gmail, lines } = withProgress();
     gmail.failNext(429, { times: 1 });

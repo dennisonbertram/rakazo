@@ -39,6 +39,7 @@ import {
   ensureMailAgent,
   listMailInbox,
   listMailTodos,
+  markNoReply,
   moveMailMessages,
   refreshMailInbox,
   todoDueLabel,
@@ -247,6 +248,33 @@ export default function InboxScreen() {
       void load(tabRef.current, false);
     }
   };
+  // The row leaves Needs reply at once; the third one for a sender says so, with Undo.
+  const announceStop = (messageId: string, sender: string) =>
+    Alert.alert(t("Stopped Needs reply for {sender}", { sender }), undefined, [
+      {
+        text: t("Undo"),
+        onPress: () =>
+          void markNoReply(messageId, true).catch((cause) => Alert.alert(errorText(cause))),
+      },
+      { text: t("Done") },
+    ]);
+  const noReplyRow = async (row: MailRow) => {
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            rows: current.rows.map((r) => (r.id === row.id ? { ...r, needsReply: false } : r)),
+          }
+        : current,
+    );
+    try {
+      const { stopped } = await markNoReply(row.id);
+      if (stopped) announceStop(row.id, stopped);
+    } catch (cause) {
+      Alert.alert(errorText(cause));
+    }
+    void load(tabRef.current, false);
+  };
   const confirmArchiveGroup = (group: SenderGroup<MailRow>) => {
     const count = archivableIds(group.rows, pileRef.current === "spam").length;
     if (count === 0) return;
@@ -278,14 +306,20 @@ export default function InboxScreen() {
   const completeTodo = (todo: InboxTodo) => {
     const index = todos.indexOf(todo);
     setTodos((current) => current.filter((item) => item.id !== todo.id));
-    completeMailTodo(todo.id).catch((cause: unknown) => {
-      setTodos((current) =>
-        current.some((item) => item.id === todo.id)
-          ? current
-          : [...current.slice(0, index), todo, ...current.slice(index)],
-      );
-      Alert.alert(errorText(cause));
-    });
+    completeMailTodo(todo.id)
+      .then(({ stoppedSender }) => {
+        if (stoppedSender && todo.messageId) announceStop(todo.messageId, stoppedSender);
+        // The server also took the mail out of Needs reply; list it again.
+        if (todo.messageId) void load(tabRef.current, false);
+      })
+      .catch((cause: unknown) => {
+        setTodos((current) =>
+          current.some((item) => item.id === todo.id)
+            ? current
+            : [...current.slice(0, index), todo, ...current.slice(index)],
+        );
+        Alert.alert(errorText(cause));
+      });
   };
 
   const accounts = data?.accounts ?? [];
@@ -541,6 +575,9 @@ export default function InboxScreen() {
           ) : (
             <MailRowMenu
               onArchive={() => void archiveRows([item.row])}
+              {...(item.row.needsReply === true
+                ? { onNoReply: () => void noReplyRow(item.row) }
+                : {})}
               {...(item.row.pile === "spam"
                 ? { onNotSpam: () => void moveRows("notSpam", [item.row]) }
                 : item.row.inInbox

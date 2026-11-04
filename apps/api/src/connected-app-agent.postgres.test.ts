@@ -33,9 +33,12 @@ describePostgres("connected app agents (PostgreSQL)", () => {
   let close: () => Promise<void>;
 
   const client = (who: Actor) =>
-    createRouterClient(createRouter({ prisma } as unknown as RouterDeps), {
-      context: { actor: who } as never,
-    });
+    createRouterClient(
+      createRouter({ prisma, env: { mailWritesDisabled: false } } as unknown as RouterDeps),
+      {
+        context: { actor: who } as never,
+      },
+    );
   const connections = (who = owner) =>
     client(who).connections as unknown as {
       createAgent(input: { connectionId: string }): Promise<{ botId: string }>;

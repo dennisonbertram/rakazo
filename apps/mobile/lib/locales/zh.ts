@@ -986,4 +986,7 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Connected.": "已连接。",
   "Disconnected {provider}. Bots now use {model}.": "已断开 {provider}。机器人现在使用 {model}。",
   "Source paused": "来源已暂停",
+  "Needs reply stopped": "已停止待回复",
+  "No reply needed": "无需回复",
+  "Stopped Needs reply for {sender}": "已停止对 {sender} 的待回复提示",
 };

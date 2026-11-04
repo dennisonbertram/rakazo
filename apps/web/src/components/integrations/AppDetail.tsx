@@ -181,7 +181,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
   const [confirmingWrites, setConfirmingWrites] = useState<Connection | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [override, setOverride] = useState<(ConnectionAccess & { rowId: string }) | null>(null);
+  const [override, setOverride] = useState<{ rowId: string; shown: string[] } | null>(null);
   const connectedCount = connected.length;
   const isGmail =
     matchFeaturedConnectorId(slug) === "gmail" || (connectorId === "google" && /mail/i.test(slug));
@@ -244,8 +244,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     (row ? data.access[row.id] : undefined) ?? { allAgents: true, botIds: [] };
   /** Who can use the row: the server's answer, except while a toggle is saving. */
   const isOn = (row: Connection | undefined, botId: string) => {
-    if (override && override.rowId === row?.id)
-      return override.allAgents || override.botIds.includes(botId);
+    if (override && override.rowId === row?.id) return override.shown.includes(botId);
     const state = row ? data.access[row.id] : undefined;
     return state ? state.effectiveAccess.botIds.includes(botId) : true;
   };
@@ -278,19 +277,20 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
 
   /** Selections made while saves are in flight: each toggle builds on the last one, not on stored data. */
   const pendingAccess = useRef(new Map<string, ConnectionAccess>());
+  const pendingShown = useRef(new Map<string, string[]>());
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const unsaved = useRef(0);
 
-  function setAgent(row: Connection | undefined, botId: string, on: boolean) {
-    if (!row || (row.agentBotId === botId && !on)) return; // the owning agent always keeps access
-    const next = toggleAccess(
-      pendingAccess.current.get(row.id) ?? storedAccess(row),
-      allBotIds,
-      botId,
-      on,
-    );
+  const accessOf = (row: Connection) => pendingAccess.current.get(row.id) ?? storedAccess(row);
+  /** Who the row shows as on: the server's answer, with this page's unsaved changes applied. */
+  const shownNow = (row: Connection) =>
+    pendingShown.current.get(row.id) ?? data.access[row.id]?.effectiveAccess.botIds ?? allBotIds;
+
+  /** Saves one whole access value; `shown` is what the list reads until the save lands. */
+  function saveAccess(row: Connection, next: ConnectionAccess, shown: string[]) {
     pendingAccess.current.set(row.id, next);
-    setOverride({ ...next, rowId: row.id });
+    pendingShown.current.set(row.id, shown);
+    setOverride({ rowId: row.id, shown });
     setError(null);
     unsaved.current += 1;
     // One save at a time, in click order, so a slow earlier save cannot overwrite a later one.
@@ -303,10 +303,35 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
       unsaved.current -= 1;
       if (unsaved.current === 0) {
         pendingAccess.current.clear();
+        pendingShown.current.clear();
         await data.refresh();
         setOverride(null);
       }
     });
+  }
+
+  function setAgent(row: Connection | undefined, botId: string, on: boolean) {
+    if (!row || (row.agentBotId === botId && !on)) return; // the owning agent always keeps access
+    const next = toggleAccess(
+      pendingAccess.current.get(row.id) ?? storedAccess(row),
+      allBotIds,
+      botId,
+      on,
+    );
+    // Only this agent's row changes on screen; the others keep what the server said they can use.
+    const shown = shownNow(row).filter((id) => id !== botId);
+    saveAccess(row, next, on ? [...shown, botId] : shown);
+  }
+
+  /** All: every agent, including ones made later. None: only the owning agent. One save either way. */
+  function setAllAgents(row: Connection | undefined, on: boolean) {
+    if (!row) return;
+    const owner = row.agentBotId ? [row.agentBotId] : [];
+    saveAccess(
+      row,
+      on ? { allAgents: true, botIds: [] } : { allAgents: false, botIds: owner },
+      on ? allBotIds : owner,
+    );
   }
 
   async function revoke(targets: Connection[], afterRemovingAll: boolean) {
@@ -462,7 +487,8 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                 onChanged={() => void data.refresh()}
                 busy={busy}
                 onCreateAgent={
-                  row.status === "connected" && !row.needsReconnect && !row.agentBotId
+                  // Every Gmail account belongs to the Inbox agent, which the server links on its own.
+                  !isGmail && row.status === "connected" && !row.needsReconnect && !row.agentBotId
                     ? () =>
                         void updateAgent(async () => {
                           const { botId } = await rpc.connections.createAgent({
@@ -516,6 +542,10 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                         disabled={busy}
                         isOn={(botId) => isOn(row, botId)}
                         onToggle={(botId, on) => setAgent(row, botId, on)}
+                        onSetAll={(on) => setAllAgents(row, on)}
+                        ownerBotId={row.agentBotId}
+                        saving={override?.rowId === row.id}
+                        everyone={accessOf(row).allAgents}
                       />
                     }
                   />
@@ -530,6 +560,9 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                       disabled={busy}
                       isOn={(botId) => isOn(row, botId)}
                       onToggle={(botId, on) => setAgent(row, botId, on)}
+                      onSetAll={(on) => setAllAgents(row, on)}
+                      saving={override?.rowId === row.id}
+                      everyone={accessOf(row).allAgents}
                     />
                   </>
                 ) : null}
@@ -557,6 +590,9 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                     disabled={busy}
                     isOn={(botId) => isOn(ordinaryAccount, botId)}
                     onToggle={(botId, on) => setAgent(ordinaryAccount, botId, on)}
+                    onSetAll={(on) => setAllAgents(ordinaryAccount, on)}
+                    saving={override?.rowId === ordinaryAccount?.id}
+                    everyone={ordinaryAccount ? accessOf(ordinaryAccount).allAgents : false}
                   />
                 </>
               ) : null}

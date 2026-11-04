@@ -121,9 +121,22 @@ export function McpDetail({
       await data.refresh();
     } catch (err) {
       setError(errorText(err, fallback));
+      // Some grants may have landed before the failure: show what the server has.
+      try {
+        await data.refresh();
+      } catch {
+        // The error above is already shown.
+      }
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Runs every call to the end, so none lands after the controls re-enable, then reports the first failure. */
+  async function settleAll(calls: Promise<unknown>[]) {
+    const results = await Promise.allSettled(calls);
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
   }
 
   const rename = () =>
@@ -171,7 +184,7 @@ export function McpDetail({
       if (shared) {
         // Exclusivity must be off first: the server refuses to grant an exclusive server to other agents.
         await exclusive(false);
-        await Promise.all(
+        await settleAll(
           data.bots.filter((bot) => !assigned(bot.id)).map((bot) => assign(bot.id, true)),
         );
         return;
@@ -205,6 +218,14 @@ export function McpDetail({
           () => rpc.mcp.servers.setWrites({ id: server.id, enabled: false }).then(() => undefined),
           t`Could not update changes`,
         );
+  /** All: every agent gets the server. None: only the owning agent keeps it. */
+  const setAllAgents = (on: boolean) =>
+    run(async () => {
+      const targets = data.bots.filter(
+        (bot) => bot.id !== server.agentBotId && assigned(bot.id) !== on,
+      );
+      await settleAll(targets.map((bot) => assign(bot.id, on)));
+    }, t`Could not update bot access`);
   const usedBy = (
     <AgentToggleList
       bots={[...data.bots].sort(
@@ -214,6 +235,8 @@ export function McpDetail({
       disabled={busy}
       isOn={assigned}
       onToggle={(botId, on) => void toggle(botId, on)}
+      onSetAll={(on) => void setAllAgents(on)}
+      ownerBotId={server.agentBotId}
     />
   );
   return (
