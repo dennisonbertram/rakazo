@@ -3583,8 +3583,37 @@ const MessageBubble = memo(function MessageBubble({
   }
   const special = message.blocks.find(
     (block) =>
-      block.kind === "subagent" || block.kind === "child_bot" || block.kind === "cloud_agent",
+      block.kind === "subagent" ||
+      block.kind === "child_bot" ||
+      block.kind === "cloud_agent" ||
+      block.kind === "page",
   );
+  if (special?.kind === "page") {
+    return (
+      <Pressable
+        {...actionProps}
+        onPress={() =>
+          router.push({
+            pathname: "/agent-page",
+            params: { botId: special.botId, pageId: special.pageId },
+          })
+        }
+        style={{
+          width: "90%",
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: tokens.border,
+          backgroundColor: tokens.card,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+        }}
+      >
+        <Text style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600" }}>
+          {special.title}
+        </Text>
+      </Pressable>
+    );
+  }
   if (special?.kind === "subagent") {
     const running = special.status === "running";
     const failed = special.status === "failed";

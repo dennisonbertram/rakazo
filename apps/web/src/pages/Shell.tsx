@@ -261,6 +261,7 @@ import {
   useDrawerFocus,
   useSidebarDocked,
 } from "../lib/shell-layout";
+import { SIDEBAR_PAGES_CHANGED_EVENT } from "../lib/sidebar-pages-event";
 import { rememberThread } from "../lib/thread-cache";
 import {
   activeThreadRuns,
@@ -2009,6 +2010,10 @@ export function ShellPage() {
           const blocks = (event.payload.blocks as Array<{ kind?: string }>) ?? [];
           if (blocks.some((block) => block.kind === "child_bot")) {
             void refreshBots().catch(() => undefined);
+          }
+          // An agent-created page is already in the sidebar; the card's message tells it to re-list.
+          if (blocks.some((block) => block.kind === "page")) {
+            window.dispatchEvent(new Event(SIDEBAR_PAGES_CHANGED_EVENT));
           }
         }
         if (
