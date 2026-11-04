@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createBotPage,
   listBotPages,
+  pageCardBlock,
   pageToolFromTool,
   removeBotPage,
   renameBotPage,
@@ -249,6 +250,7 @@ describe("page tools", () => {
     expect(await run("page_write", { content: "a b a", baseRevision: 0 }, t)).toEqual({
       ok: true,
       revision: 1,
+      link: "/app/pages/bot-1/page-1",
     });
     expect(t.revisions[0]).toMatchObject({ updatedBy: "bot", sourceRunId: "run-1" });
     expect(
@@ -256,11 +258,13 @@ describe("page tools", () => {
     ).toEqual({
       ok: true,
       revision: 2,
+      link: "/app/pages/bot-1/page-1",
     });
     expect(await run("page_read", {}, t)).toEqual({
       content: "a c a",
       revision: 2,
       title: "Finance",
+      link: "/app/pages/bot-1/page-1",
     });
   });
 
@@ -418,8 +422,11 @@ describe("named pages", () => {
         { ...scope, runId: "run-1" },
         args,
       );
+    const link = expect.stringMatching(/^\/app\/pages\/bot-1\/[^/]+$/);
     expect(await run("page_create", { title: "Cash" })).toEqual({
       ok: true,
+      pageId: expect.any(String),
+      link,
       title: "Cash",
       kind: "blocks",
       revision: 1,
@@ -430,8 +437,13 @@ describe("named pages", () => {
     expect(await run("page_write", { page: "CASH", content: "c", baseRevision: 1 })).toEqual({
       ok: true,
       revision: 2,
+      link,
     });
-    expect(await run("page_read", { page: "cash" })).toMatchObject({ content: "c", title: "Cash" });
+    expect(await run("page_read", { page: "cash" })).toMatchObject({
+      content: "c",
+      title: "Cash",
+      link,
+    });
     expect(await run("page_read", { page: "Nope" })).toMatchObject({
       error: expect.stringContaining("page_list"),
     });
@@ -439,7 +451,36 @@ describe("named pages", () => {
       error: expect.stringContaining("page_create"),
     });
     expect(await run("page_list", {})).toMatchObject({
-      pages: [{ title: "Cash", revision: 2 }],
+      pages: [{ title: "Cash", revision: 2, link }],
     });
+  });
+
+  it("a created page gets one chat card with ids and title; writes, edits and failed creates get none", async () => {
+    const t = setup();
+    const run = (name: Parameters<typeof pageToolFromTool>[0], args: Record<string, unknown>) =>
+      pageToolFromTool(
+        name,
+        { prisma: t.prisma, events: t.events },
+        { ...scope, runId: "run-1" },
+        args,
+      );
+    const created = await run("page_create", { title: "Cash" });
+    expect(pageCardBlock("page_create", scope, created)).toEqual({
+      kind: "page",
+      botId: scope.botId,
+      pageId: created.pageId,
+      title: "Cash",
+    });
+    const written = await run("page_write", { page: "Cash", content: "c", baseRevision: 1 });
+    expect(pageCardBlock("page_write", scope, written)).toBeNull();
+    const edited = await run("page_edit", {
+      page: "Cash",
+      old_string: "c",
+      new_string: "d",
+      baseRevision: 2,
+    });
+    expect(pageCardBlock("page_edit", scope, edited)).toBeNull();
+    const duplicate = await run("page_create", { title: "cash" });
+    expect(pageCardBlock("page_create", scope, duplicate)).toBeNull();
   });
 });

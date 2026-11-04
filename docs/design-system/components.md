@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 333 of 333
-- Web and shared components: 850
+- Web and shared component files with stories: 334 of 334
+- Web and shared components: 851
 - Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 130 in 71 files, native story pending
+- SwiftUI views: 139 in 76 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -448,6 +448,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | GroupIntro | [apps/web/src/pages/shell/GroupIntro.tsx](../../apps/web/src/pages/shell/GroupIntro.tsx) | [GroupIntro.stories.tsx](../../apps/web/src/pages/shell/GroupIntro.stories.tsx) | web |
 | MentionIcon | [apps/web/src/pages/shell/mention-icon.tsx](../../apps/web/src/pages/shell/mention-icon.tsx) | [mention-icon.stories.tsx](../../apps/web/src/pages/shell/mention-icon.stories.tsx) | web |
 | ResultCard, ChoiceCard, OnboardingFocusQuestion, OnboardingFocusOptionHint, OnboardingFocusOptionLabel, AppConnectCard, ChartCanvas, ChartCanvasPlot, McpApprovalCard, ChartBlockView, ArtifactImage, ArtifactImageGrid | [apps/web/src/pages/shell/message-cards.tsx](../../apps/web/src/pages/shell/message-cards.tsx) | [message-cards.stories.tsx](../../apps/web/src/pages/shell/message-cards.stories.tsx) | web |
+| PageCard | [apps/web/src/pages/shell/page-card.tsx](../../apps/web/src/pages/shell/page-card.tsx) | [page-card.stories.tsx](../../apps/web/src/pages/shell/page-card.stories.tsx) | web |
 | SidebarHeaderRow | [apps/web/src/pages/shell/sidebar-header-row.tsx](../../apps/web/src/pages/shell/sidebar-header-row.tsx) | [sidebar-header-row.stories.tsx](../../apps/web/src/pages/shell/sidebar-header-row.stories.tsx) | web |
 | SpaceSidebar | [apps/web/src/pages/shell/space-sidebar.tsx](../../apps/web/src/pages/shell/space-sidebar.tsx) | [space-sidebar.stories.tsx](../../apps/web/src/pages/shell/space-sidebar.stories.tsx) | web |
 | ThreadMarkdown, ThreadUiBlock, UnreadDivider, Transcript, QuoteSelectionButton, MessageHoverActions, SpeakerHeader, MessageView | [apps/web/src/pages/shell/transcript.tsx](../../apps/web/src/pages/shell/transcript.tsx) | [transcript.stories.tsx](../../apps/web/src/pages/shell/transcript.stories.tsx) | web |
@@ -577,7 +578,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
 | AgentPageScreen, FailedSource | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
-| AppShell | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
+| AppShell, ArchivedToast | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
 | RootView | [apps/ios/Sources/Praci/App/RootView.swift](../../apps/ios/Sources/Praci/App/RootView.swift) | native story pending | iOS |
 | ArtifactScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift) | native story pending | iOS |
 | ArtifactsScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift) | native story pending | iOS |
@@ -600,6 +601,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | InboxRowView, LabelText, TimeText | [apps/ios/Sources/Praci/Inbox/List/InboxRowView.swift](../../apps/ios/Sources/Praci/Inbox/List/InboxRowView.swift) | native story pending | iOS |
 | TodosCard, TodosCardContent | [apps/ios/Sources/Praci/Inbox/Todos/TodosCard.swift](../../apps/ios/Sources/Praci/Inbox/Todos/TodosCard.swift) | native story pending | iOS |
 | LegalScreen, ContractRow, DeadlineRow, ContractDetailView, DeadlineDetailView | [apps/ios/Sources/Praci/Legal/LegalScreen.swift](../../apps/ios/Sources/Praci/Legal/LegalScreen.swift) | native story pending | iOS |
+| AgentAccessSection | [apps/ios/Sources/Praci/Manage/AgentAccessSection.swift](../../apps/ios/Sources/Praci/Manage/AgentAccessSection.swift) | native story pending | iOS |
 | AgentRowMenu | [apps/ios/Sources/Praci/Manage/AgentRowMenu.swift](../../apps/ios/Sources/Praci/Manage/AgentRowMenu.swift) | native story pending | iOS |
 | BotSettingsScreen | [apps/ios/Sources/Praci/Manage/BotSettingsScreen.swift](../../apps/ios/Sources/Praci/Manage/BotSettingsScreen.swift) | native story pending | iOS |
 | GroupSettingsScreen | [apps/ios/Sources/Praci/Manage/GroupSettingsScreen.swift](../../apps/ios/Sources/Praci/Manage/GroupSettingsScreen.swift) | native story pending | iOS |
@@ -618,17 +620,21 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | DeleteAccountSheet | [apps/ios/Sources/Praci/Settings/Account/DeleteAccountSheet.swift](../../apps/ios/Sources/Praci/Settings/Account/DeleteAccountSheet.swift) | native story pending | iOS |
 | AIDataSharingScreen | [apps/ios/Sources/Praci/Settings/AIData/AIDataSharingScreen.swift](../../apps/ios/Sources/Praci/Settings/AIData/AIDataSharingScreen.swift) | native story pending | iOS |
 | ArchivedScreen | [apps/ios/Sources/Praci/Settings/Archived/ArchivedScreen.swift](../../apps/ios/Sources/Praci/Settings/Archived/ArchivedScreen.swift) | native story pending | iOS |
-| IntegrationsScreen, ConnectionDetailScreen | [apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift](../../apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift) | native story pending | iOS |
+| AccessSections | [apps/ios/Sources/Praci/Settings/Integrations/AccessViews.swift](../../apps/ios/Sources/Praci/Settings/Integrations/AccessViews.swift) | native story pending | iOS |
+| IntegrationsScreen, RenameRow, ConnectionDetailScreen, McpServerDetailScreen | [apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift](../../apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift) | native story pending | iOS |
 | ConnectModelSheet, SignInFlowView, APIKeyForm, LocalServerForm | [apps/ios/Sources/Praci/Settings/Models/ConnectModelSheet.swift](../../apps/ios/Sources/Praci/Settings/Models/ConnectModelSheet.swift) | native story pending | iOS |
 | ModelsScreen, DefaultModelList, ProviderDetailScreen | [apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift](../../apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift) | native story pending | iOS |
 | NotificationPreferencesScreen | [apps/ios/Sources/Praci/Settings/Preferences/NotificationPreferencesScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/NotificationPreferencesScreen.swift) | native story pending | iOS |
 | UsageScreen | [apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift) | native story pending | iOS |
 | ApprovalRulesScreen, AddRuleSheet | [apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift](../../apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift) | native story pending | iOS |
 | SettingsScreen | [apps/ios/Sources/Praci/Settings/SettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/SettingsScreen.swift) | native story pending | iOS |
+| SettingsSheet | [apps/ios/Sources/Praci/Settings/SettingsSheet.swift](../../apps/ios/Sources/Praci/Settings/SettingsSheet.swift) | native story pending | iOS |
 | VoiceSettingsScreen, HostedVoiceScreen | [apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift) | native story pending | iOS |
 | BotAvatarView | [apps/ios/Sources/Praci/Shared/BotAvatarView.swift](../../apps/ios/Sources/Praci/Shared/BotAvatarView.swift) | native story pending | iOS |
 | ConsentSheet | [apps/ios/Sources/Praci/Shared/ConsentSheet.swift](../../apps/ios/Sources/Praci/Shared/ConsentSheet.swift) | native story pending | iOS |
+| CappedSection, FullListScreen | [apps/ios/Sources/Praci/Shared/ListBrowsing.swift](../../apps/ios/Sources/Praci/Shared/ListBrowsing.swift) | native story pending | iOS |
 | LoadableView | [apps/ios/Sources/Praci/Shared/Loadable.swift](../../apps/ios/Sources/Praci/Shared/Loadable.swift) | native story pending | iOS |
+| PrimaryActionButton | [apps/ios/Sources/Praci/Shared/PrimaryActionButton.swift](../../apps/ios/Sources/Praci/Shared/PrimaryActionButton.swift) | native story pending | iOS |
 | SafeHTMLView | [apps/ios/Sources/Praci/Shared/SafeHTMLView.swift](../../apps/ios/Sources/Praci/Shared/SafeHTMLView.swift) | native story pending | iOS |
 | NewSpaceSheet | [apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift](../../apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift) | native story pending | iOS |
 | SpaceSettingsSheet | [apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift](../../apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift) | native story pending | iOS |
@@ -642,7 +648,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ComposerView | [apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift](../../apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift) | native story pending | iOS |
 | PendingSendsView | [apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift](../../apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift) | native story pending | iOS |
 | MessageActions | [apps/ios/Sources/Praci/Thread/MessageActions.swift](../../apps/ios/Sources/Praci/Thread/MessageActions.swift) | native story pending | iOS |
-| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView, UnsupportedBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
+| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, PageCardView, ImageBlockView, FileBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
 | ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |
 | ThreadScreen, UnreadDivider | [apps/ios/Sources/Praci/Thread/ThreadScreen.swift](../../apps/ios/Sources/Praci/Thread/ThreadScreen.swift) | native story pending | iOS |
 | CallButton, CallView | [apps/ios/Sources/Praci/Voice/CallView.swift](../../apps/ios/Sources/Praci/Voice/CallView.swift) | native story pending | iOS |

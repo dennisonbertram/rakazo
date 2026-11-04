@@ -1,4 +1,11 @@
-import type { BotPage, BotPageSummary, PageAuthor, PageChart, PageKind } from "@rakazo/contracts";
+import type {
+  BotPage,
+  BotPageSummary,
+  MessageBlock,
+  PageAuthor,
+  PageChart,
+  PageKind,
+} from "@rakazo/contracts";
 import {
   BOT_PAGE_MAX_CHARS,
   BOT_PAGE_MAX_CHARTS,
@@ -481,7 +488,8 @@ export async function pageToolFromTool(
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   if (name === "page_list") {
-    return { pages: await listBotPages(deps.prisma, scope) };
+    const pages = await listBotPages(deps.prisma, scope);
+    return { pages: pages.map((page) => ({ ...page, link: botPageLink(scope.botId, page.id) })) };
   }
   if (name === "page_create") {
     try {
@@ -493,7 +501,14 @@ export async function pageToolFromTool(
         kind: args.kind === "html" ? "html" : "blocks",
         sourceRunId: scope.runId,
       });
-      return { ok: true, title: page.title, kind: page.kind, revision: page.revision };
+      return {
+        ok: true,
+        pageId: page.id,
+        link: botPageLink(scope.botId, page.id),
+        title: page.title,
+        kind: page.kind,
+        revision: page.revision,
+      };
     } catch (error) {
       if (error instanceof PageValidationError || error instanceof PageConflictError) {
         return { error: error.message };
@@ -513,7 +528,7 @@ export async function pageToolFromTool(
     return {
       content: current?.content ?? "",
       revision: current?.revision ?? 0,
-      ...(current ? { title: current.title } : {}),
+      ...(current ? { title: current.title, link: botPageLink(scope.botId, current.id) } : {}),
     };
   }
   const baseRevision = Number(args.baseRevision);
@@ -543,7 +558,13 @@ export async function pageToolFromTool(
       updatedBy: "bot",
       sourceRunId: scope.runId,
     });
-    if (result.ok) return { ok: true, revision: result.page.revision };
+    if (result.ok) {
+      return {
+        ok: true,
+        revision: result.page.revision,
+        link: botPageLink(scope.botId, result.page.id),
+      };
+    }
     return {
       error:
         "The page changed since you read it. Nothing was saved; reapply your change to the current content.",
@@ -554,4 +575,20 @@ export async function pageToolFromTool(
     if (error instanceof PageValidationError) return { error: error.message };
     throw error;
   }
+}
+
+/** The in-app path of a bot page. Chat renders a Markdown link to it as in-app navigation. */
+export const botPageLink = (botId: string, pageId: string) =>
+  `/app/pages/${encodeURIComponent(botId)}/${encodeURIComponent(pageId)}`;
+
+/** The chat card for a page the agent just created; null for every other page tool call or a failed create. */
+export function pageCardBlock(
+  toolName: string,
+  scope: { botId: string },
+  result: Record<string, unknown>,
+): MessageBlock | null {
+  if (toolName !== "page_create" || result.ok !== true || typeof result.pageId !== "string") {
+    return null;
+  }
+  return { kind: "page", botId: scope.botId, pageId: result.pageId, title: String(result.title) };
 }

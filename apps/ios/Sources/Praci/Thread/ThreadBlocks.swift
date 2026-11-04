@@ -6,6 +6,7 @@ import UIKit
 struct MarkdownView: View {
   let text: String
   var color: Color = Color.token(.foreground)
+  @Environment(AppModel.self) private var app
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -15,6 +16,12 @@ struct MarkdownView: View {
     }
     .foregroundStyle(color)
     .frame(maxWidth: .infinity, alignment: .leading)
+    // A link to one of the app's own paths opens its screen; web links keep the system behaviour.
+    .environment(\.openURL, OpenURLAction { url in
+      guard url.scheme == nil, url.host() == nil else { return .systemAction }
+      if let route = Route(appPath: url.relativeString) { app.open(route) }
+      return .handled
+    })
   }
 
   @ViewBuilder private func view(_ block: MarkdownBlock) -> some View {
@@ -150,6 +157,28 @@ struct SubagentRowView: View {
       title: failed ? "\(name) failed" : done ? "\(name) finished" : "\(name) is working",
       summary: block.fields["result"]?.stringValue ?? block.fields["progress"]?.stringValue,
       running: !done && !failed)
+  }
+}
+
+/// The card an agent leaves when it creates a page. Tapping it opens the page. There is no sidebar here,
+/// so it has no add button.
+struct PageCardView: View {
+  let block: MessageBlock
+  @Environment(AppModel.self) private var app
+
+  var body: some View {
+    if let botID = block.fields["botId"]?.stringValue, let pageID = block.fields["pageId"]?.stringValue {
+      Button { app.open(.agentPage(botID: botID, pageID: pageID)) } label: {
+        Text(block.title ?? "Page").font(.body.weight(.medium))
+          .foregroundStyle(Color.token(.foreground))
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, 16).padding(.vertical, 12)
+          .background(Color.token(.muted), in: RoundedRectangle(cornerRadius: 18))
+          .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.token(.border)))
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("pageCard")
+    }
   }
 }
 

@@ -67,3 +67,14 @@ func messageWithMissingOptionalFieldsStillDecodes() throws {
   #expect(message.role == "bot")
   #expect(message.blocks.first?.text == "hi")
 }
+
+@Test
+func decodesPageCardBlock() throws {
+  let data = Data(
+    #"{"kind":"page","botId":"b1","pageId":"p1","title":"Customer support"}"#.utf8)
+  let block = try JSONDecoder().decode(MessageBlock.self, from: data)
+  #expect(block.kind == .page)
+  #expect(block.title == "Customer support")
+  #expect(block.fields["botId"]?.stringValue == "b1")
+  #expect(block.fields["pageId"]?.stringValue == "p1")
+}
