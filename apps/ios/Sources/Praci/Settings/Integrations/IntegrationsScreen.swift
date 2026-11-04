@@ -26,20 +26,40 @@ struct IntegrationsScreen: View {
           Section { Text(error).foregroundStyle(Color.token(.destructive)) }
         }
         if !snapshot.connections.isEmpty {
-          Section("Connected") {
-            ForEach(snapshot.connections) { connection in
-              NavigationLink {
-                ConnectionDetailScreen(connection: connection, model: model)
-              } label: {
-                VStack(alignment: .leading) {
-                  Text(connection.displayName)
-                  Text(connection.needsReconnect ? "Needs reconnecting" : Self.appName(connection, snapshot))
-                    .font(.caption)
-                    .foregroundStyle(Color.token(connection.needsReconnect ? .destructive : .mutedForeground))
+          CappedSection(
+            title: "Connected", items: snapshot.connections,
+            spec: ListSpec(
+              sorts: [
+                ListSort(id: "attention", title: String(localized: "Needs attention")) { left, right in
+                  if left.needsReconnect != right.needsReconnect { return left.needsReconnect }
+                  return left.displayName.localizedStandardCompare(right.displayName) == .orderedAscending
+                },
+                ListSort(id: "name", title: String(localized: "Name")) {
+                  $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
                 }
+              ],
+              filters: [
+                ListFilter(
+                  id: "state", title: String(localized: "Status"),
+                  options: [
+                    ListFilterOption(id: "reconnect", title: String(localized: "Needs reconnecting")) {
+                      $0.needsReconnect
+                    }
+                  ])
+              ],
+              searchText: { $0.displayName })
+          ) { connection in
+            NavigationLink {
+              ConnectionDetailScreen(connection: connection, model: model)
+            } label: {
+              VStack(alignment: .leading) {
+                Text(connection.displayName)
+                Text(connection.needsReconnect ? "Needs reconnecting" : Self.appName(connection, snapshot))
+                  .font(.caption)
+                  .foregroundStyle(Color.token(connection.needsReconnect ? .destructive : .mutedForeground))
               }
-              .accessibilityIdentifier("connection-\(connection.id)")
             }
+            .accessibilityIdentifier("connection-\(connection.id)")
           }
         }
         available(snapshot)

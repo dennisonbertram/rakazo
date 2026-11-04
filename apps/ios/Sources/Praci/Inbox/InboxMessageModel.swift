@@ -2,6 +2,11 @@ import Foundation
 import Observation
 import RakazoAPI
 
+extension Notification.Name {
+  /// Posted with the message id (as the object) after the message screen archives a message.
+  static let inboxMessageArchived = Notification.Name("praci.inboxMessageArchived")
+}
+
 @MainActor
 @Observable
 final class InboxMessageModel {
@@ -42,7 +47,10 @@ final class InboxMessageModel {
   func reload() async {
     state = .loading
     do {
-      state = .loaded(try await client.get(messageID))
+      let message = try await client.get(messageID)
+      state = .loaded(message)
+      // The server does not mark a message read when it is fetched, so opening it has to say so.
+      if message.unread { try? await client.markRead(messageID) }
     } catch {
       state = .failed(text(error))
     }

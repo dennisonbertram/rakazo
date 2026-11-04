@@ -8,6 +8,7 @@ struct AccountScreen: View {
   @Environment(AppModel.self) private var app
   @State private var model = AccountModel()
   @State private var showingDelete = false
+  @State private var confirmingSignOut = false
 
   var body: some View {
     List {
@@ -32,8 +33,11 @@ struct AccountScreen: View {
         }
       }
       Section {
-        Button("Sign out") { Task { await app.authentication.signOut() } }
+        Button("Sign out", role: .destructive) { confirmingSignOut = true }
           .accessibilityIdentifier("accountSignOut")
+          .confirmationDialog("Sign out of Praci?", isPresented: $confirmingSignOut) {
+            Button("Sign out", role: .destructive) { Task { await app.authentication.signOut() } }
+          }
       }
       Section {
         Button("Delete account", role: .destructive) { showingDelete = true }
@@ -51,12 +55,13 @@ struct AccountScreen: View {
 
 struct Initials: View {
   let name: String
+  @ScaledMetric private var size = 40.0
 
   var body: some View {
     Text(initials)
       .font(.subheadline.weight(.semibold))
       .foregroundStyle(Color.token(.secondaryForeground))
-      .frame(width: 40, height: 40)
+      .frame(width: size, height: size)
       .background(Color.token(.secondary), in: Circle())
       .accessibilityHidden(true)
   }

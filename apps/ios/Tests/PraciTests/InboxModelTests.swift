@@ -121,3 +121,14 @@ func openingARowMarksItReadOnScreen() async {
   model.didOpen(model.rows[0])
   #expect(model.rows[0].unread == false)
 }
+
+@Test @MainActor
+func aMessageArchivedOnItsScreenLeavesTheListWithAnUndoToast() async throws {
+  let fake = Fake()
+  fake.pages = [Fake.list(["a", "b"]), Fake.list(["a", "b"])]
+  let model = InboxModel(client: fake.client())
+  await model.start()
+  model.archivedElsewhere("a")
+  #expect(model.rows.map(\.id) == ["b"])
+  #expect(model.toast?.undo == .unarchive(messageID: "a"))
+}

@@ -49,7 +49,7 @@ struct DictationButton: View {
 
   var body: some View {
     Button { Task { await model.toggle(text: $text) } } label: {
-      Image(systemName: model.listening ? "stop.fill" : "mic").frame(width: 44, height: 44)
+      Image(systemName: model.listening ? "stop.fill" : "mic").frame(width: 30, height: 30)
         .foregroundStyle(Color.token(.primaryForeground))
     }
     .buttonStyle(.glassProminent)
