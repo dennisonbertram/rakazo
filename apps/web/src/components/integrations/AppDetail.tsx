@@ -17,7 +17,14 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { appStatus, groupTools, toggleAccess, toolLabel } from "../../lib/integrations";
+import {
+  appStatus,
+  groupTools,
+  keptAgentIds,
+  setOthersAccess,
+  toggleAccess,
+  toolLabel,
+} from "../../lib/integrations";
 import { appReturnPath } from "../../lib/return-to";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
@@ -323,15 +330,16 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     saveAccess(row, next, on ? [...shown, botId] : shown);
   }
 
-  /** All: every agent, including ones made later. None: only the owning agent. One save either way. */
+  /** All: every other agent, including ones made later. None: only the owning agent and, on mail, its email chats. One save either way. */
   function setAllAgents(row: Connection | undefined, on: boolean) {
     if (!row) return;
-    const owner = row.agentBotId ? [row.agentBotId] : [];
-    saveAccess(
-      row,
-      on ? { allAgents: true, botIds: [] } : { allAgents: false, botIds: owner },
-      on ? allBotIds : owner,
+    const next = setOthersAccess(
+      accessOf(row),
+      allBotIds,
+      keptAgentIds(data.bots, row.agentBotId),
+      on,
     );
+    saveAccess(row, next, next.allAgents ? allBotIds : next.botIds);
   }
 
   async function revoke(targets: Connection[], afterRemovingAll: boolean) {

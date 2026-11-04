@@ -11,7 +11,7 @@ import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { toggleAccess } from "../../lib/integrations";
+import { setOthersAccess, toggleAccess } from "../../lib/integrations";
 import type { OmiSyncState } from "../../lib/omi/useOmiSync";
 import { useOmiSync } from "../../lib/omi/useOmiSync";
 import { formatRelativeTime } from "../../lib/relative-time";
@@ -297,7 +297,12 @@ export function OmiAgent({
             everyone={access?.allAgents ?? false}
             onSetAll={(on) =>
               save(
-                on ? { allAgents: true, botIds: [] } : { allAgents: false, botIds: [agentBotId] },
+                setOthersAccess(
+                  latest.current ?? { allAgents: false, botIds: [] },
+                  allBotIds,
+                  [agentBotId],
+                  on,
+                ),
               )
             }
             onToggle={(botId, on) => {

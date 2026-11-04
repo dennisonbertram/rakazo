@@ -19,6 +19,7 @@ import {
   mcpStatus,
   popularApps,
   sortEntries,
+  setOthersAccess,
   toggleAccess,
   toolLabel,
 } from "./integrations";
@@ -188,6 +189,29 @@ describe("toggleAccess", () => {
       allAgents: true,
       botIds: [],
     });
+  });
+});
+
+describe("setOthersAccess", () => {
+  const all = ["inbox", "chat", "a", "b"];
+  const keep = ["inbox", "chat"];
+  it("None leaves the kept agents exactly as they were and turns the others off", () => {
+    expect(setOthersAccess({ allAgents: false, botIds: ["inbox", "a"] }, all, keep, false)).toEqual(
+      { allAgents: false, botIds: ["inbox"] },
+    );
+    expect(setOthersAccess({ allAgents: true, botIds: [] }, all, keep, false)).toEqual({
+      allAgents: false,
+      botIds: ["inbox", "chat"],
+    });
+  });
+  it("All turns the others on without turning a kept agent on", () => {
+    expect(setOthersAccess({ allAgents: false, botIds: ["inbox"] }, all, keep, true)).toEqual({
+      allAgents: false,
+      botIds: ["inbox", "a", "b"],
+    });
+    expect(
+      setOthersAccess({ allAgents: false, botIds: ["inbox", "chat"] }, all, keep, true),
+    ).toEqual({ allAgents: true, botIds: [] });
   });
 });
 

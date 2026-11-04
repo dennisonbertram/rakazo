@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type { Connection, ConnectionCatalogItem } from "@rakazo/contracts";
+import { inboxAgentSpawnKey, mailThreadAgentSpawnKey } from "@rakazo/contracts";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -639,6 +640,33 @@ it("None leaves Let other agents use on with Used by listed and every other agen
   );
   expect(switchOf("b").getAttribute("aria-checked")).toBe("false");
   expect(switchOf("c").getAttribute("aria-checked")).toBe("false");
+});
+
+it("None on a mail connection leaves the Inbox agent and its email chats as they are", async () => {
+  const bots = [
+    { id: "inbox", name: "Inbox agent", color: "#000", spawnKey: inboxAgentSpawnKey("u1") },
+    { id: "e1", name: "Chat", color: "#000", spawnKey: mailThreadAgentSpawnKey("conn_app", "t") },
+    { id: "a", name: "Ada", color: "#000", spawnKey: null },
+  ];
+  await show(
+    APP_PAGE,
+    data({
+      bots: bots as unknown as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "inbox" })],
+      access: {
+        conn_app: {
+          allAgents: false,
+          botIds: ["inbox", "e1", "a"],
+          agentShared: true,
+          effectiveAccess: { shared: "some", botIds: ["inbox", "e1", "a"] },
+        },
+      },
+    }),
+  );
+  await act(async () => buttonOf("None").click());
+  expect(setAccess.mock.calls).toEqual([
+    [{ connectionId: "conn_app", allAgents: false, botIds: ["inbox", "e1"] }],
+  ]);
 });
 
 it("keeps All available when every agent is on but access is a chosen list", async () => {

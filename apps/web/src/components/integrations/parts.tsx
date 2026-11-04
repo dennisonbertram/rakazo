@@ -138,6 +138,44 @@ export function AgentToggleList({
     bot.id === ownerBotId ||
     (isMailThreadAgentSpawnKey(bot.spawnKey) && isInboxAgentSpawnKey(owner?.spawnKey));
   const noneOn = bots.every((bot) => locked(bot) || !isOn(bot.id));
+  // On a mail connection the Inbox agent and email chats sit together at the top, apart from the rest.
+  const mail = isInboxAgentSpawnKey(owner?.spawnKey);
+  const agentRow = (bot: Bot) => (
+    <div key={bot.id} className="flex items-center gap-3 px-3.5 py-2.5">
+      <BotAvatar color={bot.color} identity={bot.id} size={22} />
+      <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
+      <Switch
+        aria-label={t`${bot.name} can use ${appName}`}
+        checked={isOn(bot.id)}
+        disabled={disabled}
+        onCheckedChange={(next) => onToggle(bot.id, next)}
+      />
+    </div>
+  );
+  const chatsRow =
+    emailChats.length > 0 ? (
+      <div className="flex items-center gap-3 px-3.5 py-2.5">
+        <span className="min-w-0 flex-1 truncate text-sm">
+          <Trans>Email chats</Trans>
+          <span className="ms-2 text-xs tabular-nums text-muted-foreground">
+            {emailChats.length}
+          </span>
+          {someEmailOn && !allEmailOn ? (
+            <span className="ms-2 text-xs text-muted-foreground">
+              <Trans>Some</Trans>
+            </span>
+          ) : null}
+        </span>
+        <Switch
+          aria-label={t`Email chats can use ${appName}`}
+          checked={someEmailOn}
+          disabled={disabled}
+          onCheckedChange={(next) => {
+            for (const bot of emailChats) onToggle(bot.id, next);
+          }}
+        />
+      </div>
+    ) : null;
   return (
     <div className="divide-y divide-border rounded-xl border border-border bg-card">
       {onSetAll && bots.length > 1 ? (
@@ -160,41 +198,23 @@ export function AgentToggleList({
           </Button>
         </div>
       ) : null}
-      {rows.map((bot) => (
-        <div key={bot.id} className="flex items-center gap-3 px-3.5 py-2.5">
-          <BotAvatar color={bot.color} identity={bot.id} size={22} />
-          <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
-          <Switch
-            aria-label={t`${bot.name} can use ${appName}`}
-            checked={isOn(bot.id)}
-            disabled={disabled}
-            onCheckedChange={(next) => onToggle(bot.id, next)}
-          />
-        </div>
-      ))}
-      {emailChats.length > 0 ? (
-        <div className="flex items-center gap-3 px-3.5 py-2.5">
-          <span className="min-w-0 flex-1 truncate text-sm">
-            <Trans>Email chats</Trans>
-            <span className="ms-2 text-xs tabular-nums text-muted-foreground">
-              {emailChats.length}
-            </span>
-            {someEmailOn && !allEmailOn ? (
-              <span className="ms-2 text-xs text-muted-foreground">
-                <Trans>Some</Trans>
-              </span>
-            ) : null}
-          </span>
-          <Switch
-            aria-label={t`Email chats can use ${appName}`}
-            checked={someEmailOn}
-            disabled={disabled}
-            onCheckedChange={(next) => {
-              for (const bot of emailChats) onToggle(bot.id, next);
-            }}
-          />
-        </div>
-      ) : null}
+      {mail && owner ? (
+        <>
+          {agentRow(owner)}
+          {chatsRow}
+          {rows.some((bot) => bot.id !== owner.id) ? (
+            <div className="px-3.5 pb-1 pt-2.5 text-xs font-semibold text-muted-foreground">
+              <Trans>Other agents</Trans>
+            </div>
+          ) : null}
+          {rows.filter((bot) => bot.id !== owner.id).map(agentRow)}
+        </>
+      ) : (
+        <>
+          {rows.map(agentRow)}
+          {chatsRow}
+        </>
+      )}
     </div>
   );
 }
